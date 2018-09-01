@@ -1,0 +1,55 @@
+#!/usr/bin/env python
+# D. Jones, R. Kessler - 8/31/18
+
+import exceptions
+import os
+import optparse
+import configparser
+import numpy as np
+
+class TrainSALT2:
+	def __init__(self):
+		pass
+
+	def add_options(self, parser=None, usage=None, config=None):
+		import optparse
+		if parser == None:
+			parser = optparse.OptionParser(usage=usage, conflict_handler="resolve")
+
+		# The basics
+		parser.add_option('-v', '--verbose', action="count", dest="verbose",
+						  default=1,help='verbosity level')
+		parser.add_option('--debug', default=False, action="store_true",
+						  help='debug mode: more output and debug files')
+		parser.add_option('--clobber', default=False, action="store_true",
+						  help='clobber')
+		parser.add_option('-c','--configfile', default=None, type="string",
+						  help='configuration file')
+
+		if config:
+			parser.add_option('--traindatadir', default=config.get('main','traindatadir'), type="float",
+							  help='training data directory (default=%default)')
+
+		return parser
+
+if __name__ == "__main__":
+	usagestring = """SALT2 Training"""
+
+	salt = TrainSALT2()
+	parser = salt.add_options(usage=usagestring)
+	options,  args = parser.parse_args()
+	if options.configfile:
+		config = configparser.ConfigParser()
+		config.read(options.configfile)
+	else:
+		parser.print_help()
+		raise RuntimeError('Configuration file must be specified at command line')
+
+	parser = salt.add_options(usage=usagestring,config=config)
+	options,  args = parser.parse_args()
+
+	salt.options = options
+	salt.verbose = options.verbose
+	salt.clobber = options.clobber
+
+	salt.main()
