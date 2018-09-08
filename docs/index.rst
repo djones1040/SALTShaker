@@ -5,16 +5,16 @@
     </style>
 
 **********  
-SALT2 Training
+SALT3
 **********
 
 Overview
 ==========================================
 
-    SALT2 is a model of Type Ia supernovae
+    SALT is a model of Type Ia supernovae
     that accounts for spectral variations as
     a function of shape and color.  The goal
-    of this software is to retrain the model
+    of the SALT3 software is to retrain the SALT model
     from 2800 to 11,000 Angstroms to make use
     of izY data from PS1, LSST, and WFIRST.
     

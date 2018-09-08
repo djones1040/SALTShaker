@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# SALT3 documentation build configuration file, created by
+# SALT2 Training documentation build configuration file, created by
 # sphinx-quickstart on Thu Sep  6 11:23:33 2018.
 #
 # This file is execfile()d with the current directory set to its
@@ -54,7 +54,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'SALT3 Training'
+project = 'SALT2 Training'
 copyright = '2018, David Jones, Rick Kessler'
 author = 'David Jones, Rick Kessler'
 
@@ -124,7 +124,7 @@ html_sidebars = {
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'SALT3Trainingdoc'
+htmlhelp_basename = 'SALT2Trainingdoc'
 
 
 # -- Options for LaTeX output ---------------------------------------------
@@ -151,7 +151,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'SALT3Training.tex', 'SALT2 Training Documentation',
+    (master_doc, 'SALT2Training.tex', 'SALT2 Training Documentation',
      'David Jones, Rick Kessler', 'manual'),
 ]
 
@@ -161,7 +161,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'salt3training', 'SALT3 Training Documentation',
+    (master_doc, 'salt2training', 'SALT2 Training Documentation',
      [author], 1)
 ]
 
@@ -172,8 +172,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'SALT3Training', 'SALT3 Training Documentation',
-     author, 'SALT3Training', 'One line description of project.',
+    (master_doc, 'SALT2Training', 'SALT2 Training Documentation',
+     author, 'SALT2Training', 'One line description of project.',
      'Miscellaneous'),
 ]
 
