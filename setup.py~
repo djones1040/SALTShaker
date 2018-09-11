@@ -1,9 +1,0 @@
-from distutils.core import setup
-
-setup(
-    name='SALT3',
-    version='0.01dev',
-    packages=['salt3',],
-    license='Creative Commons Attribution-Noncommercial-Share Alike license',
-    long_description=open('README.md').read(),
-)
