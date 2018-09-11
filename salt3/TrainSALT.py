@@ -7,7 +7,7 @@ import argparse
 import configparser
 import numpy as np
 
-class TrainSALT2:
+class TrainSALT:
 	def __init__(self):
 		pass
 
@@ -61,16 +61,16 @@ class TrainSALT2:
 		pass
 	
 if __name__ == "__main__":
-	usagestring = """SALT2 Training
+	usagestring = """SALT3 Training
 
-usage: python TrainSALT2.py -c <configfile> <options>
+usage: python TrainSALT.py -c <configfile> <options>
 
 config file options can be overwridden at the command line
 
 Dependencies: sncosmo?
 """
 
-	salt = TrainSALT2()
+	salt = TrainSALT()
 
 	parser = argparse.ArgumentParser(usage=usagestring, conflict_handler="resolve")
 	parser.add_argument('-c','--configfile', default=None, type=str,

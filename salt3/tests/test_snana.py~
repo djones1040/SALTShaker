@@ -1,0 +1,12 @@
+import unittest
+from .util import *
+
+class SNANA_Test(unittest.TestCase):
+
+	def test_read_ascii(self):
+
+		sn = snana.SuperNova('exampledata/GPC1v3_F15ago.snana.dat')
+		self.assertTrue(sn.has_key('FLUXCAL'))
+
+if __name__ == "__main__":
+	unittest.main()
