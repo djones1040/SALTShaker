@@ -2,7 +2,6 @@
 # D. Jones - 2/13/14
 
 import numpy as np
-from . import rebin
 
 def make_2d(x,y):
     """Change from 1-d indexing to 2-d indexing
@@ -47,7 +46,16 @@ def make_2d(x,y):
     xx = x.reshape(1,nx)
     yy = y.reshape(ny,1)
 
-    xx = rebin.rebin(xx, [ny, nx])
-    yy = rebin.rebin(yy, [ny, nx])
+    xx = rebin(xx, [ny, nx])
+    yy = rebin(yy, [ny, nx])
 
     return(xx,yy)
+
+def rebin(a, new_shape):
+
+    M, N = a.shape
+    m, n = new_shape
+    if m<M:
+        return a.reshape((m,M/m,n,N/n)).mean(3).mean(1)
+    else:
+        return np.repeat(np.repeat(a, m/M, axis=0), n/N, axis=1)
