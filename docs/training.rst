@@ -37,8 +37,8 @@ kcor_path+=                          Same as :code:`kcor_path`, but appends a se
 [trainparams]
 waverange            2000,9200       Wavelength range over which the model is defined                                        
 colorwaverange       2800,7000       Wavelength range over which the color law polynomial is fit                             
-interpfunc           bspline         Function for interpolating the model between control points (basis spline is default)   
-interporder          3               Order of the splibe interpolation
+interpfunc           bspline         Function for interpolating the model between control points (b-spline is default)   
+interporder          3               Order of the spline interpolation
 wavesplineres        72              Number of Angstroms between wavelength control points
 waveoutres           2               Wavelength resolution of the trained output model (Angstroms)
 phaserange           -14,50          Phase range over which the model is defined (days)
