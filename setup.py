@@ -20,22 +20,25 @@ VERSION = '0.1dev'
 LICENSE = 'BSD'
 URL = 'salt3.readthedocs.org'
 
-c_ext = Extension("salt3.simulation._angSep", ["salt3/simulation/_angSep.c", "salt3/simulation/angSep.c"])
-setup(
-    ext_modules=[c_ext],
-    include_dirs=numpy.distutils.misc_util.get_numpy_include_dirs(),
-)
+#c_ext = Extension("salt3.simulation._angSep", ["salt3/simulation/_angSep.c", "salt3/simulation/angSep.c"])
+#setup(
+#    ext_modules=[c_ext],
+#    include_dirs=numpy.distutils.misc_util.get_numpy_include_dirs(),
+#)
 
 setup(
 	name='SALT3',
 	version=VERSION,
-	packages=['salt3','salt3.tests','salt3.simulation'],
+	packages=['salt3','salt3.tests','salt3.simulation',
+			  'salt3.training','salt3.util','salt3.initfiles'],
 	cmdclass={'test': SALT3Test},
+	scripts=['salt3/training/TrainSALT.py'],
+	package_data={'': ['initfiles/Hsiao07.dat']},
+	include_package_data=True,
 	author=AUTHOR,
 	author_email=AUTHOR_EMAIL,
 	license=LICENSE,
 	long_description=open('README.md').read(),
-    ext_modules=[c_ext],
     include_dirs=numpy.distutils.misc_util.get_numpy_include_dirs(),
 	install_requires=['numpy>=1.5.0',
 					  'scipy>=0.9.0',
