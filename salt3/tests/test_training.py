@@ -1,0 +1,92 @@
+import unittest
+from salt3.training import saltfit
+from salt3.training.TrainSALT import TrainSALT
+import numpy as np
+
+class TRAINING_Test(unittest.TestCase):
+
+	def test_init_chi2func(self):
+		
+		waverange = [2000,9200]
+		phaserange = [-14,50]
+		phasesplineres = 3.2
+		wavesplineres = 72
+		phaseoutres = 2
+		waveoutres = 2
+		
+		n_phaseknots = int((phaserange[1]-phaserange[0])/phasesplineres)-4
+		n_waveknots = int((waverange[1]-waverange[0])/wavesplineres)-4
+
+		snlist = 'examples/exampledata/photdata/PHOTFILES.LIST'
+		ts = TrainSALT()
+		datadict = ts.rdAllData(snlist)
+
+
+		parlist = ['m0']*(n_phaseknots*n_waveknots)
+		for k in datadict.keys():
+			parlist += ['x0_%s'%k,'x1_%s'%k,'c_%s'%k]*len(datadict.keys())
+		parlist = np.array(parlist)
+		
+		guess = np.ones(len(parlist))*1e-10
+		
+		kcorfile = 'examples/kcor/kcor_PS1_PS1MD.fits'
+		survey = 'PS1MD'
+		kcorpath = ('%s,%s'%(survey,kcorfile),)
+		ts = TrainSALT()
+		ts.rdkcor(kcorpath)
+
+		saltfitter = saltfit.chi2(guess,datadict,parlist,phaserange,
+								  waverange,phasesplineres,wavesplineres,phaseoutres,waveoutres,
+								  ts.kcordict)
+
+		#saltfitter.chi2fit(guess)
+		self.assertTrue('stdmag' in saltfitter.__dict__.keys())
+
+	def test_synphot(self):
+		
+		waverange = [2000,9200]
+		phaserange = [-14,50]
+		phasesplineres = 3.2
+		wavesplineres = 72
+		phaseoutres = 2
+		waveoutres = 2
+		
+		n_phaseknots = int((phaserange[1]-phaserange[0])/phasesplineres)-4
+		n_waveknots = int((waverange[1]-waverange[0])/wavesplineres)-4
+
+		snlist = 'examples/exampledata/photdata/PHOTFILES.LIST'
+		ts = TrainSALT()
+		datadict = ts.rdAllData(snlist)
+
+		parlist = ['m0']*(n_phaseknots*n_waveknots)
+		for k in datadict.keys():
+			parlist += ['x0_%s'%k,'x1_%s'%k,'c_%s'%k]*len(datadict.keys())
+		parlist = np.array(parlist)
+		guess = np.ones(len(parlist))
+		
+		kcorfile = 'examples/kcor/kcor_PS1_PS1MD.fits'
+		survey = 'PS1MD'
+		kcorpath = ('%s,%s'%(survey,kcorfile),)
+		ts = TrainSALT()
+		ts.rdkcor(kcorpath)
+		
+		saltfitter = saltfit.chi2(guess,datadict,parlist,phaserange,
+								  waverange,phasesplineres,wavesplineres,phaseoutres,waveoutres,
+								  ts.kcordict)
+
+		flatnuwave,flatnuflux = np.loadtxt('salt3/initfiles/flatnu.dat',unpack=True)
+		vegawave,vegaflux = np.loadtxt('salt3/initfiles/vegased_2004_stis.txt',unpack=True)
+		flatnufluxinterp = np.interp(saltfitter.wave,flatnuwave,flatnuflux)
+		vegafluxinterp = np.interp(saltfitter.wave,vegawave,vegaflux)
+
+		ab_offsets = [-0.08,0.16,0.37,0.54]
+		for flt,abo in zip('gri',ab_offsets):
+			abmag = saltfitter.synflux(flatnufluxinterp,ts.kcordict['PS1MD'][flt]['zpoff'],survey='PS1MD',flt=flt)
+			vegamag = saltfitter.synflux(vegafluxinterp,ts.kcordict['PS1MD'][flt]['zpoff'],survey='PS1MD',flt=flt)
+
+			# make sure my two synthetic phot methods agree
+			# both self-consistent and agree better than 3% (?!?!) with griz AB offsets from
+			# possibly reliable source (http://www.astronomy.ohio-state.edu/~martini/usefuldata.html)
+			self.assertTrue(np.abs(abmag-ts.kcordict['PS1MD'][flt]['zpoff']-saltfitter.stdmag['PS1MD'][flt]) < 0.001)
+			self.assertTrue(np.abs(vegamag-abmag-abo) < 0.015)
+

@@ -62,6 +62,17 @@ IIMODELS = {
 	'002':['IIL','Nugent+ScolnicIIL'],
 	}
 
+class SuperNovaSpectrum( object ):
+
+	"""object class for spectra extracted from a SNANA-style .DAT file"""
+
+	def __init__( self, datfile=None):
+		self.datfile = datfile
+		if datfile and os.path.exists(datfile):
+			self.readspecfromdatfile(datfile)
+		else:
+			print('Warning : data file not provided or doesn\'t exist')
+				
 class SuperNova( object ) : 
 	""" object class for a single SN extracted from SNANA sim tables
 		or from a SNANA-style .DAT file
@@ -400,8 +411,37 @@ class SuperNova( object ) :
 
 		for col in colnames : 
 			self.__dict__[col] = array( self.__dict__[col] )
+
+		self.readspecfromdatfile(datfile)
+		
 		return( None )
 
+	def readspecfromdatfile(self,datfile):
+		fin = open(datfile)
+		self.SPECTRA = {}
+		startSpec = False
+		for line in fin:
+			if line.startswith('SPECTRUM_ID'):
+				startSpec = True
+				specid = int(line.split()[1])-1
+				self.SPECTRA[specid] = {}
+				for v in specvarnames:
+					self.SPECTRA[specid][v] = np.array([])
+			elif line.startswith('END_SPECTRUM') and startSpec:
+				startSpec = False
+			elif line.startswith('VARNAMES_SPEC'):
+				specvarnames = line.split()[1:]
+			elif startSpec and not line.startswith('SPEC:'):
+				try:
+					self.SPECTRA[specid][line.split()[0][:-1]] = float(line.split('#')[0].split()[1])
+				except:
+					self.SPECTRA[specid][line.split()[0][:-1]] = line.split('#')[0].split()[1]
+			elif startSpec and line.startswith('SPEC'):
+				specvals = line.split('#')[0].split()[1:]
+				for v,sv in zip(specvarnames,specvals):
+					self.SPECTRA[specid][v] = np.append(self.SPECTRA[specid][v],float(sv))
+
+	
 	def writedatfile(self, datfile, mag2fluxcal=False, **kwarg ):
 		""" write the light curve data into a SNANA-style .dat file.
 		Metadata in the header are in "key: value" pairs

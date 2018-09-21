@@ -9,21 +9,21 @@ def synphot(wave,flux,zpoff=0,filtfile=None,primarywave=[],primaryflux=[],
 	if filtfile:
 		mag = zpoff - 2.5 * np.log10( synflux(wave,flux,pb=filtfile,plot=plot,oplot=oplot,
 									   allowneg=allowneg))
-		if len(primarywave) and len(primaryflux):
-			stdmag = - 2.5 * np.log10( synflux(primarywave,primaryflux,pb=filtfile,
-											   plot=plot,oplot=oplot,
-											   allowneg=allowneg))
+		#if len(primarywave) and len(primaryflux):
+		#	stdmag = - 2.5 * np.log10( synflux(primarywave,primaryflux,pb=filtfile,
+		#									   plot=plot,oplot=oplot,
+		#									   allowneg=allowneg))
 	elif len(filtwave) and len(filttp):
 		mag = zpoff - 2.5 * np.log10( synflux(wave,flux,pbx=filtwave,pby=filttp,plot=plot,oplot=oplot,
 											  allowneg=allowneg))
-		if len(primarywave) and len(primaryflux):
-			stdmag = -2.5 * np.log10( synflux(primarywave,primaryflux,pbx=filtwave,pby=filttp,
-											  plot=plot,oplot=oplot,
-											  allowneg=allowneg))
+		#if len(primarywave) and len(primaryflux):
+		#	stdmag = -2.5 * np.log10( synflux(primarywave,primaryflux,pbx=filtwave,pby=filttp,
+		#									  plot=plot,oplot=oplot,
+		#									  allowneg=allowneg))
 	else:
 		raise RuntimeError("filter file or throughput must be defined")
 
-	return(mag-stdmag)
+	return(mag)
 
 def synflux(x,spc,pb=None,plot=False,oplot=False,allowneg=False,pbx=[],pby=[]):
 	import numpy as np
