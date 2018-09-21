@@ -151,6 +151,66 @@
             
   <div class="section" id="spectroscopic-and-photometric-training-data">
 <h1>Spectroscopic and Photometric Training Data<a class="headerlink" href="#spectroscopic-and-photometric-training-data" title="Permalink to this headline">¶</a></h1>
+<p>A number of light curves and spectra are provided
+in the <code class="code docutils literal"><span class="pre">examples/exampledata/</span></code> directory
+for training.  Light curves and spectra are
+combined into a single <a class="reference external" href="http://http://snana.uchicago.edu/">SNANA-formatted</a>
+file.</p>
+<div class="section" id="data-format">
+<span id="id1"></span><h2>Data Format<a class="headerlink" href="#data-format" title="Permalink to this headline">¶</a></h2>
+<p><a class="reference external" href="http://http://snana.uchicago.edu/">SNANA</a> file format
+consists of a number of header keys giving information
+about each SN, followed by photometry and spectroscopy.
+Example SNANA-formatted data with both photometry and
+spectra are provided in the <code class="code docutils literal"><span class="pre">examples/exampledata/phot+specdata/</span></code>
+directory.</p>
+<p>An example of the minimum required header is below:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">SURVEY</span><span class="p">:</span>  <span class="n">PS1MD</span> <span class="c1"># matches SN to the filter functions given by each kcor file</span>
+<span class="n">SNID</span><span class="p">:</span>  <span class="n">ASASSN</span><span class="o">-</span><span class="mi">16</span><span class="n">bc</span> <span class="c1"># SN identifier</span>
+<span class="n">REDSHIFT_HELIO</span><span class="p">:</span>  <span class="mf">0.05</span> <span class="o">+-</span> <span class="mf">0.01</span> <span class="c1"># needed so that SALT model can be redshifted to match the data</span>
+</pre></div>
+</div>
+<p>Below the header, the photometry is included in the following
+format:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">NOBS</span><span class="p">:</span> <span class="mi">64</span>
+<span class="n">NVAR</span><span class="p">:</span>   <span class="mi">7</span>
+<span class="n">VARLIST</span><span class="p">:</span>  <span class="n">MJD</span>  <span class="n">FLT</span> <span class="n">FIELD</span>   <span class="n">FLUXCAL</span>   <span class="n">FLUXCALERR</span>    <span class="n">MAG</span>     <span class="n">MAGERR</span>
+<span class="n">OBS</span><span class="p">:</span> <span class="mf">57422.54</span> <span class="n">g</span> <span class="n">NULL</span>  <span class="mf">21576.285</span> <span class="mf">214.793</span> <span class="mf">16.665</span> <span class="mf">0.011</span>
+<span class="n">OBS</span><span class="p">:</span> <span class="mf">57428.47</span> <span class="n">g</span> <span class="n">NULL</span>  <span class="mf">30454.989</span> <span class="mf">229.733</span> <span class="mf">16.291</span> <span class="mf">0.008</span>
+<span class="n">OBS</span><span class="p">:</span> <span class="mf">57436.55</span> <span class="n">g</span> <span class="n">NULL</span>  <span class="mf">26053.054</span> <span class="mf">253.839</span> <span class="mf">16.460</span> <span class="mf">0.011</span>
+<span class="n">OBS</span><span class="p">:</span> <span class="mf">57449.46</span> <span class="n">g</span> <span class="n">NULL</span>  <span class="mf">11357.888</span> <span class="mf">158.107</span> <span class="mf">17.362</span> <span class="mf">0.015</span>
+<span class="o">...</span>
+<span class="n">END_PHOTOMETRY</span><span class="p">:</span>
+</pre></div>
+</div>
+<p>The SALT3 training code only reads the MJD, FLT (filter),
+FLUXCAL, and FLUXCALERR values.  FLUXCAL and FLUXCALERR use a
+zeropoint of 27.5 mag.</p>
+<p>The beginning of the spectroscopy section is identified by the following
+header lines:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">NVAR_SPEC</span><span class="p">:</span> <span class="mi">3</span>
+<span class="n">VARNAMES_SPEC</span><span class="p">:</span> <span class="n">LAMAVG</span>  <span class="n">FLAM</span>  <span class="n">FLAMERR</span>
+</pre></div>
+</div>
+<p>Where the columns are wavelength (angstrom), flux (erg/cm^2/s/A), and flux
+uncertainty (not currently used).  Each spectrum has
+the following format:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">SPECTRUM_ID</span><span class="p">:</span>       <span class="mi">1</span>
+<span class="n">SPECTRUM_MJD</span><span class="p">:</span>      <span class="mf">54998.378</span>  <span class="c1"># Tobs =  -13.832</span>
+<span class="n">SPECTRUM_TEXPOSE</span><span class="p">:</span>  <span class="mf">100000.000</span>  <span class="c1"># seconds</span>
+<span class="n">SPECTRUM_NLAM</span><span class="p">:</span>     <span class="mi">352</span> <span class="p">(</span><span class="n">of</span> <span class="mi">352</span><span class="p">)</span>  <span class="c1"># Number of valid wavelength bins</span>
+<span class="n">SPEC</span><span class="p">:</span>  <span class="mf">4200.00</span>  <span class="mf">4209.35</span>  <span class="o">-</span><span class="mf">2.068e-10</span>   <span class="mf">5.701e-10</span>
+<span class="n">SPEC</span><span class="p">:</span>  <span class="mf">4209.35</span>  <span class="mf">4218.76</span>  <span class="o">-</span><span class="mf">2.704e-10</span>   <span class="mf">6.359e-10</span>    <span class="mf">2.557e-10</span>  <span class="mf">23.25</span>
+<span class="n">SPEC</span><span class="p">:</span>  <span class="mf">4218.76</span>  <span class="mf">4228.23</span>  <span class="o">-</span><span class="mf">2.725e-10</span>   <span class="mf">6.312e-10</span>    <span class="mf">2.543e-10</span>  <span class="mf">23.26</span>
+<span class="n">SPEC</span><span class="p">:</span>  <span class="mf">4228.23</span>  <span class="mf">4237.76</span>  <span class="o">-</span><span class="mf">4.588e-11</span>   <span class="mf">6.232e-10</span>    <span class="mf">2.538e-10</span>  <span class="mf">23.25</span>
+<span class="n">SPEC</span><span class="p">:</span>  <span class="mf">4237.76</span>  <span class="mf">4247.35</span>  <span class="o">-</span><span class="mf">8.320e-10</span>   <span class="mf">6.152e-10</span>    <span class="mf">2.541e-10</span>  <span class="mf">23.25</span>
+<span class="o">...</span>
+<span class="n">END_SPECTRUM</span><span class="p">:</span>
+</pre></div>
+</div>
+<p>the <code class="code docutils literal"><span class="pre">salt3/util/</span></code> directory will soon include utilities for
+adding ASCII spectra to a pre-existing light curve file.</p>
+</div>
 </div>
 
 

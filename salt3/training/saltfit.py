@@ -64,7 +64,8 @@ class chi2:
 			photdata = self.datadict[sn]['photdata']
 			survey = self.datadict[sn]['survey']
 			filtwave = self.kcordict[survey]['filtwave']
-
+			z = self.datadict[sn]['zHelio']
+			
 			x0,x1,c = x[self.parlist == 'x0_%s'%sn],x[self.parlist == 'x1_%s'%sn],x[self.parlist == 'c_%s'%sn]
 			if self.n_components == 1:
 				saltflux = x0*M0
@@ -86,7 +87,7 @@ class chi2:
 				
 				# synthetic photometry from SALT model
 				modelphot = self.synflux(saltfluxinterp,self.kcordict[survey][flt]['zpoff'],
-										 survey=survey,flt=flt)
+										 survey=survey,flt=flt,redshift=z)
 				modelflux = 10**(-0.4*(modelphot-self.stdmag[survey][flt]-27.5))
 				# chi2 function
 				# TODO - model error/dispersion parameters
@@ -152,8 +153,8 @@ class chi2:
 
 		return self.phase,self.wave,m0,m1,clpars,resultsdict
 
-	def synflux(self,spc,zpoff,survey=None,flt=None):
-		x = self.wave
+	def synflux(self,spc,zpoff,survey=None,flt=None,redshift=0):
+		x = self.wave*(1+redshift)
 		pbphot = 1
 
 		pbx = self.kcordict[survey]['filtwave']

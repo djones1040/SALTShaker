@@ -152,10 +152,115 @@
   <div class="section" id="training-the-salt3-model">
 <h1>Training the SALT3 Model<a class="headerlink" href="#training-the-salt3-model" title="Permalink to this headline">¶</a></h1>
 <p>usage:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">TrainSALT</span><span class="o">.</span><span class="n">py</span> <span class="o">-</span><span class="n">c</span> <span class="o">&lt;</span><span class="n">configfile</span><span class="o">&gt;</span> <span class="o">&lt;</span><span class="n">options</span><span class="o">&gt;</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">TrainSALT</span><span class="o">.</span><span class="n">py</span> <span class="o">-</span><span class="n">c</span> <span class="o">&lt;</span><span class="n">configfile</span><span class="o">&gt;</span> <span class="o">&lt;</span><span class="n">options</span><span class="o">&gt;</span>
 </pre></div>
 </div>
-<p>No examples yet!</p>
+<p>To run an example, change to the “examples” directory
+in the main package and run:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">TrainSALT</span><span class="o">.</span><span class="n">py</span> <span class="o">-</span><span class="n">c</span> <span class="n">SALT</span><span class="o">.</span><span class="n">conf</span>
+</pre></div>
+</div>
+<p>This will use the lightcurves and spectra in the <code class="code docutils literal"><span class="pre">examples/exampledata/</span></code>
+directory and the kcor files in the <code class="code docutils literal"><span class="pre">examples/kcor/</span></code> directory to
+run the SALT3 training, writing outputs to the <code class="code docutils literal"><span class="pre">examples/output/</span></code>
+directory</p>
+<div class="section" id="salt3-training-configuration-options">
+<h2>SALT3 Training Configuration Options<a class="headerlink" href="#salt3-training-configuration-options" title="Permalink to this headline">¶</a></h2>
+<p>See the SALT.conf file in the <code class="code docutils literal"><span class="pre">examples/</span></code> directory
+for a list of training options.
+Descriptions of each option are given below.</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="13%" />
+<col width="10%" />
+<col width="77%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Name</th>
+<th class="head">Default</th>
+<th class="head">Description</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>[iodata]</td>
+<td>&#160;</td>
+<td>&#160;</td>
+</tr>
+<tr class="row-odd"><td>snlist</td>
+<td>&#160;</td>
+<td>ASCII file with list of SN files (see <a class="reference internal" href="data.html#data-format"><span class="std std-ref">Data File Format</span></a> for input file format)</td>
+</tr>
+<tr class="row-even"><td>outputdir</td>
+<td>&#160;</td>
+<td>Directory for trained model outputs</td>
+</tr>
+<tr class="row-odd"><td>initmodelfile</td>
+<td>Hsiao07.dat</td>
+<td>Initial SN SED model.  Initial parameter guesses are derived from this file.  Default is the Hsiao model</td>
+</tr>
+<tr class="row-even"><td>kcor_path</td>
+<td>&#160;</td>
+<td>Comma-separated surveyname,kcorfile for each <code class="code docutils literal"><span class="pre">SURVEY</span></code> key in SN data files</td>
+</tr>
+<tr class="row-odd"><td>kcor_path+=</td>
+<td>&#160;</td>
+<td>Same as <code class="code docutils literal"><span class="pre">kcor_path</span></code>, but appends a second entry to the kcor_path variable</td>
+</tr>
+<tr class="row-even"><td>[trainparams]</td>
+<td>&#160;</td>
+<td>&#160;</td>
+</tr>
+<tr class="row-odd"><td>waverange</td>
+<td>2000,9200</td>
+<td>Wavelength range over which the model is defined</td>
+</tr>
+<tr class="row-even"><td>colorwaverange</td>
+<td>2800,7000</td>
+<td>Wavelength range over which the color law polynomial is fit</td>
+</tr>
+<tr class="row-odd"><td>interpfunc</td>
+<td>bspline</td>
+<td>Function for interpolating the model between control points (basis spline is default)</td>
+</tr>
+<tr class="row-even"><td>interporder</td>
+<td>3</td>
+<td>Order of the splibe interpolation</td>
+</tr>
+<tr class="row-odd"><td>wavesplineres</td>
+<td>72</td>
+<td>Number of Angstroms between wavelength control points</td>
+</tr>
+<tr class="row-even"><td>waveoutres</td>
+<td>2</td>
+<td>Wavelength resolution of the trained output model (Angstroms)</td>
+</tr>
+<tr class="row-odd"><td>phaserange</td>
+<td>-14,50</td>
+<td>Phase range over which the model is defined (days)</td>
+</tr>
+<tr class="row-even"><td>phasesplineres</td>
+<td>3.2</td>
+<td>Wavelength resolution of the trained output model (days)</td>
+</tr>
+<tr class="row-odd"><td>phaseoutres</td>
+<td>2</td>
+<td>Phase resolution of the trained output model (days)</td>
+</tr>
+<tr class="row-even"><td>minmethod</td>
+<td>trf</td>
+<td>Numerical algorithm used to minimize the chi2.  Default is Trust Region Reflective.</td>
+</tr>
+<tr class="row-odd"><td>n_colorpars</td>
+<td>4</td>
+<td>Number of parameters used to define the color law polynomial</td>
+</tr>
+<tr class="row-even"><td>n_components</td>
+<td>2</td>
+<td>Number of principal components</td>
+</tr>
+</tbody>
+</table>
+</div>
 </div>
 
 
