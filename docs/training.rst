@@ -11,9 +11,9 @@ in the main package and run::
 
   TrainSALT.py -c SALT.conf
 
-This will use the lightcurves and spectra in the "exampledata"
-directory and the kcor files in the "kcor" directory to
-run the SALT3 training, writing outputs to the "output"
+This will use the lightcurves and spectra in the `exampledata/`
+directory and the kcor files in the `kcor/` directory to
+run the SALT3 training, writing outputs to the `output/`
 directory
 
 ************************************
