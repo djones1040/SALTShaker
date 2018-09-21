@@ -1,0 +1,164 @@
+ USER COMMENT: BLANK 
+
+ BRIEF_DESCRIPTION: simulate RANDOM SNe with GENMODEL = SALT2.Guy10_UV2IR 
+
+  HOST MACHINE: des41.fnal.gov 
+  USERNAME:  rkessler 
+  SNDATA_ROOT:  /data/des41.b/data/SNDATA_ROOT 
+  SNANA_DIR:     /home/s1/rkessler/snana 
+  SNANA_VERSION: v10_65b 
+  Current Dir:  /home/s1/rkessler/snana_debug/WFIRST 
+
+ FULL_DESCRIPTION: 
+	 SIMLIB filename  : WFIRST_2DEBUG_noIFU.SIMLIB (start at LIBID=0) 
+	 SIMLIB SURVEY    : WFIRST  (TELESCOPE=WFIRST, MINOBS=1) 
+	 SIMLIB UNITS     : PIXEL_SIGMA for PSF,  ADU_PER_SQPIXEL for SKYSIG 
+	 NEWMJD_DIF       : 576.00  minutes (defines trigger epoch)
+	 Generation VERSION: RKDEBUG_SALT2_TAKE_SPECTRUM_SNR 
+	 Generation source : RANDOM 
+	 Generation FILTERS: ZYJ012 
+	 KCOR lookup tables: /data/des41.b/data/SNDATA_ROOT/INTERNAL/WFIRST/kcor/kcor_WFIRST_c6_IFCImV6.fits 
+	 Flux-smearing is ON 
+	 Reported flux-uncertainty includes SKY+GALAXY+SOURCE
+	 Zeropt-smearing is ON 
+	 Host-galaxy shot-noise  is OFF 
+	 Host-galaxy image-noise  is OFF 
+	 MilkyWay extinction  is ON  
+	    Color law: CCM89+ODonell94  (OPT_MWCOLORLAW=94) 
+	    E(B-V): FILE value (SIMLIB or data header)   (OPT_MWEBV=1)
+	    sigma(MWEBV) = 0.16*MWEBV + 0.00  
+	    shift(MWEBV) = 0.000 mag 
+
+ *********************************** 
+   SIMULATED VOLUME, TIME, RATE(FLAT)
+	 Survey dOmega  = 8.3600e-03 steradians  ( 0.00266 PI) 
+	 Redshift range =  0.1000 -  0.5000
+	 <redsfhit>     =  0.3676  (volume-weighted) 
+	 Survey Volume  = 1.8568e+07  sr*(MPc/h70)^3 
+	 Survey Time    =  0.0274  years/season 
+	 Co-moving Time =  0.0200  years/season  [ T/(1+<z>) ] 
+	 Co-moving V*T  = 3.7198e+05  sr*(MPc/h70)^3 * yr / season 
+	 dN/dz = FLAT  ~  (MJDrage * dOmega) 
+	 Number of EVENTS per season =   109 
+
+
+  GENERATION RANGES: 
+	 Generate Redshift :  0.100 to  0.500  using  FLAT distribution. 
+	 REDSHIFT_FINAL is ZCMB_GEN smeared by :  0.00000 
+	 v(cmb)=0 -> REDSHIFT_HELIO=REDSHIFT_CMB (legacy option)
+	 Peculiar Velocity Gaussian sigma: 0.0 km/sec
+	 ZYJ012   ZP   offsets :  0.000  0.000  0.000  0.000  0.000  0.000 
+	 ZYJ012  MODEL offsets :  0.000  0.000  0.000  0.000  0.000  0.000 
+	 ZYJ012  exposure times: 1.0000 1.0000 1.0000 1.0000 1.0000 1.0000 
+	 RA       : -360.00 to 360.00  deg
+	 PEAKMJD  :  55005.0 to  55015.0   
+	 sigma-smear(SEARCH_PEAKMJD)  :  0.00 days 
+	 Trest    :   -20.00 to    70.00  days 
+	 RISETIME-SHIFT(days) SIGMA(lo,hi) : 0.0 , 0.0  (Mean= 0.0) 
+	 FALLTIME-SHIFT(days) SIGMA(lo,hi) : 0.0 , 0.0  (Mean= 0.0) 
+	 Shape-par(x1): Peak=0.30  SIG-+= 1.500,0.900  SKEW=0.00,0.00  BND=-3.00,2.00
+	 SALT2c: Peak=0.00  SIG-+= 0.080,0.140  SKEW=0.00,0.00  BND=-0.30,0.50
+	 Alpha : Peak=0.14  SIG-+= 0.000,0.000  SKEW=0.00,0.00  BND=0.00,0.40
+	 Beta  : Peak=3.20  SIG-+= 0.000,0.000  SKEW=0.00,0.00  BND=0.50,9.90
+
+  Z-dependent SN-parameter shifts:  None. 
+
+  Intrinsic MAG-smearing models (sigma clip -3.0 to  3.0) : 
+   Model 1: Coherent MAG-smearing (GENMAG_SMEAR) :  0.000  
+   Model 2: passband MAG-smearing is OFF 
+   Model 3: G10 model-smear is ON  
+   Model 4: intrinsic scatter matrix is OFF 
+   Model 5: GENMAG_SMEAR_USRFUN is  OFF 
+
+  AVWARP_OVERFLOWS:  NONE. 
+
+ TAKE_SPECTRUM w.r.t peakMJD: 
+    TREST = -11.0 to -10.0   SNR(5000:6000) = 20.000 + 0.000*z + 0.000*z^2
+    TREST =   0.0 to   1.0   SNR(5000:6000) = 20.000 + 0.000*z + 0.000*z^2
+    TREST =  10.0 to  11.0   SNR(5000:6000) = 20.000 + 0.000*z + 0.000*z^2
+    TREST =  20.0 to  21.0   SNR(5000:6000) = 20.000 + 0.000*z + 0.000*z^2
+    TREST =  -1.0 to   1.0   SNR(7300:8300) = 20.000 + 0.000*z + 0.000*z^2
+
+  Cosmology Parameters: 
+	 H0 =  70.00 km/s per MPc 
+	 Omega_{M,L} =  0.30,  0.70   w = -1.00  
+
+ --------------------------------------------------- 
+  Software-Pipeline Search Efficiency (MINOBS=2) from 
+	 /data/des41.b/data/SNDATA_ROOT/INTERNAL/WFIRST/searcheff/SEARCHEFF_PIPELINE_WFIRST.DAT
+	 Epoch SEARCH_EFF(Z) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(Z) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(Y) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(Y) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(J) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(J) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(H) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(H) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(F) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(F) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(B) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(B) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(V) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(V) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(R) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(R) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(I) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(I) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(G) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(G) =  0.00 at SNR =  0.00 
+
+   Fetch SOFTWARE SEARCH-LOGIC from : 
+	 /data/des41.b/data/SNDATA_ROOT/INTERNAL/WFIRST/searcheff/SEARCHEFF_PIPELINE_LOGIC.DAT 
+	 Logic: 1 MJDs require filters=YJ+HJ 
+	 Trigger epoch contains all obs withing 0.400 days
+
+  Spectroscopic Efficiency : 
+	 No spec-eff option specified ==> 100% efficiency. 
+
+  Unconfirmed zHOST Efficiency : 100% 
+
+  APPLY_SEARCHEFF_OPT:  1 => Apply only PIPELINE efficiency (not SPEC-eff) 
+  SNTYPE(Ia) = 1(SPEC)  and 101(PHOT) 
+ --------------------------------------------------- 
+
+  SOFTWARE CUTS: 
+	 EPOCH CUT:  2000 Lambda(rest) < 22000 A 
+	 EPOCH CUT: SNR >= -9999  
+	 TrestMIN <  -0.0  &&  TrestMAX > 20.0 days 
+	 Max TGAP(rest) <=  20.0  days 
+	 Max T0GAP(rest) <=  10.0  days 
+	 NOBS(MJDDIF > 0.0) >=  0 
+	 NEPOCH(SNR > -9999.0) >=  1 
+	 SNRMAX > 14.0 for 1 of the 'ZYJ' filters (-20.0 < Trest <  50.0) 
+	 SIMGEN_DUMP file includes SNe passing software cuts. 
+	 PEAKMAG(any filter) < 999.0 
+	 MWEBV <= 5.0 
+
+  HOSTLIB Summary: None. 
+
+  Fudges on SIMLIB Seeing Conditions: NONE. 
+
+ ============ END OF SIMULATION SUMMARY ============== 
+
+  Random Number Sync: 
+	 RANDOM SEED: 12945   (RANLIST_START_GENSMEAR: 1)
+	 FIRST/LAST Random Number (List=1): 0.204429 0.181496  
+	 FIRST/LAST Random Number (List=2): 0.291181 0.717726  
+	 FIRST/LAST Random Number (List=3): 0.846520 0.688927  
+
+  Generation Statistics (total CPU=0.1 minutes): 
+	 Generated    10 simulated light curves (2/sec) 
+	 Wrote        10 simulated light curves to SNDATA files (2/sec). 
+	 Wrote        50 simulated spectra to SNDATA files 
+  Spectroscopic-type: 10 -> 10 (before -> after cuts)
+  Photometric-type:   0 -> 0 (before -> after cuts)
+  Rejection Statistics: 
+	     0 rejected by NEPOCH<1 
+	     0 rejected by GENRANGEs 
+	     0 rejected by SEARCH-TRIGGER 
+	     0 rejected by CUTWIN-SELECTION 
+  SEARCH+CUTS Efficiency:  1.0000 +-  0.1000 
+
+  Number of SNe per season AFTER CUTS :    109 +-    35 
+
+	 ===== END OF README FILE ====== 
