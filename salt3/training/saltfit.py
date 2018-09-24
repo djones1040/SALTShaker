@@ -149,7 +149,7 @@ class chi2:
 		resultsdict = {}
 		n_sn = len(self.datadict.keys())
 		for k in self.datadict.keys():
-			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k],'x1':x[self.parlist == 'x0_%s'%k]}
+			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k],'x1':x[self.parlist == 'x1_%s'%k]}
 
 		return self.phase,self.wave,m0,m1,clpars,resultsdict
 
