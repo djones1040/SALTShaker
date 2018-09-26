@@ -23,6 +23,13 @@ KCOR_FILE:  PS1/PS1s_RS14/kcor_PS1_none.fits
 APPLY_SEARCHEFF_OPT: 1  # see manual: bit1(pipeline) + bit4(zHost)
 SEARCHEFF_PIPELINE_FILE: SELECTION_EFFICIENCY.DAT
 
+APPLY_CUTWIN_OPT:     1
+CUTWIN_NEPOCH:   5 3.              # require 5 epochs (no S/N requirement)
+CUTWIN_SNRMAX:   6 gr 2 -20. 60.   # require 2 of griz with S/N > 6
+CUTWIN_TRESTMIN: -20  0
+CUTWIN_TRESTMAX:   9  40
+CUTWIN_MWEBV:      0 .20
+
 # point to model of wrong host and wrong redshift
 
 # selection criteria for generation
