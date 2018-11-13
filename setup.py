@@ -44,5 +44,6 @@ setup(
 					  'scipy>=0.9.0',
 					  'extinction>=0.2.2',
 					  'astropy>=0.4.0',
-					  'pytest-astropy'],
-)
+					  'pytest-astropy',
+					  'sncosmo'],
+	)

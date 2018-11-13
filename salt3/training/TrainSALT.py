@@ -39,6 +39,10 @@ class TrainSALT:
 		# input/output files
 		parser.add_argument('--snlist', default=config.get('iodata','snlist'), type=str,
 							help="""list of SNANA-formatted SN data files, including both photometry and spectroscopy. (default=%default)""")
+		parser.add_argument('--speclist', default=config.get('iodata','speclist'), type=str,
+							help="""optional list of ascii spectra, which will be written to the 
+							SNANA-formatted SN light curve files provided by the snlist argument.
+							List format should be space-delimited SNID, MJD-OBS (or DATE-OBS), spectrum filename (default=%default)""")
 		parser.add_argument('--outputdir', default=config.get('iodata','outputdir'), type=str,
 							help="""data directory for spectroscopy, format should be ASCII 
 							with columns wavelength, flux, fluxerr (optional) (default=%default)""")
@@ -110,15 +114,52 @@ class TrainSALT:
 				self.kcordict[survey][filt.split('-')[-1]]['filttrans'] = filtertrans[filt]
 				self.kcordict[survey][filt.split('-')[-1]]['zpoff'] = zpoff['ZPOff(Primary)'][zpoff['Filter Name'] == filt][0]
 				self.kcordict[survey][filt.split('-')[-1]]['magsys'] = zpoff['Primary Name'][zpoff['Filter Name'] == filt][0]
+
+	def rdSpecData(self,datadict,speclist,tpk):
+
+		if not os.path.exists(speclist):
+			raise RuntimeError('speclist %s does not exist')
 		
-	def rdAllData(self,snlist):
+		snid,mjd,specfiles = np.loadtxt(speclist,unpack=True,dtype='str')
+		snid,mjd,specfiles = np.atleast_1d(snid),np.atleast_1d(mjd),np.atleast_1d(specfiles)
+		for s,m,sf in zip(snid,mjd,specfiles):
+			try: m = float(m)
+			except: m = snana.date_to_mjd(m)
+
+			if '/' not in sf:
+				sf = '%s/%s'%(os.path.dirname(speclist),sf)
+			if not os.path.exists(sf):
+				raise RuntimeError('specfile %s does not exist'%sf)
+				
+			if s in datadict.keys():
+				if 'specdata' not in datadict[s].keys():
+					datadict[s]['specdata'] = {}
+					speccount = 0
+				else:
+					speccount = len(datadict[s]['specdata'].keys())
+				datadict[s]['specdata'][speccount] = {}
+				try:
+					wave,flux,fluxerr = np.loadtxt(sf,unpack=True,usecols=[0,1,2])
+					datadict[s]['specdata'][speccount]['fluxerr'] = fluxerr
+				except:
+					wave,flux = np.loadtxt(sf,unpack=True,usecols=[0,1])
+				datadict[s]['specdata'][speccount]['wavelength'] = wave
+				datadict[s]['specdata'][speccount]['flux'] = flux
+				datadict[s]['specdata'][speccount]['tobs'] = m - tpk
+				datadict[s]['specdata'][speccount]['mjd'] = m
+			else:
+				print('SNID %s has no photometry so I\'m ignoring it')
+
+		return datadict
+
+	def rdAllData(self,snlist,speclist=None):
 		datadict = {}
 
 		if not os.path.exists(snlist):
 			raise RuntimeError('SN list %s doesn\'t exist'%snlist)
 		snfiles = np.loadtxt(snlist,dtype='str')
 		snfiles = np.atleast_1d(snfiles)
-			
+
 		for f in snfiles:
 			if f.lower().endswith('.fits'):
 				raise RuntimeError('FITS extensions are not supported yet')
@@ -130,7 +171,7 @@ class TrainSALT:
 			if sn.SNID in datadict.keys():
 				self.addwarning('SNID %s is a duplicate!  Skipping'%sn.SNID)
 				continue
-				
+
 			if not 'SURVEY' in sn.__dict__.keys():
 				raise RuntimeError('File %s has no SURVEY key, which is needed to find the filter transmission curves'%PhotSNID[0])
 			if not 'REDSHIFT_HELIO' in sn.__dict__.keys():
@@ -149,27 +190,35 @@ class TrainSALT:
 			
 			# TODO: flux errors
 			datadict[sn.SNID]['specdata'] = {}
-			datadict[sn.SNID]['specdata']['specphase'],datadict[sn.SNID]['specdata']['wavelength'],datadict[sn.SNID]['specdata']['flux'] = np.array([]),np.array([]),np.array([])
 			for k in sn.SPECTRA.keys():
-				datadict[sn.SNID]['specdata']['specphase'] = np.append(datadict[sn.SNID]['specdata']['specphase'],[sn.SPECTRA[k]['SPECTRUM_MJD']]*len(sn.SPECTRA[k]['FLAM']))
+				datadict[sn.SNID]['specdata'][k] = {}
+				datadict[sn.SNID]['specdata'][k]['specphase'] = sn.SPECTRA[k]['SPECTRUM_MJD']
+				datadict[sn.SNID]['specdata'][k]['tobs'] = sn.SPECTRA[k]['SPECTRUM_MJD'] - tpk
+				datadict[sn.SNID]['specdata'][k]['mjd'] = sn.SPECTRA[k]['SPECTRUM_MJD']
 				if 'LAMAVG' in sn.SPECTRA[k].keys():
-					datadict[sn.SNID]['specdata']['wavelength'] = np.append(datadict[sn.SNID]['specdata']['wavelength'],sn.SPECTRA[k]['LAMAVG'])
+					datadict[sn.SNID]['specdata'][k]['wavelength'] = sn.SPECTRA[k]['LAMAVG']
 				elif 'LAMMIN' in sn.SPECTRA[k].keys() and 'LAMMAX' in sn.SPECTRA[k].keys():
-					datadict[sn.SNID]['specdata']['wavelength'] = np.append(datadict[sn.SNID]['specdata']['wavelength'],np.mean([[sn.SPECTRA[k]['LAMMIN']],[sn.SPECTRA[k]['LAMMAX']]],axis=0))
+					datadict[sn.SNID]['specdata'][k]['wavelength'] = np.mean([[sn.SPECTRA[k]['LAMMIN']],
+																			  [sn.SPECTRA[k]['LAMMAX']]],axis=0)
 				else:
 					raise RuntimeError('couldn\t find wavelength data in photometry file')
-				datadict[sn.SNID]['specdata']['flux'] = np.append(datadict[sn.SNID]['specdata']['flux'],sn.SPECTRA[k]['FLAM'])
+				datadict[sn.SNID]['specdata'][k]['flux'] = sn.SPECTRA[k]['FLAM']
+				datadict[sn.SNID]['specdata'][k]['fluxerr'] = sn.SPECTRA[k]['FLAMERR']
 				
 			datadict[sn.SNID]['photdata'] = {}
 			datadict[sn.SNID]['photdata']['tobs'] = sn.MJD - tpk
+			datadict[sn.SNID]['photdata']['mjd'] = sn.MJD
 			datadict[sn.SNID]['photdata']['fluxcal'] = sn.FLUXCAL
 			datadict[sn.SNID]['photdata']['fluxcalerr'] = sn.FLUXCALERR
 			datadict[sn.SNID]['photdata']['filt'] = sn.FLT
-				
+
+		if speclist:
+			datadict = self.rdSpecData(datadict,speclist,tpk)
+			
 		return datadict
 
 	def fitSALTModel(self,datadict,phaserange,phaseres,waverange,waveres,
-					 minmethod,kcordict,initmodelfile,phaseoutres,waveoutres,
+					 colorwaverange,minmethod,kcordict,initmodelfile,phaseoutres,waveoutres,
 					 n_components=1,n_colorpars=0):
 
 		n_phaseknots = int((phaserange[1]-phaserange[0])/phaseres)-4
@@ -179,7 +228,7 @@ class TrainSALT:
 		# x1,x0,c for each SN
 		# phase/wavelength spline knots for M0, M1 (ignoring color for now)
 		# TODO: spectral recalibration
-		n_params = n_components*n_phaseknots*n_waveknots + 3*n_sn
+		n_params = n_components*n_phaseknots*n_waveknots + 4*n_sn
 		if n_colorpars: n_params += n_colorpars
 		
 		guess = np.zeros(n_params)
@@ -202,7 +251,7 @@ class TrainSALT:
 			parlist += ['cl']*n_colorpars
 
 		for k in datadict.keys():
-			parlist += ['x0_%s'%k,'x1_%s'%k,'c_%s'%k]
+			parlist += ['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k]
 		parlist = np.array(parlist)
 
 		
@@ -215,18 +264,21 @@ class TrainSALT:
 
 		saltfitter = saltfit.chi2(guess,datadict,parlist,phaserange,
 								  waverange,phaseres,waveres,phaseoutres,waveoutres,
+								  colorwaverange,
 								  kcordict,n_components,n_colorpars)
 
 		# first pass - estimate x0 so we can bound it to w/i an order of mag
-		initbounds = ([0,-np.inf,-np.inf]*n_sn,[np.inf,np.inf,np.inf]*n_sn)
-		initguess = (1,0,0)*n_sn
+		initbounds = ([0,-np.inf,-np.inf,-5]*n_sn,[np.inf,np.inf,np.inf,5]*n_sn)
+		initguess = (1,0,0,0)*n_sn #+ (0,)*n_colorpars
 		initparlist = []
 		for k in datadict.keys():
-			initparlist += ['x0_%s'%k,'x1_%s'%k,'c_%s'%k]
+			initparlist += ['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k]
+		#initparlist += ['cl']*n_colorpars
 		initparlist = np.array(initparlist)
 		saltfitter.parlist = initparlist
 
-		md_init = least_squares(saltfitter.chi2fit,initguess,method='trf',bounds=initbounds,args=(True,))
+		md_init = least_squares(saltfitter.chi2fit,initguess,method='trf',bounds=initbounds,
+								args=(True,))
 		try:
 			if 'condition is satisfied' not in md_init.message.decode('utf-8'):
 				self.addwarning('Initialization minimizer message: %s'%md_init.message)
@@ -238,21 +290,25 @@ class TrainSALT:
 
 
 		# 2nd pass - let the SALT model spline knots float			
-		lsqbounds_lower = [-np.inf]*n_components*n_phaseknots*n_waveknots
+		lsqbounds_lower = [-np.inf]*(n_components*n_phaseknots*n_waveknots + n_colorpars)
 		for k in datadict.keys():
-			lsqbounds_lower += [md_init.x[initparlist == 'x0_%s'%k]*1e-1,-np.inf,-np.inf]
-		lsqbounds_upper = [np.inf]*n_components*n_phaseknots*n_waveknots
+			lsqbounds_lower += [md_init.x[initparlist == 'x0_%s'%k]*1e-1,-np.inf,-np.inf,-5]
+		lsqbounds_upper = [np.inf]*(n_components*n_phaseknots*n_waveknots+n_colorpars)
 		for k in datadict.keys():
-			lsqbounds_upper += [md_init.x[initparlist == 'x0_%s'%k]*1e1,np.inf,np.inf]
+			lsqbounds_upper += [md_init.x[initparlist == 'x0_%s'%k]*1e1,np.inf,np.inf,5]
 
 			
 		lsqbounds = (lsqbounds_lower,lsqbounds_upper)
 		for k in datadict.keys():
 			guess[parlist == 'x0_%s'%k] = md_init.x[initparlist == 'x0_%s'%k]
+		#guess[parlist == 'cl'] = md_init.x[initparlist == 'cl']
 			
 		saltfitter.parlist = parlist
-			
-		md = least_squares(saltfitter.chi2fit,guess,method='trf',bounds=lsqbounds)
+
+		# lsmr is for sparse problems, and regularize option defaults to true
+		# this is presumably less optimal than what SALT2 does
+		md = least_squares(saltfitter.chi2fit,guess,method='trf',
+						   bounds=lsqbounds,args=(False,False,False))#,tr_solver='lsmr')
 
 		# another fitting option, but least_squares seems to
 		# work best for now
@@ -281,7 +337,7 @@ class TrainSALT:
 		# principal components and color law
 		foutm0 = open('%s/salt3_template_0.dat'%outdir,'w')
 		foutm1 = open('%s/salt3_template_1.dat'%outdir,'w')
-		foutcl = open('%s/salt3_template_colorlaw.dat'%outdir,'w')
+		foutcl = open('%s/salt3_color_correction.dat'%outdir,'w')
 		
 		for p,i in zip(phase,range(len(phase))):
 			for w,j in zip(wave,range(len(wave))):
@@ -291,16 +347,23 @@ class TrainSALT:
 		foutm0.close()
 		foutm1.close()
 
+		print('%i'%len(clpars),file=foutcl)
 		for c in clpars:
 			print('%8.5e'%c,file=foutcl)
+		print("""Salt2ExtinctionLaw.version 1
+Salt2ExtinctionLaw.min_lambda %i
+Salt2ExtinctionLaw.max_lambda %i"""%(
+	self.options.colorwaverange[0],
+	self.options.colorwaverange[1]),file=foutcl)
 		foutcl.close()
 
 		# best-fit SN params
 		foutsn = open('%s/salt3train_snparams.txt'%outdir,'w')
-		print('# SN x0 x1',file=foutsn)
+		print('# SN x0 x1 c t0',file=foutsn)
 		for k in SNParams.keys():
-			print('%s %8.5e %8.5e'%(k,SNParams[k]['x0'],SNParams[k]['x1']),file=foutsn)
-
+			print('%s %8.5e %.4f %.4f %.2f'%(k,SNParams[k]['x0'],SNParams[k]['x1'],SNParams[k]['c'],SNParams[k]['t0']),file=foutsn)
+		foutsn.close()
+			
 		return
 
 	def main(self):
@@ -311,12 +374,13 @@ class TrainSALT:
 		# TODO: ASCII filter files
 		
 		# read the data
-		datadict = self.rdAllData(self.options.snlist)
+		datadict = self.rdAllData(self.options.snlist,speclist=self.options.speclist)
 		
 		# fit the model - initial pass
 		phase,wave,M0,M1,clpars,SNParams = self.fitSALTModel(
 			datadict,self.options.phaserange,self.options.phasesplineres,
 			self.options.waverange,self.options.wavesplineres,
+			self.options.colorwaverange,
 			self.options.minmethod,self.kcordict,
 			self.options.initmodelfile,
 			self.options.phaseoutres,self.options.waveoutres,
