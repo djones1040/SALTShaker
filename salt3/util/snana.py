@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os
 import time
 from astropy.io import fits as pyfits
@@ -6,6 +8,7 @@ import glob
 from collections import Sequence
 from matplotlib import pyplot as p
 from matplotlib import patches
+from astropy.time import Time
 
 SNTYPEDICT = {1:'Ia',10:'Ia',2:'II',3:'Ibc',32:'Ib',33:'Ic',20:'IIP',21:'IIn',22:'IIL',23:'IIb',42:'Ia' }
 
@@ -412,11 +415,12 @@ class SuperNova( object ) :
 		for col in colnames : 
 			self.__dict__[col] = array( self.__dict__[col] )
 
-		self.readspecfromdatfile(datfile)
+		self.readspecfromlcfile(datfile)
 		
 		return( None )
 
-	def readspecfromdatfile(self,datfile):
+	def readspecfromlcfile(self,datfile):
+		"""read spectroscopy from the SNANA lightcurve file"""
 		fin = open(datfile)
 		self.SPECTRA = {}
 		startSpec = False
@@ -441,7 +445,58 @@ class SuperNova( object ) :
 				for v,sv in zip(specvarnames,specvals):
 					self.SPECTRA[specid][v] = np.append(self.SPECTRA[specid][v],float(sv))
 
-	
+	def readnewspec(self,datfile):
+		"""read spectroscopy from an ascii file with columns wavelength, flux, (fluxerr)
+Header must include one of two following lines at the top:
+
+MJD-OBS: <spectrum MJD>
+DATE-OBS: <spectrum date (isot format)>
+
+Each file should contain only one spectrum
+"""
+
+		if 'SPECTRA' not in self.__dict__.keys():
+			self.SPECTRA = {}
+
+		specid = -1
+		for i in range(100):
+			if i not in self.SPECTRA.keys():
+				specid = i
+				self.SPECTRA[specid] = {}
+				break
+		if specid == -1:
+			raise RuntimeError('something really weird happened or you have >100 spectra for this object already!')
+			
+		startSpec = False
+		with open(datfile) as fin:
+			for line in fin:
+				line = line.replace('\n','')
+				if 'MJD_OBS:' in line:
+					self.SPECTRA[specid]['SPECTRUM_MJD'] = float(line.split()[-11])
+				elif 'DATE_OBS:' in line:
+					self.SPECTRA[specid]['SPECTRUM_MJD'] = date_to_mjd(line.split()[-1])
+				elif not startSpec:
+					specvals = line.split()
+					if len(specvals) == 2:
+						specvarnames = ['LAMAVG','FLAM']
+					elif len(specvals) == 3:
+						specvarnames = ['LAMAVG','FLAM','FLAMERR']
+					else:
+						raise RuntimeError('format of file %s not understood'%datfile)
+				
+					for v in specvarnames:
+						self.SPECTRA[specid][v] = np.array([])
+
+					for v,sv in zip(specvarnames,specvals):
+						self.SPECTRA[specid][v] = np.append(self.SPECTRA[specid][v],float(sv))
+					startSpec = True
+				elif startSpec:
+					specvals = line.split()
+					for v,sv in zip(specvarnames,specvals):
+						self.SPECTRA[specid][v] = np.append(self.SPECTRA[specid][v],float(sv))
+		if 'SPECTRUM_MJD' not in self.SPECTRA[specid].keys():
+			raise RuntimeError('MJD_OBS or DATE_OBS keys must be in spectrum header')
+						
 	def writedatfile(self, datfile, mag2fluxcal=False, **kwarg ):
 		""" write the light curve data into a SNANA-style .dat file.
 		Metadata in the header are in "key: value" pairs
@@ -468,18 +523,62 @@ class SuperNova( object ) :
 					'SIM_SALT2c','SIM_SALT2x1','SIM_SALT2mB','SIM_SALT2alpha',
 					'SIM_SALT2beta','SIM_REDSHIFT','SIM_PEAKMJD'] : 
 			if key in kwarg : 
-				print>> fout, '%s: %s'%(key,str(kwarg[key]))
+				print('%s: %s'%(key,str(kwarg[key])),file=fout)
 			elif key in self.__dict__ : 
-				print>> fout, '%s: %s'%(key,str(self.__dict__[key]))
-		print>>fout,'\nNOBS: %i'%len(self.MAG)
-		print>>fout,'NVAR: 7'
-		print>>fout,'VARLIST:  MJD	FLT FIELD	FLUXCAL	  FLUXCALERR	MAG		MAGERR\n'
+				print('%s: %s'%(key,str(self.__dict__[key])),file=fout)
+		print('\nNOBS: %i'%len(self.FLUXCAL),file=fout)
+		if 'MAG' in self.__dict__.keys():
+			print('NVAR: 7',file=fout)
+			print('VARLIST:  MJD	FLT FIELD	FLUXCAL	  FLUXCALERR	MAG		MAGERR\n',file=fout)
+			
+			for i in range(self.nobs):
+				print('OBS: %9.3f  %s  %s %8.3f %8.3f %8.3f %8.3f'%(
+					self.MJD[i], self.FLT[i], self.FIELD[i], self.FLUXCAL[i], 
+					self.FLUXCALERR[i], self.MAG[i], self.MAGERR[i] ),file=fout)
+		else:
+			print('NVAR: 5',file=fout)
+			print('VARLIST:  MJD	FLT FIELD	FLUXCAL	  FLUXCALERR\n',file=fout)
+			
+			for i in range(self.nobs):
+				print('OBS: %9.3f  %s  %s %8.3f %8.3f'%(
+					self.MJD[i], self.FLT[i], self.FIELD[i], self.FLUXCAL[i], 
+					self.FLUXCALERR[i] ),file=fout)
 
-		for i in range(self.nobs):
-			print>>fout, 'OBS: %9.3f  %s  %s %8.3f %8.3f %8.3f %8.3f'%(
-				self.MJD[i], self.FLT[i], self.FIELD[i], self.FLUXCAL[i], 
-				self.FLUXCALERR[i], self.MAG[i], self.MAGERR[i] )
-		print >>fout,'\nEND:'
+		if 'SPECTRA' in self.__dict__.keys():
+			print("""\nEND_PHOTOMETRY:
+
+# =============================================
+NSPECTRA:  %i
+"""%len(self.SPECTRA.keys()),file=fout)
+			for k in self.SPECTRA.keys():
+				if k == list(self.SPECTRA.keys())[0]:
+					nvar_spec = len(self.SPECTRA[k].keys())
+					print('NVAR_SPEC: %i'%len(self.SPECTRA[k].keys()),file=fout)
+				if nvar_spec != len(self.SPECTRA[k].keys()):
+					raise RuntimeError('number of variables for spectrum %s is inconsistent with the other spectra!'%k)
+				varnames_line = 'VARNAMES_SPEC: '
+				specarray_varnames = []
+				specheader = ''
+				for ks in ['LAMMIN','LAMMAX','LAMAVG','FLAM','FLAMERR','SIM_GENFLAM','SIM_GENMAG']:
+					if ks in self.SPECTRA[k].keys():
+						varnames_line += '%s '%ks
+						specarray_varnames += [ks]
+				for ks in self.SPECTRA[k].keys():
+					if ks not in specarray_varnames:
+						specheader += '%s: %s\n'%(ks,self.SPECTRA[k][ks])
+				if k == list(self.SPECTRA.keys())[0]: print('%s\n'%varnames_line,file=fout)
+				
+				print('SPECTRUM_ID: %i'%k,file=fout)
+				print(specheader,file=fout)
+				if not len(specarray_varnames):
+					raise RuntimeError('couldn\'t find wavelength/flux keys for spectrum')
+				for i in range(len(self.SPECTRA[k][specarray_varnames[0]])):
+					outline = 'SPEC:  '
+					for ks in specarray_varnames:
+						outline += '%8.5e '%self.SPECTRA[k][ks][i]
+					print(outline,file=fout)
+				print('END_SPECTRUM:\n',file=fout)
+		print('\nEND:',file=fout)
 		fout.close()
 		return( datfile )
 
@@ -844,3 +943,7 @@ def str2num(s) :
 	except ValueError:
 		try: return float(s)
 		except ValueError: return( s )
+
+def date_to_mjd(date):
+    time = Time(date,scale='utc')
+    return time.mjd

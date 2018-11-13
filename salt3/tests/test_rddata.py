@@ -25,6 +25,16 @@ class RdTest(unittest.TestCase):
 
 		self.assertTrue(len(datadict.keys()) == nsn)
 
+	def test_rdspecdata(self):
+
+		snlist = 'examples/exampledata/photdata/PHOTFILES.LIST'
+		speclist = 'examples/exampledata/specdata/SPECFILES.LIST'
+		nsn = len(np.loadtxt(snlist,dtype='str'))
+		ts = TrainSALT()
+		datadict = ts.rdAllData(snlist,speclist)
+
+		self.assertTrue(len(datadict.keys()) == nsn)
+		
 	def test_rdkcor(self):
 
 		kcorfile = 'examples/kcor/kcor_PS1_PS1MD.fits'

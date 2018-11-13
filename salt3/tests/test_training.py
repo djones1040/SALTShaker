@@ -8,6 +8,7 @@ class TRAINING_Test(unittest.TestCase):
 	def test_init_chi2func(self):
 		
 		waverange = [2000,9200]
+		colorwaverange = [2800,7000]
 		phaserange = [-14,50]
 		phasesplineres = 3.2
 		wavesplineres = 72
@@ -37,7 +38,7 @@ class TRAINING_Test(unittest.TestCase):
 
 		saltfitter = saltfit.chi2(guess,datadict,parlist,phaserange,
 								  waverange,phasesplineres,wavesplineres,phaseoutres,waveoutres,
-								  ts.kcordict)
+								  colorwaverange,ts.kcordict)
 
 		#saltfitter.chi2fit(guess)
 		self.assertTrue('stdmag' in saltfitter.__dict__.keys())
@@ -45,6 +46,7 @@ class TRAINING_Test(unittest.TestCase):
 	def test_synphot(self):
 		
 		waverange = [2000,9200]
+		colorwaverange = [2800,7000]
 		phaserange = [-14,50]
 		phasesplineres = 3.2
 		wavesplineres = 72
@@ -72,7 +74,7 @@ class TRAINING_Test(unittest.TestCase):
 		
 		saltfitter = saltfit.chi2(guess,datadict,parlist,phaserange,
 								  waverange,phasesplineres,wavesplineres,phaseoutres,waveoutres,
-								  ts.kcordict)
+								  colorwaverange,ts.kcordict)
 
 		flatnuwave,flatnuflux = np.loadtxt('salt3/initfiles/flatnu.dat',unpack=True)
 		vegawave,vegaflux = np.loadtxt('salt3/initfiles/vegased_2004_stis.txt',unpack=True)

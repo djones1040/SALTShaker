@@ -42,7 +42,7 @@ def complc(lcfile='../../examples/exampledata/photdata/foundASASSN-16av.txt',zps
 	hsiaomodel = sncosmo.Model(source='hsiao')
 	
 	sn = snana.SuperNova(lcfile)
-	sn.FLT = sn.FLT.astype('S20')
+	sn.FLT = sn.FLT.astype('U20')
 	for i in range(len(sn.FLT)):
 		sn.FLT[i] = 'sdss%s'%sn.FLT[i]
 
@@ -95,5 +95,10 @@ def complc(lcfile='../../examples/exampledata/photdata/foundASASSN-16av.txt',zps
 		ax.set_xlim([sn.MJD[flux == np.max(flux)]-20, sn.MJD[flux == np.max(flux)]+50])
 
 	ax1.legend()
-		
+	plt.savefig('comp.png')
+	
 	return
+
+if __name__ == "__main__":
+	complc()
+
