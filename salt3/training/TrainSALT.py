@@ -229,8 +229,9 @@ class TrainSALT:
 		# phase/wavelength spline knots for M0, M1 (ignoring color for now)
 		# TODO: spectral recalibration
 		n_params = n_components*n_phaseknots*n_waveknots + 4*n_sn
-		if n_colorpars: n_params += n_colorpars
 		
+		if n_colorpars: n_params += n_colorpars
+		print(n_params)
 		guess = np.zeros(n_params)
 
 		if not os.path.exists(initmodelfile):
