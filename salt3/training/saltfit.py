@@ -107,9 +107,8 @@ class chi2:
 				denom = np.trapz(pbspl,obswave[g])
 				
 				#Select data from the appropriate time range and filter
-				filtInd=(photdata['filt']==flt)&(photdata['tobs']>self.phaserange[0]) & (photdata['tobs']<self.phaserange[1])
-				#This would be a lot cleaner if photdata was a structured array to begin with
-				filtPhot={key:photdata[key][filtInd] for key in photdata}
+				selectFilter=(photdata['filt']==flt)&(photdata['tobs']>self.phaserange[0]) & (photdata['tobs']<self.phaserange[1])
+				filtPhot={key:photdata[key][selectFilter] for key in photdata}
 				try:
 					#Array output indices match time along 0th axis, wavelength along 1st axis
 					saltfluxinterp = int1d(filtPhot['tobs']+tpkoff)
