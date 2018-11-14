@@ -105,31 +105,27 @@ class chi2:
 				pbspl *= obswave[g]
 
 				denom = np.trapz(pbspl,obswave[g])
+				
+				#Select data from the appropriate time range and filter
+				filtInd=(photdata['filt']==flt)&(photdata['tobs']>self.phaserange[0]) & (photdata['tobs']<self.phaserange[1])
+				#This would be a lot cleaner if photdata was a structured array to begin with
+				filtPhot={key:photdata[key][filtInd] for key in photdata}
+				try:
+					#Array output indices match time along 0th axis, wavelength along 1st axis
+					saltfluxinterp = int1d(filtPhot['tobs']+tpkoff)
+				except:
+					import pdb; pdb.set_trace()
+				# synthetic photometry from SALT model
+				# Integrate along wavelength axis
+				modelsynflux=np.trapz(pbspl[np.newaxis,:]*saltfluxinterp[:,g],obswave[g],axis=1)/denom
+				modelflux = modelsynflux*10**(-0.4*self.kcordict[survey][flt]['zpoff'])*10**(0.4*self.stdmag[survey][flt])*10**(0.4*27.5)
 
-				for t,f,fe,flt in zip(photdata['tobs'][photdata['filt'] == flt],photdata['fluxcal'][photdata['filt'] == flt],
-									  photdata['fluxcalerr'][photdata['filt'] == flt],photdata['filt'][photdata['filt'] == flt]):
-					# HACK - will need to change this when we fit for t0
-					if t < self.phaserange[0] or t > self.phaserange[1]: continue
-
-					try:
-						saltfluxinterp = int1d(t+tpkoff)
-					except:
-						import pdb; pdb.set_trace()
-						
-					# synthetic photometry from SALT model
-					modelsynflux = np.trapz(pbspl*saltfluxinterp[g],obswave[g])/denom
-					modelflux = modelsynflux*10**(-0.4*self.kcordict[survey][flt]['zpoff'])*10**(0.4*self.stdmag[survey][flt])*10**(0.4*27.5)
-
-					# chi2 function
-					# TODO - model error/dispersion parameters
-					chi2 += (f-modelflux)**2./fe**2.
-					if debug:
-						if t == photdata['tobs'][0]:
-							plt.errorbar(t,modelflux,fmt='o',color='C0',label='model')
-							plt.errorbar(t,f,yerr=fe,fmt='o',color='C1',label='obs')
-						else:
-							plt.errorbar(t,modelflux,fmt='o',color='C0')
-							plt.errorbar(t,f,yerr=fe,fmt='o',color='C1')
+				# chi2 function
+				# TODO - model error/dispersion parameters
+				chi2 += ((filtPhot['fluxcal']-modelflux)**2./filtPhot['fluxcalerr']**2.).sum()
+				if debug:
+						plt.errorbar(filtPhot['tobs'],modelflux,fmt='o',color='C0',label='model')
+						plt.errorbar(filtPhot['tobs'],filtPhot['fluxcal'],yerr=filtPhot['fluxcalerr'],fmt='o',color='C1',label='obs')
 
 		if debug:
 			import pdb; pdb.set_trace()
