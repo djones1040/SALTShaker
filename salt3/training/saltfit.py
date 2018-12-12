@@ -47,14 +47,38 @@ class chi2:
 												   zpoff=0)#kcordict[survey][flt]['zpoff'])
 
 	def chi2fit(self,x,onlySNpars=False,pool=None,debug=False,debug2=False):
-
+		"""
+		Calculates the goodness of fit of given SALT model to photometric and spectroscopic data given during initialization
+		
+		Parameters
+		----------
+		x : array
+			SALT model parameters
+			
+		onlySNpars : boolean, optional
+			Only fit the individual SN parameters, while retaining fixed model parameters
+			
+		pool : 	multiprocessing.pool.Pool, optional
+			Optional worker pool to be used for calculating chi2 values for each SN. If not provided, all work is done in root process
+		
+		debug : boolean, optional
+		debug2 : boolean, optional
+			Debug flags
+		
+		Returns
+		-------
+		
+		chi2: float
+			Goodness of fit of model to training data	
+		"""
 		# TODO: fit to t0
 		
 		if debug:
 			import pylab as plt
 			plt.ion()
 			plt.clf()
-			
+		
+		#Set up SALT model
 		if onlySNpars:
 			components = self.components
 		else:
@@ -62,50 +86,89 @@ class chi2:
 		if self.n_components == 1: M0 = components[0]
 		elif self.n_components == 2: M0,M1 = components
 		if self.n_colorpars:
-			self._colorlaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
-
+			colorLaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
 		
 		chi2 = 0
-		args=[(sn,x,onlySNpars,False,False) for sn in self.datadict.keys()]
+		#Construct arguments for chi2forSN method
+		args=[(sn,x,components,colorLaw,onlySNpars,False,False) for sn in self.datadict.keys()]
+		
+		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
 		if pool:
 			chi2=sum(pool.starmap(self.chi2forSN,args))
 		else:
 			chi2=sum(starmap(self.chi2forSN,args))
+			
+		#Debug statements
 		if debug:
 			import pdb; pdb.set_trace()
 			plt.close()
-
 		if debug2: import pdb; pdb.set_trace()
 		if onlySNpars: print(chi2,x)
 		else: print(chi2,x[0],x[self.parlist == 'x0_ASASSN-16bc'],x[self.parlist == 'cl'])
 		if chi2 != chi2:
 			import pdb; pdb.set_trace()
+		
 		return chi2
 		
-	def chi2forSN(self,sn,x,onlySNpars=False,debug=False,debug2=False):
-		if onlySNpars:
-			components = self.components
-		else:
-			components = self.SALTModel(x)
+	def chi2forSN(self,sn,x,components=None,colorLaw=None,onlySNpars=False,debug=False,debug2=False):
+		"""
+		Calculates the goodness of fit of given SALT model to photometric and spectroscopic observations of a single SN 
+		
+		Parameters
+		----------
+		sn : str
+			Name of supernova to compare to model
+			
+		x : array
+			SALT model parameters
+			
+		components: array_like, optional
+			SALT model components, if not provided will be derived from SALT model parameters passed in \'x\'
+		
+		colorLaw: function, optional
+			SALT color law which takes wavelength as an argument
+
+		onlySNpars : boolean, optional
+			Only fit the individual SN parameters, while retaining fixed model parameters
+					
+		debug : boolean, optional
+		debug2 : boolean, optional
+			Debug flags
+		
+		Returns
+		-------
+		chi2: float
+			Model chi2 relative to training data	
+		"""
+
+		#Set up SALT model
+		if components is None:
+			if onlySNpars:
+				components = self.components
+			else:
+				components = self.SALTModel(x)
 		if self.n_components == 1: M0 = components[0]
 		elif self.n_components == 2: M0,M1 = components
 
+		#Declare variables
 		photdata = self.datadict[sn]['photdata']
 		specdata = self.datadict[sn]['specdata']
 		survey = self.datadict[sn]['survey']
 		filtwave = self.kcordict[survey]['filtwave']
 		z = self.datadict[sn]['zHelio']
 		obswave = self.wave*(1+z)
-		
+	
 		x0,x1,c,tpkoff = \
 			x[self.parlist == 'x0_%s'%sn][0],x[self.parlist == 'x1_%s'%sn][0],\
 			x[self.parlist == 'c_%s'%sn][0],x[self.parlist == 'tpkoff_%s'%sn][0]
+			
+		#Calculate spectral model
 		if self.n_components == 1:
 			saltflux = x0*M0
 		elif self.n_components == 2:
 			saltflux = x0*(M0 + x1*M1)
-		if self.n_colorpars:
-			saltflux *= 10. ** (-0.4 * self._colorlaw(self.wave) * c)
+		if colorLaw:
+			saltflux *= 10. ** (-0.4 * colorLaw(self.wave) * c)
 			if debug2: import pdb; pdb.set_trace()
 
 		chi2=0
