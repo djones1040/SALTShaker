@@ -47,4 +47,5 @@ phaseoutres          2               Phase resolution of the trained output mode
 minmethod            trf             Numerical algorithm used to minimize the chi2.  Default is Trust Region Reflective.
 n_colorpars          4               Number of parameters used to define the color law polynomial
 n_components         2               Number of principal components
+n_processes          1               Number of worker processes to spawn to calculate the chi2
 ==================   =============   =========================================================================================================
