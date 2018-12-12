@@ -6,6 +6,7 @@ from salt3.util.synphot import synphot
 from scipy.interpolate import interp1d
 from sncosmo.salt2utils import SALT2ColorLaw
 import time
+from itertools import starmap
 #import pysynphot as S
 
 lambdaeff = {'g':4900.1409,'r':6241.2736,'i':7563.7672,'z':8690.0840}
@@ -26,7 +27,6 @@ class chi2:
 		self.colorwaverange = colorwaverange
 		
 		assert type(parlist) == np.ndarray
-		
 		self.splinephase = np.linspace(phaserange[0],phaserange[1],(phaserange[1]-phaserange[0])/phaseres)
 		self.splinewave = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/waveres)
 		self.phase = np.linspace(phaserange[0]-5,phaserange[1]+5,(phaserange[1]-phaserange[0])/phaseoutres)
@@ -46,7 +46,7 @@ class chi2:
 												   filttp=kcordict[survey][flt]['filttrans'],
 												   zpoff=0)#kcordict[survey][flt]['zpoff'])
 
-	def chi2fit(self,x,onlySNpars=False,debug=False,debug2=False):
+	def chi2fit(self,x,onlySNpars=False,pool=None,debug=False,debug2=False):
 
 		# TODO: fit to t0
 		
@@ -54,7 +54,35 @@ class chi2:
 			import pylab as plt
 			plt.ion()
 			plt.clf()
+			
+		if onlySNpars:
+			components = self.components
+		else:
+			components = self.SALTModel(x)
+		if self.n_components == 1: M0 = components[0]
+		elif self.n_components == 2: M0,M1 = components
+		if self.n_colorpars:
+			self._colorlaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
 
+		
+		chi2 = 0
+		args=[(sn,x,onlySNpars,False,False) for sn in self.datadict.keys()]
+		if pool:
+			chi2=sum(pool.starmap(self.chi2forSN,args))
+		else:
+			chi2=sum(starmap(self.chi2forSN,args))
+		if debug:
+			import pdb; pdb.set_trace()
+			plt.close()
+
+		if debug2: import pdb; pdb.set_trace()
+		if onlySNpars: print(chi2,x)
+		else: print(chi2,x[0],x[self.parlist == 'x0_ASASSN-16bc'],x[self.parlist == 'cl'])
+		if chi2 != chi2:
+			import pdb; pdb.set_trace()
+		return chi2
+		
+	def chi2forSN(self,sn,x,onlySNpars=False,debug=False,debug2=False):
 		if onlySNpars:
 			components = self.components
 		else:
@@ -62,81 +90,67 @@ class chi2:
 		if self.n_components == 1: M0 = components[0]
 		elif self.n_components == 2: M0,M1 = components
 
+		photdata = self.datadict[sn]['photdata']
+		specdata = self.datadict[sn]['specdata']
+		survey = self.datadict[sn]['survey']
+		filtwave = self.kcordict[survey]['filtwave']
+		z = self.datadict[sn]['zHelio']
+		obswave = self.wave*(1+z)
 		
-		chi2 = 0
-		tused = 0
-		for sn in self.datadict.keys():
-			photdata = self.datadict[sn]['photdata']
-			specdata = self.datadict[sn]['specdata']
-			survey = self.datadict[sn]['survey']
-			filtwave = self.kcordict[survey]['filtwave']
-			z = self.datadict[sn]['zHelio']
-			obswave = self.wave*(1+z)
+		x0,x1,c,tpkoff = \
+			x[self.parlist == 'x0_%s'%sn][0],x[self.parlist == 'x1_%s'%sn][0],\
+			x[self.parlist == 'c_%s'%sn][0],x[self.parlist == 'tpkoff_%s'%sn][0]
+		if self.n_components == 1:
+			saltflux = x0*M0
+		elif self.n_components == 2:
+			saltflux = x0*(M0 + x1*M1)
+		if self.n_colorpars:
+			saltflux *= 10. ** (-0.4 * self._colorlaw(self.wave) * c)
+			if debug2: import pdb; pdb.set_trace()
+
+		chi2=0
+		int1d = interp1d(self.phase,saltflux,axis=0)
+		for k in specdata.keys():
+			if specdata[k]['tobs'] < self.phaserange[0] or specdata[k]['tobs'] > self.phaserange[1]: continue
+			saltfluxinterp = int1d(specdata[k]['tobs']+tpkoff)
+			saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)
+			chi2 += np.sum((saltfluxinterp2-specdata[k]['flux'])**2./specdata[k]['fluxerr']**2.)
 			
-			x0,x1,c,tpkoff = \
-				x[self.parlist == 'x0_%s'%sn][0],x[self.parlist == 'x1_%s'%sn][0],\
-				x[self.parlist == 'c_%s'%sn][0],x[self.parlist == 'tpkoff_%s'%sn][0]
-			if self.n_components == 1:
-				saltflux = x0*M0
-			elif self.n_components == 2:
-				saltflux = x0*(M0 + x1*M1)
-			if self.n_colorpars:
-				self._colorlaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
-				saltflux *= 10. ** (-0.4 * self._colorlaw(self.wave) * c)
-				if debug2: import pdb; pdb.set_trace()
+		for flt in np.unique(photdata['filt']):
 
-				
-			int1d = interp1d(self.phase,saltflux,axis=0)
-			for k in specdata.keys():
-				if specdata[k]['tobs'] < self.phaserange[0] or specdata[k]['tobs'] > self.phaserange[1]: continue
-				saltfluxinterp = int1d(specdata[k]['tobs']+tpkoff)
-				saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)
-				chi2 += np.sum((saltfluxinterp2-specdata[k]['flux'])**2./specdata[k]['fluxerr']**2.)
-				
-			for flt in np.unique(photdata['filt']):
+			# synthetic photometry
+			filtwave = self.kcordict[survey]['filtwave']
+			filttrans = self.kcordict[survey][flt]['filttrans']
 
-				# synthetic photometry
-				filtwave = self.kcordict[survey]['filtwave']
-				filttrans = self.kcordict[survey][flt]['filttrans']
+			g = (obswave >= filtwave[0]) & (obswave <= filtwave[-1])  # overlap range
 
-				g = (obswave >= filtwave[0]) & (obswave <= filtwave[-1])  # overlap range
+			pbspl = np.interp(obswave[g],filtwave,filttrans)
+			pbspl *= obswave[g]
 
-				pbspl = np.interp(obswave[g],filtwave,filttrans)
-				pbspl *= obswave[g]
+			denom = np.trapz(pbspl,obswave[g])
+			
+			#Select data from the appropriate time range and filter
+			selectFilter=(photdata['filt']==flt)&(photdata['tobs']>self.phaserange[0]) & (photdata['tobs']<self.phaserange[1])
+			filtPhot={key:photdata[key][selectFilter] for key in photdata}
+			try:
+				#Array output indices match time along 0th axis, wavelength along 1st axis
+				saltfluxinterp = int1d(filtPhot['tobs']+tpkoff)
+			except:
+				import pdb; pdb.set_trace()
+			# synthetic photometry from SALT model
+			# Integrate along wavelength axis
+			modelsynflux=np.trapz(pbspl[np.newaxis,:]*saltfluxinterp[:,g],obswave[g],axis=1)/denom
+			modelflux = modelsynflux*10**(-0.4*self.kcordict[survey][flt]['zpoff'])*10**(0.4*self.stdmag[survey][flt])*10**(0.4*27.5)
 
-				denom = np.trapz(pbspl,obswave[g])
-				
-				#Select data from the appropriate time range and filter
-				selectFilter=(photdata['filt']==flt)&(photdata['tobs']>self.phaserange[0]) & (photdata['tobs']<self.phaserange[1])
-				filtPhot={key:photdata[key][selectFilter] for key in photdata}
-				try:
-					#Array output indices match time along 0th axis, wavelength along 1st axis
-					saltfluxinterp = int1d(filtPhot['tobs']+tpkoff)
-				except:
-					import pdb; pdb.set_trace()
-				# synthetic photometry from SALT model
-				# Integrate along wavelength axis
-				modelsynflux=np.trapz(pbspl[np.newaxis,:]*saltfluxinterp[:,g],obswave[g],axis=1)/denom
-				modelflux = modelsynflux*10**(-0.4*self.kcordict[survey][flt]['zpoff'])*10**(0.4*self.stdmag[survey][flt])*10**(0.4*27.5)
-
-				# chi2 function
-				# TODO - model error/dispersion parameters
-				chi2 += ((filtPhot['fluxcal']-modelflux)**2./filtPhot['fluxcalerr']**2.).sum()
-				if debug:
-						plt.errorbar(filtPhot['tobs'],modelflux,fmt='o',color='C0',label='model')
-						plt.errorbar(filtPhot['tobs'],filtPhot['fluxcal'],yerr=filtPhot['fluxcalerr'],fmt='o',color='C1',label='obs')
-
-		if debug:
-			import pdb; pdb.set_trace()
-			plt.close()
-
-		if debug2: import pdb; pdb.set_trace()
-		if onlySNpars: print(chi2,x,tpkoff)
-		else: print(chi2,x[0],x[self.parlist == 'x0_ASASSN-16bc'],x[self.parlist == 'cl'])
-		if chi2 != chi2:
-			import pdb; pdb.set_trace()
+			# chi2 function
+			# TODO - model error/dispersion parameters
+			chi2 += ((filtPhot['fluxcal']-modelflux)**2./filtPhot['fluxcalerr']**2.).sum()
+			if debug:
+					plt.errorbar(filtPhot['tobs'],modelflux,fmt='o',color='C0',label='model')
+					plt.errorbar(filtPhot['tobs'],filtPhot['fluxcal'],yerr=filtPhot['fluxcalerr'],fmt='o',color='C1',label='obs')
 		return chi2
-
+		
+		
 	def specchi2(self):
 
 		return chi2
