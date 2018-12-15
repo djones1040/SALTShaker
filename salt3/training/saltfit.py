@@ -105,8 +105,6 @@ class chi2:
 		if debug2: import pdb; pdb.set_trace()
 		if onlySNpars: print(chi2,x)
 		else: print(chi2,x[0],x[self.parlist == 'x0_ASASSN-16bc'],x[self.parlist == 'cl'])
-		if chi2 != chi2:
-			import pdb; pdb.set_trace()
 		
 		return chi2
 		
