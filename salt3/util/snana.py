@@ -421,29 +421,29 @@ class SuperNova( object ) :
 
 	def readspecfromlcfile(self,datfile):
 		"""read spectroscopy from the SNANA lightcurve file"""
-		fin = open(datfile)
-		self.SPECTRA = {}
-		startSpec = False
-		for line in fin:
-			if line.startswith('SPECTRUM_ID'):
-				startSpec = True
-				specid = int(line.split()[1])-1
-				self.SPECTRA[specid] = {}
-				for v in specvarnames:
-					self.SPECTRA[specid][v] = np.array([])
-			elif line.startswith('END_SPECTRUM') and startSpec:
-				startSpec = False
-			elif line.startswith('VARNAMES_SPEC'):
-				specvarnames = line.split()[1:]
-			elif startSpec and not line.startswith('SPEC:'):
-				try:
-					self.SPECTRA[specid][line.split()[0][:-1]] = float(line.split('#')[0].split()[1])
-				except:
-					self.SPECTRA[specid][line.split()[0][:-1]] = line.split('#')[0].split()[1]
-			elif startSpec and line.startswith('SPEC'):
-				specvals = line.split('#')[0].split()[1:]
-				for v,sv in zip(specvarnames,specvals):
-					self.SPECTRA[specid][v] = np.append(self.SPECTRA[specid][v],float(sv))
+		with open(datfile) as fin:
+			self.SPECTRA = {}
+			startSpec = False
+			for line in fin:
+				if line.startswith('SPECTRUM_ID'):
+					startSpec = True
+					specid = int(line.split()[1])-1
+					self.SPECTRA[specid] = {}
+					for v in specvarnames:
+						self.SPECTRA[specid][v] = np.array([])
+				elif line.startswith('END_SPECTRUM') and startSpec:
+					startSpec = False
+				elif line.startswith('VARNAMES_SPEC'):
+					specvarnames = line.split()[1:]
+				elif startSpec and not line.startswith('SPEC:'):
+					try:
+						self.SPECTRA[specid][line.split()[0][:-1]] = float(line.split('#')[0].split()[1])
+					except:
+						self.SPECTRA[specid][line.split()[0][:-1]] = line.split('#')[0].split()[1]
+				elif startSpec and line.startswith('SPEC'):
+					specvals = line.split('#')[0].split()[1:]
+					for v,sv in zip(specvarnames,specvals):
+						self.SPECTRA[specid][v] = np.append(self.SPECTRA[specid][v],float(sv))
 
 	def readnewspec(self,datfile):
 		"""read spectroscopy from an ascii file with columns wavelength, flux, (fluxerr)
