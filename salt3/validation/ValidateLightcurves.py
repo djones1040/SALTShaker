@@ -1,10 +1,16 @@
 import numpy as np
 import pylab as plt
 import sncosmo
+import argparse
 from salt3.util import snana
 from astropy.table import Table
-lcfile='foundPS17tn.txt'
-sn = snana.SuperNova(lcfile)
+from os import path
+parser = argparse.ArgumentParser(description='Plot lightcurves from SALT3 model against data, Hsiao model, and SALT2 model.')
+parser.add_argument('lcfile',type=str,help='Supernova lightcurve data in SNANA format')
+parser.add_argument('SALT3',type=str,help='Directory with SALT3 parameters')
+parser=parser.parse_args()
+
+sn = snana.SuperNova(parser.lcfile)
 sn.FLT = sn.FLT.astype('U20')
 for i in range(len(sn.FLT)):
     sn.FLT[i] = 'sdss%s'%sn.FLT[i]
@@ -16,7 +22,7 @@ data = Table([sn.MJD,sn.FLT,sn.FLUXCAL,sn.FLUXCALERR,
 flux = sn.FLUXCAL
 salt2model = sncosmo.Model(source='salt2')
 hsiaomodel = sncosmo.Model(source='hsiao')
-salt3 = sncosmo.SALT2Source(m0file='salt3_template_0.dat',m1file='salt3_template_1.dat')
+salt3 = sncosmo.SALT2Source(modeldir=parser.SALT3,m0file='salt3_template_0.dat',m1file='salt3_template_1.dat')
 salt3model =  sncosmo.Model(salt3)
 fitparams_salt2=['t0', 'x0', 'x1', 'c']
 salt2model.set(z=sn.REDSHIFT_FINAL[0:5])
