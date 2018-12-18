@@ -39,9 +39,10 @@ class chi2:
 			self.stdmag[survey] = {}
 			primarywave = kcordict[survey]['primarywave']
 			for flt in self.kcordict[survey].keys():
-				if flt == 'filtwave' or flt == 'primarywave' or flt == 'snflux' or flt == 'AB': continue
+				if flt == 'filtwave' or flt == 'primarywave' or flt == 'snflux' or flt == 'AB' or flt == 'BD17': continue
 				if kcordict[survey][flt]['magsys'] == 'AB': primarykey = 'AB'
 				elif kcordict[survey][flt]['magsys'] == 'Vega': primarykey = 'Vega'
+				elif kcordict[survey][flt]['magsys'] == 'BD17': primarykey = 'BD17'
 				self.stdmag[survey][flt] = synphot(primarywave,kcordict[survey][primarykey],filtwave=self.kcordict[survey]['filtwave'],
 												   filttp=kcordict[survey][flt]['filttrans'],
 												   zpoff=0)#kcordict[survey][flt]['zpoff'])
@@ -87,7 +88,8 @@ class chi2:
 		elif self.n_components == 2: M0,M1 = components
 		if self.n_colorpars:
 			colorLaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
-		
+		else: colorLaw = None
+			
 		chi2 = 0
 		#Construct arguments for chi2forSN method
 		args=[(sn,x,components,colorLaw,onlySNpars,False,False) for sn in self.datadict.keys()]
