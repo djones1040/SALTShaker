@@ -7,6 +7,8 @@ import argparse
 import configparser
 import numpy as np
 import sys
+import multiprocessing
+
 from salt3.util import snana
 from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
 from scipy.optimize import minimize, least_squares
@@ -82,7 +84,9 @@ class TrainSALT:
 							help='number of degrees of the phase-independent color law polynomial (default=%default)')
 		parser.add_argument('--n_specrecal', default=config.get('trainparams','n_specrecal'), type=int,
 							help='number of parameters defining the spectral recalibration (default=%default)')
-		
+		parser.add_argument('--n_processes', default=config.get('trainparams','n_processes'), type=int,
+							help='number of processes to use in calculating chi2 (default=%default)')
+
 		return parser
 
 	def rdkcor(self,kcorpath):
@@ -225,7 +229,7 @@ class TrainSALT:
 
 	def fitSALTModel(self,datadict,phaserange,phaseres,waverange,waveres,
 					 colorwaverange,minmethod,kcordict,initmodelfile,phaseoutres,waveoutres,
-					 n_components=1,n_colorpars=0):
+					 n_components=1,n_colorpars=0,n_processes=1):
 
 		n_phaseknots = int((phaserange[1]-phaserange[0])/phaseres)-4
 		n_waveknots = int((waverange[1]-waverange[0])/waveres)-4
@@ -283,9 +287,15 @@ class TrainSALT:
 		#initparlist += ['cl']*n_colorpars
 		initparlist = np.array(initparlist)
 		saltfitter.parlist = initparlist
+		
+		if n_processes>1:
+			with multiprocessing.Pool(n_processes) as pool:
+				md_init = least_squares(saltfitter.chi2fit,initguess,method='trf',bounds=initbounds,
+								args=(True,pool))
+		else:
+			md_init = least_squares(saltfitter.chi2fit,initguess,method='trf',bounds=initbounds,
+				args=(True,))
 
-		md_init = least_squares(saltfitter.chi2fit,initguess,method='trf',bounds=initbounds,
-								args=(True,))
 		try:
 			if 'condition is satisfied' not in md_init.message.decode('utf-8'):
 				self.addwarning('Initialization minimizer message: %s'%md_init.message)
@@ -314,8 +324,13 @@ class TrainSALT:
 
 		# lsmr is for sparse problems, and regularize option defaults to true
 		# this is presumably less optimal than what SALT2 does
-		md = least_squares(saltfitter.chi2fit,guess,method='trf',
-						   bounds=lsqbounds,args=(False,False,False))#,tr_solver='lsmr')
+		if n_processes>1:
+			with multiprocessing.Pool(n_processes) as pool:
+				md = least_squares(saltfitter.chi2fit,guess,method='trf',
+						   bounds=lsqbounds,args=(False,pool,False,False))
+		else:
+			md = least_squares(saltfitter.chi2fit,guess,method='trf',
+						   bounds=lsqbounds,args=(False,None,False,False))
 
 		# another fitting option, but least_squares seems to
 		# work best for now
