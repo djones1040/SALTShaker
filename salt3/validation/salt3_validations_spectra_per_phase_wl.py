@@ -3,38 +3,65 @@ import pylab as plt
 import sncosmo
 from salt3.util import snana
 from astropy.table import Table
-hsiao_model = sncosmo.Model(source='hsiao')
-hsiao_model.set(amplitude=1)
-salt2_model = sncosmo.Model(source='salt2')
-salt2_model.set_source_peakmag(hsiao_model.source_peakmag('bessellv', 'vega'),'bessellv', 'vega')
-salt3 = sncosmo.SALT2Source(m0file='salt3_template_0.dat',m1file='salt3_template_1.dat')
-salt3_model =  sncosmo.Model(salt3)
-salt3_model.set_source_peakmag(hsiao_model.source_peakmag('bessellv', 'vega'),'bessellv', 'vega')
-p=np.linspace(-10,10,100)
-wave_array=np.linspace(3000.0,8000.0,1000.0)
-flux_salt2=salt2_model.flux(p, wave_array)
-flux_salt3=salt3_model.flux(p, wave_array)
-flux_hsiao=hsiao_model.flux(p, wave_array)
-salt3_hsiao_comp=np.sqrt((flux_salt3-flux_hsiao)**2)
-salt3_salt2_comp=np.sqrt((flux_salt3-flux_salt2)**2)
-max_salt3_hsiao_comp=np.max(salt3_hsiao_comp)
-max_salt3_salt2_comp=np.max(salt3_salt2_comp)
-fig = plt.figure(figsize=(8, 5))
-ax1 = fig.add_subplot(211)
-ax2 = fig.add_subplot(212)
-ax1.set_ylabel('Phase (days)')
-#ax1.set_xlabel('Wavelength ($\AA$)')
-ax1.set_xticklabels([])
-ax1.set_title('SALT3-Hsiao')
-i = ax1.imshow(salt3_hsiao_comp/max_salt3_hsiao_comp,interpolation='none',aspect='auto',cmap = plt.cm.get_cmap("viridis")
-              ,origin='lower',extent=[min(wave_array),max(wave_array), min(p),max(p)])
-clb = plt.colorbar(i,ax=ax1)
-clb.ax.set_title('% 100')
-ax2.set_ylabel('Phase (days)')
-ax2.set_xlabel('Wavelength ($\AA$)')
-ax2.set_title('SALT3-SALT2')
-i = ax2.imshow(salt3_salt2_comp/max_salt3_salt2_comp,interpolation='none',aspect='auto',cmap = plt.cm.get_cmap("viridis")
-              ,origin='lower',extent=[min(wave_array),max(wave_array), min(p),max(p)])
-clb = plt.colorbar(i,ax=ax2)
-clb.ax.set_title('% 100')
-plt.show()
+
+def main(outfile,
+		 m0file='salt3_template_0.dat',
+		 m1file='salt3_template_1.dat',
+		 clfile='salt2_color_correction.dat',
+		 cdfile='salt2_color_dispersion.dat',
+		 errscalefile='salt2_lc_dispersion_scaling.dat',
+		 lcrv00file='salt2_lc_relative_variance_0.dat',
+		 lcrv11file='salt2_lc_relative_variance_1.dat',
+		 lcrv01file='salt2_lc_relative_covariance_01.dat'):
+	plt.clf()
+	
+	hsiao_model = sncosmo.Model(source='hsiao')
+	hsiao_model.set(amplitude=1)
+	salt2_model = sncosmo.Model(source='salt2')
+	salt2_model.set_source_peakmag(
+		hsiao_model.source_peakmag('bessellv', 'vega'),'bessellv', 'vega')
+
+	salt3 = sncosmo.SALT2Source(m0file=m0file,m1file=m0file,
+								clfile=clfile,cdfile=cdfile,
+								errscalefile=errscalefile,
+								lcrv00file=lcrv00file,
+								lcrv11file=lcrv11file,
+								lcrv01file=lcrv01file)
+	salt3_model =  sncosmo.Model(salt3)
+	salt3_model.set_source_peakmag(
+		hsiao_model.source_peakmag('bessellv', 'vega'),'bessellv', 'vega')
+	p=np.linspace(-10,10,100)
+
+	wave_array=np.linspace(3000.0,8000.0,1000.0)
+	flux_salt2=salt2_model.flux(p, wave_array)
+	flux_salt3=salt3_model.flux(p, wave_array)
+	flux_hsiao=hsiao_model.flux(p, wave_array)
+	salt3_hsiao_comp=np.sqrt((flux_salt3-flux_hsiao)**2)
+	salt3_salt2_comp=np.sqrt((flux_salt3-flux_salt2)**2)
+	max_salt3_hsiao_comp=np.max(salt3_hsiao_comp)
+	max_salt3_salt2_comp=np.max(salt3_salt2_comp)
+	fig = plt.figure(figsize=(8, 5))
+
+	ax1 = fig.add_subplot(211)
+	ax2 = fig.add_subplot(212)
+
+	ax1.set_ylabel('Phase (days)')
+	#ax1.set_xlabel('Wavelength ($\AA$)')
+	ax1.set_xticklabels([])
+	ax1.set_title('SALT3-Hsiao')
+	i = ax1.imshow(salt3_hsiao_comp/max_salt3_hsiao_comp,
+				   interpolation='none',aspect='auto',cmap = plt.cm.get_cmap("viridis"),
+				   origin='lower',extent=[min(wave_array),max(wave_array), min(p),max(p)])
+	clb = plt.colorbar(i,ax=ax1)
+	clb.ax.set_title('% 100')
+	ax2.set_ylabel('Phase (days)')
+	ax2.set_xlabel('Wavelength ($\AA$)')
+	ax2.set_title('SALT3-SALT2')
+	i = ax2.imshow(salt3_salt2_comp/max_salt3_salt2_comp,
+				   interpolation='none',aspect='auto',cmap = plt.cm.get_cmap("viridis")
+				   ,origin='lower',extent=[min(wave_array),max(wave_array), min(p),max(p)])
+	clb = plt.colorbar(i,ax=ax2)
+	clb.ax.set_title('% 100')
+	plt.show()
+
+	plt.savefig(outfile)
