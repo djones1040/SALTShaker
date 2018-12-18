@@ -88,7 +88,8 @@ class chi2:
 		elif self.n_components == 2: M0,M1 = components
 		if self.n_colorpars:
 			colorLaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
-		
+		else: colorLaw = None
+			
 		chi2 = 0
 		#Construct arguments for chi2forSN method
 		args=[(sn,x,components,colorLaw,onlySNpars,False,False) for sn in self.datadict.keys()]
