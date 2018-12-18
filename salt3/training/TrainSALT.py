@@ -37,7 +37,10 @@ class TrainSALT:
 							help='clobber')
 		parser.add_argument('-c','--configfile', default=None, type=str,
 							help='configuration file')
+		parser.add_argument('-s','--stage', default='all', type=str,
+							help='stage - options are train and validate')
 
+		
 		# input/output files
 		parser.add_argument('--snlist', default=config.get('iodata','snlist'), type=str,
 							help="""list of SNANA-formatted SN data files, including both photometry and spectroscopy. (default=%default)""")
@@ -113,6 +116,8 @@ class TrainSALT:
 				self.kcordict[survey]['AB'] = primarysed['AB']
 			if 'Vega' in primarysed.names:
 				self.kcordict[survey]['Vega'] = primarysed['Vega']
+			if 'BD17' in primarysed.names:
+				self.kcordict[survey]['BD17'] = primarysed['BD17']
 			for filt in zpoff['Filter Name']:
 				self.kcordict[survey][filt.split('-')[-1]] = {}
 				self.kcordict[survey][filt.split('-')[-1]]['filttrans'] = filtertrans[filt]
@@ -182,9 +187,10 @@ class TrainSALT:
 				raise RuntimeError('File %s has no heliocentric redshift information in the header'%PhotSNID[0])
 			
 			zHel = float(sn.REDSHIFT_HELIO.split('+-')[0])
-			tpk,tpkmsg = estimate_tpk_bazin(sn.MJD,sn.FLUXCAL,sn.FLUXCALERR)
+			tpk,tpkmsg = estimate_tpk_bazin(sn.MJD,sn.FLUXCAL,sn.FLUXCALERR,max_nfev=100000)
+
 			if 'termination condition is satisfied' not in tpkmsg:
-				self.addwarning('skipping SN %s; can\'t estimate t_max')
+				self.addwarning('skipping SN %s; can\'t estimate t_max'%sn.SNID)
 				continue
 
 			datadict[sn.SNID] = {'snfile':f,
@@ -382,6 +388,44 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			
 		return
 
+	def validate(self,outputdir):
+
+		import pylab as plt
+		plt.ion()
+		
+		from salt3.validation import salt3_validations_lightcurves
+		from salt3.validation import salt3_validations_spectra_per_phase_wl
+
+		salt3_validations_spectra_per_phase_wl.main(
+			'%s/spectralcomp.png'%outputdir,
+			m0file='%s/salt3_template_0.dat'%outputdir,
+			m1file='%s/salt3_template_1.dat'%outputdir,
+			clfile='%s/salt2_color_correction.dat'%outputdir,
+			cdfile='%s/salt2_color_dispersion.dat'%outputdir,
+			errscalefile='%s/salt2_lc_dispersion_scaling.dat'%outputdir,
+			lcrv00file='%s/salt2_lc_relative_variance_0.dat'%outputdir,
+			lcrv11file='%s/salt2_lc_relative_variance_1.dat'%outputdir,
+			lcrv01file='%s/salt2_lc_relative_covariance_01.dat'%outputdir)
+		
+		snfiles = np.loadtxt(self.options.snlist,dtype='str')
+		snfiles = np.atleast_1d(snfiles)
+		for l in snfiles:
+			plt.clf()
+			if '/' not in l:
+				l = '%s/%s'%(os.path.dirname(self.options.snlist),l)
+			
+			salt3_validations_lightcurves.main(
+				'%s/lccomp.png'%outputdir,l,
+				m0file='%s/salt3_template_0.dat'%outputdir,
+				m1file='%s/salt3_template_1.dat'%outputdir,
+				clfile='%s/salt2_color_correction.dat'%outputdir,
+				cdfile='%s/salt2_color_dispersion.dat'%outputdir,
+				errscalefile='%s/salt2_lc_dispersion_scaling.dat'%outputdir,
+				lcrv00file='%s/salt2_lc_relative_variance_0.dat'%outputdir,
+				lcrv11file='%s/salt2_lc_relative_variance_1.dat'%outputdir,
+				lcrv01file='%s/salt2_lc_relative_covariance_01.dat'%outputdir)
+
+		
 	def main(self):
 
 		if not self.options.kcor_path:
@@ -393,20 +437,23 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		datadict = self.rdAllData(self.options.snlist,speclist=self.options.speclist)
 		
 		# fit the model - initial pass
-		phase,wave,M0,M1,clpars,SNParams = self.fitSALTModel(
-			datadict,self.options.phaserange,self.options.phasesplineres,
-			self.options.waverange,self.options.wavesplineres,
-			self.options.colorwaverange,
-			self.options.minmethod,self.kcordict,
-			self.options.initmodelfile,
-			self.options.phaseoutres,self.options.waveoutres,
-			self.options.n_components,
-			self.options.n_colorpars,
-			self.options.n_processes)
+		if self.options.stage == "all" or self.options.stage == "train":
+			phase,wave,M0,M1,clpars,SNParams = self.fitSALTModel(
+				datadict,self.options.phaserange,self.options.phasesplineres,
+				self.options.waverange,self.options.wavesplineres,
+				self.options.colorwaverange,
+				self.options.minmethod,self.kcordict,
+				self.options.initmodelfile,
+				self.options.phaseoutres,self.options.waveoutres,
+				self.options.n_components,
+				self.options.n_colorpars)
 		
-		# write the output model - M0, M1, c
-		self.wrtoutput(self.options.outputdir,phase,wave,M0,M1,clpars,SNParams)
+			# write the output model - M0, M1, c
+			self.wrtoutput(self.options.outputdir,phase,wave,M0,M1,clpars,SNParams)
 
+		if self.options.stage == "all" or self.options.stage == "validate":
+			self.validate(self.options.outputdir)
+		
 		print('successful SALT2 training!  Output files written to %s'%self.options.outputdir)
 		
 	

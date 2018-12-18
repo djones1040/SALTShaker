@@ -39,9 +39,10 @@ class chi2:
 			self.stdmag[survey] = {}
 			primarywave = kcordict[survey]['primarywave']
 			for flt in self.kcordict[survey].keys():
-				if flt == 'filtwave' or flt == 'primarywave' or flt == 'snflux' or flt == 'AB': continue
+				if flt == 'filtwave' or flt == 'primarywave' or flt == 'snflux' or flt == 'AB' or flt == 'BD17': continue
 				if kcordict[survey][flt]['magsys'] == 'AB': primarykey = 'AB'
 				elif kcordict[survey][flt]['magsys'] == 'Vega': primarykey = 'Vega'
+				elif kcordict[survey][flt]['magsys'] == 'BD17': primarykey = 'BD17'
 				self.stdmag[survey][flt] = synphot(primarywave,kcordict[survey][primarykey],filtwave=self.kcordict[survey]['filtwave'],
 												   filttp=kcordict[survey][flt]['filttrans'],
 												   zpoff=0)#kcordict[survey][flt]['zpoff'])
