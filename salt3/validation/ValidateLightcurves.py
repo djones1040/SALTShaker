@@ -1,6 +1,7 @@
 import numpy as np
 import pylab as plt
 import sncosmo
+import argparse
 from salt3.util import snana
 from astropy.table import Table
 
@@ -80,3 +81,4 @@ def main(outfile,lcfile,
 	plt.show()
 	
 	plt.savefig(outfile)
+
