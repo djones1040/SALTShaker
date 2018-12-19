@@ -226,7 +226,25 @@ class TrainSALT:
 			datadict = self.rdSpecData(datadict,speclist,tpk)
 			
 		return datadict
+	def applyMinMethod(self,minFun,minMethod,guess,bounds,minFunArgs):
+		if minMethod in ['trf']:
+			md= least_squares(minFun,guess,method=minMethod,bounds=bounds,
+								args=minFunArgs)
+			# another fitting option, but least_squares seems to
+			# work best for now
+			#md = minimize(saltfitter.chi2fit,guess,
+			#			  bounds=lsqbounds,
+			#			  method=minmethod,
+			#			  options={'maxiter':100000,'maxfev':100000,'maxfun':100000})
 
+			try:
+				if 'condition is satisfied' not in md.message.decode('utf-8'):
+					self.addwarning('Minimizer message: %s'%md.message)
+			except:
+				if 'condition is satisfied' not in md.message:
+					self.addwarning('Minimizer message: %s'%md.message)
+			return md.x
+			
 	def fitSALTModel(self,datadict,phaserange,phaseres,waverange,waveres,
 					 colorwaverange,minmethod,kcordict,initmodelfile,phaseoutres,waveoutres,
 					 n_components=1,n_colorpars=0,n_processes=1):
@@ -290,18 +308,11 @@ class TrainSALT:
 		
 		if n_processes>1:
 			with multiprocessing.Pool(n_processes) as pool:
-				md_init = least_squares(saltfitter.chi2fit,initguess,method='trf',bounds=initbounds,
-								args=(True,pool))
+				initX=self.applyMinMethod(saltfitter.chi2fit,minmethod,initguess,initbounds,(True,pool))
+				
 		else:
-			md_init = least_squares(saltfitter.chi2fit,initguess,method='trf',bounds=initbounds,
-				args=(True,))
+			initX=self.applyMinMethod(saltfitter.chi2fit,minmethod,initguess,initbounds,(True,))
 
-		try:
-			if 'condition is satisfied' not in md_init.message.decode('utf-8'):
-				self.addwarning('Initialization minimizer message: %s'%md_init.message)
-		except:
-			if 'condition is satisfied' not in md_init.message:
-				self.addwarning('Initialization minimizer message: %s'%md_init.message)
 		if self.verbose:
 			print('x0 guesses initialized successfully')
 
@@ -309,45 +320,30 @@ class TrainSALT:
 		# 2nd pass - let the SALT model spline knots float			
 		lsqbounds_lower = [-np.inf]*(n_components*n_phaseknots*n_waveknots + n_colorpars)
 		for k in datadict.keys():
-			lsqbounds_lower += [md_init.x[initparlist == 'x0_%s'%k]*1e-1,-np.inf,-np.inf,-5]
+			lsqbounds_lower += [initX[initparlist == 'x0_%s'%k]*1e-1,-np.inf,-np.inf,-5]
 		lsqbounds_upper = [np.inf]*(n_components*n_phaseknots*n_waveknots+n_colorpars)
 		for k in datadict.keys():
-			lsqbounds_upper += [md_init.x[initparlist == 'x0_%s'%k]*1e1,np.inf,np.inf,5]
+			lsqbounds_upper += [initX[initparlist == 'x0_%s'%k]*1e1,np.inf,np.inf,5]
 
 			
 		lsqbounds = (lsqbounds_lower,lsqbounds_upper)
 		for k in datadict.keys():
-			guess[parlist == 'x0_%s'%k] = md_init.x[initparlist == 'x0_%s'%k]
+			guess[parlist == 'x0_%s'%k] = initX[initparlist == 'x0_%s'%k]
 		#guess[parlist == 'cl'] = md_init.x[initparlist == 'cl']
 			
 		saltfitter.parlist = parlist
+		
+		if n_processes>1:
+			with multiprocessing.Pool(n_processes) as pool:
+				fittedX=self.applyMinMethod(saltfitter.chi2fit,minmethod,guess,lsqbounds,(False,pool,False,False))
+		else:
+			fittedX= self.applyMinMethod(saltfitter.chi2fit,minmethod,guess,lsqbounds,(False,None,False,False))
 
 		# lsmr is for sparse problems, and regularize option defaults to true
 		# this is presumably less optimal than what SALT2 does
-		if n_processes>1:
-			with multiprocessing.Pool(n_processes) as pool:
-				md = least_squares(saltfitter.chi2fit,guess,method='trf',
-						   bounds=lsqbounds,args=(False,pool,False,False))
-		else:
-			md = least_squares(saltfitter.chi2fit,guess,method='trf',
-						   bounds=lsqbounds,args=(False,None,False,False))
-
-		# another fitting option, but least_squares seems to
-		# work best for now
-		#md = minimize(saltfitter.chi2fit,guess,
-		#			  bounds=lsqbounds,
-		#			  method=minmethod,
-		#			  options={'maxiter':100000,'maxfev':100000,'maxfun':100000})
-
-		try:
-			if 'condition is satisfied' not in md.message.decode('utf-8'):
-				self.addwarning('Minimizer message: %s'%md.message)
-		except:
-			if 'condition is satisfied' not in md.message:
-				self.addwarning('Minimizer message: %s'%md.message)
 				
 		phase,wave,M0,M1,clpars,SNParams = \
-			saltfitter.getPars(md.x)
+			saltfitter.getPars(fittedX)
 
 		return phase,wave,M0,M1,clpars,SNParams
 
