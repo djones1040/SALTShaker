@@ -393,19 +393,10 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		import pylab as plt
 		plt.ion()
 		
-		from salt3.validation import salt3_validations_lightcurves
-		from salt3.validation import salt3_validations_spectra_per_phase_wl
+		from salt3.validation import ValidateLightcurves
+		from salt3.validation import ValidateModel
 
-		salt3_validations_spectra_per_phase_wl.main(
-			'%s/spectralcomp.png'%outputdir,
-			m0file='%s/salt3_template_0.dat'%outputdir,
-			m1file='%s/salt3_template_1.dat'%outputdir,
-			clfile='%s/salt2_color_correction.dat'%outputdir,
-			cdfile='%s/salt2_color_dispersion.dat'%outputdir,
-			errscalefile='%s/salt2_lc_dispersion_scaling.dat'%outputdir,
-			lcrv00file='%s/salt2_lc_relative_variance_0.dat'%outputdir,
-			lcrv11file='%s/salt2_lc_relative_variance_1.dat'%outputdir,
-			lcrv01file='%s/salt2_lc_relative_covariance_01.dat'%outputdir)
+		ValidateModel.main('%s/modelcomp.png'%outputdir,outputdir)
 		
 		snfiles = np.loadtxt(self.options.snlist,dtype='str')
 		snfiles = np.atleast_1d(snfiles)
@@ -415,16 +406,8 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				l = '%s/%s'%(os.path.dirname(self.options.snlist),l)
 			sn = snana.SuperNova(l)
 				
-			salt3_validations_lightcurves.main(
-				'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,
-				m0file='%s/salt3_template_0.dat'%outputdir,
-				m1file='%s/salt3_template_1.dat'%outputdir,
-				clfile='%s/salt2_color_correction.dat'%outputdir,
-				cdfile='%s/salt2_color_dispersion.dat'%outputdir,
-				errscalefile='%s/salt2_lc_dispersion_scaling.dat'%outputdir,
-				lcrv00file='%s/salt2_lc_relative_variance_0.dat'%outputdir,
-				lcrv11file='%s/salt2_lc_relative_variance_1.dat'%outputdir,
-				lcrv01file='%s/salt2_lc_relative_covariance_01.dat'%outputdir)
+			ValidateLightcurves.main(
+				'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,outputdir)
 
 		
 	def main(self):

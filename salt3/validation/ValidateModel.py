@@ -3,8 +3,9 @@ import pylab as plt
 import sncosmo
 from salt3.util import snana
 from astropy.table import Table
+import argparse
 
-def main(outfile,
+def main(outfile,salt3dir,
 		 m0file='salt3_template_0.dat',
 		 m1file='salt3_template_1.dat',
 		 clfile='salt2_color_correction.dat',
@@ -21,7 +22,7 @@ def main(outfile,
 	salt2_model.set_source_peakmag(
 		hsiao_model.source_peakmag('bessellv', 'vega'),'bessellv', 'vega')
 
-	salt3 = sncosmo.SALT2Source(m0file=m0file,m1file=m0file,
+	salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,m1file=m0file,
 								clfile=clfile,cdfile=cdfile,
 								errscalefile=errscalefile,
 								lcrv00file=lcrv00file,
@@ -62,6 +63,16 @@ def main(outfile,
 				   ,origin='lower',extent=[min(wave_array),max(wave_array), min(p),max(p)])
 	clb = plt.colorbar(i,ax=ax2)
 	clb.ax.set_title('% 100')
+	plt.savefig(outfile)
 	plt.show()
 
-	plt.savefig(outfile)
+	
+if __name__ == "__main__":
+	parser = argparse.ArgumentParser(description='Plot differences between SALT3 model and the SALT2/Hsiao models')
+	parser.add_argument('salt3dir',type=str,help='File with supernova fit parameters')
+	parser.add_argument('outfile',type=str,nargs='?',default=None,help='File with supernova fit parameters')
+	parser=parser.parse_args()
+	args=vars(parser)
+	if parser.outfile is None:
+		args['outfile']='modelcomp.png'
+	main(**args)
