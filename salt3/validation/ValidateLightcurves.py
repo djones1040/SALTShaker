@@ -53,7 +53,7 @@ def main(outfile,lcfile,
 	hsiaomodel.set(z=sn.REDSHIFT_HELIO[0:5])
 	result_salt3, fitted_salt3_model = sncosmo.fit_lc(data, salt3model, fitparams_salt3)
 	plotmjd = np.linspace(sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]-20,
-						  sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]+40,100)
+						  sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]+55,100)
 	
 	fig = plt.figure(figsize=(15, 5))
 	ax1 = fig.add_subplot(131)
@@ -77,6 +77,8 @@ def main(outfile,lcfile,
 					yerr=sn.FLUXCALERR[sn.FLT == flt],
 					fmt='o',label=sn.SNID,color='k')
 		ax.set_title(flt)
+		ax.set_xlim([sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]-30,
+					 sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]+55])
 	ax1.legend()
 	plt.show()
 	
