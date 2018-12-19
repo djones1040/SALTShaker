@@ -7,13 +7,16 @@ from scipy.interpolate import interp1d
 from sncosmo.salt2utils import SALT2ColorLaw
 import time
 from itertools import starmap
+from salt3.training import init_hsiao
+from sncosmo.models import StretchSource
+from scipy.optimize import minimize
 #import pysynphot as S
 
 lambdaeff = {'g':4900.1409,'r':6241.2736,'i':7563.7672,'z':8690.0840}
 
 class chi2:
 	def __init__(self,guess,datadict,parlist,phaserange,waverange,phaseres,waveres,phaseoutres,waveoutres,
-				 colorwaverange,kcordict,n_components=1,n_colorpars=0):
+				 colorwaverange,kcordict,initmodelfile,n_components=1,n_colorpars=0,days_interp=5):
 		self.datadict = datadict
 		self.parlist = parlist
 		self.phaserange = phaserange
@@ -29,9 +32,34 @@ class chi2:
 		assert type(parlist) == np.ndarray
 		self.splinephase = np.linspace(phaserange[0],phaserange[1],(phaserange[1]-phaserange[0])/phaseres)
 		self.splinewave = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/waveres)
-		self.phase = np.linspace(phaserange[0]-5,phaserange[1]+5,(phaserange[1]-phaserange[0])/phaseoutres)
+		self.phase = np.linspace(phaserange[0]-days_interp,phaserange[1]+days_interp,
+								 (phaserange[1]-phaserange[0]+2*days_interp)/phaseoutres)
 		self.wave = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/waveoutres)
 
+		self.hsiaoflux = init_hsiao.get_hsiao(hsiaofile=initmodelfile,
+											  phaserange=phaserange,waverange=waverange,
+											  phaseinterpres=phaseoutres,waveinterpres=waveoutres,
+											  phasesplineres=phaseres,wavesplineres=waveres,
+											  days_interp=days_interp)
+		self.extrapsource = StretchSource(self.phase,self.wave,self.hsiaoflux)
+		self.extrapsource.set(amplitude=1,s=1)
+		# sample every 50 wavelengths to make fitting faster
+		self.extrapidx = np.arange(0,len(self.wave),waveoutres*25,dtype='int')
+		self.iExtrapFittingPhaseMin = self.phase < 0
+		self.iExtrapFittingPhaseMax = self.phase > 40
+
+		self.iExtrapFittingPhaseMin2D = np.zeros([len(self.phase),len(self.wave)],dtype='bool')
+		self.iExtrapFittingPhaseMax2D = np.zeros([len(self.phase),len(self.wave)],dtype='bool')
+		for p in range(len(self.phase)):
+			for w in range(len(self.wave)):
+				if self.phase[p] < 0 and w in self.extrapidx:
+					self.iExtrapFittingPhaseMin2D[p,w] = True
+				if self.phase[p] > 40 and w in self.extrapidx:
+					self.iExtrapFittingPhaseMax2D[p,w] = True
+		
+		self.iExtrapPhaseMin = self.phase < phaserange[0]
+		self.iExtrapPhaseMax = self.phase > phaserange[1]
+		
 		self.components = self.SALTModel(guess)
 		
 		self.stdmag = {}
@@ -47,6 +75,30 @@ class chi2:
 												   filttp=kcordict[survey][flt]['filttrans'],
 												   zpoff=0)#kcordict[survey][flt]['zpoff'])
 
+	def extrapolate(self,saltflux,x0):
+
+		def errfunc_min(params):
+			self.extrapsource.set(amplitude=params[0],s=params[1])
+			if params[1] <= 0: return np.inf
+			return np.sum(abs(saltflux[self.iExtrapFittingPhaseMin2D] - self.extrapsource.flux(self.phase[self.iExtrapFittingPhaseMin], self.wave[self.extrapidx]).flatten()))
+		def errfunc_max(params):
+			self.extrapsource.set(amplitude=params[0],s=params[1])
+			if params[1] <= 0: return np.inf
+			return np.sum(abs(saltflux[self.iExtrapFittingPhaseMax2D] - self.extrapsource.flux(self.phase[self.iExtrapFittingPhaseMax], self.wave[self.extrapidx]).flatten()))
+
+		guess = (x0,1)
+		MinResult = minimize(errfunc_min,guess,method='Nelder-Mead')
+		MaxResult = minimize(errfunc_max,guess,method='Nelder-Mead')
+
+		saltfluxbkp = saltflux[:]
+		
+		self.extrapsource.set(amplitude=MinResult.x[0],s=MinResult.x[1])
+		saltflux[self.iExtrapPhaseMin,:] = self.extrapsource.flux(self.phase[self.iExtrapPhaseMin],self.wave)
+		self.extrapsource.set(amplitude=MaxResult.x[0],s=MaxResult.x[1])
+		saltflux[self.iExtrapPhaseMax,:] = self.extrapsource.flux(self.phase[self.iExtrapPhaseMax],self.wave)
+
+		return saltflux
+		
 	def chi2fit(self,x,onlySNpars=False,pool=None,debug=False,debug2=False):
 		"""
 		Calculates the goodness of fit of given SALT model to photometric and spectroscopic data given during initialization
@@ -170,6 +222,7 @@ class chi2:
 		if colorLaw:
 			saltflux *= 10. ** (-0.4 * colorLaw(self.wave) * c)
 			if debug2: import pdb; pdb.set_trace()
+		saltflux = self.extrapolate(saltflux,x0)
 
 		chi2=0
 		int1d = interp1d(self.phase,saltflux,axis=0)
@@ -223,6 +276,21 @@ class chi2:
 		
 		m0pars = x[self.parlist == 'm0']
 		m0 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m0pars,bsorder,bsorder))
+
+		#import pdb; pdb.set_trace()
+		# extrapolate
+		#import pdb; pdb.set_trace()
+		iPhaseLow = (self.phase - self.phaserange[0])**2. == np.min((self.phase - self.phaserange[0])**2.)
+		LowScale = np.mean(m0[iPhaseLow]/self.hsiaoflux[iPhaseLow])
+		iPhaseHigh = (self.phase - self.phaserange[1])**2. == np.min((self.phase - self.phaserange[1])**2.)
+		HighScale = np.mean(m0[iPhaseHigh]/self.hsiaoflux[iPhaseHigh])
+		
+		m0[self.phase < self.phaserange[0],:] = self.hsiaoflux[self.phase < self.phaserange[0],:]*LowScale
+		m0[self.phase > self.phaserange[1],:] = self.hsiaoflux[self.phase > self.phaserange[1],:]*HighScale
+		#self.hsiaofluxlow
+		#self.hsiaofluxhigh
+
+
 		if self.n_components == 2:
 			m1pars = x[self.parlist == 'm1']
 			m1 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m1pars,bsorder,bsorder))
@@ -254,7 +322,7 @@ class chi2:
 							  'x1':x[self.parlist == 'x1_%s'%k],
 							  'c':x[self.parlist == 'x1_%s'%k],
 							  't0':x[self.parlist == 'tpkoff_%s'%k]+tpk_init}
-
+			
 		return self.phase,self.wave,m0,m1,clpars,resultsdict
 
 	def synflux(self,sourceflux,zpoff,survey=None,flt=None,redshift=0):

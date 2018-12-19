@@ -276,7 +276,7 @@ class TrainSALT:
 		saltfitter = saltfit.chi2(guess,datadict,parlist,phaserange,
 								  waverange,phaseres,waveres,phaseoutres,waveoutres,
 								  colorwaverange,
-								  kcordict,n_components,n_colorpars)
+								  kcordict,initmodelfile,n_components,n_colorpars)
 
 		# first pass - estimate x0 so we can bound it to w/i an order of mag
 		initbounds = ([0,-np.inf,-np.inf,-5]*n_sn,[np.inf,np.inf,np.inf,5]*n_sn)
@@ -393,7 +393,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		import pylab as plt
 		plt.ion()
 		
-		from salt3.validation import salt3_validations_lightcurves
+		from salt3.validation import ValidateLightcurves
 		from salt3.validation import salt3_validations_spectra_per_phase_wl
 
 		salt3_validations_spectra_per_phase_wl.main(
@@ -415,7 +415,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				l = '%s/%s'%(os.path.dirname(self.options.snlist),l)
 			sn = snana.SuperNova(l)
 				
-			salt3_validations_lightcurves.main(
+			ValidateLightcurves.main(
 				'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,
 				m0file='%s/salt3_template_0.dat'%outputdir,
 				m1file='%s/salt3_template_1.dat'%outputdir,
