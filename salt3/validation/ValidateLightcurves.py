@@ -5,7 +5,7 @@ import argparse
 from salt3.util import snana
 from astropy.table import Table
 
-def main(outfile,lcfile,
+def main(outfile,lcfile,salt3dir,
 		 m0file='salt3_template_0.dat',
 		 m1file='salt3_template_1.dat',
 		 clfile='salt2_color_correction.dat',
@@ -35,7 +35,7 @@ def main(outfile,lcfile,
 	flux = sn.FLUXCAL
 	salt2model = sncosmo.Model(source='salt2')
 	hsiaomodel = sncosmo.Model(source='hsiao')
-	salt3 = sncosmo.SALT2Source(m0file=m0file,
+	salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,
 								m1file=m1file,
 								clfile=clfile,cdfile=cdfile,
 								errscalefile=errscalefile,
@@ -78,7 +78,19 @@ def main(outfile,lcfile,
 					fmt='o',label=sn.SNID,color='k')
 		ax.set_title(flt)
 	ax1.legend()
+	plt.savefig(outfile)
 	plt.show()
 	
-	plt.savefig(outfile)
-
+	
+	
+if __name__ == "__main__":
+	parser = argparse.ArgumentParser(description='Plot lightcurves from SALT3 model against SALT2 model, Hsiao model, and data')
+	parser.add_argument('lcfile',type=str,help='File with supernova fit parameters')
+	parser.add_argument('salt3dir',type=str,help='File with supernova fit parameters')
+	parser.add_argument('outfile',type=str,nargs='?',default=None,help='File with supernova fit parameters')
+	parser=parser.parse_args()
+	args=vars(parser)
+	if parser.outfile is None:
+		sn = snana.SuperNova(parser.lcfile)
+		args['outfile']='lccomp_%s.png'%sn.SNID
+	main(**args)
