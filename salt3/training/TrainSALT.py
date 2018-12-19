@@ -8,13 +8,15 @@ import configparser
 import numpy as np
 import sys
 import multiprocessing
+import pyswarm
+
+from scipy.optimize import minimize, least_squares
+from astropy.io import fits
 
 from salt3.util import snana
 from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
-from scipy.optimize import minimize, least_squares
 from salt3.training import saltfit
 from salt3.training.init_hsiao import init_hsiao
-from astropy.io import fits
 
 class TrainSALT:
 	def __init__(self):
@@ -227,7 +229,7 @@ class TrainSALT:
 			
 		return datadict
 	def applyMinMethod(self,minFun,minMethod,guess,bounds,minFunArgs):
-		if minMethod in ['trf']:
+		if minMethod in ['trf','dogbox','lm']:
 			md= least_squares(minFun,guess,method=minMethod,bounds=bounds,
 								args=minFunArgs)
 			# another fitting option, but least_squares seems to
@@ -244,6 +246,10 @@ class TrainSALT:
 				if 'condition is satisfied' not in md.message:
 					self.addwarning('Minimizer message: %s'%md.message)
 			return md.x
+		elif minMethod == 'pso':
+			return pyswarm.pso(minFun,bounds[0],bounds[1],args=minFunArgs)[0]
+		else:
+			raise ValueError('Specified minimization method {} is unimplemented'.format(minMethod))
 			
 	def fitSALTModel(self,datadict,phaserange,phaseres,waverange,waveres,
 					 colorwaverange,minmethod,kcordict,initmodelfile,phaseoutres,waveoutres,
@@ -297,7 +303,7 @@ class TrainSALT:
 								  kcordict,n_components,n_colorpars)
 
 		# first pass - estimate x0 so we can bound it to w/i an order of mag
-		initbounds = ([0,-np.inf,-np.inf,-5]*n_sn,[np.inf,np.inf,np.inf,5]*n_sn)
+		initbounds = ([0,-10,-1,-5]*n_sn,[np.inf,10,1,5]*n_sn)
 		initguess = (1,0,0,0)*n_sn #+ (0,)*n_colorpars
 		initparlist = []
 		for k in datadict.keys():
