@@ -8,13 +8,16 @@ import configparser
 import numpy as np
 import sys
 import multiprocessing
+from scipy.linalg import lstsq
 
 from salt3.util import snana
 from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
-from scipy.optimize import minimize, least_squares
+from scipy.optimize import minimize, least_squares, differential_evolution
 from salt3.training import saltfit
+from salt3.training.fitting import fitting
 from salt3.training.init_hsiao import init_hsiao
 from astropy.io import fits
+from astropy.cosmology import Planck15 as cosmo
 
 class TrainSALT:
 	def __init__(self):
@@ -54,6 +57,8 @@ class TrainSALT:
 		parser.add_argument('--initmodelfile', default=config.get('iodata','initmodelfile'), type=str,
 							help="""initial model to begin training, ASCII with columns
 							phase, wavelength, flux (default=%default)""")
+		parser.add_argument('--initbfilt', default=config.get('iodata','initbfilt'), type=str,
+							help="""initial B-filter to get the normalization of the initial model (default=%default)""")
 		parser.add_argument('--kcor_path', default=config.get('iodata','kcor_path'), type=str, action='append',
 							help="""kcor_path gives survey,kcorfile for each survey used in the training data (default=%default)""")
 
@@ -76,8 +81,12 @@ class TrainSALT:
 							help='phase resolution in angstroms of the output file (default=%default)')
 		parser.add_argument('--phaserange', default=list(map(int,config.get('trainparams','phaserange').split(','))), type=int, nargs=2,
 							help='phase range over which model is trained (default=%default)')
-		parser.add_argument('--minmethod', default=config.get('trainparams','minmethod'), type=str, nargs=2,
-							help='minimization algorithm, passed to scipy.optimize.minimize (default=%default)')
+		parser.add_argument('--fitmethod', default=config.get('trainparams','fitmethod'), type=str,
+							help='fitting algorithm, passed to the fitter (default=%default)')
+		parser.add_argument('--fitstrategy', default=config.get('trainparams','fitstrategy'), type=str,
+							help='fitting strategy, one of leastsquares, minimize, emcee, hyperopt, or diffevol (default=%default)')
+		parser.add_argument('--fititer', default=config.get('trainparams','fititer'), type=int,
+							help='fitting iterations (default=%default)')
 		parser.add_argument('--n_components', default=config.get('trainparams','n_components'), type=int,
 							help='number of principal components of the SALT model to fit for (default=%default)')
 		parser.add_argument('--n_colorpars', default=config.get('trainparams','n_colorpars'), type=int,
@@ -123,6 +132,7 @@ class TrainSALT:
 				self.kcordict[survey][filt.split('-')[-1]]['filttrans'] = filtertrans[filt]
 				self.kcordict[survey][filt.split('-')[-1]]['zpoff'] = zpoff['ZPOff(Primary)'][zpoff['Filter Name'] == filt][0]
 				self.kcordict[survey][filt.split('-')[-1]]['magsys'] = zpoff['Primary Name'][zpoff['Filter Name'] == filt][0]
+				self.kcordict[survey][filt.split('-')[-1]]['primarymag'] = zpoff['Primary Mag'][zpoff['Filter Name'] == filt][0]
 
 	def rdSpecData(self,datadict,speclist,tpk):
 
@@ -187,7 +197,15 @@ class TrainSALT:
 				raise RuntimeError('File %s has no heliocentric redshift information in the header'%PhotSNID[0])
 			
 			zHel = float(sn.REDSHIFT_HELIO.split('+-')[0])
-			tpk,tpkmsg = estimate_tpk_bazin(sn.MJD,sn.FLUXCAL,sn.FLUXCALERR,max_nfev=100000)
+			if 'B' in sn.FLT:
+				tpk,tpkmsg = estimate_tpk_bazin(
+					sn.MJD[sn.FLT == 'B'],sn.FLUXCAL[sn.FLT == 'B'],sn.FLUXCALERR[sn.FLT == 'B'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
+			elif 'g' in sn.FLT:
+				tpk,tpkmsg = estimate_tpk_bazin(
+					sn.MJD[sn.FLT == 'g'],sn.FLUXCAL[sn.FLT == 'g'],sn.FLUXCALERR[sn.FLT == 'g'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
+			else:
+				raise RuntimeError('need a blue filter to estimate tmax')
+
 
 			if 'termination condition is satisfied' not in tpkmsg:
 				self.addwarning('skipping SN %s; can\'t estimate t_max'%sn.SNID)
@@ -222,19 +240,32 @@ class TrainSALT:
 			datadict[sn.SNID]['photdata']['fluxcalerr'] = sn.FLUXCALERR
 			datadict[sn.SNID]['photdata']['filt'] = sn.FLT
 
+		if not len(datadict.keys()):
+			raise RuntimeError('no light curve data to train on!!')
+			
 		if speclist:
 			datadict = self.rdSpecData(datadict,speclist,tpk)
 			
 		return datadict
-
+		
 	def fitSALTModel(self,datadict,phaserange,phaseres,waverange,waveres,
-					 colorwaverange,minmethod,kcordict,initmodelfile,phaseoutres,waveoutres,
-					 n_components=1,n_colorpars=0,n_processes=1):
+					 colorwaverange,fitmethod,fitstrategy,fititer,kcordict,initmodelfile,initBfilt,
+					 phaseoutres,waveoutres,n_components=1,n_colorpars=0,n_processes=1):
 
-		n_phaseknots = int((phaserange[1]-phaserange[0])/phaseres)-4
-		n_waveknots = int((waverange[1]-waverange[0])/waveres)-4
+		if not os.path.exists(initmodelfile):
+			from salt3.initfiles import init_rootdir
+			initmodelfile = '%s/%s'%(init_rootdir,initmodelfile)
+			initBfilt = '%s/%s'%(init_rootdir,initBfilt)
+			salt2file = '%s/salt2_template_0.dat.gz'%init_rootdir
+		if not os.path.exists(initmodelfile):
+			raise RuntimeError('model initialization file not found in local directory or %s'%init_rootdir)
+		
+		phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
+			initmodelfile,salt2file,initBfilt,phaserange=phaserange,waverange=waverange,
+			phasesplineres=phaseres,wavesplineres=waveres,
+			phaseinterpres=phaseoutres,waveinterpres=waveoutres)
+		n_phaseknots,n_waveknots = len(phaseknotloc)-4,len(waveknotloc)-4
 		n_sn = len(datadict.keys())
-
 		# x1,x0,c for each SN
 		# phase/wavelength spline knots for M0, M1 (ignoring color for now)
 		# TODO: spectral recalibration
@@ -243,17 +274,6 @@ class TrainSALT:
 		if n_colorpars: n_params += n_colorpars
 		print(n_params)
 		guess = np.zeros(n_params)
-
-		if not os.path.exists(initmodelfile):
-			from salt3.initfiles import init_rootdir
-			initmodelfile = '%s/%s'%(init_rootdir,initmodelfile)
-		if not os.path.exists(initmodelfile):
-			raise RuntimeError('model initialization file not found in local directory or %s'%init_rootdir)
-			
-		phase,wave,m0,m1,m0knots,m1knots = init_hsiao(
-			initmodelfile,phaserange=phaserange,waverange=waverange,
-			phasesplineres=phaseres,wavesplineres=waveres,
-			phaseinterpres=phaseoutres,waveinterpres=waveoutres)
 
 		parlist = ['m0']*(n_phaseknots*n_waveknots)
 		if n_components == 2:
@@ -273,29 +293,34 @@ class TrainSALT:
 			guess[parlist == 'cl'] = [0.]*n_colorpars
 		guess[(parlist == 'm0') & (guess < 0)] = 0
 
-		saltfitter = saltfit.chi2(guess,datadict,parlist,phaserange,
+		saltfitter = saltfit.chi2(guess,datadict,parlist,
+								  phaseknotloc,waveknotloc,phaserange,
 								  waverange,phaseres,waveres,phaseoutres,waveoutres,
 								  colorwaverange,
-								  kcordict,initmodelfile,n_components,n_colorpars)
+								  kcordict,initmodelfile,initBfilt,n_components,n_colorpars)
 
 		# first pass - estimate x0 so we can bound it to w/i an order of mag
 		initbounds = ([0,-np.inf,-np.inf,-5]*n_sn,[np.inf,np.inf,np.inf,5]*n_sn)
-		initguess = (1,0,0,0)*n_sn #+ (0,)*n_colorpars
 		initparlist = []
+		initguess = ()
 		for k in datadict.keys():
 			initparlist += ['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k]
+			initguess += (10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36)),0,0,0)
 		#initparlist += ['cl']*n_colorpars
 		initparlist = np.array(initparlist)
 		saltfitter.parlist = initparlist
-		
+		saltfitter.onlySNpars = True
+
+		#nll = lambda *args: -saltfitter.chi2fit(*args)
 		if n_processes>1:
 			with multiprocessing.Pool(n_processes) as pool:
 				md_init = least_squares(saltfitter.chi2fit,initguess,method='trf',bounds=initbounds,
-								args=(True,pool))
+								args=(pool,))
 		else:
 			md_init = least_squares(saltfitter.chi2fit,initguess,method='trf',bounds=initbounds,
-				args=(True,))
+				args=(None,))
 
+			
 		try:
 			if 'condition is satisfied' not in md_init.message.decode('utf-8'):
 				self.addwarning('Initialization minimizer message: %s'%md_init.message)
@@ -307,47 +332,42 @@ class TrainSALT:
 
 
 		# 2nd pass - let the SALT model spline knots float			
-		lsqbounds_lower = [-np.inf]*(n_components*n_phaseknots*n_waveknots + n_colorpars)
-		for k in datadict.keys():
-			lsqbounds_lower += [md_init.x[initparlist == 'x0_%s'%k]*1e-1,-np.inf,-np.inf,-5]
-		lsqbounds_upper = [np.inf]*(n_components*n_phaseknots*n_waveknots+n_colorpars)
-		for k in datadict.keys():
-			lsqbounds_upper += [md_init.x[initparlist == 'x0_%s'%k]*1e1,np.inf,np.inf,5]
-
-			
-		lsqbounds = (lsqbounds_lower,lsqbounds_upper)
+		SNpars,SNparlist = [],[]
 		for k in datadict.keys():
 			guess[parlist == 'x0_%s'%k] = md_init.x[initparlist == 'x0_%s'%k]
+			SNpars += [md_init.x[initparlist == 'x0_%s'%k],md_init.x[initparlist == 'x1_%s'%k],
+					   md_init.x[initparlist == 'c_%s'%k],md_init.x[initparlist == 'tpkoff_%s'%k]]
+			SNparlist += ['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k]
+		SNparlist = np.array(SNparlist); SNpars = np.array(SNpars)
 		#guess[parlist == 'cl'] = md_init.x[initparlist == 'cl']
 			
 		saltfitter.parlist = parlist
+		saltfitter.onlySNpars = False
 
-		# lsmr is for sparse problems, and regularize option defaults to true
-		# this is presumably less optimal than what SALT2 does
-		if n_processes>1:
-			with multiprocessing.Pool(n_processes) as pool:
-				md = least_squares(saltfitter.chi2fit,guess,method='trf',
-						   bounds=lsqbounds,args=(False,pool,False,False))
+		fitter = fitting(n_components,n_colorpars,
+						 n_phaseknots,n_waveknots,
+						 datadict,md_init.x,
+						 initparlist,parlist)
+		
+		if self.options.fitstrategy == 'leastsquares':
+			phase,wave,M0,M1,clpars,SNParams,message = fitter.least_squares(saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod)
+		elif self.options.fitstrategy == 'minimize':
+			phase,wave,M0,M1,clpars,SNParams,message = fitter.minimize(saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod)
+		elif self.options.fitstrategy == 'emcee':
+			phase,wave,M0,M1,clpars,SNParams,message = fitter.emcee(saltfitter,guess,SNpars,SNparlist,n_processes)
+		elif self.options.fitstrategy == 'hyperopt':
+			phase,wave,M0,M1,clpars,SNParams,message = fitter.hyperopt(saltfitter,guess,m0knots,SNpars,SNparlist,n_processes)
+		elif self.options.fitstrategy == 'diffevol':
+			phase,wave,M0,M1,clpars,SNParams,message = fitter.diffevol(saltfitter,SNpars,SNparlist,n_processes)
 		else:
-			md = least_squares(saltfitter.chi2fit,guess,method='trf',
-						   bounds=lsqbounds,args=(False,None,False,False))
-
-		# another fitting option, but least_squares seems to
-		# work best for now
-		#md = minimize(saltfitter.chi2fit,guess,
-		#			  bounds=lsqbounds,
-		#			  method=minmethod,
-		#			  options={'maxiter':100000,'maxfev':100000,'maxfun':100000})
+			raise RuntimeError('fitting strategy not one of leastsquares, minimize, emcee, hyperopt, or diffevol')
 
 		try:
-			if 'condition is satisfied' not in md.message.decode('utf-8'):
-				self.addwarning('Minimizer message: %s'%md.message)
+			if 'condition is satisfied' not in message.decode('utf-8'):
+				self.addwarning('Minimizer message: %s'%message)
 		except:
-			if 'condition is satisfied' not in md.message:
-				self.addwarning('Minimizer message: %s'%md.message)
-				
-		phase,wave,M0,M1,clpars,SNParams = \
-			saltfitter.getPars(md.x)
+			if 'condition is satisfied' not in message:
+				self.addwarning('Minimizer message: %s'%message)
 
 		return phase,wave,M0,M1,clpars,SNParams
 
@@ -409,12 +429,18 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		
 		snfiles = np.loadtxt(self.options.snlist,dtype='str')
 		snfiles = np.atleast_1d(snfiles)
+		fitparams_salt3 = ['t0','x0']
+		if self.options.n_components == 2:
+			fitparams_salt3 += ['x1']
+		if self.options.n_colorpars > 0:
+			fitparams_salt3 += ['c']
+
 		for l in snfiles:
 			plt.clf()
 			if '/' not in l:
 				l = '%s/%s'%(os.path.dirname(self.options.snlist),l)
 			sn = snana.SuperNova(l)
-				
+			print(fitparams_salt3)
 			ValidateLightcurves.main(
 				'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,
 				m0file='%s/salt3_template_0.dat'%outputdir,
@@ -424,7 +450,8 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				errscalefile='%s/salt2_lc_dispersion_scaling.dat'%outputdir,
 				lcrv00file='%s/salt2_lc_relative_variance_0.dat'%outputdir,
 				lcrv11file='%s/salt2_lc_relative_variance_1.dat'%outputdir,
-				lcrv01file='%s/salt2_lc_relative_covariance_01.dat'%outputdir)
+				lcrv01file='%s/salt2_lc_relative_covariance_01.dat'%outputdir,
+				fitparams_salt3=fitparams_salt3)
 
 		
 	def main(self):
@@ -443,9 +470,14 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				datadict,self.options.phaserange,self.options.phasesplineres,
 				self.options.waverange,self.options.wavesplineres,
 				self.options.colorwaverange,
-				self.options.minmethod,self.kcordict,
+				self.options.fitmethod,
+				self.options.fitstrategy,
+				self.options.fititer,
+				self.kcordict,
 				self.options.initmodelfile,
-				self.options.phaseoutres,self.options.waveoutres,
+				self.options.initbfilt,
+				self.options.phaseoutres,
+				self.options.waveoutres,
 				self.options.n_components,
 				self.options.n_colorpars)
 		
