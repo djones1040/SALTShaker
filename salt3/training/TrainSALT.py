@@ -414,18 +414,11 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		plt.ion()
 		
 		from salt3.validation import ValidateLightcurves
-		from salt3.validation import salt3_validations_spectra_per_phase_wl
+		from salt3.validation import ValidateModel
 
-		salt3_validations_spectra_per_phase_wl.main(
+		ValidateModel.main(
 			'%s/spectralcomp.png'%outputdir,
-			m0file='%s/salt3_template_0.dat'%outputdir,
-			m1file='%s/salt3_template_1.dat'%outputdir,
-			clfile='%s/salt2_color_correction.dat'%outputdir,
-			cdfile='%s/salt2_color_dispersion.dat'%outputdir,
-			errscalefile='%s/salt2_lc_dispersion_scaling.dat'%outputdir,
-			lcrv00file='%s/salt2_lc_relative_variance_0.dat'%outputdir,
-			lcrv11file='%s/salt2_lc_relative_variance_1.dat'%outputdir,
-			lcrv01file='%s/salt2_lc_relative_covariance_01.dat'%outputdir)
+			outputdir)
 		
 		snfiles = np.loadtxt(self.options.snlist,dtype='str')
 		snfiles = np.atleast_1d(snfiles)
@@ -443,15 +436,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 			print(fitparams_salt3)
 			ValidateLightcurves.main(
-				'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,
-				m0file='%s/salt3_template_0.dat'%outputdir,
-				m1file='%s/salt3_template_1.dat'%outputdir,
-				clfile='%s/salt2_color_correction.dat'%outputdir,
-				cdfile='%s/salt2_color_dispersion.dat'%outputdir,
-				errscalefile='%s/salt2_lc_dispersion_scaling.dat'%outputdir,
-				lcrv00file='%s/salt2_lc_relative_variance_0.dat'%outputdir,
-				lcrv11file='%s/salt2_lc_relative_variance_1.dat'%outputdir,
-				lcrv01file='%s/salt2_lc_relative_covariance_01.dat'%outputdir,
+				'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,outputdir,
 				fitparams_salt3=fitparams_salt3)
 
 		
