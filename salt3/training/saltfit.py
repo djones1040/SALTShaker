@@ -21,7 +21,7 @@ class chi2:
 	def __init__(self,guess,datadict,parlist,phaseknotloc,waveknotloc,
 				 phaserange,waverange,phaseres,waveres,phaseoutres,waveoutres,
 				 colorwaverange,kcordict,initmodelfile,initBfilt,n_components=1,
-				 n_colorpars=0,days_interp=5,onlySNpars=False):
+				 n_colorpars=0,days_interp=5,onlySNpars=False,emcee=False):
 		self.datadict = datadict
 		self.parlist = parlist
 		self.phaserange = phaserange
@@ -34,6 +34,7 @@ class chi2:
 		self.n_colorpars = n_colorpars
 		self.colorwaverange = colorwaverange
 		self.onlySNpars = onlySNpars
+		self.emcee = emcee
 		
 		assert type(parlist) == np.ndarray
 		self.splinephase = phaseknotloc #np.linspace(phaserange[0],phaserange[1],(phaserange[1]-phaserange[0])/phaseres)
@@ -164,7 +165,10 @@ class chi2:
 		if self.onlySNpars: print(chi2,x)
 		else: print(chi2,x[0],x[self.parlist == 'x0_ASASSN-16bc'],x[self.parlist == 'cl'])
 
-		return chi2
+		if self.emcee:
+			return -chi2
+		else:
+			return chi2
 		
 	def chi2forSN(self,sn,x,components=None,SNpars=(),SNparlist=(),
 				  colorLaw=None,onlySNpars=False,
