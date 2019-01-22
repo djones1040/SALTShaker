@@ -440,6 +440,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			if '/' not in l:
 				l = '%s/%s'%(os.path.dirname(self.options.snlist),l)
 			sn = snana.SuperNova(l)
+
 			print(fitparams_salt3)
 			ValidateLightcurves.main(
 				'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,
