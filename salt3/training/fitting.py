@@ -81,8 +81,10 @@ class fitting:
 
 	def emcee(self,saltfitter,guess,SNpars,SNparlist,n_processes):
 
+		saltfitter.emcee = True
+		
 		import emcee
-		ndim, nwalkers = len(parlist), 2*len(parlist)
+		ndim, nwalkers = len(self.parlist), 2*len(self.parlist)
 		pos = [guess + 1e-21*np.random.randn(ndim) for i in range(nwalkers)]
 		sampler = emcee.EnsembleSampler(nwalkers, ndim, saltfitter.chi2fit,
 										args=(None,SNpars,SNparlist,False,False),threads=n_processes)
