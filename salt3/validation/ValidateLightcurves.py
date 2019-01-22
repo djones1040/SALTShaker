@@ -13,7 +13,8 @@ def main(outfile,lcfile,salt3dir,
 		 errscalefile='salt2_lc_dispersion_scaling.dat',
 		 lcrv00file='salt2_lc_relative_variance_0.dat',
 		 lcrv11file='salt2_lc_relative_variance_1.dat',
-		 lcrv01file='salt2_lc_relative_covariance_01.dat'):
+		 lcrv01file='salt2_lc_relative_covariance_01.dat',
+		 fitparams_salt3=['t0', 'x0', 'x1', 'c']):
 	plt.clf()
 
 	sn = snana.SuperNova(lcfile)
@@ -49,11 +50,11 @@ def main(outfile,lcfile,salt3dir,
 	fitparams_hsiao = ['t0','amplitude']
 	hsiaomodel.set(z=sn.REDSHIFT_HELIO[0:5])
 	result_hsiao, fitted_hsiao_model = sncosmo.fit_lc(data, hsiaomodel, fitparams_hsiao)
-	fitparams_salt3=['t0', 'x0', 'x1', 'c']
-	hsiaomodel.set(z=sn.REDSHIFT_HELIO[0:5])
+
+	salt3model.set(z=sn.REDSHIFT_HELIO[0:5])
 	result_salt3, fitted_salt3_model = sncosmo.fit_lc(data, salt3model, fitparams_salt3)
 	plotmjd = np.linspace(sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]-20,
-						  sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]+40,100)
+						  sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]+55,100)
 	
 	fig = plt.figure(figsize=(15, 5))
 	ax1 = fig.add_subplot(131)
@@ -77,6 +78,8 @@ def main(outfile,lcfile,salt3dir,
 					yerr=sn.FLUXCALERR[sn.FLT == flt],
 					fmt='o',label=sn.SNID,color='k')
 		ax.set_title(flt)
+		ax.set_xlim([sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]-30,
+					 sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]+55])
 	ax1.legend()
 	plt.savefig(outfile)
 	plt.show()
