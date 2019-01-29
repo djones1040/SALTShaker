@@ -2,6 +2,7 @@
 
 from scipy.optimize import minimize, least_squares, differential_evolution
 import numpy as np
+import pyswarm
 
 class fitting:
 	def __init__(self,n_components,n_colorpars,n_phaseknots,n_waveknots,datadict,x_init,initparlist,parlist):
@@ -78,6 +79,29 @@ class fitting:
 			saltfitter.getPars(md.x)
 			
 		return phase,wave,M0,M1,clpars,SNParams,md.message
+
+	def particleswarm(self,saltfitter,SNpars,SNparlist,n_processes):
+
+		bounds = ((0,np.max(self.x_init[self.initparlist == 'x0_%s'%(list(self.datadict.keys())[0])])),)*\
+				 (self.n_components*self.n_phaseknots*self.n_waveknots + self.n_colorpars)
+		for k in self.datadict.keys():
+			bounds += ((self.x_init[self.initparlist == 'x0_%s'%k][0]*1e-1,self.x_init[self.initparlist == 'x0_%s'%k][0]*1e1),
+						(-5,5),(-1,1),(-5,5))
+		bounds=tuple(zip(*bounds))
+		# another fitting option, but least_squares seems to
+		# work best for now
+		x=pyswarm.pso(saltfitter.chi2fit,bounds[0],bounds[1],args=(None,SNpars,SNparlist,False,False))[0]
+
+		for k in self.datadict.keys():
+			x[self.parlist == 'x0_%s'%k],x[self.parlist == 'x1_%s'%k],\
+				x[self.parlist == 'c_%s'%k],x[self.parlist == 'tpkoff_%s'%k] = \
+				self.x_init[self.initparlist == 'x0_%s'%k],self.x_init[self.initparlist == 'x1_%s'%k],\
+				self.x_init[self.initparlist == 'c_%s'%k],self.x_init[self.initparlist == 'tpkoff_%s'%k]
+			
+		phase,wave,M0,M1,clpars,SNParams = \
+			saltfitter.getPars(x)
+			
+		return phase,wave,M0,M1,clpars,SNParams,"Particle swarm optimization successful"
 
 	def emcee(self,saltfitter,guess,SNpars,SNparlist,n_processes):
 

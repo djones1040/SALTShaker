@@ -348,7 +348,7 @@ class TrainSALT:
 						 n_phaseknots,n_waveknots,
 						 datadict,md_init.x,
 						 initparlist,parlist)
-		
+
 		if self.options.fitstrategy == 'leastsquares':
 			phase,wave,M0,M1,clpars,SNParams,message = fitter.least_squares(saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod)
 		elif self.options.fitstrategy == 'minimize':
@@ -359,6 +359,9 @@ class TrainSALT:
 			phase,wave,M0,M1,clpars,SNParams,message = fitter.hyperopt(saltfitter,guess,m0knots,SNpars,SNparlist,n_processes)
 		elif self.options.fitstrategy == 'diffevol':
 			phase,wave,M0,M1,clpars,SNParams,message = fitter.diffevol(saltfitter,SNpars,SNparlist,n_processes)
+		elif self.options.fitstrategy == 'particleswarm':
+			phase,wave,M0,M1,clpars,SNParams,message = fitter.particleswarm(saltfitter,SNpars,SNparlist,n_processes)
+
 		else:
 			raise RuntimeError('fitting strategy not one of leastsquares, minimize, emcee, hyperopt, or diffevol')
 
@@ -414,9 +417,9 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		plt.ion()
 		
 		from salt3.validation import ValidateLightcurves
-		from salt3.validation import salt3_validations_spectra_per_phase_wl
+		from salt3.validation import ValidateModel
 
-		salt3_validations_spectra_per_phase_wl.main(
+		ValidateModel.main(
 			'%s/spectralcomp.png'%outputdir,
 			m0file='%s/salt3_template_0.dat'%outputdir,
 			m1file='%s/salt3_template_1.dat'%outputdir,
