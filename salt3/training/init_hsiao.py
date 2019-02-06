@@ -9,10 +9,11 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 			   salt2file='initfiles/salt2_template_0.dat.gz',
 			   Bfilt='initfiles/Bessell90_B.dat',
 			   phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
-			   waveinterpres=2.0,phasesplineres=3.2,wavesplineres=72,days_interp=5):
+			   waveinterpres=2.0,phasesplineres=3.2,wavesplineres=72,
+			   days_interp=5,debug=False):
 
 	phase,wave,flux = np.loadtxt(hsiaofile,unpack=True)
-	sphase,swave,sflux = np.loadtxt(hsiaofile,unpack=True)
+	#sphase,swave,sflux = np.loadtxt(hsiaofile,unpack=True)
 	#HBmag = synphotB(wave[phase == 0],flux[phase == 0],0,Bfilt=Bfilt)
 	#SBmag = synphotB(swave[phase == 0],sflux[sphase == 0],0,Bfilt=Bfilt)
 	#import pdb; pdb.set_trace()
@@ -42,6 +43,23 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 					  flux-m0sub.reshape(len(flux)),kx=3,ky=3,
 					  tx=splinephase,ty=splinewave,task=-1)
 	m1 = bisplev(intphase,intwave,bsplm1)
+	if debug:
+		import pylab as plt
+		plt.ion()
+		plt.plot(wave[phase == 0],flux[phase == 0],label='hsiao, phase = 0 days')
+		#plt.plot(wave[phase == 1],flux[phase == 1],label='hsiao, phase = +1 day')
+		#plt.plot(intwave,m0[7,:],label='interp')
+		m0test = bisplev(np.array([0]),intwave,(bspl[0],bspl[1],bspl[2],3,3))
+		plt.xlim([2000,9200])
+		plt.legend()
+		plt.plot(intwave,m0test,label='interp')
+
+		#bspl[2][bspl[2] < 0] = 0
+		bspltmp = bspl[2].reshape([len(splinephase)-4,len(splinewave)-4])
+		#bspltmp[bspltmp
+		#m0test = bisplev(np.array([0]),intwave,(bspl[0],bspl[1],bspltmp.flatten(),3,3))
+		#plt.plot(intwave,m0test,label='interp')
+		import pdb; pdb.set_trace()
 	
 	return intphase,intwave,m0,m1,bspl[0],bspl[1],bspl[2],bsplm1[2]
 

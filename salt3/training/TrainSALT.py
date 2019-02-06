@@ -13,7 +13,6 @@ from scipy.linalg import lstsq
 from salt3.util import snana
 from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
 from scipy.optimize import minimize, least_squares, differential_evolution
-from salt3.training import saltfit
 from salt3.training.fitting import fitting
 from salt3.training.init_hsiao import init_hsiao
 from astropy.io import fits
@@ -252,6 +251,11 @@ class TrainSALT:
 					 colorwaverange,fitmethod,fitstrategy,fititer,kcordict,initmodelfile,initBfilt,
 					 phaseoutres,waveoutres,n_components=1,n_colorpars=0,n_processes=1):
 
+		if self.options.fitstrategy == 'multinest':
+			from salt3.training import saltfit_mcmc as saltfit
+		else:
+			from salt3.training import saltfit
+		
 		if not os.path.exists(initmodelfile):
 			from salt3.initfiles import init_rootdir
 			initmodelfile = '%s/%s'%(init_rootdir,initmodelfile)
@@ -315,10 +319,10 @@ class TrainSALT:
 		if n_processes>1:
 			with multiprocessing.Pool(n_processes) as pool:
 				md_init = least_squares(saltfitter.chi2fit,initguess,method='trf',bounds=initbounds,
-								args=(pool,))
+								args=(None,None,pool,))
 		else:
 			md_init = least_squares(saltfitter.chi2fit,initguess,method='trf',bounds=initbounds,
-				args=(None,))
+				args=(None,None,None,))
 
 			
 		try:
@@ -359,8 +363,10 @@ class TrainSALT:
 			phase,wave,M0,M1,clpars,SNParams,message = fitter.hyperopt(saltfitter,guess,m0knots,SNpars,SNparlist,n_processes)
 		elif self.options.fitstrategy == 'diffevol':
 			phase,wave,M0,M1,clpars,SNParams,message = fitter.diffevol(saltfitter,SNpars,SNparlist,n_processes)
+		elif self.options.fitstrategy == 'multinest':
+			phase,wave,M0,M1,clpars,SNParams,message = fitter.pymultinest(saltfitter,guess,SNpars,SNparlist,n_processes)
 		else:
-			raise RuntimeError('fitting strategy not one of leastsquares, minimize, emcee, hyperopt, or diffevol')
+			raise RuntimeError('fitting strategy not one of leastsquares, minimize, emcee, hyperopt, multinest, or diffevol')
 
 		try:
 			if 'condition is satisfied' not in message.decode('utf-8'):
@@ -416,28 +422,33 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		from salt3.validation import ValidateLightcurves
 		from salt3.validation import ValidateModel
 
+		x0,x1,c,t0 = np.loadtxt('%s/salt3train_snparams.txt'%outputdir,unpack=True,usecols=[1,2,3,4])
+		snid = np.loadtxt('%s/salt3train_snparams.txt'%outputdir,unpack=True,dtype='str',usecols=[0])
+		
 		ValidateModel.main(
 			'%s/spectralcomp.png'%outputdir,
 			outputdir)
 		
 		snfiles = np.loadtxt(self.options.snlist,dtype='str')
 		snfiles = np.atleast_1d(snfiles)
-		fitparams_salt3 = ['t0','x0']
+		fitx1,fitc = False,False
 		if self.options.n_components == 2:
-			fitparams_salt3 += ['x1']
+			fitx1 = True
 		if self.options.n_colorpars > 0:
-			fitparams_salt3 += ['c']
-
+			fitc = True
+			
 		for l in snfiles:
 			plt.clf()
 			if '/' not in l:
 				l = '%s/%s'%(os.path.dirname(self.options.snlist),l)
 			sn = snana.SuperNova(l)
+			x0sn,x1sn,csn,t0sn = \
+				x0[snid == sn.SNID][0],x1[snid == sn.SNID][0],\
+				c[snid == sn.SNID][0],t0[snid == sn.SNID][0]
 
-			print(fitparams_salt3)
 			ValidateLightcurves.main(
 				'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,outputdir,
-				fitparams_salt3=fitparams_salt3)
+				t0=t0sn,x0=x0sn,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc)
 
 		
 	def main(self):
