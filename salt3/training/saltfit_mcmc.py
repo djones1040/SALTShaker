@@ -21,9 +21,11 @@ class chi2:
 	def __init__(self,guess,datadict,parlist,phaseknotloc,waveknotloc,
 				 phaserange,waverange,phaseres,waveres,phaseoutres,waveoutres,
 				 colorwaverange,kcordict,initmodelfile,initBfilt,n_components=1,
-				 n_colorpars=0,days_interp=5,onlySNpars=False,mcmc=False):
+				 n_colorpars=0,days_interp=5,onlySNpars=False,mcmc=False,debug=False):
 		self.datadict = datadict
 		self.parlist = parlist
+		self.m0min = np.min(np.where(self.parlist == 'm0')[0])
+		self.m0max = np.max(np.where(self.parlist == 'm0')[0])
 		self.phaserange = phaserange
 		self.waverange = waverange
 		self.phaseres = phaseres
@@ -35,10 +37,14 @@ class chi2:
 		self.colorwaverange = colorwaverange
 		self.onlySNpars = onlySNpars
 		self.mcmc = mcmc
+		self.SNpars=()
+		self.SNparlist=()
+		self.guess = guess
+		self.debug = debug
 		
 		assert type(parlist) == np.ndarray
-		self.splinephase = phaseknotloc #np.linspace(phaserange[0],phaserange[1],(phaserange[1]-phaserange[0])/phaseres)
-		self.splinewave = waveknotloc #np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/waveres)
+		self.splinephase = phaseknotloc
+		self.splinewave = waveknotloc
 		self.phase = np.linspace(phaserange[0]-days_interp,phaserange[1]+days_interp,
 								 (phaserange[1]-phaserange[0]+2*days_interp)/phaseoutres)
 		self.wave = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/waveoutres)
@@ -107,7 +113,7 @@ class chi2:
 
 		return saltflux
 		
-	def chi2fit(self,x,ndim=None,nparams=None,pool=None,SNpars=(),SNparlist=(),debug=False,debug2=False):
+	def chi2fit(self,x,pool=None,debug=False,debug2=False):
 		"""
 		Calculates the goodness of fit of given SALT model to photometric and spectroscopic data given during initialization
 		
@@ -133,8 +139,6 @@ class chi2:
 			Goodness of fit of model to training data	
 		"""
 		# TODO: fit to t0
-
-		x = np.array(x)
 		
 		#Set up SALT model
 		if self.onlySNpars:
@@ -149,7 +153,7 @@ class chi2:
 
 		chi2 = 0
 		#Construct arguments for chi2forSN method
-		args=[(sn,x,components,SNpars,SNparlist,colorLaw,self.onlySNpars,debug,debug2) for sn in self.datadict.keys()]
+		args=[(sn,x,components,colorLaw,self.onlySNpars,debug,debug2) for sn in self.datadict.keys()]
 		
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
 		if pool:
@@ -157,20 +161,26 @@ class chi2:
 		else:
 			chi2=sum(starmap(self.chi2forSN,args))
 		
-		#lnp = self.prior(M0[abs(self.phase) == np.min(abs(self.phase)),:][0])
-		#chi2 += lnp
-		
 		#Debug statements
-		if debug2: import pdb; pdb.set_trace()
-		if self.onlySNpars: print(chi2,x)
-		else: print(chi2,x[0],x[self.parlist == 'x0_ASASSN-16bc'],x[self.parlist == 'cl'])
+		#if debug2: import pdb; pdb.set_trace()
+		#if self.onlySNpars: print(chi2,x)
+		#else:
+		#	print(chi2,x[0])#,x[self.parlist == 'x0_ASASSN-16bc'],x[self.parlist == 'cl'])
 
 		if self.mcmc:
+			#print(-chi2)
 			return -chi2
 		else:
+			#print(chi2)
 			return chi2
-		
-	def chi2forSN(self,sn,x,components=None,SNpars=(),SNparlist=(),
+			
+	def prior(self,cube,ndim=None,nparams=None):
+		for i in range(self.m0min,self.m0max):
+			#cube[i] = 1.0*self.guess[i] + 1e-16*cube[i]
+			cube[i] = self.guess[i]*10**(0.4*(cube[i]*2-1))
+		return cube
+			
+	def chi2forSN(self,sn,x,components=None,
 				  colorLaw=None,onlySNpars=False,
 				  debug=False,debug2=False):
 		"""
@@ -221,14 +231,14 @@ class chi2:
 		z = self.datadict[sn]['zHelio']
 		obswave = self.wave*(1+z)
 	
-		if not len(SNpars):
+		if not len(self.SNpars):
 			x0,x1,c,tpkoff = \
 				x[self.parlist == 'x0_%s'%sn][0],x[self.parlist == 'x1_%s'%sn][0],\
 				x[self.parlist == 'c_%s'%sn][0],x[self.parlist == 'tpkoff_%s'%sn][0]
 		else:
 			x0,x1,c,tpkoff = \
-				SNpars[SNparlist == 'x0_%s'%sn][0][0],SNpars[SNparlist == 'x1_%s'%sn][0][0],\
-				SNpars[SNparlist == 'c_%s'%sn][0][0],SNpars[SNparlist == 'tpkoff_%s'%sn][0][0]
+				self.SNpars[self.SNparlist == 'x0_%s'%sn][0][0],self.SNpars[self.SNparlist == 'x1_%s'%sn][0][0],\
+				self.SNpars[self.SNparlist == 'c_%s'%sn][0][0],self.SNpars[self.SNparlist == 'tpkoff_%s'%sn][0][0]
 			
 		#Calculate spectral model
 		if self.n_components == 1:
@@ -276,24 +286,28 @@ class chi2:
 			# chi2 function
 			# TODO - model error/dispersion parameters
 			#chi2 += ((filtPhot['fluxcal']-modelflux)**2./filtPhot['fluxcalerr']**2.).sum()
-			chi2 += ((filtPhot['fluxcal']-modelflux)**2./(filtPhot['fluxcal']*0.05)**2.).sum()
-			if debug:
-				if chi2 > 1357: continue
-				import pylab as plt
-				plt.ion()
-				plt.clf()
-				plt.errorbar(filtPhot['tobs'],modelflux,fmt='o',color='C0',label='model')
-				plt.errorbar(filtPhot['tobs'],filtPhot['fluxcal'],yerr=filtPhot['fluxcalerr'],fmt='o',color='C1',label='obs')
+			chi2 += ((filtPhot['fluxcal']-modelflux)**2./(np.max(filtPhot['fluxcal'])*0.4)**2.).sum()
 
-				hint1d = interp1d(self.phase,self.hsiaoflux,axis=0)
-				hsiaofluxinterp = hint1d(filtPhot['tobs']+tpkoff)
-				hsiaomodelsynflux=np.trapz(pbspl[np.newaxis,:]*hsiaofluxinterp[:,g],obswave[g],axis=1)/denom
-				hsiaomodelflux = hsiaomodelsynflux*10**(-0.4*self.kcordict[survey][flt]['zpoff'])*10**(0.4*self.stdmag[survey][flt])*10**(0.4*27.5)
-				#plt.errorbar(filtPhot['tobs'],hsiaomodelflux,fmt='o',color='C2',label='hsiao model')
-				#import pdb; pdb.set_trace()
+			if self.debug:
+				#print(chi2)
+				if chi2 < 30:
+					import pylab as plt
+					plt.ion()
+					plt.clf()
+					plt.errorbar(filtPhot['tobs'],modelflux,fmt='o',color='C0',label='model')
+					plt.errorbar(filtPhot['tobs'],filtPhot['fluxcal'],yerr=filtPhot['fluxcalerr'],fmt='o',color='C1',label='obs')
+					import pdb; pdb.set_trace()
 				
-				if chi2 < 1357: import pdb; pdb.set_trace()	
-		return chi2
+				#hint1d = interp1d(self.phase,self.hsiaoflux,axis=0)
+				#hsiaofluxinterp = hint1d(filtPhot['tobs']+tpkoff)
+				#hsiaomodelsynflux=np.trapz(pbspl[np.newaxis,:]*hsiaofluxinterp[:,g],obswave[g],axis=1)/denom
+				#hsiaomodelflux = hsiaomodelsynflux*10**(-0.4*self.kcordict[survey][flt]['zpoff'])*10**(0.4*self.stdmag[survey][flt])*10**(0.4*27.5)
+				#plt.errorbar(filtPhot['tobs'],hsiaomodelflux,fmt='o',color='C2',label='hsiao model')
+				
+				
+				#if chi2 < 1357: import pdb; pdb.set_trace()
+			print(chi2)
+			return chi2
 		
 		
 	def specchi2(self):
@@ -302,10 +316,11 @@ class chi2:
 	
 	def SALTModel(self,x,bsorder=3):
 		# parlist,phaserange,waverange,phaseres,waveres,phaseoutres,waveoutres
-		x = np.array(x)
+		#x = np.array(x)
 		#self.parlist = np.array(self.parlist)
-		
-		m0pars = x[self.parlist == 'm0']
+
+		try: m0pars = x[self.m0min:self.m0max]
+		except: import pdb; pdb.set_trace()
 		m0 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m0pars,bsorder,bsorder))
 
 		#import pdb; pdb.set_trace()
@@ -356,6 +371,39 @@ class chi2:
 			
 		return self.phase,self.wave,m0,m1,clpars,resultsdict
 
+	def getParsMCMC(self,x,bsorder=3):
+
+		m0pars = np.array([])
+		for i in np.where(self.parlist == 'm0')[0]:
+			m0pars = np.append(m0pars,x[i].mean())
+			
+		import pdb; pdb.set_trace()
+		m1pars = np.array([])
+		for i in np.where(self.parlist == 'm1')[0]:
+			m1pars = np.append(m1pars,x[i].mean())
+
+		clpars = np.array([])
+		for i in np.where(self.parlist == 'cl')[0]:
+			clpars = np.append(clpars,x[i].mean())
+	
+		m0 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m0pars,bsorder,bsorder))
+		if len(m1pars):
+			m1 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m1pars,bsorder,bsorder))
+		else: m1 = np.zeros(np.shape(m0))
+		if not len(clpars): clpars = []
+	
+		resultsdict = {}
+		n_sn = len(self.datadict.keys())
+		for k in self.datadict.keys():
+			tpk_init = self.datadict[k]['photdata']['mjd'][0] - self.datadict[k]['photdata']['tobs'][0]
+			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k].mean(),
+							  'x1':x[self.parlist == 'x1_%s'%k].mean(),
+							  'c':x[self.parlist == 'x1_%s'%k].mean(),
+							  't0':x[self.parlist == 'tpkoff_%s'%k].mean()+tpk_init}
+			
+		return self.phase,self.wave,m0,m1,clpars,resultsdict
+
+	
 	def synphot(self,sourceflux,zpoff,survey=None,flt=None,redshift=0):
 		obswave = self.wave*(1+redshift)
 
@@ -369,10 +417,3 @@ class chi2:
 
 		res = np.trapz(pbspl*sourceflux[g],obswave[g])/np.trapz(pbspl,obswave[g])
 		return(zpoff-2.5*np.log10(res))
-
-	def prior(self,saltflux,prior_mean=-19.36,prior_std=0.1):
-		
-		Bmag = self.synphot(saltflux/_SCALE_FACTOR,0,survey='SSS',flt='B')-self.stdmag['SSS']['B']
-		p_theta = 1 + norm.logpdf(Bmag,prior_mean,prior_std)
-		print(Bmag)
-		return -p_theta

@@ -17,7 +17,7 @@ class fitting:
 		
 	def least_squares(self,saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod):
 
-		bounds_lower = [-np.inf]*(self.n_components*self.n_phaseknots*self.n_waveknots + self.n_colorpars)
+		bounds_lower = [0]*(self.n_components*self.n_phaseknots*self.n_waveknots + self.n_colorpars)
 		for k in self.datadict.keys():
 			bounds_lower += [self.x_init[self.initparlist == 'x0_%s'%k]*1e-1,-5,-1,-5]
 		bounds_upper = [np.inf]*(self.n_components*self.n_phaseknots*self.n_waveknots+self.n_colorpars)
@@ -29,11 +29,12 @@ class fitting:
 		if n_processes>1:
 			with multiprocessing.Pool(n_processes) as pool:
 				md = least_squares(saltfitter.chi2fit,guess,method=fitmethod,bounds=bounds,
-								   args=(pool,SNpars,SNparlist,False,False))
+								   args=(None,None,pool,SNpars,SNparlist,False,False))
 		else:
 			md = least_squares(saltfitter.chi2fit,guess,method=fitmethod,bounds=bounds,
-							   args=(None,SNpars,SNparlist,False,False))
-
+							   ftol=1e-8,gtol=1e-8,xtol=1e-8,
+							   args=(None,None,None,SNpars,SNparlist,False,False),verbose=2)
+			
 		for k in self.datadict.keys():
 			md.x[self.parlist == 'x0_%s'%k],md.x[self.parlist == 'x1_%s'%k],\
 				md.x[self.parlist == 'c_%s'%k],md.x[self.parlist == 'tpkoff_%s'%k] = \
@@ -47,7 +48,7 @@ class fitting:
 
 	def minimize(self,saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod):
 
-		bounds = ((0,np.inf),)*self.n_phaseknots*self.n_waveknots + ((-np.inf,np.inf),)*\
+		bounds = ((-np.inf,np.inf),)*self.n_phaseknots*self.n_waveknots + ((-np.inf,np.inf),)*\
 				 ((self.n_components-1)*self.n_phaseknots*self.n_waveknots + self.n_colorpars)
 		for k in self.datadict.keys():
 			bounds += ((self.x_init[self.initparlist == 'x0_%s'%k]*1e-1,self.x_init[self.initparlist == 'x0_%s'%k]*1e1),
@@ -59,14 +60,14 @@ class fitting:
 			md = minimize(saltfitter.chi2fit,guess,
 						  bounds=bounds,
 						  method=fitmethod,
-						  args=(Pool,False,False),
+						  args=(None,None,Pool,False,False),
 						  options={'maxiter':100000,'maxfev':100000,'maxfun':100000})
 		else:
 			md = minimize(saltfitter.chi2fit,guess,
 						  bounds=bounds,
 		 				  method=fitmethod,
-		  				  args=(None,SNpars,SNparlist,False,False),
-						  options={'maxiter':100000,'maxfev':100000,'maxfun':100000})
+		  				  args=(None,None,None,SNpars,SNparlist,False,False),
+						  options={'maxiter':10000,'maxfev':10000,'maxfun':10000})
 
 		for k in self.datadict.keys():
 			md.x[self.parlist == 'x0_%s'%k],md.x[self.parlist == 'x1_%s'%k],\
@@ -81,11 +82,13 @@ class fitting:
 
 	def emcee(self,saltfitter,guess,SNpars,SNparlist,n_processes):
 
+		saltfitter.mcmc = True
+		
 		import emcee
-		ndim, nwalkers = len(parlist), 2*len(parlist)
+		ndim, nwalkers = len(self.parlist), 2*len(self.parlist)
 		pos = [guess + 1e-21*np.random.randn(ndim) for i in range(nwalkers)]
 		sampler = emcee.EnsembleSampler(nwalkers, ndim, saltfitter.chi2fit,
-										args=(None,SNpars,SNparlist,False,False),threads=n_processes)
+										args=(None,None,None,SNpars,SNparlist,False,False),threads=n_processes)
 		sampler.run_mcmc(pos, 200)
 		samples = sampler.chain[:, 50:, :].reshape((-1, ndim))
 
@@ -96,6 +99,44 @@ class fitting:
 		
 		return phase,wave,M0,M1,clpars,SNParams,message
 
+	def pymultinest(self,saltfitter,guess,SNpars,SNparlist,n_processes):
+
+		saltfitter.mcmc = True
+		
+		import pymultinest
+		saltfitter.m0min = np.min(np.where(saltfitter.parlist == 'm0')[0])
+		saltfitter.m0max = np.max(np.where(saltfitter.parlist == 'm0')[0])
+		saltfitter.SNpars = SNpars
+		saltfitter.SNparlist = SNparlist
+		saltfitter.mcmc = True
+		saltfitter.debug = False
+		#pymultinest.run(saltfitter.chi2fit, saltfitter.prior, len(guess),
+		#				outputfiles_basename='output/pmntest_1_',
+		#				resume = False, verbose = True)
+		def myprior(cube):
+			return cube * 10 * np.pi
+
+		def myloglike(cube):
+			chi = (np.cos(cube[0:1] / 2.)).prod()
+			return (2. + chi)**5
+		
+		result = pymultinest.solve(#LogLikelihood=myloglike, Prior=myprior,
+								   LogLikelihood=saltfitter.chi2fit, Prior=saltfitter.prior,
+								   n_dims=len(guess),
+								   outputfiles_basename='output/pmntest_1_',
+								   verbose=True,resume=False,n_live_points=150,#max_iter=300,
+								   multimodal=False,importance_nested_sampling=True,
+								   #n_iter_before_update=50,
+								   evidence_tolerance=5,
+								   sampling_efficiency=1)
+		import pdb; pdb.set_trace()
+		phase,wave,M0,M1,clpars,SNParams = \
+			saltfitter.getParsMCMC(result['samples'].transpose())
+		
+		message = 'pymultinest finished successfully'
+		
+		return phase,wave,M0,M1,clpars,SNParams,message
+		
 	def diffevol(self,saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod):
 
 		bounds = ((0,np.max(self.x_init[self.initparlist == 'x0_%s'%(list(self.datadict.keys())[0])])),)*\
@@ -107,7 +148,7 @@ class fitting:
 		md = differential_evolution(saltfitter.chi2fit,
 									bounds=bounds,
 									strategy=fitmethod,
-		  							args=(None,SNpars,SNparlist,False,False))
+		  							args=(None,None,None,SNpars,SNparlist,False,False))
 
 		for k in self.datadict.keys():
 			md.x[self.parlist == 'x0_%s'%k],md.x[self.parlist == 'x1_%s'%k],\
