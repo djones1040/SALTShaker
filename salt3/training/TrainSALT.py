@@ -141,7 +141,7 @@ class TrainSALT:
 		if not os.path.exists(speclist):
 			raise RuntimeError('speclist %s does not exist')
 		
-		snid,mjd,specfiles = np.loadtxt(speclist,unpack=True,dtype='str')
+		snid,mjd,specfiles = np.genfromtxt(speclist,unpack=True,dtype='str')
 		snid,mjd,specfiles = np.atleast_1d(snid),np.atleast_1d(mjd),np.atleast_1d(specfiles)
 		for s,m,sf in zip(snid,mjd,specfiles):
 			try: m = float(m)
@@ -160,10 +160,10 @@ class TrainSALT:
 					speccount = len(datadict[s]['specdata'].keys())
 				datadict[s]['specdata'][speccount] = {}
 				try:
-					wave,flux,fluxerr = np.loadtxt(sf,unpack=True,usecols=[0,1,2])
+					wave,flux,fluxerr = np.genfromtxt(sf,unpack=True,usecols=[0,1,2])
 					datadict[s]['specdata'][speccount]['fluxerr'] = fluxerr
 				except:
-					wave,flux = np.loadtxt(sf,unpack=True,usecols=[0,1])
+					wave,flux = np.genfromtxt(sf,unpack=True,usecols=[0,1])
 				datadict[s]['specdata'][speccount]['wavelength'] = wave
 				datadict[s]['specdata'][speccount]['flux'] = flux
 				datadict[s]['specdata'][speccount]['tobs'] = m - tpk
@@ -178,7 +178,7 @@ class TrainSALT:
 
 		if not os.path.exists(snlist):
 			raise RuntimeError('SN list %s doesn\'t exist'%snlist)
-		snfiles = np.loadtxt(snlist,dtype='str')
+		snfiles = np.genfromtxt(snlist,dtype='str')
 		snfiles = np.atleast_1d(snfiles)
 
 		for f in snfiles:
@@ -439,13 +439,13 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		from salt3.validation import ValidateModel
 
 		x0,x1,c,t0 = np.loadtxt('%s/salt3train_snparams.txt'%outputdir,unpack=True,usecols=[1,2,3,4])
-		snid = np.loadtxt('%s/salt3train_snparams.txt'%outputdir,unpack=True,dtype='str',usecols=[0])
+		snid = np.genfromtxt('%s/salt3train_snparams.txt'%outputdir,unpack=True,dtype='str',usecols=[0])
 		
 		ValidateModel.main(
 			'%s/spectralcomp.png'%outputdir,
 			outputdir)
 		
-		snfiles = np.loadtxt(self.options.snlist,dtype='str')
+		snfiles = np.genfromtxt(self.options.snlist,dtype='str')
 		snfiles = np.atleast_1d(snfiles)
 		fitx1,fitc = False,False
 		if self.options.n_components == 2:
