@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from scipy.optimize import minimize, least_squares, differential_evolution, Bounds
+from scipy.optimize import minimize, least_squares, differential_evolution
 import numpy as np
 
 class fitting:
@@ -84,7 +84,7 @@ class fitting:
 		#for k in self.datadict.keys():
 		#	bounds_upper += [self.x_init[self.initparlist == 'x0_%s'%k]*1e1,5,1,5]
 
-		bounds = Bounds(bounds_lower,bounds_upper,keep_feasible=True)
+		bounds = (bounds_lower,bounds_upper)
 		
 		#bounds = ((-np.inf,np.inf),)*self.n_phaseknots*self.n_waveknots + ((-np.inf,np.inf),)*\
 		#		 ((self.n_components-1)*self.n_phaseknots*self.n_waveknots + self.n_colorpars)
