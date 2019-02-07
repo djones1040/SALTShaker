@@ -94,7 +94,10 @@ class TrainSALT:
 							help='number of parameters defining the spectral recalibration (default=%default)')
 		parser.add_argument('--n_processes', default=config.get('trainparams','n_processes'), type=int,
 							help='number of processes to use in calculating chi2 (default=%default)')
+		parser.add_argument('--n_iter', default=config.get('trainparams','n_iter'), type=int,
+							help='number of fitting iterations (default=%default)')
 
+		
 		return parser
 
 	def rdkcor(self,kcorpath):
@@ -279,14 +282,14 @@ class TrainSALT:
 		print(n_params)
 		guess = np.zeros(n_params)
 
-		parlist = ['m0']*(n_phaseknots*n_waveknots)
+		parlist = np.array(['m0']*(n_phaseknots*n_waveknots))
 		if n_components == 2:
-			parlist += ['m1']*(n_phaseknots*n_waveknots)
+			parlist = np.append(parlist,['m1']*(n_phaseknots*n_waveknots))
 		if n_colorpars:
-			parlist += ['cl']*n_colorpars
+			parlist = np.append(parlist,['cl']*n_colorpars)
 
 		for k in datadict.keys():
-			parlist += ['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k]
+			parlist = np.append(parlist,['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k])
 		parlist = np.array(parlist)
 
 		
@@ -312,68 +315,81 @@ class TrainSALT:
 			initguess += (10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36)),0,0,0)
 		#initparlist += ['cl']*n_colorpars
 		initparlist = np.array(initparlist)
-		saltfitter.parlist = initparlist
-		saltfitter.onlySNpars = True
 
-		#nll = lambda *args: -saltfitter.chi2fit(*args)
-		if n_processes>1:
-			with multiprocessing.Pool(n_processes) as pool:
-				md_init = least_squares(saltfitter.chi2fit,initguess,method='trf',bounds=initbounds,
-								args=(None,None,pool,))
-		else:
-			md_init = least_squares(saltfitter.chi2fit,initguess,method='trf',bounds=initbounds,
-				args=(None,None,None,))
-
-			
-		try:
-			if 'condition is satisfied' not in md_init.message.decode('utf-8'):
-				self.addwarning('Initialization minimizer message: %s'%md_init.message)
-		except:
-			if 'condition is satisfied' not in md_init.message:
-				self.addwarning('Initialization minimizer message: %s'%md_init.message)
-		if self.verbose:
-			print('x0 guesses initialized successfully')
-
-
-		# 2nd pass - let the SALT model spline knots float			
-		SNpars,SNparlist = [],[]
-		for k in datadict.keys():
-			guess[parlist == 'x0_%s'%k] = md_init.x[initparlist == 'x0_%s'%k]
-			SNpars += [md_init.x[initparlist == 'x0_%s'%k],md_init.x[initparlist == 'x1_%s'%k],
-					   md_init.x[initparlist == 'c_%s'%k],md_init.x[initparlist == 'tpkoff_%s'%k]]
-			SNparlist += ['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k]
-		SNparlist = np.array(SNparlist); SNpars = np.array(SNpars)
-		#guess[parlist == 'cl'] = md_init.x[initparlist == 'cl']
-			
-		saltfitter.parlist = parlist
-		saltfitter.onlySNpars = False
-
-		fitter = fitting(n_components,n_colorpars,
-						 n_phaseknots,n_waveknots,
-						 datadict,md_init.x,
-						 initparlist,parlist)
 		
-		if self.options.fitstrategy == 'leastsquares':
-			phase,wave,M0,M1,clpars,SNParams,message = fitter.least_squares(saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod)
-		elif self.options.fitstrategy == 'minimize':
-			phase,wave,M0,M1,clpars,SNParams,message = fitter.minimize(saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod)
-		elif self.options.fitstrategy == 'emcee':
-			phase,wave,M0,M1,clpars,SNParams,message = fitter.emcee(saltfitter,guess,SNpars,SNparlist,n_processes)
-		elif self.options.fitstrategy == 'hyperopt':
-			phase,wave,M0,M1,clpars,SNParams,message = fitter.hyperopt(saltfitter,guess,m0knots,SNpars,SNparlist,n_processes)
-		elif self.options.fitstrategy == 'diffevol':
-			phase,wave,M0,M1,clpars,SNParams,message = fitter.diffevol(saltfitter,SNpars,SNparlist,n_processes)
-		elif self.options.fitstrategy == 'multinest':
-			phase,wave,M0,M1,clpars,SNParams,message = fitter.pymultinest(saltfitter,guess,SNpars,SNparlist,n_processes)
-		else:
-			raise RuntimeError('fitting strategy not one of leastsquares, minimize, emcee, hyperopt, multinest, or diffevol')
+		for i in range(self.options.n_iter):
+			saltfitter.onlySNpars = True
+			if i > 0:
+				initguess = SNpars.transpose()[0]
+				saltfitter.components = saltfitter.SALTModel(x)
+			saltfitter.parlist = initparlist
 
-		try:
-			if 'condition is satisfied' not in message.decode('utf-8'):
-				self.addwarning('Minimizer message: %s'%message)
-		except:
-			if 'condition is satisfied' not in message:
-				self.addwarning('Minimizer message: %s'%message)
+			if n_processes>1:
+				with multiprocessing.Pool(n_processes) as pool:
+					md_init = least_squares(saltfitter.chi2fit,initguess,method='trf',bounds=initbounds,
+											args=(None,None,pool,))
+			else:
+				md_init = least_squares(saltfitter.chi2fit,initguess,method='trf',bounds=initbounds,
+										args=(None,None,None,))
+
+			
+			try:
+				if 'condition is satisfied' not in md_init.message.decode('utf-8'):
+					self.addwarning('Initialization minimizer message: %s'%md_init.message)
+			except:
+				if 'condition is satisfied' not in md_init.message:
+					self.addwarning('Initialization minimizer message: %s'%md_init.message)
+			if self.verbose:
+				print('x0 guesses initialized successfully')
+
+			# 2nd pass - let the SALT model spline knots float			
+			SNpars,SNparlist = [],[]
+			for k in datadict.keys():
+				guess[parlist == 'x0_%s'%k] = md_init.x[initparlist == 'x0_%s'%k]
+				SNpars += [md_init.x[initparlist == 'x0_%s'%k],md_init.x[initparlist == 'x1_%s'%k],
+						   md_init.x[initparlist == 'c_%s'%k],md_init.x[initparlist == 'tpkoff_%s'%k]]
+				SNparlist += ['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k]
+				SNparlist = np.array(SNparlist); SNpars = np.array(SNpars)
+				#guess[parlist == 'cl'] = md_init.x[initparlist == 'cl']
+
+			if i > 0:
+				guess[parlist == 'm0'] = x[parlist == 'm0']
+				if n_components == 2:
+					guess[parlist == 'm1'] = x[parlist == 'm1']
+				if n_colorpars:
+					guess[parlist == 'cl'] = clpars
+				
+			saltfitter.parlist = parlist
+			saltfitter.onlySNpars = False
+
+			fitter = fitting(n_components,n_colorpars,
+							 n_phaseknots,n_waveknots,
+							 datadict,md_init.x,
+							 initparlist,parlist)
+		
+			if self.options.fitstrategy == 'leastsquares':
+				x,phase,wave,M0,M1,clpars,SNParams,message = fitter.least_squares(saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod)
+			elif self.options.fitstrategy == 'minimize':
+				x,phase,wave,M0,M1,clpars,SNParams,message = fitter.minimize(saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod)
+			elif self.options.fitstrategy == 'bobyqa':
+				x,phase,wave,M0,M1,clpars,SNParams,message = fitter.bobyqa(saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod)
+			elif self.options.fitstrategy == 'emcee':
+				phase,wave,M0,M1,clpars,SNParams,message = fitter.emcee(saltfitter,guess,SNpars,SNparlist,n_processes)
+			elif self.options.fitstrategy == 'hyperopt':
+				phase,wave,M0,M1,clpars,SNParams,message = fitter.hyperopt(saltfitter,guess,m0knots,SNpars,SNparlist,n_processes)
+			elif self.options.fitstrategy == 'diffevol':
+				x,phase,wave,M0,M1,clpars,SNParams,message = fitter.diffevol(saltfitter,SNpars,SNparlist,n_processes)
+			elif self.options.fitstrategy == 'multinest':
+				phase,wave,M0,M1,clpars,SNParams,message = fitter.pymultinest(saltfitter,guess,SNpars,SNparlist,n_processes)
+			else:
+				raise RuntimeError('fitting strategy not one of leastsquares, minimize, emcee, hyperopt, multinest, bobyqa or diffevol')
+
+			try:
+				if 'condition is satisfied' not in message.decode('utf-8'):
+					self.addwarning('Minimizer message on iter %i: %s'%(i,message))
+			except:
+				if 'condition is satisfied' not in message:
+					self.addwarning('Minimizer message on iter %i: %s'%(i,message))
 
 		return phase,wave,M0,M1,clpars,SNParams
 
@@ -448,7 +464,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 			ValidateLightcurves.main(
 				'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,outputdir,
-				t0=t0sn,x0=x0sn,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc)
+				t0=t0sn,x0=x0sn*1e14,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc)
 
 		
 	def main(self):
