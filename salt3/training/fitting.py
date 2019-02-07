@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from scipy.optimize import minimize, least_squares, differential_evolution
+from scipy.optimize import minimize, least_squares, differential_evolution, Bounds
 import numpy as np
 
 class fitting:
@@ -17,12 +17,22 @@ class fitting:
 		
 	def least_squares(self,saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod):
 
-		bounds_lower = [0]*(self.n_components*self.n_phaseknots*self.n_waveknots + self.n_colorpars)
-		for k in self.datadict.keys():
-			bounds_lower += [self.x_init[self.initparlist == 'x0_%s'%k]*1e-1,-5,-1,-5]
-		bounds_upper = [np.inf]*(self.n_components*self.n_phaseknots*self.n_waveknots+self.n_colorpars)
-		for k in self.datadict.keys():
-			bounds_upper += [self.x_init[self.initparlist == 'x0_%s'%k]*1e1,5,1,5]
+		bounds_lower,bounds_upper = [],[]
+		for i in range(len(guess)):
+			if guess[i] != 0:
+				bounds_lower += [guess[i]*10**(-0.4*0.5)]
+				bounds_upper += [guess[i]*10**(0.4*0.5)]
+			else:
+				bounds_lower += [0]
+				bounds_upper += [np.max(guess)*1e-20]
+		#import pdb; pdb.set_trace()
+				
+		#bounds_lower = [0]*(self.n_components*self.n_phaseknots*self.n_waveknots + self.n_colorpars)
+		#for k in self.datadict.keys():
+		#	bounds_lower += [self.x_init[self.initparlist == 'x0_%s'%k]*1e-1,-5,-1,-5]
+		#bounds_upper = [np.inf]*(self.n_components*self.n_phaseknots*self.n_waveknots+self.n_colorpars)
+		#for k in self.datadict.keys():
+		#	bounds_upper += [self.x_init[self.initparlist == 'x0_%s'%k]*1e1,5,1,5]
 
 		bounds = (bounds_lower,bounds_upper)
 
@@ -32,8 +42,9 @@ class fitting:
 								   args=(None,None,pool,SNpars,SNparlist,False,False))
 		else:
 			md = least_squares(saltfitter.chi2fit,guess,method=fitmethod,bounds=bounds,
-							   ftol=1e-8,gtol=1e-8,xtol=1e-8,
-							   args=(None,None,None,SNpars,SNparlist,False,False),verbose=2)
+							   ftol=1e-16,gtol=1e-16,xtol=1e-16,
+							   args=(None,None,None,SNpars,SNparlist,False,False),
+							   verbose=2,tr_solver='exact')#,max_nfev=1)
 			
 		for k in self.datadict.keys():
 			md.x[self.parlist == 'x0_%s'%k],md.x[self.parlist == 'x1_%s'%k],\
@@ -44,18 +55,44 @@ class fitting:
 		phase,wave,M0,M1,clpars,SNParams = \
 			saltfitter.getPars(md.x)
 			
-		return phase,wave,M0,M1,clpars,SNParams,md.message
+		return md.x,phase,wave,M0,M1,clpars,SNParams,md.message
 
 	def minimize(self,saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod):
 
-		bounds = ((-np.inf,np.inf),)*self.n_phaseknots*self.n_waveknots + ((-np.inf,np.inf),)*\
-				 ((self.n_components-1)*self.n_phaseknots*self.n_waveknots + self.n_colorpars)
-		for k in self.datadict.keys():
-			bounds += ((self.x_init[self.initparlist == 'x0_%s'%k]*1e-1,self.x_init[self.initparlist == 'x0_%s'%k]*1e1),
-						(-np.inf,np.inf),(-np.inf,np.inf),(-5,5))
+		# 1 mag bounds on M0
+		# this won't work for M1/color obviously, needs to be tweaked
+		#bounds = ()
+		#for i in range(len(guess)):
+		#	if guess[i] != 0:
+		#		bounds += ((guess[i]*10**(-0.4*1e-5),guess[i]*10**(0.4*1e-5)),)
+		#	else:
+		#		bounds += ((0,1e-22),)#np.max(guess)),)
+
+		bounds_lower,bounds_upper = [],[]
+		for i in range(len(guess)):
+			if guess[i] != 0:
+				bounds_lower += [guess[i]*10**(-0.4*3)]
+				bounds_upper += [guess[i]*10**(0.4*3)]
+			else:
+				bounds_lower += [0]
+				bounds_upper += [np.max(guess)*1e-20]
+				
+		#bounds_lower = [0]*(self.n_components*self.n_phaseknots*self.n_waveknots + self.n_colorpars)
+		#for k in self.datadict.keys():
+		#	bounds_lower += [self.x_init[self.initparlist == 'x0_%s'%k]*1e-1,-5,-1,-5]
+		#bounds_upper = [np.inf]*(self.n_components*self.n_phaseknots*self.n_waveknots+self.n_colorpars)
+		#for k in self.datadict.keys():
+		#	bounds_upper += [self.x_init[self.initparlist == 'x0_%s'%k]*1e1,5,1,5]
+
+		bounds = Bounds(bounds_lower,bounds_upper,keep_feasible=True)
 		
-		# another fitting option, but least_squares seems to
-		# work best for now
+		#bounds = ((-np.inf,np.inf),)*self.n_phaseknots*self.n_waveknots + ((-np.inf,np.inf),)*\
+		#		 ((self.n_components-1)*self.n_phaseknots*self.n_waveknots + self.n_colorpars)
+		#for k in self.datadict.keys():
+		#	bounds += ((self.x_init[self.initparlist == 'x0_%s'%k]*1e-1,self.x_init[self.initparlist == 'x0_%s'%k]*1e1),
+		#				(-np.inf,np.inf),(-np.inf,np.inf),(-5,5))
+		# import pdb; pdb.set_trace()
+		
 		if n_processes > 1:
 			md = minimize(saltfitter.chi2fit,guess,
 						  bounds=bounds,
@@ -63,11 +100,13 @@ class fitting:
 						  args=(None,None,Pool,False,False),
 						  options={'maxiter':100000,'maxfev':100000,'maxfun':100000})
 		else:
+			# Powell?
+			#import pdb; pdb.set_trace()
 			md = minimize(saltfitter.chi2fit,guess,
 						  bounds=bounds,
 		 				  method=fitmethod,
 		  				  args=(None,None,None,SNpars,SNparlist,False,False),
-						  options={'maxiter':10000,'maxfev':10000,'maxfun':10000})
+						  options={'maxiter':1000})
 
 		for k in self.datadict.keys():
 			md.x[self.parlist == 'x0_%s'%k],md.x[self.parlist == 'x1_%s'%k],\
@@ -78,7 +117,7 @@ class fitting:
 		phase,wave,M0,M1,clpars,SNParams = \
 			saltfitter.getPars(md.x)
 			
-		return phase,wave,M0,M1,clpars,SNParams,md.message
+		return md.x,phase,wave,M0,M1,clpars,SNParams,md.message
 
 	def emcee(self,saltfitter,guess,SNpars,SNparlist,n_processes):
 
@@ -159,7 +198,7 @@ class fitting:
 		phase,wave,M0,M1,clpars,SNParams = \
 			saltfitter.getPars(md.x)
 			
-		return phase,wave,M0,M1,clpars,SNParams,md.message
+		return md.x,phase,wave,M0,M1,clpars,SNParams,md.message
 
 	def hyperopt(self,saltfitter,guess,m0knots,SNpars,SNparlist,n_processes):
 
@@ -188,3 +227,44 @@ class fitting:
 					space = space, #hp.normal('x', 4.9, 0.5),
 					algo=tpe.suggest, 
 					max_evals = 2000)
+
+
+	def bobyqa(self,saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod):
+		import pybobyqa
+		import dfols
+		
+		# 1 mag bounds on M0
+		bounds_lower,bounds_upper = [],[]
+		for i in range(len(guess)):
+			if guess[i] != 0:
+				bounds_lower += [guess[i]*10**(-0.4*3)]
+				bounds_upper += [guess[i]*10**(0.4*3)]
+			else:
+				bounds_lower += [0]
+				bounds_upper += [np.max(guess)*1e-20]
+		bounds = (np.array(bounds_lower),np.array(bounds_upper))
+		
+		if n_processes > 1:
+			md = pybobyqa.solve(saltfitter.chi2fit,guess,
+								bounds=bounds,
+		  						args=(None,None,None,SNpars,SNparlist,False,False),
+								maxfun=10000,scaling_within_bounds=True)
+		else:
+			# Powell?
+			md = dfols.solve(saltfitter.chi2fit,guess,
+							 bounds=bounds,
+		  					 args=(None,None,None,SNpars,SNparlist,False,False),
+							 maxfun=10000,scaling_within_bounds=True)
+			import pdb; pdb.set_trace()
+			
+		for k in self.datadict.keys():
+			md.x[self.parlist == 'x0_%s'%k],md.x[self.parlist == 'x1_%s'%k],\
+				md.x[self.parlist == 'c_%s'%k],md.x[self.parlist == 'tpkoff_%s'%k] = \
+				self.x_init[self.initparlist == 'x0_%s'%k],self.x_init[self.initparlist == 'x1_%s'%k],\
+				self.x_init[self.initparlist == 'c_%s'%k],self.x_init[self.initparlist == 'tpkoff_%s'%k]
+			
+		phase,wave,M0,M1,clpars,SNParams = \
+			saltfitter.getPars(md.x)
+			
+		return md.x,phase,wave,M0,M1,clpars,SNParams,md.message
+		

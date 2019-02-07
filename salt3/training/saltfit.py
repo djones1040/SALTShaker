@@ -21,7 +21,8 @@ class chi2:
 	def __init__(self,guess,datadict,parlist,phaseknotloc,waveknotloc,
 				 phaserange,waverange,phaseres,waveres,phaseoutres,waveoutres,
 				 colorwaverange,kcordict,initmodelfile,initBfilt,n_components=1,
-				 n_colorpars=0,days_interp=5,onlySNpars=False,mcmc=False):
+				 n_colorpars=0,days_interp=5,onlySNpars=False,mcmc=False,
+				 fitstrategy='leastsquares'):
 		self.datadict = datadict
 		self.parlist = parlist
 		self.phaserange = phaserange
@@ -35,6 +36,8 @@ class chi2:
 		self.colorwaverange = colorwaverange
 		self.onlySNpars = onlySNpars
 		self.mcmc = mcmc
+		self.fitstrategy = fitstrategy
+		self.guess = guess
 		
 		assert type(parlist) == np.ndarray
 		self.splinephase = phaseknotloc #np.linspace(phaserange[0],phaserange[1],(phaserange[1]-phaserange[0])/phaseres)
@@ -141,6 +144,7 @@ class chi2:
 			components = self.components
 		else:
 			components = self.SALTModel(x)
+
 		if self.n_components == 1: M0 = components[0]
 		elif self.n_components == 2: M0,M1 = components
 		if self.n_colorpars:
@@ -161,10 +165,11 @@ class chi2:
 		#chi2 += lnp
 		
 		#Debug statements
-		if debug2: import pdb; pdb.set_trace()
-		if self.onlySNpars: print(chi2,x)
-		else: print(chi2,x[0],x[self.parlist == 'x0_ASASSN-16bc'],x[self.parlist == 'cl'])
-
+		#if debug2: import pdb; pdb.set_trace()
+		#if self.onlySNpars: print(chi2,x)
+		#else: print(chi2,x[0],x[self.parlist == 'x0_ASASSN-16bc'],x[self.parlist == 'cl'])
+		print(chi2.sum())
+		
 		if self.mcmc:
 			return -chi2
 		else:
@@ -229,7 +234,7 @@ class chi2:
 			x0,x1,c,tpkoff = \
 				SNpars[SNparlist == 'x0_%s'%sn][0][0],SNpars[SNparlist == 'x1_%s'%sn][0][0],\
 				SNpars[SNparlist == 'c_%s'%sn][0][0],SNpars[SNparlist == 'tpkoff_%s'%sn][0][0]
-			
+
 		#Calculate spectral model
 		if self.n_components == 1:
 			saltflux = x0*M0/_SCALE_FACTOR
@@ -240,7 +245,8 @@ class chi2:
 			if debug2: import pdb; pdb.set_trace()
 		saltflux = self.extrapolate(saltflux,x0)
 
-		chi2=0
+		if self.fitstrategy == 'leastsquares': chi2 = np.array([])
+		else: chi2 = 0
 		int1d = interp1d(self.phase,saltflux,axis=0)
 		for k in specdata.keys():
 			if specdata[k]['tobs'] < self.phaserange[0] or specdata[k]['tobs'] > self.phaserange[1]: continue
@@ -276,7 +282,10 @@ class chi2:
 			# chi2 function
 			# TODO - model error/dispersion parameters
 			#chi2 += ((filtPhot['fluxcal']-modelflux)**2./filtPhot['fluxcalerr']**2.).sum()
-			chi2 += ((filtPhot['fluxcal']-modelflux)**2./(filtPhot['fluxcal']*0.05)**2.).sum()
+			if self.fitstrategy == 'leastsquares':
+				chi2 = np.append(chi2,(filtPhot['fluxcal']-modelflux)**2./(filtPhot['fluxcal']*0.05)**2.)
+			else:
+				chi2 += ((filtPhot['fluxcal']-modelflux)**2./(filtPhot['fluxcal']*0.05)**2.).sum()
 			if debug:
 				if chi2 > 1357: continue
 				import pylab as plt
