@@ -83,7 +83,7 @@ class TrainSALT:
 		parser.add_argument('--fitmethod', default=config.get('trainparams','fitmethod'), type=str,
 							help='fitting algorithm, passed to the fitter (default=%default)')
 		parser.add_argument('--fitstrategy', default=config.get('trainparams','fitstrategy'), type=str,
-							help='fitting strategy, one of leastsquares, minimize, emcee, hyperopt, or diffevol (default=%default)')
+							help='fitting strategy, one of leastsquares, minimize, emcee, hyperopt, simplemcmc or diffevol (default=%default)')
 		parser.add_argument('--fititer', default=config.get('trainparams','fititer'), type=int,
 							help='fitting iterations (default=%default)')
 		parser.add_argument('--n_components', default=config.get('trainparams','n_components'), type=int,
@@ -254,7 +254,7 @@ class TrainSALT:
 					 colorwaverange,fitmethod,fitstrategy,fititer,kcordict,initmodelfile,initBfilt,
 					 phaseoutres,waveoutres,n_components=1,n_colorpars=0,n_processes=1):
 
-		if self.options.fitstrategy == 'multinest':
+		if self.options.fitstrategy == 'multinest' or self.options.fitstrategy == 'simplemcmc':
 			from salt3.training import saltfit_mcmc as saltfit
 		else:
 			from salt3.training import saltfit
@@ -331,7 +331,6 @@ class TrainSALT:
 			else:
 				md_init = least_squares(saltfitter.chi2fit,initguess,method='trf',bounds=initbounds,
 										args=(None,None,None,))
-
 			
 			try:
 				if 'condition is satisfied' not in md_init.message.decode('utf-8'):
@@ -373,6 +372,8 @@ class TrainSALT:
 				x,phase,wave,M0,M1,clpars,SNParams,message = fitter.minimize(saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod)
 			elif self.options.fitstrategy == 'bobyqa':
 				x,phase,wave,M0,M1,clpars,SNParams,message = fitter.bobyqa(saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod)
+			elif self.options.fitstrategy == 'simplemcmc':
+				phase,wave,M0,M1,clpars,SNParams,message = fitter.mcmc(saltfitter,guess,SNpars,SNparlist,n_processes)
 			elif self.options.fitstrategy == 'emcee':
 				phase,wave,M0,M1,clpars,SNParams,message = fitter.emcee(saltfitter,guess,SNpars,SNparlist,n_processes)
 			elif self.options.fitstrategy == 'hyperopt':
@@ -461,10 +462,12 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			x0sn,x1sn,csn,t0sn = \
 				x0[snid == sn.SNID][0],x1[snid == sn.SNID][0],\
 				c[snid == sn.SNID][0],t0[snid == sn.SNID][0]
-
+			if not fitc: csn = 0
+			if not fitx1: x1sn = 0
+			
 			ValidateLightcurves.main(
 				'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,outputdir,
-				t0=t0sn,x0=x0sn*1e14,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc)
+				t0=None,x0=None,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc)
 
 		
 	def main(self):

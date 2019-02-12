@@ -301,7 +301,8 @@ class chi2:
 				#plt.errorbar(filtPhot['tobs'],hsiaomodelflux,fmt='o',color='C2',label='hsiao model')
 				#import pdb; pdb.set_trace()
 				
-				if chi2 < 1357: import pdb; pdb.set_trace()	
+				if chi2 < 1357: import pdb; pdb.set_trace()
+
 		return chi2
 		
 		
