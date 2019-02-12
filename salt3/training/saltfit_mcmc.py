@@ -21,7 +21,8 @@ class chi2:
 	def __init__(self,guess,datadict,parlist,phaseknotloc,waveknotloc,
 				 phaserange,waverange,phaseres,waveres,phaseoutres,waveoutres,
 				 colorwaverange,kcordict,initmodelfile,initBfilt,n_components=1,
-				 n_colorpars=0,days_interp=5,onlySNpars=False,mcmc=False,debug=False):
+				 n_colorpars=0,days_interp=5,onlySNpars=False,mcmc=False,debug=False,
+				 fitstrategy='leastsquares'):
 		self.datadict = datadict
 		self.parlist = parlist
 		self.m0min = np.min(np.where(self.parlist == 'm0')[0])
@@ -39,6 +40,7 @@ class chi2:
 		self.mcmc = mcmc
 		self.SNpars=()
 		self.SNparlist=()
+		self.fitstrategy = fitstrategy
 		self.guess = guess
 		self.debug = debug
 		
@@ -112,7 +114,55 @@ class chi2:
 		saltflux[self.iExtrapPhaseMax,:] = self.extrapsource.flux(self.phase[self.iExtrapPhaseMax],self.wave)
 
 		return saltflux
+
+	def adjust_model(self,X):
+
+		X2 = np.zeros(self.npar)
+		for i in range(self.npar):
+			X2[i] = X[i]*10**(0.4*np.random.normal(scale=0.04))
+		return X2
+			
+	def mcmcfit(self,x,nsteps,pool=None,debug=False,debug2=False):
+		npar = len(x)
+		self.npar = npar
 		
+		# initial log likelihood
+		last_loglike = self.chi2fit(x,pool=pool,debug=debug,debug2=debug2)
+		Xlast = self.adjust_model(x)
+		
+		outpars = [[] for i in range(npar)]
+		accept = 0
+		for i in range(nsteps):
+			X = self.adjust_model(Xlast)
+			
+			# loglike
+			this_loglike = self.chi2fit(X,pool=pool,debug=debug,debug2=debug2)
+
+			# accepted?
+			accept_bool = self.accept(last_loglike,this_loglike)
+			if accept_bool:
+				for j in range(npar):
+					outpars[j] += [X[j]]
+				last_loglike = this_loglike
+				accept += 1
+				Xlast = X[:]
+
+		print('acceptance = %.3f'%(accept/float(nsteps)))
+		if accept < 500:
+			raise RuntimeError('Not enough steps to wait 500 before burn-in')
+		phase,wave,M0,M1,clpars,SNParams = self.getParsMCMC(np.array(outpars),nburn=500)
+		return phase,wave,M0,M1,clpars,SNParams
+		
+	def accept(self, last_loglike, this_loglike):
+		alpha = np.exp(this_loglike - last_loglike)
+		return_bool = False
+		if alpha >= 1:
+			return_bool = True
+		else:
+			if np.random.rand() < alpha:
+				return_bool = True
+		return return_bool
+	
 	def chi2fit(self,x,pool=None,debug=False,debug2=False):
 		"""
 		Calculates the goodness of fit of given SALT model to photometric and spectroscopic data given during initialization
@@ -125,7 +175,7 @@ class chi2:
 		onlySNpars : boolean, optional
 			Only fit the individual SN parameters, while retaining fixed model parameters
 			
-		pool : 	multiprocessing.pool.Pool, optional
+		pool :	multiprocessing.pool.Pool, optional
 			Optional worker pool to be used for calculating chi2 values for each SN. If not provided, all work is done in root process
 		
 		debug : boolean, optional
@@ -166,10 +216,10 @@ class chi2:
 		#if self.onlySNpars: print(chi2,x)
 		#else:
 		#	print(chi2,x[0])#,x[self.parlist == 'x0_ASASSN-16bc'],x[self.parlist == 'cl'])
-
+		print(chi2.sum())
 		if self.mcmc:
 			#print(-chi2)
-			return -chi2
+			return -chi2/2
 		else:
 			#print(chi2)
 			return chi2
@@ -250,7 +300,8 @@ class chi2:
 			if debug2: import pdb; pdb.set_trace()
 		saltflux = self.extrapolate(saltflux,x0)
 
-		chi2=0
+		if self.fitstrategy == 'leastsquares': chi2 = np.array([])
+		else: chi2 = 0
 		int1d = interp1d(self.phase,saltflux,axis=0)
 		for k in specdata.keys():
 			if specdata[k]['tobs'] < self.phaserange[0] or specdata[k]['tobs'] > self.phaserange[1]: continue
@@ -285,9 +336,11 @@ class chi2:
 
 			# chi2 function
 			# TODO - model error/dispersion parameters
-			#chi2 += ((filtPhot['fluxcal']-modelflux)**2./filtPhot['fluxcalerr']**2.).sum()
-			chi2 += ((filtPhot['fluxcal']-modelflux)**2./(np.max(filtPhot['fluxcal'])*0.4)**2.).sum()
-
+			if self.fitstrategy == 'leastsquares':
+				chi2 = np.append(chi2,(filtPhot['fluxcal']-modelflux)**2./(filtPhot['fluxcal']*0.05)**2.)
+			else:
+				chi2 += ((filtPhot['fluxcal']-modelflux)**2./(filtPhot['fluxcalerr']**2. + (filtPhot['fluxcal']*0.05)**2.)).sum()
+			
 			if self.debug:
 				#print(chi2)
 				if chi2 < 30:
@@ -306,36 +359,20 @@ class chi2:
 				
 				
 				#if chi2 < 1357: import pdb; pdb.set_trace()
-			print(chi2)
-			return chi2
-		
+			#print(chi2)
+			#import pdb; pdb.set_trace()
+		return chi2
+
 		
 	def specchi2(self):
 
 		return chi2
 	
 	def SALTModel(self,x,bsorder=3):
-		# parlist,phaserange,waverange,phaseres,waveres,phaseoutres,waveoutres
-		#x = np.array(x)
-		#self.parlist = np.array(self.parlist)
 
 		try: m0pars = x[self.m0min:self.m0max]
 		except: import pdb; pdb.set_trace()
 		m0 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m0pars,bsorder,bsorder))
-
-		#import pdb; pdb.set_trace()
-		# extrapolate
-		#import pdb; pdb.set_trace()
-		#iPhaseLow = (self.phase - self.phaserange[0])**2. == np.min((self.phase - self.phaserange[0])**2.)
-		#LowScale = np.mean(m0[iPhaseLow]/self.hsiaoflux[iPhaseLow])
-		#iPhaseHigh = (self.phase - self.phaserange[1])**2. == np.min((self.phase - self.phaserange[1])**2.)
-		#HighScale = np.mean(m0[iPhaseHigh]/self.hsiaoflux[iPhaseHigh])
-		
-		#m0[self.phase < self.phaserange[0],:] = self.hsiaoflux[self.phase < self.phaserange[0],:]*LowScale
-		#m0[self.phase > self.phaserange[1],:] = self.hsiaoflux[self.phase > self.phaserange[1],:]*HighScale
-		#self.hsiaofluxlow
-		#self.hsiaofluxhigh
-
 
 		if self.n_components == 2:
 			m1pars = x[self.parlist == 'm1']
@@ -371,20 +408,20 @@ class chi2:
 			
 		return self.phase,self.wave,m0,m1,clpars,resultsdict
 
-	def getParsMCMC(self,x,bsorder=3):
+	def getParsMCMC(self,x,nburn=500,bsorder=3):
 
 		m0pars = np.array([])
 		for i in np.where(self.parlist == 'm0')[0]:
-			m0pars = np.append(m0pars,x[i].mean())
-			
-		import pdb; pdb.set_trace()
+			#[x[i][nburn:] == x[i][nburn:]]
+			m0pars = np.append(m0pars,x[i][nburn:].mean())
+
 		m1pars = np.array([])
 		for i in np.where(self.parlist == 'm1')[0]:
-			m1pars = np.append(m1pars,x[i].mean())
+			m1pars = np.append(m1pars,x[i][nburn:].mean())
 
 		clpars = np.array([])
 		for i in np.where(self.parlist == 'cl')[0]:
-			clpars = np.append(clpars,x[i].mean())
+			clpars = np.append(clpars,x[i][nburn:].mean())
 	
 		m0 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m0pars,bsorder,bsorder))
 		if len(m1pars):
@@ -396,11 +433,15 @@ class chi2:
 		n_sn = len(self.datadict.keys())
 		for k in self.datadict.keys():
 			tpk_init = self.datadict[k]['photdata']['mjd'][0] - self.datadict[k]['photdata']['tobs'][0]
-			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k].mean(),
-							  'x1':x[self.parlist == 'x1_%s'%k].mean(),
-							  'c':x[self.parlist == 'x1_%s'%k].mean(),
-							  't0':x[self.parlist == 'tpkoff_%s'%k].mean()+tpk_init}
-			
+			#resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k].mean(),
+			#				  'x1':x[self.parlist == 'x1_%s'%k].mean(),
+			#				  'c':x[self.parlist == 'x1_%s'%k].mean(),
+			#				  't0':x[self.parlist == 'tpkoff_%s'%k].mean()+tpk_init}
+			resultsdict[k] = {'x0':self.SNpars[self.SNparlist == 'x0_%s'%k][0][0],
+							  'x1':self.SNpars[self.SNparlist == 'x1_%s'%k][0][0],
+							  'c':self.SNpars[self.SNparlist == 'c_%s'%k][0][0],
+							  't0':tpk_init - self.SNpars[self.SNparlist == 'tpkoff_%s'%k][0][0]}
+
 		return self.phase,self.wave,m0,m1,clpars,resultsdict
 
 	

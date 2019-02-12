@@ -152,12 +152,6 @@ class fitting:
 		#pymultinest.run(saltfitter.chi2fit, saltfitter.prior, len(guess),
 		#				outputfiles_basename='output/pmntest_1_',
 		#				resume = False, verbose = True)
-		def myprior(cube):
-			return cube * 10 * np.pi
-
-		def myloglike(cube):
-			chi = (np.cos(cube[0:1] / 2.)).prod()
-			return (2. + chi)**5
 		
 		result = pymultinest.solve(#LogLikelihood=myloglike, Prior=myprior,
 								   LogLikelihood=saltfitter.chi2fit, Prior=saltfitter.prior,
@@ -268,3 +262,15 @@ class fitting:
 			
 		return md.x,phase,wave,M0,M1,clpars,SNParams,md.message
 		
+	def mcmc(self,saltfitter,guess,SNpars,SNparlist,n_processes):
+
+		saltfitter.SNpars = SNpars
+		saltfitter.SNparlist = SNparlist
+		saltfitter.mcmc = True
+		saltfitter.debug = False
+		saltfitter.fitstrategy = 'mcmc'
+		
+		phase,wave,M0,M1,clpars,SNParams = \
+			saltfitter.mcmcfit(guess,10000)
+		
+		return phase,wave,M0,M1,clpars,SNParams,'simple MCMC was successful'
