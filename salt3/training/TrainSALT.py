@@ -305,7 +305,6 @@ class TrainSALT:
 								  waverange,phaseres,waveres,phaseoutres,waveoutres,
 								  colorwaverange,
 								  kcordict,initmodelfile,initBfilt,n_components,n_colorpars)
-
 		# first pass - estimate x0 so we can bound it to w/i an order of mag
 		initbounds = ([0,-np.inf,-np.inf,-5]*n_sn,[np.inf,np.inf,np.inf,5]*n_sn)
 		initparlist = []
@@ -480,6 +479,28 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		# read the data
 		datadict = self.rdAllData(self.options.snlist,speclist=self.options.speclist)
 		
+		# Eliminate all data outside phase range
+		numSpecElimmed,numSpec=0,0
+		numPhotElimmed,numPhot=0,0
+		for sn in datadict.keys():
+			photdata = datadict[sn]['photdata']
+			specdata = datadict[sn]['specdata']
+			z = datadict[sn]['zHelio']
+			#Remove spectra outside phase range
+			for k in list(specdata.keys()):
+				if ((specdata[k]['tobs'])/(1+z)<self.options.phaserange[0]) or ((specdata[k]['tobs'])/(1+z)>self.options.phaserange[1]):
+					specdata.pop(k)
+					numSpecElimmed+=1
+				else:
+					numSpec+=1
+			#Remove photometric data outside phase range
+			phase=(photdata['tobs'])/(1+z)
+			phaseFilter=(phase>self.options.phaserange[0]) & (phase<self.options.phaserange[1])
+			numPhotElimmed+=(~phaseFilter).sum()
+			numPhot+=phaseFilter.sum()
+			datadict[sn]['photdata'] ={key:photdata[key][phaseFilter] for key in photdata}
+		print('{} spectra and {} photometric observations removed for being outside phase range'.format(numSpecElimmed,numPhotElimmed))
+		print('{} spectra and {} photometric observations remaining'.format(numSpec,numPhot))
 		# fit the model - initial pass
 		if self.options.stage == "all" or self.options.stage == "train":
 			phase,wave,M0,M1,clpars,SNParams = self.fitSALTModel(

@@ -250,7 +250,7 @@ class chi2:
 		int1d = interp1d(self.phase,saltflux,axis=0)
 		for k in specdata.keys():
 			phase=(specdata[k]['tobs']+tpkoff)/(1+z)
-			if phase < self.phaserange[0] or phase > self.phaserange[1]: continue
+			if phase < self.phase.min() or phase > self.phase.max(): continue
 			saltfluxinterp = int1d(phase)
 			saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)
 			chi2 += np.sum((saltfluxinterp2-specdata[k]['flux'])**2./specdata[k]['fluxerr']**2.)
@@ -268,7 +268,7 @@ class chi2:
 			denom = np.trapz(pbspl,obswave[g])
 			phase=(photdata['tobs']+tpkoff)/1+z
 			#Select data from the appropriate time range and filter
-			selectFilter=(photdata['filt']==flt)&(phase>self.phaserange[0]) & (phase<self.phaserange[1])
+			selectFilter=(photdata['filt']==flt)&(phase>self.phase.min()]) & (phase<self.phase.max())
 			filtPhot={key:photdata[key][selectFilter] for key in photdata}
 			phase=phase[selectFilter]
 			try:
