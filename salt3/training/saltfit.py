@@ -249,8 +249,9 @@ class chi2:
 		else: chi2 = 0
 		int1d = interp1d(self.phase,saltflux,axis=0)
 		for k in specdata.keys():
-			if specdata[k]['tobs'] < self.phaserange[0] or specdata[k]['tobs'] > self.phaserange[1]: continue
-			saltfluxinterp = int1d(specdata[k]['tobs']+tpkoff)
+			phase=(specdata[k]['tobs']+tpkoff)/(1+z)
+			if phase < self.phaserange[0] or phase > self.phaserange[1]: continue
+			saltfluxinterp = int1d(phase)
 			saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)
 			chi2 += np.sum((saltfluxinterp2-specdata[k]['flux'])**2./specdata[k]['fluxerr']**2.)
 			
@@ -265,13 +266,14 @@ class chi2:
 			pbspl *= obswave[g]
 
 			denom = np.trapz(pbspl,obswave[g])
-			
+			phase=(photdata['tobs']+tpkoff)/1+z
 			#Select data from the appropriate time range and filter
-			selectFilter=(photdata['filt']==flt)&(photdata['tobs']>self.phaserange[0]) & (photdata['tobs']<self.phaserange[1])
+			selectFilter=(photdata['filt']==flt)&(phase>self.phaserange[0]) & (phase<self.phaserange[1])
 			filtPhot={key:photdata[key][selectFilter] for key in photdata}
+			phase=phase[selectFilter]
 			try:
 				#Array output indices match time along 0th axis, wavelength along 1st axis
-				saltfluxinterp = int1d(filtPhot['tobs']+tpkoff)
+				saltfluxinterp = int1d(phase)
 			except:
 				import pdb; pdb.set_trace()
 			# synthetic photometry from SALT model
