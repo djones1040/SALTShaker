@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import numpy as np
-from scipy.interpolate import splprep,splev,BSpline,griddata,bisplev,interp1d
+from scipy.interpolate import splprep,splev,BSpline,griddata,bisplev,interp1d,interp2d
 from salt3.util.synphot import synphot
 from sncosmo.salt2utils import SALT2ColorLaw
 import time
@@ -53,6 +53,11 @@ class chi2:
 		self.guess = guess
 		self.debug = debug
 		
+		self.phasebins = np.linspace(phaserange[0],phaserange[1],
+							  (phaserange[1]-phaserange[0])/phaseres)
+		self.wavebins = np.linspace(waverange[0],waverange[1],
+							 (waverange[1]-waverange[0])/waveres)
+
 		
 		assert type(parlist) == np.ndarray
 		self.splinephase = phaseknotloc
@@ -244,7 +249,6 @@ class chi2:
 		chi2 = 0
 		#Construct arguments for chi2forSN method
 		args=[(sn,x,components,colorLaw,self.onlySNpars,debug,debug2) for sn in self.datadict.keys()]
-		#if self.mcmc: import pdb; pdb.set_trace()
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
 		if self.fitstrategy != 'leastsquares':
 			if pool:
@@ -265,6 +269,13 @@ class chi2:
 		#else:
 		#	print(chi2,x[0])#,x[self.parlist == 'x0_ASASSN-16bc'],x[self.parlist == 'cl'])
 		print(chi2.sum())
+		
+		if not self.onlySNpars:
+			if self.fitstrategy == 'leastsquares':
+				chi2 = np.append(chi2,self.regularizationChi2(x,10,10))
+			else:
+				chi2 += self.regularizationChi2(x,10,10)
+
 		if self.mcmc:
 			#print(-chi2)
 			return -chi2/2
@@ -416,7 +427,6 @@ class chi2:
 				#if chi2 < 1357: import pdb; pdb.set_trace()
 			#print(chi2)
 			#import pdb; pdb.set_trace()
-
 		return chi2
 
 		
@@ -424,15 +434,15 @@ class chi2:
 
 		return chi2
 	
-	def SALTModel(self,x,bsorder=3):
+	def SALTModel(self,x,bsorder=3,evaluatePhase=None,evaluateWave=None):
 
 		try: m0pars = x[self.m0min:self.m0max]
 		except: import pdb; pdb.set_trace()
-		m0 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m0pars,bsorder,bsorder))
+		m0 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,self.wave if evaluateWave is None else evaluateWave,(self.splinephase,self.splinewave,m0pars,bsorder,bsorder))
 
 		if self.n_components == 2:
 			m1pars = x[self.parlist == 'm1']
-			m1 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m1pars,bsorder,bsorder))
+			m1 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,self.wave if evaluateWave is None else evaluateWave,(self.splinephase,self.splinewave,m1pars,bsorder,bsorder))
 			components = (m0,m1)
 		elif self.n_components == 1:
 			components = (m0,)
@@ -518,7 +528,7 @@ class chi2:
 		
 	def updateEffectivePoints(self,x):
 		#Determine number of effective data points in each bin of phase and wavelength
-		self.neff=np.zeros((self.phase.size,self.wave.size))
+		self.neff=np.zeros((self.phasebins.size,self.wavebins.size))
 		#Consider weighting neff by variance for each measurement?
 		for sn in self.datadict.keys():
 			tpkoff=x[self.parlist == 'tpkoff_%s'%sn]
@@ -530,9 +540,8 @@ class chi2:
 			for k in specdata.keys():
 				restWave=specdata[k]['wavelength']/(1+z)
 				phase=(specdata[k]['tobs']+tpkoff)/(1+z)
-				#off by one error here, maybe?
-				phaseIndex=np.searchsorted(self.phase,phase,'left')
-				waveIndex=np.searchsorted(self.wave,restWave,'left')
+				phaseIndex=np.searchsorted(self.phasebins,phase,'left')
+				waveIndex=np.searchsorted(self.wavebins,restWave,'left')
 				self.neff[phaseIndex][waveIndex]+=1
 # 			filts={}
 # 			for flt in np.unique(photdata['filt']):
@@ -541,23 +550,34 @@ class chi2:
 # 				pbspl = np.interp(self.wave[g],filtwave,filttrans)
 # 				pbspl *= self.wave[g]
 # 				pbspl /= np.trapz(pbspl,self.wave[g])	
-			for phase,flt in zip((photdata['tobs']+tpkoff)/1+z,photdata['filt']):
-				phaseIndex=np.searchsorted(self.phase,phase,'left')
-				waveIndex=np.searchsorted(self.wave,lambdaeff[flt]/(1+z),'left')
+			for phase,flt in zip((photdata['tobs']+tpkoff)/(1+z),photdata['filt']):
+				phaseIndex=np.searchsorted(self.phasebins,phase,'left')
+				waveIndex=np.searchsorted(self.wavebins,lambdaeff[flt]/(1+z),'left')
 				self.neff[phaseIndex][waveIndex]+=1
-		self.neff=gaussian_filter(self.neff,[1,80])
+		self.neff=gaussian_filter(self.neff,[1,2])
+		self.neff=np.clip(self.neff,0.01*self.neff.max(),None)
 
 	def plotEffectivePoints(self):
 		import matplotlib.pyplot as plt
 		print(self.neff)
 		plt.imshow(self.neff,cmap='Greys',aspect='auto')
-		xticks=np.linspace(0,self.wave.size,8,False)
-		plt.xticks(xticks,['{:.0f}'.format(self.wave[int(x)]) for x in xticks])
+		xticks=np.linspace(0,self.wavebins.size,8,False)
+		plt.xticks(xticks,['{:.0f}'.format(self.wavebins[int(x)]) for x in xticks])
 		plt.xlabel('$\lambda$ / Angstrom')
-		yticks=np.linspace(0,self.phase.size,8,False)
-		plt.yticks(yticks,['{:.0f}'.format(self.phase[int(x)]) for x in yticks])
+		yticks=np.linspace(0,self.phasebins.size,8,False)
+		plt.yticks(yticks,['{:.0f}'.format(self.phasebins[int(x)]) for x in yticks])
 		plt.ylabel('Phase / days')
 		plt.show()
+		
+
+	def regularizationChi2(self, x,dyad,gradient):
+		fluxes=self.SALTModel(x,evaluatePhase=self.phasebins,evaluateWave=self.wavebins)
+		chi2grad=0
+		chi2dyad=0
+		for i in range(self.n_components):
+			fluxvals=fluxes[i]
+			chi2grad+=(((fluxvals[:,:,np.newaxis]-fluxvals[:,np.newaxis,:])**2/(self.neff[:,:,np.newaxis]*np.abs(self.wavebins[np.newaxis,np.newaxis,:]-self.wavebins[np.newaxis,:,np.newaxis])))[:,~np.diag(np.ones(self.wavebins.size,dtype=bool))]).sum()
+		return gradient*chi2grad+dyad*chi2dyad
 	
 def trapIntegrate(a,b,xs,ys):
 	if (a<xs.min()) or (b>xs.max()):
