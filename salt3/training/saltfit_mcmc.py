@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 
 import numpy as np
-from scipy.interpolate import splprep,splev,BSpline,griddata,bisplev
+from scipy.interpolate import splprep,splev,BSpline,griddata,bisplev,interp1d
 from salt3.util.synphot import synphot
-from scipy.interpolate import interp1d
 from sncosmo.salt2utils import SALT2ColorLaw
 import time
 from itertools import starmap
@@ -11,11 +10,12 @@ from salt3.training import init_hsiao
 from sncosmo.models import StretchSource
 from scipy.optimize import minimize
 from scipy.stats import norm
+from scipy.ndimage import gaussian_filter
 #import pysynphot as S
 
 _SCALE_FACTOR = 1e-12
 
-lambdaeff = {'g':4900.1409,'r':6241.2736,'i':7563.7672,'z':8690.0840}
+lambdaeff = {'g':4900.1409,'r':6241.2736,'i':7563.7672,'z':8690.0840,'B':4353,'V':5477}
 
 class chi2:
 	def __init__(self,guess,datadict,parlist,phaseknotloc,waveknotloc,
@@ -53,6 +53,7 @@ class chi2:
 		self.guess = guess
 		self.debug = debug
 		
+		
 		assert type(parlist) == np.ndarray
 		self.splinephase = phaseknotloc
 		self.splinewave = waveknotloc
@@ -85,7 +86,8 @@ class chi2:
 		self.iExtrapPhaseMin = self.phase < phaserange[0]
 		self.iExtrapPhaseMax = self.phase > phaserange[1]
 		
-		
+		self.neff=0
+		self.updateEffectivePoints(guess)
 		
 		self.components = self.SALTModel(guess)
 		
@@ -351,7 +353,7 @@ class chi2:
 		else: chi2 = 0
 		int1d = interp1d(obsphase,saltflux,axis=0)
 		for k in specdata.keys():
-			if phase < obsphase.min() or phase > obsphase.max(): continue
+			if phase < obsphase.min() or phase > obsphase.max(): raise RuntimeError('Phase {} is out of extrapolated phase range for SN {} with tpkoff {}'.format(phase,sn,tpkoff))
 			saltfluxinterp = int1d(phase)
 			saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)
 			chi2 += np.sum((saltfluxinterp2-specdata[k]['flux'])**2./specdata[k]['fluxerr']**2.)
@@ -363,13 +365,16 @@ class chi2:
 
 			g = (obswave >= filtwave[0]) & (obswave <= filtwave[-1])  # overlap range
 
+			
 			pbspl = np.interp(obswave[g],filtwave,filttrans)
 			pbspl *= obswave[g]
 
 			denom = np.trapz(pbspl,obswave[g])
 			phase=photdata['tobs']+tpkoff
-			#Select data from the appropriate time range and filter
-			selectFilter=(photdata['filt']==flt)&(phase>obsphase.min()) & (phase<obsphase.max())
+			#Select data from the appropriate filter filter
+			selectFilter=(photdata['filt']==flt)
+			if ((phase<obsphase.min()) | (phase>obsphase.max())).any():
+				raise RuntimeError('Phases {} are out of extrapolated phase range for SN {} with tpkoff {}'.format(phase[((phase<self.phase.min()) | (phase>elf.phase.max()))],sn,tpkoff))
 			filtPhot={key:photdata[key][selectFilter] for key in photdata}
 			phase=phase[selectFilter]
 			try:
@@ -510,3 +515,61 @@ class chi2:
 
 		res = np.trapz(pbspl*sourceflux[g],obswave[g])/np.trapz(pbspl,obswave[g])
 		return(zpoff-2.5*np.log10(res))
+		
+	def updateEffectivePoints(self,x):
+		#Determine number of effective data points in each bin of phase and wavelength
+		self.neff=np.zeros((self.phase.size,self.wave.size))
+		#Consider weighting neff by variance for each measurement?
+		for sn in self.datadict.keys():
+			tpkoff=x[self.parlist == 'tpkoff_%s'%sn]
+			photdata = self.datadict[sn]['photdata']
+			specdata = self.datadict[sn]['specdata']
+			survey = self.datadict[sn]['survey']
+			filtwave = self.kcordict[survey]['filtwave']
+			z = self.datadict[sn]['zHelio']
+			for k in specdata.keys():
+				restWave=specdata[k]['wavelength']/(1+z)
+				phase=(specdata[k]['tobs']+tpkoff)/(1+z)
+				#off by one error here, maybe?
+				phaseIndex=np.searchsorted(self.phase,phase,'left')
+				waveIndex=np.searchsorted(self.wave,restWave,'left')
+				self.neff[phaseIndex][waveIndex]+=1
+# 			filts={}
+# 			for flt in np.unique(photdata['filt']):
+# 				filttrans = self.kcordict[survey][flt]['filttrans']
+# 				g = (self.wave  >= filtwave[0]/(1+z)) & (self.wave <= filtwave[-1]/(1+z))  # overlap range
+# 				pbspl = np.interp(self.wave[g],filtwave,filttrans)
+# 				pbspl *= self.wave[g]
+# 				pbspl /= np.trapz(pbspl,self.wave[g])	
+			for phase,flt in zip((photdata['tobs']+tpkoff)/1+z,photdata['filt']):
+				phaseIndex=np.searchsorted(self.phase,phase,'left')
+				waveIndex=np.searchsorted(self.wave,lambdaeff[flt]/(1+z),'left')
+				self.neff[phaseIndex][waveIndex]+=1
+		self.neff=gaussian_filter(self.neff,[1,80])
+
+	def plotEffectivePoints(self):
+		import matplotlib.pyplot as plt
+		print(self.neff)
+		plt.imshow(self.neff,cmap='Greys',aspect='auto')
+		xticks=np.linspace(0,self.wave.size,8,False)
+		plt.xticks(xticks,['{:.0f}'.format(self.wave[int(x)]) for x in xticks])
+		plt.xlabel('$\lambda$ / Angstrom')
+		yticks=np.linspace(0,self.phase.size,8,False)
+		plt.yticks(yticks,['{:.0f}'.format(self.phase[int(x)]) for x in yticks])
+		plt.ylabel('Phase / days')
+		plt.show()
+	
+def trapIntegrate(a,b,xs,ys):
+	if (a<xs.min()) or (b>xs.max()):
+		raise ValueError('Bounds of integration outside of provided values')
+	aInd,bInd=np.searchsorted(xs,[a,b])
+	if aInd==bInd:
+		return ((ys[aInd]-ys[aInd-1])/(xs[aInd]-xs[aInd-1])*((a+b)/2-xs[aInd-1])+ys[aInd-1])*(b-a)
+	elif aInd+1==bInd:
+		return ((ys[aInd]-ys[aInd-1])/(xs[aInd]-xs[aInd-1])*((a+xs[aInd])/2-xs[aInd-1])+ys[aInd-1])*(xs[aInd]-a) + ((ys[bInd]-ys[bInd-1])/(xs[bInd]-xs[bInd-1])*((xs[bInd-1]+b)/2-xs[bInd-1])+ys[bInd-1])*(b-xs[bInd-1])
+	else:
+		return np.trapz(xs[(xs>a)&(xs<b)],ys[(xs>a)&(xs<b)])+((ys[aInd]-ys[aInd-1])/(xs[aInd]-xs[aInd-1])*((a+xs[aInd])/2-xs[aInd-1])+ys[aInd-1])*(xs[aInd]-a) + ((ys[bInd]-ys[bInd-1])/(xs[bInd]-xs[bInd-1])*((xs[bInd-1]+b)/2-xs[bInd-1])+ys[bInd-1])*(b-xs[bInd-1])
+		
+def changeIntegralVariables(newx,oldx,oldyvals):
+	
+	return np.array([trapIntegrate(a,b,oldx,oldyvals) for a,b in zip(newx[:-1],newx[1:])])

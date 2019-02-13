@@ -391,7 +391,8 @@ class TrainSALT:
 					self.addwarning('Initialization MCMC message: %s'%message)
 			if self.verbose:
 				print('SN guesses initialized successfully')
-
+			saltfitter.updateEffectivePoints(md_init.x)
+			saltfitter.plotEffectivePoints()
 			# 2nd pass - let the SALT model spline knots float			
 			SNpars,SNparlist = [],[]
 			for k in datadict.keys():
