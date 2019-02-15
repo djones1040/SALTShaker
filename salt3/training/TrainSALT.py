@@ -96,6 +96,14 @@ class TrainSALT:
 							help='number of processes to use in calculating chi2 (default=%default)')
 		parser.add_argument('--n_iter', default=config.get('trainparams','n_iter'), type=int,
 							help='number of fitting iterations (default=%default)')
+		parser.add_argument('--regulargradientphase', default=config.get('trainparams','regulargradientphase'), type=float,
+							help='Weighting of phase gradient chi^2 regularization during training of model parameters (default=%default)')
+		parser.add_argument('--regulargradientwave', default=config.get('trainparams','regulargradientwave'), type=float,
+							help='Weighting of wave gradient chi^2 regularization during training of model parameters (default=%default)')
+		parser.add_argument('--regulardyad', default=config.get('trainparams','regulardyad'), type=float,
+							help='Weighting of dyadic chi^2 regularization during training of model parameters (default=%default)')
+
+				
 
 		# mcmc parameters
 		parser.add_argument('--n_steps_mcmc', default=config.get('mcmcparams','n_steps_mcmc'), type=int,
@@ -291,7 +299,7 @@ class TrainSALT:
 		
 	def fitSALTModel(self,datadict,phaserange,phaseres,waverange,waveres,
 					 colorwaverange,fitmethod,fitstrategy,fititer,kcordict,initmodelfile,initBfilt,
-					 phaseoutres,waveoutres,n_components=1,n_colorpars=0,n_processes=1):
+					 phaseoutres,waveoutres,regulargradientphase, regulargradientwave, regulardyad ,n_components=1,n_colorpars=0,n_processes=1):
 
 		if self.options.fitstrategy == 'multinest' or self.options.fitstrategy == 'simplemcmc':
 			from salt3.training import saltfit_mcmc as saltfit
@@ -343,7 +351,7 @@ class TrainSALT:
 								  phaseknotloc,waveknotloc,phaserange,
 								  waverange,phaseres,waveres,phaseoutres,waveoutres,
 								  colorwaverange,
-								  kcordict,initmodelfile,initBfilt,n_components,n_colorpars)
+								  kcordict,initmodelfile,initBfilt,regulargradientphase, regulargradientwave, regulardyad ,n_components,n_colorpars)
 
 		saltfitter.stepsize_M0 = self.options.stepsize_M0
 		saltfitter.stepsize_mag_M1 = self.options.stepsize_mag_M1
@@ -354,7 +362,7 @@ class TrainSALT:
 		saltfitter.stepsize_x1 = self.options.stepsize_x1
 		saltfitter.stepsize_c = self.options.stepsize_c
 		saltfitter.stepsize_tpk = self.options.stepsize_tpk
-		
+
 		# first pass - estimate x0 so we can bound it to w/i an order of mag
 		initbounds = ([0,-np.inf,-np.inf,-5]*n_sn,[np.inf,np.inf,np.inf,5]*n_sn)
 		initparlist = []
@@ -392,7 +400,7 @@ class TrainSALT:
 			if self.verbose:
 				print('SN guesses initialized successfully')
 			saltfitter.updateEffectivePoints(md_init.x)
-			saltfitter.plotEffectivePoints()
+			#saltfitter.plotEffectivePoints()
 			# 2nd pass - let the SALT model spline knots float			
 			SNpars,SNparlist = [],[]
 			for k in datadict.keys():
@@ -542,6 +550,9 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		# read the data
 		datadict = self.rdAllData(self.options.snlist,speclist=self.options.speclist)
 		
+		if not os.path.exists(self.options.outputdir):
+			os.makedirs(self.options.outputdir)
+		
 		# Eliminate all data outside phase range
 		numSpecElimmed,numSpec=0,0
 		numPhotElimmed,numPhot=0,0
@@ -578,6 +589,9 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				self.options.initbfilt,
 				self.options.phaseoutres,
 				self.options.waveoutres,
+				self.options.regulargradientphase, 
+				self.options.regulargradientwave, 
+				self.options.regulardyad,
 				self.options.n_components,
 				self.options.n_colorpars)
 		

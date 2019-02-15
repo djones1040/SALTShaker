@@ -20,7 +20,7 @@ lambdaeff = {'g':4900.1409,'r':6241.2736,'i':7563.7672,'z':8690.0840,'B':4353,'V
 class chi2:
 	def __init__(self,guess,datadict,parlist,phaseknotloc,waveknotloc,
 				 phaserange,waverange,phaseres,waveres,phaseoutres,waveoutres,
-				 colorwaverange,kcordict,initmodelfile,initBfilt,n_components=1,
+				 colorwaverange,kcordict,initmodelfile,initBfilt,regulargradientphase, regulargradientwave, regulardyad ,n_components=1,
 				 n_colorpars=0,days_interp=5,onlySNpars=False,mcmc=False,debug=False,
 				 fitstrategy='leastsquares',stepsize_M0=None,stepsize_mag_M1=None,
 				 stepsize_flux_M1=None,stepsize_cl=None,
@@ -95,7 +95,9 @@ class chi2:
 		self.updateEffectivePoints(guess)
 		
 		self.components = self.SALTModel(guess)
-		
+		self.regulargradientphase=regulargradientphase
+		self.regulargradientwave=regulargradientwave
+		self.regulardyad=regulardyad
 		self.stdmag = {}
 		for survey in self.kcordict.keys():
 			self.stdmag[survey] = {}
@@ -272,9 +274,9 @@ class chi2:
 		
 		if not self.onlySNpars:
 			if self.fitstrategy == 'leastsquares':
-				chi2 = np.append(chi2,self.regularizationChi2(x,10,10))
+				chi2 = np.append(chi2,self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad))
 			else:
-				chi2 += self.regularizationChi2(x,10,10)
+				chi2 += self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad)
 
 		if self.mcmc:
 			#print(-chi2)
@@ -570,14 +572,22 @@ class chi2:
 		plt.show()
 		
 
-	def regularizationChi2(self, x,dyad,gradient):
+	def regularizationChi2(self, x,gradientPhase,gradientWave,dyad):
 		fluxes=self.SALTModel(x,evaluatePhase=self.phasebins,evaluateWave=self.wavebins)
-		chi2grad=0
+		chi2wavegrad=0
+		chi2phasegrad=0
 		chi2dyad=0
 		for i in range(self.n_components):
 			fluxvals=fluxes[i]
-			chi2grad+=(((fluxvals[:,:,np.newaxis]-fluxvals[:,np.newaxis,:])**2/(self.neff[:,:,np.newaxis]*np.abs(self.wavebins[np.newaxis,np.newaxis,:]-self.wavebins[np.newaxis,:,np.newaxis])))[:,~np.diag(np.ones(self.wavebins.size,dtype=bool))]).sum()
-		return gradient*chi2grad+dyad*chi2dyad
+			if gradientWave !=0:
+				chi2wavegrad+=((   (fluxvals[:,:,np.newaxis]-fluxvals[:,np.newaxis,:])**2   /   (self.neff[:,:,np.newaxis]* (self.wavebins[np.newaxis,np.newaxis,:]-self.wavebins[np.newaxis,:,np.newaxis])**2))[:,~np.diag(np.ones(self.wavebins.size,dtype=bool))]).sum()
+			if gradientPhase != 0:
+				chi2phasegrad+=((  (fluxvals[np.newaxis,:,:]-fluxvals[:,np.newaxis,:])**2   /   (self.neff[:,np.newaxis,:]* (self.phasebins[:,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:,np.newaxis])**2))[~np.diag(np.ones(self.phasebins.size,dtype=bool)),:]).sum()
+			if gradientDyad!= 0:
+				chi2dyadvals=(   (fluxvals[:,np.newaxis,:,np.newaxis] * fluxvals[np.newaxis,:,np.newaxis,:] - fluxvals[np.newaxis,:,:,np.newaxis] * fluxvals[:,np.newaxis,np.newaxis,:])**2)   /   (self.neff[:,np.newaxis,:,np.newaxis]*np.abs(self.wavebins[np.newaxis,np.newaxis,:,np.newaxis]-self.wavebins[np.newaxis,np.newaxis,np.newaxis,:])*np.abs(self.phasebins[:,np.newaxis,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:,np.newaxis,np.newaxis]))
+				chi2dyad+=chi2dyadvals[~np.isnan(chi2dyadvals)].sum()
+		print(gradientPhase*chi2phasegrad,gradientWave*chi2wavegrad,dyad*chi2dyad)
+		return gradientWave*chi2wavegrad+dyad*chi2dyad+gradientPhase*chi2phasegrad
 	
 def trapIntegrate(a,b,xs,ys):
 	if (a<xs.min()) or (b>xs.max()):
