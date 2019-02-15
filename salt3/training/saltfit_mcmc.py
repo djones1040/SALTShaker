@@ -53,18 +53,18 @@ class chi2:
 		self.guess = guess
 		self.debug = debug
 		
-		self.phasebins = np.linspace(phaserange[0],phaserange[1],
-							  (phaserange[1]-phaserange[0])/phaseres)
+		self.phasebins = np.linspace(phaserange[0]-days_interp,phaserange[1]+days_interp,
+							 1+ (phaserange[1]-phaserange[0]+2*days_interp)/phaseres)
 		self.wavebins = np.linspace(waverange[0],waverange[1],
-							 (waverange[1]-waverange[0])/waveres)
+							 1+(waverange[1]-waverange[0])/waveres)
 
 		
 		assert type(parlist) == np.ndarray
 		self.splinephase = phaseknotloc
 		self.splinewave = waveknotloc
 		self.phase = np.linspace(phaserange[0]-days_interp,phaserange[1]+days_interp,
-								 (phaserange[1]-phaserange[0]+2*days_interp)/phaseoutres)
-		self.wave = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/waveoutres)
+								 (phaserange[1]-phaserange[0]+2*days_interp)/phaseoutres,False)
+		self.wave = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/waveoutres,False)
 
 		self.hsiaoflux = init_hsiao.get_hsiao(hsiaofile=initmodelfile,Bfilt=initBfilt,
 											  phaserange=phaserange,waverange=waverange,
@@ -530,7 +530,7 @@ class chi2:
 		
 	def updateEffectivePoints(self,x):
 		#Determine number of effective data points in each bin of phase and wavelength
-		self.neff=np.zeros((self.phasebins.size,self.wavebins.size))
+		self.neff=np.zeros((self.phasebins.size-1,self.wavebins.size-1))
 		#Consider weighting neff by variance for each measurement?
 		for sn in self.datadict.keys():
 			tpkoff=x[self.parlist == 'tpkoff_%s'%sn]
@@ -552,10 +552,7 @@ class chi2:
 # 				pbspl = np.interp(self.wave[g],filtwave,filttrans)
 # 				pbspl *= self.wave[g]
 # 				pbspl /= np.trapz(pbspl,self.wave[g])	
-			for phase,flt in zip((photdata['tobs']+tpkoff)/(1+z),photdata['filt']):
-				phaseIndex=np.searchsorted(self.phasebins,phase,'left')
-				waveIndex=np.searchsorted(self.wavebins,lambdaeff[flt]/(1+z),'left')
-				self.neff[phaseIndex][waveIndex]+=1
+			self.neff+=np.histogram2d((photdata['tobs']+tpkoff)/(1+z),[lambdaeff[flt]/(1+z) for flt in photdata['filt']],(self.phasebins,self.wavebins))[0]
 		self.neff=gaussian_filter(self.neff,[1,2])
 		self.neff=np.clip(self.neff,0.01*self.neff.max(),None)
 
@@ -573,18 +570,18 @@ class chi2:
 		
 
 	def regularizationChi2(self, x,gradientPhase,gradientWave,dyad):
-		fluxes=self.SALTModel(x,evaluatePhase=self.phasebins,evaluateWave=self.wavebins)
+		fluxes=self.SALTModel(x,evaluatePhase=self.phasebins[:-1],evaluateWave=self.wavebins[:-1])
 		chi2wavegrad=0
 		chi2phasegrad=0
 		chi2dyad=0
 		for i in range(self.n_components):
 			fluxvals=fluxes[i]
 			if gradientWave !=0:
-				chi2wavegrad+=((   (fluxvals[:,:,np.newaxis]-fluxvals[:,np.newaxis,:])**2   /   (self.neff[:,:,np.newaxis]* (self.wavebins[np.newaxis,np.newaxis,:]-self.wavebins[np.newaxis,:,np.newaxis])**2))[:,~np.diag(np.ones(self.wavebins.size,dtype=bool))]).sum()
+				chi2wavegrad+=((   (fluxvals[:,:,np.newaxis]-fluxvals[:,np.newaxis,:])**2   /   (self.neff[:,:,np.newaxis]* (self.wavebins[np.newaxis,np.newaxis,:-1]-self.wavebins[np.newaxis,:-1,np.newaxis])**2))[:,~np.diag(np.ones(self.wavebins.size-1,dtype=bool))]).sum()
 			if gradientPhase != 0:
-				chi2phasegrad+=((  (fluxvals[np.newaxis,:,:]-fluxvals[:,np.newaxis,:])**2   /   (self.neff[:,np.newaxis,:]* (self.phasebins[:,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:,np.newaxis])**2))[~np.diag(np.ones(self.phasebins.size,dtype=bool)),:]).sum()
-			if gradientDyad!= 0:
-				chi2dyadvals=(   (fluxvals[:,np.newaxis,:,np.newaxis] * fluxvals[np.newaxis,:,np.newaxis,:] - fluxvals[np.newaxis,:,:,np.newaxis] * fluxvals[:,np.newaxis,np.newaxis,:])**2)   /   (self.neff[:,np.newaxis,:,np.newaxis]*np.abs(self.wavebins[np.newaxis,np.newaxis,:,np.newaxis]-self.wavebins[np.newaxis,np.newaxis,np.newaxis,:])*np.abs(self.phasebins[:,np.newaxis,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:,np.newaxis,np.newaxis]))
+				chi2phasegrad+=((  (fluxvals[np.newaxis,:,:]-fluxvals[:,np.newaxis,:])**2   /   (self.neff[:,np.newaxis,:]* (self.phasebins[:-1,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:-1,np.newaxis])**2))[~np.diag(np.ones(self.phasebins.size-1,dtype=bool)),:]).sum()
+			if dyad!= 0:
+				chi2dyadvals=(   (fluxvals[:,np.newaxis,:,np.newaxis] * fluxvals[np.newaxis,:,np.newaxis,:] - fluxvals[np.newaxis,:,:,np.newaxis] * fluxvals[:,np.newaxis,np.newaxis,:])**2)   /   (self.neff[:,np.newaxis,:,np.newaxis]*np.abs(self.wavebins[np.newaxis,np.newaxis,:-1,np.newaxis]-self.wavebins[np.newaxis,np.newaxis,np.newaxis,:-1])*np.abs(self.phasebins[:-1,np.newaxis,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:-1,np.newaxis,np.newaxis]))
 				chi2dyad+=chi2dyadvals[~np.isnan(chi2dyadvals)].sum()
 		print(gradientPhase*chi2phasegrad,gradientWave*chi2wavegrad,dyad*chi2dyad)
 		return gradientWave*chi2wavegrad+dyad*chi2dyad+gradientPhase*chi2phasegrad
