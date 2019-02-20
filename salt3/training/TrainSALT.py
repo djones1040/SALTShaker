@@ -130,11 +130,14 @@ class TrainSALT:
 			if 'BD17' in primarysed.names:
 				self.kcordict[survey]['BD17'] = primarysed['BD17']
 			for filt in zpoff['Filter Name']:
-				self.kcordict[survey][filt.split('-')[-1]] = {}
-				self.kcordict[survey][filt.split('-')[-1]]['filttrans'] = filtertrans[filt]
-				self.kcordict[survey][filt.split('-')[-1]]['zpoff'] = zpoff['ZPOff(Primary)'][zpoff['Filter Name'] == filt][0]
-				self.kcordict[survey][filt.split('-')[-1]]['magsys'] = zpoff['Primary Name'][zpoff['Filter Name'] == filt][0]
-				self.kcordict[survey][filt.split('-')[-1]]['primarymag'] = zpoff['Primary Mag'][zpoff['Filter Name'] == filt][0]
+				self.kcordict[survey][filt.split('-')[-1].split('/')[-1]] = {}
+				self.kcordict[survey][filt.split('-')[-1].split('/')[-1]]['filttrans'] = filtertrans[filt]
+				self.kcordict[survey][filt.split('-')[-1].split('/')[-1]]['zpoff'] = \
+					zpoff['ZPOff(Primary)'][zpoff['Filter Name'] == filt][0]
+				self.kcordict[survey][filt.split('-')[-1].split('/')[-1]]['magsys'] = \
+					zpoff['Primary Name'][zpoff['Filter Name'] == filt][0]
+				self.kcordict[survey][filt.split('-')[-1].split('/')[-1]]['primarymag'] = \
+					zpoff['Primary Mag'][zpoff['Filter Name'] == filt][0]
 
 	def rdSpecData(self,datadict,speclist,tpk):
 
@@ -197,7 +200,8 @@ class TrainSALT:
 				raise RuntimeError('File %s has no SURVEY key, which is needed to find the filter transmission curves'%PhotSNID[0])
 			if not 'REDSHIFT_HELIO' in sn.__dict__.keys():
 				raise RuntimeError('File %s has no heliocentric redshift information in the header'%PhotSNID[0])
-			
+
+			if 'PEAKMJD' in sn.__dict__.keys(): sn.SEARCH_PEAKMJD = sn.PEAKMJD
 			zHel = float(sn.REDSHIFT_HELIO.split('+-')[0])
 			if 'B' in sn.FLT:
 				tpk,tpkmsg = estimate_tpk_bazin(
@@ -205,6 +209,9 @@ class TrainSALT:
 			elif 'g' in sn.FLT:
 				tpk,tpkmsg = estimate_tpk_bazin(
 					sn.MJD[sn.FLT == 'g'],sn.FLUXCAL[sn.FLT == 'g'],sn.FLUXCALERR[sn.FLT == 'g'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
+			elif 'e' in sn.FLT:
+				tpk,tpkmsg = estimate_tpk_bazin(
+					sn.MJD[sn.FLT == 'c'],sn.FLUXCAL[sn.FLT == 'c'],sn.FLUXCALERR[sn.FLT == 'c'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
 			else:
 				raise RuntimeError('need a blue filter to estimate tmax')
 

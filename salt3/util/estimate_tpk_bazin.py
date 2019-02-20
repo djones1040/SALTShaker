@@ -19,7 +19,11 @@ def estimate_tpk_bazin(time, flux, fluxerr, t0=None, max_nfev=10000000):
 	else:
 		iTime = (scaled_time > 0) & (scaled_time < 30)
 	flux,fluxerr,scaled_time = flux[iTime],fluxerr[iTime],scaled_time[iTime]
-
+	if len(scaled_time) < 3:
+		return -99,'failed'
+	if t0 < time.min():
+		return -99,'failed'
+	
 	if not t0:
 		t0 = scaled_time[flux.argmax()]
 		bounds = ((-np.inf,-np.inf,-np.inf,-np.inf,-np.inf),
@@ -31,12 +35,11 @@ def estimate_tpk_bazin(time, flux, fluxerr, t0=None, max_nfev=10000000):
 	guess = (flux.max(), 0, t0, 40, -5)
 	
 	errfunc = lambda params: abs(flux - bazin(scaled_time, *params))#/fluxerr
-
 	result = least_squares(errfunc, guess,#method='trf',
 						   max_nfev=max_nfev,bounds=bounds)
 	scaled_time_bettersamp = np.arange(
 		np.min(scaled_time),np.max(scaled_time),0.1)
 	tpk = scaled_time_bettersamp[bazin(
 		scaled_time_bettersamp, *result.x).argmax()]
-	
+
 	return tpk+time.min(),result.message
