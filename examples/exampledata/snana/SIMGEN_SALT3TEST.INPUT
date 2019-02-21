@@ -21,7 +21,7 @@ RANSEED:      28473   # random number seed
 FORMAT_MASK:  2        # 2=text  32=FITS
 
 CIDOFF:     5999386
-NGEN_LC:    10
+NGEN_LC:    30
 
 GENVERSION: SALT3TEST_SIMPLE
 GENSOURCE:  RANDOM   
