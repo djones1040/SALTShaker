@@ -127,9 +127,9 @@
 	 FIRST/LAST Random Number (List=2): 0.407840 0.460827  
 	 FIRST/LAST Random Number (List=3): 0.221022 0.448651  
 
-  Generation Statistics (total CPU=0.1 minutes): 
-	 Generated    33 simulated light curves (11/sec) 
-	 Wrote        30 simulated light curves to SNDATA files (10/sec). 
+  Generation Statistics (total CPU=0.0 minutes): 
+	 Generated    33 simulated light curves (16/sec) 
+	 Wrote        30 simulated light curves to SNDATA files (15/sec). 
   Spectroscopic-type: 33 -> 30 (before -> after cuts)
   Photometric-type:   0 -> 0 (before -> after cuts)
   Rejection Statistics: 
