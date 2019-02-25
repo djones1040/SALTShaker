@@ -61,7 +61,7 @@ class TrainSALT:
 		parser.add_argument('--kcor_path', default=config.get('iodata','kcor_path'), type=str, action='append',
 							help="""kcor_path gives survey,kcorfile for each survey used in the training data (default=%default)""")
 
-		# training parameters
+		# training model parameters
 		parser.add_argument('--waverange', default=list(map(int,config.get('trainparams','waverange').split(','))), type=int, nargs=2,
 							help='wavelength range over which the model is defined (default=%default)')
 		parser.add_argument('--colorwaverange', default=list(map(int,config.get('trainparams','colorwaverange').split(','))), type=int, nargs=2,
@@ -96,6 +96,34 @@ class TrainSALT:
 							help='number of processes to use in calculating chi2 (default=%default)')
 		parser.add_argument('--n_iter', default=config.get('trainparams','n_iter'), type=int,
 							help='number of fitting iterations (default=%default)')
+
+		# mcmc parameters
+		parser.add_argument('--n_steps_mcmc', default=config.get('mcmcparams','n_steps_mcmc'), type=int,
+							help='number of accepted MCMC steps (default=%default)')
+		parser.add_argument('--n_burnin_mcmc', default=config.get('mcmcparams','n_burnin_mcmc'), type=int,
+							help='number of burn-in MCMC steps  (default=%default)')
+		parser.add_argument('--n_init_steps_mcmc', default=config.get('mcmcparams','n_init_steps_mcmc'), type=int,
+							help='number of accepted MCMC steps, initialization stage (default=%default)')
+		parser.add_argument('--n_init_burnin_mcmc', default=config.get('mcmcparams','n_init_burnin_mcmc'), type=int,
+							help='number of burn-in MCMC steps, initialization stage  (default=%default)')
+		parser.add_argument('--stepsize_M0', default=config.get('mcmcparams','stepsize_M0'), type=float,
+							help='initial MCMC step size for M0, in mag  (default=%default)')
+		parser.add_argument('--stepsize_mag_M1', default=config.get('mcmcparams','stepsize_mag_M1'), type=float,
+							help='initial MCMC step size for M1, in mag - need both mag and flux steps because M1 can be negative (default=%default)')
+		parser.add_argument('--stepsize_flux_M1', default=config.get('mcmcparams','stepsize_flux_M1'), type=float,
+							help='initial MCMC step size for M1, in flux - need both mag and flux steps because M1 can be negative (default=%default)')
+		parser.add_argument('--stepsize_cl', default=config.get('mcmcparams','stepsize_cl'), type=float,
+							help='initial MCMC step size for color law  (default=%default)')
+		parser.add_argument('--stepsize_specrecal', default=config.get('mcmcparams','stepsize_specrecal'), type=float,
+							help='initial MCMC step size for spec recal. params  (default=%default)')
+		parser.add_argument('--stepsize_x0', default=config.get('mcmcparams','stepsize_x0'), type=float,
+							help='initial MCMC step size for x0, in mag  (default=%default)')
+		parser.add_argument('--stepsize_x1', default=config.get('mcmcparams','stepsize_x1'), type=float,
+							help='initial MCMC step size for x1  (default=%default)')
+		parser.add_argument('--stepsize_c', default=config.get('mcmcparams','stepsize_c'), type=float,
+							help='initial MCMC step size for c  (default=%default)')
+		parser.add_argument('--stepsize_tpk', default=config.get('mcmcparams','stepsize_tpk'), type=float,
+							help='initial MCMC step size for tpk  (default=%default)')
 
 		
 		return parser
@@ -209,12 +237,16 @@ class TrainSALT:
 			elif 'g' in sn.FLT:
 				tpk,tpkmsg = estimate_tpk_bazin(
 					sn.MJD[sn.FLT == 'g'],sn.FLUXCAL[sn.FLT == 'g'],sn.FLUXCALERR[sn.FLT == 'g'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
-			elif 'e' in sn.FLT:
+			elif 'c' in sn.FLT:
 				tpk,tpkmsg = estimate_tpk_bazin(
 					sn.MJD[sn.FLT == 'c'],sn.FLUXCAL[sn.FLT == 'c'],sn.FLUXCALERR[sn.FLT == 'c'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
 			else:
 				raise RuntimeError('need a blue filter to estimate tmax')
 
+			# at least one epoch 3 days before max
+			if not len(sn.MJD[sn.MJD < tpk-3]):
+				self.addwarning('skipping SN %s; no epochs 3 days pre-max'%sn.SNID)
+				continue
 
 			if 'termination condition is satisfied' not in tpkmsg:
 				self.addwarning('skipping SN %s; can\'t estimate t_max'%sn.SNID)
@@ -312,6 +344,17 @@ class TrainSALT:
 								  waverange,phaseres,waveres,phaseoutres,waveoutres,
 								  colorwaverange,
 								  kcordict,initmodelfile,initBfilt,n_components,n_colorpars)
+
+		saltfitter.stepsize_M0 = self.options.stepsize_M0
+		saltfitter.stepsize_mag_M1 = self.options.stepsize_mag_M1
+		saltfitter.stepsize_flux_M1 = self.options.stepsize_flux_M1
+		saltfitter.stepsize_cl = self.options.stepsize_cl
+		saltfitter.stepsize_specrecal = self.options.stepsize_specrecal
+		saltfitter.stepsize_x0 = self.options.stepsize_x0
+		saltfitter.stepsize_x1 = self.options.stepsize_x1
+		saltfitter.stepsize_c = self.options.stepsize_c
+		saltfitter.stepsize_tpk = self.options.stepsize_tpk
+		
 		# first pass - estimate x0 so we can bound it to w/i an order of mag
 		initbounds = ([0,-np.inf,-np.inf,-5]*n_sn,[np.inf,np.inf,np.inf,5]*n_sn)
 		initparlist = []
@@ -330,33 +373,35 @@ class TrainSALT:
 				saltfitter.components = saltfitter.SALTModel(x)
 			saltfitter.parlist = initparlist
 
-			if n_processes>1:
-				with multiprocessing.Pool(n_processes) as pool:
-					md_init = least_squares(saltfitter.chi2fit,initguess,method='trf',bounds=initbounds,
-											args=(None,None,pool,))
-			else:
-				md_init = least_squares(saltfitter.chi2fit,initguess,method='trf',bounds=initbounds,
-										args=(None,None,None,))
+			fitter = fitting(n_components,n_colorpars,
+							 n_phaseknots,n_waveknots,
+							 datadict,initguess,
+							 initparlist,parlist)
+
+			phase,wave,M0,M1,clpars,SNParams,message = fitter.mcmc(
+				saltfitter,initguess,(),(),n_processes,
+				self.options.n_init_steps_mcmc,
+				self.options.n_init_burnin_mcmc,init=True)
 			
 			try:
-				if 'condition is satisfied' not in md_init.message.decode('utf-8'):
-					self.addwarning('Initialization minimizer message: %s'%md_init.message)
+				if 'condition is satisfied' not in message.decode('utf-8'):
+					self.addwarning('Initialization MCMC message: %s'%message)
 			except:
-				if 'condition is satisfied' not in md_init.message:
-					self.addwarning('Initialization minimizer message: %s'%md_init.message)
+				if 'condition is satisfied' not in message:
+					self.addwarning('Initialization MCMC message: %s'%message)
 			if self.verbose:
-				print('x0 guesses initialized successfully')
+				print('SN guesses initialized successfully')
 
 			# 2nd pass - let the SALT model spline knots float			
 			SNpars,SNparlist = [],[]
 			for k in datadict.keys():
-				guess[parlist == 'x0_%s'%k] = md_init.x[initparlist == 'x0_%s'%k]
-				SNpars += [md_init.x[initparlist == 'x0_%s'%k],md_init.x[initparlist == 'x1_%s'%k],
-						   md_init.x[initparlist == 'c_%s'%k],md_init.x[initparlist == 'tpkoff_%s'%k]]
+				tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
+				guess[parlist == 'x0_%s'%k] = SNParams[k]['x0']
+				SNpars += [SNParams[k]['x0'],SNParams[k]['x1'],SNParams[k]['c'],SNParams[k]['tpkoff']]
 				SNparlist += ['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k]
-				SNparlist = np.array(SNparlist); SNpars = np.array(SNpars)
+			SNparlist = np.array(SNparlist); SNpars = np.array(SNpars)
 				#guess[parlist == 'cl'] = md_init.x[initparlist == 'cl']
-
+			
 			if i > 0:
 				guess[parlist == 'm0'] = x[parlist == 'm0']
 				if n_components == 2:
@@ -369,34 +414,22 @@ class TrainSALT:
 
 			fitter = fitting(n_components,n_colorpars,
 							 n_phaseknots,n_waveknots,
-							 datadict,md_init.x,
+							 datadict,guess,
 							 initparlist,parlist)
-		
-			if self.options.fitstrategy == 'leastsquares':
-				x,phase,wave,M0,M1,clpars,SNParams,message = fitter.least_squares(saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod)
-			elif self.options.fitstrategy == 'minimize':
-				x,phase,wave,M0,M1,clpars,SNParams,message = fitter.minimize(saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod)
-			elif self.options.fitstrategy == 'bobyqa':
-				x,phase,wave,M0,M1,clpars,SNParams,message = fitter.bobyqa(saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod)
-			elif self.options.fitstrategy == 'simplemcmc':
-				phase,wave,M0,M1,clpars,SNParams,message = fitter.mcmc(saltfitter,guess,SNpars,SNparlist,n_processes)
-			elif self.options.fitstrategy == 'emcee':
-				phase,wave,M0,M1,clpars,SNParams,message = fitter.emcee(saltfitter,guess,SNpars,SNparlist,n_processes)
-			elif self.options.fitstrategy == 'hyperopt':
-				phase,wave,M0,M1,clpars,SNParams,message = fitter.hyperopt(saltfitter,guess,m0knots,SNpars,SNparlist,n_processes)
-			elif self.options.fitstrategy == 'diffevol':
-				x,phase,wave,M0,M1,clpars,SNParams,message = fitter.diffevol(saltfitter,SNpars,SNparlist,n_processes)
-			elif self.options.fitstrategy == 'multinest':
-				phase,wave,M0,M1,clpars,SNParams,message = fitter.pymultinest(saltfitter,guess,SNpars,SNparlist,n_processes)
-			else:
-				raise RuntimeError('fitting strategy not one of leastsquares, minimize, emcee, hyperopt, multinest, bobyqa or diffevol')
 
+			phase,wave,M0,M1,clpars,SNParams,message = fitter.mcmc(
+				saltfitter,guess,SNpars,SNparlist,n_processes,
+				self.options.n_steps_mcmc,self.options.n_burnin_mcmc)
+			for k in datadict.keys():
+				tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
+				SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
+			
 			try:
 				if 'condition is satisfied' not in message.decode('utf-8'):
-					self.addwarning('Minimizer message on iter %i: %s'%(i,message))
+					self.addwarning('MCMC message on iter %i: %s'%(i,message))
 			except:
 				if 'condition is satisfied' not in message:
-					self.addwarning('Minimizer message on iter %i: %s'%(i,message))
+					self.addwarning('MCMC message on iter %i: %s'%(i,message))
 
 		return phase,wave,M0,M1,clpars,SNParams
 
@@ -459,21 +492,43 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			fitx1 = True
 		if self.options.n_colorpars > 0:
 			fitc = True
-			
+
+		from salt3.util.synphot import synphot
+		kcordict = {}
+		for k in self.kcordict.keys():
+			for k2 in self.kcordict[k].keys():
+				if k2 not in ['primarywave','snflux','BD17','filtwave','AB']:
+					if self.kcordict[k][k2]['magsys'] == 'AB': primarykey = 'AB'
+					elif self.kcordict[k][k2]['magsys'] == 'Vega': primarykey = 'Vega'
+					elif self.kcordict[k][k2]['magsys'] == 'BD17': primarykey = 'BD17'
+
+					kcordict[k2] = self.kcordict[k][k2]
+					kcordict[k2]['filtwave'] = self.kcordict[k]['filtwave']
+					kcordict[k2]['stdmag'] = synphot(self.kcordict[k]['primarywave'],self.kcordict[k][primarykey],filtwave=self.kcordict[k]['filtwave'],
+													 filttp=self.kcordict[k][k2]['filttrans'],
+													 zpoff=0) - self.kcordict[k][k2]['primarymag']
+#		import pdb; pdb.set_trace()
+				
 		for l in snfiles:
 			plt.clf()
 			if '/' not in l:
 				l = '%s/%s'%(os.path.dirname(self.options.snlist),l)
 			sn = snana.SuperNova(l)
+			sn.SNID = str(sn.SNID)
+
+			if sn.SNID not in snid:
+				self.addwarning('sn %s not in output files'%sn.SNID)
+				continue
 			x0sn,x1sn,csn,t0sn = \
 				x0[snid == sn.SNID][0],x1[snid == sn.SNID][0],\
 				c[snid == sn.SNID][0],t0[snid == sn.SNID][0]
 			if not fitc: csn = 0
 			if not fitx1: x1sn = 0
 			
-			ValidateLightcurves.main(
+			ValidateLightcurves.customfilt(
 				'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,outputdir,
-				t0=None,x0=None,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc)
+				t0=t0sn,x0=x0sn,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc,
+				bandpassdict=kcordict)
 
 		
 	def main(self):
