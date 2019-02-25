@@ -262,8 +262,11 @@ class fitting:
 			
 		return md.x,phase,wave,M0,M1,clpars,SNParams,md.message
 		
-	def mcmc(self,saltfitter,guess,SNpars,SNparlist,n_processes):
+	def mcmc(self,saltfitter,guess,SNpars,SNparlist,
+			 n_processes,n_mcmc_steps,n_burnin_mcmc,
+			 init=False):
 
+		if init: saltfitter.onlySNpars = True
 		saltfitter.SNpars = SNpars
 		saltfitter.SNparlist = SNparlist
 		saltfitter.mcmc = True
@@ -271,6 +274,6 @@ class fitting:
 		saltfitter.fitstrategy = 'mcmc'
 		
 		phase,wave,M0,M1,clpars,SNParams = \
-			saltfitter.mcmcfit(guess,10000)
-		
+			saltfitter.mcmcfit(guess,n_mcmc_steps,n_burnin_mcmc)
+
 		return phase,wave,M0,M1,clpars,SNParams,'simple MCMC was successful'

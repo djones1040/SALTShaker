@@ -22,7 +22,16 @@ class chi2:
 				 phaserange,waverange,phaseres,waveres,phaseoutres,waveoutres,
 				 colorwaverange,kcordict,initmodelfile,initBfilt,n_components=1,
 				 n_colorpars=0,days_interp=5,onlySNpars=False,mcmc=False,debug=False,
-				 fitstrategy='leastsquares'):
+				 fitstrategy='leastsquares',stepsize_M0=None,stepsize_mag_M1=None,
+				 stepsize_flux_M1=None,stepsize_cl=None,
+				 stepsize_specrecal=None,stepsize_x0=None,stepsize_x1=None,
+				 stepsize_c=None,stepsize_tpkoff=None):
+
+		self.init_stepsizes(
+			stepsize_M0,stepsize_mag_M1,stepsize_flux_M1,stepsize_cl,
+			stepsize_specrecal,stepsize_x0,stepsize_x1,
+			stepsize_c,stepsize_tpkoff)
+		
 		self.datadict = datadict
 		self.parlist = parlist
 		self.m0min = np.min(np.where(self.parlist == 'm0')[0])
@@ -92,6 +101,21 @@ class chi2:
 				self.stdmag[survey][flt] = synphot(primarywave,kcordict[survey][primarykey],filtwave=self.kcordict[survey]['filtwave'],
 												   filttp=kcordict[survey][flt]['filttrans'],
 												   zpoff=0) - kcordict[survey][flt]['primarymag'] #kcordict[survey][flt]['zpoff'])
+
+	def init_stepsizes(
+			self,stepsize_M0,stepsize_mag_M1,stepsize_flux_M1,stepsize_cl,
+			stepsize_specrecal,stepsize_x0,stepsize_x1,
+			stepsize_c,stepsize_tpkoff):
+		self.stepsize_M0 = stepsize_M0
+		self.stepsize_mag_M1 = stepsize_mag_M1
+		self.stepsize_flux_M1 = stepsize_flux_M1
+		self.stepsize_cl = stepsize_cl
+		self.stepsize_specrecal = stepsize_specrecal
+		self.stepsize_x0 = stepsize_x0
+		self.stepsize_x1 = stepsize_x1
+		self.stepsize_c = stepsize_c
+		self.stepsize_tpkoff = stepsize_tpkoff
+		
 				
 	def extrapolate(self,saltflux,x0):
 
@@ -120,21 +144,32 @@ class chi2:
 	def adjust_model(self,X):
 
 		X2 = np.zeros(self.npar)
-		for i in range(self.npar):
-			X2[i] = X[i]*10**(0.4*np.random.normal(scale=0.04))
+		for i,par in zip(range(self.npar),self.parlist):
+			if par == 'm0': X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_M0))
+			elif par == 'm1': X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_mag_M1)) + np.random.normal(scale=self.stepsize_flux_M1)
+			elif par == 'cl': X2[i] = X[i]*np.random.normal(scale=self.stepsize_cl)
+			elif par == 'specrecal': X2[i] = X[i]*np.random.normal(scale=self.stepsize_specrecal)
+			elif par.startswith('x0'): X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0))
+			elif par.startswith('x1'): X2[i] = X[i] + np.random.normal(scale=self.stepsize_x1)
+			elif par.startswith('c'): X2[i] = X[i] + np.random.normal(scale=self.stepsize_c)
+			elif par.startswith('tpkoff'):
+				X2[i] = X[i] + np.random.normal(scale=self.stepsize_tpk)
 		return X2
-			
-	def mcmcfit(self,x,nsteps,pool=None,debug=False,debug2=False):
+
+	def mcmcfit(self,x,nsteps,nburn,pool=None,debug=False,debug2=False):
 		npar = len(x)
 		self.npar = npar
-		
+		#self.debug = True
+		#import pdb; pdb.set_trace()
 		# initial log likelihood
 		last_loglike = self.chi2fit(x,pool=pool,debug=debug,debug2=debug2)
 		Xlast = self.adjust_model(x)
 		
 		outpars = [[] for i in range(npar)]
 		accept = 0
-		for i in range(nsteps):
+		nstep = 0
+		while accept < nsteps: #for i in range(nsteps):
+			nstep += 1
 			X = self.adjust_model(Xlast)
 			
 			# loglike
@@ -148,11 +183,12 @@ class chi2:
 				last_loglike = this_loglike
 				accept += 1
 				Xlast = X[:]
-
-		print('acceptance = %.3f'%(accept/float(nsteps)))
-		if accept < 500:
+				print(nstep,accept)
+				
+		print('acceptance = %.3f'%(accept/float(nstep)))
+		if accept < nburn:
 			raise RuntimeError('Not enough steps to wait 500 before burn-in')
-		phase,wave,M0,M1,clpars,SNParams = self.getParsMCMC(np.array(outpars),nburn=500)
+		phase,wave,M0,M1,clpars,SNParams = self.getParsMCMC(np.array(outpars),nburn=nburn)
 		return phase,wave,M0,M1,clpars,SNParams
 		
 	def accept(self, last_loglike, this_loglike):
@@ -206,13 +242,21 @@ class chi2:
 		chi2 = 0
 		#Construct arguments for chi2forSN method
 		args=[(sn,x,components,colorLaw,self.onlySNpars,debug,debug2) for sn in self.datadict.keys()]
-		
+		#if self.mcmc: import pdb; pdb.set_trace()
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
-		if pool:
-			chi2=sum(pool.starmap(self.chi2forSN,args))
+		if self.fitstrategy != 'leastsquares':
+			if pool:
+				chi2=sum(pool.starmap(self.chi2forSN,args))
+			else:
+				chi2=sum(starmap(self.chi2forSN,args))
 		else:
-			chi2=sum(starmap(self.chi2forSN,args))
-		
+			if pool:
+				chi2=np.concatenate(pool.starmap(self.chi2forSN,args))
+			else:
+				chi2 = np.array([])
+				for i in starmap(self.chi2forSN,args):
+					chi2 = np.append(chi2,i)
+				
 		#Debug statements
 		#if debug2: import pdb; pdb.set_trace()
 		#if self.onlySNpars: print(chi2,x)
@@ -282,21 +326,22 @@ class chi2:
 		filtwave = self.kcordict[survey]['filtwave']
 		z = self.datadict[sn]['zHelio']
 		obswave = self.wave*(1+z)
-	
+		obsphase = self.phase*(1+z)
+		
 		if not len(self.SNpars):
 			x0,x1,c,tpkoff = \
 				x[self.parlist == 'x0_%s'%sn][0],x[self.parlist == 'x1_%s'%sn][0],\
 				x[self.parlist == 'c_%s'%sn][0],x[self.parlist == 'tpkoff_%s'%sn][0]
 		else:
 			x0,x1,c,tpkoff = \
-				self.SNpars[self.SNparlist == 'x0_%s'%sn][0][0],self.SNpars[self.SNparlist == 'x1_%s'%sn][0][0],\
-				self.SNpars[self.SNparlist == 'c_%s'%sn][0][0],self.SNpars[self.SNparlist == 'tpkoff_%s'%sn][0][0]
+				self.SNpars[self.SNparlist == 'x0_%s'%sn][0],self.SNpars[self.SNparlist == 'x1_%s'%sn][0],\
+				self.SNpars[self.SNparlist == 'c_%s'%sn][0],self.SNpars[self.SNparlist == 'tpkoff_%s'%sn][0]
 			
 		#Calculate spectral model
 		if self.n_components == 1:
 			saltflux = x0*M0/_SCALE_FACTOR
 		elif self.n_components == 2:
-			saltflux = x0*(M0*_SCALE_FACTOR + x1*M1*_SCALE_FACTOR)
+			saltflux = x0*(M0 + x1*M1)/_SCALE_FACTOR
 		if colorLaw:
 			saltflux *= 10. ** (-0.4 * colorLaw(self.wave) * c)
 			if debug2: import pdb; pdb.set_trace()
@@ -304,10 +349,9 @@ class chi2:
 
 		if self.fitstrategy == 'leastsquares': chi2 = np.array([])
 		else: chi2 = 0
-		int1d = interp1d(self.phase,saltflux,axis=0)
+		int1d = interp1d(obsphase,saltflux,axis=0)
 		for k in specdata.keys():
-			phase=(specdata[k]['tobs']+tpkoff)/(1+z)
-			if phase < self.phase.min() or phase > self.phase.max(): continue
+			if phase < obsphase.min() or phase > obsphase.max(): continue
 			saltfluxinterp = int1d(phase)
 			saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)
 			chi2 += np.sum((saltfluxinterp2-specdata[k]['flux'])**2./specdata[k]['fluxerr']**2.)
@@ -323,9 +367,9 @@ class chi2:
 			pbspl *= obswave[g]
 
 			denom = np.trapz(pbspl,obswave[g])
-			phase=(photdata['tobs']+tpkoff)/1+z
+			phase=photdata['tobs']+tpkoff
 			#Select data from the appropriate time range and filter
-			selectFilter=(photdata['filt']==flt)&(phase>self.phase.min()) & (phase<self.phase.max())
+			selectFilter=(photdata['filt']==flt)&(phase>obsphase.min()) & (phase<obsphase.max())
 			filtPhot={key:photdata[key][selectFilter] for key in photdata}
 			phase=phase[selectFilter]
 			try:
@@ -344,10 +388,12 @@ class chi2:
 				chi2 = np.append(chi2,(filtPhot['fluxcal']-modelflux)**2./(filtPhot['fluxcal']*0.05)**2.)
 			else:
 				chi2 += ((filtPhot['fluxcal']-modelflux)**2./(filtPhot['fluxcalerr']**2. + (filtPhot['fluxcal']*0.05)**2.)).sum()
-			
+
 			if self.debug:
 				#print(chi2)
-				if chi2 < 30:
+				#print(flt)
+				if chi2 < 200 and flt == 'c' and sn == 5999396:
+					print(sn)
 					import pylab as plt
 					plt.ion()
 					plt.clf()
@@ -365,6 +411,7 @@ class chi2:
 				#if chi2 < 1357: import pdb; pdb.set_trace()
 			#print(chi2)
 			#import pdb; pdb.set_trace()
+
 		return chi2
 
 		
@@ -408,7 +455,7 @@ class chi2:
 			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k],
 							  'x1':x[self.parlist == 'x1_%s'%k],
 							  'c':x[self.parlist == 'x1_%s'%k],
-							  't0':x[self.parlist == 'tpkoff_%s'%k]+tpk_init}
+							  'tpkoff':x[self.parlist == 'tpkoff_%s'%k]}
 			
 		return self.phase,self.wave,m0,m1,clpars,resultsdict
 
@@ -417,7 +464,7 @@ class chi2:
 		m0pars = np.array([])
 		for i in np.where(self.parlist == 'm0')[0]:
 			#[x[i][nburn:] == x[i][nburn:]]
-			m0pars = np.append(m0pars,x[i][nburn:].mean())
+			m0pars = np.append(m0pars,x[i][nburn:].mean()/_SCALE_FACTOR)
 
 		m1pars = np.array([])
 		for i in np.where(self.parlist == 'm1')[0]:
@@ -437,14 +484,16 @@ class chi2:
 		n_sn = len(self.datadict.keys())
 		for k in self.datadict.keys():
 			tpk_init = self.datadict[k]['photdata']['mjd'][0] - self.datadict[k]['photdata']['tobs'][0]
-			#resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k].mean(),
-			#				  'x1':x[self.parlist == 'x1_%s'%k].mean(),
-			#				  'c':x[self.parlist == 'x1_%s'%k].mean(),
-			#				  't0':x[self.parlist == 'tpkoff_%s'%k].mean()+tpk_init}
-			resultsdict[k] = {'x0':self.SNpars[self.SNparlist == 'x0_%s'%k][0][0],
-							  'x1':self.SNpars[self.SNparlist == 'x1_%s'%k][0][0],
-							  'c':self.SNpars[self.SNparlist == 'c_%s'%k][0][0],
-							  't0':tpk_init - self.SNpars[self.SNparlist == 'tpkoff_%s'%k][0][0]}
+			if not len(self.SNpars):
+				resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k][0][nburn:].mean(),
+								  'x1':x[self.parlist == 'x1_%s'%k][0][nburn:].mean(),
+								  'c':x[self.parlist == 'x1_%s'%k][0][nburn:].mean(),
+								  'tpkoff':x[self.parlist == 'tpkoff_%s'%k][0][nburn:].mean()}
+			else:
+				resultsdict[k] = {'x0':self.SNpars[self.SNparlist == 'x0_%s'%k][0],
+								  'x1':self.SNpars[self.SNparlist == 'x1_%s'%k][0],
+								  'c':self.SNpars[self.SNparlist == 'c_%s'%k][0],
+								  'tpkoff':self.SNpars[self.SNparlist == 'tpkoff_%s'%k][0]}
 
 		return self.phase,self.wave,m0,m1,clpars,resultsdict
 	
