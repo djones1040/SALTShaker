@@ -426,7 +426,7 @@ class TrainSALT:
 							 datadict,guess,
 							 initparlist,parlist)
 
-			phase,wave,M0,M1,clpars,SNParams,message = fitter.mcmc(
+			x,phase,wave,M0,M1,clpars,SNParams,message = fitter.mcmc(
 				saltfitter,guess,SNpars,SNparlist,n_processes,
 				self.options.n_steps_mcmc,self.options.n_burnin_mcmc)
 			for k in datadict.keys():
@@ -439,7 +439,9 @@ class TrainSALT:
 			except:
 				if 'condition is satisfied' not in message:
 					self.addwarning('MCMC message on iter %i: %s'%(i,message))
-
+					self.addwarning('Minimizer message on iter %i: %s'%(i,message))
+			print('Regulatization chi^2 of result', saltfitter.regularizationChi2(x,1,1,1))
+			
 		return phase,wave,M0,M1,clpars,SNParams
 
 	def wrtoutput(self,outdir,phase,wave,M0,M1,clpars,SNParams):

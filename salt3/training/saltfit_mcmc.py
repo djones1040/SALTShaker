@@ -197,8 +197,8 @@ class chi2:
 		print('acceptance = %.3f'%(accept/float(nstep)))
 		if accept < nburn:
 			raise RuntimeError('Not enough steps to wait 500 before burn-in')
-		phase,wave,M0,M1,clpars,SNParams = self.getParsMCMC(np.array(outpars),nburn=nburn)
-		return phase,wave,M0,M1,clpars,SNParams
+		x,phase,wave,M0,M1,clpars,SNParams = self.getParsMCMC(np.array(outpars),nburn=nburn)
+		return x,phase,wave,M0,M1,clpars,SNParams
 		
 	def accept(self, last_loglike, this_loglike):
 		alpha = np.exp(this_loglike - last_loglike)
@@ -273,6 +273,7 @@ class chi2:
 		print(chi2.sum())
 		
 		if not self.onlySNpars:
+			
 			if self.fitstrategy == 'leastsquares':
 				chi2 = np.append(chi2,self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad))
 			else:
@@ -477,7 +478,7 @@ class chi2:
 		return self.phase,self.wave,m0,m1,clpars,resultsdict
 
 	def getParsMCMC(self,x,nburn=500,bsorder=3):
-
+		
 		m0pars = np.array([])
 		for i in np.where(self.parlist == 'm0')[0]:
 			#[x[i][nburn:] == x[i][nburn:]]
@@ -490,7 +491,7 @@ class chi2:
 		clpars = np.array([])
 		for i in np.where(self.parlist == 'cl')[0]:
 			clpars = np.append(clpars,x[i][nburn:].mean())
-	
+		
 		m0 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m0pars,bsorder,bsorder))
 		if len(m1pars):
 			m1 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m1pars,bsorder,bsorder))
@@ -511,8 +512,8 @@ class chi2:
 								  'x1':self.SNpars[self.SNparlist == 'x1_%s'%k][0],
 								  'c':self.SNpars[self.SNparlist == 'c_%s'%k][0],
 								  'tpkoff':self.SNpars[self.SNparlist == 'tpkoff_%s'%k][0]}
-
-		return self.phase,self.wave,m0,m1,clpars,resultsdict
+		
+		return np.mean(x,axis=1),self.phase,self.wave,m0,m1,clpars,resultsdict
 	
 	def synphot(self,sourceflux,zpoff,survey=None,flt=None,redshift=0):
 		obswave = self.wave*(1+redshift)
@@ -554,7 +555,7 @@ class chi2:
 # 				pbspl /= np.trapz(pbspl,self.wave[g])	
 			self.neff+=np.histogram2d((photdata['tobs']+tpkoff)/(1+z),[lambdaeff[flt]/(1+z) for flt in photdata['filt']],(self.phasebins,self.wavebins))[0]
 		self.neff=gaussian_filter(self.neff,[1,2])
-		self.neff=np.clip(self.neff,0.01*self.neff.max(),None)
+		self.neff=np.clip(self.neff,1e-4*self.neff.max(),None)
 
 	def plotEffectivePoints(self):
 		import matplotlib.pyplot as plt
@@ -571,18 +572,19 @@ class chi2:
 
 	def regularizationChi2(self, x,gradientPhase,gradientWave,dyad):
 		fluxes=self.SALTModel(x,evaluatePhase=self.phasebins[:-1],evaluateWave=self.wavebins[:-1])
+
 		chi2wavegrad=0
 		chi2phasegrad=0
 		chi2dyad=0
 		for i in range(self.n_components):
-			fluxvals=fluxes[i]
+			fluxvals=fluxes[i]/np.mean(fluxes[i])
 			if gradientWave !=0:
-				chi2wavegrad+=((   (fluxvals[:,:,np.newaxis]-fluxvals[:,np.newaxis,:])**2   /   (self.neff[:,:,np.newaxis]* (self.wavebins[np.newaxis,np.newaxis,:-1]-self.wavebins[np.newaxis,:-1,np.newaxis])**2))[:,~np.diag(np.ones(self.wavebins.size-1,dtype=bool))]).sum()
+				chi2wavegrad+= 1/((self.wavebins.size-1)**2 *(self.phasebins.size-1)) * (( (fluxvals[:,:,np.newaxis]-fluxvals[:,np.newaxis,:])**2   /   (self.neff[:,:,np.newaxis]* np.abs(self.wavebins[np.newaxis,np.newaxis,:-1]-self.wavebins[np.newaxis,:-1,np.newaxis])))[:,~np.diag(np.ones(self.wavebins.size-1,dtype=bool))]).sum()
 			if gradientPhase != 0:
-				chi2phasegrad+=((  (fluxvals[np.newaxis,:,:]-fluxvals[:,np.newaxis,:])**2   /   (self.neff[:,np.newaxis,:]* (self.phasebins[:-1,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:-1,np.newaxis])**2))[~np.diag(np.ones(self.phasebins.size-1,dtype=bool)),:]).sum()
+				chi2phasegrad+= 1/((self.phasebins.size-1)**2 *(self.wavebins.size-1) ) * ((  (fluxvals[np.newaxis,:,:]-fluxvals[:,np.newaxis,:])**2   /   (self.neff[:,np.newaxis,:]* np.abs(self.phasebins[:-1,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:-1,np.newaxis])**2))[~np.diag(np.ones(self.phasebins.size-1,dtype=bool)),:]).sum()
 			if dyad!= 0:
 				chi2dyadvals=(   (fluxvals[:,np.newaxis,:,np.newaxis] * fluxvals[np.newaxis,:,np.newaxis,:] - fluxvals[np.newaxis,:,:,np.newaxis] * fluxvals[:,np.newaxis,np.newaxis,:])**2)   /   (self.neff[:,np.newaxis,:,np.newaxis]*np.abs(self.wavebins[np.newaxis,np.newaxis,:-1,np.newaxis]-self.wavebins[np.newaxis,np.newaxis,np.newaxis,:-1])*np.abs(self.phasebins[:-1,np.newaxis,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:-1,np.newaxis,np.newaxis]))
-				chi2dyad+=chi2dyadvals[~np.isnan(chi2dyadvals)].sum()
+				chi2dyad+=1/( (self.wavebins.size-1) *(self.phasebins.size-1))**2  * chi2dyadvals[~np.isnan(chi2dyadvals)].sum()
 		print(gradientPhase*chi2phasegrad,gradientWave*chi2wavegrad,dyad*chi2dyad)
 		return gradientWave*chi2wavegrad+dyad*chi2dyad+gradientPhase*chi2phasegrad
 	
