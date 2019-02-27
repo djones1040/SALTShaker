@@ -440,8 +440,9 @@ class TrainSALT:
 				if 'condition is satisfied' not in message:
 					self.addwarning('MCMC message on iter %i: %s'%(i,message))
 					self.addwarning('Minimizer message on iter %i: %s'%(i,message))
-			print('Regulatization chi^2 of result', saltfitter.regularizationChi2(x,1,1,1))
-			
+			print('Individual components of final regularization chi^2'); saltfitter.regularizationChi2(x,1,1,1)
+			print('Final chi^2'); saltfitter.chi2fit(x,None,False,False)
+
 		return phase,wave,M0,M1,clpars,SNParams
 
 	def wrtoutput(self,outdir,phase,wave,M0,M1,clpars,SNParams):

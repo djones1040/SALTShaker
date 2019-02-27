@@ -40,6 +40,7 @@ class chi2:
 		self.waverange = waverange
 		self.phaseres = phaseres
 		self.phaseoutres = phaseoutres
+		self.waveres=waveres
 		self.waveoutres = waveoutres
 		self.kcordict = kcordict
 		self.n_components = n_components
@@ -171,7 +172,7 @@ class chi2:
 		#self.debug = True
 		#import pdb; pdb.set_trace()
 		# initial log likelihood
-		last_loglike = self.chi2fit(x,pool=pool,debug=debug,debug2=debug2)
+		loglikes=[self.chi2fit(x,pool=pool,debug=debug,debug2=debug2)]
 		Xlast = self.adjust_model(x)
 		
 		outpars = [[] for i in range(npar)]
@@ -185,19 +186,19 @@ class chi2:
 			this_loglike = self.chi2fit(X,pool=pool,debug=debug,debug2=debug2)
 
 			# accepted?
-			accept_bool = self.accept(last_loglike,this_loglike)
+			accept_bool = self.accept(loglikes[-1],this_loglike)
 			if accept_bool:
 				for j in range(npar):
 					outpars[j] += [X[j]]
-				last_loglike = this_loglike
+				loglikes+=[this_loglike]
 				accept += 1
 				Xlast = X[:]
 				print(nstep,accept)
-				
-		print('acceptance = %.3f'%(accept/float(nstep)))
-		if accept < nburn:
+		loglikes=loglikes[1:]
+		print('acceptance = %.3f'%(accept/float(nsteps)))
+		if accept < 500:
 			raise RuntimeError('Not enough steps to wait 500 before burn-in')
-		x,phase,wave,M0,M1,clpars,SNParams = self.getParsMCMC(np.array(outpars),nburn=nburn)
+		x,phase,wave,M0,M1,clpars,SNParams = self.getParsMCMC(loglikes,np.array(outpars),nburn=nburn,result='mode')
 		return x,phase,wave,M0,M1,clpars,SNParams
 		
 	def accept(self, last_loglike, this_loglike):
@@ -477,6 +478,7 @@ class chi2:
 			
 		return self.phase,self.wave,m0,m1,clpars,resultsdict
 
+<<<<<<< HEAD
 	def getParsMCMC(self,x,nburn=500,bsorder=3):
 		
 		m0pars = np.array([])
@@ -492,6 +494,29 @@ class chi2:
 		for i in np.where(self.parlist == 'cl')[0]:
 			clpars = np.append(clpars,x[i][nburn:].mean())
 		
+=======
+	def getParsMCMC(self,loglikes,x,nburn=500,bsorder=3,result='mean'):
+		if  result == 'mean':
+			m0pars = np.array([])
+			for i in np.where(self.parlist == 'm0')[0]:
+				#[x[i][nburn:] == x[i][nburn:]]
+				m0pars = np.append(m0pars,x[i][nburn:].mean())
+
+			m1pars = np.array([])
+			for i in np.where(self.parlist == 'm1')[0]:
+				m1pars = np.append(m1pars,x[i][nburn:].mean())
+
+			clpars = np.array([])
+			for i in np.where(self.parlist == 'cl')[0]:
+				clpars = np.append(clpars,x[i][nburn:].mean())
+		elif result =='mode':
+			maxLike=np.argmax(loglikes)
+			m0pars=x[:,maxLike][self.parlist == 'm0']
+			m1pars=x[:,maxLike][self.parlist == 'm1']
+			clpars=x[:,maxLike][self.parlist=='cl']
+		else:
+			raise ValueError('Key {} passed to getParsMCMC, valid keys are \"mean\" or \"mode\"')
+>>>>>>> Changed normalization on regularization term, added print messages, added an argument to choose whether getParsMCMC gets the mean or the mode
 		m0 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m0pars,bsorder,bsorder))
 		if len(m1pars):
 			m1 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m1pars,bsorder,bsorder))
@@ -577,14 +602,15 @@ class chi2:
 		chi2phasegrad=0
 		chi2dyad=0
 		for i in range(self.n_components):
+			exponent=2
 			fluxvals=fluxes[i]/np.mean(fluxes[i])
 			if gradientWave !=0:
-				chi2wavegrad+= 1/((self.wavebins.size-1)**2 *(self.phasebins.size-1)) * (( (fluxvals[:,:,np.newaxis]-fluxvals[:,np.newaxis,:])**2   /   (self.neff[:,:,np.newaxis]* np.abs(self.wavebins[np.newaxis,np.newaxis,:-1]-self.wavebins[np.newaxis,:-1,np.newaxis])))[:,~np.diag(np.ones(self.wavebins.size-1,dtype=bool))]).sum()
+				chi2wavegrad+= self.waveres**exponent/((self.wavebins.size-1)**2 *(self.phasebins.size-1)) * (( (fluxvals[:,:,np.newaxis]-fluxvals[:,np.newaxis,:])**2   /   (self.neff[:,:,np.newaxis]* np.abs(self.wavebins[np.newaxis,np.newaxis,:-1]-self.wavebins[np.newaxis,:-1,np.newaxis])**exponent))[:,~np.diag(np.ones(self.wavebins.size-1,dtype=bool))]).sum()
 			if gradientPhase != 0:
-				chi2phasegrad+= 1/((self.phasebins.size-1)**2 *(self.wavebins.size-1) ) * ((  (fluxvals[np.newaxis,:,:]-fluxvals[:,np.newaxis,:])**2   /   (self.neff[:,np.newaxis,:]* np.abs(self.phasebins[:-1,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:-1,np.newaxis])**2))[~np.diag(np.ones(self.phasebins.size-1,dtype=bool)),:]).sum()
+				chi2phasegrad+= self.phaseres**exponent/((self.phasebins.size-1)**2 *(self.wavebins.size-1) ) * ((  (fluxvals[np.newaxis,:,:]-fluxvals[:,np.newaxis,:])**2   /   (self.neff[:,np.newaxis,:]* np.abs(self.phasebins[:-1,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:-1,np.newaxis])**exponent))[~np.diag(np.ones(self.phasebins.size-1,dtype=bool)),:]).sum()
 			if dyad!= 0:
 				chi2dyadvals=(   (fluxvals[:,np.newaxis,:,np.newaxis] * fluxvals[np.newaxis,:,np.newaxis,:] - fluxvals[np.newaxis,:,:,np.newaxis] * fluxvals[:,np.newaxis,np.newaxis,:])**2)   /   (self.neff[:,np.newaxis,:,np.newaxis]*np.abs(self.wavebins[np.newaxis,np.newaxis,:-1,np.newaxis]-self.wavebins[np.newaxis,np.newaxis,np.newaxis,:-1])*np.abs(self.phasebins[:-1,np.newaxis,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:-1,np.newaxis,np.newaxis]))
-				chi2dyad+=1/( (self.wavebins.size-1) *(self.phasebins.size-1))**2  * chi2dyadvals[~np.isnan(chi2dyadvals)].sum()
+				chi2dyad+=self.phaseres*self.waveres/( (self.wavebins.size-1) *(self.phasebins.size-1))**2  * chi2dyadvals[~np.isnan(chi2dyadvals)].sum()
 		print(gradientPhase*chi2phasegrad,gradientWave*chi2wavegrad,dyad*chi2dyad)
 		return gradientWave*chi2wavegrad+dyad*chi2dyad+gradientPhase*chi2phasegrad
 	
