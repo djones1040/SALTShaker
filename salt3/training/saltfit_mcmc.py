@@ -196,7 +196,7 @@ class chi2:
 				print(nstep,accept)
 		loglikes=loglikes[1:]
 		print('acceptance = %.3f'%(accept/float(nsteps)))
-		if accept < 500:
+		if accept < nburn:
 			raise RuntimeError('Not enough steps to wait 500 before burn-in')
 		x,phase,wave,M0,M1,clpars,SNParams = self.getParsMCMC(loglikes,np.array(outpars),nburn=nburn,result='mode')
 		return x,phase,wave,M0,M1,clpars,SNParams
@@ -478,29 +478,12 @@ class chi2:
 			
 		return self.phase,self.wave,m0,m1,clpars,resultsdict
 
-<<<<<<< HEAD
-	def getParsMCMC(self,x,nburn=500,bsorder=3):
-		
-		m0pars = np.array([])
-		for i in np.where(self.parlist == 'm0')[0]:
-			#[x[i][nburn:] == x[i][nburn:]]
-			m0pars = np.append(m0pars,x[i][nburn:].mean()/_SCALE_FACTOR)
-
-		m1pars = np.array([])
-		for i in np.where(self.parlist == 'm1')[0]:
-			m1pars = np.append(m1pars,x[i][nburn:].mean())
-
-		clpars = np.array([])
-		for i in np.where(self.parlist == 'cl')[0]:
-			clpars = np.append(clpars,x[i][nburn:].mean())
-		
-=======
 	def getParsMCMC(self,loglikes,x,nburn=500,bsorder=3,result='mean'):
 		if  result == 'mean':
 			m0pars = np.array([])
 			for i in np.where(self.parlist == 'm0')[0]:
 				#[x[i][nburn:] == x[i][nburn:]]
-				m0pars = np.append(m0pars,x[i][nburn:].mean())
+				m0pars = np.append(m0pars,x[i][nburn:].mean()/_SCALE_FACTOR)
 
 			m1pars = np.array([])
 			for i in np.where(self.parlist == 'm1')[0]:
@@ -509,14 +492,15 @@ class chi2:
 			clpars = np.array([])
 			for i in np.where(self.parlist == 'cl')[0]:
 				clpars = np.append(clpars,x[i][nburn:].mean())
+			result=np.mean(x,axis=1)
 		elif result =='mode':
 			maxLike=np.argmax(loglikes)
-			m0pars=x[:,maxLike][self.parlist == 'm0']
+			result=x[:,maxLike]
+			m0pars=x[:,maxLike][self.parlist == 'm0']/_SCALE_FACTOR
 			m1pars=x[:,maxLike][self.parlist == 'm1']
 			clpars=x[:,maxLike][self.parlist=='cl']
 		else:
 			raise ValueError('Key {} passed to getParsMCMC, valid keys are \"mean\" or \"mode\"')
->>>>>>> Changed normalization on regularization term, added print messages, added an argument to choose whether getParsMCMC gets the mean or the mode
 		m0 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m0pars,bsorder,bsorder))
 		if len(m1pars):
 			m1 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m1pars,bsorder,bsorder))
@@ -538,7 +522,7 @@ class chi2:
 								  'c':self.SNpars[self.SNparlist == 'c_%s'%k][0],
 								  'tpkoff':self.SNpars[self.SNparlist == 'tpkoff_%s'%k][0]}
 		
-		return np.mean(x,axis=1),self.phase,self.wave,m0,m1,clpars,resultsdict
+		return result,self.phase,self.wave,m0,m1,clpars,resultsdict
 	
 	def synphot(self,sourceflux,zpoff,survey=None,flt=None,redshift=0):
 		obswave = self.wave*(1+redshift)
