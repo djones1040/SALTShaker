@@ -386,7 +386,7 @@ class TrainSALT:
 							 datadict,initguess,
 							 initparlist,parlist)
 
-			phase,wave,M0,M1,clpars,SNParams,message = fitter.mcmc(
+			initX,phase,wave,M0,M1,clpars,SNParams,message = fitter.mcmc(
 				saltfitter,initguess,(),(),n_processes,
 				self.options.n_init_steps_mcmc,
 				self.options.n_init_burnin_mcmc,init=True)
@@ -399,7 +399,7 @@ class TrainSALT:
 					self.addwarning('Initialization MCMC message: %s'%message)
 			if self.verbose:
 				print('SN guesses initialized successfully')
-			saltfitter.updateEffectivePoints(md_init.x)
+			saltfitter.updateEffectivePoints(initX)
 			#saltfitter.plotEffectivePoints()
 			# 2nd pass - let the SALT model spline knots float			
 			SNpars,SNparlist = [],[]
