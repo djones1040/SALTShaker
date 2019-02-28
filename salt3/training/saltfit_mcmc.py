@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 
 import numpy as np
-from scipy.interpolate import splprep,splev,BSpline,griddata,bisplev
+from scipy.interpolate import splprep,splev,BSpline,griddata,bisplev,interp1d,interp2d
 from salt3.util.synphot import synphot
-from scipy.interpolate import interp1d
 from sncosmo.salt2utils import SALT2ColorLaw
 import time
 from itertools import starmap
@@ -11,16 +10,17 @@ from salt3.training import init_hsiao
 from sncosmo.models import StretchSource
 from scipy.optimize import minimize
 from scipy.stats import norm
+from scipy.ndimage import gaussian_filter
 #import pysynphot as S
 
 _SCALE_FACTOR = 1e-12
 
-lambdaeff = {'g':4900.1409,'r':6241.2736,'i':7563.7672,'z':8690.0840}
+lambdaeff = {'g':4900.1409,'r':6241.2736,'i':7563.7672,'z':8690.0840,'B':4353,'V':5477}
 
 class chi2:
 	def __init__(self,guess,datadict,parlist,phaseknotloc,waveknotloc,
 				 phaserange,waverange,phaseres,waveres,phaseoutres,waveoutres,
-				 colorwaverange,kcordict,initmodelfile,initBfilt,n_components=1,
+				 colorwaverange,kcordict,initmodelfile,initBfilt,regulargradientphase, regulargradientwave, regulardyad ,n_components=1,
 				 n_colorpars=0,days_interp=5,onlySNpars=False,mcmc=False,debug=False,
 				 fitstrategy='leastsquares',stepsize_M0=None,stepsize_magscale_M1=None,
 				 stepsize_magadd_M1=None,stepsize_cl=None,
@@ -40,6 +40,7 @@ class chi2:
 		self.waverange = waverange
 		self.phaseres = phaseres
 		self.phaseoutres = phaseoutres
+		self.waveres=waveres
 		self.waveoutres = waveoutres
 		self.kcordict = kcordict
 		self.n_components = n_components
@@ -53,12 +54,18 @@ class chi2:
 		self.guess = guess
 		self.debug = debug
 		
+		self.phasebins = np.linspace(phaserange[0]-days_interp,phaserange[1]+days_interp,
+							 1+ (phaserange[1]-phaserange[0]+2*days_interp)/phaseres)
+		self.wavebins = np.linspace(waverange[0],waverange[1],
+							 1+(waverange[1]-waverange[0])/waveres)
+
+		
 		assert type(parlist) == np.ndarray
 		self.splinephase = phaseknotloc
 		self.splinewave = waveknotloc
 		self.phase = np.linspace(phaserange[0]-days_interp,phaserange[1]+days_interp,
-								 (phaserange[1]-phaserange[0]+2*days_interp)/phaseoutres)
-		self.wave = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/waveoutres)
+								 (phaserange[1]-phaserange[0]+2*days_interp)/phaseoutres,False)
+		self.wave = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/waveoutres,False)
 
 		self.hsiaoflux = init_hsiao.get_hsiao(hsiaofile=initmodelfile,Bfilt=initBfilt,
 											  phaserange=phaserange,waverange=waverange,
@@ -85,10 +92,13 @@ class chi2:
 		self.iExtrapPhaseMin = self.phase < phaserange[0]
 		self.iExtrapPhaseMax = self.phase > phaserange[1]
 		
-		
+		self.neff=0
+		self.updateEffectivePoints(guess)
 		
 		self.components = self.SALTModel(guess)
-		
+		self.regulargradientphase=regulargradientphase
+		self.regulargradientwave=regulargradientwave
+		self.regulardyad=regulardyad
 		self.stdmag = {}
 		for survey in self.kcordict.keys():
 			self.stdmag[survey] = {}
@@ -167,7 +177,7 @@ class chi2:
 		#self.debug3 = True
 
 		# initial log likelihood
-		last_loglike = self.chi2fit(x,pool=pool,debug=debug,debug2=debug2)
+		loglikes=[self.chi2fit(x,pool=pool,debug=debug,debug2=debug2)]
 		Xlast = x[:] #self.adjust_model(x)
 		
 		outpars = [[] for i in range(npar)]
@@ -188,11 +198,11 @@ class chi2:
 			this_loglike = self.chi2fit(X,pool=pool,debug=debug,debug2=debug2)
 
 			# accepted?
-			accept_bool = self.accept(last_loglike,this_loglike)
+			accept_bool = self.accept(loglikes[-1],this_loglike)
 			if accept_bool:
 				for j in range(npar):
 					outpars[j] += [X[j]]
-				last_loglike = this_loglike
+				loglikes+=[this_loglike]
 				accept += 1
 				Xlast = X[:]
 				print('step = %i, accepted = %i, acceptance = %.3f, stepfactor = %.3f'%(nstep,accept,accept/float(nstep),stepfactor))
@@ -200,9 +210,9 @@ class chi2:
 		print('acceptance = %.3f'%(accept/float(nstep)))
 		if accept < nburn:
 			raise RuntimeError('Not enough steps to wait 500 before burn-in')
-		phase,wave,M0,M1,clpars,SNParams,xfinal = self.getParsMCMC(np.array(outpars),nburn=nburn)
+		xfinal,phase,wave,M0,M1,clpars,SNParams = self.getParsMCMC(loglikes,np.array(outpars),nburn=nburn,result='mode')
 
-		return phase,wave,M0,M1,clpars,SNParams,xfinal
+		return xfinal,phase,wave,M0,M1,clpars,SNParams
 		
 	def accept(self, last_loglike, this_loglike):
 		alpha = np.exp(this_loglike - last_loglike)
@@ -255,7 +265,6 @@ class chi2:
 		chi2 = 0
 		#Construct arguments for chi2forSN method
 		args=[(sn,x,components,colorLaw,self.onlySNpars,debug,debug2) for sn in self.datadict.keys()]
-		#if self.mcmc: import pdb; pdb.set_trace()
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
 		if self.fitstrategy != 'leastsquares':
 			if pool:
@@ -276,6 +285,14 @@ class chi2:
 		#else:
 		#	print(chi2,x[0])#,x[self.parlist == 'x0_ASASSN-16bc'],x[self.parlist == 'cl'])
 		print(chi2.sum())
+		
+		if not self.onlySNpars:
+			
+			if self.fitstrategy == 'leastsquares':
+				chi2 = np.append(chi2,self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad))
+			else:
+				chi2 += self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad)
+
 		if self.mcmc:
 			#print(-chi2)
 			return -chi2/2
@@ -366,7 +383,7 @@ class chi2:
 		else: chi2 = 0
 		int1d = interp1d(obsphase,saltflux,axis=0)
 		for k in specdata.keys():
-			if phase < obsphase.min() or phase > obsphase.max(): continue
+			if phase < obsphase.min() or phase > obsphase.max(): raise RuntimeError('Phase {} is out of extrapolated phase range for SN {} with tpkoff {}'.format(phase,sn,tpkoff))
 			saltfluxinterp = int1d(phase)
 			saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)
 			chi2 += np.sum((saltfluxinterp2-specdata[k]['flux'])**2./specdata[k]['fluxerr']**2.)
@@ -378,13 +395,16 @@ class chi2:
 
 			g = (obswave >= filtwave[0]) & (obswave <= filtwave[-1])  # overlap range
 
+			
 			pbspl = np.interp(obswave[g],filtwave,filttrans)
 			pbspl *= obswave[g]
 
 			denom = np.trapz(pbspl,obswave[g])
 			phase=photdata['tobs']+tpkoff
-			#Select data from the appropriate time range and filter
-			selectFilter=(photdata['filt']==flt)&(phase>obsphase.min()) & (phase<obsphase.max())
+			#Select data from the appropriate filter filter
+			selectFilter=(photdata['filt']==flt)
+			if ((phase<obsphase.min()) | (phase>obsphase.max())).any():
+				raise RuntimeError('Phases {} are out of extrapolated phase range for SN {} with tpkoff {}'.format(phase[((phase<self.phase.min()) | (phase>elf.phase.max()))],sn,tpkoff))
 			filtPhot={key:photdata[key][selectFilter] for key in photdata}
 			phase=phase[selectFilter]
 			try:
@@ -426,7 +446,6 @@ class chi2:
 				#if chi2 < 1357: import pdb; pdb.set_trace()
 			#print(chi2)
 			#import pdb; pdb.set_trace()
-
 		return chi2
 
 		
@@ -434,15 +453,15 @@ class chi2:
 
 		return chi2
 	
-	def SALTModel(self,x,bsorder=3):
+	def SALTModel(self,x,bsorder=3,evaluatePhase=None,evaluateWave=None):
 
 		try: m0pars = x[self.m0min:self.m0max]
 		except: import pdb; pdb.set_trace()
-		m0 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m0pars,bsorder,bsorder))
+		m0 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,self.wave if evaluateWave is None else evaluateWave,(self.splinephase,self.splinewave,m0pars,bsorder,bsorder))
 
 		if self.n_components == 2:
 			m1pars = x[self.parlist == 'm1']
-			m1 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m1pars,bsorder,bsorder))
+			m1 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,self.wave if evaluateWave is None else evaluateWave,(self.splinephase,self.splinewave,m1pars,bsorder,bsorder))
 			components = (m0,m1)
 		elif self.n_components == 1:
 			components = (m0,)
@@ -474,25 +493,30 @@ class chi2:
 			
 		return self.phase,self.wave,m0,m1,clpars,resultsdict
 
-	def getParsMCMC(self,x,nburn=500,bsorder=3):
+	def getParsMCMC(self,loglikes,x,nburn=500,bsorder=3,result='mean'):
+		if  result == 'mean':
+			m0pars = np.array([])
+			for i in np.where(self.parlist == 'm0')[0]:
+				#[x[i][nburn:] == x[i][nburn:]]
+				m0pars = np.append(m0pars,x[i][nburn:].mean()/_SCALE_FACTOR)
 
-		xfinal = np.array([])
-		for i in range(len(self.parlist)):
-			xfinal = np.append(xfinal,x[i][nburn:].mean())
-			
-		m0pars = np.array([])
-		for i in np.where(self.parlist == 'm0')[0]:
-			#[x[i][nburn:] == x[i][nburn:]]
-			m0pars = np.append(m0pars,x[i][nburn:].mean()/_SCALE_FACTOR)
+			m1pars = np.array([])
+			for i in np.where(self.parlist == 'm1')[0]:
+				m1pars = np.append(m1pars,x[i][nburn:].mean())
 
-		m1pars = np.array([])
-		for i in np.where(self.parlist == 'm1')[0]:
-			m1pars = np.append(m1pars,x[i][nburn:].mean())
+			clpars = np.array([])
+			for i in np.where(self.parlist == 'cl')[0]:
+				clpars = np.append(clpars,x[i][nburn:].mean())
+			result=np.mean(x,axis=1)
+		elif result =='mode':
+			maxLike=np.argmax(loglikes)
+			result=x[:,maxLike]
+			m0pars=x[:,maxLike][self.parlist == 'm0']/_SCALE_FACTOR
+			m1pars=x[:,maxLike][self.parlist == 'm1']
+			clpars=x[:,maxLike][self.parlist=='cl']
+		else:
+			raise ValueError('Key {} passed to getParsMCMC, valid keys are \"mean\" or \"mode\"')
 
-		clpars = np.array([])
-		for i in np.where(self.parlist == 'cl')[0]:
-			clpars = np.append(clpars,x[i][nburn:].mean())
-	
 		m0 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m0pars,bsorder,bsorder))
 		if len(m1pars):
 			m1 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m1pars,bsorder,bsorder))
@@ -513,8 +537,9 @@ class chi2:
 								  'x1':self.SNpars[self.SNparlist == 'x1_%s'%k][0],
 								  'c':self.SNpars[self.SNparlist == 'c_%s'%k][0],
 								  'tpkoff':self.SNpars[self.SNparlist == 'tpkoff_%s'%k][0]}
+		
+		return result,self.phase,self.wave,m0,m1,clpars,resultsdict
 
-		return self.phase,self.wave,m0,m1,clpars,resultsdict,xfinal
 	
 	def synphot(self,sourceflux,zpoff,survey=None,flt=None,redshift=0):
 		obswave = self.wave*(1+redshift)
@@ -529,3 +554,78 @@ class chi2:
 
 		res = np.trapz(pbspl*sourceflux[g],obswave[g])/np.trapz(pbspl,obswave[g])
 		return(zpoff-2.5*np.log10(res))
+		
+	def updateEffectivePoints(self,x):
+		#Determine number of effective data points in each bin of phase and wavelength
+		self.neff=np.zeros((self.phasebins.size-1,self.wavebins.size-1))
+		#Consider weighting neff by variance for each measurement?
+		for sn in self.datadict.keys():
+			tpkoff=x[self.parlist == 'tpkoff_%s'%sn]
+			photdata = self.datadict[sn]['photdata']
+			specdata = self.datadict[sn]['specdata']
+			survey = self.datadict[sn]['survey']
+			filtwave = self.kcordict[survey]['filtwave']
+			z = self.datadict[sn]['zHelio']
+			for k in specdata.keys():
+				restWave=specdata[k]['wavelength']/(1+z)
+				phase=(specdata[k]['tobs']+tpkoff)/(1+z)
+				phaseIndex=np.searchsorted(self.phasebins,phase,'left')
+				waveIndex=np.searchsorted(self.wavebins,restWave,'left')
+				self.neff[phaseIndex][waveIndex]+=1
+# 			filts={}
+# 			for flt in np.unique(photdata['filt']):
+# 				filttrans = self.kcordict[survey][flt]['filttrans']
+# 				g = (self.wave  >= filtwave[0]/(1+z)) & (self.wave <= filtwave[-1]/(1+z))  # overlap range
+# 				pbspl = np.interp(self.wave[g],filtwave,filttrans)
+# 				pbspl *= self.wave[g]
+# 				pbspl /= np.trapz(pbspl,self.wave[g])	
+			self.neff+=np.histogram2d((photdata['tobs']+tpkoff)/(1+z),[lambdaeff[flt]/(1+z) for flt in photdata['filt']],(self.phasebins,self.wavebins))[0]
+		self.neff=gaussian_filter(self.neff,[1,2])
+		self.neff=np.clip(self.neff,1e-4*self.neff.max(),None)
+
+	def plotEffectivePoints(self):
+		import matplotlib.pyplot as plt
+		print(self.neff)
+		plt.imshow(self.neff,cmap='Greys',aspect='auto')
+		xticks=np.linspace(0,self.wavebins.size,8,False)
+		plt.xticks(xticks,['{:.0f}'.format(self.wavebins[int(x)]) for x in xticks])
+		plt.xlabel('$\lambda$ / Angstrom')
+		yticks=np.linspace(0,self.phasebins.size,8,False)
+		plt.yticks(yticks,['{:.0f}'.format(self.phasebins[int(x)]) for x in yticks])
+		plt.ylabel('Phase / days')
+		plt.show()
+		
+
+	def regularizationChi2(self, x,gradientPhase,gradientWave,dyad):
+		fluxes=self.SALTModel(x,evaluatePhase=self.phasebins[:-1],evaluateWave=self.wavebins[:-1])
+
+		chi2wavegrad=0
+		chi2phasegrad=0
+		chi2dyad=0
+		for i in range(self.n_components):
+			exponent=2
+			fluxvals=fluxes[i]/np.mean(fluxes[i])
+			if gradientWave !=0:
+				chi2wavegrad+= self.waveres**exponent/((self.wavebins.size-1)**2 *(self.phasebins.size-1)) * (( (fluxvals[:,:,np.newaxis]-fluxvals[:,np.newaxis,:])**2   /   (self.neff[:,:,np.newaxis]* np.abs(self.wavebins[np.newaxis,np.newaxis,:-1]-self.wavebins[np.newaxis,:-1,np.newaxis])**exponent))[:,~np.diag(np.ones(self.wavebins.size-1,dtype=bool))]).sum()
+			if gradientPhase != 0:
+				chi2phasegrad+= self.phaseres**exponent/((self.phasebins.size-1)**2 *(self.wavebins.size-1) ) * ((  (fluxvals[np.newaxis,:,:]-fluxvals[:,np.newaxis,:])**2   /   (self.neff[:,np.newaxis,:]* np.abs(self.phasebins[:-1,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:-1,np.newaxis])**exponent))[~np.diag(np.ones(self.phasebins.size-1,dtype=bool)),:]).sum()
+			if dyad!= 0:
+				chi2dyadvals=(   (fluxvals[:,np.newaxis,:,np.newaxis] * fluxvals[np.newaxis,:,np.newaxis,:] - fluxvals[np.newaxis,:,:,np.newaxis] * fluxvals[:,np.newaxis,np.newaxis,:])**2)   /   (self.neff[:,np.newaxis,:,np.newaxis]*np.abs(self.wavebins[np.newaxis,np.newaxis,:-1,np.newaxis]-self.wavebins[np.newaxis,np.newaxis,np.newaxis,:-1])*np.abs(self.phasebins[:-1,np.newaxis,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:-1,np.newaxis,np.newaxis]))
+				chi2dyad+=self.phaseres*self.waveres/( (self.wavebins.size-1) *(self.phasebins.size-1))**2  * chi2dyadvals[~np.isnan(chi2dyadvals)].sum()
+		print(gradientPhase*chi2phasegrad,gradientWave*chi2wavegrad,dyad*chi2dyad)
+		return gradientWave*chi2wavegrad+dyad*chi2dyad+gradientPhase*chi2phasegrad
+	
+def trapIntegrate(a,b,xs,ys):
+	if (a<xs.min()) or (b>xs.max()):
+		raise ValueError('Bounds of integration outside of provided values')
+	aInd,bInd=np.searchsorted(xs,[a,b])
+	if aInd==bInd:
+		return ((ys[aInd]-ys[aInd-1])/(xs[aInd]-xs[aInd-1])*((a+b)/2-xs[aInd-1])+ys[aInd-1])*(b-a)
+	elif aInd+1==bInd:
+		return ((ys[aInd]-ys[aInd-1])/(xs[aInd]-xs[aInd-1])*((a+xs[aInd])/2-xs[aInd-1])+ys[aInd-1])*(xs[aInd]-a) + ((ys[bInd]-ys[bInd-1])/(xs[bInd]-xs[bInd-1])*((xs[bInd-1]+b)/2-xs[bInd-1])+ys[bInd-1])*(b-xs[bInd-1])
+	else:
+		return np.trapz(xs[(xs>a)&(xs<b)],ys[(xs>a)&(xs<b)])+((ys[aInd]-ys[aInd-1])/(xs[aInd]-xs[aInd-1])*((a+xs[aInd])/2-xs[aInd-1])+ys[aInd-1])*(xs[aInd]-a) + ((ys[bInd]-ys[bInd-1])/(xs[bInd]-xs[bInd-1])*((xs[bInd-1]+b)/2-xs[bInd-1])+ys[bInd-1])*(b-xs[bInd-1])
+		
+def changeIntegralVariables(newx,oldx,oldyvals):
+	
+	return np.array([trapIntegrate(a,b,oldx,oldyvals) for a,b in zip(newx[:-1],newx[1:])])
