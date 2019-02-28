@@ -96,6 +96,8 @@ class TrainSALT:
 							help='number of processes to use in calculating chi2 (default=%default)')
 		parser.add_argument('--n_iter', default=config.get('trainparams','n_iter'), type=int,
 							help='number of fitting iterations (default=%default)')
+		parser.add_argument('--estimate_tpk', default=config.get('trainparams','estimate_tpk'), type=bool,
+							help='if set, estimate time of max with quick least squares fitting (default=%default)')
 
 		# mcmc parameters
 		parser.add_argument('--n_steps_mcmc', default=config.get('mcmcparams','n_steps_mcmc'), type=int,
@@ -108,9 +110,9 @@ class TrainSALT:
 							help='number of burn-in MCMC steps, initialization stage  (default=%default)')
 		parser.add_argument('--stepsize_M0', default=config.get('mcmcparams','stepsize_M0'), type=float,
 							help='initial MCMC step size for M0, in mag  (default=%default)')
-		parser.add_argument('--stepsize_mag_M1', default=config.get('mcmcparams','stepsize_mag_M1'), type=float,
+		parser.add_argument('--stepsize_magscale_M1', default=config.get('mcmcparams','stepsize_magscale_M1'), type=float,
 							help='initial MCMC step size for M1, in mag - need both mag and flux steps because M1 can be negative (default=%default)')
-		parser.add_argument('--stepsize_flux_M1', default=config.get('mcmcparams','stepsize_flux_M1'), type=float,
+		parser.add_argument('--stepsize_magadd_M1', default=config.get('mcmcparams','stepsize_magadd_M1'), type=float,
 							help='initial MCMC step size for M1, in flux - need both mag and flux steps because M1 can be negative (default=%default)')
 		parser.add_argument('--stepsize_cl', default=config.get('mcmcparams','stepsize_cl'), type=float,
 							help='initial MCMC step size for color law  (default=%default)')
@@ -231,17 +233,21 @@ class TrainSALT:
 
 			if 'PEAKMJD' in sn.__dict__.keys(): sn.SEARCH_PEAKMJD = sn.PEAKMJD
 			zHel = float(sn.REDSHIFT_HELIO.split('+-')[0])
-			if 'B' in sn.FLT:
-				tpk,tpkmsg = estimate_tpk_bazin(
-					sn.MJD[sn.FLT == 'B'],sn.FLUXCAL[sn.FLT == 'B'],sn.FLUXCALERR[sn.FLT == 'B'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
-			elif 'g' in sn.FLT:
-				tpk,tpkmsg = estimate_tpk_bazin(
-					sn.MJD[sn.FLT == 'g'],sn.FLUXCAL[sn.FLT == 'g'],sn.FLUXCALERR[sn.FLT == 'g'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
-			elif 'c' in sn.FLT:
-				tpk,tpkmsg = estimate_tpk_bazin(
-					sn.MJD[sn.FLT == 'c'],sn.FLUXCAL[sn.FLT == 'c'],sn.FLUXCALERR[sn.FLT == 'c'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
+			if self.options.estimate_tpk:
+				if 'B' in sn.FLT:
+					tpk,tpkmsg = estimate_tpk_bazin(
+						sn.MJD[sn.FLT == 'B'],sn.FLUXCAL[sn.FLT == 'B'],sn.FLUXCALERR[sn.FLT == 'B'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
+				elif 'g' in sn.FLT:
+					tpk,tpkmsg = estimate_tpk_bazin(
+						sn.MJD[sn.FLT == 'g'],sn.FLUXCAL[sn.FLT == 'g'],sn.FLUXCALERR[sn.FLT == 'g'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
+				elif 'c' in sn.FLT:
+					tpk,tpkmsg = estimate_tpk_bazin(
+						sn.MJD[sn.FLT == 'c'],sn.FLUXCAL[sn.FLT == 'c'],sn.FLUXCALERR[sn.FLT == 'c'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
+				else:
+					raise RuntimeError('need a blue filter to estimate tmax')
 			else:
-				raise RuntimeError('need a blue filter to estimate tmax')
+				tpk = sn.SEARCH_PEAKMJD
+				tpkmsg = 'termination condition is satisfied'
 
 			# at least one epoch 3 days before max
 			if not len(sn.MJD[sn.MJD < tpk-3]):
@@ -346,8 +352,8 @@ class TrainSALT:
 								  kcordict,initmodelfile,initBfilt,n_components,n_colorpars)
 
 		saltfitter.stepsize_M0 = self.options.stepsize_M0
-		saltfitter.stepsize_mag_M1 = self.options.stepsize_mag_M1
-		saltfitter.stepsize_flux_M1 = self.options.stepsize_flux_M1
+		saltfitter.stepsize_magscale_M1 = self.options.stepsize_magscale_M1
+		saltfitter.stepsize_magadd_M1 = self.options.stepsize_magadd_M1
 		saltfitter.stepsize_cl = self.options.stepsize_cl
 		saltfitter.stepsize_specrecal = self.options.stepsize_specrecal
 		saltfitter.stepsize_x0 = self.options.stepsize_x0
@@ -369,16 +375,16 @@ class TrainSALT:
 		for i in range(self.options.n_iter):
 			saltfitter.onlySNpars = True
 			if i > 0:
-				initguess = SNpars.transpose()[0]
-				saltfitter.components = saltfitter.SALTModel(x)
+				initguess = SNpars #.transpose()[0]
+				saltfitter.components = saltfitter.SALTModel(x_modelpars)
 			saltfitter.parlist = initparlist
 
 			fitter = fitting(n_components,n_colorpars,
 							 n_phaseknots,n_waveknots,
 							 datadict,initguess,
 							 initparlist,parlist)
-
-			phase,wave,M0,M1,clpars,SNParams,message = fitter.mcmc(
+			#import pdb; pdb.set_trace()
+			phase,wave,M0,M1,clpars,SNParams,x,message = fitter.mcmc(
 				saltfitter,initguess,(),(),n_processes,
 				self.options.n_init_steps_mcmc,
 				self.options.n_init_burnin_mcmc,init=True)
@@ -403,12 +409,13 @@ class TrainSALT:
 				#guess[parlist == 'cl'] = md_init.x[initparlist == 'cl']
 			
 			if i > 0:
-				guess[parlist == 'm0'] = x[parlist == 'm0']
+				guess = np.zeros(n_params)
+				guess[parlist == 'm0'] = x_modelpars[parlist == 'm0']
 				if n_components == 2:
-					guess[parlist == 'm1'] = x[parlist == 'm1']
+					guess[parlist == 'm1'] = x_modelpars[parlist == 'm1']
 				if n_colorpars:
 					guess[parlist == 'cl'] = clpars
-				
+					
 			saltfitter.parlist = parlist
 			saltfitter.onlySNpars = False
 
@@ -417,13 +424,13 @@ class TrainSALT:
 							 datadict,guess,
 							 initparlist,parlist)
 
-			phase,wave,M0,M1,clpars,SNParams,message = fitter.mcmc(
+			phase,wave,M0,M1,clpars,SNParams,x_modelpars,message = fitter.mcmc(
 				saltfitter,guess,SNpars,SNparlist,n_processes,
 				self.options.n_steps_mcmc,self.options.n_burnin_mcmc)
 			for k in datadict.keys():
 				tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
 				SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
-			
+
 			try:
 				if 'condition is satisfied' not in message.decode('utf-8'):
 					self.addwarning('MCMC message on iter %i: %s'%(i,message))
@@ -461,11 +468,34 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 	self.options.colorwaverange[1]),file=foutcl)
 		foutcl.close()
 
-		# best-fit SN params
+		# best-fit and simulated SN params
+		snfiles = np.genfromtxt(self.options.snlist,dtype='str')
+		snfiles = np.atleast_1d(snfiles)
+		
 		foutsn = open('%s/salt3train_snparams.txt'%outdir,'w')
-		print('# SN x0 x1 c t0',file=foutsn)
+		print('# SN x0 x1 c t0 tpkoff SIM_x0 SIM_x1 SIM_c SIM_t0',file=foutsn)
 		for k in SNParams.keys():
-			print('%s %8.5e %.4f %.4f %.2f'%(k,SNParams[k]['x0'],SNParams[k]['x1'],SNParams[k]['c'],SNParams[k]['t0']),file=foutsn)
+			foundfile = False
+			for l in snfiles:
+				if str(k) not in l: continue
+				foundfile = True
+				if '/' not in l:
+					l = '%s/%s'%(os.path.dirname(self.options.snlist),l)
+				sn = snana.SuperNova(l)
+				sn.SNID = str(sn.SNID)
+				if 'SIM_SALT2x0' in sn.__dict__.keys(): SIM_x0 = sn.SIM_SALT2x0
+				else: SIM_x0 = -99
+				if 'SIM_SALT2x1' in sn.__dict__.keys(): SIM_x1 = sn.SIM_SALT2x1
+				else: SIM_x1 = -99
+				if 'SIM_SALT2c' in sn.__dict__.keys(): SIM_c = sn.SIM_SALT2c
+				else: SIM_c = -99
+				if 'SIM_PEAKMJD' in sn.__dict__.keys(): SIM_PEAKMJD = float(sn.SIM_PEAKMJD.split()[0])
+				else: SIM_PEAKMJD = -99
+			if not foundfile: SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD = -99,-99,-99,-99
+
+			print('%s %8.5e %.4f %.4f %.2f %.2f %8.5e %.4f %.4f %.2f'%(
+				k,SNParams[k]['x0'],SNParams[k]['x1'],SNParams[k]['c'],SNParams[k]['t0'],
+				SNParams[k]['tpkoff'],SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD),file=foutsn)
 		foutsn.close()
 			
 		return
