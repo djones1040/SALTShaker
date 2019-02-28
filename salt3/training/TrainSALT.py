@@ -447,8 +447,8 @@ class TrainSALT:
 				if 'condition is satisfied' not in message:
 					self.addwarning('MCMC message on iter %i: %s'%(i,message))
 					self.addwarning('Minimizer message on iter %i: %s'%(i,message))
-			print('Individual components of final regularization chi^2'); saltfitter.regularizationChi2(x,1,1,1)
-			print('Final chi^2'); saltfitter.chi2fit(x,None,False,False)
+			print('Individual components of final regularization chi^2'); saltfitter.regularizationChi2(x_modelpars,1,1,1)
+			print('Final chi^2'); saltfitter.chi2fit(x_modelpars,None,False,False)
 
 		return phase,wave,M0,M1,clpars,SNParams
 

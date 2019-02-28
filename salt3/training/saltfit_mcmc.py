@@ -190,7 +190,7 @@ class chi2:
 			
 			if not nstep % 50:
 				accept_frac = accept/float(nstep)
-				if accept_frac > 0.75: stepfactor *= 1.25
+				if accept_frac > 0.50: stepfactor *= 1.25
 				elif accept_frac < 0.25: stepfactor *= 0.75
 			X = self.adjust_model(Xlast,stepfactor=stepfactor)
 			
@@ -212,6 +212,8 @@ class chi2:
 			raise RuntimeError('Not enough steps to wait 500 before burn-in')
 		xfinal,phase,wave,M0,M1,clpars,SNParams = self.getParsMCMC(loglikes,np.array(outpars),nburn=nburn,result='mode')
 
+		self.plotEffectivePoints()
+		
 		return xfinal,phase,wave,M0,M1,clpars,SNParams
 		
 	def accept(self, last_loglike, this_loglike):
