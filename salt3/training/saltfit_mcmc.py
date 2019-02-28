@@ -10,7 +10,7 @@ from salt3.training import init_hsiao
 from sncosmo.models import StretchSource
 from scipy.optimize import minimize
 from scipy.stats import norm
-from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter1d
 #import pysynphot as S
 
 _SCALE_FACTOR = 1e-12
@@ -211,8 +211,6 @@ class chi2:
 		if accept < nburn:
 			raise RuntimeError('Not enough steps to wait 500 before burn-in')
 		xfinal,phase,wave,M0,M1,clpars,SNParams = self.getParsMCMC(loglikes,np.array(outpars),nburn=nburn,result='mode')
-
-		self.plotEffectivePoints()
 		
 		return xfinal,phase,wave,M0,M1,clpars,SNParams
 		
@@ -574,15 +572,21 @@ class chi2:
 				phaseIndex=np.searchsorted(self.phasebins,phase,'left')
 				waveIndex=np.searchsorted(self.wavebins,restWave,'left')
 				self.neff[phaseIndex][waveIndex]+=1
-# 			filts={}
-# 			for flt in np.unique(photdata['filt']):
-# 				filttrans = self.kcordict[survey][flt]['filttrans']
-# 				g = (self.wave  >= filtwave[0]/(1+z)) & (self.wave <= filtwave[-1]/(1+z))  # overlap range
-# 				pbspl = np.interp(self.wave[g],filtwave,filttrans)
-# 				pbspl *= self.wave[g]
-# 				pbspl /= np.trapz(pbspl,self.wave[g])	
-			self.neff+=np.histogram2d((photdata['tobs']+tpkoff)/(1+z),[lambdaeff[flt]/(1+z) for flt in photdata['filt']],(self.phasebins,self.wavebins))[0]
-		self.neff=gaussian_filter(self.neff,[1,2])
+			for flt in np.unique(photdata['filt']):
+				filttrans = self.kcordict[survey][flt]['filttrans']
+				g = (self.wavebins[:-1]  >= filtwave[0]/(1+z)) & (self.wavebins[:-1] <= filtwave[-1]/(1+z))  # overlap range
+				pbspl = np.zeros(g.sum())
+				for i in range(g.sum()):
+					j=np.where(g)[0][i]
+					pbspl[i]=trapIntegrate(self.wavebins[j],self.wavebins[j+1],filtwave/(1+z),filttrans)
+				pbspl *= (self.wavebins[:-1] + self.wavebins[1:])[g]/2
+				#Normalize it so that total number of points added is 1
+				pbspl /= np.sum(pbspl)
+				for phase in (photdata['tobs'][(photdata['filt']==flt)]+tpkoff)/(1+z):
+					self.neff[np.searchsorted(self.phasebins,phase),:][g]+=pbspl
+			#self.neff+=np.histogram2d((photdata['tobs']+tpkoff)/(1+z),[lambdaeff[flt]/(1+z) for flt in photdata['filt']],(self.phasebins,self.wavebins))[0]
+		#Smear it out a bit along phase axis
+		self.neff=gaussian_filter1d(self.neff,1,0)
 		self.neff=np.clip(self.neff,1e-4*self.neff.max(),None)
 
 	def plotEffectivePoints(self):
@@ -626,8 +630,5 @@ def trapIntegrate(a,b,xs,ys):
 	elif aInd+1==bInd:
 		return ((ys[aInd]-ys[aInd-1])/(xs[aInd]-xs[aInd-1])*((a+xs[aInd])/2-xs[aInd-1])+ys[aInd-1])*(xs[aInd]-a) + ((ys[bInd]-ys[bInd-1])/(xs[bInd]-xs[bInd-1])*((xs[bInd-1]+b)/2-xs[bInd-1])+ys[bInd-1])*(b-xs[bInd-1])
 	else:
-		return np.trapz(xs[(xs>a)&(xs<b)],ys[(xs>a)&(xs<b)])+((ys[aInd]-ys[aInd-1])/(xs[aInd]-xs[aInd-1])*((a+xs[aInd])/2-xs[aInd-1])+ys[aInd-1])*(xs[aInd]-a) + ((ys[bInd]-ys[bInd-1])/(xs[bInd]-xs[bInd-1])*((xs[bInd-1]+b)/2-xs[bInd-1])+ys[bInd-1])*(b-xs[bInd-1])
+		return np.trapz(ys[(xs>=a)&(xs<b)],xs[(xs>=a)&(xs<b)])+((ys[aInd]-ys[aInd-1])/(xs[aInd]-xs[aInd-1])*((a+xs[aInd])/2-xs[aInd-1])+ys[aInd-1])*(xs[aInd]-a) + ((ys[bInd]-ys[bInd-1])/(xs[bInd]-xs[bInd-1])*((xs[bInd-1]+b)/2-xs[bInd-1])+ys[bInd-1])*(b-xs[bInd-1])
 		
-def changeIntegralVariables(newx,oldx,oldyvals):
-	
-	return np.array([trapIntegrate(a,b,oldx,oldyvals) for a,b in zip(newx[:-1],newx[1:])])
