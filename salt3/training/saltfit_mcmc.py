@@ -588,6 +588,7 @@ class chi2:
 		#Smear it out a bit along phase axis
 		self.neff=gaussian_filter1d(self.neff,1,0)
 		self.neff=np.clip(self.neff,1e-4*self.neff.max(),None)
+		self.plotEffectivePoints()
 
 	def plotEffectivePoints(self):
 		import matplotlib.pyplot as plt
