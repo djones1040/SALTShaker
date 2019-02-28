@@ -212,8 +212,8 @@ def customfilt(outfile,lcfile,salt3dir,
 		result_salt3, fitted_salt3_model = sncosmo.fit_lc(data, salt3model, fitparams_salt3)
 	else:
 		fitted_salt3_model = salt3model
-	plotmjd = np.linspace(sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]-20,
-						  sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]+55,200)
+	plotmjd = np.linspace(sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)][0]-20,
+						  sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)][0]+55,200)
 	
 	fig = plt.figure(figsize=(15, 5))
 	ax1 = fig.add_subplot(131)
@@ -239,7 +239,7 @@ def customfilt(outfile,lcfile,salt3dir,
 			#salt3flux = fitted_salt3_model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')#*\
 
 		phase=plotmjd-t0
-		salt3flux = int1d(phase)
+		salt3fluxnew = int1d(phase)
 		#phase=(photdata['tobs']+tpkoff)/1+z
 		filtwave = bandpassdict[flt]['filtwave']
 		filttrans = bandpassdict[flt]['filttrans']
@@ -249,7 +249,7 @@ def customfilt(outfile,lcfile,salt3dir,
 		pbspl = np.interp(salt3wave[g],filtwave,filttrans)
 		pbspl *= salt3wave[g]
 		denom = np.trapz(pbspl,salt3wave[g])
-		salt3synflux=np.trapz(pbspl[np.newaxis,:]*salt3flux[:,g],salt3wave[g],axis=1)/denom
+		salt3synflux=np.trapz(pbspl[np.newaxis,:]*salt3fluxnew[:,g],salt3wave[g],axis=1)/denom
 		salt3synflux *= 10**(-0.4*bandpassdict[flt]['zpoff'])*10**(0.4*bandpassdict[flt]['stdmag'])*10**(0.4*27.5)
 		#int1d = interp1d(salt3phase,salt3synflux,axis=0,fill_value='extrapolate')
 	
