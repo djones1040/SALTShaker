@@ -16,13 +16,16 @@ def plot_io_sed(inputfile='../initfiles/Hsiao07.dat',
 		plt.close()
 
 		plt.plot(iwave[iphase == p],iflux[iphase == p],label='Hsiao model')
-		plt.plot(owave[(ophase-p)**2. == np.min((ophase-p)**2.)],
-				 oflux[(ophase-p)**2. == np.min((ophase-p)**2.)],label='output model')
+		nearestOPhase=ophase[np.argmin(np.abs(ophase-p))]
+		normalization=iflux[iphase == p].max()/oflux[ophase==nearestOPhase].max()
+		
+		plt.plot(owave[ophase==nearestOPhase],oflux[ophase==nearestOPhase]*normalization,label='output model')
 		plt.xlabel('Wavelength ($\AA$)')
 		plt.ylabel('Flux')
 		plt.title('phase = %.1f days'%p)
 		plt.xlim([2000,9200])
-		import pdb; pdb.set_trace()
+		plt.show()
+		#import pdb; pdb.set_trace()
 		
 	return
 
