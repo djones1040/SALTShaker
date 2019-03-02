@@ -185,7 +185,7 @@ class chi2:
 		nstep = 0
 		stepfactor = 1.0
 		accept_frac = 0.5
-		while accept < nsteps:
+		while nstep < nsteps:
 			nstep += 1
 			
 			if not nstep % 50:
@@ -206,6 +206,9 @@ class chi2:
 				accept += 1
 				Xlast = X[:]
 				print('step = %i, accepted = %i, acceptance = %.3f, stepfactor = %.3f'%(nstep,accept,accept/float(nstep),stepfactor))
+			else:
+				for j in range(npar):
+					outpars[j] += [Xlast[j]]
 				
 		print('acceptance = %.3f'%(accept/float(nstep)))
 		if accept < nburn:
@@ -293,6 +296,7 @@ class chi2:
 			if self.fitstrategy == 'leastsquares':
 				chi2 = np.append(chi2,self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad))
 			else:
+				import pdb; pdb.set_trace()
 				chi2 += self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad)
 
 		if self.mcmc:
@@ -608,9 +612,12 @@ class chi2:
 			exponent=2
 			fluxvals=fluxes[i]/np.mean(fluxes[i])
 			if gradientWave !=0:
-				chi2wavegrad+= self.waveres**exponent/((self.wavebins.size-1)**2 *(self.phasebins.size-1)) * (( (fluxvals[:,:,np.newaxis]-fluxvals[:,np.newaxis,:])**2   /   (self.neff[:,:,np.newaxis]* np.abs(self.wavebins[np.newaxis,np.newaxis,:-1]-self.wavebins[np.newaxis,:-1,np.newaxis])**exponent))[:,~np.diag(np.ones(self.wavebins.size-1,dtype=bool))]).sum()
+				wavenorm = self.waveres**exponent/((self.wavebins.size-1)**2 *(self.phasebins.size-1))
+				n_p_l = self.neff[:,:,np.newaxis]
+				chi2wavegrad+= wavenorm * (( (fluxvals[:,:,np.newaxis]-fluxvals[:,np.newaxis,:])**2   /   (n_p_l* np.abs(self.wavebins[np.newaxis,np.newaxis,:-1]-self.wavebins[np.newaxis,:-1,np.newaxis])**exponent))[:,~np.diag(np.ones(self.wavebins.size-1,dtype=bool))]).sum()
 			if gradientPhase != 0:
-				chi2phasegrad+= self.phaseres**exponent/((self.phasebins.size-1)**2 *(self.wavebins.size-1) ) * ((  (fluxvals[np.newaxis,:,:]-fluxvals[:,np.newaxis,:])**2   /   (self.neff[:,np.newaxis,:]* np.abs(self.phasebins[:-1,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:-1,np.newaxis])**exponent))[~np.diag(np.ones(self.phasebins.size-1,dtype=bool)),:]).sum()
+				phasenorm = self.phaseres**exponent/((self.phasebins.size-1)**2 *(self.wavebins.size-1))
+				chi2phasegrad+= phasenorm * ((  (fluxvals[np.newaxis,:,:]-fluxvals[:,np.newaxis,:])**2   /   (self.neff[:,np.newaxis,:]* np.abs(self.phasebins[:-1,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:-1,np.newaxis])**exponent))[~np.diag(np.ones(self.phasebins.size-1,dtype=bool)),:]).sum()
 			if dyad!= 0:
 				chi2dyadvals=(   (fluxvals[:,np.newaxis,:,np.newaxis] * fluxvals[np.newaxis,:,np.newaxis,:] - fluxvals[np.newaxis,:,:,np.newaxis] * fluxvals[:,np.newaxis,np.newaxis,:])**2)   /   (self.neff[:,np.newaxis,:,np.newaxis]*np.abs(self.wavebins[np.newaxis,np.newaxis,:-1,np.newaxis]-self.wavebins[np.newaxis,np.newaxis,np.newaxis,:-1])*np.abs(self.phasebins[:-1,np.newaxis,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:-1,np.newaxis,np.newaxis]))
 				chi2dyad+=self.phaseres*self.waveres/( (self.wavebins.size-1) *(self.phasebins.size-1))**2  * chi2dyadvals[~np.isnan(chi2dyadvals)].sum()
