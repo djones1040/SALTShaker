@@ -556,9 +556,19 @@ class chi2:
 		return(zpoff-2.5*np.log10(res))
 		
 	def updateEffectivePoints(self,x):
-		#Determine number of effective data points in each bin of phase and wavelength
+		"""
+		Updates the "effective number of points" constraining a given bin in phase/wavelength space. Should be called any time tpkoff values are recalculated
+		
+		Parameters
+		----------
+			
+		x : array
+			SALT model parameters
+					
+		"""
+		#Clean out array
 		self.neff=np.zeros((self.phasebins.size-1,self.wavebins.size-1))
-		#Consider weighting neff by variance for each measurement?
+		
 		for sn in self.datadict.keys():
 			tpkoff=x[self.parlist == 'tpkoff_%s'%sn]
 			photdata = self.datadict[sn]['photdata']
@@ -566,12 +576,15 @@ class chi2:
 			survey = self.datadict[sn]['survey']
 			filtwave = self.kcordict[survey]['filtwave']
 			z = self.datadict[sn]['zHelio']
+			
+			#For each spectrum, add one point to each bin for every spectral measurement in that bin
 			for k in specdata.keys():
 				restWave=specdata[k]['wavelength']/(1+z)
 				phase=(specdata[k]['tobs']+tpkoff)/(1+z)
 				phaseIndex=np.searchsorted(self.phasebins,phase,'left')
 				waveIndex=np.searchsorted(self.wavebins,restWave,'left')
 				self.neff[phaseIndex][waveIndex]+=1
+			#For each photometric filter, weight the contribution by  
 			for flt in np.unique(photdata['filt']):
 				filttrans = self.kcordict[survey][flt]['filttrans']
 				g = (self.wavebins[:-1]  >= filtwave[0]/(1+z)) & (self.wavebins[:-1] <= filtwave[-1]/(1+z))  # overlap range
@@ -582,14 +595,15 @@ class chi2:
 				pbspl *= (self.wavebins[:-1] + self.wavebins[1:])[g]/2
 				#Normalize it so that total number of points added is 1
 				pbspl /= np.sum(pbspl)
+				#Consider weighting neff by variance for each measurement?
 				for phase in (photdata['tobs'][(photdata['filt']==flt)]+tpkoff)/(1+z):
 					self.neff[np.searchsorted(self.phasebins,phase),:][g]+=pbspl
 			#self.neff+=np.histogram2d((photdata['tobs']+tpkoff)/(1+z),[lambdaeff[flt]/(1+z) for flt in photdata['filt']],(self.phasebins,self.wavebins))[0]
 		#Smear it out a bit along phase axis
 		self.neff=gaussian_filter1d(self.neff,1,0)
-		self.neff=np.clip(self.neff,1e-4*self.neff.max(),None)
-		self.plotEffectivePoints([-12.5,0,12.5,40])
-	def plotEffectivePoints(self,phases=None):
+		self.neff=np.clip(self.neff,1e-2*self.neff.max(),None)
+		self.plotEffectivePoints([-12.5,0,12.5,40],'neff.png')
+	def plotEffectivePoints(self,phases=None,output=None):
 		import matplotlib.pyplot as plt
 		print(self.neff)
 		if phases is None:
@@ -600,7 +614,6 @@ class chi2:
 			yticks=np.linspace(0,self.phasebins.size,8,False)
 			plt.yticks(yticks,['{:.0f}'.format(self.phasebins[int(x)]) for x in yticks])
 			plt.ylabel('Phase / days')
-			plt.show()
 		else:
 			inds=np.searchsorted(self.phasebins,phases)
 			for i in inds:
@@ -609,11 +622,16 @@ class chi2:
 			plt.xlabel('$\lambda (\AA)$')
 			plt.xlim(self.wavebins.min(),self.wavebins.max())
 			plt.legend()
+		
+		if output is None:
 			plt.show()
-
+		else:
+			plt.savefig(output,dpi=288)
+		plt.clf()
 
 
 	def regularizationChi2(self, x,gradientPhase,gradientWave,dyad):
+		
 		fluxes=self.SALTModel(x,evaluatePhase=self.phasebins[:-1],evaluateWave=self.wavebins[:-1])
 
 		chi2wavegrad=0
