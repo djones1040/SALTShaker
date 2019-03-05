@@ -15,8 +15,30 @@ from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
 from scipy.optimize import minimize, least_squares, differential_evolution
 from salt3.training.fitting import fitting
 from salt3.training.init_hsiao import init_hsiao
+from salt3.initfiles import init_rootdir
 from astropy.io import fits
 from astropy.cosmology import Planck15 as cosmo
+
+testx1dict = {5999387:-2.3919,
+			  5999388: 0.8029,
+			  5999389: 0.6971,
+			  5999390:-2.9930,
+			  5999391:-1.0716,
+			  5999392:-2.2737,
+			  5999393: 1.7047,
+			  5999394: 1.1291,
+			  5999395: 2.0568,
+			  5999396: 1.6647,
+			  5999397:-2.1002,
+			  5999398: 2.5913,
+			  5999399:-1.2756,
+			  5999400:-1.8371,
+			  5999401:-2.3846,
+			  5999402: 2.9826,
+			  5999403:-0.7240,
+			  5999404:-2.6362,
+			  5999405: 1.9302,
+			  5999406:-1.5747}
 
 class TrainSALT:
 	def __init__(self):
@@ -175,6 +197,13 @@ class TrainSALT:
 				self.kcordict[survey][filt.split('-')[-1].split('/')[-1]]['primarymag'] = \
 					zpoff['Primary Mag'][zpoff['Filter Name'] == filt][0]
 
+		initBfilt = '%s/Bessell90_B.dat'%init_rootdir
+		filtwave,filttp = np.genfromtxt(initBfilt,unpack=True)
+			
+		self.kcordict['default'] = {}
+		self.kcordict['default']['Bwave'] = filtwave
+		self.kcordict['default']['Btp'] = filttp
+				
 	def rdSpecData(self,datadict,speclist,tpk):
 
 		if not os.path.exists(speclist):
@@ -324,6 +353,7 @@ class TrainSALT:
 			phaseinterpres=phaseoutres,waveinterpres=waveoutres)
 		n_phaseknots,n_waveknots = len(phaseknotloc)-4,len(waveknotloc)-4
 		n_sn = len(datadict.keys())
+		m1knots = m0knots*1e-2
 		# x1,x0,c for each SN
 		# phase/wavelength spline knots for M0, M1 (ignoring color for now)
 		# TODO: spectral recalibration
@@ -355,7 +385,9 @@ class TrainSALT:
 								  phaseknotloc,waveknotloc,phaserange,
 								  waverange,phaseres,waveres,phaseoutres,waveoutres,
 								  colorwaverange,
-								  kcordict,initmodelfile,initBfilt,regulargradientphase, regulargradientwave, regulardyad ,n_components,n_colorpars)
+								  kcordict,initmodelfile,initBfilt,regulargradientphase,
+								  regulargradientwave,regulardyad,n_components,n_colorpars,
+								  n_iter=self.options.n_iter)
 
 		saltfitter.stepsize_M0 = self.options.stepsize_M0
 		saltfitter.stepsize_magscale_M1 = self.options.stepsize_magscale_M1
@@ -376,65 +408,94 @@ class TrainSALT:
 			initguess += (10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36)),0,0,0)
 		#initparlist += ['cl']*n_colorpars
 		initparlist = np.array(initparlist)
+		print('training on %i SNe!'%len(datadict.keys()))
 
-		
-		for i in range(self.options.n_iter):
-			saltfitter.onlySNpars = True
-			if i > 0:
-				initguess = SNpars #.transpose()[0]
-				saltfitter.components = saltfitter.SALTModel(x_modelpars)
-			saltfitter.parlist = initparlist
+		if self.options.n_iter:
+			for i in range(self.options.n_iter):
+				saltfitter.onlySNpars = True
+				if i > 0:
+					initguess = SNpars #.transpose()[0]
+					saltfitter.components = saltfitter.SALTModel(x_modelpars)
+				saltfitter.parlist = initparlist
 
-			fitter = fitting(n_components,n_colorpars,
-							 n_phaseknots,n_waveknots,
-							 datadict,initguess,
-							 initparlist,parlist)
+				fitter = fitting(n_components,n_colorpars,
+								 n_phaseknots,n_waveknots,
+								 datadict)
 
-			#import pdb; pdb.set_trace()
-			#phase,wave,M0,M1,clpars,SNParams,x,message = fitter.mcmc(
-			initX,phase,wave,M0,M1,clpars,SNParams,message = fitter.mcmc(
-				saltfitter,initguess,(),(),n_processes,
-				self.options.n_init_steps_mcmc,
-				self.options.n_init_burnin_mcmc,init=True)
-			
-			try:
-				if 'condition is satisfied' not in message.decode('utf-8'):
-					self.addwarning('Initialization MCMC message: %s'%message)
-			except:
-				if 'condition is satisfied' not in message:
-					self.addwarning('Initialization MCMC message: %s'%message)
-			if self.verbose:
-				print('SN guesses initialized successfully')
-			saltfitter.updateEffectivePoints(initX)
-			#saltfitter.plotEffectivePoints()
-			# 2nd pass - let the SALT model spline knots float			
-			SNpars,SNparlist = [],[]
+				#import pdb; pdb.set_trace()
+				#phase,wave,M0,M1,clpars,SNParams,x,message = fitter.mcmc(
+				initX,phase,wave,M0,M1,clpars,SNParams,message = fitter.mcmc(
+					saltfitter,initguess,(),(),n_processes,
+					self.options.n_init_steps_mcmc,
+					self.options.n_init_burnin_mcmc,init=True)
+
+				try:
+					if 'condition is satisfied' not in message.decode('utf-8'):
+						self.addwarning('Initialization MCMC message: %s'%message)
+				except:
+					if 'condition is satisfied' not in message:
+						self.addwarning('Initialization MCMC message: %s'%message)
+				if self.verbose:
+					print('SN guesses initialized successfully')
+				saltfitter.updateEffectivePoints(initX)
+				#saltfitter.plotEffectivePoints()
+				# 2nd pass - let the SALT model spline knots float			
+				SNpars,SNparlist = [],[]
+				for k in datadict.keys():
+					tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
+					guess[parlist == 'x0_%s'%k] = SNParams[k]['x0']
+					SNpars += [SNParams[k]['x0'],SNParams[k]['x1'],SNParams[k]['c'],SNParams[k]['tpkoff']]
+					SNparlist += ['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k]
+				SNparlist = np.array(SNparlist); SNpars = np.array(SNpars)
+					#guess[parlist == 'cl'] = md_init.x[initparlist == 'cl']
+
+				if i > 0:
+					guess = np.zeros(n_params)
+					guess[parlist == 'm0'] = x_modelpars[parlist == 'm0']
+					if n_components == 2:
+						guess[parlist == 'm1'] = x_modelpars[parlist == 'm1']
+					if n_colorpars:
+						guess[parlist == 'cl'] = clpars
+
+				saltfitter.parlist = parlist
+				saltfitter.onlySNpars = False
+
+				fitter = fitting(n_components,n_colorpars,
+								 n_phaseknots,n_waveknots,
+								 datadict)
+
+				x_modelpars,phase,wave,M0,M1,clpars,SNParams,message = fitter.mcmc(
+					saltfitter,guess,SNpars,SNparlist,n_processes,
+					self.options.n_steps_mcmc,self.options.n_burnin_mcmc)
+				for k in datadict.keys():
+					tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
+					SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
+
+				try:
+					if 'condition is satisfied' not in message.decode('utf-8'):
+						self.addwarning('MCMC message on iter %i: %s'%(i,message))
+				except:
+					if 'condition is satisfied' not in message:
+						self.addwarning('MCMC message on iter %i: %s'%(i,message))
+						self.addwarning('Minimizer message on iter %i: %s'%(i,message))
+				print('Individual components of final regularization chi^2'); saltfitter.regularizationChi2(x_modelpars,1,1,1)
+				print('Final chi^2'); saltfitter.chi2fit(x_modelpars,None,False,False)
+		else:
+
 			for k in datadict.keys():
-				tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
-				guess[parlist == 'x0_%s'%k] = SNParams[k]['x0']
-				SNpars += [SNParams[k]['x0'],SNParams[k]['x1'],SNParams[k]['c'],SNParams[k]['tpkoff']]
-				SNparlist += ['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k]
-			SNparlist = np.array(SNparlist); SNpars = np.array(SNpars)
-				#guess[parlist == 'cl'] = md_init.x[initparlist == 'cl']
-			
-			if i > 0:
-				guess = np.zeros(n_params)
-				guess[parlist == 'm0'] = x_modelpars[parlist == 'm0']
-				if n_components == 2:
-					guess[parlist == 'm1'] = x_modelpars[parlist == 'm1']
-				if n_colorpars:
-					guess[parlist == 'cl'] = clpars
-					
+				guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36))
+				#guess[parlist == 'x1_%s'%k] = testx1dict[k]
+				
 			saltfitter.parlist = parlist
 			saltfitter.onlySNpars = False
-
+			#saltfitter.x1debugdict = testx1dict
+			
 			fitter = fitting(n_components,n_colorpars,
 							 n_phaseknots,n_waveknots,
-							 datadict,guess,
-							 initparlist,parlist)
+							 datadict)
 
 			x_modelpars,phase,wave,M0,M1,clpars,SNParams,message = fitter.mcmc(
-				saltfitter,guess,SNpars,SNparlist,n_processes,
+				saltfitter,guess,(),(),n_processes,
 				self.options.n_steps_mcmc,self.options.n_burnin_mcmc)
 			for k in datadict.keys():
 				tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
@@ -442,14 +503,15 @@ class TrainSALT:
 
 			try:
 				if 'condition is satisfied' not in message.decode('utf-8'):
-					self.addwarning('MCMC message on iter %i: %s'%(i,message))
+					self.addwarning('MCMC message on iter 0: %s'%(i,message))
 			except:
 				if 'condition is satisfied' not in message:
-					self.addwarning('MCMC message on iter %i: %s'%(i,message))
-					self.addwarning('Minimizer message on iter %i: %s'%(i,message))
+					self.addwarning('MCMC message on iter 0: %s'%(message))
+					self.addwarning('Minimizer message on iter 0: %s'%(message))
 			print('Individual components of final regularization chi^2'); saltfitter.regularizationChi2(x_modelpars,1,1,1)
 			print('Final chi^2'); saltfitter.chi2fit(x_modelpars,None,False,False)
 
+			
 		return phase,wave,M0,M1,clpars,SNParams
 
 	def wrtoutput(self,outdir,phase,wave,M0,M1,clpars,SNParams):
@@ -538,6 +600,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		from salt3.util.synphot import synphot
 		kcordict = {}
 		for k in self.kcordict.keys():
+			if k == 'default': continue
 			for k2 in self.kcordict[k].keys():
 				if k2 not in ['primarywave','snflux','BD17','filtwave','AB']:
 					if self.kcordict[k][k2]['magsys'] == 'AB': primarykey = 'AB'
@@ -570,7 +633,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			ValidateLightcurves.customfilt(
 				'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,outputdir,
 				t0=t0sn,x0=x0sn,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc,
-				bandpassdict=kcordict)
+				bandpassdict=kcordict,n_components=self.options.n_components)
 
 		
 	def main(self):
