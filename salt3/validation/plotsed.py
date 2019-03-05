@@ -6,29 +6,43 @@ from salt3.util import snana
 from astropy.table import Table
 
 def plot_io_sed(inputfile='../initfiles/Hsiao07.dat',
-				outputfile='../../examples/output/salt3_template_0.dat'):
+				outputfile='../../examples/output/salt3_template_0.dat',phase=None):
 
 	iphase,iwave,iflux = np.loadtxt(inputfile,unpack=True)
 	ophase,owave,oflux = np.loadtxt(outputfile,unpack=True)
 
-	for p in np.unique(iphase):
+	
+	#Normalize fluxes at peak s.t. total emitted light is equal
+	owave=np.unique(owave)
+	iwave=np.unique(iwave)
+	normalization=np.trapz(get_interpolated_flux(0,iflux,iphase), iwave )/np.trapz(get_interpolated_flux(0,oflux,ophase), owave )
+	oflux*=normalization
+	
+		
+	for p in np.unique([-8,0,8,20] if phase is None else phase):
 		if p < -14: continue
 		plt.close()
 
-		plt.plot(iwave[iphase == p],iflux[iphase == p],label='Hsiao model')
-		nearestOPhase=ophase[np.argmin(np.abs(ophase-p))]
-		normalization=iflux[iphase == p].max()/oflux[ophase==nearestOPhase].max()
+		plt.plot(iwave,get_interpolated_flux(p,iflux,iphase),label='Hsiao model')
 		
-		plt.plot(owave[ophase==nearestOPhase],oflux[ophase==nearestOPhase]*normalization,label='output model')
+		plt.plot(owave,get_interpolated_flux(p,oflux,ophase),label='output model')
 		plt.xlabel('Wavelength ($\AA$)')
 		plt.ylabel('Flux')
 		plt.title('phase = %.1f days'%p)
 		plt.xlim([2000,9200])
-		plt.show()
+		plt.savefig('io_sed_{}.png'.format(p),dpi=288)
+		#plt.show()
 		#import pdb; pdb.set_trace()
 		
 	return
 
+def get_interpolated_flux(phase,fluxes,phases):
+	phaseVals=np.sort(np.unique(phases))
+	leftPhase=np.searchsorted(phaseVals,phase,'left')
+	rightPhase=phaseVals[leftPhase+1]
+	leftPhase=phaseVals[leftPhase]
+	return (fluxes[phases==rightPhase] - fluxes[phases==leftPhase])/(rightPhase-leftPhase) *(phase-leftPhase)+fluxes[phases==leftPhase]
+	
 def complc(lcfile='../../examples/exampledata/photdata/foundASASSN-16av.txt',zpsys='AB',
 		   fitparams = ['t0', 'x0', 'x1', 'c'], hsiaofitparams = ['t0','amplitude']):
 
