@@ -185,7 +185,7 @@ class chi2:
 		nstep = 0
 		stepfactor = 1.0
 		accept_frac = 0.5
-		while accept < nsteps:
+		while nstep < nsteps:
 			nstep += 1
 			
 			if not nstep % 50:
@@ -206,6 +206,9 @@ class chi2:
 				accept += 1
 				Xlast = X[:]
 				print('step = %i, accepted = %i, acceptance = %.3f, stepfactor = %.3f'%(nstep,accept,accept/float(nstep),stepfactor))
+			else:
+				for j in range(npar):
+					outpars[j] += [Xlast[j]]
 				
 		print('acceptance = %.3f'%(accept/float(nstep)))
 		if accept < nburn:
@@ -291,6 +294,7 @@ class chi2:
 			if self.fitstrategy == 'leastsquares':
 				chi2 = np.append(chi2,self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad))
 			else:
+				import pdb; pdb.set_trace()
 				chi2 += self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad)
 
 		if self.mcmc:
