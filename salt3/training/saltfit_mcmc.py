@@ -25,13 +25,14 @@ class chi2:
 				 fitstrategy='leastsquares',stepsize_M0=None,stepsize_magscale_M1=None,
 				 stepsize_magadd_M1=None,stepsize_cl=None,
 				 stepsize_specrecal=None,stepsize_x0=None,stepsize_x1=None,
-				 stepsize_c=None,stepsize_tpkoff=None):
+				 stepsize_c=None,stepsize_tpkoff=None,n_iter=0,x1debugdict={}):
 
 		self.init_stepsizes(
 			stepsize_M0,stepsize_magscale_M1,stepsize_magadd_M1,stepsize_cl,
 			stepsize_specrecal,stepsize_x0,stepsize_x1,
 			stepsize_c,stepsize_tpkoff)
-		
+
+		self.n_iter = n_iter
 		self.datadict = datadict
 		self.parlist = parlist
 		self.m0min = np.min(np.where(self.parlist == 'm0')[0])
@@ -53,6 +54,7 @@ class chi2:
 		self.fitstrategy = fitstrategy
 		self.guess = guess
 		self.debug = debug
+		self.x1debugdict = x1debugdict
 		
 		self.phasebins = np.linspace(phaserange[0]-days_interp,phaserange[1]+days_interp,
 							 1+ (phaserange[1]-phaserange[0]+2*days_interp)/phaseres)
@@ -96,11 +98,15 @@ class chi2:
 		self.updateEffectivePoints(guess)
 		
 		self.components = self.SALTModel(guess)
+		int1d = interp1d(self.phase,self.components[0],axis=0)
+		self.m0guess = synphot(self.wave,int1d(0),filtwave=self.kcordict['default']['Bwave'],filttp=self.kcordict['default']['Btp'])
+
 		self.regulargradientphase=regulargradientphase
 		self.regulargradientwave=regulargradientwave
 		self.regulardyad=regulardyad
 		self.stdmag = {}
 		for survey in self.kcordict.keys():
+			if survey == 'default': continue
 			self.stdmag[survey] = {}
 			primarywave = kcordict[survey]['primarywave']
 			for flt in self.kcordict[survey].keys():
@@ -151,7 +157,10 @@ class chi2:
 
 		return saltflux
 
-	def adjust_model(self,X,stepfactor=1.0):
+	def adjust_model(self,X,stepfactor=1.0,nstep=0):
+
+		#if stepfactor < 1: x0stepfactor = stepfactor*0.5
+		#else: x0stepfactor = stepfactor
 		
 		X2 = np.zeros(self.npar)
 		for i,par in zip(range(self.npar),self.parlist):
@@ -164,11 +173,13 @@ class chi2:
 			elif par == 'specrecal': X2[i] = X[i]*np.random.normal(scale=self.stepsize_specrecal*stepfactor)
 			elif par.startswith('x0'): X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0*stepfactor))
 			elif par.startswith('x1'):
-				X2[i] = X[i] + np.random.normal(scale=self.stepsize_x1*stepfactor)
-			elif par.startswith('c'): X2[i] = X[i] + np.random.normal(scale=self.stepsize_c*stepfactor)
+				X2[i] = X[i] + np.random.normal(scale=self.stepsize_x1)#*stepfactor)
+			elif par.startswith('c'): X2[i] = X[i] + np.random.normal(scale=self.stepsize_c)#*stepfactor)
 			elif par.startswith('tpkoff'):
+				#if nstep > 3000:
 				X2[i] = X[i] + np.random.normal(scale=self.stepsize_tpk*stepfactor)
-			
+				#else:
+				#	X2[i] = X[i] + 0
 		return X2
 
 	def mcmcfit(self,x,nsteps,nburn,pool=None,debug=False,debug2=False):
@@ -177,7 +188,8 @@ class chi2:
 		#self.debug3 = True
 
 		# initial log likelihood
-		loglikes=[self.chi2fit(x,pool=pool,debug=debug,debug2=debug2)]
+		loglikes = [self.chi2fit(x,pool=pool,debug=debug,debug2=debug2)]
+		loglike_history = []#self.chi2fit(x,pool=pool,debug=debug,debug2=debug2)]
 		Xlast = x[:] #self.adjust_model(x)
 		
 		outpars = [[] for i in range(npar)]
@@ -185,14 +197,16 @@ class chi2:
 		nstep = 0
 		stepfactor = 1.0
 		accept_frac = 0.5
+		accept_frac_recent = 0.5
+		accepted_history = np.array([])
 		while nstep < nsteps:
 			nstep += 1
 			
-			if not nstep % 50:
-				accept_frac = accept/float(nstep)
-				if accept_frac > 0.50: stepfactor *= 1.25
-				elif accept_frac < 0.25: stepfactor *= 0.75
-			X = self.adjust_model(Xlast,stepfactor=stepfactor)
+			if not nstep % 50 and nstep > 250:
+				accept_frac_recent = len(accepted_history[-100:][accepted_history[-100:] == True])/100. #accept/float(nstep)
+				if accept_frac_recent > 0.30: stepfactor *= 1.25
+				elif accept_frac_recent < 0.25: stepfactor *= 0.75
+			X = self.adjust_model(Xlast,stepfactor=stepfactor,nstep=nstep)
 			
 			# loglike
 			this_loglike = self.chi2fit(X,pool=pool,debug=debug,debug2=debug2)
@@ -203,17 +217,20 @@ class chi2:
 				for j in range(npar):
 					outpars[j] += [X[j]]
 				loglikes+=[this_loglike]
+				loglike_history+=[this_loglike]
 				accept += 1
 				Xlast = X[:]
-				print('step = %i, accepted = %i, acceptance = %.3f, stepfactor = %.3f'%(nstep,accept,accept/float(nstep),stepfactor))
+				print('step = %i, accepted = %i, acceptance = %.3f, recent acceptance = %.3f, stepfactor = %.3f'%(nstep,accept,accept/float(nstep),accept_frac_recent,stepfactor))
 			else:
 				for j in range(npar):
 					outpars[j] += [Xlast[j]]
+				loglike_history += [this_loglike]
+			accepted_history = np.append(accepted_history,accept_bool)
 				
 		print('acceptance = %.3f'%(accept/float(nstep)))
-		if accept < nburn:
+		if nstep < nburn:
 			raise RuntimeError('Not enough steps to wait 500 before burn-in')
-		xfinal,phase,wave,M0,M1,clpars,SNParams = self.getParsMCMC(loglikes,np.array(outpars),nburn=nburn,result='mode')
+		xfinal,phase,wave,M0,M1,clpars,SNParams = self.getParsMCMC(loglike_history,np.array(outpars),nburn=nburn,result='mode')
 		
 		return xfinal,phase,wave,M0,M1,clpars,SNParams
 		
@@ -294,16 +311,27 @@ class chi2:
 			if self.fitstrategy == 'leastsquares':
 				chi2 = np.append(chi2,self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad))
 			else:
-				import pdb; pdb.set_trace()
 				chi2 += self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad)
 
-		if self.mcmc:
-			#print(-chi2)
-			return -chi2/2
+		if self.n_iter == 0:
+			logp = -chi2/2 + self.m0prior(x)
 		else:
-			#print(chi2)
-			return chi2
+			logp = -chi2/2
 			
+		if self.mcmc:
+			return logp
+		else:
+			return chi2
+
+	def m0prior(self,x):
+
+		components = self.SALTModel(x)
+		int1d = interp1d(self.phase,components[0],axis=0)
+		m0B = synphot(self.wave,int1d(0),filtwave=self.kcordict['default']['Bwave'],filttp=self.kcordict['default']['Btp'])
+		logprior = norm.logpdf(m0B,self.m0guess,0.02)
+		#print(m0B,self.m0guess,logprior)
+		return logprior
+		
 	def prior(self,cube,ndim=None,nparams=None):
 		for i in range(self.m0min,self.m0max):
 			#cube[i] = 1.0*self.guess[i] + 1e-16*cube[i]
@@ -366,22 +394,26 @@ class chi2:
 			x0,x1,c,tpkoff = \
 				x[self.parlist == 'x0_%s'%sn][0],x[self.parlist == 'x1_%s'%sn][0],\
 				x[self.parlist == 'c_%s'%sn][0],x[self.parlist == 'tpkoff_%s'%sn][0]
+			if len(self.x1debugdict.keys()):
+				x1 = self.x1debugdict[sn]
 		else:
 			x0,x1,c,tpkoff = \
 				self.SNpars[self.SNparlist == 'x0_%s'%sn][0],self.SNpars[self.SNparlist == 'x1_%s'%sn][0],\
 				self.SNpars[self.SNparlist == 'c_%s'%sn][0],self.SNpars[self.SNparlist == 'tpkoff_%s'%sn][0]
 			# HACK!
-			x1 = x[self.parlist == 'x1_%s'%sn][0]
+			# x1 = x[self.parlist == 'x1_%s'%sn][0]
 			
 		#Calculate spectral model
 		if self.n_components == 1:
 			saltflux = x0*M0/_SCALE_FACTOR
 		elif self.n_components == 2:
-			saltflux = x0*(M0 + x1*M1)/_SCALE_FACTOR
+			saltflux = x0*(M0/_SCALE_FACTOR + x1*M1/_SCALE_FACTOR)
+			#saltflux_simple = x0*M0/_SCALE_FACTOR
 		if colorLaw:
 			saltflux *= 10. ** (-0.4 * colorLaw(self.wave) * c)
 			if debug2: import pdb; pdb.set_trace()
-		saltflux = self.extrapolate(saltflux,x0)
+
+		#saltflux = self.extrapolate(saltflux,x0)
 		#import pdb; pdb.set_trace()
 		if self.fitstrategy == 'leastsquares': chi2 = np.array([])
 		else: chi2 = 0
@@ -393,22 +425,30 @@ class chi2:
 			chi2 += np.sum((saltfluxinterp2-specdata[k]['flux'])**2./specdata[k]['fluxerr']**2.)
 			
 		for flt in np.unique(photdata['filt']):
+			# check if filter 
+
 			# synthetic photometry
 			filtwave = self.kcordict[survey]['filtwave']
 			filttrans = self.kcordict[survey][flt]['filttrans']
 
 			g = (obswave >= filtwave[0]) & (obswave <= filtwave[-1])  # overlap range
-
+			#gred = filtwave > obswave[-1]
+			#gblue = filtwave < obswave[0]
+			
 			
 			pbspl = np.interp(obswave[g],filtwave,filttrans)
 			pbspl *= obswave[g]
 
 			denom = np.trapz(pbspl,obswave[g])
+			#denom_blue = np.trapz(pbspl,obswave[gblue])
+			#denom_red = np.trapz(pbspl,obswave[gred])
+			#import pdb; pdb.set_trace()
+
 			phase=photdata['tobs']+tpkoff
 			#Select data from the appropriate filter filter
 			selectFilter=(photdata['filt']==flt)
 			if ((phase<obsphase.min()) | (phase>obsphase.max())).any():
-				raise RuntimeError('Phases {} are out of extrapolated phase range for SN {} with tpkoff {}'.format(phase[((phase<self.phase.min()) | (phase>elf.phase.max()))],sn,tpkoff))
+				raise RuntimeError('Phases {} are out of extrapolated phase range for SN {} with tpkoff {}'.format(phase[((phase<self.phase.min()) | (phase>self.phase.max()))],sn,tpkoff))
 			filtPhot={key:photdata[key][selectFilter] for key in photdata}
 			phase=phase[selectFilter]
 			try:
@@ -506,7 +546,7 @@ class chi2:
 
 			m1pars = np.array([])
 			for i in np.where(self.parlist == 'm1')[0]:
-				m1pars = np.append(m1pars,x[i][nburn:].mean())
+				m1pars = np.append(m1pars,x[i][nburn:].mean()/_SCALE_FACTOR)
 
 			clpars = np.array([])
 			for i in np.where(self.parlist == 'cl')[0]:
@@ -516,7 +556,7 @@ class chi2:
 			maxLike=np.argmax(loglikes)
 			result=x[:,maxLike]
 			m0pars=x[:,maxLike][self.parlist == 'm0']/_SCALE_FACTOR
-			m1pars=x[:,maxLike][self.parlist == 'm1']
+			m1pars=x[:,maxLike][self.parlist == 'm1']/_SCALE_FACTOR
 			clpars=x[:,maxLike][self.parlist=='cl']
 		else:
 			raise ValueError('Key {} passed to getParsMCMC, valid keys are \"mean\" or \"mode\"')
@@ -541,7 +581,9 @@ class chi2:
 								  'x1':self.SNpars[self.SNparlist == 'x1_%s'%k][0],
 								  'c':self.SNpars[self.SNparlist == 'c_%s'%k][0],
 								  'tpkoff':self.SNpars[self.SNparlist == 'tpkoff_%s'%k][0]}
-		
+			if len(self.x1debugdict.keys()):
+				resultsdict[k]['x1'] = self.x1debugdict[k]
+				
 		return result,self.phase,self.wave,m0,m1,clpars,resultsdict
 
 	
@@ -592,7 +634,8 @@ class chi2:
 		#Smear it out a bit along phase axis
 		self.neff=gaussian_filter1d(self.neff,1,0)
 		self.neff=np.clip(self.neff,1e-4*self.neff.max(),None)
-		self.plotEffectivePoints([-12.5,0,12.5,40])
+		if self.debug: self.plotEffectivePoints([-12.5,0,12.5,40])
+		
 	def plotEffectivePoints(self,phases=None):
 		import matplotlib.pyplot as plt
 		print(self.neff)
@@ -633,7 +676,7 @@ class chi2:
 			if dyad!= 0:
 				chi2dyadvals=(   (fluxvals[:,np.newaxis,:,np.newaxis] * fluxvals[np.newaxis,:,np.newaxis,:] - fluxvals[np.newaxis,:,:,np.newaxis] * fluxvals[:,np.newaxis,np.newaxis,:])**2)   /   (np.sqrt(np.sqrt(self.neff[np.newaxis,:,np.newaxis,:]*self.neff[np.newaxis,:,:,np.newaxis]*self.neff[:,np.newaxis,:,np.newaxis]*self.neff[:,np.newaxis,np.newaxis,:]))*np.abs(self.wavebins[np.newaxis,np.newaxis,:-1,np.newaxis]-self.wavebins[np.newaxis,np.newaxis,np.newaxis,:-1])*np.abs(self.phasebins[:-1,np.newaxis,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:-1,np.newaxis,np.newaxis]))
 				chi2dyad+=self.phaseres*self.waveres/( (self.wavebins.size-1) *(self.phasebins.size-1))**2  * chi2dyadvals[~np.isnan(chi2dyadvals)].sum()
-		print(gradientPhase*chi2phasegrad,gradientWave*chi2wavegrad,dyad*chi2dyad)
+		#print(gradientPhase*chi2phasegrad,gradientWave*chi2wavegrad,dyad*chi2dyad)
 		return gradientWave*chi2wavegrad+dyad*chi2dyad+gradientPhase*chi2phasegrad
 	
 def trapIntegrate(a,b,xs,ys):

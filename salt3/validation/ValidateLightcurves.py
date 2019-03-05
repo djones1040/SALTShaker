@@ -140,7 +140,7 @@ def customfilt(outfile,lcfile,salt3dir,
 			   lcrv11file='salt2_lc_relative_variance_1.dat',
 			   lcrv01file='salt2_lc_relative_covariance_01.dat',
 			   x0 = None, x1 = None, c = None, t0 = None,
-			   fitx1=False,fitc=False,bandpassdict=None):
+			   fitx1=False,fitc=False,bandpassdict=None, n_components=1):
 	
 	plt.clf()
 
@@ -182,11 +182,16 @@ def customfilt(outfile,lcfile,salt3dir,
 	salt2model = sncosmo.Model(source='salt2')
 	hsiaomodel = sncosmo.Model(source='hsiao')
 	salt3phase,salt3wave,salt3flux = np.genfromtxt('%s/%s'%(salt3dir,m0file),unpack=True)
+	salt3m1phase,salt3m1wave,salt3m1flux = np.genfromtxt('%s/%s'%(salt3dir,m1file),unpack=True)
 	salt3flux = salt3flux.reshape([len(np.unique(salt3phase)),len(np.unique(salt3wave))])
+	salt3m1flux = salt3m1flux.reshape([len(np.unique(salt3phase)),len(np.unique(salt3wave))])
 	salt3phase = np.unique(salt3phase)*(1+float(sn.REDSHIFT_HELIO[0:5]))
 	salt3wave = np.unique(salt3wave)*(1+float(sn.REDSHIFT_HELIO[0:5]))
-	salt3flux = x0*salt3flux
 
+	if n_components == 1: salt3flux = x0*salt3flux
+	elif n_components == 2: salt3flux = x0*(salt3flux + x1*salt3m1flux)
+	#import pdb; pdb.set_trace()
+	
 	salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,
 								m1file=m1file,
 								clfile=clfile,cdfile=cdfile,
@@ -262,7 +267,7 @@ def customfilt(outfile,lcfile,salt3dir,
 						result_salt3['chisq']/result_salt3['ndof']))
 		else:
 			ax.plot(plotmjd,salt3synflux,color='C2',
-					label='SALT3')
+					label='SALT3, x1=%.2f, z=%.3f'%(x1,float(sn.REDSHIFT_HELIO[0:5])))
 			
 		ax.errorbar(sn.MJD[sn.FLT == flt],sn.FLUXCAL[sn.FLT == flt],
 					yerr=sn.FLUXCALERR[sn.FLT == flt],
