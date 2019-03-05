@@ -37,9 +37,10 @@ GENFILTERS: bcdeghijlmnopqrsuvwxyzACDEFHIJK
 
 GENRANGE_PEAKMJD:  49200.0  55500.0 
 GENSIGMA_SEARCH_PEAKMJD:  1.0         # sigma-smearing for  SEARCH_PEAKMJD
-GENSIGMA_VPEC: 250
+GENSIGMA_VPEC: 0
+#250
 
-GENRANGE_REDSHIFT:  0.02    0.1
+GENRANGE_REDSHIFT:  0.15    0.15
 GENSIGMA_REDSHIFT:  0.000001
 DNDZ: POWERLAW  2.6E-5  2.2
 
@@ -60,8 +61,8 @@ SMEARFLAG_ZEROPT:  1   # smear zero-point with zptsig
 #GENSIGMA_SALT2x1:    3.12   0.724     # bifurcated sigmas
 
 GENMEAN_SALT2x1:     0.0
-GENRANGE_SALT2x1:   0.0  0.0     # x1 (stretch) range
-GENSIGMA_SALT2x1:    0.0  0.0      # bifurcated sigmas
+GENRANGE_SALT2x1:    0.0  0.0     # x1 (stretch) range
+GENSIGMA_SALT2x1:    3.0  3.0      # bifurcated sigmas
 
 GENPEAK_SALT2c:     0.0
 GENRANGE_SALT2c:   0.0   0.0     # color range

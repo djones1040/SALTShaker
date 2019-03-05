@@ -4,16 +4,16 @@ from scipy.optimize import minimize, least_squares, differential_evolution
 import numpy as np
 
 class fitting:
-	def __init__(self,n_components,n_colorpars,n_phaseknots,n_waveknots,datadict,x_init,initparlist,parlist):
+	def __init__(self,n_components,n_colorpars,n_phaseknots,n_waveknots,datadict): #,x_init,initparlist,parlist):
 
 		self.n_phaseknots = n_phaseknots
 		self.n_waveknots = n_waveknots
 		self.n_components = n_components
 		self.n_colorpars = n_colorpars
 		self.datadict = datadict
-		self.x_init = x_init
-		self.initparlist = initparlist
-		self.parlist = parlist
+		#self.x_init = x_init
+		#self.initparlist = initparlist
+		#self.parlist = parlist
 		
 	def least_squares(self,saltfitter,guess,SNpars,SNparlist,n_processes,fitmethod):
 
