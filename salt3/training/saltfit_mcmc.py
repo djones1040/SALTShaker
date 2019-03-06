@@ -233,7 +233,7 @@ class chi2:
 		print('acceptance = %.3f'%(accept/float(nstep)))
 		if nstep < nburn:
 			raise RuntimeError('Not enough steps to wait 500 before burn-in')
-		xfinal,phase,wave,M0,M1,clpars,SNParams = self.getParsMCMC(loglike_history,np.array(outpars),nburn=nburn,result='mode')
+		xfinal,phase,wave,M0,M1,clpars,SNParams = self.getParsMCMC(loglike_history,np.array(outpars),nburn=nburn,result='mean')
 		
 		return xfinal,phase,wave,M0,M1,clpars,SNParams
 		
@@ -541,7 +541,7 @@ class chi2:
 		return self.phase,self.wave,m0,m1,clpars,resultsdict
 
 	def getParsMCMC(self,loglikes,x,nburn=500,bsorder=3,result='mean'):
-		result = 'mean'
+
 		if  result == 'mean':
 			m0pars = np.array([])
 			for i in np.where(self.parlist == 'm0')[0]:
