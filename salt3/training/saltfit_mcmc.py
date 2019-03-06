@@ -171,7 +171,7 @@ class chi2:
 				X2[i] = X[i]*scalefactor + X[i]*(scalefactor2-1)
 			elif par == 'cl': X2[i] = X[i]*np.random.normal(scale=self.stepsize_cl*stepfactor)
 			elif par == 'specrecal': X2[i] = X[i]*np.random.normal(scale=self.stepsize_specrecal*stepfactor)
-			elif par.startswith('x0'): X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0*stepfactor))
+			elif par.startswith('x0'): X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0))#*stepfactor))
 			elif par.startswith('x1'):
 				X2[i] = X[i] + np.random.normal(scale=self.stepsize_x1)#*stepfactor)
 			elif par.startswith('c'): X2[i] = X[i] + np.random.normal(scale=self.stepsize_c)#*stepfactor)
@@ -186,7 +186,9 @@ class chi2:
 		npar = len(x)
 		self.npar = npar
 		#self.debug3 = True
-
+		#self.debug = True
+		#self.nstep = 0
+		
 		# initial log likelihood
 		loglikes = [self.chi2fit(x,pool=pool,debug=debug,debug2=debug2)]
 		loglike_history = []#self.chi2fit(x,pool=pool,debug=debug,debug2=debug2)]
@@ -201,6 +203,7 @@ class chi2:
 		accepted_history = np.array([])
 		while nstep < nsteps:
 			nstep += 1
+			#self.nstep = nstep
 			
 			if not nstep % 50 and nstep > 250:
 				accept_frac_recent = len(accepted_history[-100:][accepted_history[-100:] == True])/100. #accept/float(nstep)
@@ -471,7 +474,7 @@ class chi2:
 			if self.debug:
 				#print(chi2)
 				#print(flt)
-				if chi2 < 200 and flt == 'c' and sn == 5999396:
+				if self.nstep > 1500 and flt == 'd' and sn == 5999398:
 					print(sn)
 					import pylab as plt
 					plt.ion()
@@ -538,6 +541,7 @@ class chi2:
 		return self.phase,self.wave,m0,m1,clpars,resultsdict
 
 	def getParsMCMC(self,loglikes,x,nburn=500,bsorder=3,result='mean'):
+		result = 'mean'
 		if  result == 'mean':
 			m0pars = np.array([])
 			for i in np.where(self.parlist == 'm0')[0]:
