@@ -221,21 +221,40 @@ class TrainSALT:
 				raise RuntimeError('specfile %s does not exist'%sf)
 				
 			if s in datadict.keys():
+				
 				if 'specdata' not in datadict[s].keys():
 					datadict[s]['specdata'] = {}
 					speccount = 0
 				else:
 					speccount = len(datadict[s]['specdata'].keys())
-				datadict[s]['specdata'][speccount] = {}
+				
 				try:
-					wave,flux,fluxerr = np.genfromtxt(sf,unpack=True,usecols=[0,1,2])
-					datadict[s]['specdata'][speccount]['fluxerr'] = fluxerr
+					sn=snana.SuperNova(sf)
+					if len(sn.SPECTRA)==0:
+						raise ValueError('File {} contains no supernova spectra'.format(sf))
+					for k in sn.SPECTRA:
+						spec=sn.SPECTRA[k]
+						datadict[s]['specdata'][speccount] = {}
+						datadict[s]['specdata'][speccount]['fluxerr'] = spec['FLAMERR']
+						datadict[s]['specdata'][speccount]['wavelength'] = (spec['LAMIN']+spec['LAMAX'])/2
+						datadict[s]['specdata'][speccount]['flux'] = spec['FLAM']
+						datadict[s]['specdata'][speccount]['tobs'] = m - tpk
+						datadict[s]['specdata'][speccount]['mjd'] = m
+						speccount+=1
 				except:
-					wave,flux = np.genfromtxt(sf,unpack=True,usecols=[0,1])
-				datadict[s]['specdata'][speccount]['wavelength'] = wave
-				datadict[s]['specdata'][speccount]['flux'] = flux
-				datadict[s]['specdata'][speccount]['tobs'] = m - tpk
-				datadict[s]['specdata'][speccount]['mjd'] = m
+					try:
+						wave,flux,fluxerr = np.genfromtxt(sf,unpack=True,usecols=[0,1,2])
+					
+					except:
+						wave,flux = np.genfromtxt(sf,unpack=True,usecols=[0,1])
+						fluxerr=np.tile(np.nan,flux.size)
+
+					datadict[s]['specdata'][speccount] = {}
+					datadict[s]['specdata'][speccount]['fluxerr'] = fluxerr
+					datadict[s]['specdata'][speccount]['wavelength'] = wave
+					datadict[s]['specdata'][speccount]['flux'] = flux
+					datadict[s]['specdata'][speccount]['tobs'] = m - tpk
+					datadict[s]['specdata'][speccount]['mjd'] = m
 			else:
 				print('SNID %s has no photometry so I\'m ignoring it')
 
@@ -371,8 +390,15 @@ class TrainSALT:
 
 		for k in datadict.keys():
 			parlist = np.append(parlist,['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k])
+			
+# 		for sn in datdict.keys():
+# 			for k in datadict[sn]['specdata'].keys():
+# 				order=int(np.log((specdata[k]['wavelength'].max() - specdata[k]['wavelength'].min())/500) +np.unique(photdata['filt']).size/2.)
+# 				parlist=np.append(parlist,['ys_%_%'%(sn,k)])
 		parlist = np.array(parlist)
-
+		
+		
+		
 		
 		guess[parlist == 'm0'] = m0knots
 		if n_components == 2:
