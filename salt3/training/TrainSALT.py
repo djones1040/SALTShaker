@@ -209,31 +209,36 @@ class TrainSALT:
 		if not os.path.exists(speclist):
 			raise RuntimeError('speclist %s does not exist')
 		
-		snid,mjd,specfiles = np.genfromtxt(speclist,unpack=True,dtype='str')
-		snid,mjd,specfiles = np.atleast_1d(snid),np.atleast_1d(mjd),np.atleast_1d(specfiles)
-		for s,m,sf in zip(snid,mjd,specfiles):
-			try: m = float(m)
-			except: m = snana.date_to_mjd(m)
-
-			if '/' not in sf:
-				sf = '%s/%s'%(os.path.dirname(speclist),sf)
-			if not os.path.exists(sf):
-				raise RuntimeError('specfile %s does not exist'%sf)
-				
-			if s in datadict.keys():
-				
-				if 'specdata' not in datadict[s].keys():
-					datadict[s]['specdata'] = {}
-					speccount = 0
-				else:
-					speccount = len(datadict[s]['specdata'].keys())
-				
-				try:
-					sn=snana.SuperNova(sf)
+		try:
+			snid,mjd,specfiles = np.genfromtxt(speclist,unpack=True,dtype='str')
+			snid,mjd,specfiles = np.atleast_1d(snid),np.atleast_1d(mjd),np.atleast_1d(specfiles)
+			snanaSpec=False
+		except:
+			specfiles=np.genfromtxt(speclist,dtype='str')
+			specfiles=np.atleast_1d(specfiles)
+			snanaSpec=True
+			
+		if snanaSpec:
+			for sf in specfiles:
+			
+				if '/' not in sf:
+					sf = '%s/%s'%(os.path.dirname(speclist),sf)
+				if not os.path.exists(sf):
+					raise RuntimeError('specfile %s does not exist'%sf)
+				sn=snana.SuperNova(sf)
+				s=sn.name
+				if s in datadict.keys():
+					if 'specdata' not in datadict[s].keys():
+						datadict[s]['specdata'] = {}
+						speccount = 0
+					else:
+						speccount = len(datadict[s]['specdata'].keys())
+						
 					if len(sn.SPECTRA)==0:
 						raise ValueError('File {} contains no supernova spectra'.format(sf))
 					for k in sn.SPECTRA:
 						spec=sn.SPECTRA[k]
+						m=spec['SPECTRUM_MJD']
 						datadict[s]['specdata'][speccount] = {}
 						datadict[s]['specdata'][speccount]['fluxerr'] = spec['FLAMERR']
 						datadict[s]['specdata'][speccount]['wavelength'] = (spec['LAMIN']+spec['LAMAX'])/2
@@ -241,10 +246,31 @@ class TrainSALT:
 						datadict[s]['specdata'][speccount]['tobs'] = m - tpk
 						datadict[s]['specdata'][speccount]['mjd'] = m
 						speccount+=1
-				except:
+				else:
+					print('SNID %s has no photometry so I\'m ignoring it')
+
+		else:
+			for s,m,sf in zip(snid,mjd,specfiles):
+				try: m = float(m)
+				except: m = snana.date_to_mjd(m)
+
+				if '/' not in sf:
+					sf = '%s/%s'%(os.path.dirname(speclist),sf)
+					
+				if not os.path.exists(sf):
+					raise RuntimeError('specfile %s does not exist'%sf)
+			
+				if s in datadict.keys():
+			
+					if 'specdata' not in datadict[s].keys():
+						datadict[s]['specdata'] = {}
+						speccount = 0
+					else:
+						speccount = len(datadict[s]['specdata'].keys())
+			
 					try:
 						wave,flux,fluxerr = np.genfromtxt(sf,unpack=True,usecols=[0,1,2])
-					
+			
 					except:
 						wave,flux = np.genfromtxt(sf,unpack=True,usecols=[0,1])
 						fluxerr=np.tile(np.nan,flux.size)
@@ -255,8 +281,8 @@ class TrainSALT:
 					datadict[s]['specdata'][speccount]['flux'] = flux
 					datadict[s]['specdata'][speccount]['tobs'] = m - tpk
 					datadict[s]['specdata'][speccount]['mjd'] = m
-			else:
-				print('SNID %s has no photometry so I\'m ignoring it')
+				else:
+					print('SNID %s has no photometry so I\'m ignoring it')
 
 		return datadict
 
