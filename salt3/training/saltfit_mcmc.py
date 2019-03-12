@@ -20,7 +20,7 @@ lambdaeff = {'g':4900.1409,'r':6241.2736,'i':7563.7672,'z':8690.0840,'B':4353,'V
 class chi2:
 	def __init__(self,guess,datadict,parlist,phaseknotloc,waveknotloc,
 				 phaserange,waverange,phaseres,waveres,phaseoutres,waveoutres,
-				 colorwaverange,kcordict,initmodelfile,initBfilt,regulargradientphase, regulargradientwave, regulardyad ,n_components=1,
+				 colorwaverange,kcordict,initmodelfile,initBfilt,regulargradientphase, regulargradientwave, regulardyad,filter_mass_tolerance ,n_components=1,
 				 n_colorpars=0,days_interp=5,onlySNpars=False,mcmc=False,debug=False,
 				 fitstrategy='leastsquares',stepsize_M0=None,stepsize_magscale_M1=None,
 				 stepsize_magadd_M1=None,stepsize_cl=None,
@@ -60,7 +60,7 @@ class chi2:
 							 1+ (phaserange[1]-phaserange[0]+2*days_interp)/phaseres)
 		self.wavebins = np.linspace(waverange[0],waverange[1],
 							 1+(waverange[1]-waverange[0])/waveres)
-
+		self.filter_mass_tolerance=filter_mass_tolerance
 		
 		assert type(parlist) == np.ndarray
 		self.splinephase = phaseknotloc
@@ -424,9 +424,11 @@ class chi2:
 		else: chi2 = 0
 		int1d = interp1d(obsphase,saltflux,axis=0)
 		for k in specdata.keys():
+			phase=specdata[k]['tobs']+tpkoff
 			if phase < obsphase.min() or phase > obsphase.max(): raise RuntimeError('Phase {} is out of extrapolated phase range for SN {} with tpkoff {}'.format(phase,sn,tpkoff))
 			saltfluxinterp = int1d(phase)
-			saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)
+			#Interpolate SALT flux at observed wavelengths and multiply by recalibration factor
+			saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)*np.exp(np.poly1d(x[self.parlist=='ys_{}_{}'.format(sn,k)])(specdata[k]['wavelength']))
 			chi2 += np.sum((saltfluxinterp2-specdata[k]['flux'])**2./specdata[k]['fluxerr']**2.)
 			
 		for flt in np.unique(photdata['filt']):
@@ -435,7 +437,12 @@ class chi2:
 			# synthetic photometry
 			filtwave = self.kcordict[survey]['filtwave']
 			filttrans = self.kcordict[survey][flt]['filttrans']
-
+			
+			#Check how much mass of the filter is inside the wavelength range
+			filtRange=(filtwave/(1+z)>self.wavebins.min()) &(filtwave/(1+z) <self.wavebins.max())
+			if np.trapz((filttrans*filtwave/(1+z))[filtRange],filtwave[filtRange]/(1+z))/np.trapz(filttrans*filtwave/(1+z),filtwave/(1+z)) < 1-self.filter_mass_tolerance:
+				continue
+					
 			g = (obswave >= filtwave[0]) & (obswave <= filtwave[-1])  # overlap range
 			#gred = filtwave > obswave[-1]
 			#gblue = filtwave < obswave[0]
@@ -443,7 +450,7 @@ class chi2:
 			
 			pbspl = np.interp(obswave[g],filtwave,filttrans)
 			pbspl *= obswave[g]
-
+				
 			denom = np.trapz(pbspl,obswave[g])
 			#denom_blue = np.trapz(pbspl,obswave[gblue])
 			#denom_red = np.trapz(pbspl,obswave[gred])
@@ -620,7 +627,6 @@ class chi2:
 		"""
 		#Clean out array
 		self.neff=np.zeros((self.phasebins.size-1,self.wavebins.size-1))
-		
 		for sn in self.datadict.keys():
 			tpkoff=x[self.parlist == 'tpkoff_%s'%sn]
 			photdata = self.datadict[sn]['photdata']
@@ -632,19 +638,26 @@ class chi2:
 			#For each spectrum, add one point to each bin for every spectral measurement in that bin
 			for k in specdata.keys():
 				restWave=specdata[k]['wavelength']/(1+z)
+				restWave=restWave[(restWave>self.wavebins.min())&(restWave<self.wavebins.max())]
 				phase=(specdata[k]['tobs']+tpkoff)/(1+z)
-				phaseIndex=np.searchsorted(self.phasebins,phase,'left')
-				waveIndex=np.searchsorted(self.wavebins,restWave,'left')
+				phaseIndex=np.searchsorted(self.phasebins,phase,'left')[0]
+				waveIndex=np.searchsorted(self.wavebins,restWave,'left')[0]
 				self.neff[phaseIndex][waveIndex]+=1
 			#For each photometric filter, weight the contribution by  
 			for flt in np.unique(photdata['filt']):
 				filttrans = self.kcordict[survey][flt]['filttrans']
+				
+				#Check how much mass of the filter is inside the wavelength range
+				filtRange=(filtwave/(1+z)>self.wavebins.min()) &(filtwave/(1+z) <self.wavebins.max())
+				if np.trapz((filttrans*filtwave/(1+z))[filtRange],filtwave[filtRange]/(1+z))/np.trapz(filttrans*filtwave/(1+z),filtwave/(1+z)) < 1-self.filter_mass_tolerance:
+					continue
+					
 				g = (self.wavebins[:-1]  >= filtwave[0]/(1+z)) & (self.wavebins[:-1] <= filtwave[-1]/(1+z))  # overlap range
 				pbspl = np.zeros(g.sum())
 				for i in range(g.sum()):
 					j=np.where(g)[0][i]
-					pbspl[i]=trapIntegrate(self.wavebins[j],self.wavebins[j+1],filtwave/(1+z),filttrans)
-				pbspl *= (self.wavebins[:-1] + self.wavebins[1:])[g]/2
+					pbspl[i]=trapIntegrate(self.wavebins[j],self.wavebins[j+1],filtwave/(1+z),filttrans*filtwave/(1+z))
+
 				#Normalize it so that total number of points added is 1
 				pbspl /= np.sum(pbspl)
 				#Consider weighting neff by variance for each measurement?

@@ -126,6 +126,16 @@ class TrainSALT:
 							help='Weighting of wave gradient chi^2 regularization during training of model parameters (default=%default)')
 		parser.add_argument('--regulardyad', default=config.get('trainparams','regulardyad'), type=float,
 							help='Weighting of dyadic chi^2 regularization during training of model parameters (default=%default)')
+		parser.add_argument('--n_min_specrecal', default=config.get('trainparams','n_min_specrecal'), type=int,
+							help='Minimum order of spectral recalibration polynomials (default=%default)')
+		parser.add_argument('--specrange_wavescale_specrecal', default=config.get('trainparams','specrange_wavescale_specrecal'), type=float,
+							help='Wavelength scale (in angstroms) for determining additional orders of spectral recalibration from wavelength range of spectrum (default=%default)')
+		parser.add_argument('--n_specrecal_per_lightcurve', default=config.get('trainparams','n_specrecal_per_lightcurve'), type=float,
+							help='Number of additional spectral recalibration orders per lightcurve (default=%default)')
+		parser.add_argument('--filter_mass_tolerance', default=config.get('trainparams','filter_mass_tolerance'), type=float,
+							help='Mass of filter transmission allowed outside of model wavelength range (default=%default)')
+
+
 
 		# mcmc parameters
 		parser.add_argument('--n_steps_mcmc', default=config.get('mcmcparams','n_steps_mcmc'), type=int,
@@ -241,7 +251,7 @@ class TrainSALT:
 						m=spec['SPECTRUM_MJD']
 						datadict[s]['specdata'][speccount] = {}
 						datadict[s]['specdata'][speccount]['fluxerr'] = spec['FLAMERR']
-						datadict[s]['specdata'][speccount]['wavelength'] = (spec['LAMIN']+spec['LAMAX'])/2
+						datadict[s]['specdata'][speccount]['wavelength'] = (spec['LAMMIN']+spec['LAMMAX'])/2
 						datadict[s]['specdata'][speccount]['flux'] = spec['FLAM']
 						datadict[s]['specdata'][speccount]['tobs'] = m - tpk
 						datadict[s]['specdata'][speccount]['mjd'] = m
@@ -377,7 +387,7 @@ class TrainSALT:
 		
 	def fitSALTModel(self,datadict,phaserange,phaseres,waverange,waveres,
 					 colorwaverange,fitmethod,fitstrategy,fititer,kcordict,initmodelfile,initBfilt,
-					 phaseoutres,waveoutres,regulargradientphase, regulargradientwave, regulardyad ,n_components=1,n_colorpars=0,n_processes=1):
+					 phaseoutres,waveoutres,regulargradientphase, regulargradientwave, regulardyad,n_min_specrecal,specrange_wavescale_specrecal,n_specrecal_per_lightcurve,filter_mass_tolerance ,n_components=1,n_colorpars=0,n_processes=1):
 
 		if self.options.fitstrategy == 'multinest' or self.options.fitstrategy == 'simplemcmc':
 			from salt3.training import saltfit_mcmc as saltfit
@@ -402,11 +412,6 @@ class TrainSALT:
 		# x1,x0,c for each SN
 		# phase/wavelength spline knots for M0, M1 (ignoring color for now)
 		# TODO: spectral recalibration
-		n_params = n_components*n_phaseknots*n_waveknots + 4*n_sn
-		
-		if n_colorpars: n_params += n_colorpars
-		print(n_params)
-		guess = np.zeros(n_params)
 
 		parlist = np.array(['m0']*(n_phaseknots*n_waveknots))
 		if n_components == 2:
@@ -417,28 +422,31 @@ class TrainSALT:
 		for k in datadict.keys():
 			parlist = np.append(parlist,['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k])
 			
-# 		for sn in datdict.keys():
-# 			for k in datadict[sn]['specdata'].keys():
-# 				order=int(np.log((specdata[k]['wavelength'].max() - specdata[k]['wavelength'].min())/500) +np.unique(photdata['filt']).size/2.)
-# 				parlist=np.append(parlist,['ys_%_%'%(sn,k)])
+		for sn in datadict.keys():
+			specdata=datadict[sn]['specdata']
+			photdata=datadict[sn]['photdata']
+			for k in specdata.keys():
+				order=n_min_specrecal+int(np.log((specdata[k]['wavelength'].max() - specdata[k]['wavelength'].min())/specrange_wavescale_specrecal) +np.unique(photdata['filt']).size* n_specrecal_per_lightcurve)
+				parlist=np.append(parlist,['ys_{}_{}'.format(sn,k)]*order)
+				
 		parlist = np.array(parlist)
 		
-		
-		
-		
+		n_params=parlist.size
+		guess = np.zeros(parlist.size)
 		guess[parlist == 'm0'] = m0knots
 		if n_components == 2:
 			guess[parlist == 'm1'] = m1knots
 		if n_colorpars:
 			guess[parlist == 'cl'] = [0.]*n_colorpars
 		guess[(parlist == 'm0') & (guess < 0)] = 0
-
+		
 		saltfitter = saltfit.chi2(guess,datadict,parlist,
 								  phaseknotloc,waveknotloc,phaserange,
 								  waverange,phaseres,waveres,phaseoutres,waveoutres,
 								  colorwaverange,
 								  kcordict,initmodelfile,initBfilt,regulargradientphase,
-								  regulargradientwave,regulardyad,n_components,n_colorpars,
+								  regulargradientwave,regulardyad,filter_mass_tolerance,
+								  n_components,n_colorpars,
 								  n_iter=self.options.n_iter)
 
 		saltfitter.stepsize_M0 = self.options.stepsize_M0
@@ -740,6 +748,10 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				self.options.regulargradientphase, 
 				self.options.regulargradientwave, 
 				self.options.regulardyad,
+				self.options.n_min_specrecal,
+				self.options.specrange_wavescale_specrecal,
+				self.options.n_specrecal_per_lightcurve,
+				self.options.filter_mass_tolerance,
 				self.options.n_components,
 				self.options.n_colorpars)
 		
