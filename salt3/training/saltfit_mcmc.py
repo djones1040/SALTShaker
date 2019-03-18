@@ -20,7 +20,8 @@ lambdaeff = {'g':4900.1409,'r':6241.2736,'i':7563.7672,'z':8690.0840,'B':4353,'V
 class chi2:
 	def __init__(self,guess,datadict,parlist,phaseknotloc,waveknotloc,
 				 phaserange,waverange,phaseres,waveres,phaseoutres,waveoutres,
-				 colorwaverange,kcordict,initmodelfile,initBfilt,regulargradientphase, regulargradientwave, regulardyad ,n_components=1,
+				 colorwaverange,kcordict,initmodelfile,initBfilt,
+				 regulargradientphase, regulargradientwave, regulardyad ,n_components=1,
 				 n_colorpars=0,days_interp=5,onlySNpars=False,mcmc=False,debug=False,
 				 fitstrategy='leastsquares',stepsize_M0=None,stepsize_magscale_M1=None,
 				 stepsize_magadd_M1=None,stepsize_cl=None,
@@ -164,20 +165,26 @@ class chi2:
 		
 		X2 = np.zeros(self.npar)
 		for i,par in zip(range(self.npar),self.parlist):
-			if par == 'm0': X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_M0*stepfactor))
+			if par == 'm0': X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_M0))#*stepfactor))
 			elif par == 'm1':
-				scalefactor = 10**(0.4*np.random.normal(scale=self.stepsize_magscale_M1*stepfactor))
-				scalefactor2 = 10**(0.4*np.random.normal(scale=self.stepsize_magadd_M1*stepfactor))
+				m1scalestep = self.stepsize_magscale_M1*stepfactor
+				if m1scalestep < 0.001: m1scalestep = 0.001
+				m1addstep = self.stepsize_magadd_M1*stepfactor
+				if m1addstep < 0.001: m1addstep = 0.001
+
+				scalefactor = 10**(0.4*np.random.normal(scale=m1scalestep))
+				scalefactor2 = 10**(0.4*np.random.normal(scale=m1addstep))
 				X2[i] = X[i]*scalefactor + X[i]*(scalefactor2-1)
 			elif par == 'cl': X2[i] = X[i]*np.random.normal(scale=self.stepsize_cl*stepfactor)
 			elif par == 'specrecal': X2[i] = X[i]*np.random.normal(scale=self.stepsize_specrecal*stepfactor)
-			elif par.startswith('x0'): X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0))#*stepfactor))
+			elif par.startswith('x0'):
+				X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0))#*stepfactor))
 			elif par.startswith('x1'):
-				X2[i] = X[i] + np.random.normal(scale=self.stepsize_x1)#*stepfactor)
+				X2[i] = X[i] + np.random.normal(scale=self.stepsize_x1*stepfactor)
 			elif par.startswith('c'): X2[i] = X[i] + np.random.normal(scale=self.stepsize_c)#*stepfactor)
 			elif par.startswith('tpkoff'):
 				#if nstep > 3000:
-				X2[i] = X[i] + np.random.normal(scale=self.stepsize_tpk*stepfactor)
+				X2[i] = X[i] + np.random.normal(scale=self.stepsize_tpk)#*stepfactor)
 				#else:
 				#	X2[i] = X[i] + 0
 		return X2
@@ -469,7 +476,7 @@ class chi2:
 			if self.fitstrategy == 'leastsquares':
 				chi2 = np.append(chi2,(filtPhot['fluxcal']-modelflux)**2./(filtPhot['fluxcal']*0.05)**2.)
 			else:
-				chi2 += ((filtPhot['fluxcal']-modelflux)**2./(filtPhot['fluxcalerr']**2. + (filtPhot['fluxcal']*0.05)**2.)).sum()
+				chi2 += ((filtPhot['fluxcal']-modelflux)**2./(filtPhot['fluxcalerr']**2. + (filtPhot['fluxcal']*0.01)**2.)).sum()
 
 			if self.debug:
 				#print(chi2)
