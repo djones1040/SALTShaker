@@ -314,7 +314,6 @@ class chi2:
 		#if self.onlySNpars: print(chi2,x)
 		#else:
 		#	print(chi2,x[0])#,x[self.parlist == 'x0_ASASSN-16bc'],x[self.parlist == 'cl'])
-		print(chi2.sum())
 		
 		if not self.onlySNpars:
 			
@@ -327,10 +326,13 @@ class chi2:
 			logp = -chi2/2 + self.m0prior(x)
 		else:
 			logp = -chi2/2
+		
 			
 		if self.mcmc:
+			print(logp*-2)
 			return logp
 		else:
+			print(chi2.sum())
 			return chi2
 
 	def m0prior(self,x):
