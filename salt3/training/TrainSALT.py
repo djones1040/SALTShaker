@@ -427,7 +427,7 @@ class TrainSALT:
 			photdata=datadict[sn]['photdata']
 			for k in specdata.keys():
 				order=n_min_specrecal+int(np.log((specdata[k]['wavelength'].max() - specdata[k]['wavelength'].min())/specrange_wavescale_specrecal) +np.unique(photdata['filt']).size* n_specrecal_per_lightcurve)
-				parlist=np.append(parlist,['ys_{}_{}'.format(sn,k)]*order)
+				parlist=np.append(parlist,['specrecal_{}_{}'.format(sn,k)]*order)
 				
 		parlist = np.array(parlist)
 		
@@ -445,7 +445,7 @@ class TrainSALT:
 								  waverange,phaseres,waveres,phaseoutres,waveoutres,
 								  colorwaverange,
 								  kcordict,initmodelfile,initBfilt,regulargradientphase,
-								  regulargradientwave,regulardyad,filter_mass_tolerance,
+								  regulargradientwave,regulardyad,filter_mass_tolerance,specrange_wavescale_specrecal,
 								  n_components,n_colorpars,
 								  n_iter=self.options.n_iter)
 
@@ -572,13 +572,20 @@ class TrainSALT:
 			print('Final chi^2'); saltfitter.chi2fit(x_modelpars,None,False,False)
 
 			
-		return phase,wave,M0,M1,clpars,SNParams
+		return phase,wave,M0,M1,clpars,SNParams,x_modelpars,parlist
 
-	def wrtoutput(self,outdir,phase,wave,M0,M1,clpars,SNParams):
+	def wrtoutput(self,outdir,phase,wave,M0,M1,clpars,SNParams,pars,parlist):
 
 		if not os.path.exists(outdir):
 			raise RuntimeError('desired output directory %s doesn\'t exist'%outdir)
 
+		#Save all model parameters
+		
+		with  open('{}/salt3_parameters.dat'.format(outdir),'w') as foutpars:
+			foutpars.write('{: <30} {}\n'.format('Parameter Name','Value'))
+			for name,par in zip(parlist,pars):
+				foutpars.write('{: <30} {:.6e}\n'.format(name,par))
+			
 		# principal components and color law
 		foutm0 = open('%s/salt3_template_0.dat'%outdir,'w')
 		foutm1 = open('%s/salt3_template_1.dat'%outdir,'w')
@@ -709,9 +716,10 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		if not os.path.exists(self.options.outputdir):
 			os.makedirs(self.options.outputdir)
 		
-		# Eliminate all data outside phase range
+		# Eliminate all data outside wave/phase range
 		numSpecElimmed,numSpec=0,0
 		numPhotElimmed,numPhot=0,0
+		numSpecPoints=0
 		for sn in datadict.keys():
 			photdata = datadict[sn]['photdata']
 			specdata = datadict[sn]['specdata']
@@ -723,17 +731,32 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 					numSpecElimmed+=1
 				else:
 					numSpec+=1
+					numSpecPoints+=((specdata[k]['wavelength']/(1+z)>self.options.waverange[0])&(specdata[k]['wavelength']/(1+z)<self.options.waverange[1])).sum()
+					
 			#Remove photometric data outside phase range
 			phase=(photdata['tobs'])/(1+z)
-			phaseFilter=(phase>self.options.phaserange[0]) & (phase<self.options.phaserange[1])
-			numPhotElimmed+=(~phaseFilter).sum()
-			numPhot+=phaseFilter.sum()
-			datadict[sn]['photdata'] ={key:photdata[key][phaseFilter] for key in photdata}
+			def checkFilterMass(flt):
+				survey = datadict[sn]['survey']
+				filtwave = self.kcordict[survey]['filtwave']
+				filttrans = self.kcordict[survey][flt]['filttrans']
+			
+				#Check how much mass of the filter is inside the wavelength range
+				filtRange=(filtwave/(1+z)>self.options.waverange[0]) &(filtwave/(1+z) <self.options.waverange[1])
+				return np.trapz((filttrans*filtwave/(1+z))[filtRange],filtwave[filtRange]/(1+z))/np.trapz(filttrans*filtwave/(1+z),filtwave/(1+z)) > 1-self.options.filter_mass_tolerance
+					
+			filterInBounds=np.vectorize(checkFilterMass)(photdata['filt'])
+			phaseInBounds=(phase>self.options.phaserange[0]) & (phase<self.options.phaserange[1])
+			keepPhot=filterInBounds&phaseInBounds
+			numPhotElimmed+=(~keepPhot).sum()
+			numPhot+=keepPhot.sum()
+			datadict[sn]['photdata'] ={key:photdata[key][keepPhot] for key in photdata}
+			
 		print('{} spectra and {} photometric observations removed for being outside phase range'.format(numSpecElimmed,numPhotElimmed))
 		print('{} spectra and {} photometric observations remaining'.format(numSpec,numPhot))
+		print('{} total spectroscopic data points'.format(numSpecPoints))
 		# fit the model - initial pass
 		if self.options.stage == "all" or self.options.stage == "train":
-			phase,wave,M0,M1,clpars,SNParams = self.fitSALTModel(
+			phase,wave,M0,M1,clpars,SNParams,pars,parlist = self.fitSALTModel(
 				datadict,self.options.phaserange,self.options.phasesplineres,
 				self.options.waverange,self.options.wavesplineres,
 				self.options.colorwaverange,
@@ -756,7 +779,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				self.options.n_colorpars)
 		
 			# write the output model - M0, M1, c
-			self.wrtoutput(self.options.outputdir,phase,wave,M0,M1,clpars,SNParams)
+			self.wrtoutput(self.options.outputdir,phase,wave,M0,M1,clpars,SNParams,pars,parlist)
 
 		if self.options.stage == "all" or self.options.stage == "validate":
 			self.validate(self.options.outputdir)
