@@ -669,6 +669,8 @@ class chi2:
 
 		self.neff=np.clip(self.neff,1e-2*self.neff.max(),None)
 		self.plotEffectivePoints([-12.5,0,12.5,40],'neff.png')
+		self.plotEffectivePoints(None,'neff-heatmap.png')
+
 	def plotEffectivePoints(self,phases=None,output=None):
 
 		import matplotlib.pyplot as plt
