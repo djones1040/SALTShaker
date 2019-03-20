@@ -11,6 +11,7 @@ from sncosmo.models import StretchSource
 from scipy.optimize import minimize
 from scipy.stats import norm
 from scipy.ndimage import gaussian_filter1d
+import pylab as plt
 from scipy.special import factorial
 
 #import pysynphot as S
@@ -25,16 +26,20 @@ class chi2:
 				 colorwaverange,kcordict,initmodelfile,initBfilt,regulargradientphase,
 				 regulargradientwave, regulardyad,filter_mass_tolerance, specrange_wavescale_specrecal ,n_components=1,
 				 n_colorpars=0,days_interp=5,onlySNpars=False,mcmc=False,debug=False,
-				 fitstrategy='leastsquares',stepsize_M0=None,stepsize_magscale_M1=None,
+				 fitstrategy='leastsquares',stepsize_magscale_M0=None,stepsize_magadd_M0=None,stepsize_magscale_M1=None,
 				 stepsize_magadd_M1=None,stepsize_cl=None,
 				 stepsize_specrecal=None,stepsize_x0=None,stepsize_x1=None,
-				 stepsize_c=None,stepsize_tpkoff=None,n_iter=0,x1debugdict={}):
+				 stepsize_c=None,stepsize_tpkoff=None,n_iter=0,x1debugdict={},
+				 nsteps_before_adaptive=5000,nsteps_adaptive_memory=200,adaptive_sigma_opt_scale=3):
 
 		self.init_stepsizes(
-			stepsize_M0,stepsize_magscale_M1,stepsize_magadd_M1,stepsize_cl,
+			stepsize_magscale_M0,stepsize_magadd_M0,stepsize_magscale_M1,stepsize_magadd_M1,stepsize_cl,
 			stepsize_specrecal,stepsize_x0,stepsize_x1,
 			stepsize_c,stepsize_tpkoff)
 
+		self.nsteps_adaptive_memory = nsteps_adaptive_memory
+		self.nsteps_before_adaptive = nsteps_before_adaptive
+		self.adaptive_sigma_opt_scale = adaptive_sigma_opt_scale
 		self.n_iter = n_iter
 		self.datadict = datadict
 		self.parlist = parlist
@@ -144,10 +149,12 @@ class chi2:
 					
 
 	def init_stepsizes(
-			self,stepsize_M0,stepsize_magscale_M1,stepsize_magadd_M1,stepsize_cl,
+			self,stepsize_magscale_M0,stepsize_magadd_M0,
+			stepsize_magscale_M1,stepsize_magadd_M1,stepsize_cl,
 			stepsize_specrecal,stepsize_x0,stepsize_x1,
 			stepsize_c,stepsize_tpkoff):
-		self.stepsize_M0 = stepsize_M0
+		self.stepsize_magscale_M0 = stepsize_magscale_M0
+		self.stepsize_magadd_M0 = stepsize_magadd_M0
 		self.stepsize_magscale_M1 = stepsize_magscale_M1
 		self.stepsize_magadd_M1 = stepsize_magadd_M1
 		self.stepsize_cl = stepsize_cl
@@ -155,8 +162,7 @@ class chi2:
 		self.stepsize_x0 = stepsize_x0
 		self.stepsize_x1 = stepsize_x1
 		self.stepsize_c = stepsize_c
-		self.stepsize_tpkoff = stepsize_tpkoff
-		
+		self.stepsize_tpkoff = stepsize_tpkoff		
 				
 	def extrapolate(self,saltflux,x0):
 
@@ -184,12 +190,15 @@ class chi2:
 
 	def adjust_model(self,X,stepfactor=1.0,nstep=0):
 
-		#if stepfactor < 1: x0stepfactor = stepfactor*0.5
-		#else: x0stepfactor = stepfactor
-		
+		stepfactor = 1
 		X2 = np.zeros(self.npar)
 		for i,par in zip(range(self.npar),self.parlist):
-			if par == 'm0': X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_M0))#*stepfactor))
+			if par == 'm0':
+				m0scalestep = self.stepsize_magscale_M0*stepfactor
+				m0addstep = self.stepsize_magadd_M0*stepfactor
+
+				scalefactor = 10**(0.4*np.random.normal(scale=m0scalestep))
+				X2[i] = X[i]*scalefactor + self.M0stddev*np.random.normal(scale=self.stepsize_magadd_M0*stepfactor)
 			elif par == 'm1':
 				m1scalestep = self.stepsize_magscale_M1*stepfactor
 				if m1scalestep < 0.001: m1scalestep = 0.001
@@ -197,11 +206,11 @@ class chi2:
 				if m1addstep < 0.001: m1addstep = 0.001
 
 				scalefactor = 10**(0.4*np.random.normal(scale=m1scalestep))
-				scalefactor2 = 10**(0.4*np.random.normal(scale=m1addstep))
-				X2[i] = X[i]*scalefactor + X[i]*(scalefactor2-1)
+				X2[i] = X[i]*scalefactor + self.M1stddev*np.random.normal(scale=self.stepsize_magadd_M1*stepfactor)
 			elif par == 'cl': X2[i] = X[i]*np.random.normal(scale=self.stepsize_cl*stepfactor)
+
 			elif par.startswith('specrecal'): X2[i] = X[i]+np.random.normal(scale=self.stepsize_specrecal*stepfactor)
-			elif par.startswith('x0'): X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0))#*stepfactor))
+			elif par.startswith('x0'): X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0))
 			elif par.startswith('x1'):
 				X2[i] = X[i] + np.random.normal(scale=self.stepsize_x1*stepfactor)
 			elif par.startswith('c'): X2[i] = X[i] + np.random.normal(scale=self.stepsize_c)#*stepfactor)
@@ -209,19 +218,91 @@ class chi2:
 				X2[i] = X[i] + np.random.normal(scale=self.stepsize_tpk*stepfactor)
 			else:
 				raise ValueError('Parameter {} has not been assigned a step factor'.format(par))
+
 		return X2
 
+	def get_proposal_cov(self, M2, n, beta=0.05):
+		d, _ = M2.shape
+		init_period = self.nsteps_before_adaptive
+		s_0, s_opt, C_0 = self.AMpars['sigma_0'], self.AMpars['sigma_opt'], self.AMpars['C_0']
+		if n<= init_period or np.random.rand()<=beta:
+			return C_0, False
+		else:
+			# We can always divide M2 by n-1 since n > init_period
+			return (s_opt/(self.nsteps_adaptive_memory - 1))*M2, True
+	
+	def generate_AM_candidate(self, current, M2, n):
+		prop_cov,adjust_flag = self.get_proposal_cov(M2, n)
+
+		candidate = np.zeros(self.npar)
+		if not adjust_flag:
+			for i,par in zip(range(self.npar),self.parlist):
+				if par == 'm0':
+					m0scalestep = self.stepsize_magscale_M0
+					m0addstep = self.stepsize_magadd_M0
+					scalefactor = 10**(0.4*np.random.normal(scale=m0scalestep))
+					candidate[i] = current[i]*scalefactor + np.random.normal(scale=prop_cov[i,i])
+				elif par == 'm1':
+					m1scalestep = self.stepsize_magscale_M1
+					scalefactor = 10**(0.4*np.random.normal(scale=m1scalestep))
+					candidate[i] = current[i]*scalefactor + np.random.normal(scale=prop_cov[i,i])
+				elif par.startswith('x0'):
+					candidate[i] = current[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0))
+				elif par.startswith('specrecal'): X2[i] = X[i]+np.random.normal(scale=self.stepsize_specrecal)
+				else:
+					candidate[i] = current[i] + np.random.normal(0,np.sqrt(prop_cov[i,i]))
+		else:
+			for i,par in zip(range(self.npar),self.parlist):
+				candidate[i] = np.random.normal(loc=current[i],scale=np.sqrt(prop_cov[i,i]))
+				# candidate = ss.multivariate_normal(mean=current, cov=prop_cov, allow_singular=True).rvs()
+
+		return candidate
+
+	def update_moments(self,mean, M2, sample, n):
+		next_n = (n + 1)
+		w = 1/next_n
+		new_mean = mean + w*(sample - mean)
+		delta_bf, delta_af = sample - mean, sample - new_mean
+		new_M2 = M2 + np.outer(delta_bf, delta_af)
+
+		return new_mean, new_M2
+
+	def get_propcov_init(self,x):
+		x
+		C_0 = np.zeros([len(x),len(x)])
+		for i,par in zip(range(self.npar),self.parlist):
+			if par == 'm0':
+				C_0[i,i] = (self.M0stddev*self.stepsize_magadd_M0)**2.
+			elif par == 'm1':
+				C_0[i,i] = (self.M1stddev*self.stepsize_magadd_M1)**2.
+			elif par.startswith('x0'):
+				C_0[i,i] = 0.0 
+			elif par.startswith('x1'):
+				C_0[i,i] = self.stepsize_x1**2.
+			elif par.startswith('c'): C_0[i,i] = (self.stepsize_c)**2.
+			elif par.startswith('specrecal'): C_0[i,i] = self.stepsize_specrecal**2.
+			elif par.startswith('tpkoff'):
+				C_0[i,i] = self.stepsize_tpk**2.
+				
+		self.AMpars = {'C_0':C_0,
+					   'sigma_0':0.1/np.sqrt(self.npar),
+					   'sigma_opt':2.38*self.adaptive_sigma_opt_scale/np.sqrt(self.npar)}
+
+	
 	def mcmcfit(self,x,nsteps,nburn,pool=None,debug=False,debug2=False):
 		npar = len(x)
 		self.npar = npar
-		#self.debug3 = True
-		#self.debug = True
-		#self.nstep = 0
 		
 		# initial log likelihood
 		loglikes = [self.chi2fit(x,pool=pool,debug=debug,debug2=debug2)]
-		loglike_history = []#self.chi2fit(x,pool=pool,debug=debug,debug2=debug2)]
-		Xlast = x[:] #self.adjust_model(x)
+		loglike_history = []
+		Xlast = x[:]
+		self.M0stddev = np.std(Xlast[self.parlist == 'm0'])
+		self.M1stddev = np.std(Xlast[self.parlist == 'm1'])
+		mean, M2 = x[:], np.zeros([len(x),len(x)])
+		mean_recent, M2_recent = x[:], np.zeros([len(x),len(x)])
+
+		self.get_propcov_init(x)
 		
 		outpars = [[] for i in range(npar)]
 		accept = 0
@@ -230,14 +311,16 @@ class chi2:
 		accept_frac = 0.5
 		accept_frac_recent = 0.5
 		accepted_history = np.array([])
+		n_adaptive = 0
 		while nstep < nsteps:
 			nstep += 1
+			n_adaptive += 1
 			
 			if not nstep % 50 and nstep > 250:
-				accept_frac_recent = len(accepted_history[-100:][accepted_history[-100:] == True])/100. #accept/float(nstep)
-				if accept_frac_recent > 0.30: stepfactor *= 1.25
-				elif accept_frac_recent < 0.25: stepfactor *= 0.75
-			X = self.adjust_model(Xlast,stepfactor=stepfactor,nstep=nstep)
+				accept_frac_recent = len(accepted_history[-100:][accepted_history[-100:] == True])/100.
+			
+			#X = self.adjust_model(Xlast,stepfactor=stepfactor,nstep=nstep)
+			X = self.generate_AM_candidate(current=Xlast, M2=M2_recent, n=nstep)
 			
 			# loglike
 			this_loglike = self.chi2fit(X,pool=pool,debug=debug,debug2=debug2)
@@ -257,7 +340,14 @@ class chi2:
 					outpars[j] += [Xlast[j]]
 				loglike_history += [this_loglike]
 			accepted_history = np.append(accepted_history,accept_bool)
-				
+
+			mean, M2 = self.update_moments(mean, M2, Xlast, n_adaptive)
+			if not n_adaptive % self.nsteps_adaptive_memory:
+				n_adaptive = 0
+				M2_recent = M2[:]
+				mean_recent = mean[:]
+				mean, M2 = Xlast[:], np.zeros([len(x),len(x)])
+			
 		print('acceptance = %.3f'%(accept/float(nstep)))
 		if nstep < nburn:
 			raise RuntimeError('Not enough steps to wait 500 before burn-in')
@@ -563,16 +653,47 @@ class chi2:
 
 	def getParsMCMC(self,loglikes,x,nburn=500,bsorder=3,result='mean'):
 
-		if  result == 'mean':
+		axcount = 0; parcount = 0
+		from matplotlib.backends.backend_pdf import PdfPages
+		pdf_pages = PdfPages('output/MCMC_hist.pdf')
+		fig = plt.figure()
+		
+		if result == 'mean':
 			m0pars = np.array([])
 			for i in np.where(self.parlist == 'm0')[0]:
 				#[x[i][nburn:] == x[i][nburn:]]
 				m0pars = np.append(m0pars,x[i][nburn:].mean()/_SCALE_FACTOR)
+				if not parcount % 9:
+					subnum = axcount%9+1
+					ax = plt.subplot(3,3,subnum)
+					axcount += 1
+					md,std = np.mean(x[i][nburn:]),np.std(x[i][nburn:])
+					histbins = np.linspace(md-3*std,md+3*std,50)
+					ax.hist(x[i][nburn:],bins=histbins)
+					ax.set_title('M0')
+					if axcount % 9 == 8:
+						pdf_pages.savefig(fig)
+						fig = plt.figure()
+				parcount += 1
 
 			m1pars = np.array([])
+			parcount = 0
 			for i in np.where(self.parlist == 'm1')[0]:
 				m1pars = np.append(m1pars,x[i][nburn:].mean()/_SCALE_FACTOR)
+				if not parcount % 9:
+					subnum = axcount%9+1
+					ax = plt.subplot(3,3,subnum)
+					axcount += 1
+					md,std = np.mean(x[i][nburn:]),np.std(x[i][nburn:])
+					histbins = np.linspace(md-3*std,md+3*std,50)
+					ax.hist(x[i][nburn:],bins=histbins)
+					ax.set_title('M1')
+					if axcount % 9 == 8:
+						pdf_pages.savefig(fig)
+						fig = plt.figure()
+				parcount += 1
 
+				
 			clpars = np.array([])
 			for i in np.where(self.parlist == 'cl')[0]:
 				clpars = np.append(clpars,x[i][nburn:].mean())
@@ -634,7 +755,39 @@ class chi2:
 		else: m1 = np.zeros(np.shape(m0))
 		if not len(clpars): clpars = []
 	
+		resultsdict = {}
+		n_sn = len(self.datadict.keys())
+		for k in self.datadict.keys():
+			tpk_init = self.datadict[k]['photdata']['mjd'][0] - self.datadict[k]['photdata']['tobs'][0]
+			if not len(self.SNpars):
+				resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k][0][nburn:].mean(),
+								  'x1':x[self.parlist == 'x1_%s'%k][0][nburn:].mean(),
+								  'c':x[self.parlist == 'x1_%s'%k][0][nburn:].mean(),
+								  'tpkoff':x[self.parlist == 'tpkoff_%s'%k][0][nburn:].mean()}
+			else:
+				resultsdict[k] = {'x0':self.SNpars[self.SNparlist == 'x0_%s'%k][0],
+								  'x1':self.SNpars[self.SNparlist == 'x1_%s'%k][0],
+								  'c':self.SNpars[self.SNparlist == 'c_%s'%k][0],
+								  'tpkoff':self.SNpars[self.SNparlist == 'tpkoff_%s'%k][0]}
+			if len(self.x1debugdict.keys()):
+				resultsdict[k]['x1'] = self.x1debugdict[k]
+
+			for snpar in ['x0','x1','c','tpkoff']:
+				subnum = axcount%9+1
+				ax = plt.subplot(3,3,subnum)
+				axcount += 1
+				md = np.mean(x[self.parlist == '%s_%s'%(snpar,k)][0][nburn:])
+				std = np.std(x[self.parlist == '%s_%s'%(snpar,k)][0][nburn:])
+				histbins = np.linspace(md-3*std,md+3*std,50)
+				ax.hist(x[self.parlist == '%s_%s'%(snpar,k)][0][nburn:],bins=histbins)
+				ax.set_title('%s_%s'%(snpar,k))
+				if axcount % 9 == 8:
+					pdf_pages.savefig(fig)
+					fig = plt.figure()
 				
+		pdf_pages.savefig(fig)			
+		pdf_pages.close()
+
 		return result,self.phase,self.wave,m0,m1,clpars,resultsdict
 
 	

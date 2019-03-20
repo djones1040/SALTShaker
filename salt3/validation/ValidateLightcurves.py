@@ -273,8 +273,11 @@ def customfilt(outfile,lcfile,salt3dir,
 					yerr=sn.FLUXCALERR[sn.FLT == flt],
 					fmt='o',label=sn.SNID,color='k')
 		ax.set_title(flt)
-		ax.set_xlim([sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]-30,
-					 sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]+55])
+		try:
+			ax.set_xlim([sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]-30,
+						 sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]+55])
+		except:
+			import pdb; pdb.set_trace()
 		ax.set_ylim([-np.max(sn.FLUXCAL)*1/20.,np.max(sn.FLUXCAL)*1.1])
 		#if flt == 'c': import pdb; pdb.set_trace()
 	ax1.legend()
