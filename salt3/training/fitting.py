@@ -275,5 +275,4 @@ class fitting:
 		
 		x,phase,wave,M0,M1,clpars,SNParams = \
 			saltfitter.mcmcfit(guess,n_mcmc_steps,n_burnin_mcmc)
-		
 		return x,phase,wave,M0,M1,clpars,SNParams,'simple MCMC was successful'
