@@ -136,7 +136,9 @@ class TrainSALT:
 							help='number of accepted MCMC steps, initialization stage (default=%default)')
 		parser.add_argument('--n_init_burnin_mcmc', default=config.get('mcmcparams','n_init_burnin_mcmc'), type=int,
 							help='number of burn-in MCMC steps, initialization stage  (default=%default)')
-		parser.add_argument('--stepsize_M0', default=config.get('mcmcparams','stepsize_M0'), type=float,
+		parser.add_argument('--stepsize_magscale_M0', default=config.get('mcmcparams','stepsize_magscale_M0'), type=float,
+							help='initial MCMC step size for M0, in mag  (default=%default)')
+		parser.add_argument('--stepsize_magadd_M0', default=config.get('mcmcparams','stepsize_magadd_M0'), type=float,
 							help='initial MCMC step size for M0, in mag  (default=%default)')
 		parser.add_argument('--stepsize_magscale_M1', default=config.get('mcmcparams','stepsize_magscale_M1'), type=float,
 							help='initial MCMC step size for M1, in mag - need both mag and flux steps because M1 can be negative (default=%default)')
@@ -335,7 +337,7 @@ class TrainSALT:
 					 phaseoutres,waveoutres,regulargradientphase, regulargradientwave, regulardyad ,n_components=1,n_colorpars=0,n_processes=1):
 
 		if self.options.fitstrategy == 'multinest' or self.options.fitstrategy == 'simplemcmc':
-			from salt3.training import saltfit_mcmc as saltfit
+			from salt3.training import saltfit_mcmc_am as saltfit
 		else:
 			from salt3.training import saltfit
 		
@@ -389,7 +391,8 @@ class TrainSALT:
 								  regulargradientwave,regulardyad,n_components,n_colorpars,
 								  n_iter=self.options.n_iter)
 
-		saltfitter.stepsize_M0 = self.options.stepsize_M0
+		saltfitter.stepsize_magscale_M0 = self.options.stepsize_magscale_M0
+		saltfitter.stepsize_magadd_M0 = self.options.stepsize_magadd_M0
 		saltfitter.stepsize_magscale_M1 = self.options.stepsize_magscale_M1
 		saltfitter.stepsize_magadd_M1 = self.options.stepsize_magadd_M1
 		saltfitter.stepsize_cl = self.options.stepsize_cl

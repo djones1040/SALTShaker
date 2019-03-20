@@ -11,6 +11,7 @@ from sncosmo.models import StretchSource
 from scipy.optimize import minimize
 from scipy.stats import norm
 from scipy.ndimage import gaussian_filter1d
+import pylab as plt
 #import pysynphot as S
 
 _SCALE_FACTOR = 1e-12
@@ -23,13 +24,13 @@ class chi2:
 				 colorwaverange,kcordict,initmodelfile,initBfilt,
 				 regulargradientphase, regulargradientwave, regulardyad ,n_components=1,
 				 n_colorpars=0,days_interp=5,onlySNpars=False,mcmc=False,debug=False,
-				 fitstrategy='leastsquares',stepsize_M0=None,stepsize_magscale_M1=None,
+				 fitstrategy='leastsquares',stepsize_magscale_M0=None,stepsize_magadd_M0=None,stepsize_magscale_M1=None,
 				 stepsize_magadd_M1=None,stepsize_cl=None,
 				 stepsize_specrecal=None,stepsize_x0=None,stepsize_x1=None,
 				 stepsize_c=None,stepsize_tpkoff=None,n_iter=0,x1debugdict={}):
 
 		self.init_stepsizes(
-			stepsize_M0,stepsize_magscale_M1,stepsize_magadd_M1,stepsize_cl,
+			stepsize_magscale_M0,stepsize_magadd_M0,stepsize_magscale_M1,stepsize_magadd_M1,stepsize_cl,
 			stepsize_specrecal,stepsize_x0,stepsize_x1,
 			stepsize_c,stepsize_tpkoff)
 
@@ -120,10 +121,12 @@ class chi2:
 												   zpoff=0) - kcordict[survey][flt]['primarymag'] #kcordict[survey][flt]['zpoff'])
 
 	def init_stepsizes(
-			self,stepsize_M0,stepsize_magscale_M1,stepsize_magadd_M1,stepsize_cl,
+			self,stepsize_magscale_M0,stepsize_magadd_M0,
+			stepsize_magscale_M1,stepsize_magadd_M1,stepsize_cl,
 			stepsize_specrecal,stepsize_x0,stepsize_x1,
 			stepsize_c,stepsize_tpkoff):
-		self.stepsize_M0 = stepsize_M0
+		self.stepsize_magscale_M0 = stepsize_magscale_M0
+		self.stepsize_magadd_M0 = stepsize_magadd_M0
 		self.stepsize_magscale_M1 = stepsize_magscale_M1
 		self.stepsize_magadd_M1 = stepsize_magadd_M1
 		self.stepsize_cl = stepsize_cl
@@ -131,8 +134,7 @@ class chi2:
 		self.stepsize_x0 = stepsize_x0
 		self.stepsize_x1 = stepsize_x1
 		self.stepsize_c = stepsize_c
-		self.stepsize_tpkoff = stepsize_tpkoff
-		
+		self.stepsize_tpkoff = stepsize_tpkoff		
 				
 	def extrapolate(self,saltflux,x0):
 
@@ -162,10 +164,17 @@ class chi2:
 
 		#if stepfactor < 1: x0stepfactor = stepfactor*0.5
 		#else: x0stepfactor = stepfactor
-		
+		stepfactor = 1
 		X2 = np.zeros(self.npar)
 		for i,par in zip(range(self.npar),self.parlist):
-			if par == 'm0': X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_M0))#*stepfactor))
+			if par == 'm0':
+				m0scalestep = self.stepsize_magscale_M0*stepfactor
+				m0addstep = self.stepsize_magadd_M0*stepfactor
+
+				scalefactor = 10**(0.4*np.random.normal(scale=m0scalestep))
+				#scalefactor2 = 10**(0.4*np.random.normal(scale=m0addstep))
+				X2[i] = X[i]*scalefactor + self.M0stddev*np.random.normal(scale=self.stepsize_magadd_M0*stepfactor) #(scalefactor2-1)
+				#X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_M0*stepfactor))
 			elif par == 'm1':
 				m1scalestep = self.stepsize_magscale_M1*stepfactor
 				if m1scalestep < 0.001: m1scalestep = 0.001
@@ -173,18 +182,19 @@ class chi2:
 				if m1addstep < 0.001: m1addstep = 0.001
 
 				scalefactor = 10**(0.4*np.random.normal(scale=m1scalestep))
-				scalefactor2 = 10**(0.4*np.random.normal(scale=m1addstep))
-				X2[i] = X[i]*scalefactor + X[i]*(scalefactor2-1)
+				#scalefactor2 = 10**(0.4*np.random.normal(scale=m1addstep))
+				X2[i] = X[i]*scalefactor + self.M1stddev*np.random.normal(scale=self.stepsize_magadd_M1*stepfactor) #(scalefactor2-1) #X[i]*(scalefactor2-1)
+				#print(X[i],self.M1stddev)
 			elif par == 'cl': X2[i] = X[i]*np.random.normal(scale=self.stepsize_cl*stepfactor)
 			elif par == 'specrecal': X2[i] = X[i]*np.random.normal(scale=self.stepsize_specrecal*stepfactor)
 			elif par.startswith('x0'):
-				X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0))#*stepfactor))
+				X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0*stepfactor))
 			elif par.startswith('x1'):
 				X2[i] = X[i] + np.random.normal(scale=self.stepsize_x1*stepfactor)
 			elif par.startswith('c'): X2[i] = X[i] + np.random.normal(scale=self.stepsize_c)#*stepfactor)
 			elif par.startswith('tpkoff'):
 				#if nstep > 3000:
-				X2[i] = X[i] + np.random.normal(scale=self.stepsize_tpk)#*stepfactor)
+				X2[i] = X[i] + np.random.normal(scale=self.stepsize_tpk*stepfactor)
 				#else:
 				#	X2[i] = X[i] + 0
 		return X2
@@ -200,6 +210,8 @@ class chi2:
 		loglikes = [self.chi2fit(x,pool=pool,debug=debug,debug2=debug2)]
 		loglike_history = []#self.chi2fit(x,pool=pool,debug=debug,debug2=debug2)]
 		Xlast = x[:] #self.adjust_model(x)
+		self.M0stddev = np.std(Xlast[self.parlist == 'm0'])
+		self.M1stddev = np.std(Xlast[self.parlist == 'm1'])
 		
 		outpars = [[] for i in range(npar)]
 		accept = 0
@@ -216,6 +228,7 @@ class chi2:
 				accept_frac_recent = len(accepted_history[-100:][accepted_history[-100:] == True])/100. #accept/float(nstep)
 				if accept_frac_recent > 0.30: stepfactor *= 1.25
 				elif accept_frac_recent < 0.25: stepfactor *= 0.75
+				if stepfactor < 1: stepfactor = 1
 			X = self.adjust_model(Xlast,stepfactor=stepfactor,nstep=nstep)
 			
 			# loglike
@@ -551,16 +564,47 @@ class chi2:
 
 	def getParsMCMC(self,loglikes,x,nburn=500,bsorder=3,result='mean'):
 
-		if  result == 'mean':
+		axcount = 0; parcount = 0
+		from matplotlib.backends.backend_pdf import PdfPages
+		pdf_pages = PdfPages('output/MCMC_hist.pdf')
+		fig = plt.figure()
+		
+		if result == 'mean':
 			m0pars = np.array([])
 			for i in np.where(self.parlist == 'm0')[0]:
 				#[x[i][nburn:] == x[i][nburn:]]
 				m0pars = np.append(m0pars,x[i][nburn:].mean()/_SCALE_FACTOR)
+				if not parcount % 9:
+					subnum = axcount%9+1
+					ax = plt.subplot(3,3,subnum)
+					axcount += 1
+					md,std = np.mean(x[i][nburn:]),np.std(x[i][nburn:])
+					histbins = np.linspace(md-3*std,md+3*std,50)
+					ax.hist(x[i][nburn:],bins=histbins)
+					ax.set_title('M0')
+					if axcount % 9 == 8:
+						pdf_pages.savefig(fig)
+						fig = plt.figure()
+				parcount += 1
 
 			m1pars = np.array([])
+			parcount = 0
 			for i in np.where(self.parlist == 'm1')[0]:
 				m1pars = np.append(m1pars,x[i][nburn:].mean()/_SCALE_FACTOR)
+				if not parcount % 9:
+					subnum = axcount%9+1
+					ax = plt.subplot(3,3,subnum)
+					axcount += 1
+					md,std = np.mean(x[i][nburn:]),np.std(x[i][nburn:])
+					histbins = np.linspace(md-3*std,md+3*std,50)
+					ax.hist(x[i][nburn:],bins=histbins)
+					ax.set_title('M1')
+					if axcount % 9 == 8:
+						pdf_pages.savefig(fig)
+						fig = plt.figure()
+				parcount += 1
 
+				
 			clpars = np.array([])
 			for i in np.where(self.parlist == 'cl')[0]:
 				clpars = np.append(clpars,x[i][nburn:].mean())
@@ -596,7 +640,23 @@ class chi2:
 								  'tpkoff':self.SNpars[self.SNparlist == 'tpkoff_%s'%k][0]}
 			if len(self.x1debugdict.keys()):
 				resultsdict[k]['x1'] = self.x1debugdict[k]
+
+			for snpar in ['x0','x1','c','tpkoff']:
+				subnum = axcount%9+1
+				ax = plt.subplot(3,3,subnum)
+				axcount += 1
+				md = np.mean(x[self.parlist == '%s_%s'%(snpar,k)][0][nburn:])
+				std = np.std(x[self.parlist == '%s_%s'%(snpar,k)][0][nburn:])
+				histbins = np.linspace(md-3*std,md+3*std,50)
+				ax.hist(x[self.parlist == '%s_%s'%(snpar,k)][0][nburn:],bins=histbins)
+				ax.set_title('%s_%s'%(snpar,k))
+				if axcount % 9 == 8:
+					pdf_pages.savefig(fig)
+					fig = plt.figure()
 				
+		pdf_pages.savefig(fig)			
+		pdf_pages.close()
+
 		return result,self.phase,self.wave,m0,m1,clpars,resultsdict
 
 	
