@@ -11,6 +11,8 @@ from sncosmo.models import StretchSource
 from scipy.optimize import minimize
 from scipy.stats import norm
 from scipy.ndimage import gaussian_filter1d
+from scipy.special import factorial
+
 #import pysynphot as S
 
 _SCALE_FACTOR = 1e-12
@@ -20,7 +22,8 @@ lambdaeff = {'g':4900.1409,'r':6241.2736,'i':7563.7672,'z':8690.0840,'B':4353,'V
 class chi2:
 	def __init__(self,guess,datadict,parlist,phaseknotloc,waveknotloc,
 				 phaserange,waverange,phaseres,waveres,phaseoutres,waveoutres,
-				 colorwaverange,kcordict,initmodelfile,initBfilt,regulargradientphase, regulargradientwave, regulardyad ,n_components=1,
+				 colorwaverange,kcordict,initmodelfile,initBfilt,regulargradientphase,
+				 regulargradientwave, regulardyad,filter_mass_tolerance, specrange_wavescale_specrecal ,n_components=1,
 				 n_colorpars=0,days_interp=5,onlySNpars=False,mcmc=False,debug=False,
 				 fitstrategy='leastsquares',stepsize_M0=None,stepsize_magscale_M1=None,
 				 stepsize_magadd_M1=None,stepsize_cl=None,
@@ -55,12 +58,12 @@ class chi2:
 		self.guess = guess
 		self.debug = debug
 		self.x1debugdict = x1debugdict
-		
+		self.specrange_wavescale_specrecal=specrange_wavescale_specrecal
 		self.phasebins = np.linspace(phaserange[0]-days_interp,phaserange[1]+days_interp,
 							 1+ (phaserange[1]-phaserange[0]+2*days_interp)/phaseres)
 		self.wavebins = np.linspace(waverange[0],waverange[1],
 							 1+(waverange[1]-waverange[0])/waveres)
-
+		self.filter_mass_tolerance=filter_mass_tolerance
 		
 		assert type(parlist) == np.ndarray
 		self.splinephase = phaseknotloc
@@ -117,6 +120,28 @@ class chi2:
 				self.stdmag[survey][flt] = synphot(primarywave,kcordict[survey][primarykey],filtwave=self.kcordict[survey]['filtwave'],
 												   filttp=kcordict[survey][flt]['filttrans'],
 												   zpoff=0) - kcordict[survey][flt]['primarymag'] #kcordict[survey][flt]['zpoff'])
+		#Count number of photometric and spectroscopic points
+		self.num_spec=0
+		self.num_phot=0
+		for sn in self.datadict.keys():
+			photdata = self.datadict[sn]['photdata']
+			specdata = self.datadict[sn]['specdata']
+			survey = self.datadict[sn]['survey']
+			filtwave = self.kcordict[survey]['filtwave']
+			z = self.datadict[sn]['zHelio']
+			
+			self.num_spec+=len(specdata.keys())
+			
+			for flt in np.unique(photdata['filt']):
+				# synthetic photometry
+				filtwave = self.kcordict[survey]['filtwave']
+				filttrans = self.kcordict[survey][flt]['filttrans']
+			
+				#Check how much mass of the filter is inside the wavelength range
+				filtRange=(filtwave/(1+z)>self.wavebins.min()) &(filtwave/(1+z) <self.wavebins.max())
+				if not np.trapz((filttrans*filtwave/(1+z))[filtRange],filtwave[filtRange]/(1+z))/np.trapz(filttrans*filtwave/(1+z),filtwave/(1+z)) < 1-self.filter_mass_tolerance:
+					self.num_phot+=1
+					
 
 	def init_stepsizes(
 			self,stepsize_M0,stepsize_magscale_M1,stepsize_magadd_M1,stepsize_cl,
@@ -170,7 +195,7 @@ class chi2:
 				scalefactor2 = 10**(0.4*np.random.normal(scale=self.stepsize_magadd_M1*stepfactor))
 				X2[i] = X[i]*scalefactor + X[i]*(scalefactor2-1)
 			elif par == 'cl': X2[i] = X[i]*np.random.normal(scale=self.stepsize_cl*stepfactor)
-			elif par == 'specrecal': X2[i] = X[i]*np.random.normal(scale=self.stepsize_specrecal*stepfactor)
+			elif par.startswith('specrecal'): X2[i] = X[i]+np.random.normal(scale=self.stepsize_specrecal*stepfactor)
 			elif par.startswith('x0'): X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0))#*stepfactor))
 			elif par.startswith('x1'):
 				X2[i] = X[i] + np.random.normal(scale=self.stepsize_x1)#*stepfactor)
@@ -178,8 +203,8 @@ class chi2:
 			elif par.startswith('tpkoff'):
 				#if nstep > 3000:
 				X2[i] = X[i] + np.random.normal(scale=self.stepsize_tpk*stepfactor)
-				#else:
-				#	X2[i] = X[i] + 0
+			else:
+				raise ValueError('Parameter {} has not been assigned a step factor'.format(par))
 		return X2
 
 	def mcmcfit(self,x,nsteps,nburn,pool=None,debug=False,debug2=False):
@@ -233,7 +258,7 @@ class chi2:
 		print('acceptance = %.3f'%(accept/float(nstep)))
 		if nstep < nburn:
 			raise RuntimeError('Not enough steps to wait 500 before burn-in')
-		xfinal,phase,wave,M0,M1,clpars,SNParams = self.getParsMCMC(loglike_history,np.array(outpars),nburn=nburn,result='mean')
+		xfinal,phase,wave,M0,M1,clpars,SNParams = self.getParsMCMC(loglike_history,np.array(outpars),nburn=nburn,result='best')
 		
 		return xfinal,phase,wave,M0,M1,clpars,SNParams
 		
@@ -424,16 +449,17 @@ class chi2:
 		else: chi2 = 0
 		int1d = interp1d(obsphase,saltflux,axis=0)
 		for k in specdata.keys():
+			phase=specdata[k]['tobs']+tpkoff
 			if phase < obsphase.min() or phase > obsphase.max(): raise RuntimeError('Phase {} is out of extrapolated phase range for SN {} with tpkoff {}'.format(phase,sn,tpkoff))
 			saltfluxinterp = int1d(phase)
-			saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)
-			chi2 += np.sum((saltfluxinterp2-specdata[k]['flux'])**2./specdata[k]['fluxerr']**2.)
+			#Interpolate SALT flux at observed wavelengths and multiply by recalibration factor
+			coeffs=x[self.parlist=='specrecal_{}_{}'.format(sn,k)]
+			coeffs/=factorial(np.arange(len(coeffs)))
+			saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)*np.exp(np.poly1d(coeffs)((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal))
+			chi2 += np.sum((saltfluxinterp2-specdata[k]['flux'])**2./specdata[k]['fluxerr']**2.)*self.num_phot/self.num_spec
 			
 		for flt in np.unique(photdata['filt']):
 			# check if filter 
-
-			# synthetic photometry
-			filtwave = self.kcordict[survey]['filtwave']
 			filttrans = self.kcordict[survey][flt]['filttrans']
 
 			g = (obswave >= filtwave[0]) & (obswave <= filtwave[-1])  # overlap range
@@ -443,7 +469,7 @@ class chi2:
 			
 			pbspl = np.interp(obswave[g],filtwave,filttrans)
 			pbspl *= obswave[g]
-
+				
 			denom = np.trapz(pbspl,obswave[g])
 			#denom_blue = np.trapz(pbspl,obswave[gblue])
 			#denom_red = np.trapz(pbspl,obswave[gred])
@@ -471,7 +497,7 @@ class chi2:
 			if self.fitstrategy == 'leastsquares':
 				chi2 = np.append(chi2,(filtPhot['fluxcal']-modelflux)**2./(filtPhot['fluxcal']*0.05)**2.)
 			else:
-				chi2 += ((filtPhot['fluxcal']-modelflux)**2./(filtPhot['fluxcalerr']**2. + (filtPhot['fluxcal']*0.05)**2.)).sum()
+				chi2 += ((filtPhot['fluxcal']-modelflux)**2./(filtPhot['fluxcalerr']**2. )).sum()
 
 			if self.debug:
 				#print(chi2)
@@ -558,12 +584,54 @@ class chi2:
 			for i in np.where(self.parlist == 'cl')[0]:
 				clpars = np.append(clpars,x[i][nburn:].mean())
 			result=np.mean(x,axis=1)
+			resultsdict = {}
+			n_sn = len(self.datadict.keys())
+			for k in self.datadict.keys():
+				tpk_init = self.datadict[k]['photdata']['mjd'][0] - self.datadict[k]['photdata']['tobs'][0]
+				if not len(self.SNpars):
+					resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k][0][nburn:].mean(),
+									  'x1':x[self.parlist == 'x1_%s'%k][0][nburn:].mean(),
+									  'c':x[self.parlist == 'x1_%s'%k][0][nburn:].mean(),
+									  'tpkoff':x[self.parlist == 'tpkoff_%s'%k][0][nburn:].mean()}
+				else:
+					resultsdict[k] = {'x0':self.SNpars[self.SNparlist == 'x0_%s'%k][0],
+									  'x1':self.SNpars[self.SNparlist == 'x1_%s'%k][0],
+									  'c':self.SNpars[self.SNparlist == 'c_%s'%k][0],
+									  'tpkoff':self.SNpars[self.SNparlist == 'tpkoff_%s'%k][0]}
+				if len(self.x1debugdict.keys()):
+					resultsdict[k]['x1'] = self.x1debugdict[k]
+
 		elif result =='mode':
 			maxLike=np.argmax(loglikes)
 			result=x[:,maxLike]
-			m0pars=x[:,maxLike][self.parlist == 'm0']/_SCALE_FACTOR
-			m1pars=x[:,maxLike][self.parlist == 'm1']/_SCALE_FACTOR
-			clpars=x[:,maxLike][self.parlist=='cl']
+			m0pars=result[self.parlist == 'm0']/_SCALE_FACTOR
+			m1pars=result[self.parlist == 'm1']/_SCALE_FACTOR
+			clpars=result[self.parlist=='cl']
+			resultsdict = {}
+			n_sn = len(self.datadict.keys())
+			for k in self.datadict.keys():
+				tpk_init = self.datadict[k]['photdata']['mjd'][0] - self.datadict[k]['photdata']['tobs'][0]
+				if not len(self.SNpars):
+					resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k][0,maxLike],
+									  'x1':x[self.parlist == 'x1_%s'%k][0,maxLike],
+									  'c':x[self.parlist == 'x1_%s'%k][0,maxLike],
+									  'tpkoff':x[self.parlist == 'tpkoff_%s'%k][0,maxLike]}
+				else:
+					resultsdict[k] = {'x0':self.SNpars[self.SNparlist == 'x0_%s'%k][0],
+									  'x1':self.SNpars[self.SNparlist == 'x1_%s'%k][0],
+									  'c':self.SNpars[self.SNparlist == 'c_%s'%k][0],
+									  'tpkoff':self.SNpars[self.SNparlist == 'tpkoff_%s'%k][0]}
+				if len(self.x1debugdict.keys()):
+					resultsdict[k]['x1'] = self.x1debugdict[k]
+
+		elif result=='best':
+			methods=['mode','mean']
+			results=[self.getParsMCMC(loglikes,x,nburn,bsorder,result=method) for method in methods]
+			resultLikes=np.array([self.chi2fit(y[0]) for y in results])
+			for method,result,resultLike in zip(methods,results,resultLikes):
+				print('With method {} result has chi^2 of {}'.format(method,resultLike*-2))
+			print('Returning result from method {}'.format(methods[resultLikes.argmax()]))
+			return results[resultLikes.argmax()]
 		else:
 			raise ValueError('Key {} passed to getParsMCMC, valid keys are \"mean\" or \"mode\"')
 
@@ -573,22 +641,6 @@ class chi2:
 		else: m1 = np.zeros(np.shape(m0))
 		if not len(clpars): clpars = []
 	
-		resultsdict = {}
-		n_sn = len(self.datadict.keys())
-		for k in self.datadict.keys():
-			tpk_init = self.datadict[k]['photdata']['mjd'][0] - self.datadict[k]['photdata']['tobs'][0]
-			if not len(self.SNpars):
-				resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k][0][nburn:].mean(),
-								  'x1':x[self.parlist == 'x1_%s'%k][0][nburn:].mean(),
-								  'c':x[self.parlist == 'x1_%s'%k][0][nburn:].mean(),
-								  'tpkoff':x[self.parlist == 'tpkoff_%s'%k][0][nburn:].mean()}
-			else:
-				resultsdict[k] = {'x0':self.SNpars[self.SNparlist == 'x0_%s'%k][0],
-								  'x1':self.SNpars[self.SNparlist == 'x1_%s'%k][0],
-								  'c':self.SNpars[self.SNparlist == 'c_%s'%k][0],
-								  'tpkoff':self.SNpars[self.SNparlist == 'tpkoff_%s'%k][0]}
-			if len(self.x1debugdict.keys()):
-				resultsdict[k]['x1'] = self.x1debugdict[k]
 				
 		return result,self.phase,self.wave,m0,m1,clpars,resultsdict
 
@@ -620,7 +672,6 @@ class chi2:
 		"""
 		#Clean out array
 		self.neff=np.zeros((self.phasebins.size-1,self.wavebins.size-1))
-		
 		for sn in self.datadict.keys():
 			tpkoff=x[self.parlist == 'tpkoff_%s'%sn]
 			photdata = self.datadict[sn]['photdata']
@@ -632,19 +683,21 @@ class chi2:
 			#For each spectrum, add one point to each bin for every spectral measurement in that bin
 			for k in specdata.keys():
 				restWave=specdata[k]['wavelength']/(1+z)
+				restWave=restWave[(restWave>self.wavebins.min())&(restWave<self.wavebins.max())]
 				phase=(specdata[k]['tobs']+tpkoff)/(1+z)
-				phaseIndex=np.searchsorted(self.phasebins,phase,'left')
-				waveIndex=np.searchsorted(self.wavebins,restWave,'left')
+				phaseIndex=np.searchsorted(self.phasebins,phase,'left')[0]
+				waveIndex=np.searchsorted(self.wavebins,restWave,'left')[0]
 				self.neff[phaseIndex][waveIndex]+=1
 			#For each photometric filter, weight the contribution by  
 			for flt in np.unique(photdata['filt']):
 				filttrans = self.kcordict[survey][flt]['filttrans']
+				
 				g = (self.wavebins[:-1]  >= filtwave[0]/(1+z)) & (self.wavebins[:-1] <= filtwave[-1]/(1+z))  # overlap range
 				pbspl = np.zeros(g.sum())
 				for i in range(g.sum()):
 					j=np.where(g)[0][i]
-					pbspl[i]=trapIntegrate(self.wavebins[j],self.wavebins[j+1],filtwave/(1+z),filttrans)
-				pbspl *= (self.wavebins[:-1] + self.wavebins[1:])[g]/2
+					pbspl[i]=trapIntegrate(self.wavebins[j],self.wavebins[j+1],filtwave/(1+z),filttrans*filtwave/(1+z))
+
 				#Normalize it so that total number of points added is 1
 				pbspl /= np.sum(pbspl)
 				#Consider weighting neff by variance for each measurement?
@@ -656,6 +709,8 @@ class chi2:
 
 		self.neff=np.clip(self.neff,1e-2*self.neff.max(),None)
 		self.plotEffectivePoints([-12.5,0,12.5,40],'neff.png')
+		self.plotEffectivePoints(None,'neff-heatmap.png')
+
 	def plotEffectivePoints(self,phases=None,output=None):
 
 		import matplotlib.pyplot as plt
