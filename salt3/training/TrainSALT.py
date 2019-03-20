@@ -167,6 +167,13 @@ class TrainSALT:
 		parser.add_argument('--stepsize_tpk', default=config.get('mcmcparams','stepsize_tpk'), type=float,
 							help='initial MCMC step size for tpk  (default=%default)')
 
+		# adaptive MCMC parameters
+		parser.add_argument('--nsteps_before_adaptive', default=config.get('mcmcparams','nsteps_before_adaptive'), type=float,
+							help='number of steps before starting adaptive step sizes (default=%default)')
+		parser.add_argument('--nsteps_adaptive_memory', default=config.get('mcmcparams','nsteps_adaptive_memory'), type=float,
+							help='number of steps to use to estimate adaptive steps (default=%default)')
+		parser.add_argument('--adaptive_sigma_opt_scale', default=config.get('mcmcparams','adaptive_sigma_opt_scale'), type=float,
+							help='scaling the adaptive step sizes (default=%default)')
 		
 		return parser
 
@@ -393,7 +400,7 @@ class TrainSALT:
 					 phaseoutres,waveoutres,regulargradientphase, regulargradientwave, regulardyad,n_min_specrecal,specrange_wavescale_specrecal,n_specrecal_per_lightcurve,filter_mass_tolerance ,n_components=1,n_colorpars=0,n_processes=1):
 
 		if self.options.fitstrategy == 'multinest' or self.options.fitstrategy == 'simplemcmc':
-			from salt3.training import saltfit_mcmc_am as saltfit
+			from salt3.training import saltfit_mcmc as saltfit
 		else:
 			from salt3.training import saltfit
 		
@@ -450,7 +457,10 @@ class TrainSALT:
 								  kcordict,initmodelfile,initBfilt,regulargradientphase,
 								  regulargradientwave,regulardyad,filter_mass_tolerance,specrange_wavescale_specrecal,
 								  n_components,n_colorpars,
-								  n_iter=self.options.n_iter)
+								  n_iter=self.options.n_iter,
+								  nsteps_before_adaptive=self.options.nsteps_before_adaptive,
+								  nsteps_adaptive_memory=self.options.nsteps_adaptive_memory,
+								  adaptive_sigma_opt_scale=self.options.adaptive_sigma_opt_scale)
 
 		saltfitter.stepsize_magscale_M0 = self.options.stepsize_magscale_M0
 		saltfitter.stepsize_magadd_M0 = self.options.stepsize_magadd_M0
@@ -470,7 +480,7 @@ class TrainSALT:
 		for k in datadict.keys():
 			initparlist += ['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k]
 			initguess += (10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36)),0,0,0)
-		#initparlist += ['cl']*n_colorpars
+
 		initparlist = np.array(initparlist)
 		print('training on %i SNe!'%len(datadict.keys()))
 
@@ -478,7 +488,7 @@ class TrainSALT:
 			for i in range(self.options.n_iter):
 				saltfitter.onlySNpars = True
 				if i > 0:
-					initguess = SNpars #.transpose()[0]
+					initguess = SNpars
 					saltfitter.components = saltfitter.SALTModel(x_modelpars)
 				saltfitter.parlist = initparlist
 
@@ -486,8 +496,6 @@ class TrainSALT:
 								 n_phaseknots,n_waveknots,
 								 datadict)
 
-				#import pdb; pdb.set_trace()
-				#phase,wave,M0,M1,clpars,SNParams,x,message = fitter.mcmc(
 				initX,phase,wave,M0,M1,clpars,SNParams,message = fitter.mcmc(
 					saltfitter,initguess,(),(),n_processes,
 					self.options.n_init_steps_mcmc,
@@ -544,16 +552,14 @@ class TrainSALT:
 						self.addwarning('Minimizer message on iter %i: %s'%(i,message))
 				print('Individual components of final regularization chi^2'); saltfitter.regularizationChi2(x_modelpars,1,1,1)
 				print('Final chi^2'); saltfitter.chi2fit(x_modelpars)
-				
+
 		else:
 
 			for k in datadict.keys():
 				guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36))
-				#guess[parlist == 'x1_%s'%k] = testx1dict[k]
 				
 			saltfitter.parlist = parlist
 			saltfitter.onlySNpars = False
-			#saltfitter.x1debugdict = testx1dict
 			
 			fitter = fitting(n_components,n_colorpars,
 							 n_phaseknots,n_waveknots,
