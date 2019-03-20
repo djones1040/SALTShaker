@@ -126,6 +126,16 @@ class TrainSALT:
 							help='Weighting of wave gradient chi^2 regularization during training of model parameters (default=%default)')
 		parser.add_argument('--regulardyad', default=config.get('trainparams','regulardyad'), type=float,
 							help='Weighting of dyadic chi^2 regularization during training of model parameters (default=%default)')
+		parser.add_argument('--n_min_specrecal', default=config.get('trainparams','n_min_specrecal'), type=int,
+							help='Minimum order of spectral recalibration polynomials (default=%default)')
+		parser.add_argument('--specrange_wavescale_specrecal', default=config.get('trainparams','specrange_wavescale_specrecal'), type=float,
+							help='Wavelength scale (in angstroms) for determining additional orders of spectral recalibration from wavelength range of spectrum (default=%default)')
+		parser.add_argument('--n_specrecal_per_lightcurve', default=config.get('trainparams','n_specrecal_per_lightcurve'), type=float,
+							help='Number of additional spectral recalibration orders per lightcurve (default=%default)')
+		parser.add_argument('--filter_mass_tolerance', default=config.get('trainparams','filter_mass_tolerance'), type=float,
+							help='Mass of filter transmission allowed outside of model wavelength range (default=%default)')
+
+
 
 		# mcmc parameters
 		parser.add_argument('--n_steps_mcmc', default=config.get('mcmcparams','n_steps_mcmc'), type=int,
@@ -204,40 +214,85 @@ class TrainSALT:
 		self.kcordict['default']['Bwave'] = filtwave
 		self.kcordict['default']['Btp'] = filttp
 				
-	def rdSpecData(self,datadict,speclist,tpk):
-
+	def rdSpecData(self,datadict,speclist):
 		if not os.path.exists(speclist):
 			raise RuntimeError('speclist %s does not exist')
 		
-		snid,mjd,specfiles = np.genfromtxt(speclist,unpack=True,dtype='str')
-		snid,mjd,specfiles = np.atleast_1d(snid),np.atleast_1d(mjd),np.atleast_1d(specfiles)
-		for s,m,sf in zip(snid,mjd,specfiles):
-			try: m = float(m)
-			except: m = snana.date_to_mjd(m)
-
-			if '/' not in sf:
-				sf = '%s/%s'%(os.path.dirname(speclist),sf)
-			if not os.path.exists(sf):
-				raise RuntimeError('specfile %s does not exist'%sf)
-				
-			if s in datadict.keys():
-				if 'specdata' not in datadict[s].keys():
-					datadict[s]['specdata'] = {}
-					speccount = 0
+		try:
+			snid,mjd,specfiles = np.genfromtxt(speclist,unpack=True,dtype='str')
+			snid,mjd,specfiles = np.atleast_1d(snid),np.atleast_1d(mjd),np.atleast_1d(specfiles)
+			snanaSpec=False
+		except:
+			specfiles=np.genfromtxt(speclist,dtype='str')
+			specfiles=np.atleast_1d(specfiles)
+			snanaSpec=True
+			
+		if snanaSpec:
+			for sf in specfiles:
+			
+				if '/' not in sf:
+					sf = '%s/%s'%(os.path.dirname(speclist),sf)
+				if not os.path.exists(sf):
+					raise RuntimeError('specfile %s does not exist'%sf)
+				sn=snana.SuperNova(sf)
+				s=sn.name
+				if s in datadict.keys():
+					tpk=datadict[s]['tpk']
+					if 'specdata' not in datadict[s].keys():
+						datadict[s]['specdata'] = {}
+						speccount = 0
+					else:
+						speccount = len(datadict[s]['specdata'].keys())
+						
+					if len(sn.SPECTRA)==0:
+						raise ValueError('File {} contains no supernova spectra'.format(sf))
+					for k in sn.SPECTRA:
+						spec=sn.SPECTRA[k]
+						m=spec['SPECTRUM_MJD']
+						datadict[s]['specdata'][speccount] = {}
+						datadict[s]['specdata'][speccount]['fluxerr'] = spec['FLAMERR']
+						datadict[s]['specdata'][speccount]['wavelength'] = (spec['LAMMIN']+spec['LAMMAX'])/2
+						datadict[s]['specdata'][speccount]['flux'] = spec['FLAM']
+						datadict[s]['specdata'][speccount]['tobs'] = m - tpk
+						datadict[s]['specdata'][speccount]['mjd'] = m
+						speccount+=1
 				else:
-					speccount = len(datadict[s]['specdata'].keys())
-				datadict[s]['specdata'][speccount] = {}
-				try:
-					wave,flux,fluxerr = np.genfromtxt(sf,unpack=True,usecols=[0,1,2])
+					print('SNID %s has no photometry so I\'m ignoring it')
+
+		else:
+			for s,m,sf in zip(snid,mjd,specfiles):
+				try: m = float(m)
+				except: m = snana.date_to_mjd(m)
+
+				if '/' not in sf:
+					sf = '%s/%s'%(os.path.dirname(speclist),sf)
+					
+				if not os.path.exists(sf):
+					raise RuntimeError('specfile %s does not exist'%sf)
+			
+				if s in datadict.keys():
+					tpk=datadict[s]['tpk']
+					if 'specdata' not in datadict[s].keys():
+						datadict[s]['specdata'] = {}
+						speccount = 0
+					else:
+						speccount = len(datadict[s]['specdata'].keys())
+			
+					try:
+						wave,flux,fluxerr = np.genfromtxt(sf,unpack=True,usecols=[0,1,2])
+			
+					except:
+						wave,flux = np.genfromtxt(sf,unpack=True,usecols=[0,1])
+						fluxerr=np.tile(np.nan,flux.size)
+
+					datadict[s]['specdata'][speccount] = {}
 					datadict[s]['specdata'][speccount]['fluxerr'] = fluxerr
-				except:
-					wave,flux = np.genfromtxt(sf,unpack=True,usecols=[0,1])
-				datadict[s]['specdata'][speccount]['wavelength'] = wave
-				datadict[s]['specdata'][speccount]['flux'] = flux
-				datadict[s]['specdata'][speccount]['tobs'] = m - tpk
-				datadict[s]['specdata'][speccount]['mjd'] = m
-			else:
-				print('SNID %s has no photometry so I\'m ignoring it')
+					datadict[s]['specdata'][speccount]['wavelength'] = wave
+					datadict[s]['specdata'][speccount]['flux'] = flux
+					datadict[s]['specdata'][speccount]['tobs'] = m - tpk
+					datadict[s]['specdata'][speccount]['mjd'] = m
+				else:
+					print('SNID %s has no photometry so I\'m ignoring it')
 
 		return datadict
 
@@ -295,26 +350,27 @@ class TrainSALT:
 
 			datadict[sn.SNID] = {'snfile':f,
 								 'zHelio':zHel,
-								 'survey':sn.SURVEY}
+								 'survey':sn.SURVEY,
+								 'tpk':tpk}
 			#datadict[snid]['zHelio'] = zHel
 			
 			# TODO: flux errors
 			datadict[sn.SNID]['specdata'] = {}
-			for k in sn.SPECTRA.keys():
-				datadict[sn.SNID]['specdata'][k] = {}
-				datadict[sn.SNID]['specdata'][k]['specphase'] = sn.SPECTRA[k]['SPECTRUM_MJD']
-				datadict[sn.SNID]['specdata'][k]['tobs'] = sn.SPECTRA[k]['SPECTRUM_MJD'] - tpk
-				datadict[sn.SNID]['specdata'][k]['mjd'] = sn.SPECTRA[k]['SPECTRUM_MJD']
-				if 'LAMAVG' in sn.SPECTRA[k].keys():
-					datadict[sn.SNID]['specdata'][k]['wavelength'] = sn.SPECTRA[k]['LAMAVG']
-				elif 'LAMMIN' in sn.SPECTRA[k].keys() and 'LAMMAX' in sn.SPECTRA[k].keys():
-					datadict[sn.SNID]['specdata'][k]['wavelength'] = np.mean([[sn.SPECTRA[k]['LAMMIN']],
-																			  [sn.SPECTRA[k]['LAMMAX']]],axis=0)
-				else:
-					raise RuntimeError('couldn\t find wavelength data in photometry file')
-				datadict[sn.SNID]['specdata'][k]['flux'] = sn.SPECTRA[k]['FLAM']
-				datadict[sn.SNID]['specdata'][k]['fluxerr'] = sn.SPECTRA[k]['FLAMERR']
-				
+# 			for k in sn.SPECTRA.keys():
+# 				datadict[sn.SNID]['specdata'][k] = {}
+# 				datadict[sn.SNID]['specdata'][k]['specphase'] = sn.SPECTRA[k]['SPECTRUM_MJD']
+# 				datadict[sn.SNID]['specdata'][k]['tobs'] = sn.SPECTRA[k]['SPECTRUM_MJD'] - tpk
+# 				datadict[sn.SNID]['specdata'][k]['mjd'] = sn.SPECTRA[k]['SPECTRUM_MJD']
+# 				if 'LAMAVG' in sn.SPECTRA[k].keys():
+# 					datadict[sn.SNID]['specdata'][k]['wavelength'] = sn.SPECTRA[k]['LAMAVG']
+# 				elif 'LAMMIN' in sn.SPECTRA[k].keys() and 'LAMMAX' in sn.SPECTRA[k].keys():
+# 					datadict[sn.SNID]['specdata'][k]['wavelength'] = np.mean([[sn.SPECTRA[k]['LAMMIN']],
+# 																			  [sn.SPECTRA[k]['LAMMAX']]],axis=0)
+# 				else:
+# 					raise RuntimeError('couldn\t find wavelength data in photometry file')
+# 				datadict[sn.SNID]['specdata'][k]['flux'] = sn.SPECTRA[k]['FLAM']
+# 				datadict[sn.SNID]['specdata'][k]['fluxerr'] = sn.SPECTRA[k]['FLAMERR']
+# 				
 			datadict[sn.SNID]['photdata'] = {}
 			datadict[sn.SNID]['photdata']['tobs'] = sn.MJD - tpk
 			datadict[sn.SNID]['photdata']['mjd'] = sn.MJD
@@ -326,13 +382,13 @@ class TrainSALT:
 			raise RuntimeError('no light curve data to train on!!')
 			
 		if speclist:
-			datadict = self.rdSpecData(datadict,speclist,tpk)
+			datadict = self.rdSpecData(datadict,speclist)
 			
 		return datadict
 		
 	def fitSALTModel(self,datadict,phaserange,phaseres,waverange,waveres,
 					 colorwaverange,fitmethod,fitstrategy,fititer,kcordict,initmodelfile,initBfilt,
-					 phaseoutres,waveoutres,regulargradientphase, regulargradientwave, regulardyad ,n_components=1,n_colorpars=0,n_processes=1):
+					 phaseoutres,waveoutres,regulargradientphase, regulargradientwave, regulardyad,n_min_specrecal,specrange_wavescale_specrecal,n_specrecal_per_lightcurve,filter_mass_tolerance ,n_components=1,n_colorpars=0,n_processes=1):
 
 		if self.options.fitstrategy == 'multinest' or self.options.fitstrategy == 'simplemcmc':
 			from salt3.training import saltfit_mcmc as saltfit
@@ -357,11 +413,6 @@ class TrainSALT:
 		# x1,x0,c for each SN
 		# phase/wavelength spline knots for M0, M1 (ignoring color for now)
 		# TODO: spectral recalibration
-		n_params = n_components*n_phaseknots*n_waveknots + 4*n_sn
-		
-		if n_colorpars: n_params += n_colorpars
-		print(n_params)
-		guess = np.zeros(n_params)
 
 		parlist = np.array(['m0']*(n_phaseknots*n_waveknots))
 		if n_components == 2:
@@ -371,22 +422,32 @@ class TrainSALT:
 
 		for k in datadict.keys():
 			parlist = np.append(parlist,['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k])
+			
+		for sn in datadict.keys():
+			specdata=datadict[sn]['specdata']
+			photdata=datadict[sn]['photdata']
+			for k in specdata.keys():
+				order=n_min_specrecal+int(np.log((specdata[k]['wavelength'].max() - specdata[k]['wavelength'].min())/specrange_wavescale_specrecal) +np.unique(photdata['filt']).size* n_specrecal_per_lightcurve)
+				parlist=np.append(parlist,['specrecal_{}_{}'.format(sn,k)]*order)
+				
 		parlist = np.array(parlist)
-
 		
+		n_params=parlist.size
+		guess = np.zeros(parlist.size)
 		guess[parlist == 'm0'] = m0knots
 		if n_components == 2:
 			guess[parlist == 'm1'] = m1knots
 		if n_colorpars:
 			guess[parlist == 'cl'] = [0.]*n_colorpars
 		guess[(parlist == 'm0') & (guess < 0)] = 0
-
+		
 		saltfitter = saltfit.chi2(guess,datadict,parlist,
 								  phaseknotloc,waveknotloc,phaserange,
 								  waverange,phaseres,waveres,phaseoutres,waveoutres,
 								  colorwaverange,
 								  kcordict,initmodelfile,initBfilt,regulargradientphase,
-								  regulargradientwave,regulardyad,n_components,n_colorpars,
+								  regulargradientwave,regulardyad,filter_mass_tolerance,specrange_wavescale_specrecal,
+								  n_components,n_colorpars,
 								  n_iter=self.options.n_iter)
 
 		saltfitter.stepsize_M0 = self.options.stepsize_M0
@@ -479,7 +540,8 @@ class TrainSALT:
 						self.addwarning('MCMC message on iter %i: %s'%(i,message))
 						self.addwarning('Minimizer message on iter %i: %s'%(i,message))
 				print('Individual components of final regularization chi^2'); saltfitter.regularizationChi2(x_modelpars,1,1,1)
-				print('Final chi^2'); saltfitter.chi2fit(x_modelpars,None,False,False)
+				print('Final chi^2'); saltfitter.chi2fit(x_modelpars)
+				
 		else:
 
 			for k in datadict.keys():
@@ -512,13 +574,20 @@ class TrainSALT:
 			print('Final chi^2'); saltfitter.chi2fit(x_modelpars,None,False,False)
 
 			
-		return phase,wave,M0,M1,clpars,SNParams
+		return phase,wave,M0,M1,clpars,SNParams,x_modelpars,parlist
 
-	def wrtoutput(self,outdir,phase,wave,M0,M1,clpars,SNParams):
+	def wrtoutput(self,outdir,phase,wave,M0,M1,clpars,SNParams,pars,parlist):
 
 		if not os.path.exists(outdir):
 			raise RuntimeError('desired output directory %s doesn\'t exist'%outdir)
 
+		#Save all model parameters
+		
+		with  open('{}/salt3_parameters.dat'.format(outdir),'w') as foutpars:
+			foutpars.write('{: <30} {}\n'.format('Parameter Name','Value'))
+			for name,par in zip(parlist,pars):
+				foutpars.write('{: <30} {:.6e}\n'.format(name,par))
+			
 		# principal components and color law
 		foutm0 = open('%s/salt3_template_0.dat'%outdir,'w')
 		foutm1 = open('%s/salt3_template_1.dat'%outdir,'w')
@@ -649,9 +718,10 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		if not os.path.exists(self.options.outputdir):
 			os.makedirs(self.options.outputdir)
 		
-		# Eliminate all data outside phase range
+		# Eliminate all data outside wave/phase range
 		numSpecElimmed,numSpec=0,0
 		numPhotElimmed,numPhot=0,0
+		numSpecPoints=0
 		for sn in datadict.keys():
 			photdata = datadict[sn]['photdata']
 			specdata = datadict[sn]['specdata']
@@ -663,17 +733,32 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 					numSpecElimmed+=1
 				else:
 					numSpec+=1
+					numSpecPoints+=((specdata[k]['wavelength']/(1+z)>self.options.waverange[0])&(specdata[k]['wavelength']/(1+z)<self.options.waverange[1])).sum()
+					
 			#Remove photometric data outside phase range
 			phase=(photdata['tobs'])/(1+z)
-			phaseFilter=(phase>self.options.phaserange[0]) & (phase<self.options.phaserange[1])
-			numPhotElimmed+=(~phaseFilter).sum()
-			numPhot+=phaseFilter.sum()
-			datadict[sn]['photdata'] ={key:photdata[key][phaseFilter] for key in photdata}
+			def checkFilterMass(flt):
+				survey = datadict[sn]['survey']
+				filtwave = self.kcordict[survey]['filtwave']
+				filttrans = self.kcordict[survey][flt]['filttrans']
+			
+				#Check how much mass of the filter is inside the wavelength range
+				filtRange=(filtwave/(1+z)>self.options.waverange[0]) &(filtwave/(1+z) <self.options.waverange[1])
+				return np.trapz((filttrans*filtwave/(1+z))[filtRange],filtwave[filtRange]/(1+z))/np.trapz(filttrans*filtwave/(1+z),filtwave/(1+z)) > 1-self.options.filter_mass_tolerance
+					
+			filterInBounds=np.vectorize(checkFilterMass)(photdata['filt'])
+			phaseInBounds=(phase>self.options.phaserange[0]) & (phase<self.options.phaserange[1])
+			keepPhot=filterInBounds&phaseInBounds
+			numPhotElimmed+=(~keepPhot).sum()
+			numPhot+=keepPhot.sum()
+			datadict[sn]['photdata'] ={key:photdata[key][keepPhot] for key in photdata}
+			
 		print('{} spectra and {} photometric observations removed for being outside phase range'.format(numSpecElimmed,numPhotElimmed))
 		print('{} spectra and {} photometric observations remaining'.format(numSpec,numPhot))
+		print('{} total spectroscopic data points'.format(numSpecPoints))
 		# fit the model - initial pass
 		if self.options.stage == "all" or self.options.stage == "train":
-			phase,wave,M0,M1,clpars,SNParams = self.fitSALTModel(
+			phase,wave,M0,M1,clpars,SNParams,pars,parlist = self.fitSALTModel(
 				datadict,self.options.phaserange,self.options.phasesplineres,
 				self.options.waverange,self.options.wavesplineres,
 				self.options.colorwaverange,
@@ -688,11 +773,15 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				self.options.regulargradientphase, 
 				self.options.regulargradientwave, 
 				self.options.regulardyad,
+				self.options.n_min_specrecal,
+				self.options.specrange_wavescale_specrecal,
+				self.options.n_specrecal_per_lightcurve,
+				self.options.filter_mass_tolerance,
 				self.options.n_components,
 				self.options.n_colorpars)
 		
 			# write the output model - M0, M1, c
-			self.wrtoutput(self.options.outputdir,phase,wave,M0,M1,clpars,SNParams)
+			self.wrtoutput(self.options.outputdir,phase,wave,M0,M1,clpars,SNParams,pars,parlist)
 
 		if self.options.stage == "all" or self.options.stage == "validate":
 			self.validate(self.options.outputdir)
