@@ -27,7 +27,8 @@ class chi2:
 				 fitstrategy='leastsquares',stepsize_magscale_M0=None,stepsize_magadd_M0=None,stepsize_magscale_M1=None,
 				 stepsize_magadd_M1=None,stepsize_cl=None,
 				 stepsize_specrecal=None,stepsize_x0=None,stepsize_x1=None,
-				 stepsize_c=None,stepsize_tpkoff=None,n_iter=0,x1debugdict={}):
+				 stepsize_c=None,stepsize_tpkoff=None,n_iter=0,x1debugdict={},
+				 nsteps_before_adaptive=5000):
 
 		self.init_stepsizes(
 			stepsize_magscale_M0,stepsize_magadd_M0,stepsize_magscale_M1,stepsize_magadd_M1,stepsize_cl,
@@ -163,8 +164,6 @@ class chi2:
 
 	def adjust_model(self,X,stepfactor=1.0,nstep=0):
 
-		#if stepfactor < 1: x0stepfactor = stepfactor*0.5
-		#else: x0stepfactor = stepfactor
 		stepfactor = 1
 		X2 = np.zeros(self.npar)
 		for i,par in zip(range(self.npar),self.parlist):
@@ -174,8 +173,7 @@ class chi2:
 
 				scalefactor = 10**(0.4*np.random.normal(scale=m0scalestep))
 				scalefactor2 = 10**(0.4*np.random.normal(scale=m0addstep))
-				X2[i] = X[i]*scalefactor + self.M0stddev*np.random.normal(scale=self.stepsize_magadd_M0*stepfactor) #(scalefactor2-1)
-				#X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_M0*stepfactor))
+				X2[i] = X[i]*scalefactor + self.M0stddev*np.random.normal(scale=self.stepsize_magadd_M0*stepfactor)
 			elif par == 'm1':
 				m1scalestep = self.stepsize_magscale_M1*stepfactor
 				if m1scalestep < 0.001: m1scalestep = 0.001
@@ -184,26 +182,21 @@ class chi2:
 
 				scalefactor = 10**(0.4*np.random.normal(scale=m1scalestep))
 				scalefactor2 = 10**(0.4*np.random.normal(scale=m1addstep))
-				X2[i] = X[i]*scalefactor + self.M1stddev*np.random.normal(scale=self.stepsize_magadd_M1*stepfactor) #(scalefactor2-1) #X[i]*(scalefactor2-1)
-				#print(X[i],self.M1stddev)
+				X2[i] = X[i]*scalefactor + self.M1stddev*np.random.normal(scale=self.stepsize_magadd_M1*stepfactor)
 			elif par == 'cl': X2[i] = X[i]*np.random.normal(scale=self.stepsize_cl*stepfactor)
 			elif par == 'specrecal': X2[i] = X[i]*np.random.normal(scale=self.stepsize_specrecal*stepfactor)
 			elif par.startswith('x0'):
 				X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0*stepfactor))
 			elif par.startswith('x1'):
 				X2[i] = X[i] + np.random.normal(scale=self.stepsize_x1*stepfactor)
-			elif par.startswith('c'): X2[i] = X[i] + np.random.normal(scale=self.stepsize_c)#*stepfactor)
+			elif par.startswith('c'): X2[i] = X[i] + np.random.normal(scale=self.stepsize_c)
 			elif par.startswith('tpkoff'):
-				#if nstep > 3000:
 				X2[i] = X[i] + np.random.normal(scale=self.stepsize_tpk*stepfactor)
-				#else:
-				#	X2[i] = X[i] + 0
 		return X2
 
 	def get_proposal_cov(self, M2, n, beta=0.05):
 		d, _ = M2.shape
-		init_period = 5000 #1.0*d
-		#import pdb; pdb.set_trace()
+		init_period = self.nsteps_before_adaptive
 		s_0, s_opt, C_0 = self.AMpars['sigma_0'], self.AMpars['sigma_opt'], self.AMpars['C_0']
 		if n<= init_period or np.random.rand()<=beta:
 			return C_0, False
