@@ -455,7 +455,7 @@ class chi2:
 			#Interpolate SALT flux at observed wavelengths and multiply by recalibration factor
 			coeffs=x[self.parlist=='specrecal_{}_{}'.format(sn,k)]
 			coeffs/=factorial(np.arange(len(coeffs)))
-			saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)*np.exp(np.poly1d(coeffs)((specdata[k]['wavelength']-specdata[k]['wavelength'].min())/self.specrange_wavescale_specrecal))
+			saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)*np.exp(np.poly1d(coeffs)((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal))
 			chi2 += np.sum((saltfluxinterp2-specdata[k]['flux'])**2./specdata[k]['fluxerr']**2.)*self.num_phot/self.num_spec
 			
 		for flt in np.unique(photdata['filt']):
@@ -630,7 +630,7 @@ class chi2:
 			resultLikes=np.array([self.chi2fit(y[0]) for y in results])
 			for method,result,resultLike in zip(methods,results,resultLikes):
 				print('With method {} result has chi^2 of {}'.format(method,resultLike*-2))
-				#print(result)
+			print('Returning result from method {}'.format(methods[resultLikes.argmax()]))
 			return results[resultLikes.argmax()]
 		else:
 			raise ValueError('Key {} passed to getParsMCMC, valid keys are \"mean\" or \"mode\"')

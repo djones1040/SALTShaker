@@ -214,8 +214,7 @@ class TrainSALT:
 		self.kcordict['default']['Bwave'] = filtwave
 		self.kcordict['default']['Btp'] = filttp
 				
-	def rdSpecData(self,datadict,speclist,tpk):
-
+	def rdSpecData(self,datadict,speclist):
 		if not os.path.exists(speclist):
 			raise RuntimeError('speclist %s does not exist')
 		
@@ -238,6 +237,7 @@ class TrainSALT:
 				sn=snana.SuperNova(sf)
 				s=sn.name
 				if s in datadict.keys():
+					tpk=datadict[s]['tpk']
 					if 'specdata' not in datadict[s].keys():
 						datadict[s]['specdata'] = {}
 						speccount = 0
@@ -271,7 +271,7 @@ class TrainSALT:
 					raise RuntimeError('specfile %s does not exist'%sf)
 			
 				if s in datadict.keys():
-			
+					tpk=datadict[s]['tpk']
 					if 'specdata' not in datadict[s].keys():
 						datadict[s]['specdata'] = {}
 						speccount = 0
@@ -350,26 +350,27 @@ class TrainSALT:
 
 			datadict[sn.SNID] = {'snfile':f,
 								 'zHelio':zHel,
-								 'survey':sn.SURVEY}
+								 'survey':sn.SURVEY,
+								 'tpk':tpk}
 			#datadict[snid]['zHelio'] = zHel
 			
 			# TODO: flux errors
 			datadict[sn.SNID]['specdata'] = {}
-			for k in sn.SPECTRA.keys():
-				datadict[sn.SNID]['specdata'][k] = {}
-				datadict[sn.SNID]['specdata'][k]['specphase'] = sn.SPECTRA[k]['SPECTRUM_MJD']
-				datadict[sn.SNID]['specdata'][k]['tobs'] = sn.SPECTRA[k]['SPECTRUM_MJD'] - tpk
-				datadict[sn.SNID]['specdata'][k]['mjd'] = sn.SPECTRA[k]['SPECTRUM_MJD']
-				if 'LAMAVG' in sn.SPECTRA[k].keys():
-					datadict[sn.SNID]['specdata'][k]['wavelength'] = sn.SPECTRA[k]['LAMAVG']
-				elif 'LAMMIN' in sn.SPECTRA[k].keys() and 'LAMMAX' in sn.SPECTRA[k].keys():
-					datadict[sn.SNID]['specdata'][k]['wavelength'] = np.mean([[sn.SPECTRA[k]['LAMMIN']],
-																			  [sn.SPECTRA[k]['LAMMAX']]],axis=0)
-				else:
-					raise RuntimeError('couldn\t find wavelength data in photometry file')
-				datadict[sn.SNID]['specdata'][k]['flux'] = sn.SPECTRA[k]['FLAM']
-				datadict[sn.SNID]['specdata'][k]['fluxerr'] = sn.SPECTRA[k]['FLAMERR']
-				
+# 			for k in sn.SPECTRA.keys():
+# 				datadict[sn.SNID]['specdata'][k] = {}
+# 				datadict[sn.SNID]['specdata'][k]['specphase'] = sn.SPECTRA[k]['SPECTRUM_MJD']
+# 				datadict[sn.SNID]['specdata'][k]['tobs'] = sn.SPECTRA[k]['SPECTRUM_MJD'] - tpk
+# 				datadict[sn.SNID]['specdata'][k]['mjd'] = sn.SPECTRA[k]['SPECTRUM_MJD']
+# 				if 'LAMAVG' in sn.SPECTRA[k].keys():
+# 					datadict[sn.SNID]['specdata'][k]['wavelength'] = sn.SPECTRA[k]['LAMAVG']
+# 				elif 'LAMMIN' in sn.SPECTRA[k].keys() and 'LAMMAX' in sn.SPECTRA[k].keys():
+# 					datadict[sn.SNID]['specdata'][k]['wavelength'] = np.mean([[sn.SPECTRA[k]['LAMMIN']],
+# 																			  [sn.SPECTRA[k]['LAMMAX']]],axis=0)
+# 				else:
+# 					raise RuntimeError('couldn\t find wavelength data in photometry file')
+# 				datadict[sn.SNID]['specdata'][k]['flux'] = sn.SPECTRA[k]['FLAM']
+# 				datadict[sn.SNID]['specdata'][k]['fluxerr'] = sn.SPECTRA[k]['FLAMERR']
+# 				
 			datadict[sn.SNID]['photdata'] = {}
 			datadict[sn.SNID]['photdata']['tobs'] = sn.MJD - tpk
 			datadict[sn.SNID]['photdata']['mjd'] = sn.MJD
@@ -381,7 +382,7 @@ class TrainSALT:
 			raise RuntimeError('no light curve data to train on!!')
 			
 		if speclist:
-			datadict = self.rdSpecData(datadict,speclist,tpk)
+			datadict = self.rdSpecData(datadict,speclist)
 			
 		return datadict
 		
@@ -539,7 +540,8 @@ class TrainSALT:
 						self.addwarning('MCMC message on iter %i: %s'%(i,message))
 						self.addwarning('Minimizer message on iter %i: %s'%(i,message))
 				print('Individual components of final regularization chi^2'); saltfitter.regularizationChi2(x_modelpars,1,1,1)
-				print('Final chi^2'); saltfitter.chi2fit(x_modelpars,None,False,False)
+				print('Final chi^2'); saltfitter.chi2fit(x_modelpars)
+				
 		else:
 
 			for k in datadict.keys():
