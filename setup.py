@@ -32,7 +32,7 @@ setup(
 	packages=['salt3','salt3.tests','salt3.simulation',
 			  'salt3.training','salt3.util','salt3.initfiles','salt3.validation'],
 	cmdclass={'test': SALT3Test},
-	scripts=['salt3/training/TrainSALT.py','salt3/validation/ValidateModel.py','salt3/validation/ValidateLightcurves.py'],
+	scripts=['salt3/training/TrainSALT.py','salt3/validation/ValidateModel.py','salt3/validation/ValidateLightcurves.py','salt3/validation/ValidateSpectra.py'],
 	package_data={'': ['initfiles/Hsiao07.dat','initfiles/Bessell90_B.dat']},
 	include_package_data=True,
 	author=AUTHOR,

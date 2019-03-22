@@ -12,6 +12,7 @@ from scipy.optimize import minimize
 from scipy.stats import norm
 from scipy.ndimage import gaussian_filter1d
 from scipy.special import factorial
+from astropy.cosmology import Planck15 as cosmo
 
 #import pysynphot as S
 
@@ -456,6 +457,7 @@ class chi2:
 			coeffs=x[self.parlist=='specrecal_{}_{}'.format(sn,k)]
 			coeffs/=factorial(np.arange(len(coeffs)))
 			saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)*np.exp(np.poly1d(coeffs)((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal))
+			print(np.mean(saltfluxinterp2),np.mean(specdata[k]['fluxerr']))
 			chi2 += np.sum((saltfluxinterp2-specdata[k]['flux'])**2./specdata[k]['fluxerr']**2.)*self.num_phot/self.num_spec
 			
 		for flt in np.unique(photdata['filt']):
@@ -491,7 +493,8 @@ class chi2:
 			# Integrate along wavelength axis
 			modelsynflux=np.trapz(pbspl[np.newaxis,:]*saltfluxinterp[:,g],obswave[g],axis=1)/denom
 			modelflux = modelsynflux*10**(-0.4*self.kcordict[survey][flt]['zpoff'])*10**(0.4*self.stdmag[survey][flt])*10**(0.4*27.5)
-
+			print(modelflux,filtPhot['fluxcal'])
+			print(x0,-2.5*np.log10(x0),cosmo.distmod(z).value)
 			# chi2 function
 			# TODO - model error/dispersion parameters
 			if self.fitstrategy == 'leastsquares':
