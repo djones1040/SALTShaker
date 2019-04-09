@@ -46,7 +46,7 @@ named "color"**. An example of the BYOSED.params file is as follows:
 	host_mass = False
 
 In this case, a magnitude smearing of 0.1 would be applied to the Hsiao model at all wavelengths,
-and some color and host mass effects are applied as well based on functions you will 
+and some color and stretch effects are applied as well based on functions you will 
 define in the next section. 
 
 Warping Effects
@@ -143,7 +143,6 @@ for the color function. In principle this could look like the following if you h
 .. math::
 
 	F(\lambda,\phi)=A\Big[H(\lambda,\phi)+X_1(\lambda,\phi)x_1+X_2(\lambda,\phi)x_2+...+X_N(\lambda,\phi)x_N\Big]\times10^{-0.4C(\lambda,\phi)c}
-
 
 
 
