@@ -37,8 +37,8 @@ kcor_path+=                          Same as :code:`kcor_path`, but appends a se
 [trainparams]
 waverange            2000,9200       Wavelength range over which the model is defined                                        
 colorwaverange       2800,7000       Wavelength range over which the color law polynomial is fit                             
-interpfunc           bspline         Function for interpolating the model between control points (basis spline is default)   
-interporder          3               Order of the splibe interpolation
+interpfunc           bspline         Function for interpolating the model between control points (b-spline is default)   
+interporder          3               Order of the spline interpolation
 wavesplineres        72              Number of Angstroms between wavelength control points
 waveoutres           2               Wavelength resolution of the trained output model (Angstroms)
 phaserange           -14,50          Phase range over which the model is defined (days)
@@ -47,4 +47,5 @@ phaseoutres          2               Phase resolution of the trained output mode
 minmethod            trf             Numerical algorithm used to minimize the chi2.  Default is Trust Region Reflective.
 n_colorpars          4               Number of parameters used to define the color law polynomial
 n_components         2               Number of principal components
+n_processes          1               Number of worker processes to spawn to calculate the chi2
 ==================   =============   =========================================================================================================
