@@ -26,6 +26,7 @@
 
   <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
   <link rel="stylesheet" href="_static/gallery.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -83,7 +84,6 @@
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="data.html">Spectroscopic and Photometric Training Data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="training.html">Training the SALT3 Model</a></li>
-<li class="toctree-l1"><a class="reference internal" href="training.html#salt3-training-configuration-options">SALT3 Training Configuration Options</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Creating Simulated Data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="validation.html">Validating the Trained Model</a></li>
 </ul>
@@ -152,7 +152,124 @@
             
   <div class="section" id="creating-simulated-data">
 <h1>Creating Simulated Data<a class="headerlink" href="#creating-simulated-data" title="Permalink to this headline">¶</a></h1>
-<p>Create simulations using the Hsiao+07 model (initfiles/Hsiao07.dat)</p>
+<div class="section" id="byo-sed">
+<h2>BYO SED<a class="headerlink" href="#byo-sed" title="Permalink to this headline">¶</a></h2>
+<p>The BYOSED framework allows any spectrophotometric model to be used
+as the underlying template to generate simulated Type Ia light curve data
+with SNANA. By default, this model is the Hsiao+07 model (initfiles/Hsiao07.dat).
+This can be replaced by any model</p>
+</div>
+<div class="section" id="param-file">
+<h2>Param File<a class="headerlink" href="#param-file" title="Permalink to this headline">¶</a></h2>
+<p>The first file to setup is the BYOSED.params file. This contains the general aspects
+of the simulated SN you want to create using BYOSED. This file is separated into 2
+sections:</p>
+<div class="section" id="main">
+<h3>[main]<a class="headerlink" href="#main" title="Permalink to this headline">¶</a></h3>
+<p>This section contains <strong>sed_file</strong> (name of SED file), as well as <strong>magsmear</strong> (magnitude
+smearing) and <strong>magoff</strong> (magnitude offsets) definitions to be applied to the base SED defined by
+sed_file.</p>
+</div>
+<div class="section" id="effects">
+<h3>[effects]<a class="headerlink" href="#effects" title="Permalink to this headline">¶</a></h3>
+<p>This section contains all of the various wavelength/phase dependent effects that you want
+to apply to your SED. You can turn effects on and off with True/false flags, and you can
+name them whatever you want <strong>with the exception of a “color law” effect, which must be
+named “color”</strong>. An example of the BYOSED.params file is as follows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">main</span><span class="p">]</span>
+<span class="n">sed_file</span> <span class="o">=</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
+<span class="n">magsmear</span> <span class="o">=</span> <span class="mf">0.1</span>
+<span class="n">magoff</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+<span class="p">[</span><span class="n">effects</span><span class="p">]</span>
+<span class="n">color</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="n">stretch</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="n">host_mass</span> <span class="o">=</span> <span class="kc">False</span>
+</pre></div>
+</div>
+<p>In this case, a magnitude smearing of 0.1 would be applied to the Hsiao model at all wavelengths,
+and some color and host mass effects are applied as well based on functions you will
+define in the next section.</p>
+</div>
+</div>
+<div class="section" id="warping-effects">
+<h2>Warping Effects<a class="headerlink" href="#warping-effects" title="Permalink to this headline">¶</a></h2>
+<p>You must set up a second file that defines the warping functions you’ve set up as effects in the
+BYOSED.params file above. This file is called <strong>sed_warps.dat</strong> and similarly has two sections:</p>
+<div class="section" id="functions">
+<h3>[functions]<a class="headerlink" href="#functions" title="Permalink to this headline">¶</a></h3>
+<p>The names used for the various warping functions must match those used in the BYOSED.params file
+above. Then, each function can either be defined as an array of phase,wave,value:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1">#p w v</span>
+<span class="n">dust</span> <span class="o">=</span> <span class="p">[[</span><span class="o">-</span><span class="mi">100</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+        <span class="p">[</span><span class="o">-</span><span class="mi">100</span><span class="p">,</span><span class="mi">10000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
+        <span class="p">[</span><span class="o">-</span><span class="mi">100</span><span class="p">,</span><span class="mi">15000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
+        <span class="p">[</span><span class="o">-</span><span class="mi">100</span><span class="p">,</span><span class="mi">25000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
+        <span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">1000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
+        <span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">10000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
+        <span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">15000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
+        <span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">25000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
+        <span class="p">[</span><span class="mi">100</span><span class="p">,</span><span class="mi">1000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
+        <span class="p">[</span><span class="mi">100</span><span class="p">,</span><span class="mi">10000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
+        <span class="p">[</span><span class="mi">100</span><span class="p">,</span><span class="mi">15000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
+        <span class="p">[</span><span class="mi">100</span><span class="p">,</span><span class="mi">25000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
+        <span class="p">[</span><span class="mi">500</span><span class="p">,</span><span class="mi">1000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
+        <span class="p">[</span><span class="mi">500</span><span class="p">,</span><span class="mi">10000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
+        <span class="p">[</span><span class="mi">500</span><span class="p">,</span><span class="mi">15000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
+        <span class="p">[</span><span class="mi">500</span><span class="p">,</span><span class="mi">25000</span><span class="p">,</span><span class="mi">1</span><span class="p">]]</span>
+</pre></div>
+</div>
+<p>Or else as a file name to be read, which contains a similar definition:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1">#p w v</span>
+<span class="o">-</span><span class="mi">20</span> <span class="mi">1000</span> <span class="mf">25.75805</span>
+<span class="o">-</span><span class="mi">20</span> <span class="mi">1010</span> <span class="mf">25.64852</span>
+<span class="o">-</span><span class="mi">20</span> <span class="mi">1020</span> <span class="mf">25.53899</span>
+<span class="o">-</span><span class="mi">20</span> <span class="mi">1030</span> <span class="mf">25.42946</span>
+<span class="o">-</span><span class="mi">20</span> <span class="mi">1040</span> <span class="mf">25.31993</span>
+<span class="o">-</span><span class="mi">20</span> <span class="mi">1050</span> <span class="mf">25.2104</span>
+     <span class="o">...</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="distributions">
+<h3>[distributions]<a class="headerlink" href="#distributions" title="Permalink to this headline">¶</a></h3>
+<p>The second section in the sed_warps file defines the distributions that will be
+used to randomly generate a scale parameter for each effect, for each SN being
+simulated. They are defined as (a)symmetric gaussian functions as follows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">color</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;mu&quot;</span><span class="p">:</span><span class="mf">0.0</span><span class="p">,</span><span class="s2">&quot;sigma_left&quot;</span><span class="p">:</span><span class="mf">0.07</span><span class="p">,</span> <span class="s2">&quot;sigma_right&quot;</span><span class="p">:</span><span class="mf">0.1</span><span class="p">,</span><span class="s2">&quot;lower_lim&quot;</span><span class="p">:</span><span class="o">-</span><span class="mf">0.3</span><span class="p">,</span> <span class="s2">&quot;upper_lim&quot;</span><span class="p">:</span><span class="mf">0.3</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>All together, an <strong>sed_warps.dat</strong> file might look something like this:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">functions</span><span class="p">]</span>
+
+<span class="n">stretch</span> <span class="o">=</span> <span class="s1">&#39;stretch_function.dat&#39;</span>
+<span class="n">color</span> <span class="o">=</span> <span class="s1">&#39;color_function.dat&#39;</span>
+
+<span class="p">[</span><span class="n">distributions</span><span class="p">]</span>
+
+<span class="n">stretch</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;mu&quot;</span><span class="p">:</span><span class="mf">0.5</span><span class="p">,</span> <span class="s2">&quot;sigma_left&quot;</span><span class="p">:</span><span class="mf">1.0</span><span class="p">,</span> <span class="s2">&quot;sigma_right&quot;</span><span class="p">:</span><span class="mf">0.7</span><span class="p">,</span><span class="s2">&quot;lower_lim&quot;</span><span class="p">:</span><span class="o">-</span><span class="mf">2.5</span><span class="p">,</span> <span class="s2">&quot;upper_lim&quot;</span><span class="p">:</span><span class="mf">2.5</span><span class="p">}</span>
+<span class="n">color</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;mu&quot;</span><span class="p">:</span><span class="mf">0.0</span><span class="p">,</span><span class="s2">&quot;sigma_left&quot;</span><span class="p">:</span><span class="mf">0.07</span><span class="p">,</span> <span class="s2">&quot;sigma_right&quot;</span><span class="p">:</span><span class="mf">0.1</span><span class="p">,</span><span class="s2">&quot;lower_lim&quot;</span><span class="p">:</span><span class="o">-</span><span class="mf">0.3</span><span class="p">,</span> <span class="s2">&quot;upper_lim&quot;</span><span class="p">:</span><span class="mf">0.3</span><span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="final-notes">
+<h2>Final Notes<a class="headerlink" href="#final-notes" title="Permalink to this headline">¶</a></h2>
+<p>Now you can replace the Hsiao template with your own template SED, and start adding in warping
+effects. This warping process is designed so that as many effects as you would like can be
+included. Anything but a color effect (which should affect the final SED as a function of
+wavelength and possibly phase) is applied additively, while the color effect is applied
+multiplicatively. This is similar to the existing SALT2 framework. For the example file
+above, the final flux would look like this</p>
+<div class="math notranslate nohighlight">
+\[F(\lambda,\phi)=A\Big[H(\lambda,\phi)+S(\lambda,\phi)s\Big]\times10^{-0.4C(\lambda,\phi)c}\]</div>
+<p>Where here F is the final flux, H is the Hsiao template, S is the defined stretch function,
+C is the defined color function, s is the scale parameter pulled from the distribution defined
+for the stretch function, and c is the scale parameter pulled from the distribution defined
+for the color function. In principle this could look like the following if you had N such effects:</p>
+<div class="math notranslate nohighlight">
+\[F(\lambda,\phi)=A\Big[H(\lambda,\phi)+X_1(\lambda,\phi)x_1+X_2(\lambda,\phi)x_2+...+X_N(\lambda,\phi)x_N\Big]\times10^{-0.4C(\lambda,\phi)c}\]</div>
+</div>
 </div>
 
 
@@ -175,7 +292,7 @@
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2018, David Jones, Rick Kessler.
+        &copy; Copyright 2018, David Jones, Rick Kessler
 
     </p>
   </div>
@@ -194,21 +311,15 @@
 
   
 
-    <script type="text/javascript">
-        var DOCUMENTATION_OPTIONS = {
-            URL_ROOT:'./',
-            VERSION:'',
-            LANGUAGE:'None',
-            COLLAPSE_INDEX:false,
-            FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true,
-            SOURCELINK_SUFFIX: '.txt'
-        };
-    </script>
-      <script type="text/javascript" src="_static/jquery.js"></script>
-      <script type="text/javascript" src="_static/underscore.js"></script>
-      <script type="text/javascript" src="_static/doctools.js"></script>
-      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script type="text/javascript" src="_static/jquery.js"></script>
+        <script type="text/javascript" src="_static/underscore.js"></script>
+        <script type="text/javascript" src="_static/doctools.js"></script>
+        <script type="text/javascript" src="_static/language_data.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
 
   
 
