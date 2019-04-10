@@ -26,6 +26,7 @@
 
   <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
   <link rel="stylesheet" href="_static/gallery.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -152,21 +153,21 @@
   <div class="section" id="training-the-salt3-model">
 <h1>Training the SALT3 Model<a class="headerlink" href="#training-the-salt3-model" title="Permalink to this headline">¶</a></h1>
 <p>usage:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">TrainSALT</span><span class="o">.</span><span class="n">py</span> <span class="o">-</span><span class="n">c</span> <span class="o">&lt;</span><span class="n">configfile</span><span class="o">&gt;</span> <span class="o">&lt;</span><span class="n">options</span><span class="o">&gt;</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">TrainSALT</span><span class="o">.</span><span class="n">py</span> <span class="o">-</span><span class="n">c</span> <span class="o">&lt;</span><span class="n">configfile</span><span class="o">&gt;</span> <span class="o">&lt;</span><span class="n">options</span><span class="o">&gt;</span>
 </pre></div>
 </div>
 <p>To run an example, change to the “examples” directory
 in the main package and run:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">TrainSALT</span><span class="o">.</span><span class="n">py</span> <span class="o">-</span><span class="n">c</span> <span class="n">SALT</span><span class="o">.</span><span class="n">conf</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">TrainSALT</span><span class="o">.</span><span class="n">py</span> <span class="o">-</span><span class="n">c</span> <span class="n">SALT</span><span class="o">.</span><span class="n">conf</span>
 </pre></div>
 </div>
-<p>This will use the lightcurves and spectra in the <code class="code docutils literal"><span class="pre">examples/exampledata/</span></code>
-directory and the kcor files in the <code class="code docutils literal"><span class="pre">examples/kcor/</span></code> directory to
-run the SALT3 training, writing outputs to the <code class="code docutils literal"><span class="pre">examples/output/</span></code>
+<p>This will use the lightcurves and spectra in the <code class="code docutils literal notranslate"><span class="pre">examples/exampledata/</span></code>
+directory and the kcor files in the <code class="code docutils literal notranslate"><span class="pre">examples/kcor/</span></code> directory to
+run the SALT3 training, writing outputs to the <code class="code docutils literal notranslate"><span class="pre">examples/output/</span></code>
 directory</p>
 <div class="section" id="salt3-training-configuration-options">
 <h2>SALT3 Training Configuration Options<a class="headerlink" href="#salt3-training-configuration-options" title="Permalink to this headline">¶</a></h2>
-<p>See the SALT.conf file in the <code class="code docutils literal"><span class="pre">examples/</span></code> directory
+<p>See the SALT.conf file in the <code class="code docutils literal notranslate"><span class="pre">examples/</span></code> directory
 for a list of training options.
 Descriptions of each option are given below.</p>
 <table border="1" class="docutils">
@@ -188,7 +189,7 @@ Descriptions of each option are given below.</p>
 </tr>
 <tr class="row-odd"><td>snlist</td>
 <td>&#160;</td>
-<td>ASCII file with list of SN files (see <a class="reference internal" href="data.html#data-format"><span class="std std-ref">Data File Format</span></a> for input file format)</td>
+<td>ASCII file with list of SN files (see <a class="reference internal" href="data.html#data-format"><span class="std std-ref">Data Format</span></a> for input file format)</td>
 </tr>
 <tr class="row-even"><td>outputdir</td>
 <td>&#160;</td>
@@ -200,11 +201,11 @@ Descriptions of each option are given below.</p>
 </tr>
 <tr class="row-even"><td>kcor_path</td>
 <td>&#160;</td>
-<td>Comma-separated surveyname,kcorfile for each <code class="code docutils literal"><span class="pre">SURVEY</span></code> key in SN data files</td>
+<td>Comma-separated surveyname,kcorfile for each <code class="code docutils literal notranslate"><span class="pre">SURVEY</span></code> key in SN data files</td>
 </tr>
 <tr class="row-odd"><td>kcor_path+=</td>
 <td>&#160;</td>
-<td>Same as <code class="code docutils literal"><span class="pre">kcor_path</span></code>, but appends a second entry to the kcor_path variable</td>
+<td>Same as <code class="code docutils literal notranslate"><span class="pre">kcor_path</span></code>, but appends a second entry to the kcor_path variable</td>
 </tr>
 <tr class="row-even"><td>[trainparams]</td>
 <td>&#160;</td>
@@ -220,11 +221,11 @@ Descriptions of each option are given below.</p>
 </tr>
 <tr class="row-odd"><td>interpfunc</td>
 <td>bspline</td>
-<td>Function for interpolating the model between control points (basis spline is default)</td>
+<td>Function for interpolating the model between control points (b-spline is default)</td>
 </tr>
 <tr class="row-even"><td>interporder</td>
 <td>3</td>
-<td>Order of the splibe interpolation</td>
+<td>Order of the spline interpolation</td>
 </tr>
 <tr class="row-odd"><td>wavesplineres</td>
 <td>72</td>
@@ -258,6 +259,10 @@ Descriptions of each option are given below.</p>
 <td>2</td>
 <td>Number of principal components</td>
 </tr>
+<tr class="row-odd"><td>n_processes</td>
+<td>1</td>
+<td>Number of worker processes to spawn to calculate the chi2</td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -283,7 +288,7 @@ Descriptions of each option are given below.</p>
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2018, David Jones, Rick Kessler.
+        &copy; Copyright 2018, David Jones, Rick Kessler
 
     </p>
   </div>
@@ -302,21 +307,14 @@ Descriptions of each option are given below.</p>
 
   
 
-    <script type="text/javascript">
-        var DOCUMENTATION_OPTIONS = {
-            URL_ROOT:'./',
-            VERSION:'',
-            LANGUAGE:'None',
-            COLLAPSE_INDEX:false,
-            FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true,
-            SOURCELINK_SUFFIX: '.txt'
-        };
-    </script>
-      <script type="text/javascript" src="_static/jquery.js"></script>
-      <script type="text/javascript" src="_static/underscore.js"></script>
-      <script type="text/javascript" src="_static/doctools.js"></script>
-      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script type="text/javascript" src="_static/jquery.js"></script>
+        <script type="text/javascript" src="_static/underscore.js"></script>
+        <script type="text/javascript" src="_static/doctools.js"></script>
+        <script type="text/javascript" src="_static/language_data.js"></script>
+    
 
   
 
