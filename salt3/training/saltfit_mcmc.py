@@ -13,7 +13,7 @@ from scipy.stats import norm
 from scipy.ndimage import gaussian_filter1d
 from scipy.special import factorial
 from astropy.cosmology import Planck15 as cosmo
-
+from sncosmo.constants import HC_ERG_AA
 #import pysynphot as S
 
 _SCALE_FACTOR = 1e-12
@@ -103,14 +103,19 @@ class chi2:
 		
 		self.components = self.SALTModel(guess)
 		int1d = interp1d(self.phase,self.components[0],axis=0)
-		self.m0guess = synphot(self.wave,int1d(0),filtwave=self.kcordict['default']['Bwave'],filttp=self.kcordict['default']['Btp'])
+		self.m0guess = 10.635#synphot(self.wave,int1d(0),filtwave=self.kcordict['default']['Bwave'],filttp=self.kcordict['default']['Btp'])
 
 		self.regulargradientphase=regulargradientphase
 		self.regulargradientwave=regulargradientwave
 		self.regulardyad=regulardyad
 		self.stdmag = {}
 		for survey in self.kcordict.keys():
-			if survey == 'default': continue
+			if survey == 'default': 
+				self.stdmag[survey] = {}
+				self.stdmag[survey]['B']=synphot(kcordict[survey]['primarywave'],kcordict[survey]['AB'],filtwave=kcordict['default']['Bwave'],
+												   filttp=kcordict[survey]['Btp'],
+												   zpoff=0)
+				continue
 			self.stdmag[survey] = {}
 			primarywave = kcordict[survey]['primarywave']
 			for flt in self.kcordict[survey].keys():
@@ -121,6 +126,7 @@ class chi2:
 				self.stdmag[survey][flt] = synphot(primarywave,kcordict[survey][primarykey],filtwave=self.kcordict[survey]['filtwave'],
 												   filttp=kcordict[survey][flt]['filttrans'],
 												   zpoff=0) - kcordict[survey][flt]['primarymag'] #kcordict[survey][flt]['zpoff'])
+		
 		#Count number of photometric and spectroscopic points
 		self.num_spec=0
 		self.num_phot=0
@@ -357,10 +363,11 @@ class chi2:
 	def m0prior(self,x):
 
 		components = self.SALTModel(x)
-		int1d = interp1d(self.phase,components[0],axis=0)
-		m0B = synphot(self.wave,int1d(0),filtwave=self.kcordict['default']['Bwave'],filttp=self.kcordict['default']['Btp'])
+		int1d = interp1d(self.phase,components[0]/_SCALE_FACTOR,axis=0)
+		m0B = synphot(self.wave,int1d(0),filtwave=self.kcordict['default']['Bwave'],filttp=self.kcordict['default']['Btp'])-self.stdmag['default']['B']
+		
 		logprior = norm.logpdf(m0B,self.m0guess,0.02)
-		#print(m0B,self.m0guess,logprior)
+		print(m0B,self.m0guess,logprior)
 		return logprior
 		
 	def prior(self,cube,ndim=None,nparams=None):
@@ -457,7 +464,7 @@ class chi2:
 			coeffs=x[self.parlist=='specrecal_{}_{}'.format(sn,k)]
 			coeffs/=factorial(np.arange(len(coeffs)))
 			saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)*np.exp(np.poly1d(coeffs)((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal))
-			print(np.mean(saltfluxinterp2),np.mean(specdata[k]['fluxerr']))
+			print(np.mean(saltfluxinterp2),np.mean(specdata[k]['flux']))
 			chi2 += np.sum((saltfluxinterp2-specdata[k]['flux'])**2./specdata[k]['fluxerr']**2.)*self.num_phot/self.num_spec
 			
 		for flt in np.unique(photdata['filt']):
@@ -492,9 +499,9 @@ class chi2:
 			# synthetic photometry from SALT model
 			# Integrate along wavelength axis
 			modelsynflux=np.trapz(pbspl[np.newaxis,:]*saltfluxinterp[:,g],obswave[g],axis=1)/denom
-			modelflux = modelsynflux*10**(-0.4*self.kcordict[survey][flt]['zpoff'])*10**(0.4*self.stdmag[survey][flt])*10**(0.4*27.5)
+			modelflux = modelsynflux*10**(-0.4*self.kcordict[survey][flt]['zpoff'])*10**(0.4*(self.stdmag[survey][flt]+27.5))
 			print(modelflux,filtPhot['fluxcal'])
-			print(x0,-2.5*np.log10(x0),cosmo.distmod(z).value)
+			print(x0,10.635-2.5*np.log10(x0),cosmo.distmod(z).value)
 			# chi2 function
 			# TODO - model error/dispersion parameters
 			if self.fitstrategy == 'leastsquares':
@@ -523,7 +530,7 @@ class chi2:
 				
 				#if chi2 < 1357: import pdb; pdb.set_trace()
 			#print(chi2)
-			#import pdb; pdb.set_trace()
+		if len(specdata)>0: import pdb; pdb.set_trace()
 		return chi2
 
 		

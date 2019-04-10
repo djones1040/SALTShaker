@@ -47,9 +47,13 @@ def rdkcor(kcorpath,addwarning):
 	initBfilt = '%s/Bessell90_B.dat'%init_rootdir
 	filtwave,filttp = np.genfromtxt(initBfilt,unpack=True)
 		
+	primarywave,primarysed = np.genfromtxt('%s/flatnu.dat'%init_rootdir,unpack=True)
+	
 	kcordict['default'] = {}
 	kcordict['default']['Bwave'] = filtwave
 	kcordict['default']['Btp'] = filttp
+	kcordict['default']['AB']=primarysed
+	kcordict['default']['primarywave']=primarywave
 	return kcordict
 			
 def rdSpecData(datadict,speclist):

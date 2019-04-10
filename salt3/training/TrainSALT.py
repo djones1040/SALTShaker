@@ -180,13 +180,14 @@ class TrainSALT:
 		if not os.path.exists(initmodelfile):
 			from salt3.initfiles import init_rootdir
 			initmodelfile = '%s/%s'%(init_rootdir,initmodelfile)
+			flatnu='%s/flatnu.dat'%(init_rootdir)
 			initBfilt = '%s/%s'%(init_rootdir,initBfilt)
 			salt2file = '%s/salt2_template_0.dat.gz'%init_rootdir
 		if not os.path.exists(initmodelfile):
 			raise RuntimeError('model initialization file not found in local directory or %s'%init_rootdir)
 		
 		phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
-			initmodelfile,salt2file,initBfilt,phaserange=phaserange,waverange=waverange,
+			initmodelfile,salt2file,initBfilt,flatnu,phaserange=phaserange,waverange=waverange,
 			phasesplineres=phaseres,wavesplineres=waveres,
 			phaseinterpres=phaseoutres,waveinterpres=waveoutres)
 		n_phaseknots,n_waveknots = len(phaseknotloc)-4,len(waveknotloc)-4
@@ -223,6 +224,7 @@ class TrainSALT:
 			guess[parlist == 'cl'] = [0.]*n_colorpars
 		guess[(parlist == 'm0') & (guess < 0)] = 0
 		
+		
 		saltfitter = saltfit.chi2(guess,datadict,parlist,
 								  phaseknotloc,waveknotloc,phaserange,
 								  waverange,phaseres,waveres,phaseoutres,waveoutres,
@@ -231,7 +233,6 @@ class TrainSALT:
 								  regulargradientwave,regulardyad,filter_mass_tolerance,specrange_wavescale_specrecal,
 								  n_components,n_colorpars,
 								  n_iter=self.options.n_iter)
-
 		saltfitter.stepsize_M0 = self.options.stepsize_M0
 		saltfitter.stepsize_magscale_M1 = self.options.stepsize_magscale_M1
 		saltfitter.stepsize_magadd_M1 = self.options.stepsize_magadd_M1
@@ -248,7 +249,7 @@ class TrainSALT:
 		initguess = ()
 		for k in datadict.keys():
 			initparlist += ['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k]
-			initguess += (10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36)),0,0,0)
+			initguess += (10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.24-10.635)),0,0,0)
 		#initparlist += ['cl']*n_colorpars
 		initparlist = np.array(initparlist)
 		print('training on %i SNe!'%len(datadict.keys()))
@@ -327,7 +328,7 @@ class TrainSALT:
 		else:
 
 			for k in datadict.keys():
-				guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36))
+				guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36-10.635))
 				#guess[parlist == 'x1_%s'%k] = testx1dict[k]
 				
 			saltfitter.parlist = parlist
