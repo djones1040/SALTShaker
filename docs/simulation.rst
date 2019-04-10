@@ -150,7 +150,7 @@ for the color function. In principle this could look like the following if you h
 Example Files
 =============
 
-Thse are example files that can be used for your :download:`sed_file <./example_files/Hsiao07.dat>`, :download:`BYOSED.params <./example_files/BYOSED.params>` and :download:`sed_warps.dat <./example_files/sed_warps.dat>`.
+These are example files that can be used for your :download:`sed_file <./example_files/Hsiao07.dat>`, :download:`BYOSED.params <./example_files/BYOSED.params>` and :download:`sed_warps.dat <./example_files/sed_warps.dat>`.
 The color and stretch functions are defined by accompanying :download:`color <./example_files/color_func.dat>` and :download:`stretch <./example_files/stretch_func.dat>` files.
 
 
