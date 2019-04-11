@@ -50,6 +50,8 @@ class chi2:
 		self.errmin = np.min(np.where(self.parlist == 'modelerr')[0])
 		self.errmax = np.max(np.where(self.parlist == 'modelerr')[0])
 
+		self.splinecolorwave = np.linspace(colorwaverange[0],colorwaverange[1],n_colorpars)
+		
 		self.phaserange = phaserange
 		self.waverange = waverange
 		self.phaseres = phaseres
@@ -366,11 +368,11 @@ class chi2:
 		if nstep < nburn:
 			raise RuntimeError('Not enough steps to wait 500 before burn-in')
 		xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-			modelerr,clpars,clerr,clscat,clscaterr,SNParams = \
+			modelerr,clpars,clerr,clscat,SNParams = \
 			self.getParsMCMC(loglike_history,np.array(outpars),nburn=nburn,result='mean')
 		
 		return xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-			modelerr,clpars,clerr,clscat,clscaterr,SNParams
+			modelerr,clpars,clerr,clscat,SNParams
 		
 	def accept(self, last_loglike, this_loglike):
 		alpha = np.exp(this_loglike - last_loglike)
@@ -417,7 +419,6 @@ class chi2:
 		elif self.n_components == 2: M0,M1 = components
 		if self.n_colorpars:
 			colorLaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
-			colorScat = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'clscat'])
 		else: colorLaw = None; colorScat = None
 
 		chi2 = 0
@@ -591,7 +592,8 @@ class chi2:
 			# color dispersion
 			#np.exp(np.sum(s)
 
-			if colorScat: colorerr = colorScat(self.kcordict[survey][flt]['lambdaeff'])
+			if colorScat: colorerr = splev(self.kcordict[survey][flt]['lambdaeff'],
+										   (self.splinecolorwave,x[self.parlist == 'clscat'],3))
 			else: colorerr = 0.0
 			
 			# chi2 function
@@ -824,6 +826,7 @@ class chi2:
 	
 		cov_m0_m1 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m0_m1_cov,bsorder,bsorder))
 		modelerr = bisplev(self.phase,self.wave,(self.errphase,self.errwave,modelerrpars,bsorder,bsorder))
+		clscat = splev(self.wave,(self.errwave,clscatpars,3))
 		#import pdb; pdb.set_trace()
 		if not len(clpars): clpars = []
 	
@@ -865,7 +868,7 @@ class chi2:
 		pdf_pages.close()
 
 		return(result,self.phase,self.wave,m0,m0err,m1,m1err,cov_m0_m1,modelerr,
-			   clpars,clerr,clscatpars,clscaterr,resultsdict)
+			   clpars,clerr,clscat,resultsdict)
 
 	
 	def synphot(self,sourceflux,zpoff,survey=None,flt=None,redshift=0):
