@@ -37,6 +37,8 @@ def rdkcor(kcorpath,addwarning):
 		for filt in zpoff['Filter Name']:
 			kcordict[survey][filt.split('-')[-1].split('/')[-1]] = {}
 			kcordict[survey][filt.split('-')[-1].split('/')[-1]]['filttrans'] = filtertrans[filt]
+			lambdaeff = np.sum(self.kcordict[survey]['filtwave']*filtertrans[filt])/np.sum(filtertrans[filt])
+			self.kcordict[survey][filt.split('-')[-1].split('/')[-1]]['lambdaeff'] = lambdaeff
 			kcordict[survey][filt.split('-')[-1].split('/')[-1]]['zpoff'] = \
 				zpoff['ZPOff(Primary)'][zpoff['Filter Name'] == filt][0]
 			kcordict[survey][filt.split('-')[-1].split('/')[-1]]['magsys'] = \
