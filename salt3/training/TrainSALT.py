@@ -10,7 +10,7 @@ import sys
 import multiprocessing
 from scipy.linalg import lstsq
 
-from salt3.util import snana
+from salt3.util import snana,readutils
 from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
 from scipy.optimize import minimize, least_squares, differential_evolution
 from salt3.training.fitting import fitting
@@ -418,13 +418,14 @@ class TrainSALT:
 		if not os.path.exists(initmodelfile):
 			from salt3.initfiles import init_rootdir
 			initmodelfile = '%s/%s'%(init_rootdir,initmodelfile)
+			flatnu='%s/flatnu.dat'%(init_rootdir)
 			initBfilt = '%s/%s'%(init_rootdir,initBfilt)
 			salt2file = '%s/salt2_template_0.dat.gz'%init_rootdir
 		if not os.path.exists(initmodelfile):
 			raise RuntimeError('model initialization file not found in local directory or %s'%init_rootdir)
 		
 		phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
-			initmodelfile,salt2file,initBfilt,phaserange=phaserange,waverange=waverange,
+			initmodelfile,salt2file,initBfilt,flatnu,phaserange=phaserange,waverange=waverange,
 			phasesplineres=phaseres,wavesplineres=waveres,
 			phaseinterpres=phaseoutres,waveinterpres=waveoutres)
 		errphaseknotloc,errwaveknotloc = init_errs(
@@ -475,6 +476,7 @@ class TrainSALT:
 			guess[parlist == 'cl'] = [0.]*n_colorpars
 		guess[(parlist == 'm0') & (guess < 0)] = 0
 		
+		
 		saltfitter = saltfit.chi2(guess,datadict,parlist,
 								  phaseknotloc,waveknotloc,
 								  errphaseknotloc,errwaveknotloc,
@@ -508,8 +510,7 @@ class TrainSALT:
 		initguess = ()
 		for k in datadict.keys():
 			initparlist += ['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k]
-			initguess += (10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36)),0,0,0)
-
+			initguess += (10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.24-10.635)),0,0,0)
 		initparlist = np.array(initparlist)
 		print('training on %i SNe!'%len(datadict.keys()))
 
@@ -705,11 +706,11 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 		if not self.options.kcor_path:
 			raise RuntimeError('kcor_path variable must be defined!')
-		self.rdkcor(self.options.kcor_path)
+		self.kcordict=readutils.rdkcor(self.options.kcor_path,self.addwarning)
 		# TODO: ASCII filter files
 		
 		# read the data
-		datadict = self.rdAllData(self.options.snlist,speclist=self.options.speclist)
+		datadict = readutils.rdAllData(self.options.snlist,self.options.estimate_tpk,self.addwarning,speclist=self.options.speclist)
 		
 		if not os.path.exists(self.options.outputdir):
 			os.makedirs(self.options.outputdir)

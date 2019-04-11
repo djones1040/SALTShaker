@@ -8,11 +8,13 @@ _SCALE_FACTOR = 1e-12
 def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 			   salt2file='initfiles/salt2_template_0.dat.gz',
 			   Bfilt='initfiles/Bessell90_B.dat',
+			   flatnu='initfiles/flatnu.dat',
 			   phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
 			   waveinterpres=2.0,phasesplineres=3.2,wavesplineres=72,
 			   days_interp=5,debug=False):
 
 	phase,wave,flux = np.loadtxt(hsiaofile,unpack=True)
+	refWave,refFlux=np.loadtxt(flatnu,unpack=True)
 	#sphase,swave,sflux = np.loadtxt(hsiaofile,unpack=True)
 	#HBmag = synphotB(wave[phase == 0],flux[phase == 0],0,Bfilt=Bfilt)
 	#SBmag = synphotB(swave[phase == 0],sflux[sphase == 0],0,Bfilt=Bfilt)
@@ -20,7 +22,7 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 	
 	#flux /= 4*np.pi*(10*3.086e18)**2.
 	#flux *= 10**(0.4*19.36)*_SCALE_FACTOR
-	flux *= _SCALE_FACTOR
+	flux *= 10**(-0.4*(10.635+(synphotB(refWave,refFlux,0,0,Bfilt)-synphotB(wave[phase==0],flux[phase==0],0,0,Bfilt))))*_SCALE_FACTOR
 	
 	m1phase = phase*1.1
 	splinephase = np.linspace(phaserange[0],phaserange[1],
@@ -117,5 +119,4 @@ def synphotB(sourcewave,sourceflux,zpoff,redshift=0,
 	pbspl *= obswave[g]
 
 	res = np.trapz(pbspl*sourceflux[g],obswave[g])/np.trapz(pbspl,obswave[g])
-	print(res)
 	return(zpoff-2.5*np.log10(res))
