@@ -172,6 +172,7 @@ smearing) and <strong>magoff</strong> (magnitude offsets) definitions to be appl
 sed_file. You may also define <strong>clobber</strong> and <strong>verbose</strong> flags here as well. This section may look
 like the following:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">main</span><span class="p">]</span>
+
 <span class="n">sed_file</span> <span class="o">=</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
 <span class="n">magsmear</span> <span class="o">=</span> <span class="mf">0.1</span>
 <span class="n">magoff</span> <span class="o">=</span> <span class="mf">0.0</span>
@@ -186,11 +187,13 @@ this section exists, then it supersedes later sections and defines the warping e
 If it does not exist, all defined warping effects are used. Adding this onto the <strong>[main]</strong> section,
 the params file might now look like the following:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">main</span><span class="p">]</span>
+
 <span class="n">sed_file</span> <span class="o">=</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
 <span class="n">magsmear</span> <span class="o">=</span> <span class="mf">0.1</span>
 <span class="n">magoff</span> <span class="o">=</span> <span class="mf">0.0</span>
 
 <span class="p">[</span><span class="n">flags</span><span class="p">]</span>
+
 <span class="n">color</span> <span class="o">=</span> <span class="kc">True</span>
 <span class="n">stretch</span> <span class="o">=</span> <span class="kc">True</span>
 <span class="n">host_mass</span> <span class="o">=</span> <span class="kc">False</span>
@@ -273,6 +276,7 @@ sections. If I do not define a <strong>[flags]</strong> section, then whatever s
 the <strong>[main]</strong> section are assumed to be warping effects. One such section might look like the
 following:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">color</span><span class="p">]</span>
+
 <span class="n">function</span> <span class="o">=</span> <span class="n">color_function</span><span class="o">.</span><span class="n">dat</span>
 <span class="n">mean</span> <span class="o">=</span> <span class="mf">0.0</span>
 <span class="n">sigma_left</span> <span class="o">=</span> <span class="mf">0.07</span>
@@ -283,16 +287,19 @@ following:</p>
 </div>
 <p>All together, after adding in the stretch section as well, a <strong>BYOSED.params</strong> file might look something like this:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">main</span><span class="p">]</span>
+
 <span class="n">sed_file</span> <span class="o">=</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
 <span class="n">magsmear</span> <span class="o">=</span> <span class="mf">0.1</span>
 <span class="n">magoff</span> <span class="o">=</span> <span class="mf">0.0</span>
 
 <span class="p">[</span><span class="n">flags</span><span class="p">]</span>
+
 <span class="n">color</span> <span class="o">=</span> <span class="kc">True</span>
 <span class="n">stretch</span> <span class="o">=</span> <span class="kc">True</span>
 <span class="n">host_mass</span> <span class="o">=</span> <span class="kc">False</span>
 
 <span class="p">[</span><span class="n">color</span><span class="p">]</span>
+
 <span class="n">function</span> <span class="o">=</span> <span class="n">color_function</span><span class="o">.</span><span class="n">dat</span>
 <span class="n">mean</span> <span class="o">=</span> <span class="mf">0.0</span>
 <span class="n">sigma_left</span> <span class="o">=</span> <span class="mf">0.07</span>
@@ -313,11 +320,13 @@ following:</p>
 <p>Or, if you do not define a flags section, color and stretch will automatically be used as
 warping effects with the following <strong>BYOSED.params</strong> file:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">main</span><span class="p">]</span>
+
 <span class="n">sed_file</span> <span class="o">=</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
 <span class="n">magsmear</span> <span class="o">=</span> <span class="mf">0.1</span>
 <span class="n">magoff</span> <span class="o">=</span> <span class="mf">0.0</span>
 
 <span class="p">[</span><span class="n">color</span><span class="p">]</span>
+
 <span class="n">function</span> <span class="o">=</span> <span class="n">color_function</span><span class="o">.</span><span class="n">dat</span>
 <span class="n">mean</span> <span class="o">=</span> <span class="mf">0.0</span>
 <span class="n">sigma_left</span> <span class="o">=</span> <span class="mf">0.07</span>

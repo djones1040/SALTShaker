@@ -1,14 +1,17 @@
 [main]
+
 sed_file = Hsiao07.dat
 magsmear = 0.1
 magoff = 0.0
 
 [flags]
+
 color = True
 stretch = True
 host_mass = False
 
 [color]
+
 function = color_function.dat
 mean = 0.0
 sigma_left = 0.07
