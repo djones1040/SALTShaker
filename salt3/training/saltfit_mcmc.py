@@ -22,19 +22,21 @@ _SCALE_FACTOR = 1e-12
 lambdaeff = {'g':4900.1409,'r':6241.2736,'i':7563.7672,'z':8690.0840,'B':4353,'V':5477}
 
 class chi2:
-	def __init__(self,guess,datadict,parlist,phaseknotloc,waveknotloc,
+	def __init__(self,guess,datadict,parlist,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc,
 				 phaserange,waverange,phaseres,waveres,phaseoutres,waveoutres,
 				 colorwaverange,kcordict,initmodelfile,initBfilt,regulargradientphase,
 				 regulargradientwave, regulardyad,filter_mass_tolerance, specrange_wavescale_specrecal ,n_components=1,
 				 n_colorpars=0,days_interp=5,onlySNpars=False,mcmc=False,debug=False,
-				 fitstrategy='leastsquares',stepsize_magscale_M0=None,stepsize_magadd_M0=None,stepsize_magscale_M1=None,
-				 stepsize_magadd_M1=None,stepsize_cl=None,
+				 fitstrategy='leastsquares',stepsize_magscale_M0=None,stepsize_magadd_M0=None,
+				 stepsize_magscale_err=None,stepsize_magscale_M1=None,
+				 stepsize_magadd_M1=None,stepsize_cl=None,stepsize_magscale_clscat=None,
 				 stepsize_specrecal=None,stepsize_x0=None,stepsize_x1=None,
 				 stepsize_c=None,stepsize_tpkoff=None,n_iter=0,x1debugdict={},
 				 nsteps_before_adaptive=5000,nsteps_adaptive_memory=200,adaptive_sigma_opt_scale=3):
 
 		self.init_stepsizes(
-			stepsize_magscale_M0,stepsize_magadd_M0,stepsize_magscale_M1,stepsize_magadd_M1,stepsize_cl,
+			stepsize_magscale_M0,stepsize_magadd_M0,stepsize_magscale_err,
+			stepsize_magscale_M1,stepsize_magadd_M1,stepsize_cl,stepsize_magscale_clscat,
 			stepsize_specrecal,stepsize_x0,stepsize_x1,
 			stepsize_c,stepsize_tpkoff)
 
@@ -46,6 +48,11 @@ class chi2:
 		self.parlist = parlist
 		self.m0min = np.min(np.where(self.parlist == 'm0')[0])
 		self.m0max = np.max(np.where(self.parlist == 'm0')[0])
+		self.errmin = np.min(np.where(self.parlist == 'modelerr')[0])
+		self.errmax = np.max(np.where(self.parlist == 'modelerr')[0])
+
+		self.splinecolorwave = np.linspace(colorwaverange[0],colorwaverange[1],n_colorpars)
+		
 		self.phaserange = phaserange
 		self.waverange = waverange
 		self.phaseres = phaseres
@@ -74,6 +81,9 @@ class chi2:
 		assert type(parlist) == np.ndarray
 		self.splinephase = phaseknotloc
 		self.splinewave = waveknotloc
+		self.errphase = errphaseknotloc
+		self.errwave = errwaveknotloc
+
 		self.phase = np.linspace(phaserange[0]-days_interp,phaserange[1]+days_interp,
 								 (phaserange[1]-phaserange[0]+2*days_interp)/phaseoutres,False)
 		self.wave = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/waveoutres,False)
@@ -131,7 +141,8 @@ class chi2:
 				self.stdmag[survey][flt] = synphot(primarywave,kcordict[survey][primarykey],filtwave=self.kcordict[survey]['filtwave'],
 												   filttp=kcordict[survey][flt]['filttrans'],
 												   zpoff=0) - kcordict[survey][flt]['primarymag'] #kcordict[survey][flt]['zpoff'])
-		
+
+
 		#Count number of photometric and spectroscopic points
 		self.num_spec=0
 		self.num_phot=0
@@ -156,15 +167,17 @@ class chi2:
 					
 
 	def init_stepsizes(
-			self,stepsize_magscale_M0,stepsize_magadd_M0,
-			stepsize_magscale_M1,stepsize_magadd_M1,stepsize_cl,
+			self,stepsize_magscale_M0,stepsize_magadd_M0,stepsize_magscale_err,
+			stepsize_magscale_M1,stepsize_magadd_M1,stepsize_cl,stepsize_magscale_clscat,
 			stepsize_specrecal,stepsize_x0,stepsize_x1,
 			stepsize_c,stepsize_tpkoff):
 		self.stepsize_magscale_M0 = stepsize_magscale_M0
 		self.stepsize_magadd_M0 = stepsize_magadd_M0
+		self.stepsize_magscale_err = stepsize_magscale_err
 		self.stepsize_magscale_M1 = stepsize_magscale_M1
 		self.stepsize_magadd_M1 = stepsize_magadd_M1
 		self.stepsize_cl = stepsize_cl
+		self.stepsize_magscale_clscat = stepsize_magscale_clscat
 		self.stepsize_specrecal = stepsize_specrecal
 		self.stepsize_x0 = stepsize_x0
 		self.stepsize_x1 = stepsize_x1
@@ -261,7 +274,6 @@ class chi2:
 		else:
 			for i,par in zip(range(self.npar),self.parlist):
 				candidate[i] = np.random.normal(loc=current[i],scale=np.sqrt(prop_cov[i,i]))
-				# candidate = ss.multivariate_normal(mean=current, cov=prop_cov, allow_singular=True).rvs()
 
 		return candidate
 
@@ -280,6 +292,8 @@ class chi2:
 		for i,par in zip(range(self.npar),self.parlist):
 			if par == 'm0':
 				C_0[i,i] = (self.M0stddev*self.stepsize_magadd_M0)**2.
+			if par == 'modelerr':
+				C_0[i,i] = (self.errstddev)**2.
 			elif par == 'm1':
 				C_0[i,i] = (self.M1stddev*self.stepsize_magadd_M1)**2.
 			elif par.startswith('x0'):
@@ -306,6 +320,7 @@ class chi2:
 		Xlast = x[:]
 		self.M0stddev = np.std(Xlast[self.parlist == 'm0'])
 		self.M1stddev = np.std(Xlast[self.parlist == 'm1'])
+		self.errstddev = self.stepsize_magscale_err
 		mean, M2 = x[:], np.zeros([len(x),len(x)])
 		mean_recent, M2_recent = x[:], np.zeros([len(x),len(x)])
 
@@ -326,8 +341,8 @@ class chi2:
 			if not nstep % 50 and nstep > 250:
 				accept_frac_recent = len(accepted_history[-100:][accepted_history[-100:] == True])/100.
 			
-			#X = self.adjust_model(Xlast,stepfactor=stepfactor,nstep=nstep)
 			X = self.generate_AM_candidate(current=Xlast, M2=M2_recent, n=nstep)
+			#import pdb; pdb.set_trace()
 			
 			# loglike
 			this_loglike = self.chi2fit(X,pool=pool,debug=debug,debug2=debug2)
@@ -358,9 +373,12 @@ class chi2:
 		print('acceptance = %.3f'%(accept/float(nstep)))
 		if nstep < nburn:
 			raise RuntimeError('Not enough steps to wait 500 before burn-in')
-		xfinal,phase,wave,M0,M1,clpars,SNParams = self.getParsMCMC(loglike_history,np.array(outpars),nburn=nburn,result='best')
+		xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+			modelerr,clpars,clerr,clscat,SNParams = \
+			self.getParsMCMC(loglike_history,np.array(outpars),nburn=nburn,result='mean')
 		
-		return xfinal,phase,wave,M0,M1,clpars,SNParams
+		return xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+			modelerr,clpars,clerr,clscat,SNParams
 		
 	def accept(self, last_loglike, this_loglike):
 		alpha = np.exp(this_loglike - last_loglike)
@@ -397,7 +415,6 @@ class chi2:
 		chi2: float
 			Goodness of fit of model to training data	
 		"""
-		# TODO: fit to t0
 		
 		#Set up SALT model
 		if self.onlySNpars:
@@ -408,11 +425,11 @@ class chi2:
 		elif self.n_components == 2: M0,M1 = components
 		if self.n_colorpars:
 			colorLaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
-		else: colorLaw = None
+		else: colorLaw = None; colorScat = None
 
 		chi2 = 0
 		#Construct arguments for chi2forSN method
-		args=[(sn,x,components,colorLaw,self.onlySNpars,debug,debug2) for sn in self.datadict.keys()]
+		args=[(sn,x,components,colorLaw,colorScat,self.onlySNpars,debug,debug2) for sn in self.datadict.keys()]
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
 		if self.fitstrategy != 'leastsquares':
 			if pool:
@@ -427,11 +444,6 @@ class chi2:
 				for i in starmap(self.chi2forSN,args):
 					chi2 = np.append(chi2,i)
 				
-		#Debug statements
-		#if debug2: import pdb; pdb.set_trace()
-		#if self.onlySNpars: print(chi2,x)
-		#else:
-		#	print(chi2,x[0])#,x[self.parlist == 'x0_ASASSN-16bc'],x[self.parlist == 'cl'])
 		
 		if not self.onlySNpars:
 			
@@ -460,17 +472,14 @@ class chi2:
 		m0B = synphot(self.wave,int1d(0),filtwave=self.kcordict['default']['Bwave'],filttp=self.kcordict['default']['Btp'])-self.stdmag['default']['B']
 		
 		logprior = norm.logpdf(m0B,self.m0guess,0.02)
-		print(m0B,self.m0guess,logprior)
+
 		return logprior
+
+	def EBVprior(self,x):
+		pass
 		
-	def prior(self,cube,ndim=None,nparams=None):
-		for i in range(self.m0min,self.m0max):
-			#cube[i] = 1.0*self.guess[i] + 1e-16*cube[i]
-			cube[i] = self.guess[i]*10**(0.4*(cube[i]*2-1))
-		return cube
-			
 	def chi2forSN(self,sn,x,components=None,
-				  colorLaw=None,onlySNpars=False,
+				  colorLaw=None,colorScat=None,onlySNpars=False,
 				  debug=False,debug2=False):
 		"""
 		Calculates the goodness of fit of given SALT model to photometric and spectroscopic observations of a single SN 
@@ -511,7 +520,8 @@ class chi2:
 				components = self.SALTModel(x)
 		if self.n_components == 1: M0 = components[0]
 		elif self.n_components == 2: M0,M1 = components
-
+		salterr = self.ErrModel(x)
+		
 		#Declare variables
 		photdata = self.datadict[sn]['photdata']
 		specdata = self.datadict[sn]['specdata']
@@ -531,8 +541,6 @@ class chi2:
 			x0,x1,c,tpkoff = \
 				self.SNpars[self.SNparlist == 'x0_%s'%sn][0],self.SNpars[self.SNparlist == 'x1_%s'%sn][0],\
 				self.SNpars[self.SNparlist == 'c_%s'%sn][0],self.SNpars[self.SNparlist == 'tpkoff_%s'%sn][0]
-			# HACK!
-			# x1 = x[self.parlist == 'x1_%s'%sn][0]
 			
 		#Calculate spectral model
 		if self.n_components == 1:
@@ -544,11 +552,10 @@ class chi2:
 			saltflux *= 10. ** (-0.4 * colorLaw(self.wave) * c)
 			if debug2: import pdb; pdb.set_trace()
 
-		#saltflux = self.extrapolate(saltflux,x0)
-		#import pdb; pdb.set_trace()
 		if self.fitstrategy == 'leastsquares': chi2 = np.array([])
 		else: chi2 = 0
 		int1d = interp1d(obsphase,saltflux,axis=0)
+		interr1d = interp1d(obsphase,salterr,axis=0)
 		for k in specdata.keys():
 			phase=specdata[k]['tobs']+tpkoff
 			if phase < obsphase.min() or phase > obsphase.max(): raise RuntimeError('Phase {} is out of extrapolated phase range for SN {} with tpkoff {}'.format(phase,sn,tpkoff))
@@ -565,17 +572,12 @@ class chi2:
 			filttrans = self.kcordict[survey][flt]['filttrans']
 
 			g = (obswave >= filtwave[0]) & (obswave <= filtwave[-1])  # overlap range
-			#gred = filtwave > obswave[-1]
-			#gblue = filtwave < obswave[0]
 			
 			
 			pbspl = np.interp(obswave[g],filtwave,filttrans)
 			pbspl *= obswave[g]
 				
 			denom = np.trapz(pbspl,obswave[g])
-			#denom_blue = np.trapz(pbspl,obswave[gblue])
-			#denom_red = np.trapz(pbspl,obswave[gred])
-			#import pdb; pdb.set_trace()
 
 			phase=photdata['tobs']+tpkoff
 			#Select data from the appropriate filter filter
@@ -587,24 +589,33 @@ class chi2:
 			try:
 				#Array output indices match time along 0th axis, wavelength along 1st axis
 				saltfluxinterp = int1d(phase)
+				salterrinterp = interr1d(phase)
 			except:
 				import pdb; pdb.set_trace()
 			# synthetic photometry from SALT model
 			# Integrate along wavelength axis
 			modelsynflux=np.trapz(pbspl[np.newaxis,:]*saltfluxinterp[:,g],obswave[g],axis=1)/denom
+
 			modelflux = modelsynflux*10**(-0.4*self.kcordict[survey][flt]['zpoff'])*10**(0.4*(self.stdmag[survey][flt]+27.5))
-			print(modelflux,filtPhot['fluxcal'])
-			print(x0,10.635-2.5*np.log10(x0),cosmo.distmod(z).value)
+			modelerr=np.trapz(pbspl[np.newaxis,:]*salterrinterp[:,g],obswave[g],axis=1)/denom
+
+			if colorScat: colorerr = splev(self.kcordict[survey][flt]['lambdaeff'],
+										   (self.splinecolorwave,x[self.parlist == 'clscat'],3))
+			else: colorerr = 0.0
+			
+
 			# chi2 function
-			# TODO - model error/dispersion parameters
 			if self.fitstrategy == 'leastsquares':
 				chi2 = np.append(chi2,(filtPhot['fluxcal']-modelflux)**2./(filtPhot['fluxcal']*0.05)**2.)
 			else:
-				chi2 += ((filtPhot['fluxcal']-modelflux)**2./(filtPhot['fluxcalerr']**2. + (filtPhot['fluxcal']*0.01)**2.)).sum()
-
+				chi2 += ((filtPhot['fluxcal']-modelflux)**2./(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)-\
+						 np.log(1/(np.sqrt(2*np.pi)*np.sqrt(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)))).sum()
+				#if chi2 < 0: import pdb; pdb.set_trace()
+				#chi2 += ((filtPhot['fluxcal']-modelflux)**2./(filtPhot['fluxcalerr']**2. + modelflux**2.*0.01**2. + colorerr**2.)-\
+				#		 np.log(1/(np.sqrt(2*np.pi)*np.sqrt(filtPhot['fluxcalerr']**2. + modelflux**2.*0.01**2. + colorerr**2.)))).sum()
+				#import pdb; pdb.set_trace()
+				
 			if self.debug:
-				#print(chi2)
-				#print(flt)
 				if self.nstep > 1500 and flt == 'd' and sn == 5999398:
 					print(sn)
 					import pylab as plt
@@ -646,7 +657,18 @@ class chi2:
 			raise RuntimeError('A maximum of two principal components is allowed')
 			
 		return components
+
+	def ErrModel(self,x,bsorder=3,evaluatePhase=None,evaluateWave=None):
+
+		try: errpars = x[self.errmin:self.errmax]
+		except: import pdb; pdb.set_trace()
+
+		modelerr = bisplev(self.phase if evaluatePhase is None else evaluatePhase,self.wave if evaluateWave is None else evaluateWave,(self.errphase,self.errwave,errpars,bsorder,bsorder))
+		if len(np.where(modelerr != modelerr)[0]): import pdb; pdb.set_trace()
 		
+		return modelerr
+
+	
 	def getPars(self,x,bsorder=3):
 
 		m0pars = x[self.parlist == 'm0']
@@ -670,7 +692,7 @@ class chi2:
 			
 		return self.phase,self.wave,m0,m1,clpars,resultsdict
 
-	def getParsMCMC(self,loglikes,x,nburn=500,bsorder=3,result='mean'):
+	def getParsMCMC(self,loglikes,x,nburn=500,bsorder=3,result='mean',mkplots=False):
 
 		axcount = 0; parcount = 0
 		from matplotlib.backends.backend_pdf import PdfPages
@@ -679,43 +701,80 @@ class chi2:
 		
 		if result == 'mean':
 			m0pars = np.array([])
+			m0err = np.array([])
 			for i in np.where(self.parlist == 'm0')[0]:
 				#[x[i][nburn:] == x[i][nburn:]]
 				m0pars = np.append(m0pars,x[i][nburn:].mean()/_SCALE_FACTOR)
-				if not parcount % 9:
-					subnum = axcount%9+1
-					ax = plt.subplot(3,3,subnum)
-					axcount += 1
-					md,std = np.mean(x[i][nburn:]),np.std(x[i][nburn:])
-					histbins = np.linspace(md-3*std,md+3*std,50)
-					ax.hist(x[i][nburn:],bins=histbins)
-					ax.set_title('M0')
-					if axcount % 9 == 8:
-						pdf_pages.savefig(fig)
-						fig = plt.figure()
-				parcount += 1
+				m0err = np.append(m0err,x[i][nburn:].std()/_SCALE_FACTOR)
+				if mkplots:
+					if not parcount % 9:
+						subnum = axcount%9+1
+						ax = plt.subplot(3,3,subnum)
+						axcount += 1
+						md,std = np.mean(x[i][nburn:]),np.std(x[i][nburn:])
+						histbins = np.linspace(md-3*std,md+3*std,50)
+						ax.hist(x[i][nburn:],bins=histbins)
+						ax.set_title('M0')
+						if axcount % 9 == 8:
+							pdf_pages.savefig(fig)
+							fig = plt.figure()
+					parcount += 1
 
 			m1pars = np.array([])
+			m1err = np.array([])
 			parcount = 0
 			for i in np.where(self.parlist == 'm1')[0]:
 				m1pars = np.append(m1pars,x[i][nburn:].mean()/_SCALE_FACTOR)
-				if not parcount % 9:
-					subnum = axcount%9+1
-					ax = plt.subplot(3,3,subnum)
-					axcount += 1
-					md,std = np.mean(x[i][nburn:]),np.std(x[i][nburn:])
-					histbins = np.linspace(md-3*std,md+3*std,50)
-					ax.hist(x[i][nburn:],bins=histbins)
-					ax.set_title('M1')
-					if axcount % 9 == 8:
-						pdf_pages.savefig(fig)
-						fig = plt.figure()
-				parcount += 1
+				m1err = np.append(m1err,x[i][nburn:].std()/_SCALE_FACTOR)
+				if mkplots:
+					if not parcount % 9:
+						subnum = axcount%9+1
+						ax = plt.subplot(3,3,subnum)
+						axcount += 1
+						md,std = np.mean(x[i][nburn:]),np.std(x[i][nburn:])
+						histbins = np.linspace(md-3*std,md+3*std,50)
+						ax.hist(x[i][nburn:],bins=histbins)
+						ax.set_title('M1')
+						if axcount % 9 == 8:
+							pdf_pages.savefig(fig)
+							fig = plt.figure()
+					parcount += 1
 
+			# covmat (diagonals only?)
+			m0_m1_cov = np.zeros(len(m0pars))
+			chain_len = len(m0pars)
+			iM0 = self.parlist == 'm0'
+			iM1 = self.parlist == 'm1'
+			m0mean = np.repeat(x[iM0][:,nburn:].mean(axis=1),np.shape(x[iM0][:,nburn:])[1]).reshape(np.shape(x[iM0][:,nburn:]))
+			m1mean = np.repeat(x[iM1][:,nburn:].mean(axis=1),np.shape(x[iM1][:,nburn:])[1]).reshape(np.shape(x[iM1][:,nburn:]))
+			m0var = x[iM0][:,nburn:]-m0mean
+			m1var = x[iM1][:,nburn:]-m1mean
+			
+			for i in range(len(m0pars)):
+				for j in range(len(m1pars)):
+					if i == j: m0_m1_cov[i] = np.sum(m0var[j]*m1var[i])
+			m0_m1_cov /= chain_len
+
+					
+			modelerrpars = np.array([])
+			modelerrerr = np.array([])
+			for i in np.where(self.parlist == 'modelerr')[0]:
+				modelerrpars = np.append(modelerrpars,x[i][nburn:].mean())
+				modelerrerr = np.append(modelerrerr,x[i][nburn:].std())
 				
 			clpars = np.array([])
+			clerr = np.array([])
 			for i in np.where(self.parlist == 'cl')[0]:
 				clpars = np.append(clpars,x[i][nburn:].mean())
+				clerr = np.append(clpars,x[i][nburn:].std())
+
+			clscatpars = np.array([])
+			clscaterr = np.array([])
+			for i in np.where(self.parlist == 'clscat')[0]:
+				clscatpars = np.append(clpars,x[i][nburn:].mean())
+				clscaterr = np.append(clpars,x[i][nburn:].std())
+
+				
 			result=np.mean(x,axis=1)
 			resultsdict = {}
 			n_sn = len(self.datadict.keys())
@@ -725,7 +784,11 @@ class chi2:
 					resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k][0][nburn:].mean(),
 									  'x1':x[self.parlist == 'x1_%s'%k][0][nburn:].mean(),
 									  'c':x[self.parlist == 'x1_%s'%k][0][nburn:].mean(),
-									  'tpkoff':x[self.parlist == 'tpkoff_%s'%k][0][nburn:].mean()}
+									  'tpkoff':x[self.parlist == 'tpkoff_%s'%k][0][nburn:].mean(),
+									  'x0err':x[self.parlist == 'x0_%s'%k][0][nburn:].std(),
+									  'x1err':x[self.parlist == 'x1_%s'%k][0][nburn:].std(),
+									  'cerr':x[self.parlist == 'x1_%s'%k][0][nburn:].std(),
+									  'tpkofferr':x[self.parlist == 'tpkoff_%s'%k][0][nburn:].std()}
 				else:
 					resultsdict[k] = {'x0':self.SNpars[self.SNparlist == 'x0_%s'%k][0],
 									  'x1':self.SNpars[self.SNparlist == 'x1_%s'%k][0],
@@ -769,9 +832,19 @@ class chi2:
 			raise ValueError('Key {} passed to getParsMCMC, valid keys are \"mean\" or \"mode\"')
 
 		m0 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m0pars,bsorder,bsorder))
+		m0err = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m0err,bsorder,bsorder))
 		if len(m1pars):
 			m1 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m1pars,bsorder,bsorder))
-		else: m1 = np.zeros(np.shape(m0))
+			m1err = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m1err,bsorder,bsorder))
+		else:
+			m1 = np.zeros(np.shape(m0))
+			m1err = np.zeros(np.shape(m0))
+
+	
+		cov_m0_m1 = bisplev(self.phase,self.wave,(self.splinephase,self.splinewave,m0_m1_cov,bsorder,bsorder))
+		modelerr = bisplev(self.phase,self.wave,(self.errphase,self.errwave,modelerrpars,bsorder,bsorder))
+		clscat = splev(self.wave,(self.errwave,clscatpars,3))
+		#import pdb; pdb.set_trace()
 		if not len(clpars): clpars = []
 	
 		resultsdict = {}
@@ -782,7 +855,11 @@ class chi2:
 				resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k][0][nburn:].mean(),
 								  'x1':x[self.parlist == 'x1_%s'%k][0][nburn:].mean(),
 								  'c':x[self.parlist == 'x1_%s'%k][0][nburn:].mean(),
-								  'tpkoff':x[self.parlist == 'tpkoff_%s'%k][0][nburn:].mean()}
+								  'tpkoff':x[self.parlist == 'tpkoff_%s'%k][0][nburn:].mean(),
+								  'x0err':x[self.parlist == 'x0_%s'%k][0][nburn:].std(),
+								  'x1err':x[self.parlist == 'x1_%s'%k][0][nburn:].std(),
+								  'cerr':x[self.parlist == 'x1_%s'%k][0][nburn:].std(),
+								  'tpkofferr':x[self.parlist == 'tpkoff_%s'%k][0][nburn:].std()}
 			else:
 				resultsdict[k] = {'x0':self.SNpars[self.SNparlist == 'x0_%s'%k][0],
 								  'x1':self.SNpars[self.SNparlist == 'x1_%s'%k][0],
@@ -807,7 +884,8 @@ class chi2:
 		pdf_pages.savefig(fig)			
 		pdf_pages.close()
 
-		return result,self.phase,self.wave,m0,m1,clpars,resultsdict
+		return(result,self.phase,self.wave,m0,m0err,m1,m1err,cov_m0_m1,modelerr,
+			   clpars,clerr,clscat,resultsdict)
 
 	
 	def synphot(self,sourceflux,zpoff,survey=None,flt=None,redshift=0):
