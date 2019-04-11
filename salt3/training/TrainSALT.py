@@ -450,7 +450,8 @@ class TrainSALT:
 		if self.options.error_snake_phase_binsize and self.options.error_snake_wave_binsize:
 			parlist = np.append(parlist,['modelerr']*n_errphaseknots*n_errwaveknots)
 		if self.options.n_colorscatpars:
-			parlist = np.append(parlist,['clscat']*self.options.n_colorscatpars)
+			# four knots for the end points
+			parlist = np.append(parlist,['clscat']*(self.options.n_colorscatpars+8))
 			
 		for k in datadict.keys():
 			parlist = np.append(parlist,['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k])
@@ -525,7 +526,7 @@ class TrainSALT:
 
 		# do the fitting
 		x_modelpars,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-			modelerr,clpars,clerr,clscat,clscaterr,SNParams,message = fitter.mcmc(
+			modelerr,clpars,clerr,clscat,SNParams,message = fitter.mcmc(
 			saltfitter,guess,(),(),n_processes,
 			self.options.n_steps_mcmc,self.options.n_burnin_mcmc)
 		for k in datadict.keys():
@@ -546,12 +547,12 @@ class TrainSALT:
 
 		
 		return phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-			modelerr,clpars,clerr,clscat,clscaterr,SNParams,x_modelpars,parlist
+			modelerr,clpars,clerr,clscat,SNParams,x_modelpars,parlist
 
 	def wrtoutput(self,outdir,phase,wave,
 				  M0,M0err,M1,M1err,cov_M0_M1,
 				  modelerr,clpars,
-				  clerr,clscat,clscaterr,SNParams,pars,parlist):
+				  clerr,clscat,SNParams,pars,parlist):
 
 		if not os.path.exists(outdir):
 			raise RuntimeError('desired output directory %s doesn\'t exist'%outdir)
@@ -571,7 +572,6 @@ class TrainSALT:
 		fouterrmod = open('%s/salt3_lc_dispersion_scaling.dat'%outdir,'w')
 		foutcov = open('%s/salt3_lc_relative_covariance_01.dat'%outdir,'w')
 		foutcl = open('%s/salt3_color_correction.dat'%outdir,'w')
-		foutclscat = open('%s/salt3_color_dispersion.dat'%outdir,'w')
 
 		for p,i in zip(phase,range(len(phase))):
 			for w,j in zip(wave,range(len(wave))):
@@ -581,6 +581,11 @@ class TrainSALT:
 				print('%.1f %.2f %8.5e'%(p,w,M1err[i,j]**2.),file=foutm1err)
 				print('%.1f %.2f %8.5e'%(p,w,cov_M0_M1[i,j]),file=foutcov)
 				print('%.1f %.2f %8.5e'%(p,w,modelerr[i,j]),file=fouterrmod)
+
+		foutclscat = open('%s/salt3_color_dispersion.dat'%outdir,'w')
+		for w,j in zip(wave,range(len(wave))):
+			print('%.2f %8.5e'%(w,clscat[j]),file=foutclscat)
+		foutclscat.close()
 				
 		foutm0.close()
 		foutm1.close()
@@ -750,7 +755,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		# fit the model - initial pass
 		if self.options.stage == "all" or self.options.stage == "train":
 			phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-				modelerr,clpars,clerr,clscat,clscaterr,SNParams,pars,parlist = self.fitSALTModel(
+				modelerr,clpars,clerr,clscat,SNParams,pars,parlist = self.fitSALTModel(
 				datadict,self.options.phaserange,self.options.phasesplineres,
 				self.options.waverange,self.options.wavesplineres,
 				self.options.colorwaverange,
@@ -774,7 +779,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		
 			# write the output model - M0, M1, c
 			self.wrtoutput(self.options.outputdir,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,
-						   modelerr,clpars,clerr,clscat,clscaterr,SNParams,
+						   modelerr,clpars,clerr,clscat,SNParams,
 						   pars,parlist)
 
 		if self.options.stage == "all" or self.options.stage == "validate":

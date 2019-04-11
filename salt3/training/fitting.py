@@ -274,7 +274,7 @@ class fitting:
 		saltfitter.fitstrategy = 'mcmc'
 		
 		x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-			modelerr,clpars,clerr,clscat,clscaterr,SNParams = \
+			modelerr,clpars,clerr,clscat,SNParams = \
 			saltfitter.mcmcfit(guess,n_mcmc_steps,n_burnin_mcmc)
 		return x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,clscaterr,SNParams,'simple MCMC was successful'
