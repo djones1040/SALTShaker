@@ -30,6 +30,7 @@ like the following:
 ::
 	
 	[main]
+	
 	sed_file = Hsiao07.dat
 	magsmear = 0.1
 	magoff = 0.0
@@ -47,11 +48,13 @@ the params file might now look like the following:
 ::
 
 	[main]
+
 	sed_file = Hsiao07.dat
 	magsmear = 0.1
 	magoff = 0.0
 
 	[flags]
+
 	color = True
 	stretch = True
 	host_mass = False
@@ -116,6 +119,7 @@ following:
 ::
 
 	[color]
+
 	function = color_function.dat
 	mean = 0.0
 	sigma_left = 0.07
@@ -128,16 +132,19 @@ All together, after adding in the stretch section as well, a **BYOSED.params** f
 ::
 
 	[main]
+
 	sed_file = Hsiao07.dat
 	magsmear = 0.1
 	magoff = 0.0
 
 	[flags]
+
 	color = True
 	stretch = True
 	host_mass = False
 
 	[color]
+
 	function = color_function.dat
 	mean = 0.0
 	sigma_left = 0.07
@@ -160,11 +167,13 @@ warping effects with the following **BYOSED.params** file:
 ::
 
 	[main]
+
 	sed_file = Hsiao07.dat
 	magsmear = 0.1
 	magoff = 0.0
 
 	[color]
+
 	function = color_function.dat
 	mean = 0.0
 	sigma_left = 0.07
