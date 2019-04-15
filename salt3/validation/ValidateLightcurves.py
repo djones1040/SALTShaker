@@ -7,6 +7,10 @@ from astropy.table import Table
 import astropy.units as u
 from salt3.util.synphot import synphot
 from scipy.interpolate import interp1d
+from sncosmo.constants import HC_ERG_AA
+from salt3.initfiles import init_rootdir
+from salt3.training.init_hsiao import synphotB
+_SCALE_FACTOR = 1e-12
 
 filtdict = {'b':'cspb','c':'cspv3014','d':'cspr','e':'cspi'}
 
@@ -139,11 +143,16 @@ def customfilt(outfile,lcfile,salt3dir,
 			   lcrv00file='salt2_lc_relative_variance_0.dat',
 			   lcrv11file='salt2_lc_relative_variance_1.dat',
 			   lcrv01file='salt2_lc_relative_covariance_01.dat',
+			   Bfilt='Bessell90_B.dat',
+			   flatnu='flatnu.dat',
 			   x0 = None, x1 = None, c = None, t0 = None,
 			   fitx1=False,fitc=False,bandpassdict=None, n_components=1):
 	
 	plt.clf()
 
+	refWave,refFlux=np.loadtxt('%s/%s'%(init_rootdir,flatnu),unpack=True)
+	Bfilt = '%s/%s'%(init_rootdir,Bfilt)
+	
 	fitparams_salt3 = []
 	if not t0: fitparams_salt3 += ['t0']
 	if not x0: fitparams_salt3 += ['x0']
@@ -182,14 +191,19 @@ def customfilt(outfile,lcfile,salt3dir,
 	salt2model = sncosmo.Model(source='salt2')
 	hsiaomodel = sncosmo.Model(source='hsiao')
 	salt3phase,salt3wave,salt3flux = np.genfromtxt('%s/%s'%(salt3dir,m0file),unpack=True)
+	#salt3flux *= 10**(-0.4*(-19.36+(synphotB(refWave,refFlux,0,0,Bfilt)-synphotB(salt3wave[salt3phase==0],salt3flux[salt3phase==0],0,0,Bfilt))))
 	salt3m1phase,salt3m1wave,salt3m1flux = np.genfromtxt('%s/%s'%(salt3dir,m1file),unpack=True)
-	salt3flux = salt3flux.reshape([len(np.unique(salt3phase)),len(np.unique(salt3wave))])
-	salt3m1flux = salt3m1flux.reshape([len(np.unique(salt3phase)),len(np.unique(salt3wave))])
+	#salt3m1flux *= 10**(-0.4*(-19.36+(synphotB(refWave,refFlux,0,0,Bfilt)-synphotB(salt3m1wave[salt3m1phase==0],salt3m1flux[salt3m1phase==0],0,0,Bfilt))))
+
+	salt3flux = salt3flux.reshape([len(np.unique(salt3phase)),len(np.unique(salt3wave))])#*10**(0.4*27.5)
+	salt3m1flux = salt3m1flux.reshape([len(np.unique(salt3phase)),len(np.unique(salt3wave))])#*10**(0.4*27.5)
 	salt3phase = np.unique(salt3phase)*(1+float(sn.REDSHIFT_HELIO[0:5]))
 	salt3wave = np.unique(salt3wave)*(1+float(sn.REDSHIFT_HELIO[0:5]))
 
+	
 	if n_components == 1: salt3flux = x0*salt3flux
 	elif n_components == 2: salt3flux = x0*(salt3flux + x1*salt3m1flux)
+	salt3flux *= _SCALE_FACTOR
 	#import pdb; pdb.set_trace()
 	
 	salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,
@@ -254,7 +268,7 @@ def customfilt(outfile,lcfile,salt3dir,
 		pbspl = np.interp(salt3wave[g],filtwave,filttrans)
 		pbspl *= salt3wave[g]
 		denom = np.trapz(pbspl,salt3wave[g])
-		salt3synflux=np.trapz(pbspl[np.newaxis,:]*salt3fluxnew[:,g],salt3wave[g],axis=1)/denom
+		salt3synflux=np.trapz(pbspl[np.newaxis,:]*salt3fluxnew[:,g]/HC_ERG_AA,salt3wave[g],axis=1)/denom
 		salt3synflux *= 10**(-0.4*bandpassdict[flt]['zpoff'])*10**(0.4*bandpassdict[flt]['stdmag'])*10**(0.4*27.5)
 		#int1d = interp1d(salt3phase,salt3synflux,axis=0,fill_value='extrapolate')
 	
@@ -279,11 +293,12 @@ def customfilt(outfile,lcfile,salt3dir,
 		except:
 			import pdb; pdb.set_trace()
 		ax.set_ylim([-np.max(sn.FLUXCAL)*1/20.,np.max(sn.FLUXCAL)*1.1])
+
 		#if flt == 'c': import pdb; pdb.set_trace()
 	ax1.legend()
 	plt.savefig(outfile)
 	plt.show()
-	
+
 	
 	
 if __name__ == "__main__":
