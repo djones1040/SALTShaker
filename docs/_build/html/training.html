@@ -26,7 +26,6 @@
 
   <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
   <link rel="stylesheet" href="_static/gallery.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -153,28 +152,41 @@
   <div class="section" id="training-the-salt3-model">
 <h1>Training the SALT3 Model<a class="headerlink" href="#training-the-salt3-model" title="Permalink to this headline">¶</a></h1>
 <p>usage:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">TrainSALT</span><span class="o">.</span><span class="n">py</span> <span class="o">-</span><span class="n">c</span> <span class="o">&lt;</span><span class="n">configfile</span><span class="o">&gt;</span> <span class="o">&lt;</span><span class="n">options</span><span class="o">&gt;</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">TrainSALT</span><span class="o">.</span><span class="n">py</span> <span class="o">-</span><span class="n">c</span> <span class="o">&lt;</span><span class="n">configfile</span><span class="o">&gt;</span> <span class="o">&lt;</span><span class="n">options</span><span class="o">&gt;</span>
 </pre></div>
 </div>
 <p>To run an example, change to the “examples” directory
 in the main package and run:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">TrainSALT</span><span class="o">.</span><span class="n">py</span> <span class="o">-</span><span class="n">c</span> <span class="n">SALT</span><span class="o">.</span><span class="n">conf</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">TrainSALT</span><span class="o">.</span><span class="n">py</span> <span class="o">-</span><span class="n">c</span> <span class="n">SALT</span><span class="o">.</span><span class="n">conf</span>
 </pre></div>
 </div>
-<p>This will use the lightcurves and spectra in the <code class="code docutils literal notranslate"><span class="pre">examples/exampledata/</span></code>
-directory and the kcor files in the <code class="code docutils literal notranslate"><span class="pre">examples/kcor/</span></code> directory to
-run the SALT3 training, writing outputs to the <code class="code docutils literal notranslate"><span class="pre">examples/output/</span></code>
-directory</p>
+<p>This will use the lightcurves and spectra in the <code class="code docutils literal"><span class="pre">examples/exampledata/</span></code>
+directory and the kcor files in the <code class="code docutils literal"><span class="pre">examples/kcor/</span></code> directory to
+run the SALT3 training, writing outputs to the <code class="code docutils literal"><span class="pre">examples/output/</span></code>
+directory.</p>
+<div class="section" id="training-on-snana-simulations">
+<h2>Training on SNANA Simulations<a class="headerlink" href="#training-on-snana-simulations" title="Permalink to this headline">¶</a></h2>
+<p>There are several “SNANA” simulations included in the examples directory
+for training.  One of these is already set in the <code class="code docutils literal"><span class="pre">SALT_SNANA.conf</span></code>
+parameters file.  The relevant data are in <code class="code docutils literal"><span class="pre">exampledata/snana/photdata</span></code>
+and <code class="code docutils literal"><span class="pre">exampledata/snana/photdata_nox1</span></code> for a simple model where
+the training only attempts to find the first principal component.
+For this simplified model, run:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">TrainSALT</span><span class="o">.</span><span class="n">py</span> <span class="o">-</span><span class="n">c</span> <span class="n">SALT_SNANA</span><span class="o">.</span><span class="n">conf</span> <span class="o">--</span><span class="n">n_components</span> <span class="mi">1</span>
+</pre></div>
+</div>
+<p>Additional examples will be added as the code matures.</p>
+</div>
 <div class="section" id="salt3-training-configuration-options">
 <h2>SALT3 Training Configuration Options<a class="headerlink" href="#salt3-training-configuration-options" title="Permalink to this headline">¶</a></h2>
-<p>See the SALT.conf file in the <code class="code docutils literal notranslate"><span class="pre">examples/</span></code> directory
+<p>See the SALT.conf file in the <code class="code docutils literal"><span class="pre">examples/</span></code> directory
 for a list of training options.
 Descriptions of each option are given below.</p>
 <table border="1" class="docutils">
 <colgroup>
-<col width="13%" />
-<col width="10%" />
-<col width="77%" />
+<col width="16%" />
+<col width="9%" />
+<col width="75%" />
 </colgroup>
 <thead valign="bottom">
 <tr class="row-odd"><th class="head">Name</th>
@@ -191,69 +203,205 @@ Descriptions of each option are given below.</p>
 <td>&#160;</td>
 <td>ASCII file with list of SN files (see <a class="reference internal" href="data.html#data-format"><span class="std std-ref">Data Format</span></a> for input file format)</td>
 </tr>
-<tr class="row-even"><td>outputdir</td>
+<tr class="row-even"><td>speclist</td>
+<td>&#160;</td>
+<td>List of spectra (not sure if this is getting used currently)</td>
+</tr>
+<tr class="row-odd"><td>outputdir</td>
 <td>&#160;</td>
 <td>Directory for trained model outputs</td>
 </tr>
-<tr class="row-odd"><td>initmodelfile</td>
+<tr class="row-even"><td>initmodelfile</td>
 <td>Hsiao07.dat</td>
 <td>Initial SN SED model.  Initial parameter guesses are derived from this file.  Default is the Hsiao model</td>
 </tr>
-<tr class="row-even"><td>kcor_path</td>
-<td>&#160;</td>
-<td>Comma-separated surveyname,kcorfile for each <code class="code docutils literal notranslate"><span class="pre">SURVEY</span></code> key in SN data files</td>
+<tr class="row-odd"><td>initbfilt</td>
+<td>Bessell90_B.dat</td>
+<td>Nominal <em>B</em>-filter for putting priors on the normalization</td>
 </tr>
-<tr class="row-odd"><td>kcor_path+=</td>
+<tr class="row-even"><td>[survey_&lt;<code class="code docutils literal"><span class="pre">SURVEY</span></code>&gt;]</td>
 <td>&#160;</td>
-<td>Same as <code class="code docutils literal notranslate"><span class="pre">kcor_path</span></code>, but appends a second entry to the kcor_path variable</td>
+<td>The parameters file requires a category for <strong>every</strong> <code class="code docutils literal"><span class="pre">SURVEY</span></code> key in SN data files</td>
 </tr>
-<tr class="row-even"><td>[trainparams]</td>
+<tr class="row-odd"><td>kcorfile</td>
 <td>&#160;</td>
-<td>&#160;</td>
+<td>Kcorfile for each <code class="code docutils literal"><span class="pre">SURVEY</span></code> key in SN data files</td>
 </tr>
-<tr class="row-odd"><td>waverange</td>
+<tr class="row-even"><td>subsurveylist</td>
+<td>&#160;</td>
+<td>Comma-separated list of sub-surveys for every survey, e.g. <code class="code docutils literal"><span class="pre">CFA4</span></code> and <code class="code docutils literal"><span class="pre">CFA3</span></code> are part of survey <code class="code docutils literal"><span class="pre">PS1_LOWZ_COMBINED</span></code></td>
+</tr>
+<tr class="row-odd"><td>[mcmcparams]</td>
+<td>&#160;</td>
+<td><strong>In most cases, leave these alone</strong></td>
+</tr>
+<tr class="row-even"><td>n_steps_mcmc</td>
+<td>10000</td>
+<td>Number of MCMC steps</td>
+</tr>
+<tr class="row-odd"><td>n_burnin_mcmc</td>
+<td>8000</td>
+<td>Number of MCMC steps before saving the chain</td>
+</tr>
+<tr class="row-even"><td>stepsize_magscale_M0</td>
+<td>0.01</td>
+<td>Initial step size for M0 (mag units)</td>
+</tr>
+<tr class="row-odd"><td>stepsize_magadd_M0</td>
+<td>0.001</td>
+<td>Initial step size for M0 (additive)</td>
+</tr>
+<tr class="row-even"><td>stepsize_magscale_M1</td>
+<td>0.05</td>
+<td>Initial step size for M0 (mag units)</td>
+</tr>
+<tr class="row-odd"><td>stepsize_magadd_M1</td>
+<td>0.01</td>
+<td>Initial step size for M1 (additive)</td>
+</tr>
+<tr class="row-even"><td>stepsize_magscale_err</td>
+<td>0.0001</td>
+<td>Initial step size for phase-dependent error model (mag units)</td>
+</tr>
+<tr class="row-odd"><td>stepsize_cl</td>
+<td>0.1</td>
+<td>Initial step size for color law</td>
+</tr>
+<tr class="row-even"><td>stepsize_magscale_clscat</td>
+<td>0.01</td>
+<td>Initial step size for color scatter model</td>
+</tr>
+<tr class="row-odd"><td>stepsize_specrecal</td>
+<td>1.0</td>
+<td>Initial step size in spectral recalibration</td>
+</tr>
+<tr class="row-even"><td>stepsize_x0</td>
+<td>0.005</td>
+<td>Initial step size in x0 (mag units)</td>
+</tr>
+<tr class="row-odd"><td>stepsize_x1</td>
+<td>0.05</td>
+<td>Initial step size in x1</td>
+</tr>
+<tr class="row-even"><td>stepsize_c</td>
+<td>0.01</td>
+<td>Initial step size in color</td>
+</tr>
+<tr class="row-odd"><td>stepsize_tpk</td>
+<td>0.05</td>
+<td>Initial step size in time of max</td>
+</tr>
+<tr class="row-even"><td>nsteps_before_adaptive</td>
+<td>2000</td>
+<td>Number of steps before starting the adaptive metropolis-hastings algorithm</td>
+</tr>
+<tr class="row-odd"><td>nsteps_adaptive_memory</td>
+<td>200</td>
+<td>Number of recent MH steps to use when adjusting the MH step sizes</td>
+</tr>
+<tr class="row-even"><td>adaptive_sigma_opt_scale</td>
+<td>3</td>
+<td>Scale factor to multiply the step sizes suggested by adaptive MCMC</td>
+</tr>
+<tr class="row-odd"><td>[trainparams]</td>
+<td>&#160;</td>
+<td><strong>In most cases, leave these alone</strong></td>
+</tr>
+<tr class="row-even"><td>waverange</td>
 <td>2000,9200</td>
 <td>Wavelength range over which the model is defined</td>
 </tr>
-<tr class="row-even"><td>colorwaverange</td>
+<tr class="row-odd"><td>colorwaverange</td>
 <td>2800,7000</td>
 <td>Wavelength range over which the color law polynomial is fit</td>
 </tr>
-<tr class="row-odd"><td>interpfunc</td>
+<tr class="row-even"><td>interpfunc</td>
 <td>bspline</td>
 <td>Function for interpolating the model between control points (b-spline is default)</td>
 </tr>
-<tr class="row-even"><td>interporder</td>
+<tr class="row-odd"><td>interporder</td>
 <td>3</td>
 <td>Order of the spline interpolation</td>
 </tr>
-<tr class="row-odd"><td>wavesplineres</td>
+<tr class="row-even"><td>wavesplineres</td>
 <td>72</td>
 <td>Number of Angstroms between wavelength control points</td>
 </tr>
-<tr class="row-even"><td>waveoutres</td>
+<tr class="row-odd"><td>waveoutres</td>
 <td>2</td>
 <td>Wavelength resolution of the trained output model (Angstroms)</td>
 </tr>
-<tr class="row-odd"><td>phaserange</td>
+<tr class="row-even"><td>phaserange</td>
 <td>-14,50</td>
 <td>Phase range over which the model is defined (days)</td>
 </tr>
-<tr class="row-even"><td>phasesplineres</td>
+<tr class="row-odd"><td>phasesplineres</td>
 <td>3.2</td>
 <td>Wavelength resolution of the trained output model (days)</td>
 </tr>
-<tr class="row-odd"><td>phaseoutres</td>
+<tr class="row-even"><td>phaseoutres</td>
 <td>2</td>
 <td>Phase resolution of the trained output model (days)</td>
-</tr>
-<tr class="row-even"><td>minmethod</td>
-<td>trf</td>
-<td>Numerical algorithm used to minimize the chi2.  Default is Trust Region Reflective.</td>
 </tr>
 <tr class="row-odd"><td>n_colorpars</td>
 <td>4</td>
 <td>Number of parameters used to define the color law polynomial</td>
+</tr>
+<tr class="row-even"><td>n_colorscatpars</td>
+<td>0</td>
+<td>Number of parameters used to define the color scatter law</td>
+</tr>
+<tr class="row-odd"><td>n_components</td>
+<td>2</td>
+<td>Number of principal components (1 or 2)</td>
+</tr>
+<tr class="row-even"><td>n_specrecal</td>
+<td>4</td>
+<td>Number of spectral recalibration parameters</td>
+</tr>
+<tr class="row-odd"><td>n_processes</td>
+<td>1</td>
+<td>Number of parallel processes for the training</td>
+</tr>
+<tr class="row-even"><td>estimate_tpk</td>
+<td>&#160;</td>
+<td>&#160;</td>
+</tr>
+<tr class="row-odd"><td>regulargradientphase</td>
+<td>0</td>
+<td>Regularization parameters (gradient)</td>
+</tr>
+<tr class="row-even"><td>regulargradientwave</td>
+<td>0</td>
+<td>Regularization parameters (gradient)</td>
+</tr>
+<tr class="row-odd"><td>regulardyad</td>
+<td>0</td>
+<td>Regularization parameters (dyadic)</td>
+</tr>
+<tr class="row-even"><td>n_min_specrecal</td>
+<td>1</td>
+<td>&#160;</td>
+</tr>
+<tr class="row-odd"><td>specrange_wavescale_specrecal</td>
+<td>2500</td>
+<td>&#160;</td>
+</tr>
+<tr class="row-even"><td>n_specrecal_per_lightcurve</td>
+<td>0.34</td>
+<td>&#160;</td>
+</tr>
+<tr class="row-odd"><td>filter_mass_tolerance</td>
+<td>0.01</td>
+<td>Amount of filter “mass” allowed to be outside the SALT wavelength range</td>
+</tr>
+<tr class="row-even"><td>error_snake_phase_binsize</td>
+<td>5</td>
+<td>Spacing in days for the SALT error model B-spline interpolation</td>
+</tr>
+<tr class="row-odd"><td>error_snake_wave_binsize</td>
+<td>600</td>
+<td>Spacing in Angstroms for the SALT error model B-spline interpolation</td>
 </tr>
 <tr class="row-even"><td>n_components</td>
 <td>2</td>
@@ -288,7 +436,7 @@ Descriptions of each option are given below.</p>
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2018, David Jones, Rick Kessler
+        &copy; Copyright 2018, David Jones, Rick Kessler.
 
     </p>
   </div>
@@ -307,14 +455,21 @@ Descriptions of each option are given below.</p>
 
   
 
-    
-    
-      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script type="text/javascript" src="_static/jquery.js"></script>
-        <script type="text/javascript" src="_static/underscore.js"></script>
-        <script type="text/javascript" src="_static/doctools.js"></script>
-        <script type="text/javascript" src="_static/language_data.js"></script>
-    
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'',
+            LANGUAGE:'None',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
   
 

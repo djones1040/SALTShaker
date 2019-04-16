@@ -17,9 +17,12 @@ from astropy.cosmology import Planck15 as cosmo
 from sncosmo.constants import HC_ERG_AA
 
 _SCALE_FACTOR = 1e-12
+_B_LAMBDA_EFF = 4353
+_V_LAMBDA_EFF = 5477
 
 class fitting:
-	def __init__(self,n_components,n_colorpars,n_phaseknots,n_waveknots,datadict):
+	def __init__(self,n_components,n_colorpars,
+				 n_phaseknots,n_waveknots,datadict):
 
 		self.n_phaseknots = n_phaseknots
 		self.n_waveknots = n_waveknots
@@ -84,7 +87,8 @@ class loglike:
 
 		int1d = interp1d(self.phase,self.components[0],axis=0)
 		self.m0guess = -19.36
-
+		self.m1guess = -8.93
+		
 		# set up the filters
 		self.stdmag = {}
 		for survey in self.kcordict.keys():
@@ -174,8 +178,10 @@ class loglike:
 			loglike=sum(starmap(self.loglikeforSN,args))
 					
 		loglike -= self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad)
-		logp = loglike + self.m0prior(components)
-
+		logp = loglike + self.m0prior(components) + self.m1prior(components)
+		if colorLaw:
+			logp += self.EBVprior(colorLaw)
+		
 		self.nstep += 1
 		
 		print(logp*-2)
@@ -190,15 +196,27 @@ class loglike:
 
 		return logprior
 
-	def EBVprior(self,x):
-		pass
-		
+	def m1prior(self,components):
+
+		int1d = interp1d(self.phase,components[1],axis=0)
+		m1B = synphot(self.wave,int1d(0),filtwave=self.kcordict['default']['Bwave'],
+					  filttp=self.kcordict['default']['Btp'])-self.stdmag['default']['B']
+		logprior = norm.logpdf(m1B,self.m1guess,0.02)
+
+		return logprior
+
+	def EBVprior(self,colorLaw):
+		# 0.4*np.log(10) = 0.921
+		logpriorB = norm.logpdf(colorLaw(_B_LAMBDA_EFF), 0.0, 0.02)
+		logpriorV = norm.logpdf(colorLaw(_V_LAMBDA_EFF), 0.921, 0.02)
+		return logpriorB + logpriorV
+
 	def loglikeforSN(self,sn,x,components=None,salterr=None,
 					 colorLaw=None,colorScat=None,
 					 debug=False):
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic observations of a single SN 
-		
+
 		Parameters
 		----------
 		sn : str
@@ -222,7 +240,7 @@ class loglike:
 			Model chi2 relative to training data	
 		"""
 		x = np.array(x)
-		
+
 		#Set up SALT model
 		if components is None:
 			components = self.SALTModel(x)
@@ -230,7 +248,7 @@ class loglike:
 			salterr = self.ErrModel(x)
 		if self.n_components == 1: M0 = components[0]
 		elif self.n_components == 2: M0,M1 = components
-		
+
 		#Declare variables
 		photdata = self.datadict[sn]['photdata']
 		specdata = self.datadict[sn]['specdata']
@@ -297,7 +315,7 @@ class loglike:
 			# Integrate along wavelength axis
 			modelsynflux=np.trapz(pbspl[np.newaxis,:]*saltfluxinterp[:,g]/HC_ERG_AA,obswave[g],axis=1)/denom
 
-			modelflux = modelsynflux*10**(-0.4*self.kcordict[survey][flt]['zpoff'])*10**(0.4*(self.stdmag[survey][flt]+27.5))
+			modelflux = modelsynflux*10**(0.4*(self.stdmag[survey][flt]+27.5)) #*10**(-0.4*self.kcordict[survey][flt]['zpoff'])
 			modelerr=np.trapz(pbspl[np.newaxis,:]*salterrinterp[:,g],obswave[g],axis=1)/denom
 
 			if colorScat: colorerr = splev(self.kcordict[survey][flt]['lambdaeff'],
@@ -673,8 +691,10 @@ class mcmc(loglike):
 					candidate[i] = current[i] + np.random.normal(0,np.sqrt(prop_cov[i,i]))
 		else:
 			for i,par in zip(range(self.npar),self.parlist):
-				candidate[i] = np.random.normal(loc=current[i],scale=np.sqrt(prop_cov[i,i]))
-
+				if par.startswith('x0'): #and np.sqrt(prop_cov[i,i]) < current[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0)):
+					candidate[i] = current[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0))
+				else:
+					candidate[i] = np.random.normal(loc=current[i],scale=np.sqrt(prop_cov[i,i]))
 		return candidate
 
 	def update_moments(self,mean, M2, sample, n):
