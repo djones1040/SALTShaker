@@ -17,14 +17,14 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 	phase,wave,flux = np.loadtxt(hsiaofile,unpack=True)
 	refWave,refFlux=np.loadtxt(flatnu,unpack=True)
 
-	flux *= 10**(-0.4*(-19.36+(synphotB(refWave,refFlux,0,0,Bfilt)-synphotB(wave[phase==0],flux[phase==0],0,0,Bfilt))))#*_SCALE_FACTOR
+	m0flux = flux*10**(-0.4*(-19.36+(synphotB(refWave,refFlux,0,0,Bfilt)-synphotB(wave[phase==0],flux[phase==0],0,0,Bfilt))))#*_SCALE_FACTOR
 	
-	m1phase = phase*1.1
+	#m1phase = phase*1.1
 	splinephase = np.linspace(phaserange[0],phaserange[1],
 							  (phaserange[1]-phaserange[0])/phasesplineres,False)
 	splinewave = np.linspace(waverange[0],waverange[1],
 							 (waverange[1]-waverange[0])/wavesplineres,False)
-	bspl = bisplrep(phase,wave,flux,kx=3,ky=3,
+	bspl = bisplrep(phase,wave,m0flux,kx=3,ky=3,
 					tx=splinephase,ty=splinewave,task=-1)
 
 	intphase = np.linspace(phaserange[0],phaserange[1],
@@ -34,10 +34,10 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 
 
 	m0 = bisplev(intphase,intwave,bspl)
-	m0sub = bisplev(np.unique(phase),np.unique(wave),bspl)
 	
-	bsplm1 = bisplrep(m1phase,wave,
-					  flux-m0sub.reshape(len(flux)),kx=3,ky=3,
+	m1fluxguess = flux*10**(-0.4*(-8.93+(synphotB(refWave,refFlux,0,0,Bfilt)-synphotB(wave[phase==0],flux[phase==0],0,0,Bfilt))))
+	bsplm1 = bisplrep(phase,wave,
+					  m1fluxguess,kx=3,ky=3,
 					  tx=splinephase,ty=splinewave,task=-1)
 	m1 = bisplev(intphase,intwave,bsplm1)
 	if debug:
@@ -49,7 +49,7 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 		plt.legend()
 		plt.plot(intwave,m0test,label='interp')
 		bspltmp = bspl[2].reshape([len(splinephase)-4,len(splinewave)-4])
-	
+
 	return intphase,intwave,m0,m1,bspl[0],bspl[1],bspl[2],bsplm1[2]
 
 def init_errs(hsiaofile='initfiles/Hsiao07.dat',

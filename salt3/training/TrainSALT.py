@@ -52,7 +52,6 @@ class TrainSALT(TrainSALTBase):
 		n_phaseknots,n_waveknots = len(phaseknotloc)-4,len(waveknotloc)-4
 		n_errphaseknots,n_errwaveknots = len(errphaseknotloc)-4,len(errwaveknotloc)-4
 		n_sn = len(datadict.keys())
-		m1knots = m0knots*1e-2
 
 		# set up the list of parameters
 		parlist = np.array(['m0']*(n_phaseknots*n_waveknots))
@@ -214,7 +213,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 	def validate(self,outputdir):
 
 		import pylab as plt
-		plt.ion()
+		#plt.ion()
 		
 		from salt3.validation import ValidateLightcurves
 		from salt3.validation import ValidateModel
@@ -277,61 +276,20 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		
 	def main(self):
 
-		if not self.options.kcor_path:
-			raise RuntimeError('kcor_path variable must be defined!')
-		self.kcordict=readutils.rdkcor(self.options.kcor_path,self.addwarning)
+		if not len(self.surveylist):
+			raise RuntimeError('surveys are not defined - see documentation')
+		self.kcordict=readutils.rdkcor(self.surveylist,self.options,addwarning=self.addwarning)
 		# TODO: ASCII filter files
 		
 		# read the data
-		datadict = readutils.rdAllData(self.options.snlist,self.options.estimate_tpk,self.addwarning,speclist=self.options.speclist)
+		datadict = readutils.rdAllData(self.options.snlist,self.options.estimate_tpk,self.kcordict,
+									   self.addwarning,speclist=self.options.speclist)
 		
 		if not os.path.exists(self.options.outputdir):
 			os.makedirs(self.options.outputdir)
-		
-		# Eliminate all data outside wave/phase range
-		numSpecElimmed,numSpec=0,0
-		numPhotElimmed,numPhot=0,0
-		numSpecPoints=0
-		for sn in datadict.keys():
-			photdata = datadict[sn]['photdata']
-			specdata = datadict[sn]['specdata']
-			z = datadict[sn]['zHelio']
-			#Remove spectra outside phase range
-			for k in list(specdata.keys()):
-				if ((specdata[k]['tobs'])/(1+z)<self.options.phaserange[0]) or \
-				   ((specdata[k]['tobs'])/(1+z)>self.options.phaserange[1]):
-					specdata.pop(k)
-					numSpecElimmed+=1
-				else:
-					numSpec+=1
-					numSpecPoints+=((specdata[k]['wavelength']/(1+z)>self.options.waverange[0]) &
-									(specdata[k]['wavelength']/(1+z)<self.options.waverange[1])).sum()
-					
-			#Remove photometric data outside phase range
-			phase=(photdata['tobs'])/(1+z)
-			def checkFilterMass(flt):
-				survey = datadict[sn]['survey']
-				filtwave = self.kcordict[survey]['filtwave']
-				filttrans = self.kcordict[survey][flt]['filttrans']
-			
-				#Check how much mass of the filter is inside the wavelength range
-				filtRange=(filtwave/(1+z) > self.options.waverange[0]) & \
-						   (filtwave/(1+z) < self.options.waverange[1])
-				return np.trapz((filttrans*filtwave/(1+z))[filtRange],
-								filtwave[filtRange]/(1+z))/np.trapz(
-									filttrans*filtwave/(1+z),
-									filtwave/(1+z)) > 1-self.options.filter_mass_tolerance
 
-			filterInBounds=np.vectorize(checkFilterMass)(photdata['filt'])
-			phaseInBounds=(phase>self.options.phaserange[0]) & (phase<self.options.phaserange[1])
-			keepPhot=filterInBounds&phaseInBounds
-			numPhotElimmed+=(~keepPhot).sum()
-			numPhot+=keepPhot.sum()
-			datadict[sn]['photdata'] ={key:photdata[key][keepPhot] for key in photdata}
-			
-		print('{} spectra and {} photometric observations removed for being outside phase range'.format(numSpecElimmed,numPhotElimmed))
-		print('{} spectra and {} photometric observations remaining'.format(numSpec,numPhot))
-		print('{} total spectroscopic data points'.format(numSpecPoints))
+		datadict = self.mkcuts(datadict)
+		
 		# fit the model - initial pass
 		if self.options.stage == "all" or self.options.stage == "train":
 			phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
@@ -379,12 +337,6 @@ Dependencies: sncosmo?
 
 	parser = salt.add_options(usage=usagestring,config=config)
 	options = parser.parse_args()
-
-	options.kcor_path = (options.kcor_path,)
-	with open(options.configfile) as fin:
-		for line in fin:
-			if line.startswith('kcor_path+'):
-				options.kcor_path += (line.replace('\n','').split('=')[-1],)
 	
 	salt.options = options
 	salt.verbose = options.verbose
