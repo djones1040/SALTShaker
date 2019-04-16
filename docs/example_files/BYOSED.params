@@ -1,10 +1,29 @@
 [main]
+
 sed_file = Hsiao07.dat
 magsmear = 0.1
 magoff = 0.0
 
-[effects]
+[flags]
 
 color = True
 stretch = True
 host_mass = False
+
+[color]
+
+function = color_function.dat
+mean = 0.0
+sigma_left = 0.07
+sigma_right = 0.1
+lower_lim = -0.3
+upper_lim = 0.3
+
+[stretch]
+
+function = stretch_function.dat
+mean = 0.5
+sigma_left = 1.0
+sigma_right = 0.7
+lower_lim = -2.5
+upper_lim = 2.5
