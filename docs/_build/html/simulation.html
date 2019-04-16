@@ -26,7 +26,6 @@
 
   <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
   <link rel="stylesheet" href="_static/gallery.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -176,7 +175,7 @@ sed_file.</p>
 to apply to your SED. You can turn effects on and off with True/false flags, and you can
 name them whatever you want <strong>with the exception of a “color law” effect, which must be
 named “color”</strong>. An example of the BYOSED.params file is as follows:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">main</span><span class="p">]</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">main</span><span class="p">]</span>
 <span class="n">sed_file</span> <span class="o">=</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
 <span class="n">magsmear</span> <span class="o">=</span> <span class="mf">0.1</span>
 <span class="n">magoff</span> <span class="o">=</span> <span class="mf">0.0</span>
@@ -200,7 +199,7 @@ BYOSED.params file above. This file is called <strong>sed_warps.dat</strong> and
 <h3>[functions]<a class="headerlink" href="#functions" title="Permalink to this headline">¶</a></h3>
 <p>The names used for the various warping functions must match those used in the BYOSED.params file
 above. Then, each function can either be defined as an array of phase,wave,value:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1">#p w v</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1">#p w v</span>
 <span class="n">dust</span> <span class="o">=</span> <span class="p">[[</span><span class="o">-</span><span class="mi">100</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
         <span class="p">[</span><span class="o">-</span><span class="mi">100</span><span class="p">,</span><span class="mi">10000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
         <span class="p">[</span><span class="o">-</span><span class="mi">100</span><span class="p">,</span><span class="mi">15000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
@@ -220,7 +219,7 @@ above. Then, each function can either be defined as an array of phase,wave,value
 </pre></div>
 </div>
 <p>Or else as a file name to be read, which contains a similar definition:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1">#p w v</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1">#p w v</span>
 <span class="o">-</span><span class="mi">20</span> <span class="mi">1000</span> <span class="mf">25.75805</span>
 <span class="o">-</span><span class="mi">20</span> <span class="mi">1010</span> <span class="mf">25.64852</span>
 <span class="o">-</span><span class="mi">20</span> <span class="mi">1020</span> <span class="mf">25.53899</span>
@@ -236,11 +235,11 @@ above. Then, each function can either be defined as an array of phase,wave,value
 <p>The second section in the sed_warps file defines the distributions that will be
 used to randomly generate a scale parameter for each effect, for each SN being
 simulated. They are defined as (a)symmetric gaussian functions as follows:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">color</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;mu&quot;</span><span class="p">:</span><span class="mf">0.0</span><span class="p">,</span><span class="s2">&quot;sigma_left&quot;</span><span class="p">:</span><span class="mf">0.07</span><span class="p">,</span> <span class="s2">&quot;sigma_right&quot;</span><span class="p">:</span><span class="mf">0.1</span><span class="p">,</span><span class="s2">&quot;lower_lim&quot;</span><span class="p">:</span><span class="o">-</span><span class="mf">0.3</span><span class="p">,</span> <span class="s2">&quot;upper_lim&quot;</span><span class="p">:</span><span class="mf">0.3</span><span class="p">}</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">color</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;mu&quot;</span><span class="p">:</span><span class="mf">0.0</span><span class="p">,</span><span class="s2">&quot;sigma_left&quot;</span><span class="p">:</span><span class="mf">0.07</span><span class="p">,</span> <span class="s2">&quot;sigma_right&quot;</span><span class="p">:</span><span class="mf">0.1</span><span class="p">,</span><span class="s2">&quot;lower_lim&quot;</span><span class="p">:</span><span class="o">-</span><span class="mf">0.3</span><span class="p">,</span> <span class="s2">&quot;upper_lim&quot;</span><span class="p">:</span><span class="mf">0.3</span><span class="p">}</span>
 </pre></div>
 </div>
 <p>All together, an <strong>sed_warps.dat</strong> file might look something like this:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">functions</span><span class="p">]</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">functions</span><span class="p">]</span>
 
 <span class="n">stretch</span> <span class="o">=</span> <span class="s1">&#39;stretch_function.dat&#39;</span>
 <span class="n">color</span> <span class="o">=</span> <span class="s1">&#39;color_function.dat&#39;</span>
@@ -261,19 +260,19 @@ included. Anything but a color effect (which should affect the final SED as a fu
 wavelength and possibly phase) is applied additively, while the color effect is applied
 multiplicatively. This is similar to the existing SALT2 framework. For the example file
 above, the final flux would look like this</p>
-<div class="math notranslate nohighlight">
+<div class="math">
 \[F(\lambda,\phi)=A\Big[H(\lambda,\phi)+S(\lambda,\phi)s\Big]\times10^{-0.4C(\lambda,\phi)c}\]</div>
 <p>Where here F is the final flux, H is the Hsiao template, S is the defined stretch function,
 C is the defined color function, s is the scale parameter pulled from the distribution defined
 for the stretch function, and c is the scale parameter pulled from the distribution defined
 for the color function. In principle this could look like the following if you had N such effects:</p>
-<div class="math notranslate nohighlight">
+<div class="math">
 \[F(\lambda,\phi)=A\Big[H(\lambda,\phi)+X_1(\lambda,\phi)x_1+X_2(\lambda,\phi)x_2+...+X_N(\lambda,\phi)x_N\Big]\times10^{-0.4C(\lambda,\phi)c}\]</div>
 </div>
 <div class="section" id="example-files">
 <h2>Example Files<a class="headerlink" href="#example-files" title="Permalink to this headline">¶</a></h2>
-<p>These are example files that can be used for your <a class="reference download internal" download="" href="_downloads/31048a48119141d933e197dbbe68b5ce/Hsiao07.dat"><code class="xref download docutils literal notranslate"><span class="pre">sed_file</span></code></a>, <a class="reference download internal" download="" href="_downloads/4f54295f1ca0d16638464a73230d1438/BYOSED.params"><code class="xref download docutils literal notranslate"><span class="pre">BYOSED.params</span></code></a> and <a class="reference download internal" download="" href="_downloads/1244fd38faf1f48b2d625f2af47f7ce9/sed_warps.dat"><code class="xref download docutils literal notranslate"><span class="pre">sed_warps.dat</span></code></a>.
-The color and stretch functions are defined by accompanying <a class="reference download internal" download="" href="_downloads/1661be1058340fe90580bbfa1a4a8d99/color_func.dat"><code class="xref download docutils literal notranslate"><span class="pre">color</span></code></a> and <a class="reference download internal" download="" href="_downloads/32c6fa9f657b4fd05cb6a93b2a0b6435/stretch_func.dat"><code class="xref download docutils literal notranslate"><span class="pre">stretch</span></code></a> files.</p>
+<p>These are example files that can be used for your <a class="reference download internal" href="_downloads/Hsiao07.dat" download=""><code class="xref download docutils literal"><span class="pre">sed_file</span></code></a>, <a class="reference download internal" href="_downloads/BYOSED.params" download=""><code class="xref download docutils literal"><span class="pre">BYOSED.params</span></code></a> and <a class="reference download internal" href="_downloads/sed_warps.dat" download=""><code class="xref download docutils literal"><span class="pre">sed_warps.dat</span></code></a>.
+The color and stretch functions are defined by accompanying <a class="reference download internal" href="_downloads/color_func.dat" download=""><code class="xref download docutils literal"><span class="pre">color</span></code></a> and <a class="reference download internal" href="_downloads/stretch_func.dat" download=""><code class="xref download docutils literal"><span class="pre">stretch</span></code></a> files.</p>
 </div>
 </div>
 
@@ -297,7 +296,7 @@ The color and stretch functions are defined by accompanying <a class="reference 
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2018, David Jones, Rick Kessler
+        &copy; Copyright 2018, David Jones, Rick Kessler.
 
     </p>
   </div>
@@ -316,15 +315,21 @@ The color and stretch functions are defined by accompanying <a class="reference 
 
   
 
-    
-    
-      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script type="text/javascript" src="_static/jquery.js"></script>
-        <script type="text/javascript" src="_static/underscore.js"></script>
-        <script type="text/javascript" src="_static/doctools.js"></script>
-        <script type="text/javascript" src="_static/language_data.js"></script>
-        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
-    
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'',
+            LANGUAGE:'None',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
   
 
