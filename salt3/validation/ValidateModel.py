@@ -64,7 +64,7 @@ def main(outfile,salt3dir,
 	clb = plt.colorbar(i,ax=ax2)
 	clb.ax.set_title('% 100')
 	plt.savefig(outfile)
-	plt.show()
+	#plt.show()
 
 	
 if __name__ == "__main__":
