@@ -1,26 +1,33 @@
-[main]
-sed_file = Hsiao07.dat
-magsmear = 0.1
-magoff = 0.0
+[MAIN]
 
-[flags]
-color = True
-stretch = True
-host_mass = False
+SED_FILE: Hsiao07.dat
+MAGSMEAR: 0.0
+MAGOFF: 0.0
 
-[color]
-function = color_function.dat
-mean = 0.0
-sigma_left = 0.07
-sigma_right = 0.1
-lower_lim = -0.3
-upper_lim = 0.3
 
-[stretch]
+#color-law must be labeled as 'color', any additive function
+#can be named anything
 
-function = stretch_function.dat
-mean = 0.5
-sigma_left = 1.0
-sigma_right = 0.7
-lower_lim = -2.5
-upper_lim = 2.5
+[FLAGS]
+
+COLOR: True
+STRETCH: True
+
+[STRETCH]
+
+#define function
+WARP_FUNCTION: salt2_m1.dat
+
+#define distribution for scale parameter
+DIST_PEAK: 0.5
+DIST_SIGMA: 1.0 0.7
+DIST_LIMITS: -2.5 2.5
+
+[COLOR]
+
+#define function
+WARP_FUNCTION: salt2_colorlaw.dat
+#define distribution for scale parameter
+DIST_PEAK: 0.0
+DIST_SIGMA: 0.07 0.1
+DIST_LIMITS: -0.3 0.3
