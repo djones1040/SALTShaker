@@ -112,7 +112,7 @@ following:
 
 	[COLOR]
 
-	WARP_FUNCTION: salt2_colorlaw.dat
+	WARP_FUNCTION: color_func.dat
 	DIST_PEAK: 0.0
 	DIST_SIGMA: 0.07 0.1
 	DIST_LIMITS: -0.3 0.3
@@ -135,14 +135,14 @@ All together, after adding in the stretch section as well, a **BYOSED.params** f
 
 	[COLOR]
 
-	WARP_FUNCTION: salt2_colorlaw.dat
+	WARP_FUNCTION: color_func.dat
 	DIST_PEAK: 0.0
 	DIST_SIGMA: 0.07 0.1
 	DIST_LIMITS: -0.3 0.3
 
 	[STRETCH]
 
-	WARP_FUNCTION: salt2_m1.dat
+	WARP_FUNCTION: stretch_func.dat
 	DIST_PEAK: 0.5
 	DIST_SIGMA: 1.0 0.7
 	DIST_LIMITS: -2.5 2.5
@@ -160,14 +160,14 @@ warping effects with the following **BYOSED.params** file:
 
 	[COLOR]
 
-	WARP_FUNCTION: salt2_colorlaw.dat
+	WARP_FUNCTION: color_func.dat
 	DIST_PEAK: 0.0
 	DIST_SIGMA: 0.07 0.1
 	DIST_LIMITS: -0.3 0.3
 
 	[STRETCH]
 
-	WARP_FUNCTION: salt2_m1.dat
+	WARP_FUNCTION: stretch_func.dat
 	DIST_PEAK: 0.5
 	DIST_SIGMA: 1.0 0.7
 	DIST_LIMITS: -2.5 2.5
