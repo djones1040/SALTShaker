@@ -5,15 +5,15 @@ from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
 from astropy.io import fits
 from salt3.initfiles import init_rootdir
 
-def rdkcor(kcorpath,addwarning):
+def rdkcor(surveylist,options,addwarning=None):
 
 	kcordict = {}
-	for k in kcorpath:
-		survey,kcorfile = k.split(',')
+	for survey in surveylist:
+		kcorfile = options.__dict__['%s_kcorfile'%survey]
+		subsurveys = options.__dict__['%s_subsurveylist'%survey].split(',')
 		kcorfile = os.path.expandvars(kcorfile)
 		if not os.path.exists(kcorfile):
 			raise RuntimeError('kcor file %s does not exist'%kcorfile)
-		kcordict[survey] = {}
 
 		try:
 			hdu = fits.open(kcorfile)
@@ -23,28 +23,32 @@ def rdkcor(kcorpath,addwarning):
 			primarysed = hdu[6].data
 			hdu.close()
 		except:
-			raise RuntimeError('kcor file format is non-standard')
+			raise RuntimeError('kcor file format is non-standard for kcor file %s'%kcorfile)
 
-		kcordict[survey]['filtwave'] = filtertrans['wavelength (A)']
-		kcordict[survey]['primarywave'] = primarysed['wavelength (A)']
-		kcordict[survey]['snflux'] = snsed['SN Flux (erg/s/cm^2/A)']
-		if 'AB' in primarysed.names:
-			kcordict[survey]['AB'] = primarysed['AB']
-		if 'Vega' in primarysed.names:
-			kcordict[survey]['Vega'] = primarysed['Vega']
-		if 'BD17' in primarysed.names:
-			kcordict[survey]['BD17'] = primarysed['BD17']
-		for filt in zpoff['Filter Name']:
-			kcordict[survey][filt.split('-')[-1].split('/')[-1]] = {}
-			kcordict[survey][filt.split('-')[-1].split('/')[-1]]['filttrans'] = filtertrans[filt]
-			lambdaeff = np.sum(self.kcordict[survey]['filtwave']*filtertrans[filt])/np.sum(filtertrans[filt])
-			self.kcordict[survey][filt.split('-')[-1].split('/')[-1]]['lambdaeff'] = lambdaeff
-			kcordict[survey][filt.split('-')[-1].split('/')[-1]]['zpoff'] = \
-				zpoff['ZPOff(Primary)'][zpoff['Filter Name'] == filt][0]
-			kcordict[survey][filt.split('-')[-1].split('/')[-1]]['magsys'] = \
-				zpoff['Primary Name'][zpoff['Filter Name'] == filt][0]
-			kcordict[survey][filt.split('-')[-1].split('/')[-1]]['primarymag'] = \
-				zpoff['Primary Mag'][zpoff['Filter Name'] == filt][0]
+
+		for subsurvey in subsurveys:
+			kcordict['%s(%s)'%(survey,subsurvey)] = {}
+			kcordict['%s(%s)'%(survey,subsurvey)]['filtwave'] = filtertrans['wavelength (A)']
+			kcordict['%s(%s)'%(survey,subsurvey)]['primarywave'] = primarysed['wavelength (A)']
+			kcordict['%s(%s)'%(survey,subsurvey)]['snflux'] = snsed['SN Flux (erg/s/cm^2/A)']
+			
+			if 'AB' in primarysed.names:
+				kcordict['%s(%s)'%(survey,subsurvey)]['AB'] = primarysed['AB']
+			if 'Vega' in primarysed.names:
+				kcordict['%s(%s)'%(survey,subsurvey)]['Vega'] = primarysed['Vega']
+			if 'BD17' in primarysed.names:
+				kcordict['%s(%s)'%(survey,subsurvey)]['BD17'] = primarysed['BD17']
+			for filt in zpoff['Filter Name']:
+				kcordict['%s(%s)'%(survey,subsurvey)][filt.split('-')[-1].split('/')[-1]] = {}
+				kcordict['%s(%s)'%(survey,subsurvey)][filt.split('-')[-1].split('/')[-1]]['filttrans'] = filtertrans[filt]
+				lambdaeff = np.sum(kcordict['%s(%s)'%(survey,subsurvey)]['filtwave']*filtertrans[filt])/np.sum(filtertrans[filt])
+				kcordict['%s(%s)'%(survey,subsurvey)][filt.split('-')[-1].split('/')[-1]]['lambdaeff'] = lambdaeff
+				kcordict['%s(%s)'%(survey,subsurvey)][filt.split('-')[-1].split('/')[-1]]['zpoff'] = \
+					zpoff['ZPOff(Primary)'][zpoff['Filter Name'] == filt][0]
+				kcordict['%s(%s)'%(survey,subsurvey)][filt.split('-')[-1].split('/')[-1]]['magsys'] = \
+					zpoff['Primary Name'][zpoff['Filter Name'] == filt][0]
+				kcordict['%s(%s)'%(survey,subsurvey)][filt.split('-')[-1].split('/')[-1]]['primarymag'] = \
+					zpoff['Primary Mag'][zpoff['Filter Name'] == filt][0]
 
 	initBfilt = '%s/Bessell90_B.dat'%init_rootdir
 	filtwave,filttp = np.genfromtxt(initBfilt,unpack=True)
@@ -146,7 +150,7 @@ def rdSpecData(datadict,speclist):
 
 	return datadict
 
-def rdAllData(snlist,estimate_tpk,addwarning,speclist=None):
+def rdAllData(snlist,estimate_tpk,kcordict,addwarning,speclist=None):
 	datadict = {}
 
 	if not os.path.exists(snlist):
@@ -197,6 +201,9 @@ def rdAllData(snlist,estimate_tpk,addwarning,speclist=None):
 		if 'termination condition is satisfied' not in tpkmsg:
 			addwarning('skipping SN %s; can\'t estimate t_max'%sn.SNID)
 			continue
+
+		if sn.SURVEY not in kcordict.keys():
+			raise RuntimeError('survey %s not in kcor file'%(sn.SURVEY))
 
 		datadict[sn.SNID] = {'snfile':f,
 							 'zHelio':zHel,
