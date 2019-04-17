@@ -57,7 +57,7 @@ the params file might now look like the following:
 
 	COLOR: True
 	STRETCH: True
-	HOST_MASS = False
+	HOST_MASS: False
 
 
 In this case, a magnitude smearing of 0.1 would be applied to the Hsiao model at all wavelengths,
@@ -131,7 +131,7 @@ All together, after adding in the stretch section as well, a **BYOSED.params** f
 
 	COLOR: True
 	STRETCH: True
-	HOST_MASS = False
+	HOST_MASS: False
 
 	[COLOR]
 
