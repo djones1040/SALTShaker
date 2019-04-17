@@ -187,8 +187,7 @@ def customfilt(outfile,lcfile,salt3dir,
 				 meta={'t0':sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]})
 
 	for m,flt,flx,flxe in zip(sn.MJD,sn.FLT,sn.FLUXCAL,sn.FLUXCALERR):
-		data.add_row((m,flt,flx,#*10**(0.4*bandpassdict[flt]['zpoff'])*10**(-0.4*bandpassdict[flt]['stdmag']),
-					  flxe,#*10**(0.4*bandpassdict[flt]['zpoff'])*10**(-0.4*bandpassdict[flt]['stdmag']),
+		data.add_row((m,flt,flx,flxe,
 					  27.5,'bd17'))
 
 	#data = Table([sn.MJD,sn.FLT,sn.FLUXCAL,sn.FLUXCALERR,
@@ -197,12 +196,15 @@ def customfilt(outfile,lcfile,salt3dir,
 	#			 meta={'t0':sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]})
 		
 	flux = sn.FLUXCAL
-	salt2model = sncosmo.Model(source='salt2')
+	salt2source = sncosmo.SALT2Source(modeldir='/usr/local/SNDATA_ROOT/models/SALT2/SALT2.JLA-B14')
+	salt2model = sncosmo.Model(salt2source)
 	hsiaomodel = sncosmo.Model(source='hsiao')
 	salt3phase,salt3wave,salt3flux = np.genfromtxt('%s/%s'%(salt3dir,m0file),unpack=True)
 	salt3m1phase,salt3m1wave,salt3m1flux = np.genfromtxt('%s/%s'%(salt3dir,m1file),unpack=True)
-	salt2phase,salt2wave,salt2flux = np.genfromtxt('/usr/local/SNDATA_ROOT/models/SALT2/SALT2.JLA-B14/salt2_template_0.dat',unpack=True)
-	salt2m1phase,salt2m1wave,salt2m1flux = np.genfromtxt('/usr/local/SNDATA_ROOT/models/SALT2/SALT2.JLA-B14/salt2_template_1.dat',unpack=True)
+	#salt2phase,salt2wave,salt2flux = np.genfromtxt('/usr/local/SNDATA_ROOT/models/SALT2/SALT2.JLA-B14/salt2_template_0.dat',unpack=True)
+	#salt2m1phase,salt2m1wave,salt2m1flux = np.genfromtxt('/usr/local/SNDATA_ROOT/models/SALT2/SALT2.JLA-B14/salt2_template_1.dat',unpack=True)
+	salt2phase,salt2wave,salt2flux = np.genfromtxt('/Users/david/.astropy/cache/sncosmo/models/salt2/salt2-4/salt2_template_0.dat',unpack=True)
+	salt2m1phase,salt2m1wave,salt2m1flux = np.genfromtxt('/Users/david/.astropy/cache/sncosmo/models/salt2/salt2-4/salt2_template_1.dat',unpack=True)
 
 
 	
@@ -211,16 +213,18 @@ def customfilt(outfile,lcfile,salt3dir,
 	salt3phase = np.unique(salt3phase)*(1+float(sn.REDSHIFT_HELIO[0:5]))
 	salt3wave = np.unique(salt3wave)*(1+float(sn.REDSHIFT_HELIO[0:5]))
 
+	salt2m0flux = salt2flux.reshape([len(np.unique(salt2phase)),len(np.unique(salt2wave))])
 	salt2flux = salt2flux.reshape([len(np.unique(salt2phase)),len(np.unique(salt2wave))])
 	salt2m1flux = salt2m1flux.reshape([len(np.unique(salt2phase)),len(np.unique(salt2wave))])
+	#int1d_salt2m1 = interp1d(salt2m1phase,salt2m1flux,axis=0,fill_value='extrapolate')
+	#salt2m1flux = int1d_salt2m1(salt2phase)
 	salt2phase = np.unique(salt2phase)*(1+sn.SIM_REDSHIFT_HELIO)#float(sn.SIM_REDSHIFT_HELIO[0:5]))
 	salt2wave = np.unique(salt2wave)*(1+sn.SIM_REDSHIFT_HELIO)#float(sn.SIM_REDSHIFT_HELIO[0:5]))
-
 	
 	if n_components == 1: salt3flux = x0*salt3flux
 	elif n_components == 2: salt3flux = x0*(salt3flux + x1*salt3m1flux)
 	salt3flux *= _SCALE_FACTOR
-	salt2flux = sn.SIM_SALT2x0*(salt2flux + (sn.SIM_SALT2x1)*salt2m1flux)*_SCALE_FACTOR
+	salt2flux = sn.SIM_SALT2x0*(salt2m0flux*_SCALE_FACTOR + (sn.SIM_SALT2x1)*salt2m1flux*_SCALE_FACTOR)
 	
 	salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,
 								m1file=m1file,
@@ -235,7 +239,9 @@ def customfilt(outfile,lcfile,salt3dir,
 	salt2model.set(z=sn.REDSHIFT_HELIO[0:5])
 	salt2model.set(c=0.0)
 	salt2model.set(x1=sn.SIM_SALT2x1)
-	result_salt2, fitted_salt2_model = sncosmo.fit_lc(data, salt2model, fitparams_salt2)
+	salt2model.set(x0=sn.SIM_SALT2x0)
+	salt2model.set(t0=float(sn.SIM_PEAKMJD.split()[0]))
+	#result_salt2, fitted_salt2_model = sncosmo.fit_lc(data, salt2model, fitparams_salt2)
 	#fitparams_hsiao = ['t0','amplitude']
 	#hsiaomodel.set(z=sn.REDSHIFT_HELIO[0:5])
 	#result_hsiao, fitted_hsiao_model = sncosmo.fit_lc(data, hsiaomodel, fitparams_hsiao)
@@ -260,10 +266,11 @@ def customfilt(outfile,lcfile,salt3dir,
 	int1d = interp1d(salt3phase,salt3flux,axis=0,fill_value='extrapolate')
 	int1d_salt2 = interp1d(salt2phase,salt2flux,axis=0,fill_value='extrapolate')
 	for flt,i,ax in zip(np.unique(sn.FLT),range(3),[ax1,ax2,ax3]):
+		#salt2fluxnew = salt2model.bandflux(flt, plotmjd,zp=27.5,zpsys='ab')
 		#try:
 		#	salt2flux = fitted_salt2_model.bandflux(flt, plotmjd,zp=27.5,zpsys='bd17')
-		#	ax.plot(plotmjd,salt2flux,color='C1',
-		#			label='SALT2, $x_1$ = %.2f, $\chi^2_{red} = %.1f$'%(
+		#ax.plot(plotmjd,salt2fluxnew*10**(-0.4*0.27),color='C0')#,
+		#		label='SALT2, $x_1$ = %.2f, $\chi^2_{red} = %.1f$'%(
 		#				result_salt2.parameters[np.array(result_salt2.param_names) == 'x1'][0],
 		#				result_salt2['chisq']/result_salt2['ndof']))
 		#except:
@@ -283,8 +290,9 @@ def customfilt(outfile,lcfile,salt3dir,
 		pbspl *= salt3wave[g]
 		denom = np.trapz(pbspl,salt3wave[g])
 		salt3synflux=np.trapz(pbspl[np.newaxis,:]*salt3fluxnew[:,g]/HC_ERG_AA,salt3wave[g],axis=1)/denom
-		salt3synflux *= 10**(-0.4*bandpassdict[flt]['zpoff'])*10**(0.4*bandpassdict[flt]['stdmag'])*10**(0.4*27.5)
-
+		salt3synflux *= 10**(0.4*bandpassdict[flt]['stdmag'])*10**(0.4*27.5)/(1+float(sn.REDSHIFT_HELIO[0:5]))
+		#10**(-0.4*bandpassdict[flt]['zpoff'])
+		
 		g = (salt2wave >= filtwave[0]) & (salt2wave <= filtwave[-1])  # overlap range
 		pbspl = np.interp(salt2wave[g],filtwave,filttrans)
 		pbspl *= salt2wave[g]
@@ -294,7 +302,7 @@ def customfilt(outfile,lcfile,salt3dir,
 		#salt2synflux=simps(pbspl[np.newaxis,:]*salt2fluxnew[:,g]/HC_ERG_AA,salt2wave[g],axis=1,even='avg')/denom
 
 		#salt2synflux *= 10**(0.4*bandpassdict[flt]['zpoff'])*
-		salt2synflux *= 10**(0.4*bandpassdict[flt]['stdmag'])*10**(0.4*27.5)*10**(-0.4*0.27)*10**(-0.4*0.17)
+		salt2synflux *= 10**(0.4*bandpassdict[flt]['stdmag'])*10**(0.4*27.5)*10**(-0.4*0.27)/(1+float(sn.REDSHIFT_HELIO[0:5]))
 
 		
 		if len(fitparams_salt3):
@@ -326,7 +334,7 @@ def customfilt(outfile,lcfile,salt3dir,
 	#plt.ion()
 	#plt.show()
 	#import pdb; pdb.set_trace()
-	#plt.show()
+	#plt.close('all')
 	
 	
 if __name__ == "__main__":
