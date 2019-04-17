@@ -267,10 +267,9 @@ class loglike:
 			saltflux = x0*M0
 		elif self.n_components == 2:
 			saltflux = x0*(M0 + x1*M1)
-			#saltflux_simple = x0*M0/_SCALE_FACTOR
 		if colorLaw:
 			saltflux *= 10. ** (-0.4 * colorLaw(self.wave) * c)
-		saltflux *= _SCALE_FACTOR
+		saltflux *= _SCALE_FACTOR/(1+z)
 			
 		loglike = 0
 		int1d = interp1d(obsphase,saltflux,axis=0)
@@ -663,7 +662,7 @@ class mcmc(loglike):
 		d, _ = M2.shape
 		init_period = self.nsteps_before_adaptive
 		s_0, s_opt, C_0 = self.AMpars['sigma_0'], self.AMpars['sigma_opt'], self.AMpars['C_0']
-		if n<= init_period or np.random.rand()<=beta:
+		if n<= init_period or np.random.rand()<=0.5: #beta:
 			return C_0, False
 		else:
 			# We can always divide M2 by n-1 since n > init_period
@@ -691,10 +690,10 @@ class mcmc(loglike):
 					candidate[i] = current[i] + np.random.normal(0,np.sqrt(prop_cov[i,i]))
 		else:
 			for i,par in zip(range(self.npar),self.parlist):
-				if par.startswith('x0'): #and np.sqrt(prop_cov[i,i]) < current[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0)):
-					candidate[i] = current[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0))
-				else:
-					candidate[i] = np.random.normal(loc=current[i],scale=np.sqrt(prop_cov[i,i]))
+				#if par.startswith('x0'): #and np.sqrt(prop_cov[i,i]) < current[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0)):
+				#	candidate[i] = current[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0*0.5))
+				#else:
+				candidate[i] = np.random.normal(loc=current[i],scale=np.sqrt(prop_cov[i,i]))
 		return candidate
 
 	def update_moments(self,mean, M2, sample, n):
