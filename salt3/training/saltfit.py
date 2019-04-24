@@ -15,6 +15,9 @@ import pylab as plt
 from scipy.special import factorial
 from astropy.cosmology import Planck15 as cosmo
 from sncosmo.constants import HC_ERG_AA
+import extinction
+from multiprocessing import Pool, get_context
+import copy
 
 _SCALE_FACTOR = 1e-12
 _B_LAMBDA_EFF = 4353
@@ -35,10 +38,16 @@ class fitting:
 			 n_burnin_mcmc):
 
 		saltfitter.debug = False
-		
+		#if n_processes > 1:
+		#	with multiprocessing.Pool(n_processes) as pool:
+		#		x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+		#			modelerr,clpars,clerr,clscat,SNParams = \
+		#			saltfitter.mcmcfit(guess,n_mcmc_steps,n_burnin_mcmc,pool=pool)
+		#else:
 		x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams = \
-			saltfitter.mcmcfit(guess,n_mcmc_steps,n_burnin_mcmc)
+			saltfitter.mcmcfit(guess,n_mcmc_steps,n_burnin_mcmc,pool=None)
+
 		return x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams,'Adaptive MCMC was successful'
 
@@ -84,9 +93,10 @@ class loglike:
 
 		# initialize the model
 		self.components = self.SALTModel(guess)
-
-		int1d = interp1d(self.phase,self.components[0],axis=0)
-		self.m0guess = -19.36
+		self.salterr = self.ErrModel(guess)
+		
+		#int1d = interp1d(self.phase,self.components[0],axis=0)
+		self.m0guess = -19.49 #-19.36
 		self.m1guess = -8.93
 		
 		# set up the filters
@@ -102,9 +112,9 @@ class loglike:
 			self.stdmag[survey] = {}
 			primarywave = self.kcordict[survey]['primarywave']
 			for flt in self.kcordict[survey].keys():
-				if flt == 'filtwave' or flt == 'primarywave' or flt == 'snflux' or flt == 'AB' or flt == 'BD17': continue
+				if flt == 'filtwave' or flt == 'primarywave' or flt == 'snflux' or flt == 'AB' or flt == 'BD17' or flt == 'Vega': continue
 				if self.kcordict[survey][flt]['magsys'] == 'AB': primarykey = 'AB'
-				elif self.kcordict[survey][flt]['magsys'] == 'Vega': primarykey = 'Vega'
+				elif self.kcordict[survey][flt]['magsys'].upper() == 'VEGA': primarykey = 'Vega'
 				elif self.kcordict[survey][flt]['magsys'] == 'BD17': primarykey = 'BD17'
 				self.stdmag[survey][flt] = synphot(
 					primarywave,self.kcordict[survey][primarykey],
@@ -124,6 +134,9 @@ class loglike:
 			z = self.datadict[sn]['zHelio']
 			
 			self.num_spec+=len(specdata.keys())
+
+			
+			self.datadict[sn]['mwextcurve'] = 10**(-0.4*extinction.fitzpatrick99(self.wave*(1+z),self.datadict[sn]['MWEBV']*3.1))
 			
 			for flt in np.unique(photdata['filt']):
 				# synthetic photometry
@@ -160,30 +173,30 @@ class loglike:
 		"""
 		
 		#Set up SALT model
+		# HACK
 		components = self.SALTModel(x)
-		salterr = self.ErrModel(x)
-		if self.n_components == 1: M0 = components[0]
-		elif self.n_components == 2: M0,M1 = components
+		#salterr = self.ErrModel(x)
+		#if self.n_components == 1: M0 = components[0]
+		#elif self.n_components == 2: M0,M1 = components
 		if self.n_colorpars:
 			colorLaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
 		else: colorLaw = None; colorScat = None
 
 		chi2 = 0
 		#Construct arguments for maxlikeforSN method
-		args=[(sn,x,components,salterr,colorLaw,colorScat,debug) for sn in self.datadict.keys()]
+		args=[(sn,x,components,self.salterr,colorLaw,colorScat,debug) for sn in self.datadict.keys()]
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
 		if pool:
 			loglike=sum(pool.starmap(self.loglikeforSN,args))
 		else:
 			loglike=sum(starmap(self.loglikeforSN,args))
-					
+
 		loglike -= self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad)
-		logp = loglike + self.m0prior(components) + self.m1prior(components)
+		logp = loglike + self.m0prior(components) #+ self.m1prior(components)
 		if colorLaw:
 			logp += self.EBVprior(colorLaw)
 		
 		self.nstep += 1
-		
 		print(logp*-2)
 		return logp
 
@@ -202,7 +215,7 @@ class loglike:
 		m1B = synphot(self.wave,int1d(0),filtwave=self.kcordict['default']['Bwave'],
 					  filttp=self.kcordict['default']['Btp'])-self.stdmag['default']['B']
 		logprior = norm.logpdf(m1B,self.m1guess,0.02)
-
+		#if logprior != logprior: import pdb; pdb.set_trace()
 		return logprior
 
 	def EBVprior(self,colorLaw):
@@ -246,8 +259,8 @@ class loglike:
 			components = self.SALTModel(x)
 		if salterr is None:
 			salterr = self.ErrModel(x)
-		if self.n_components == 1: M0 = components[0]
-		elif self.n_components == 2: M0,M1 = components
+		if self.n_components == 1: M0 = copy.deepcopy(components[0])
+		elif self.n_components == 2: M0,M1 = copy.deepcopy(components)
 
 		#Declare variables
 		photdata = self.datadict[sn]['photdata']
@@ -257,11 +270,15 @@ class loglike:
 		z = self.datadict[sn]['zHelio']
 		obswave = self.wave*(1+z)
 		obsphase = self.phase*(1+z)
+		for i in range(len(obsphase)):
+			M0[i,:] *= self.datadict[sn]['mwextcurve']
+			M1[i,:] *= self.datadict[sn]['mwextcurve']
 		
 		x0,x1,c,tpkoff = \
 			x[self.parlist == 'x0_%s'%sn][0],x[self.parlist == 'x1_%s'%sn][0],\
 			x[self.parlist == 'c_%s'%sn][0],x[self.parlist == 'tpkoff_%s'%sn][0]
-			
+		if self.fix_t0: tpkoff = 0
+		
 		#Calculate spectral model
 		if self.n_components == 1:
 			saltflux = x0*M0
@@ -276,14 +293,25 @@ class loglike:
 		interr1d = interp1d(obsphase,salterr,axis=0)
 		for k in specdata.keys():
 			phase=specdata[k]['tobs']+tpkoff
-			if phase < obsphase.min() or phase > obsphase.max(): raise RuntimeError('Phase {} is out of extrapolated phase range for SN {} with tpkoff {}'.format(phase,sn,tpkoff))
+			if phase < obsphase.min() or phase > obsphase.max():
+				raise RuntimeError('Phase {} is out of extrapolated phase range for SN {} with tpkoff {}'.format(phase,sn,tpkoff))
 			saltfluxinterp = int1d(phase)
 			#Interpolate SALT flux at observed wavelengths and multiply by recalibration factor
 			coeffs=x[self.parlist=='specrecal_{}_{}'.format(sn,k)]
 			coeffs/=factorial(np.arange(len(coeffs)))
-			saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)*np.exp(np.poly1d(coeffs)((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal))
-			print(np.mean(saltfluxinterp2),np.mean(specdata[k]['flux']))
-			loglike -= np.sum((saltfluxinterp2-specdata[k]['flux'])**2./specdata[k]['fluxerr']**2.)*self.num_phot/self.num_spec/2.
+			saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)*\
+				np.exp(np.poly1d(coeffs)((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal))
+			#print(np.mean(saltfluxinterp2),np.mean(specdata[k]['flux']))
+			loglike -= np.sum((saltfluxinterp2-specdata[k]['flux']/(1+z))**2./specdata[k]['fluxerr']**2.)*self.num_phot/self.num_spec/2.
+			#if 'g' in photdata['filt']: import pdb; pdb.set_trace()
+			#if sn == 5999433 and k == 0 and not 'hi':
+			#	import pylab as plt
+			#	plt.clf()
+			#	plt.ion()
+			#	plt.plot(specdata[k]['wavelength'],specdata[k]['flux']/(1+z))
+			#	plt.plot(specdata[k]['wavelength'],saltfluxinterp2)
+			#	plt.show()
+			#	import pdb; pdb.set_trace()
 			
 		for flt in np.unique(photdata['filt']):
 			# check if filter 
@@ -301,7 +329,8 @@ class loglike:
 			#Select data from the appropriate filter filter
 			selectFilter=(photdata['filt']==flt)
 			if ((phase<obsphase.min()) | (phase>obsphase.max())).any():
-				raise RuntimeError('Phases {} are out of extrapolated phase range for SN {} with tpkoff {}'.format(phase[((phase<self.phase.min()) | (phase>self.phase.max()))],sn,tpkoff))
+				raise RuntimeError('Phases {} are out of extrapolated phase range for SN {} with tpkoff {}'.format(
+					phase[((phase<self.phase.min()) | (phase>self.phase.max()))],sn,tpkoff))
 			filtPhot={key:photdata[key][selectFilter] for key in photdata}
 			phase=phase[selectFilter]
 			try:
@@ -345,7 +374,7 @@ class loglike:
 		return chi2
 	
 	def SALTModel(self,x,bsorder=3,evaluatePhase=None,evaluateWave=None):
-
+		
 		try: m0pars = x[self.m0min:self.m0max]
 		except: import pdb; pdb.set_trace()
 		m0 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
@@ -471,16 +500,20 @@ class loglike:
 							  'cerr':x[self.parlist == 'x1_%s'%k][0][nburn:].std(),
 							  'tpkofferr':x[self.parlist == 'tpkoff_%s'%k][0][nburn:].std()}
 
+
 		m0 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars,bsorder,bsorder))
-		m0err = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0err,bsorder,bsorder))
+		m0errp = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars+m0err,bsorder,bsorder))
+		m0errm = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars-m0err,bsorder,bsorder))
+		m0err = (m0errp-m0errm)/2.
 		if len(m1pars):
 			m1 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars,bsorder,bsorder))
-			m1err = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1err,bsorder,bsorder))
+			m1errp = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars+m1err,bsorder,bsorder))
+			m1errm = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars-m1err,bsorder,bsorder))
+			m1err = (m1errp-m1errm)/2.
 		else:
 			m1 = np.zeros(np.shape(m0))
 			m1err = np.zeros(np.shape(m0))
 
-	
 		cov_m0_m1 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0_m1_cov,bsorder,bsorder))
 		modelerr = bisplev(self.phase,self.wave,(self.errphaseknotloc,self.errwaveknotloc,modelerrpars,bsorder,bsorder))
 		clscat = splev(self.wave,(self.errwaveknotloc,clscatpars,3))
@@ -504,13 +537,20 @@ class loglike:
 			pdf_pages.savefig(fig)			
 			pdf_pages.close()
 
+		#print('hack: returning initialization components')
+		#return(result,self.phase,self.wave,self.components[0],m0err,self.components[1],m1err,cov_m0_m1,modelerr,
+		#	   clpars,clerr,clscat,resultsdict)
+			
 		return(result,self.phase,self.wave,m0,m0err,m1,m1err,cov_m0_m1,modelerr,
 			   clpars,clerr,clscat,resultsdict)
 
 	
-	def synphot(self,sourceflux,zpoff,survey=None,flt=None,redshift=0):
-		obswave = self.wave*(1+redshift)
-
+	def synphot(self,sourceflux,zpoff,survey=None,flt=None,wave=None,redshift=0):
+		if wave is None:
+			obswave = self.wave*(1+redshift)
+		else:
+			obswave = wave*(1+redshift)
+			
 		filtwave = self.kcordict[survey]['filtwave']
 		filttrans = self.kcordict[survey][flt]['filttrans']
 
@@ -524,7 +564,8 @@ class loglike:
 		
 	def updateEffectivePoints(self,x):
 		"""
-		Updates the "effective number of points" constraining a given bin in phase/wavelength space. Should be called any time tpkoff values are recalculated
+		Updates the "effective number of points" constraining a given bin in 
+		phase/wavelength space. Should be called any time tpkoff values are recalculated
 		
 		Parameters
 		----------
@@ -625,44 +666,11 @@ class loglike:
 
 class mcmc(loglike):
 
-	def adjust_model(self,X,stepfactor=1.0,nstep=0):
-
-		stepfactor = 1
-		X2 = np.zeros(self.npar)
-		for i,par in zip(range(self.npar),self.parlist):
-			if par == 'm0':
-				m0scalestep = self.stepsize_magscale_M0*stepfactor
-				m0addstep = self.stepsize_magadd_M0*stepfactor
-
-				scalefactor = 10**(0.4*np.random.normal(scale=m0scalestep))
-				X2[i] = X[i]*scalefactor + self.M0stddev*np.random.normal(scale=self.stepsize_magadd_M0*stepfactor)
-			elif par == 'm1':
-				m1scalestep = self.stepsize_magscale_M1*stepfactor
-				if m1scalestep < 0.001: m1scalestep = 0.001
-				m1addstep = self.stepsize_magadd_M1*stepfactor
-				if m1addstep < 0.001: m1addstep = 0.001
-
-				scalefactor = 10**(0.4*np.random.normal(scale=m1scalestep))
-				X2[i] = X[i]*scalefactor + self.M1stddev*np.random.normal(scale=self.stepsize_magadd_M1*stepfactor)
-			elif par == 'cl': X2[i] = X[i]*np.random.normal(scale=self.stepsize_cl*stepfactor)
-
-			elif par.startswith('specrecal'): X2[i] = X[i]+np.random.normal(scale=self.stepsize_specrecal*stepfactor)
-			elif par.startswith('x0'): X2[i] = X[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0))
-			elif par.startswith('x1'):
-				X2[i] = X[i] + np.random.normal(scale=self.stepsize_x1*stepfactor)
-			elif par.startswith('c'): X2[i] = X[i] + np.random.normal(scale=self.stepsize_c)#*stepfactor)
-			elif par.startswith('tpkoff'):
-				X2[i] = X[i] + np.random.normal(scale=self.stepsize_tpk*stepfactor)
-			else:
-				raise ValueError('Parameter {} has not been assigned a step factor'.format(par))
-
-		return X2
-
 	def get_proposal_cov(self, M2, n, beta=0.05):
 		d, _ = M2.shape
 		init_period = self.nsteps_before_adaptive
 		s_0, s_opt, C_0 = self.AMpars['sigma_0'], self.AMpars['sigma_opt'], self.AMpars['C_0']
-		if n<= init_period or np.random.rand()<=0.5: #beta:
+		if n<= init_period or np.random.rand()<=beta:
 			return C_0, False
 		else:
 			# We can always divide M2 by n-1 since n > init_period
@@ -674,25 +682,24 @@ class mcmc(loglike):
 		candidate = np.zeros(self.npar)
 		if not adjust_flag:
 			for i,par in zip(range(self.npar),self.parlist):
+				#if par == 'm0' or par == 'm1': continue
 				if par == 'm0':
-					m0scalestep = self.stepsize_magscale_M0
-					m0addstep = self.stepsize_magadd_M0
-					scalefactor = 10**(0.4*np.random.normal(scale=m0scalestep))
-					candidate[i] = current[i]*scalefactor + np.random.normal(scale=prop_cov[i,i])
+					#m0scalestep = self.stepsize_magscale_M0
+					#m0addstep = self.stepsize_magadd_M0
+					#scalefactor = 10**(0.4*np.random.normal(scale=m0scalestep))
+					#candidate[i] = current[i]*scalefactor + np.random.normal(scale=np.sqrt(prop_cov[i,i]))
+					candidate[i] = np.random.normal(scale=np.sqrt(prop_cov[i,i]))
 				elif par == 'm1':
-					m1scalestep = self.stepsize_magscale_M1
-					scalefactor = 10**(0.4*np.random.normal(scale=m1scalestep))
-					candidate[i] = current[i]*scalefactor + np.random.normal(scale=prop_cov[i,i])
+					#m1scalestep = self.stepsize_magscale_M1
+					#scalefactor = 10**(0.4*np.random.normal(scale=m1scalestep))
+					candidate[i] = current[i] + np.random.normal(scale=np.sqrt(prop_cov[i,i])) #*scalefactor + 
 				elif par.startswith('x0'):
 					candidate[i] = current[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0))
-				elif par.startswith('specrecal'): X2[i] = X[i]+np.random.normal(scale=self.stepsize_specrecal)
+				elif par.startswith('specrecal'): candidate[i] = current[i]+np.random.normal(scale=self.stepsize_specrecal)
 				else:
 					candidate[i] = current[i] + np.random.normal(0,np.sqrt(prop_cov[i,i]))
 		else:
 			for i,par in zip(range(self.npar),self.parlist):
-				#if par.startswith('x0'): #and np.sqrt(prop_cov[i,i]) < current[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0)):
-				#	candidate[i] = current[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0*0.5))
-				#else:
 				candidate[i] = np.random.normal(loc=current[i],scale=np.sqrt(prop_cov[i,i]))
 		return candidate
 
@@ -702,34 +709,35 @@ class mcmc(loglike):
 		new_mean = mean + w*(sample - mean)
 		delta_bf, delta_af = sample - mean, sample - new_mean
 		new_M2 = M2 + np.outer(delta_bf, delta_af)
-
+		#if len(iLow) and self.nstep > 200:
+		#	import pdb; pdb.set_trace()
+		
 		return new_mean, new_M2
 
 	def get_propcov_init(self,x):
-		x
 		C_0 = np.zeros([len(x),len(x)])
 		for i,par in zip(range(self.npar),self.parlist):
 			if par == 'm0':
-				C_0[i,i] = (self.M0stddev*self.stepsize_magadd_M0)**2.
+				C_0[i,i] = self.stepsize_magadd_M0**2.
 			if par == 'modelerr':
 				C_0[i,i] = (self.errstddev)**2.
 			elif par == 'm1':
-				C_0[i,i] = (self.M1stddev*self.stepsize_magadd_M1)**2.
+				C_0[i,i] = (self.stepsize_magadd_M1)**2.
 			elif par.startswith('x0'):
-				C_0[i,i] = 0.0 
+				C_0[i,i] = self.stepsize_magadd_M0**2.
 			elif par.startswith('x1'):
 				C_0[i,i] = self.stepsize_x1**2.
 			elif par.startswith('c'): C_0[i,i] = (self.stepsize_c)**2.
 			elif par.startswith('specrecal'): C_0[i,i] = self.stepsize_specrecal**2.
 			elif par.startswith('tpkoff'):
 				C_0[i,i] = self.stepsize_tpk**2.
-				
+
 		self.AMpars = {'C_0':C_0,
 					   'sigma_0':0.1/np.sqrt(self.npar),
 					   'sigma_opt':2.38*self.adaptive_sigma_opt_scale/np.sqrt(self.npar)}
 
 	
-	def mcmcfit(self,x,nsteps,nburn,pool=None,debug=False):
+	def mcmcfit(self,x,nsteps,nburn,pool=None,debug=False,thin=10):
 		npar = len(x)
 		self.npar = npar
 		
@@ -767,8 +775,9 @@ class mcmc(loglike):
 			# accepted?
 			accept_bool = self.accept(loglikes[-1],this_loglike)
 			if accept_bool:
-				for j in range(npar):
-					outpars[j] += [X[j]]
+				if not nstep % thin:
+					for j in range(npar):
+						outpars[j] += [X[j]]
 				loglikes+=[this_loglike]
 				loglike_history+=[this_loglike]
 				accept += 1
@@ -776,24 +785,34 @@ class mcmc(loglike):
 				print('step = %i, accepted = %i, acceptance = %.3f, recent acceptance = %.3f'%(
 					nstep,accept,accept/float(nstep),accept_frac_recent))
 			else:
-				for j in range(npar):
-					outpars[j] += [Xlast[j]]
+				if not nstep % thin:
+					for j in range(npar):
+						outpars[j] += [Xlast[j]]
 				loglike_history += [this_loglike]
 			accepted_history = np.append(accepted_history,accept_bool)
 
 			mean, M2 = self.update_moments(mean, M2, Xlast, n_adaptive)
 			if not n_adaptive % self.nsteps_adaptive_memory:
 				n_adaptive = 0
-				M2_recent = M2[:]
+				ix,iy = np.where(M2 < 1e-10)
+				iLow = np.where(ix == iy)[0]
+				M2[ix[iLow],iy[iLow]] = 1e-10
+				# maybe too hacky
+				iLow2 = np.where((np.diagonal(M2) < 1e-4) & ((self.parlist == 'm1') | (self.parlist == 'm2')))[0]
+				M2[iLow2,iLow2] = 1e-4
+				
+				M2_recent = copy.deepcopy(M2)
+
 				mean_recent = mean[:]
 				mean, M2 = Xlast[:], np.zeros([len(x),len(x)])
-			
+
+				
 		print('acceptance = %.3f'%(accept/float(nstep)))
 		if nstep < nburn:
-			raise RuntimeError('Not enough steps to wait 500 before burn-in')
+			raise RuntimeError('Not enough steps to wait %i before burn-in'%nburn)
 		xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams = \
-			self.getPars(loglike_history,np.array(outpars),nburn=nburn)
+			self.getPars(loglike_history,np.array(outpars),nburn=int(nburn/thin))
 		
 		return xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams

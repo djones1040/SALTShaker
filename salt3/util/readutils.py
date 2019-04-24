@@ -4,6 +4,9 @@ from salt3.util import snana
 from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
 from astropy.io import fits
 from salt3.initfiles import init_rootdir
+from astroquery.irsa_dust import IrsaDust
+from astropy.coordinates import SkyCoord
+import astropy.units as u
 
 def rdkcor(surveylist,options,addwarning=None):
 
@@ -31,11 +34,13 @@ def rdkcor(surveylist,options,addwarning=None):
 			kcordict['%s(%s)'%(survey,subsurvey)]['filtwave'] = filtertrans['wavelength (A)']
 			kcordict['%s(%s)'%(survey,subsurvey)]['primarywave'] = primarysed['wavelength (A)']
 			kcordict['%s(%s)'%(survey,subsurvey)]['snflux'] = snsed['SN Flux (erg/s/cm^2/A)']
-			
+
 			if 'AB' in primarysed.names:
 				kcordict['%s(%s)'%(survey,subsurvey)]['AB'] = primarysed['AB']
 			if 'Vega' in primarysed.names:
 				kcordict['%s(%s)'%(survey,subsurvey)]['Vega'] = primarysed['Vega']
+			if 'VEGA' in primarysed.names:
+				kcordict['%s(%s)'%(survey,subsurvey)]['Vega'] = primarysed['VEGA']
 			if 'BD17' in primarysed.names:
 				kcordict['%s(%s)'%(survey,subsurvey)]['BD17'] = primarysed['BD17']
 			for filt in zpoff['Filter Name']:
@@ -219,7 +224,15 @@ def rdAllData(snlist,estimate_tpk,kcordict,addwarning,speclist=None):
 		datadict[sn.SNID]['photdata']['fluxcal'] = sn.FLUXCAL
 		datadict[sn.SNID]['photdata']['fluxcalerr'] = sn.FLUXCALERR
 		datadict[sn.SNID]['photdata']['filt'] = sn.FLT
-
+		if 'MWEBV' in sn.__dict__.keys():
+			datadict[sn.SNID]['MWEBV'] = float(sn.MWEBV.split()[0])
+		elif 'RA' in sn.__dict__.keys() and 'DEC' in sn.__dict__.keys():
+			print('determining MW E(B-V) from IRSA for SN %s using RA/Dec in file'%sn.SNID)
+			sc = SkyCoord(sn.RA,sn.DEC,frame="fk5",unit=u.deg)
+			datadict[sn.SNID]['MWEBV'] = IrsaDust.get_query_table(sc)['ext SandF mean'][0]
+		else:
+			raise RuntimeError('Could not determine E(B-V) from files.  Set MWEBV keyword in input file header for SN %s'%sn.SNID)
+			
 	if not len(datadict.keys()):
 		raise RuntimeError('no light curve data to train on!!')
 		
