@@ -22,14 +22,15 @@ RANSEED:      28473   # random number seed
 FORMAT_MASK:  2        # 2=text  32=FITS
 
 CIDOFF:     5999386
-NGEN_LC:    400
+NGEN_LC:    50
 
-GENVERSION: SALT3TEST_SIMPLE_nox1
+GENVERSION: SALT3TEST_SIMPLE
 GENSOURCE:  RANDOM
 GENMODEL:   SALT2.JLA-B14
 GENMAG_SMEAR_MODELNAME:  G10
 
-KCOR_FILE:  $SNDATA_ROOT/kcor/PS1/Pantheon/kcor_PS1_LOWZ_COMBINED.fits
+# KCOR_FILE:  $SNDATA_ROOT/kcor/PS1/Pantheon/kcor_PS1_LOWZ_COMBINED.fits
+KCOR_FILE:  kcor/kcor_SPEC_PS1_LOWZ_COMBINED.fits
 EFFERR_STOPGEN: 0.0000000001
 
 # selection criteria for generation
@@ -69,13 +70,13 @@ SMEARFLAG_ZEROPT:  0   # smear zero-point with zptsig
 
 
 # ---------------------------
-#GENPEAK_SALT2x1:     0.44
-#GENRANGE_SALT2x1:   -4.0  +4.0     # x1 (stretch) range
-#GENSIGMA_SALT2x1:    3.12   0.724     # bifurcated sigmas
+GENMEAN_SALT2x1:     0.55
+GENRANGE_SALT2x1:   -5.0  +4.0     # x1 (stretch) range
+GENSIGMA_SALT2x1:    1.0  0.45      # bifurcated sigmas
 
-GENMEAN_SALT2x1:     0.0
-GENRANGE_SALT2x1:    0.0  0.0     # x1 (stretch) range
-GENSIGMA_SALT2x1:    0.0  0.0      # bifurcated sigmas
+#GENMEAN_SALT2x1:     0.0
+#GENRANGE_SALT2x1:    0.0  0.0     # x1 (stretch) range
+#GENSIGMA_SALT2x1:    0.0  0.0      # bifurcated sigmas
 
 GENPEAK_SALT2c:     0.0
 GENRANGE_SALT2c:   0.0   0.0     # color range
