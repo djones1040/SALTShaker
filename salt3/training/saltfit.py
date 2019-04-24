@@ -688,7 +688,7 @@ class mcmc(loglike):
 					#m0addstep = self.stepsize_magadd_M0
 					#scalefactor = 10**(0.4*np.random.normal(scale=m0scalestep))
 					#candidate[i] = current[i]*scalefactor + np.random.normal(scale=np.sqrt(prop_cov[i,i]))
-					candidate[i] = np.random.normal(scale=np.sqrt(prop_cov[i,i]))
+					candidate[i] = current[i] + np.random.normal(scale=np.sqrt(prop_cov[i,i]))
 				elif par == 'm1':
 					#m1scalestep = self.stepsize_magscale_M1
 					#scalefactor = 10**(0.4*np.random.normal(scale=m1scalestep))
