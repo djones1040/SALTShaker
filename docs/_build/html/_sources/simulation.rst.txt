@@ -18,46 +18,46 @@ The only file to set up is the BYOSED.params file. This contains the general asp
 of the simulated SN you want to create using BYOSED, and any warping effects you
 want to add in. This file is separated into the following required and optional sections:
 
-[main]
+[MAIN]
 ------
 **(Required)**
 
-This section contains **sed_file** (name of SED file), as well as **magsmear** (magnitude 
-smearing) and **magoff** (magnitude offsets) definitions to be applied to the base SED defined by
-sed_file. You may also define **clobber** and **verbose** flags here as well. This section may look
+This section contains **SED_FILE** (name of SED file), as well as **MAGSMEAR** (magnitude 
+smearing) and **MAGOFF** (magnitude offsets) definitions to be applied to the base SED defined by
+sed_file. You may also define **CLOBBER** and **VERBOSE** flags here as well. This section may look
 like the following:
 
 ::
 	
-	[main]
-	
-	sed_file = Hsiao07.dat
-	magsmear = 0.1
-	magoff = 0.0
+	[MAIN]
+
+	SED_FILE: Hsiao07.dat
+	MAGSMEAR: 0.0
+	MAGOFF: 0.0
 
 
-[flags]
+[FLAGS]
 -------
 **(Optional)**
 
 This section allows you to simply turn warping effects defined in the next section(s) on and off. If
 this section exists, then it supersedes later sections and defines the warping effects to be used. 
-If it does not exist, all defined warping effects are used. Adding this onto the **[main]** section,
+If it does not exist, all defined warping effects are used. Adding this onto the **[MAIN]** section,
 the params file might now look like the following:
 
 ::
 
-	[main]
+	[MAIN]
 
-	sed_file = Hsiao07.dat
-	magsmear = 0.1
-	magoff = 0.0
+	SED_FILE: Hsiao07.dat
+	MAGSMEAR: 0.0
+	MAGOFF: 0.0
 
-	[flags]
+	[FLAGS]
 
-	color = True
-	stretch = True
-	host_mass = False
+	COLOR: True
+	STRETCH: True
+	HOST_MASS: False
 
 
 In this case, a magnitude smearing of 0.1 would be applied to the Hsiao model at all wavelengths,
@@ -68,33 +68,25 @@ Warping Effects
 ===============
 
 The following sections contain all of the various wavelength/phase dependent effects that you want
-to apply to your SED. In this case, based on the **[flags]** section, you must have a "color" section
-and a "stretch" section. You can name effects whatever you want **with the exception of a "color law" 
-effect, which must be named "color"**, as long as the name of your section and the corresponding
-name in the **[flags]** section are identical. Creating a warping effect section requires the following
+to apply to your SED. In this case, based on the **[FLAGS]** section, you must have a "COLOR" section
+and a "STRETCH" section. You can name effects whatever you want **with the exception of a "color law" 
+effect, which must be named **"COLOR"**, as long as the name of your section and the corresponding
+name in the **[FLAGS]** section are identical. Creating a warping effect section requires the following
 variables in no particular order:
 
-1. mean
+1. DIST_PEAK
 
-  * The mean of an (a)symmetric Gaussian that will define the distribution for the scale parameter
+  * The PEAK of an (a)symmetric Gaussian that will define the distribution for the scale parameter
 
-2. sigma_left
+2. DIST_SIGMA
 
-  * The "left" standard deviation of the same distribution
+  * The "low" and "high" standard deviations of the same distribution
 
-3. sigma_right
+3. DIST_LIMITS
 
-  * The "right" standard deviation of the same distribution
+  * The lower and upper cutoff you would like for the same distribution 
 
-4. lower_lim
-
-  * The lower cutoff you would like for the same distribution 
-
-5. upper_lim
-
-  * The upper cutoff you would like for the same distribution
-
-6. function
+6. DIST_FUNCTION
 
   * A file name to be read that contains a list of phase, wave, value like the following:
 
@@ -110,85 +102,75 @@ variables in no particular order:
 	     ...
 
 You must now define a section for each warping effect, with these variables. For our current example,
-where I have defined color and stretch effects in my **[flags]** section, I must define these two
-sections. If I do not define a **[flags]** section, then whatever sections that exist apart from
-the **[main]** section are assumed to be warping effects. One such section might look like the
+where I have defined color and stretch effects in my **[FLAGS]** section, I must define these two
+sections. If I do not define a **[FLAGS]** section, then whatever sections that exist apart from
+the **[MAIN]** section are assumed to be warping effects. One such section might look like the
 following:
 
 
 ::
 
-	[color]
+	[COLOR]
 
-	function = color_function.dat
-	mean = 0.0
-	sigma_left = 0.07
-	sigma_right = 0.1
-	lower_lim = -0.3
-	upper_lim = 0.3
+	WARP_FUNCTION: color_func.dat
+	DIST_PEAK: 0.0
+	DIST_SIGMA: 0.07 0.1
+	DIST_LIMITS: -0.3 0.3
 
 All together, after adding in the stretch section as well, a **BYOSED.params** file might look something like this:
 
 ::
 
-	[main]
+	[MAIN]
 
-	sed_file = Hsiao07.dat
-	magsmear = 0.1
-	magoff = 0.0
+	SED_FILE: Hsiao07.dat
+	MAGSMEAR: 0.0
+	MAGOFF: 0.0
 
-	[flags]
+	[FLAGS]
 
-	color = True
-	stretch = True
-	host_mass = False
+	COLOR: True
+	STRETCH: True
+	HOST_MASS: False
 
-	[color]
+	[COLOR]
 
-	function = color_function.dat
-	mean = 0.0
-	sigma_left = 0.07
-	sigma_right = 0.1
-	lower_lim = -0.3
-	upper_lim = 0.3
+	WARP_FUNCTION: color_func.dat
+	DIST_PEAK: 0.0
+	DIST_SIGMA: 0.07 0.1
+	DIST_LIMITS: -0.3 0.3
 
-	[stretch]
+	[STRETCH]
 
-	function = stretch_function.dat
-	mean = 0.5
-	sigma_left = 1.0
-	sigma_right = 0.7
-	lower_lim = -2.5
-	upper_lim = 2.5
+	WARP_FUNCTION: stretch_func.dat
+	DIST_PEAK: 0.5
+	DIST_SIGMA: 1.0 0.7
+	DIST_LIMITS: -2.5 2.5
 
 Or, if you do not define a flags section, color and stretch will automatically be used as 
 warping effects with the following **BYOSED.params** file:
 
 ::
 
-	[main]
+	[MAIN]
 
-	sed_file = Hsiao07.dat
-	magsmear = 0.1
-	magoff = 0.0
+	SED_FILE: Hsiao07.dat
+	MAGSMEAR: 0.0
+	MAGOFF: 0.0
 
-	[color]
+	[COLOR]
 
-	function = color_function.dat
-	mean = 0.0
-	sigma_left = 0.07
-	sigma_right = 0.1
-	lower_lim = -0.3
-	upper_lim = 0.3
+	WARP_FUNCTION: color_func.dat
+	DIST_PEAK: 0.0
+	DIST_SIGMA: 0.07 0.1
+	DIST_LIMITS: -0.3 0.3
 
-	[stretch]
+	[STRETCH]
 
-	function = stretch_function.dat
-	mean = 0.5
-	sigma_left = 1.0
-	sigma_right = 0.7
-	lower_lim = -2.5
-	upper_lim = 2.5
+	WARP_FUNCTION: stretch_func.dat
+	DIST_PEAK: 0.5
+	DIST_SIGMA: 1.0 0.7
+	DIST_LIMITS: -2.5 2.5
 
 Final Notes
 ===========
@@ -202,7 +184,7 @@ above, the final flux would look like this
 
 .. math::
 
-	F(\lambda,\phi)=A\Big[H(\lambda,\phi)+S(\lambda,\phi)s\Big]\times10^{-0.4C(\lambda,\phi)c}
+   F(\lambda,\phi)=A\Big[H(\lambda,\phi)+S(\lambda,\phi)s\Big]\times10^{-0.4C(\lambda,\phi)c}
 
 Where here F is the final flux, H is the Hsiao template, S is the defined stretch function,
 C is the defined color function, s is the scale parameter pulled from the distribution defined
@@ -211,7 +193,7 @@ for the color function. In principle this could look like the following if you h
 
 .. math::
 
-	F(\lambda,\phi)=A\Big[H(\lambda,\phi)+X_1(\lambda,\phi)x_1+X_2(\lambda,\phi)x_2+...+X_N(\lambda,\phi)x_N\Big]\times10^{-0.4C(\lambda,\phi)c}
+   F(\lambda,\phi)=A\Big[H(\lambda,\phi)+X_1(\lambda,\phi)x_1+X_2(\lambda,\phi)x_2+...+X_N(\lambda,\phi)x_N\Big]\times10^{-0.4C(\lambda,\phi)c}
 
 
 

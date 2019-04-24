@@ -26,6 +26,7 @@
 
   <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
   <link rel="stylesheet" href="_static/gallery.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -164,48 +165,38 @@ This can be replaced by any model</p>
 of the simulated SN you want to create using BYOSED, and any warping effects you
 want to add in. This file is separated into the following required and optional sections:</p>
 <div class="section" id="main">
-<h3>[main]<a class="headerlink" href="#main" title="Permalink to this headline">¶</a></h3>
+<h3>[MAIN]<a class="headerlink" href="#main" title="Permalink to this headline">¶</a></h3>
 <p><strong>(Required)</strong></p>
-<p>This section contains <strong>sed_file</strong> (name of SED file), as well as <strong>magsmear</strong> (magnitude
-smearing) and <strong>magoff</strong> (magnitude offsets) definitions to be applied to the base SED defined by
-sed_file. You may also define <strong>clobber</strong> and <strong>verbose</strong> flags here as well. This section may look
+<p>This section contains <strong>SED_FILE</strong> (name of SED file), as well as <strong>MAGSMEAR</strong> (magnitude
+smearing) and <strong>MAGOFF</strong> (magnitude offsets) definitions to be applied to the base SED defined by
+sed_file. You may also define <strong>CLOBBER</strong> and <strong>VERBOSE</strong> flags here as well. This section may look
 like the following:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">main</span><span class="p">]</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
 
-<span class="n">sed_file</span> <span class="o">=</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
-<span class="n">magsmear</span> <span class="o">=</span> <span class="mf">0.1</span>
-<span class="n">magoff</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="n">SED_FILE</span><span class="p">:</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
+<span class="n">MAGSMEAR</span><span class="p">:</span> <span class="mf">0.0</span>
+<span class="n">MAGOFF</span><span class="p">:</span> <span class="mf">0.0</span>
 </pre></div>
 </div>
 </div>
-<<<<<<< HEAD
-<div class="section" id="effects">
-<h3>[effects]<a class="headerlink" href="#effects" title="Permalink to this headline">¶</a></h3>
-<p>This section contains all of the various wavelength/phase dependent effects that you want
-to apply to your SED. You can turn effects on and off with True/false flags, and you can
-name them whatever you want <strong>with the exception of a “color law” effect, which must be
-named “color”</strong>. An example of the BYOSED.params file is as follows:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">main</span><span class="p">]</span>
-=======
 <div class="section" id="flags">
-<h3>[flags]<a class="headerlink" href="#flags" title="Permalink to this headline">¶</a></h3>
+<h3>[FLAGS]<a class="headerlink" href="#flags" title="Permalink to this headline">¶</a></h3>
 <p><strong>(Optional)</strong></p>
 <p>This section allows you to simply turn warping effects defined in the next section(s) on and off. If
 this section exists, then it supersedes later sections and defines the warping effects to be used.
-If it does not exist, all defined warping effects are used. Adding this onto the <strong>[main]</strong> section,
+If it does not exist, all defined warping effects are used. Adding this onto the <strong>[MAIN]</strong> section,
 the params file might now look like the following:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">main</span><span class="p">]</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
 
->>>>>>> origin/master
-<span class="n">sed_file</span> <span class="o">=</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
-<span class="n">magsmear</span> <span class="o">=</span> <span class="mf">0.1</span>
-<span class="n">magoff</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="n">SED_FILE</span><span class="p">:</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
+<span class="n">MAGSMEAR</span><span class="p">:</span> <span class="mf">0.0</span>
+<span class="n">MAGOFF</span><span class="p">:</span> <span class="mf">0.0</span>
 
-<span class="p">[</span><span class="n">flags</span><span class="p">]</span>
+<span class="p">[</span><span class="n">FLAGS</span><span class="p">]</span>
 
-<span class="n">color</span> <span class="o">=</span> <span class="kc">True</span>
-<span class="n">stretch</span> <span class="o">=</span> <span class="kc">True</span>
-<span class="n">host_mass</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="n">COLOR</span><span class="p">:</span> <span class="kc">True</span>
+<span class="n">STRETCH</span><span class="p">:</span> <span class="kc">True</span>
+<span class="n">HOST_MASS</span><span class="p">:</span> <span class="kc">False</span>
 </pre></div>
 </div>
 <p>In this case, a magnitude smearing of 0.1 would be applied to the Hsiao model at all wavelengths,
@@ -215,83 +206,38 @@ define in the next sections.</p>
 </div>
 <div class="section" id="warping-effects">
 <h2>Warping Effects<a class="headerlink" href="#warping-effects" title="Permalink to this headline">¶</a></h2>
-<<<<<<< HEAD
-<p>You must set up a second file that defines the warping functions you’ve set up as effects in the
-BYOSED.params file above. This file is called <strong>sed_warps.dat</strong> and similarly has two sections:</p>
-<div class="section" id="functions">
-<h3>[functions]<a class="headerlink" href="#functions" title="Permalink to this headline">¶</a></h3>
-<p>The names used for the various warping functions must match those used in the BYOSED.params file
-above. Then, each function can either be defined as an array of phase,wave,value:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1">#p w v</span>
-<span class="n">dust</span> <span class="o">=</span> <span class="p">[[</span><span class="o">-</span><span class="mi">100</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
-        <span class="p">[</span><span class="o">-</span><span class="mi">100</span><span class="p">,</span><span class="mi">10000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
-        <span class="p">[</span><span class="o">-</span><span class="mi">100</span><span class="p">,</span><span class="mi">15000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
-        <span class="p">[</span><span class="o">-</span><span class="mi">100</span><span class="p">,</span><span class="mi">25000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
-        <span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">1000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
-        <span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">10000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
-        <span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">15000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
-        <span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">25000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
-        <span class="p">[</span><span class="mi">100</span><span class="p">,</span><span class="mi">1000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
-        <span class="p">[</span><span class="mi">100</span><span class="p">,</span><span class="mi">10000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
-        <span class="p">[</span><span class="mi">100</span><span class="p">,</span><span class="mi">15000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
-        <span class="p">[</span><span class="mi">100</span><span class="p">,</span><span class="mi">25000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
-        <span class="p">[</span><span class="mi">500</span><span class="p">,</span><span class="mi">1000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
-        <span class="p">[</span><span class="mi">500</span><span class="p">,</span><span class="mi">10000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
-        <span class="p">[</span><span class="mi">500</span><span class="p">,</span><span class="mi">15000</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
-        <span class="p">[</span><span class="mi">500</span><span class="p">,</span><span class="mi">25000</span><span class="p">,</span><span class="mi">1</span><span class="p">]]</span>
-</pre></div>
-</div>
-<p>Or else as a file name to be read, which contains a similar definition:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1">#p w v</span>
-=======
 <p>The following sections contain all of the various wavelength/phase dependent effects that you want
-to apply to your SED. In this case, based on the <strong>[flags]</strong> section, you must have a “color” section
-and a “stretch” section. You can name effects whatever you want <strong>with the exception of a “color law”
-effect, which must be named “color”</strong>, as long as the name of your section and the corresponding
-name in the <strong>[flags]</strong> section are identical. Creating a warping effect section requires the following
+to apply to your SED. In this case, based on the <strong>[FLAGS]</strong> section, you must have a “COLOR” section
+and a “STRETCH” section. You can name effects whatever you want <strong>with the exception of a “color law”
+effect, which must be named **”COLOR”</strong>, as long as the name of your section and the corresponding
+name in the <strong>[FLAGS]</strong> section are identical. Creating a warping effect section requires the following
 variables in no particular order:</p>
 <ol class="arabic simple">
-<li>mean</li>
+<li>DIST_PEAK</li>
 </ol>
 <blockquote>
 <div><ul class="simple">
-<li>The mean of an (a)symmetric Gaussian that will define the distribution for the scale parameter</li>
+<li>The PEAK of an (a)symmetric Gaussian that will define the distribution for the scale parameter</li>
 </ul>
 </div></blockquote>
 <ol class="arabic simple" start="2">
-<li>sigma_left</li>
+<li>DIST_SIGMA</li>
 </ol>
 <blockquote>
 <div><ul class="simple">
-<li>The “left” standard deviation of the same distribution</li>
+<li>The “low” and “high” standard deviations of the same distribution</li>
 </ul>
 </div></blockquote>
 <ol class="arabic simple" start="3">
-<li>sigma_right</li>
+<li>DIST_LIMITS</li>
 </ol>
 <blockquote>
 <div><ul class="simple">
-<li>The “right” standard deviation of the same distribution</li>
-</ul>
-</div></blockquote>
-<ol class="arabic simple" start="4">
-<li>lower_lim</li>
-</ol>
-<blockquote>
-<div><ul class="simple">
-<li>The lower cutoff you would like for the same distribution</li>
-</ul>
-</div></blockquote>
-<ol class="arabic simple" start="5">
-<li>upper_lim</li>
-</ol>
-<blockquote>
-<div><ul class="simple">
-<li>The upper cutoff you would like for the same distribution</li>
+<li>The lower and upper cutoff you would like for the same distribution</li>
 </ul>
 </div></blockquote>
 <ol class="arabic simple" start="6">
-<li>function</li>
+<li>DIST_FUNCTION</li>
 </ol>
 <blockquote>
 <div><ul class="simple">
@@ -299,7 +245,6 @@ variables in no particular order:</p>
 </ul>
 </div></blockquote>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1">#p w v</span>
->>>>>>> origin/master
 <span class="o">-</span><span class="mi">20</span> <span class="mi">1000</span> <span class="mf">25.75805</span>
 <span class="o">-</span><span class="mi">20</span> <span class="mi">1010</span> <span class="mf">25.64852</span>
 <span class="o">-</span><span class="mi">20</span> <span class="mi">1020</span> <span class="mf">25.53899</span>
@@ -309,92 +254,68 @@ variables in no particular order:</p>
      <span class="o">...</span>
 </pre></div>
 </div>
-<<<<<<< HEAD
-</div>
-<div class="section" id="distributions">
-<h3>[distributions]<a class="headerlink" href="#distributions" title="Permalink to this headline">¶</a></h3>
-<p>The second section in the sed_warps file defines the distributions that will be
-used to randomly generate a scale parameter for each effect, for each SN being
-simulated. They are defined as (a)symmetric gaussian functions as follows:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">color</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;mu&quot;</span><span class="p">:</span><span class="mf">0.0</span><span class="p">,</span><span class="s2">&quot;sigma_left&quot;</span><span class="p">:</span><span class="mf">0.07</span><span class="p">,</span> <span class="s2">&quot;sigma_right&quot;</span><span class="p">:</span><span class="mf">0.1</span><span class="p">,</span><span class="s2">&quot;lower_lim&quot;</span><span class="p">:</span><span class="o">-</span><span class="mf">0.3</span><span class="p">,</span> <span class="s2">&quot;upper_lim&quot;</span><span class="p">:</span><span class="mf">0.3</span><span class="p">}</span>
-</pre></div>
-</div>
-<p>All together, an <strong>sed_warps.dat</strong> file might look something like this:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">functions</span><span class="p">]</span>
-=======
 <p>You must now define a section for each warping effect, with these variables. For our current example,
-where I have defined color and stretch effects in my <strong>[flags]</strong> section, I must define these two
-sections. If I do not define a <strong>[flags]</strong> section, then whatever sections that exist apart from
-the <strong>[main]</strong> section are assumed to be warping effects. One such section might look like the
+where I have defined color and stretch effects in my <strong>[FLAGS]</strong> section, I must define these two
+sections. If I do not define a <strong>[FLAGS]</strong> section, then whatever sections that exist apart from
+the <strong>[MAIN]</strong> section are assumed to be warping effects. One such section might look like the
 following:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">color</span><span class="p">]</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">COLOR</span><span class="p">]</span>
 
-<span class="n">function</span> <span class="o">=</span> <span class="n">color_function</span><span class="o">.</span><span class="n">dat</span>
-<span class="n">mean</span> <span class="o">=</span> <span class="mf">0.0</span>
-<span class="n">sigma_left</span> <span class="o">=</span> <span class="mf">0.07</span>
-<span class="n">sigma_right</span> <span class="o">=</span> <span class="mf">0.1</span>
-<span class="n">lower_lim</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.3</span>
-<span class="n">upper_lim</span> <span class="o">=</span> <span class="mf">0.3</span>
+<span class="n">WARP_FUNCTION</span><span class="p">:</span> <span class="n">color_func</span><span class="o">.</span><span class="n">dat</span>
+<span class="n">DIST_PEAK</span><span class="p">:</span> <span class="mf">0.0</span>
+<span class="n">DIST_SIGMA</span><span class="p">:</span> <span class="mf">0.07</span> <span class="mf">0.1</span>
+<span class="n">DIST_LIMITS</span><span class="p">:</span> <span class="o">-</span><span class="mf">0.3</span> <span class="mf">0.3</span>
 </pre></div>
 </div>
 <p>All together, after adding in the stretch section as well, a <strong>BYOSED.params</strong> file might look something like this:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">main</span><span class="p">]</span>
->>>>>>> origin/master
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
 
-<span class="n">sed_file</span> <span class="o">=</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
-<span class="n">magsmear</span> <span class="o">=</span> <span class="mf">0.1</span>
-<span class="n">magoff</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="n">SED_FILE</span><span class="p">:</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
+<span class="n">MAGSMEAR</span><span class="p">:</span> <span class="mf">0.0</span>
+<span class="n">MAGOFF</span><span class="p">:</span> <span class="mf">0.0</span>
 
-<span class="p">[</span><span class="n">flags</span><span class="p">]</span>
+<span class="p">[</span><span class="n">FLAGS</span><span class="p">]</span>
 
-<span class="n">color</span> <span class="o">=</span> <span class="kc">True</span>
-<span class="n">stretch</span> <span class="o">=</span> <span class="kc">True</span>
-<span class="n">host_mass</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="n">COLOR</span><span class="p">:</span> <span class="kc">True</span>
+<span class="n">STRETCH</span><span class="p">:</span> <span class="kc">True</span>
+<span class="n">HOST_MASS</span><span class="p">:</span> <span class="kc">False</span>
 
-<span class="p">[</span><span class="n">color</span><span class="p">]</span>
+<span class="p">[</span><span class="n">COLOR</span><span class="p">]</span>
 
-<span class="n">function</span> <span class="o">=</span> <span class="n">color_function</span><span class="o">.</span><span class="n">dat</span>
-<span class="n">mean</span> <span class="o">=</span> <span class="mf">0.0</span>
-<span class="n">sigma_left</span> <span class="o">=</span> <span class="mf">0.07</span>
-<span class="n">sigma_right</span> <span class="o">=</span> <span class="mf">0.1</span>
-<span class="n">lower_lim</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.3</span>
-<span class="n">upper_lim</span> <span class="o">=</span> <span class="mf">0.3</span>
+<span class="n">WARP_FUNCTION</span><span class="p">:</span> <span class="n">color_func</span><span class="o">.</span><span class="n">dat</span>
+<span class="n">DIST_PEAK</span><span class="p">:</span> <span class="mf">0.0</span>
+<span class="n">DIST_SIGMA</span><span class="p">:</span> <span class="mf">0.07</span> <span class="mf">0.1</span>
+<span class="n">DIST_LIMITS</span><span class="p">:</span> <span class="o">-</span><span class="mf">0.3</span> <span class="mf">0.3</span>
 
-<span class="p">[</span><span class="n">stretch</span><span class="p">]</span>
+<span class="p">[</span><span class="n">STRETCH</span><span class="p">]</span>
 
-<span class="n">function</span> <span class="o">=</span> <span class="n">stretch_function</span><span class="o">.</span><span class="n">dat</span>
-<span class="n">mean</span> <span class="o">=</span> <span class="mf">0.5</span>
-<span class="n">sigma_left</span> <span class="o">=</span> <span class="mf">1.0</span>
-<span class="n">sigma_right</span> <span class="o">=</span> <span class="mf">0.7</span>
-<span class="n">lower_lim</span> <span class="o">=</span> <span class="o">-</span><span class="mf">2.5</span>
-<span class="n">upper_lim</span> <span class="o">=</span> <span class="mf">2.5</span>
+<span class="n">WARP_FUNCTION</span><span class="p">:</span> <span class="n">stretch_func</span><span class="o">.</span><span class="n">dat</span>
+<span class="n">DIST_PEAK</span><span class="p">:</span> <span class="mf">0.5</span>
+<span class="n">DIST_SIGMA</span><span class="p">:</span> <span class="mf">1.0</span> <span class="mf">0.7</span>
+<span class="n">DIST_LIMITS</span><span class="p">:</span> <span class="o">-</span><span class="mf">2.5</span> <span class="mf">2.5</span>
 </pre></div>
 </div>
 <p>Or, if you do not define a flags section, color and stretch will automatically be used as
 warping effects with the following <strong>BYOSED.params</strong> file:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">main</span><span class="p">]</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
 
-<span class="n">sed_file</span> <span class="o">=</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
-<span class="n">magsmear</span> <span class="o">=</span> <span class="mf">0.1</span>
-<span class="n">magoff</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="n">SED_FILE</span><span class="p">:</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
+<span class="n">MAGSMEAR</span><span class="p">:</span> <span class="mf">0.0</span>
+<span class="n">MAGOFF</span><span class="p">:</span> <span class="mf">0.0</span>
 
-<span class="p">[</span><span class="n">color</span><span class="p">]</span>
+<span class="p">[</span><span class="n">COLOR</span><span class="p">]</span>
 
-<span class="n">function</span> <span class="o">=</span> <span class="n">color_function</span><span class="o">.</span><span class="n">dat</span>
-<span class="n">mean</span> <span class="o">=</span> <span class="mf">0.0</span>
-<span class="n">sigma_left</span> <span class="o">=</span> <span class="mf">0.07</span>
-<span class="n">sigma_right</span> <span class="o">=</span> <span class="mf">0.1</span>
-<span class="n">lower_lim</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.3</span>
-<span class="n">upper_lim</span> <span class="o">=</span> <span class="mf">0.3</span>
+<span class="n">WARP_FUNCTION</span><span class="p">:</span> <span class="n">color_func</span><span class="o">.</span><span class="n">dat</span>
+<span class="n">DIST_PEAK</span><span class="p">:</span> <span class="mf">0.0</span>
+<span class="n">DIST_SIGMA</span><span class="p">:</span> <span class="mf">0.07</span> <span class="mf">0.1</span>
+<span class="n">DIST_LIMITS</span><span class="p">:</span> <span class="o">-</span><span class="mf">0.3</span> <span class="mf">0.3</span>
 
-<span class="p">[</span><span class="n">stretch</span><span class="p">]</span>
+<span class="p">[</span><span class="n">STRETCH</span><span class="p">]</span>
 
-<span class="n">function</span> <span class="o">=</span> <span class="n">stretch_function</span><span class="o">.</span><span class="n">dat</span>
-<span class="n">mean</span> <span class="o">=</span> <span class="mf">0.5</span>
-<span class="n">sigma_left</span> <span class="o">=</span> <span class="mf">1.0</span>
-<span class="n">sigma_right</span> <span class="o">=</span> <span class="mf">0.7</span>
-<span class="n">lower_lim</span> <span class="o">=</span> <span class="o">-</span><span class="mf">2.5</span>
-<span class="n">upper_lim</span> <span class="o">=</span> <span class="mf">2.5</span>
+<span class="n">WARP_FUNCTION</span><span class="p">:</span> <span class="n">stretch_func</span><span class="o">.</span><span class="n">dat</span>
+<span class="n">DIST_PEAK</span><span class="p">:</span> <span class="mf">0.5</span>
+<span class="n">DIST_SIGMA</span><span class="p">:</span> <span class="mf">1.0</span> <span class="mf">0.7</span>
+<span class="n">DIST_LIMITS</span><span class="p">:</span> <span class="o">-</span><span class="mf">2.5</span> <span class="mf">2.5</span>
 </pre></div>
 </div>
 </div>
@@ -406,24 +327,19 @@ included. Anything but a color effect (which should affect the final SED as a fu
 wavelength and possibly phase) is applied additively, while the color effect is applied
 multiplicatively. This is similar to the existing SALT2 framework. For the example file
 above, the final flux would look like this</p>
-<div class="math">
+<div class="math notranslate nohighlight">
 \[F(\lambda,\phi)=A\Big[H(\lambda,\phi)+S(\lambda,\phi)s\Big]\times10^{-0.4C(\lambda,\phi)c}\]</div>
 <p>Where here F is the final flux, H is the Hsiao template, S is the defined stretch function,
 C is the defined color function, s is the scale parameter pulled from the distribution defined
 for the stretch function, and c is the scale parameter pulled from the distribution defined
 for the color function. In principle this could look like the following if you had N such effects:</p>
-<div class="math">
+<div class="math notranslate nohighlight">
 \[F(\lambda,\phi)=A\Big[H(\lambda,\phi)+X_1(\lambda,\phi)x_1+X_2(\lambda,\phi)x_2+...+X_N(\lambda,\phi)x_N\Big]\times10^{-0.4C(\lambda,\phi)c}\]</div>
 </div>
 <div class="section" id="example-files">
 <h2>Example Files<a class="headerlink" href="#example-files" title="Permalink to this headline">¶</a></h2>
-<<<<<<< HEAD
-<p>These are example files that can be used for your <a class="reference download internal" href="_downloads/Hsiao07.dat" download=""><code class="xref download docutils literal"><span class="pre">sed_file</span></code></a>, <a class="reference download internal" href="_downloads/BYOSED.params" download=""><code class="xref download docutils literal"><span class="pre">BYOSED.params</span></code></a> and <a class="reference download internal" href="_downloads/sed_warps.dat" download=""><code class="xref download docutils literal"><span class="pre">sed_warps.dat</span></code></a>.
-The color and stretch functions are defined by accompanying <a class="reference download internal" href="_downloads/color_func.dat" download=""><code class="xref download docutils literal"><span class="pre">color</span></code></a> and <a class="reference download internal" href="_downloads/stretch_func.dat" download=""><code class="xref download docutils literal"><span class="pre">stretch</span></code></a> files.</p>
-=======
 <p>These are example files that can be used for your <a class="reference download internal" download="" href="_downloads/31048a48119141d933e197dbbe68b5ce/Hsiao07.dat"><code class="xref download docutils literal notranslate"><span class="pre">sed_file</span></code></a> and <a class="reference download internal" download="" href="_downloads/4f54295f1ca0d16638464a73230d1438/BYOSED.params"><code class="xref download docutils literal notranslate"><span class="pre">BYOSED.params</span></code></a>.
 The color and stretch functions are defined by accompanying <a class="reference download internal" download="" href="_downloads/1661be1058340fe90580bbfa1a4a8d99/color_func.dat"><code class="xref download docutils literal notranslate"><span class="pre">color</span></code></a> and <a class="reference download internal" download="" href="_downloads/32c6fa9f657b4fd05cb6a93b2a0b6435/stretch_func.dat"><code class="xref download docutils literal notranslate"><span class="pre">stretch</span></code></a> files.</p>
->>>>>>> origin/master
 </div>
 </div>
 
@@ -447,7 +363,7 @@ The color and stretch functions are defined by accompanying <a class="reference 
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2018, David Jones, Rick Kessler.
+        &copy; Copyright 2018, David Jones, Rick Kessler
 
     </p>
   </div>
@@ -466,21 +382,15 @@ The color and stretch functions are defined by accompanying <a class="reference 
 
   
 
-    <script type="text/javascript">
-        var DOCUMENTATION_OPTIONS = {
-            URL_ROOT:'./',
-            VERSION:'',
-            LANGUAGE:'None',
-            COLLAPSE_INDEX:false,
-            FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true,
-            SOURCELINK_SUFFIX: '.txt'
-        };
-    </script>
-      <script type="text/javascript" src="_static/jquery.js"></script>
-      <script type="text/javascript" src="_static/underscore.js"></script>
-      <script type="text/javascript" src="_static/doctools.js"></script>
-      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script type="text/javascript" src="_static/jquery.js"></script>
+        <script type="text/javascript" src="_static/underscore.js"></script>
+        <script type="text/javascript" src="_static/doctools.js"></script>
+        <script type="text/javascript" src="_static/language_data.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
 
   
 
