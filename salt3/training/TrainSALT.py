@@ -14,7 +14,7 @@ from salt3.util import snana,readutils
 from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
 from scipy.optimize import minimize, least_squares, differential_evolution
 from salt3.training.saltfit import fitting
-from salt3.training.init_hsiao import init_hsiao, init_errs
+from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs
 from salt3.training import saltfit
 from salt3.training.base import TrainSALTBase
 from salt3.initfiles import init_rootdir
@@ -29,10 +29,13 @@ class TrainSALT(TrainSALTBase):
 		
 		if not os.path.exists(self.options.initmodelfile):
 			from salt3.initfiles import init_rootdir
+			self.options.inithsiaofile = '%s/hsiao07.dat'%(init_rootdir)
 			self.options.initmodelfile = '%s/%s'%(init_rootdir,self.options.initmodelfile)
+			self.options.initx1modelfile = '%s/%s'%(init_rootdir,self.options.initx1modelfile)
 			flatnu='%s/flatnu.dat'%(init_rootdir)
 			self.options.initbfilt = '%s/%s'%(init_rootdir,self.options.initbfilt)
-			salt2file = '%s/salt2_template_0.dat.gz'%init_rootdir
+			salt2file = '%s/salt2_template_0.dat'%init_rootdir
+			salt2m1file = '%s/salt2_template_1.dat'%init_rootdir
 		if not os.path.exists(self.options.initmodelfile):
 			raise RuntimeError('model initialization file not found in local directory or %s'%init_rootdir)
 
@@ -41,8 +44,14 @@ class TrainSALT(TrainSALTBase):
 						'phasesplineres':self.options.phasesplineres,'wavesplineres':self.options.wavesplineres,
 						'phaseinterpres':self.options.phaseoutres,'waveinterpres':self.options.waveoutres}
 		
-		phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
-			self.options.initmodelfile,salt2file,self.options.initbfilt,flatnu,**init_options)
+		phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_kaepora(
+			self.options.initmodelfile,self.options.initx1modelfile,salt2file,self.options.initbfilt,flatnu,**init_options)
+		phase,wave,m0,m1test,phaseknotloc,waveknotloc,m0knots,m1knotstest = init_hsiao(
+			self.options.inithsiaofile,salt2file,self.options.initbfilt,flatnu,**init_options)
+		#print('hack: initial M1 params equal to salt2 M1')
+		#phase,wave,m1,mtemp,phaseknotloc,waveknotloc,m1knots,m1tmpknots = init_hsiao(
+		#	salt2m1file,salt2file,self.options.initbfilt,flatnu,normalize=False,**init_options)
+
 		init_options['phasesplineres'] = self.options.error_snake_phase_binsize
 		init_options['wavesplineres'] = self.options.error_snake_wave_binsize
 		errphaseknotloc,errwaveknotloc = init_errs(
@@ -77,7 +86,8 @@ class TrainSALT(TrainSALTBase):
 				order=self.options.n_min_specrecal+int(np.log((specdata[k]['wavelength'].max() - \
 					specdata[k]['wavelength'].min())/self.options.specrange_wavescale_specrecal) + \
 					np.unique(photdata['filt']).size* self.options.n_specrecal_per_lightcurve)
-				parlist=np.append(parlist,['specrecal_{}_{}'.format(sn,k)]*order)
+				if self.options.n_specrecal:
+					parlist=np.append(parlist,['specrecal_{}_{}'.format(sn,k)]*order)
 
 
 		# initial guesses
@@ -109,7 +119,7 @@ class TrainSALT(TrainSALTBase):
 			self.options.n_steps_mcmc,self.options.n_burnin_mcmc)
 		for k in datadict.keys():
 			tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
-			SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
+			if not self.options.fix_t0: SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
 
 		print('MCMC message: %s'%message)
 		print('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
@@ -148,8 +158,8 @@ class TrainSALT(TrainSALTBase):
 			for w,j in zip(wave,range(len(wave))):
 				print('%.1f %.2f %8.5e'%(p,w,M0[i,j]),file=foutm0)
 				print('%.1f %.2f %8.5e'%(p,w,M1[i,j]),file=foutm1)
-				print('%.1f %.2f %8.5e'%(p,w,M0err[i,j]**2.),file=foutm0err)
-				print('%.1f %.2f %8.5e'%(p,w,M1err[i,j]**2.),file=foutm1err)
+				print('%.1f %.2f %8.5e'%(p,w,M0err[i,j]),file=foutm0err)
+				print('%.1f %.2f %8.5e'%(p,w,M1err[i,j]),file=foutm1err)
 				print('%.1f %.2f %8.5e'%(p,w,cov_M0_M1[i,j]),file=foutcov)
 				print('%.1f %.2f %8.5e'%(p,w,modelerr[i,j]),file=fouterrmod)
 
@@ -203,6 +213,8 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				else: SIM_PEAKMJD = -99
 			if not foundfile: SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD = -99,-99,-99,-99
 
+			if 't0' not in SNParams[k].keys():
+				SNParams[k]['t0'] = 0.0
 			print('%s %8.5e %.4f %.4f %.2f %.2f %8.5e %.4f %.4f %.2f'%(
 				k,SNParams[k]['x0'],SNParams[k]['x1'],SNParams[k]['c'],SNParams[k]['t0'],
 				SNParams[k]['tpkoff'],SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD),file=foutsn)
@@ -238,9 +250,10 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		for k in self.kcordict.keys():
 			if k == 'default': continue
 			for k2 in self.kcordict[k].keys():
-				if k2 not in ['primarywave','snflux','BD17','filtwave','AB']:
+				if k2 not in ['primarywave','snflux','BD17','filtwave','AB','Vega']:
 					if self.kcordict[k][k2]['magsys'] == 'AB': primarykey = 'AB'
 					elif self.kcordict[k][k2]['magsys'] == 'Vega': primarykey = 'Vega'
+					elif self.kcordict[k][k2]['magsys'] == 'VEGA': primarykey = 'Vega'
 					elif self.kcordict[k][k2]['magsys'] == 'BD17': primarykey = 'BD17'
 
 					kcordict[k2] = self.kcordict[k][k2]
