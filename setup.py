@@ -33,7 +33,7 @@ setup(
 			  'salt3.training','salt3.util','salt3.initfiles','salt3.validation'],
 	cmdclass={'test': SALT3Test},
 	scripts=['salt3/training/TrainSALT.py','salt3/validation/ValidateModel.py','salt3/validation/ValidateLightcurves.py','salt3/validation/ValidateSpectra.py'],
-	package_data={'': ['initfiles/flatnu.dat','initfiles/Hsiao07.dat','initfiles/Bessell90_B.dat']},
+	package_data={'': ['initfiles/Kaepora_dm15_1.1.txt','initfiles/Kaepora_dm15_0.94.txt','initfiles/flatnu.dat','initfiles/Hsiao07.dat','initfiles/Bessell90_B.dat']},
 	include_package_data=True,
 	author=AUTHOR,
 	author_email=AUTHOR_EMAIL,
