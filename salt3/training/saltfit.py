@@ -268,7 +268,7 @@ class chi2:
 			denom = np.trapz(pbspl,obswave[g])
 			phase=(photdata['tobs']+tpkoff)/1+z
 			#Select data from the appropriate time range and filter
-			selectFilter=(photdata['filt']==flt)&(phase>self.phase.min()]) & (phase<self.phase.max())
+			selectFilter=(photdata['filt']==flt)&(phase>self.phase.min()) & (phase<self.phase.max())
 			filtPhot={key:photdata[key][selectFilter] for key in photdata}
 			phase=phase[selectFilter]
 			try:
