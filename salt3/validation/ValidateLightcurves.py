@@ -215,15 +215,16 @@ def customfilt(outfile,lcfile,salt3dir,
 	#			 meta={'t0':sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]})
 		
 	flux = sn.FLUXCAL
-	salt2source = sncosmo.SALT2Source(modeldir='/usr/local/SNDATA_ROOT/models/SALT2/SALT2.JLA-B14')
+	from salt3.initfiles import init_rootdir as salt2dir
+	salt2source = sncosmo.SALT2Source(modeldir=salt2dir)
 	salt2model = sncosmo.Model(salt2source)
 	hsiaomodel = sncosmo.Model(source='hsiao')
 	salt3phase,salt3wave,salt3flux = np.genfromtxt('%s/%s'%(salt3dir,m0file),unpack=True)
 	salt3m1phase,salt3m1wave,salt3m1flux = np.genfromtxt('%s/%s'%(salt3dir,m1file),unpack=True)
 	#salt2phase,salt2wave,salt2flux = np.genfromtxt('/usr/local/SNDATA_ROOT/models/SALT2/SALT2.JLA-B14/salt2_template_0.dat',unpack=True)
 	#salt2m1phase,salt2m1wave,salt2m1flux = np.genfromtxt('/usr/local/SNDATA_ROOT/models/SALT2/SALT2.JLA-B14/salt2_template_1.dat',unpack=True)
-	salt2phase,salt2wave,salt2flux = np.genfromtxt('/Users/david/.astropy/cache/sncosmo/models/salt2/salt2-4/salt2_template_0.dat',unpack=True)
-	salt2m1phase,salt2m1wave,salt2m1flux = np.genfromtxt('/Users/david/.astropy/cache/sncosmo/models/salt2/salt2-4/salt2_template_1.dat',unpack=True)
+	salt2phase,salt2wave,salt2flux = np.genfromtxt('{}/salt2_template_0.dat'.format(salt2dir),unpack=True)
+	salt2m1phase,salt2m1wave,salt2m1flux = np.genfromtxt('{}/salt2_template_1.dat'.format(salt2dir),unpack=True)
 
 
 	
