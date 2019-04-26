@@ -207,7 +207,7 @@ def rdAllData(snlist,estimate_tpk,kcordict,addwarning,speclist=None):
 			addwarning('skipping SN %s; can\'t estimate t_max'%sn.SNID)
 			continue
 
-		if sn.SURVEY not in kcordict.keys():
+		if not (kcordict is None ) and sn.SURVEY not in kcordict.keys():
 			raise RuntimeError('survey %s not in kcor file'%(sn.SURVEY))
 
 		datadict[sn.SNID] = {'snfile':f,
