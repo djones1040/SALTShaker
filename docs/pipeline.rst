@@ -39,6 +39,11 @@ Each section in the param file defines one procedure in the pipeline. The gerena
 Running the Pipeline
 ====================
 
+The pipeline class
+------------------
+
+The pipeline can be run using the ::SALT3pipe class:
+
 ::
     from pipeline.pipeline import *
     pipe = SALT3pipe(finput='sampleinput.txt')
