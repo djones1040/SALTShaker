@@ -18,31 +18,32 @@ Each section in the param file defines one procedure in the pipeline. The gerena
 
 ::
 
-[Procedure Name] ([byosed], [simulation], [training], [lcfitting], [cosmology], ...)
+    [Procedure Name] ([byosed], [simulation], [training], [lcfitting], [cosmology], ...)
 
-# external program to call
-pro =
+    # external program to call
+    pro =
 
-# arguments for the external program
-proargs = 
+    # arguments for the external program
+    proargs = 
 
-# base input location
-baseinput =  
+    # base input location
+    baseinput =  
 
-# define the section (optional), key and value to be added or changed from the base input
+    # define the section (optional), key and value to be added or changed from the base input
 
-set_key=[SECTION1] [KEY] [VALUE]
-    [SECTION2] [KEY2] [VALUE2]
-    [SECTION2] [KEY3] [VALUE3]
+    set_key=[SECTION1] [KEY] [VALUE]
+        [SECTION2] [KEY2] [VALUE2]
+        [SECTION2] [KEY3] [VALUE3]
 
 
 Running the Pipeline
 ====================
 
 ::
-pipe = SALT3pipe(finput='sampleinput.txt')
-pipe.configure()
-pipe.run()
+    from pipeline.pipeline import *
+    pipe = SALT3pipe(finput='sampleinput.txt')
+    pipe.configure()
+    pipe.run()
 
 
 
