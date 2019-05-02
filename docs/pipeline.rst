@@ -42,9 +42,10 @@ Running the Pipeline
 The pipeline class
 ------------------
 
-The pipeline can be run using the ::SALT3pipe class:
+The pipeline can be run using the SALT3pipe class:
 
 ::
+
     from pipeline.pipeline import *
     pipe = SALT3pipe(finput='sampleinput.txt')
     pipe.configure()
