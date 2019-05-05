@@ -220,11 +220,14 @@ class loglike:
 		salterr = self.ErrModel(x)
 		if self.n_colorpars:
 			colorLaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
-		else: colorLaw = None; colorScat = None
-
+		else: colorLaw = None
+		if self.n_colorscatpars:
+			colorScat = None
+		else: colorScat = True
 
 		# timing stuff
-		self.tdelt1,self.tdelt2,self.tdelt3,self.tdelt4,self.tdelt5 = 0,0,0,0,0
+		if timeit:
+			self.tdelt1,self.tdelt2,self.tdelt3,self.tdelt4,self.tdelt5 = 0,0,0,0,0
 		
 		chi2 = 0
 		#Construct arguments for maxlikeforSN method
@@ -393,8 +396,9 @@ class loglike:
 			# synthetic photometry from SALT model
 			# Integrate along wavelength axis
 
-			if timeit: time3 = time.time()
-			self.tdelt2 += time3 - time2
+			if timeit:
+				time3 = time.time()
+				self.tdelt2 += time3 - time2
 			modelsynflux=np.trapz(pbspl[flt]*saltfluxinterp[:,idx[flt]],obswave[idx[flt]],axis=1)
 			
 			modelflux = modelsynflux*self.fluxfactor[survey][flt] #*10**(-0.4*self.kcordict[survey][flt]['zpoff'])
@@ -402,14 +406,16 @@ class loglike:
 			if colorScat: colorerr = splev(self.kcordict[survey][flt]['lambdaeff'],
 										   (self.splinecolorwave,x[self.parlist == 'clscat'],3))
 			else: colorerr = 0.0
-			if timeit: time4 = time.time()
-			self.tdelt3 += time4 - time3
+			if timeit:
+				time4 = time.time()
+				self.tdelt3 += time4 - time3
 			
 			# likelihood function
 			loglike += (-(filtPhot['fluxcal']-modelflux)**2./2./(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)+\
 						np.log(1/(np.sqrt(2*np.pi)*np.sqrt(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)))).sum()
-			if timeit: time5 = time.time()
-			self.tdelt4 += time5 - time4
+			if timeit:
+				time5 = time.time()
+				self.tdelt4 += time5 - time4
 			if self.debug and self.nstep > 7000:
 				if self.nstep > 1500 and flt == 'd' and sn == 5999398:
 					print(sn)
