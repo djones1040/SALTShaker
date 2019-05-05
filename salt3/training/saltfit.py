@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 import numpy as np
-from scipy.interpolate import splprep,splev,BSpline,griddata,bisplev,interp1d,interp2d
+from scipy.interpolate import splprep,splev,BSpline,griddata,bisplev,bisplrep,interp1d,interp2d
+from scipy.integrate import trapz, simps
 from salt3.util.synphot import synphot
 from sncosmo.salt2utils import SALT2ColorLaw
 import time
@@ -18,6 +19,10 @@ from sncosmo.constants import HC_ERG_AA
 import extinction
 from multiprocessing import Pool, get_context
 import copy
+import scipy.stats as ss
+from numpy.random import standard_normal
+from scipy.linalg import cholesky
+from emcee.interruptible_pool import InterruptiblePool
 
 _SCALE_FACTOR = 1e-12
 _B_LAMBDA_EFF = 4353
@@ -38,15 +43,16 @@ class fitting:
 			 n_burnin_mcmc):
 
 		saltfitter.debug = False
-		#if n_processes > 1:
+		if n_processes > 1:
+			with InterruptiblePool(n_processes) as pool:
 		#	with multiprocessing.Pool(n_processes) as pool:
-		#		x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-		#			modelerr,clpars,clerr,clscat,SNParams = \
-		#			saltfitter.mcmcfit(guess,n_mcmc_steps,n_burnin_mcmc,pool=pool)
-		#else:
-		x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-			modelerr,clpars,clerr,clscat,SNParams = \
-			saltfitter.mcmcfit(guess,n_mcmc_steps,n_burnin_mcmc,pool=None)
+				x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+					modelerr,clpars,clerr,clscat,SNParams = \
+					saltfitter.mcmcfit(guess,n_mcmc_steps,n_burnin_mcmc,pool=pool)
+		else:
+			x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+				modelerr,clpars,clerr,clscat,SNParams = \
+				saltfitter.mcmcfit(guess,n_mcmc_steps,n_burnin_mcmc,pool=None)
 
 		return x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams,'Adaptive MCMC was successful'
@@ -70,7 +76,8 @@ class loglike:
 		self.m0max = np.max(np.where(self.parlist == 'm0')[0])
 		self.errmin = np.min(np.where(self.parlist == 'modelerr')[0])
 		self.errmax = np.max(np.where(self.parlist == 'modelerr')[0])
-
+		self.ix1 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x1')])
+		
 		# set some phase/wavelength arrays
 		self.splinecolorwave = np.linspace(self.colorwaverange[0],self.colorwaverange[1],self.n_colorpars)
 		self.phasebins = np.linspace(self.phaserange[0]-self.days_interp,self.phaserange[1]+self.days_interp,
@@ -95,12 +102,12 @@ class loglike:
 		self.components = self.SALTModel(guess)
 		self.salterr = self.ErrModel(guess)
 		
-		#int1d = interp1d(self.phase,self.components[0],axis=0)
-		self.m0guess = -19.49 #-19.36
-		self.m1guess = -8.93
+		self.m0guess = -19.49
+		self.m1guess = 1
 		
 		# set up the filters
 		self.stdmag = {}
+		self.fluxfactor = {}
 		for survey in self.kcordict.keys():
 			if survey == 'default': 
 				self.stdmag[survey] = {}
@@ -110,6 +117,7 @@ class loglike:
 					zpoff=0)
 				continue
 			self.stdmag[survey] = {}
+			self.fluxfactor[survey] = {}
 			primarywave = self.kcordict[survey]['primarywave']
 			for flt in self.kcordict[survey].keys():
 				if flt == 'filtwave' or flt == 'primarywave' or flt == 'snflux' or flt == 'AB' or flt == 'BD17' or flt == 'Vega': continue
@@ -121,7 +129,8 @@ class loglike:
 					filtwave=self.kcordict[survey]['filtwave'],
 					filttp=self.kcordict[survey][flt]['filttrans'],
 					zpoff=0) - self.kcordict[survey][flt]['primarymag']
-
+				self.fluxfactor[survey][flt] = 10**(0.4*(self.stdmag[survey][flt]+27.5))
+				
 
 		#Count number of photometric and spectroscopic points
 		self.num_spec=0
@@ -135,8 +144,10 @@ class loglike:
 			
 			self.num_spec+=len(specdata.keys())
 
-			
-			self.datadict[sn]['mwextcurve'] = 10**(-0.4*extinction.fitzpatrick99(self.wave*(1+z),self.datadict[sn]['MWEBV']*3.1))
+
+			self.datadict[sn]['mwextcurve'] = np.zeros([len(self.phase),len(self.wave)])
+			for i in range(len(self.phase)):
+				self.datadict[sn]['mwextcurve'][i,:] = 10**(-0.4*extinction.fitzpatrick99(self.wave*(1+z),self.datadict[sn]['MWEBV']*3.1))
 			
 			for flt in np.unique(photdata['filt']):
 				# synthetic photometry
@@ -150,7 +161,38 @@ class loglike:
 				if not num/denom < 1-self.filter_mass_tolerance:
 					self.num_phot+=1
 
-	def maxlikefit(self,x,pool=None,debug=False):
+		self.getobswave()
+
+	def getobswave(self):
+		"for each filter, setting up some things needed for synthetic photometry"
+		
+		for sn in self.datadict.keys():
+			z = self.datadict[sn]['zHelio']
+			survey = self.datadict[sn]['survey']
+			filtwave = self.kcordict[survey]['filtwave']
+
+			self.datadict[sn]['obswave'] = self.wave*(1+z)
+			self.datadict[sn]['obsphase'] = self.phase*(1+z)
+			self.datadict[sn]['pbspl'] = {}
+			self.datadict[sn]['denom'] = {}
+			self.datadict[sn]['idx'] = {}
+			for flt in np.unique(self.datadict[sn]['photdata']['filt']):
+
+				filttrans = self.kcordict[survey][flt]['filttrans']
+
+				g = (self.datadict[sn]['obswave'] >= filtwave[0]) & (self.datadict[sn]['obswave'] <= filtwave[-1])  # overlap range
+				self.datadict[sn]['idx'][flt] = g
+			
+				pbspl = np.interp(self.datadict[sn]['obswave'][g],filtwave,filttrans)
+				pbspl *= self.datadict[sn]['obswave'][g]
+				denom = np.trapz(pbspl,self.datadict[sn]['obswave'][g])
+				pbspl /= denom*HC_ERG_AA
+				
+				self.datadict[sn]['pbspl'][flt] = pbspl[np.newaxis,:]
+				self.datadict[sn]['denom'][flt] = denom
+
+				
+	def maxlikefit(self,x,pool=None,debug=False,timeit=False):
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic data given during initialization
 		
@@ -175,29 +217,33 @@ class loglike:
 		#Set up SALT model
 		# HACK
 		components = self.SALTModel(x)
-		#salterr = self.ErrModel(x)
-		#if self.n_components == 1: M0 = components[0]
-		#elif self.n_components == 2: M0,M1 = components
+		salterr = self.ErrModel(x)
 		if self.n_colorpars:
 			colorLaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
 		else: colorLaw = None; colorScat = None
 
+
+		# timing stuff
+		self.tdelt1,self.tdelt2,self.tdelt3,self.tdelt4,self.tdelt5 = 0,0,0,0,0
+		
 		chi2 = 0
 		#Construct arguments for maxlikeforSN method
-		args=[(sn,x,components,self.salterr,colorLaw,colorScat,debug) for sn in self.datadict.keys()]
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
+		args=[(None,sn,x,components,salterr,colorLaw,colorScat,debug,timeit) for sn in self.datadict.keys()]
 		if pool:
-			loglike=sum(pool.starmap(self.loglikeforSN,args))
+			loglike=sum(pool.map(self.loglikeforSN,args))
 		else:
 			loglike=sum(starmap(self.loglikeforSN,args))
 
 		loglike -= self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad)
-		logp = loglike + self.m0prior(components) #+ self.m1prior(components)
+		logp = loglike + self.m0prior(components) + self.m1prior(x[self.ix1]) + self.endprior(components)
 		if colorLaw:
 			logp += self.EBVprior(colorLaw)
-		
+
 		self.nstep += 1
 		print(logp*-2)
+		if timeit:
+			print('%.3f %.3f %.3f %.3f'%(self.tdelt1,self.tdelt2,self.tdelt3,self.tdelt4))
 		return logp
 
 	def m0prior(self,components):
@@ -209,29 +255,37 @@ class loglike:
 
 		return logprior
 
-	def m1prior(self,components):
+	def m1prior(self,x1pars):
 
-		int1d = interp1d(self.phase,components[1],axis=0)
-		m1B = synphot(self.wave,int1d(0),filtwave=self.kcordict['default']['Bwave'],
-					  filttp=self.kcordict['default']['Btp'])-self.stdmag['default']['B']
-		logprior = norm.logpdf(m1B,self.m1guess,0.02)
-		#if logprior != logprior: import pdb; pdb.set_trace()
+		logprior = norm.logpdf(np.std(x1pars),self.m1guess,0.02)
+		logprior += norm.logpdf(np.mean(x1pars),0,0.02)
+		
 		return logprior
 
+	def endprior(self,components):
+
+		logprior = norm.logpdf(np.sum(components[0][0,:]),0,3.0) + norm.logpdf(np.sum(components[0][-1,:]),0,3.0)
+		logprior += norm.logpdf(np.sum(components[1][0,:]),0,3.0) + norm.logpdf(np.sum(components[1][-1,:]),0,3.0)
+		return logprior
+
+	
 	def EBVprior(self,colorLaw):
 		# 0.4*np.log(10) = 0.921
 		logpriorB = norm.logpdf(colorLaw(_B_LAMBDA_EFF), 0.0, 0.02)
 		logpriorV = norm.logpdf(colorLaw(_V_LAMBDA_EFF), 0.921, 0.02)
 		return logpriorB + logpriorV
 
-	def loglikeforSN(self,sn,x,components=None,salterr=None,
+	def loglikeforSN(self,args,sn=None,x=None,components=None,salterr=None,
 					 colorLaw=None,colorScat=None,
-					 debug=False):
+					 debug=False,timeit=False):
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic observations of a single SN 
 
 		Parameters
 		----------
+		args : tuple or None
+		    Placeholder that contains all the other variables for multiprocessing quirks
+
 		sn : str
 			Name of supernova to compare to model
 			
@@ -252,6 +306,9 @@ class loglike:
 		chi2: float
 			Model chi2 relative to training data	
 		"""
+		if timeit: tstart = time.time()
+
+		if args: empty,sn,x,components,salterr,colorLaw,colorScat,debug = args[:]
 		x = np.array(x)
 
 		#Set up SALT model
@@ -262,17 +319,20 @@ class loglike:
 		if self.n_components == 1: M0 = copy.deepcopy(components[0])
 		elif self.n_components == 2: M0,M1 = copy.deepcopy(components)
 
+		
 		#Declare variables
 		photdata = self.datadict[sn]['photdata']
 		specdata = self.datadict[sn]['specdata']
+		pbspl = self.datadict[sn]['pbspl']
+		idx = self.datadict[sn]['idx']
 		survey = self.datadict[sn]['survey']
 		filtwave = self.kcordict[survey]['filtwave']
 		z = self.datadict[sn]['zHelio']
-		obswave = self.wave*(1+z)
-		obsphase = self.phase*(1+z)
-		for i in range(len(obsphase)):
-			M0[i,:] *= self.datadict[sn]['mwextcurve']
-			M1[i,:] *= self.datadict[sn]['mwextcurve']
+		obswave = self.datadict[sn]['obswave'] #self.wave*(1+z)
+		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
+		#for i in range(len(obsphase)):
+		M0 *= self.datadict[sn]['mwextcurve']
+		M1 *= self.datadict[sn]['mwextcurve']
 		
 		x0,x1,c,tpkoff = \
 			x[self.parlist == 'x0_%s'%sn][0],x[self.parlist == 'x1_%s'%sn][0],\
@@ -287,10 +347,11 @@ class loglike:
 		if colorLaw:
 			saltflux *= 10. ** (-0.4 * colorLaw(self.wave) * c)
 		saltflux *= _SCALE_FACTOR/(1+z)
-			
+
+		
 		loglike = 0
-		int1d = interp1d(obsphase,saltflux,axis=0)
-		interr1d = interp1d(obsphase,salterr,axis=0)
+		int1d = interp1d(obsphase,saltflux,axis=0,kind='nearest')
+		interr1d = interp1d(obsphase,salterr,axis=0,kind='nearest')
 		for k in specdata.keys():
 			phase=specdata[k]['tobs']+tpkoff
 			if phase < obsphase.min() or phase > obsphase.max():
@@ -302,7 +363,7 @@ class loglike:
 			saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)*\
 				np.exp(np.poly1d(coeffs)((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal))
 			#print(np.mean(saltfluxinterp2),np.mean(specdata[k]['flux']))
-			loglike -= np.sum((saltfluxinterp2-specdata[k]['flux']/(1+z))**2./specdata[k]['fluxerr']**2.)*self.num_phot/self.num_spec/2.
+			loglike -= np.sum((saltfluxinterp2-specdata[k]['flux']/(1+z))**2./(specdata[k]['fluxerr']**2. + 0.01**2.))*self.num_phot/self.num_spec/2.
 			#if 'g' in photdata['filt']: import pdb; pdb.set_trace()
 			#if sn == 5999433 and k == 0 and not 'hi':
 			#	import pylab as plt
@@ -312,19 +373,11 @@ class loglike:
 			#	plt.plot(specdata[k]['wavelength'],saltfluxinterp2)
 			#	plt.show()
 			#	import pdb; pdb.set_trace()
-			
+
+		if timeit: self.tdelt1 += time.time() - tstart
 		for flt in np.unique(photdata['filt']):
 			# check if filter 
-			filttrans = self.kcordict[survey][flt]['filttrans']
-
-			g = (obswave >= filtwave[0]) & (obswave <= filtwave[-1])  # overlap range
-			
-			
-			pbspl = np.interp(obswave[g],filtwave,filttrans)
-			pbspl *= obswave[g]
-				
-			denom = np.trapz(pbspl,obswave[g])
-
+			if timeit: time2 = time.time()			
 			phase=photdata['tobs']+tpkoff
 			#Select data from the appropriate filter filter
 			selectFilter=(photdata['filt']==flt)
@@ -333,29 +386,30 @@ class loglike:
 					phase[((phase<self.phase.min()) | (phase>self.phase.max()))],sn,tpkoff))
 			filtPhot={key:photdata[key][selectFilter] for key in photdata}
 			phase=phase[selectFilter]
-			try:
-				#Array output indices match time along 0th axis, wavelength along 1st axis
-				saltfluxinterp = int1d(phase)
-				salterrinterp = interr1d(phase)
-			except:
-				import pdb; pdb.set_trace()
+
+			#Array output indices match time along 0th axis, wavelength along 1st axis
+			saltfluxinterp = int1d(phase)
+			salterrinterp = interr1d(phase)
 			# synthetic photometry from SALT model
 			# Integrate along wavelength axis
-			modelsynflux=np.trapz(pbspl[np.newaxis,:]*saltfluxinterp[:,g]/HC_ERG_AA,obswave[g],axis=1)/denom
 
-			modelflux = modelsynflux*10**(0.4*(self.stdmag[survey][flt]+27.5)) #*10**(-0.4*self.kcordict[survey][flt]['zpoff'])
-			modelerr=np.trapz(pbspl[np.newaxis,:]*salterrinterp[:,g],obswave[g],axis=1)/denom
-
+			if timeit: time3 = time.time()
+			self.tdelt2 += time3 - time2
+			modelsynflux=np.trapz(pbspl[flt]*saltfluxinterp[:,idx[flt]],obswave[idx[flt]],axis=1)
+			
+			modelflux = modelsynflux*self.fluxfactor[survey][flt] #*10**(-0.4*self.kcordict[survey][flt]['zpoff'])
+			modelerr=np.trapz(pbspl[flt]*salterrinterp[:,idx[flt]],obswave[idx[flt]],axis=1) #/denom
 			if colorScat: colorerr = splev(self.kcordict[survey][flt]['lambdaeff'],
 										   (self.splinecolorwave,x[self.parlist == 'clscat'],3))
 			else: colorerr = 0.0
+			if timeit: time4 = time.time()
+			self.tdelt3 += time4 - time3
 			
-
 			# likelihood function
 			loglike += (-(filtPhot['fluxcal']-modelflux)**2./2./(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)+\
 						np.log(1/(np.sqrt(2*np.pi)*np.sqrt(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)))).sum()
-			#loglike -= ((filtPhot['fluxcal']-modelflux)**2./2./(filtPhot['fluxcalerr']**2. + modelflux**2.*0.01**2. + colorerr**2.)-\
-			#		 np.log(1/(np.sqrt(2*np.pi)*np.sqrt(filtPhot['fluxcalerr']**2. + modelflux**2.*0.01**2. + colorerr**2.)))).sum()
+			if timeit: time5 = time.time()
+			self.tdelt4 += time5 - time4
 			if self.debug and self.nstep > 7000:
 				if self.nstep > 1500 and flt == 'd' and sn == 5999398:
 					print(sn)
@@ -365,7 +419,7 @@ class loglike:
 					plt.errorbar(filtPhot['tobs'],modelflux,fmt='o',color='C0',label='model')
 					plt.errorbar(filtPhot['tobs'],filtPhot['fluxcal'],yerr=filtPhot['fluxcalerr'],fmt='o',color='C1',label='obs')
 					import pdb; pdb.set_trace()
-
+		
 		return loglike
 
 		
@@ -435,8 +489,8 @@ class loglike:
 		m1err = np.array([])
 		parcount = 0
 		for i in np.where(self.parlist == 'm1')[0]:
-			m1pars = np.append(m1pars,x[i][nburn:].mean())#/_SCALE_FACTOR)
-			m1err = np.append(m1err,x[i][nburn:].std())#/_SCALE_FACTOR)
+			m1pars = np.append(m1pars,x[i][nburn:].mean())
+			m1err = np.append(m1err,x[i][nburn:].std())
 			if mkplots:
 				if not parcount % 9:
 					subnum = axcount%9+1
@@ -493,11 +547,11 @@ class loglike:
 			tpk_init = self.datadict[k]['photdata']['mjd'][0] - self.datadict[k]['photdata']['tobs'][0]
 			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k][0][nburn:].mean(),
 							  'x1':x[self.parlist == 'x1_%s'%k][0][nburn:].mean(),
-							  'c':x[self.parlist == 'x1_%s'%k][0][nburn:].mean(),
+							  'c':x[self.parlist == 'c_%s'%k][0][nburn:].mean(),
 							  'tpkoff':x[self.parlist == 'tpkoff_%s'%k][0][nburn:].mean(),
 							  'x0err':x[self.parlist == 'x0_%s'%k][0][nburn:].std(),
 							  'x1err':x[self.parlist == 'x1_%s'%k][0][nburn:].std(),
-							  'cerr':x[self.parlist == 'x1_%s'%k][0][nburn:].std(),
+							  'cerr':x[self.parlist == 'c_%s'%k][0][nburn:].std(),
 							  'tpkofferr':x[self.parlist == 'tpkoff_%s'%k][0][nburn:].std()}
 
 
@@ -516,6 +570,17 @@ class loglike:
 
 		cov_m0_m1 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0_m1_cov,bsorder,bsorder))
 		modelerr = bisplev(self.phase,self.wave,(self.errphaseknotloc,self.errwaveknotloc,modelerrpars,bsorder,bsorder))
+		#phaseout,waveout,fluxout = np.array([]),np.array([]),np.array([])
+		#for i in range(len(self.phase)):
+		#	for j in range(len(self.wave)):
+		#		phaseout = np.append(phaseout,self.phase[i])
+		#		waveout = np.append(waveout,self.wave[j])
+		#		fluxout = np.append(fluxout,modelerr[i,j])
+		#bspl = bisplrep(phaseout,waveout,fluxout,kx=3,ky=3,tx=self.errphaseknotloc,ty=self.errwaveknotloc,task=-1)
+		#modelerr2 = bisplev(self.phase,self.wave,bspl)
+		#plt.plot(self.wave,modelerr[self.phase == 0,:].flatten())
+		#plt.plot(self.wave,modelerr2[self.phase == 0,:].flatten())
+		#import pdb; pdb.set_trace()
 		clscat = splev(self.wave,(self.errwaveknotloc,clscatpars,3))
 		if not len(clpars): clpars = []
 
@@ -536,10 +601,6 @@ class loglike:
 
 			pdf_pages.savefig(fig)			
 			pdf_pages.close()
-
-		#print('hack: returning initialization components')
-		#return(result,self.phase,self.wave,self.components[0],m0err,self.components[1],m1err,cov_m0_m1,modelerr,
-		#	   clpars,clerr,clscat,resultsdict)
 			
 		return(result,self.phase,self.wave,m0,m0err,m1,m1err,cov_m0_m1,modelerr,
 			   clpars,clerr,clscat,resultsdict)
@@ -596,12 +657,13 @@ class loglike:
 			for flt in np.unique(photdata['filt']):
 				filttrans = self.kcordict[survey][flt]['filttrans']
 				
-				g = (self.wavebins[:-1]  >= filtwave[0]/(1+z)) & (self.wavebins[:-1] <= filtwave[-1]/(1+z))  # overlap range
+				g = (self.wavebins[:-1]  >= filtwave[0]/(1+z)) & (self.wavebins[1:] <= filtwave[-1]/(1+z))  # overlap range
 				pbspl = np.zeros(g.sum())
 				for i in range(g.sum()):
 					j=np.where(g)[0][i]
-					pbspl[i]=trapIntegrate(self.wavebins[j],self.wavebins[j+1],filtwave/(1+z),filttrans*filtwave/(1+z))
-
+					try: pbspl[i]=trapIntegrate(self.wavebins[j],self.wavebins[j+1],filtwave/(1+z),filttrans*filtwave/(1+z))
+					except: import pdb; pdb.set_trace()
+					
 				#Normalize it so that total number of points added is 1
 				pbspl /= np.sum(pbspl)
 				#Consider weighting neff by variance for each measurement?
@@ -666,7 +728,7 @@ class loglike:
 
 class mcmc(loglike):
 
-	def get_proposal_cov(self, M2, n, beta=0.05):
+	def get_proposal_cov(self, M2, n, beta=0.25):
 		d, _ = M2.shape
 		init_period = self.nsteps_before_adaptive
 		s_0, s_opt, C_0 = self.AMpars['sigma_0'], self.AMpars['sigma_opt'], self.AMpars['C_0']
@@ -680,51 +742,30 @@ class mcmc(loglike):
 		prop_cov,adjust_flag = self.get_proposal_cov(M2, n)
 
 		candidate = np.zeros(self.npar)
-		if not adjust_flag:
-			for i,par in zip(range(self.npar),self.parlist):
-				#if par == 'm0' or par == 'm1': continue
-				if par == 'm0':
-					#m0scalestep = self.stepsize_magscale_M0
-					#m0addstep = self.stepsize_magadd_M0
-					#scalefactor = 10**(0.4*np.random.normal(scale=m0scalestep))
-					#candidate[i] = current[i]*scalefactor + np.random.normal(scale=np.sqrt(prop_cov[i,i]))
-					candidate[i] = current[i] + np.random.normal(scale=np.sqrt(prop_cov[i,i]))
-				elif par == 'm1':
-					#m1scalestep = self.stepsize_magscale_M1
-					#scalefactor = 10**(0.4*np.random.normal(scale=m1scalestep))
-					candidate[i] = current[i] + np.random.normal(scale=np.sqrt(prop_cov[i,i])) #*scalefactor + 
-				elif par.startswith('x0'):
-					candidate[i] = current[i]*10**(0.4*np.random.normal(scale=self.stepsize_x0))
-				elif par.startswith('specrecal'): candidate[i] = current[i]+np.random.normal(scale=self.stepsize_specrecal)
+		for i,par in zip(range(self.npar),self.parlist):
+			if self.adjust_snpars and (par == 'm0' or par == 'm1' or par == 'modelerr'):
+				candidate[i] = current[i]
+			elif self.adjust_modelpars and par != 'm0' and par != 'm1' and par != 'modelerr':
+				candidate[i] = current[i]
+			else:
+				if par.startswith('x0') or par == 'm0' or par == 'modelerr':
+					candidate[i] = current[i]*10**(0.4*np.random.normal(scale=np.sqrt(prop_cov[i,i])))
 				else:
-					candidate[i] = current[i] + np.random.normal(0,np.sqrt(prop_cov[i,i]))
-		else:
-			for i,par in zip(range(self.npar),self.parlist):
-				candidate[i] = np.random.normal(loc=current[i],scale=np.sqrt(prop_cov[i,i]))
-		return candidate
+					candidate[i] = np.random.normal(loc=current[i],scale=np.sqrt(prop_cov[i,i]))
 
-	def update_moments(self,mean, M2, sample, n):
-		next_n = (n + 1)
-		w = 1/next_n
-		new_mean = mean + w*(sample - mean)
-		delta_bf, delta_af = sample - mean, sample - new_mean
-		new_M2 = M2 + np.outer(delta_bf, delta_af)
-		#if len(iLow) and self.nstep > 200:
-		#	import pdb; pdb.set_trace()
-		
-		return new_mean, new_M2
+		return candidate
 
 	def get_propcov_init(self,x):
 		C_0 = np.zeros([len(x),len(x)])
 		for i,par in zip(range(self.npar),self.parlist):
 			if par == 'm0':
-				C_0[i,i] = self.stepsize_magadd_M0**2.
+				C_0[i,i] = self.stepsize_magscale_M0**2.
 			if par == 'modelerr':
-				C_0[i,i] = (self.errstddev)**2.
+				C_0[i,i] = (self.stepsize_magscale_err)**2.
 			elif par == 'm1':
 				C_0[i,i] = (self.stepsize_magadd_M1)**2.
 			elif par.startswith('x0'):
-				C_0[i,i] = self.stepsize_magadd_M0**2.
+				C_0[i,i] = self.stepsize_x0**2.
 			elif par.startswith('x1'):
 				C_0[i,i] = self.stepsize_x1**2.
 			elif par.startswith('c'): C_0[i,i] = (self.stepsize_c)**2.
@@ -735,9 +776,17 @@ class mcmc(loglike):
 		self.AMpars = {'C_0':C_0,
 					   'sigma_0':0.1/np.sqrt(self.npar),
 					   'sigma_opt':2.38*self.adaptive_sigma_opt_scale/np.sqrt(self.npar)}
-
 	
-	def mcmcfit(self,x,nsteps,nburn,pool=None,debug=False,thin=10):
+	def update_moments(self,mean, M2, sample, n):
+		next_n = (n + 1)
+		w = 1/next_n
+		new_mean = mean + w*(sample - mean)
+		delta_bf, delta_af = sample - mean, sample - new_mean
+		new_M2 = M2 + np.outer(delta_bf, delta_af)
+		
+		return new_mean, new_M2
+	
+	def mcmcfit(self,x,nsteps,nburn,pool=None,debug=False,thin=1):
 		npar = len(x)
 		self.npar = npar
 		
@@ -750,7 +799,7 @@ class mcmc(loglike):
 		self.errstddev = self.stepsize_magscale_err
 		mean, M2 = x[:], np.zeros([len(x),len(x)])
 		mean_recent, M2_recent = x[:], np.zeros([len(x),len(x)])
-
+		
 		self.get_propcov_init(x)
 
 		outpars = [[] for i in range(npar)]
@@ -760,15 +809,20 @@ class mcmc(loglike):
 		accept_frac_recent = 0.5
 		accepted_history = np.array([])
 		n_adaptive = 0
+		self.adjust_snpars,self.adjust_modelpars = False,False
 		while nstep < nsteps:
 			nstep += 1
 			n_adaptive += 1
 			
 			if not nstep % 50 and nstep > 250:
 				accept_frac_recent = len(accepted_history[-100:][accepted_history[-100:] == True])/100.
-			
+			if self.modelpar_snpar_tradeoff_nstep:
+				if not nstep % self.modelpar_snpar_tradeoff_nstep and nstep > self.nstep_before_modelpar_tradeoff:
+					if self.adjust_snpars: self.adjust_modelpars = True; self.adjust_snpars = False
+					else: self.adjust_modelpars = False; self.adjust_snpars = True
+
 			X = self.generate_AM_candidate(current=Xlast, M2=M2_recent, n=nstep)
-			
+				
 			# loglike
 			this_loglike = self.maxlikefit(X,pool=pool,debug=debug)
 
@@ -794,17 +848,23 @@ class mcmc(loglike):
 			mean, M2 = self.update_moments(mean, M2, Xlast, n_adaptive)
 			if not n_adaptive % self.nsteps_adaptive_memory:
 				n_adaptive = 0
-				ix,iy = np.where(M2 < 1e-10)
-				iLow = np.where(ix == iy)[0]
-				M2[ix[iLow],iy[iLow]] = 1e-10
+				#ix,iy = np.where(M2 < 1e-5)
+				#iLow = np.where(ix == iy)[0]
+				#M2[ix[iLow],iy[iLow]] = 1e-4
 				# maybe too hacky
-				iLow2 = np.where((np.diagonal(M2) < 1e-4) & ((self.parlist == 'm1') | (self.parlist == 'm2')))[0]
-				M2[iLow2,iLow2] = 1e-4
 				
-				M2_recent = copy.deepcopy(M2)
-
+				if self.adjust_snpars and 'M2_snpars' in self.__dict__.keys(): M2_recent = copy.deepcopy(self.M2_snpars)
+				elif self.adjust_snpars and 'M2_snpars' not in self.__dict__.keys(): M2_recent = copy.deepcopy(self.M2_allpars)
+				elif self.adjust_modelpars and 'M2_modelpars' in self.__dict__.keys(): M2_recent = copy.deepcopy(self.M2_modelpars)
+				elif self.adjust_modelpars and 'M2_modelpars' not in self.__dict__.keys(): M2_recent = copy.deepcopy(self.M2_allpars)
+				else:
+					M2_recent = copy.deepcopy(M2)
+					self.M2_allpars = copy.deepcopy(M2)
+					
 				mean_recent = mean[:]
 				mean, M2 = Xlast[:], np.zeros([len(x),len(x)])
+				if self.adjust_snpars: self.M2_snpars = copy.deepcopy(M2_recent)
+				elif self.adjust_modelpars: self.M2_modelpars = copy.deepcopy(M2_recent)
 
 				
 		print('acceptance = %.3f'%(accept/float(nstep)))

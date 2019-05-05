@@ -26,7 +26,6 @@ class TrainSALTBase:
 							help='configuration file')
 		parser.add_argument('-s','--stage', default='all', type=str,
 							help='stage - options are train and validate')
-
 		
 		# input/output files
 		parser.add_argument('--snlist', default=config.get('iodata','snlist'), type=str,
@@ -46,6 +45,9 @@ class TrainSALTBase:
 							phase, wavelength, flux (default=%default)""")
 		parser.add_argument('--initbfilt', default=config.get('iodata','initbfilt'), type=str,
 							help="""initial B-filter to get the normalization of the initial model (default=%default)""")
+		parser.add_argument('--resume_from_outputdir', default=config.get('iodata','resume_from_outputdir'), type=bool,
+							help='if set, initialize using output parameters from previous run')
+
 
 		# training model parameters
 		parser.add_argument('--waverange', default=list(map(int,config.get('trainparams','waverange').split(','))), type=int, nargs=2,
@@ -135,6 +137,10 @@ class TrainSALTBase:
 							help='number of steps before starting adaptive step sizes (default=%default)')
 		parser.add_argument('--nsteps_adaptive_memory', default=config.get('mcmcparams','nsteps_adaptive_memory'), type=float,
 							help='number of steps to use to estimate adaptive steps (default=%default)')
+		parser.add_argument('--modelpar_snpar_tradeoff_nstep', default=config.get('mcmcparams','modelpar_snpar_tradeoff_nstep'), type=float,
+							help='number of steps when trading between adjusting model params and SN params (default=%default)')
+		parser.add_argument('--nstep_before_modelpar_tradeoff', default=config.get('mcmcparams','nstep_before_modelpar_tradeoff'), type=float,
+							help='number of steps when trading between adjusting model params and SN params (default=%default)')
 		parser.add_argument('--adaptive_sigma_opt_scale', default=config.get('mcmcparams','adaptive_sigma_opt_scale'), type=float,
 							help='scaling the adaptive step sizes (default=%default)')
 
@@ -181,7 +187,10 @@ class TrainSALTBase:
 						 'stepsize_x1':self.options.stepsize_x1,
 						 'stepsize_c':self.options.stepsize_c,
 						 'stepsize_tpk':self.options.stepsize_tpk,
-						 'fix_t0':self.options.fix_t0}
+						 'fix_t0':self.options.fix_t0,
+						 'nstep_before_modelpar_tradeoff':self.options.nstep_before_modelpar_tradeoff,
+						 'modelpar_snpar_tradeoff_nstep':self.options.modelpar_snpar_tradeoff_nstep}
+
 		return saltfitkwargs
 
 	def mkcuts(self,datadict):

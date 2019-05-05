@@ -30,29 +30,31 @@ def rdkcor(surveylist,options,addwarning=None):
 
 
 		for subsurvey in subsurveys:
-			kcordict['%s(%s)'%(survey,subsurvey)] = {}
-			kcordict['%s(%s)'%(survey,subsurvey)]['filtwave'] = filtertrans['wavelength (A)']
-			kcordict['%s(%s)'%(survey,subsurvey)]['primarywave'] = primarysed['wavelength (A)']
-			kcordict['%s(%s)'%(survey,subsurvey)]['snflux'] = snsed['SN Flux (erg/s/cm^2/A)']
+			kcorkey = '%s(%s)'%(survey,subsurvey)
+			if not subsurvey: kcorkey = survey[:]
+			kcordict[kcorkey] = {}
+			kcordict[kcorkey]['filtwave'] = filtertrans['wavelength (A)']
+			kcordict[kcorkey]['primarywave'] = primarysed['wavelength (A)']
+			kcordict[kcorkey]['snflux'] = snsed['SN Flux (erg/s/cm^2/A)']
 
 			if 'AB' in primarysed.names:
-				kcordict['%s(%s)'%(survey,subsurvey)]['AB'] = primarysed['AB']
+				kcordict[kcorkey]['AB'] = primarysed['AB']
 			if 'Vega' in primarysed.names:
-				kcordict['%s(%s)'%(survey,subsurvey)]['Vega'] = primarysed['Vega']
+				kcordict[kcorkey]['Vega'] = primarysed['Vega']
 			if 'VEGA' in primarysed.names:
-				kcordict['%s(%s)'%(survey,subsurvey)]['Vega'] = primarysed['VEGA']
+				kcordict[kcorkey]['Vega'] = primarysed['VEGA']
 			if 'BD17' in primarysed.names:
-				kcordict['%s(%s)'%(survey,subsurvey)]['BD17'] = primarysed['BD17']
+				kcordict[kcorkey]['BD17'] = primarysed['BD17']
 			for filt in zpoff['Filter Name']:
-				kcordict['%s(%s)'%(survey,subsurvey)][filt.split('-')[-1].split('/')[-1]] = {}
-				kcordict['%s(%s)'%(survey,subsurvey)][filt.split('-')[-1].split('/')[-1]]['filttrans'] = filtertrans[filt]
-				lambdaeff = np.sum(kcordict['%s(%s)'%(survey,subsurvey)]['filtwave']*filtertrans[filt])/np.sum(filtertrans[filt])
-				kcordict['%s(%s)'%(survey,subsurvey)][filt.split('-')[-1].split('/')[-1]]['lambdaeff'] = lambdaeff
-				kcordict['%s(%s)'%(survey,subsurvey)][filt.split('-')[-1].split('/')[-1]]['zpoff'] = \
+				kcordict[kcorkey][filt.split('-')[-1].split('/')[-1]] = {}
+				kcordict[kcorkey][filt.split('-')[-1].split('/')[-1]]['filttrans'] = filtertrans[filt]
+				lambdaeff = np.sum(kcordict[kcorkey]['filtwave']*filtertrans[filt])/np.sum(filtertrans[filt])
+				kcordict[kcorkey][filt.split('-')[-1].split('/')[-1]]['lambdaeff'] = lambdaeff
+				kcordict[kcorkey][filt.split('-')[-1].split('/')[-1]]['zpoff'] = \
 					zpoff['ZPOff(Primary)'][zpoff['Filter Name'] == filt][0]
-				kcordict['%s(%s)'%(survey,subsurvey)][filt.split('-')[-1].split('/')[-1]]['magsys'] = \
+				kcordict[kcorkey][filt.split('-')[-1].split('/')[-1]]['magsys'] = \
 					zpoff['Primary Name'][zpoff['Filter Name'] == filt][0]
-				kcordict['%s(%s)'%(survey,subsurvey)][filt.split('-')[-1].split('/')[-1]]['primarymag'] = \
+				kcordict[kcorkey][filt.split('-')[-1].split('/')[-1]]['primarymag'] = \
 					zpoff['Primary Mag'][zpoff['Filter Name'] == filt][0]
 
 	initBfilt = '%s/Bessell90_B.dat'%init_rootdir
@@ -225,7 +227,8 @@ def rdAllData(snlist,estimate_tpk,kcordict,addwarning,speclist=None):
 		datadict[sn.SNID]['photdata']['fluxcalerr'] = sn.FLUXCALERR
 		datadict[sn.SNID]['photdata']['filt'] = sn.FLT
 		if 'MWEBV' in sn.__dict__.keys():
-			datadict[sn.SNID]['MWEBV'] = float(sn.MWEBV.split()[0])
+			try: datadict[sn.SNID]['MWEBV'] = float(sn.MWEBV.split()[0])
+			except: datadict[sn.SNID]['MWEBV'] = float(sn.MWEBV)
 		elif 'RA' in sn.__dict__.keys() and 'DEC' in sn.__dict__.keys():
 			print('determining MW E(B-V) from IRSA for SN %s using RA/Dec in file'%sn.SNID)
 			sc = SkyCoord(sn.RA,sn.DEC,frame="fk5",unit=u.deg)
