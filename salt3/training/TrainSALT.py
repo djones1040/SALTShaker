@@ -14,12 +14,14 @@ from salt3.util import snana,readutils
 from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
 from scipy.optimize import minimize, least_squares, differential_evolution
 from salt3.training.saltfit import fitting
-from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs
+from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs, init_errs_fromfile
 from salt3.training import saltfit
 from salt3.training.base import TrainSALTBase
 from salt3.initfiles import init_rootdir
+from salt3.util.txtobj import txtobj
 from astropy.io import fits
 from astropy.cosmology import Planck15 as cosmo
+from sncosmo.constants import HC_ERG_AA
 
 class TrainSALT(TrainSALTBase):
 	def __init__(self):
@@ -44,19 +46,39 @@ class TrainSALT(TrainSALTBase):
 						'phasesplineres':self.options.phasesplineres,'wavesplineres':self.options.wavesplineres,
 						'phaseinterpres':self.options.phaseoutres,'waveinterpres':self.options.waveoutres}
 		
-		phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_kaepora(
-			self.options.initmodelfile,self.options.initx1modelfile,salt2file,self.options.initbfilt,flatnu,**init_options)
-		phase,wave,m0,m1test,phaseknotloc,waveknotloc,m0knots,m1knotstest = init_hsiao(
-			self.options.inithsiaofile,salt2file,self.options.initbfilt,flatnu,**init_options)
+		#phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_kaepora(
+		#	self.options.initmodelfile,self.options.initx1modelfile,salt2file,self.options.initbfilt,flatnu,**init_options)
+		#phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
+		#	self.options.inithsiaofile,salt2file,self.options.initbfilt,flatnu,**init_options)
 		#print('hack: initial M1 params equal to salt2 M1')
-		#phase,wave,m1,mtemp,phaseknotloc,waveknotloc,m1knots,m1tmpknots = init_hsiao(
-		#	salt2m1file,salt2file,self.options.initbfilt,flatnu,normalize=False,**init_options)
+
+
+		
+		if self.options.resume_from_outputdir:
+			salt3m0file = '%s/salt3_template_0.dat'%self.options.outputdir
+			salt3m1file = '%s/salt3_template_1.dat'%self.options.outputdir
+			phase,wave,m0,mtemp,phaseknotloc,waveknotloc,m0knots,m1tmpknots = init_hsiao(
+				salt3m0file,salt2file,self.options.initbfilt,flatnu,normalize=False,**init_options)
+			phase,wave,m1,mtemp,phaseknotloc,waveknotloc,m1knots,m1tmpknots = init_hsiao(
+				salt3m1file,salt2file,self.options.initbfilt,flatnu,normalize=False,**init_options)
+
+		else:
+			phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
+				self.options.inithsiaofile,salt2file,self.options.initbfilt,flatnu,normalize=True,**init_options)
+			#phase,wave,m1,mtemp,phaseknotloc,waveknotloc,m1knots,m1tmpknots = init_hsiao(
+			#	salt2m1file,salt2file,self.options.initbfilt,flatnu,normalize=False,**init_options)
+			#phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_kaepora(
+			#	salt2file,salt2m1file,salt2file,self.options.initbfilt,flatnu,**init_options)
 
 		init_options['phasesplineres'] = self.options.error_snake_phase_binsize
 		init_options['wavesplineres'] = self.options.error_snake_wave_binsize
 		errphaseknotloc,errwaveknotloc = init_errs(
-			self.options.initmodelfile,salt2file,self.options.initbfilt,**init_options)
-
+			self.options.inithsiaofile,salt2file,self.options.initbfilt,**init_options)
+		if self.options.resume_from_outputdir:
+			errphaseknotloc,errwaveknotloc,modelerrguess = init_errs_fromfile(
+				'%s/salt3_lc_dispersion_scaling.dat'%self.options.outputdir,
+				salt2file,self.options.initbfilt,**init_options)
+		
 		# number of parameters
 		n_phaseknots,n_waveknots = len(phaseknotloc)-4,len(waveknotloc)-4
 		n_errphaseknots,n_errwaveknots = len(errphaseknotloc)-4,len(errwaveknotloc)-4
@@ -94,15 +116,26 @@ class TrainSALT(TrainSALTBase):
 		n_params=parlist.size
 		guess = np.zeros(parlist.size)
 		guess[parlist == 'm0'] = m0knots
-		guess[parlist == 'modelerr'] = 0.01
+		if self.options.resume_from_outputdir:
+			guess[parlist == 'modelerr'] = modelerrguess
+		else:
+			guess[parlist == 'modelerr'] = 1e-10 #*np.mean(m0knots)*HC_ERG_AA
 		if self.options.n_components == 2:
 			guess[parlist == 'm1'] = m1knots
 		if self.options.n_colorpars:
 			guess[parlist == 'cl'] = [0.]*n_colorpars
 		guess[(parlist == 'm0') & (guess < 0)] = 0
-		for k in datadict.keys():
-			guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36-10.635))
-
+		if self.options.resume_from_outputdir:
+			snpars = '%s/salt3train_snparams.txt'%self.options.outputdir
+			snp = txtobj(snpars)
+			for k in datadict.keys():
+				guess[parlist == 'x0_%s'%k] = snp.x0[snp.SN == k][0]
+				guess[parlist == 'x1_%s'%k] = snp.x1[snp.SN == k][0]
+				guess[parlist == 'c_%s'%k] = snp.c[snp.SN == k][0]
+				guess[parlist == 'tpkoff_%s'%k] = snp.tpkoff[snp.SN == k][0]
+		else:
+			for k in datadict.keys():
+				guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36-10.635))
 		
 		saltfitkwargs = self.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
 

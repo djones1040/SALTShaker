@@ -4,6 +4,7 @@
 import numpy as np
 import pylab as plt
 from scipy.interpolate import interp1d, interp2d
+from sncosmo.salt2utils import SALT2ColorLaw
 
 def mkModelPlot(salt3dir='modelfiles/salt3'):
 	plt.rcParams['figure.figsize'] = (9,3)
@@ -89,7 +90,7 @@ def mkModelPlot(salt3dir='modelfiles/salt3'):
 		ax1.set_ylim([0,1.35])
 
 		ax1.text(9100,spacing*(i+0.2),'%s'%plotphasestr,ha='right')
-
+		
 	spacing = 0.15		
 	for plotphase,i,plotphasestr in zip([-5,0,10],range(3),['-5','+0','+10']):
 		int_salt2m1 = interp2d(salt2m1wave,salt2m1phase,salt2m1flux)
@@ -119,6 +120,30 @@ def mkModelPlot(salt3dir='modelfiles/salt3'):
 
 		
 		#import pdb; pdb.set_trace()
+		
+	with open('modelfiles/salt2/salt2_color_correction.dat') as fin:
+		lines = fin.readlines()
+	for i in range(len(lines)):
+		lines[i] = lines[i].replace('\n','')
+	colorlaw_salt2_coeffs = np.array(lines[1:5]).astype('float')
+	salt2_colormin = float(lines[6].split()[1])
+	salt2_colormax = float(lines[7].split()[1])
+	colorlaw_salt2 = SALT2ColorLaw([salt2_colormin,salt2_colormax],colorlaw_salt2_coeffs)
+	wave = np.arange(salt2_colormin,salt2_colormax,1)
+	ax3.plot(wave,colorlaw_salt2(wave),color='b')
+
+	
+	with open('%s/salt3_color_correction.dat'%salt3dir) as fin:
+		lines = fin.readlines()
+	if len(lines):
+		for i in range(len(lines)):
+			lines[i] = lines[i].replace('\n','')
+		colorlaw_salt3_coeffs = np.array(lines[1:5]).astype('float')
+		salt3_colormin = float(lines[6].split()[1])
+		salt3_colormax = float(lines[7].split()[1])
+
+		colorlaw_salt3 = SALT2ColorLaw([salt3_colormin,salt3_colormax],colorlaw_salt3_coeffs)
+		ax3.plot(wave,colorlaw_salt2(wave),color='r')
 	
 if __name__ == "__main__":
 	mkModelPlot()
