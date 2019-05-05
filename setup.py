@@ -33,7 +33,7 @@ setup(
 			  'salt3.training','salt3.util','salt3.initfiles','salt3.validation'],
 	cmdclass={'test': SALT3Test},
 	scripts=['salt3/training/TrainSALT.py','salt3/validation/ValidateModel.py','salt3/validation/ValidateLightcurves.py','salt3/validation/ValidateSpectra.py'],
-	package_data={'': ['initfiles/flatnu.dat','initfiles/Hsiao07.dat','initfiles/Bessell90_B.dat']},
+	package_data={'': ['initfiles/Kaepora_dm15_0.94.txt', 'initfiles/salt2_color_dispersion.dat', 'initfiles/Kaepora_dm15_1.1.txt', 'initfiles/salt2_color_correction.dat', 'initfiles/vegased_2004_stis.txt', 'initfiles/Hsiao07.dat', 'initfiles/Bessell90_B.dat', 'initfiles/flatnu.dat', 'initfiles/salt2_spec_variance_0.dat', 'initfiles/salt2_spec_variance_1.dat', 'initfiles/salt2_lc_relative_covariance_01.dat', 'initfiles/salt2_template_1.dat', 'initfiles/salt2_spec_covariance_01.dat', 'initfiles/salt2_template_0.dat', 'initfiles/salt2_lc_relative_variance_1.dat', 'initfiles/salt2_lc_relative_variance_0.dat', 'initfiles/salt2_lc_dispersion_scaling.dat']},
 	include_package_data=True,
 	author=AUTHOR,
 	author_email=AUTHOR_EMAIL,
