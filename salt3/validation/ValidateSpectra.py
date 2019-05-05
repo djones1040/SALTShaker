@@ -4,7 +4,7 @@ from salt3.util import readutils
 from matplotlib import pyplot as plt
 from scipy.special import factorial
 
-def compareSpectra(snlist,speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
+def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 		 m0file='salt3_template_0.dat',
 		 m1file='salt3_template_1.dat',
 		 clfile='salt2_color_correction.dat',
@@ -14,7 +14,7 @@ def compareSpectra(snlist,speclist,salt3dir,outdir=None,parfile='salt3_parameter
 		 lcrv11file='salt2_lc_relative_variance_1.dat',
 		 lcrv01file='salt2_lc_relative_covariance_01.dat'):
 
-	datadict=readutils.rdAllData(snlist,True,lambda x: None,speclist)
+	datadict=readutils.rdAllData(speclist,False,None,lambda x: None,speclist)
 	salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,
 							m1file=m1file,
 							clfile=clfile,cdfile=cdfile,
@@ -44,12 +44,12 @@ def compareSpectra(snlist,speclist,salt3dir,outdir=None,parfile='salt3_parameter
 			coeffs/=factorial(np.arange(len(coeffs)))
 			wave=specdata[k]['wavelength']
 			modelFlux = model.flux(specdata[k]['tobs'],wave)*np.exp(np.poly1d(coeffs)((wave-np.mean(wave))/2500))
-			import pdb; pdb.set_trace()
+			#import pdb; pdb.set_trace()
 			plt.clf()
 			plt.plot(wave,modelFlux,'r-','Model spectrum')
-			#plt.plot(wave,specdata[k]['flux'],'b-','Spectral data')
+			plt.plot(wave,specdata[k]['flux'],'b-','Spectral data')
 			plt.xlim(wave.min(),wave.max())
-			#plt.ylim(0,max(modelFlux.max(),specdata[k]['flux'].max())*1.25)
+			plt.ylim(0,max(modelFlux.max(),specdata[k]['flux'].max())*1.25)
 			plt.xlabel('Wavelength $\AA$')
 			plt.ylabel('Flux')
 			plt.savefig('{}/speccomp_{}_{}.png'.format(outdir,sn,k),dpi=288)
@@ -57,7 +57,7 @@ def compareSpectra(snlist,speclist,salt3dir,outdir=None,parfile='salt3_parameter
 if __name__ == "__main__":
 	usagestring = """ Compares a SALT3 model to spectra
 
-	usage: python ValidateSpectra.py <snlist> <speclist> <salt3dir>
+	usage: python ValidateSpectra.py <speclist> <salt3dir>
 
 	Dependencies: sncosmo?
 	"""
