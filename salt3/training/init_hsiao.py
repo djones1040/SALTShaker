@@ -38,7 +38,8 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 
 	m0 = bisplev(intphase,intwave,bspl)
 	
-	m1fluxguess = flux*10**(-0.4*(-8.93+(synphotB(refWave,refFlux,0,0,Bfilt)-synphotB(wave[phase==0],flux[phase==0],0,0,Bfilt))))
+	m1fluxguess = flux*10**(-0.4*(-8.93+(synphotB(refWave,refFlux,0,0,Bfilt)-\
+										 synphotB(wave[phase==0],flux[phase==0],0,0,Bfilt))))
 	bsplm1 = bisplrep(phase,wave,
 					  m1fluxguess,kx=3,ky=3,
 					  tx=splinephase,ty=splinewave,task=-1)
@@ -53,7 +54,6 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 		plt.plot(intwave,m0test,label='interp')
 		bspltmp = bspl[2].reshape([len(splinephase)-4,len(splinewave)-4])
 
-	#import pdb; pdb.set_trace()
 	return intphase,intwave,m0,m1,bspl[0],bspl[1],bspl[2],bsplm1[2]
 
 def init_kaepora(x10file='initfiles/Kaepora_dm15_1.1.txt',
@@ -107,7 +107,6 @@ def init_kaepora(x10file='initfiles/Kaepora_dm15_1.1.txt',
 	#import pdb; pdb.set_trace()
 	return intphase,intwave,m0,m1,bspl[0],bspl[1],bspl[2],bsplm1[2]
 
-
 def init_errs(hsiaofile='initfiles/Hsiao07.dat',
 			  salt2file='initfiles/salt2_template_0.dat.gz',
 			  Bfilt='initfiles/Bessell90_B.dat',
@@ -125,8 +124,36 @@ def init_errs(hsiaofile='initfiles/Hsiao07.dat',
 
 	bspl = bisplrep(phase,wave,flux,kx=3,ky=3,
 					tx=splinephase,ty=splinewave,task=-1)
-	
+
 	return bspl[0],bspl[1]
+
+def init_errs_fromfile(hsiaofile='initfiles/Hsiao07.dat',
+					   salt2file='initfiles/salt2_template_0.dat.gz',
+					   Bfilt='initfiles/Bessell90_B.dat',
+					   phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
+					   waveinterpres=2.0,phasesplineres=6,wavesplineres=1200,
+					   days_interp=5,debug=False):
+
+	phase,wave,flux = np.loadtxt(hsiaofile,unpack=True)
+	
+	m1phase = phase*1.1
+	splinephase = np.linspace(phaserange[0],phaserange[1],
+							  (phaserange[1]-phaserange[0])/phasesplineres,False)
+	splinewave = np.linspace(waverange[0],waverange[1],
+							 (waverange[1]-waverange[0])/wavesplineres,False)
+
+	intphase = np.linspace(phaserange[0],phaserange[1],
+						   (phaserange[1]-phaserange[0])/phaseinterpres,False)
+	intwave = np.linspace(waverange[0],waverange[1],
+						  (waverange[1]-waverange[0])/waveinterpres,False)
+
+	
+	bspl = bisplrep(phase,wave,flux,kx=3,ky=3,
+					tx=splinephase,ty=splinewave,task=-1)
+	knotvals = bisplev(intphase,intwave,bspl)
+
+	return bspl[0],bspl[1],bspl[2]
+
 
 
 def get_hsiao(hsiaofile='initfiles/Hsiao07.dat',
