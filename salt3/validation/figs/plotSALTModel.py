@@ -117,7 +117,6 @@ def mkModelPlot(salt3dir='modelfiles/salt3'):
 		ax2.set_ylim([-0.05,0.4])
 
 		ax2.text(9100,spacing*(i+0.2),'%s'%plotphasestr,ha='right')
-
 		
 		#import pdb; pdb.set_trace()
 		
@@ -143,7 +142,7 @@ def mkModelPlot(salt3dir='modelfiles/salt3'):
 		salt3_colormax = float(lines[7].split()[1])
 
 		colorlaw_salt3 = SALT2ColorLaw([salt3_colormin,salt3_colormax],colorlaw_salt3_coeffs)
-		ax3.plot(wave,colorlaw_salt2(wave),color='r')
-	
+		ax3.plot(wave,colorlaw_salt3(wave),color='r')
+		
 if __name__ == "__main__":
 	mkModelPlot()

@@ -89,7 +89,7 @@ class TrainSALT(TrainSALTBase):
 		if self.options.n_components == 2:
 			parlist = np.append(parlist,['m1']*(n_phaseknots*n_waveknots))
 		if self.options.n_colorpars:
-			parlist = np.append(parlist,['cl']*n_colorpars)
+			parlist = np.append(parlist,['cl']*self.options.n_colorpars)
 		if self.options.error_snake_phase_binsize and self.options.error_snake_wave_binsize:
 			parlist = np.append(parlist,['modelerr']*n_errphaseknots*n_errwaveknots)
 		if self.options.n_colorscatpars:
@@ -123,7 +123,10 @@ class TrainSALT(TrainSALTBase):
 		if self.options.n_components == 2:
 			guess[parlist == 'm1'] = m1knots
 		if self.options.n_colorpars:
-			guess[parlist == 'cl'] = [0.]*n_colorpars
+			guess[parlist == 'cl'] = [0.]*self.options.n_colorpars
+		if self.options.n_colorscatpars:
+			guess[parlist == 'clscat'] = [0.]*self.options.n_colorscatpars
+
 		guess[(parlist == 'm0') & (guess < 0)] = 0
 		if self.options.resume_from_outputdir:
 			snpars = '%s/salt3train_snparams.txt'%self.options.outputdir
