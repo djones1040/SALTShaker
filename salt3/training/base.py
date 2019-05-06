@@ -172,6 +172,7 @@ class TrainSALTBase:
 						 'filter_mass_tolerance':self.options.filter_mass_tolerance,
 						 'specrange_wavescale_specrecal':self.options.specrange_wavescale_specrecal,
 						 'n_components':self.options.n_components,'n_colorpars':self.options.n_colorpars,
+						 'n_colorscatpars':self.options.n_colorscatpars,
 						 'nsteps_before_adaptive':self.options.nsteps_before_adaptive,
 						 'nsteps_adaptive_memory':self.options.nsteps_adaptive_memory,
 						 'adaptive_sigma_opt_scale':self.options.adaptive_sigma_opt_scale,

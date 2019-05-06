@@ -25,8 +25,8 @@ from scipy.linalg import cholesky
 from emcee.interruptible_pool import InterruptiblePool
 
 _SCALE_FACTOR = 1e-12
-_B_LAMBDA_EFF = 4353
-_V_LAMBDA_EFF = 5477
+_B_LAMBDA_EFF = np.array([4353.])
+_V_LAMBDA_EFF = np.array([5477.])
 
 class fitting:
 	def __init__(self,n_components,n_colorpars,
@@ -222,8 +222,8 @@ class loglike:
 			colorLaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
 		else: colorLaw = None
 		if self.n_colorscatpars:
-			colorScat = None
-		else: colorScat = True
+			colorScat = True
+		else: colorScat = None
 
 		# timing stuff
 		if timeit:
@@ -274,8 +274,8 @@ class loglike:
 	
 	def EBVprior(self,colorLaw):
 		# 0.4*np.log(10) = 0.921
-		logpriorB = norm.logpdf(colorLaw(_B_LAMBDA_EFF), 0.0, 0.02)
-		logpriorV = norm.logpdf(colorLaw(_V_LAMBDA_EFF), 0.921, 0.02)
+		logpriorB = norm.logpdf(colorLaw(_B_LAMBDA_EFF)[0], 0.0, 0.02)
+		logpriorV = norm.logpdf(colorLaw(_V_LAMBDA_EFF)[0], 0.921, 0.02)
 		return logpriorB + logpriorV
 
 	def loglikeforSN(self,args,sn=None,x=None,components=None,salterr=None,
@@ -366,7 +366,7 @@ class loglike:
 			saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)*\
 				np.exp(np.poly1d(coeffs)((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal))
 			#print(np.mean(saltfluxinterp2),np.mean(specdata[k]['flux']))
-			loglike -= np.sum((saltfluxinterp2-specdata[k]['flux']/(1+z))**2./(specdata[k]['fluxerr']**2. + 0.01**2.))*self.num_phot/self.num_spec/2.
+			loglike -= np.sum((saltfluxinterp2-specdata[k]['flux'])**2./(specdata[k]['fluxerr']**2. + 0.01**2.))*self.num_phot/self.num_spec/2.
 			#if 'g' in photdata['filt']: import pdb; pdb.set_trace()
 			#if sn == 5999433 and k == 0 and not 'hi':
 			#	import pylab as plt
@@ -409,7 +409,7 @@ class loglike:
 			if timeit:
 				time4 = time.time()
 				self.tdelt3 += time4 - time3
-			
+			#import pdb; pdb.set_trace()
 			# likelihood function
 			loglike += (-(filtPhot['fluxcal']-modelflux)**2./2./(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)+\
 						np.log(1/(np.sqrt(2*np.pi)*np.sqrt(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)))).sum()
@@ -754,7 +754,7 @@ class mcmc(loglike):
 			elif self.adjust_modelpars and par != 'm0' and par != 'm1' and par != 'modelerr':
 				candidate[i] = current[i]
 			else:
-				if par.startswith('x0') or par == 'm0' or par == 'modelerr':
+				if par.startswith('x0') or par == 'm0' or par == 'modelerr' or par == 'clscat':
 					candidate[i] = current[i]*10**(0.4*np.random.normal(scale=np.sqrt(prop_cov[i,i])))
 				else:
 					candidate[i] = np.random.normal(loc=current[i],scale=np.sqrt(prop_cov[i,i]))
@@ -774,6 +774,8 @@ class mcmc(loglike):
 				C_0[i,i] = self.stepsize_x0**2.
 			elif par.startswith('x1'):
 				C_0[i,i] = self.stepsize_x1**2.
+			elif par == 'clscat':
+				C_0[i,i] = (self.stepsize_magscale_clscat)**2.
 			elif par.startswith('c'): C_0[i,i] = (self.stepsize_c)**2.
 			elif par.startswith('specrecal'): C_0[i,i] = self.stepsize_specrecal**2.
 			elif par.startswith('tpkoff'):
