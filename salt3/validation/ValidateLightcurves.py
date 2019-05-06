@@ -10,6 +10,7 @@ from scipy.interpolate import interp1d
 from sncosmo.constants import HC_ERG_AA
 from salt3.initfiles import init_rootdir
 from salt3.training.init_hsiao import synphotB
+from sncosmo.salt2utils import SALT2ColorLaw
 _SCALE_FACTOR = 1e-12
 
 #filtdict = {'b':'cspb','c':'cspv3014','d':'cspr','e':'cspi'}
@@ -151,12 +152,12 @@ def main(outfile,lcfile,salt3dir,
 def customfilt(outfile,lcfile,salt3dir,
 			   m0file='salt3_template_0.dat',
 			   m1file='salt3_template_1.dat',
-			   clfile='salt2_color_correction.dat',
-			   cdfile='salt2_color_dispersion.dat',
-			   errscalefile='salt2_lc_dispersion_scaling.dat',
-			   lcrv00file='salt2_lc_relative_variance_0.dat',
-			   lcrv11file='salt2_lc_relative_variance_1.dat',
-			   lcrv01file='salt2_lc_relative_covariance_01.dat',
+			   clfile='salt3_color_correction.dat',
+			   cdfile='salt3_color_dispersion.dat',
+			   errscalefile='salt3_lc_dispersion_scaling.dat',
+			   lcrv00file='salt3_lc_relative_variance_0.dat',
+			   lcrv11file='salt3_lc_relative_variance_1.dat',
+			   lcrv01file='salt3_lc_relative_covariance_01.dat',
 			   Bfilt='Bessell90_B.dat',
 			   flatnu='flatnu.dat',
 			   x0 = None, x1 = None, c = None, t0 = None,
@@ -164,6 +165,7 @@ def customfilt(outfile,lcfile,salt3dir,
 	
 	plt.clf()
 
+	
 	refWave,refFlux=np.loadtxt('%s/%s'%(init_rootdir,flatnu),unpack=True)
 	Bfilt = '%s/%s'%(init_rootdir,Bfilt)
 	
@@ -227,6 +229,21 @@ def customfilt(outfile,lcfile,salt3dir,
 	salt2m1phase,salt2m1wave,salt2m1flux = np.genfromtxt('{}/salt2_template_1.dat'.format(salt2dir),unpack=True)
 
 
+	# color laws
+	with open('%s/%s'%(salt3dir,clfile)) as fin:
+		lines = fin.readlines()
+	if len(lines):
+		for i in range(len(lines)):
+			lines[i] = lines[i].replace('\n','')
+		colorlaw_salt3_coeffs = np.array(lines[1:5]).astype('float')
+		salt3_colormin = float(lines[6].split()[1])
+		salt3_colormax = float(lines[7].split()[1])
+
+		salt3colorlaw = SALT2ColorLaw([2800,7000],colorlaw_salt3_coeffs)
+
+	salt2colorlaw = SALT2ColorLaw([2800,7000], [-0.504294,0.787691,-0.461715,0.0815619])
+
+	
 	
 	salt3flux = salt3flux.reshape([len(np.unique(salt3phase)),len(np.unique(salt3wave))])#*10**(0.4*27.5)
 	salt3m1flux = salt3m1flux.reshape([len(np.unique(salt3phase)),len(np.unique(salt3wave))])#*10**(0.4*27.5)
@@ -244,10 +261,14 @@ def customfilt(outfile,lcfile,salt3dir,
 
 	if n_components == 1: salt3flux = x0*salt3flux
 	elif n_components == 2: salt3flux = x0*(salt3flux + x1*salt3m1flux)
+	if c:
+		salt3flux *= 10. ** (-0.4 * salt3colorlaw(salt3wave/(1+float(sn.SIM_REDSHIFT_HELIO))) * c)
 	salt3flux *= _SCALE_FACTOR
+
 	if 'SIM_SALT2x0' in sn.__dict__.keys():
-		salt2flux = sn.SIM_SALT2x0*(salt2m0flux*_SCALE_FACTOR + (sn.SIM_SALT2x1)*salt2m1flux*_SCALE_FACTOR)
-	
+		salt2flux = sn.SIM_SALT2x0*(salt2m0flux*_SCALE_FACTOR + (sn.SIM_SALT2x1)*salt2m1flux*_SCALE_FACTOR) * \
+					10. ** (-0.4 * salt2colorlaw(salt2wave/(1+float(sn.SIM_REDSHIFT_HELIO))) * float(sn.SIM_SALT2c))
+		
 	salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,
 								m1file=m1file,
 								clfile=clfile,cdfile=cdfile,
@@ -281,7 +302,7 @@ def customfilt(outfile,lcfile,salt3dir,
 		if 'SIM_SALT2x0' in sn.__dict__.keys():
 			phase_salt2 = plotmjd-float(sn.SIM_PEAKMJD.split()[0])
 			salt2fluxnew = int1d_salt2(phase_salt2)
-		
+
 		#phase=(photdata['tobs']+tpkoff)/1+z
 		filtwave = bandpassdict[flt]['filtwave']
 		filttrans = bandpassdict[flt]['filttrans']
@@ -341,6 +362,7 @@ def customfilt(outfile,lcfile,salt3dir,
 		ax2.set_title('$x_0$ = %8.5e, $x_1$ = %.2f,\n$c$ = %.2f, $z$ = %.2f'%(
 			sn.SIM_SALT2x0,sn.SIM_SALT2x1,sn.SIM_SALT2c,sn.SIM_REDSHIFT_HELIO))
 	plt.savefig(outfile)
+
 	#plt.ion()
 	#plt.show()
 	#import pdb; pdb.set_trace()
