@@ -1,0 +1,10 @@
+[main]
+sed_file = Hsiao07.dat
+magsmear = 0.0
+magoff = 0.0
+
+[effects]
+#color-law must be labeled as 'color', any additive function
+#can be named anything
+
+color = True

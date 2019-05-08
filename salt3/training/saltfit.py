@@ -392,6 +392,7 @@ class loglike:
 			if ((phase<obsphase.min()) | (phase>obsphase.max())).any():
 				raise RuntimeError('Phases {} are out of extrapolated phase range for SN {} with tpkoff {}'.format(
 					phase[((phase<self.phase.min()) | (phase>self.phase.max()))],sn,tpkoff))
+
 			filtPhot={key:photdata[key][selectFilter] for key in photdata}
 			phase=phase[selectFilter]
 
