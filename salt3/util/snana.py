@@ -431,7 +431,7 @@ class SuperNova( object ) :
 					self.SPECTRA[specid] = {}
 					for v in specvarnames:
 						self.SPECTRA[specid][v] = np.array([])
-				elif line.startswith('END_SPECTRUM') and startSpec:
+				elif (line.startswith('END_SPECTRUM') or line.startswith('SPECTRUM_END')) and startSpec:
 					startSpec = False
 				elif line.startswith('VARNAMES_SPEC'):
 					specvarnames = line.split()[1:]
