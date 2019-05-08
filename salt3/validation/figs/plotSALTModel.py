@@ -143,6 +143,70 @@ def mkModelPlot(salt3dir='modelfiles/salt3'):
 
 		colorlaw_salt3 = SALT2ColorLaw([salt3_colormin,salt3_colormax],colorlaw_salt3_coeffs)
 		ax3.plot(wave,colorlaw_salt3(wave),color='r')
+
+def mkModelErrPlot(salt3dir='modelfiles/salt3'):
+	plt.rcParams['figure.figsize'] = (9,3)
+	plt.subplots_adjust(left=None, bottom=None, right=None, top=None,
+						wspace=0, hspace=0)
+	plt.clf()
+	ax1 = plt.subplot(211)
+	ax2 = plt.subplot(212)
+
+	salt3scalephase,salt3scalewave,salt3scaleflux = \
+		np.loadtxt('%s/salt3_lc_dispersion_scaling.dat'%salt3dir,unpack=True)
+	salt3cdispphase,salt3cdispwave,salt3cdispflux = \
+		np.loadtxt('%s/salt3_color_dispersion.dat'%salt3dir,unpack=True)
+
+	salt2scalephase,salt2scalewave,salt2scaleflux = \
+		np.loadtxt('modelfiles/salt2/salt2_lc_dispersion_scaling.dat',unpack=True)
+	salt2cdispphase,salt2cdispwave,saltscdispflux = \
+		np.loadtxt('modelfiles/salt2/salt2_color_dispersion.dat',unpack=True)
+
+	salt2scaleflux = salt2scaleflux.reshape([len(np.unique(salt2scalephase)),len(np.unique(salt2scalewave))])
+	salt2cdispflux = salt2cdispflux.reshape([len(np.unique(salt2cdispphase)),len(np.unique(salt2cdispwave))])
+
+	salt3scaleflux = salt3scaleflux.reshape([len(np.unique(salt3scalephase)),len(np.unique(salt3scalewave))])
+	salt3cdispflux = salt3cdispflux.reshape([len(np.unique(salt3cdispphase)),len(np.unique(salt3cdispwave))])
+
+	salt2scalephase = np.unique(salt2scalephase)
+	salt2scalewave = np.unique(salt2scalewave)
+	salt2cdispphase = np.unique(salt2cdispphase)
+	salt2cdispwave = np.unique(salt2cdispwave)
+
+	salt3scalephase = np.unique(salt3scalephase)
+	salt3scalewave = np.unique(salt3scalewave)
+	salt3cdispphase = np.unique(salt3cdispphase)
+	salt3cdispwave = np.unique(salt3cdispwave)
+
+	spacing = 0.5
+	for plotphase,i,plotphasestr in zip([-5,0,10],range(3),['-5','+0','+10']):
+		int_salt2scale = interp2d(salt2scalewave,salt2scalephase,salt2scaleflux)
+		salt2scaleflux_0 = int_salt2scale(salt2scalewave,plotphase)
+
+		int_salt3scale = interp2d(salt3scalewave,salt3scalephase,salt3scaleflux)
+		salt3scaleflux_0 = int_salt3scale(salt3scalewave,plotphase)
+
+		ax1.plot(salt2scalewave,salt2scaleflux_0+spacing*i,color='b',label='SALT2')
+		ax1.plot(salt3scalewave,salt3scaleflux_0+spacing*i,color='r',label='SALT3')
+		ax1.set_xlim([2500,9200])
+		ax1.set_ylim([0,1.35])
+
+		ax1.text(9100,spacing*(i+0.2),'%s'%plotphasestr,ha='right')
+
+	for plotphase,i,plotphasestr in zip([-5,0,10],range(3),['-5','+0','+10']):
+		int_salt2cdisp = interp2d(salt2cdispwave,salt2cdispphase,salt2cdispflux)
+		salt2cdispflux_0 = int_salt2cdisp(salt2cdispwave,plotphase)
+
+		int_salt3cdisp = interp2d(salt3cdispwave,salt3cdispphase,salt3cdispflux)
+		salt3cdispflux_0 = int_salt3cdisp(salt3cdispwave,plotphase)
+
+		ax2.plot(salt2cdispwave,salt2cdispflux_0+spacing*i,color='b',label='SALT2')
+		ax2.plot(salt3cdispwave,salt3cdispflux_0+spacing*i,color='r',label='SALT3')
+		ax2.set_xlim([2500,9200])
+		ax2.set_ylim([0,1.35])
+
+		ax2.text(9100,spacing*(i+0.2),'%s'%plotphasestr,ha='right')
 		
+	
 if __name__ == "__main__":
 	mkModelPlot()
