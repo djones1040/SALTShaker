@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 #import pysynphot
 import numpy as np
+from sncosmo.constants import HC_ERG_AA
 
 def synphot(wave,flux,zpoff=0,filtfile=None,primarywave=[],primaryflux=[],
 			filtwave=[],filttp=[],
@@ -67,6 +68,6 @@ def synflux(x,spc,pb=None,plot=False,oplot=False,allowneg=False,pbx=[],pby=[]):
 	if (pbphot): pbspl *= x[g]
 
 
-	res = np.trapz(pbspl*spc[g],x[g])/np.trapz(pbspl,x[g])
+	res = np.trapz(pbspl*spc[g]/HC_ERG_AA,x[g])/np.trapz(pbspl,x[g])
 
 	return(res)
