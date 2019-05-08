@@ -9,13 +9,13 @@ import time
 from itertools import starmap
 from salt3.training import init_hsiao
 from sncosmo.models import StretchSource
-from scipy.optimize import minimize
+from scipy.optimize import minimize, least_squares
 from scipy.stats import norm
 from scipy.ndimage import gaussian_filter1d
 import pylab as plt
 from scipy.special import factorial
 from astropy.cosmology import Planck15 as cosmo
-from sncosmo.constants import HC_ERG_AA
+from sncosmo.constants import HC_ERG_AA, MODEL_BANDFLUX_SPACING
 import extinction
 from multiprocessing import Pool, get_context
 import copy
@@ -23,6 +23,7 @@ import scipy.stats as ss
 from numpy.random import standard_normal
 from scipy.linalg import cholesky
 from emcee.interruptible_pool import InterruptiblePool
+from sncosmo.utils import integration_grid
 
 _SCALE_FACTOR = 1e-12
 _B_LAMBDA_EFF = np.array([4353.])
@@ -67,6 +68,7 @@ class loglike:
 		self.datadict = datadict
 		self.guess = guess
 		self.days_interp = days_interp
+		self.lsqfit = False
 		
 		for key, value in kwargs.items(): 
 			self.__dict__[key] = value
@@ -176,6 +178,7 @@ class loglike:
 			self.datadict[sn]['pbspl'] = {}
 			self.datadict[sn]['denom'] = {}
 			self.datadict[sn]['idx'] = {}
+			self.datadict[sn]['dwave'] = self.wave[1]*(1+z) - self.wave[0]*(1+z)
 			for flt in np.unique(self.datadict[sn]['photdata']['filt']):
 
 				filttrans = self.kcordict[survey][flt]['filttrans']
@@ -267,8 +270,8 @@ class loglike:
 
 	def endprior(self,components):
 
-		logprior = norm.logpdf(np.sum(components[0][0,:]),0,3.0) + norm.logpdf(np.sum(components[0][-1,:]),0,3.0)
-		logprior += norm.logpdf(np.sum(components[1][0,:]),0,3.0) + norm.logpdf(np.sum(components[1][-1,:]),0,3.0)
+		logprior = norm.logpdf(np.sum(components[0][0,:]),0,0.1) #+ norm.logpdf(np.sum(components[0][-1,:]),0,0.1)
+		logprior += norm.logpdf(np.sum(components[1][0,:]),0,0.1) #+ norm.logpdf(np.sum(components[1][-1,:]),0,0.1)
 		return logprior
 
 	
@@ -327,6 +330,7 @@ class loglike:
 		photdata = self.datadict[sn]['photdata']
 		specdata = self.datadict[sn]['specdata']
 		pbspl = self.datadict[sn]['pbspl']
+		dwave = self.datadict[sn]['dwave']
 		idx = self.datadict[sn]['idx']
 		survey = self.datadict[sn]['survey']
 		filtwave = self.kcordict[survey]['filtwave']
@@ -341,7 +345,7 @@ class loglike:
 			x[self.parlist == 'x0_%s'%sn][0],x[self.parlist == 'x1_%s'%sn][0],\
 			x[self.parlist == 'c_%s'%sn][0],x[self.parlist == 'tpkoff_%s'%sn][0]
 		if self.fix_t0: tpkoff = 0
-		
+
 		#Calculate spectral model
 		if self.n_components == 1:
 			saltflux = x0*M0
@@ -378,6 +382,7 @@ class loglike:
 			#	import pdb; pdb.set_trace()
 
 		if timeit: self.tdelt1 += time.time() - tstart
+		if self.lsqfit: loglike = np.array([])
 		for flt in np.unique(photdata['filt']):
 			# check if filter 
 			if timeit: time2 = time.time()			
@@ -387,6 +392,7 @@ class loglike:
 			if ((phase<obsphase.min()) | (phase>obsphase.max())).any():
 				raise RuntimeError('Phases {} are out of extrapolated phase range for SN {} with tpkoff {}'.format(
 					phase[((phase<self.phase.min()) | (phase>self.phase.max()))],sn,tpkoff))
+
 			filtPhot={key:photdata[key][selectFilter] for key in photdata}
 			phase=phase[selectFilter]
 
@@ -399,10 +405,14 @@ class loglike:
 			if timeit:
 				time3 = time.time()
 				self.tdelt2 += time3 - time2
-			modelsynflux=np.trapz(pbspl[flt]*saltfluxinterp[:,idx[flt]],obswave[idx[flt]],axis=1)
+			modelsynflux = np.sum(pbspl[flt]*saltfluxinterp[:,idx[flt]], axis=1)*dwave
+			#import pdb; pdb.set_trace()
+			#modelsynflux=np.trapz(pbspl[flt]*saltfluxinterp[:,idx[flt]],obswave[idx[flt]],axis=1)
+			modelflux = modelsynflux*self.fluxfactor[survey][flt]
+			#modelerr=np.trapz(pbspl[flt]*salterrinterp[:,idx[flt]],obswave[idx[flt]],axis=1)
+			modelerr = np.sum(pbspl[flt]*salterrinterp[:,idx[flt]], axis=1) * dwave
+
 			
-			modelflux = modelsynflux*self.fluxfactor[survey][flt] #*10**(-0.4*self.kcordict[survey][flt]['zpoff'])
-			modelerr=np.trapz(pbspl[flt]*salterrinterp[:,idx[flt]],obswave[idx[flt]],axis=1) #/denom
 			if colorScat: colorerr = splev(self.kcordict[survey][flt]['lambdaeff'],
 										   (self.splinecolorwave,x[self.parlist == 'clscat'],3))
 			else: colorerr = 0.0
@@ -411,8 +421,14 @@ class loglike:
 				self.tdelt3 += time4 - time3
 			#import pdb; pdb.set_trace()
 			# likelihood function
-			loglike += (-(filtPhot['fluxcal']-modelflux)**2./2./(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)+\
-						np.log(1/(np.sqrt(2*np.pi)*np.sqrt(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)))).sum()
+			if self.lsqfit:
+				loglike = np.append(loglike,(-(filtPhot['fluxcal']-modelflux)**2./2./(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)+\
+											 np.log(1/(np.sqrt(2*np.pi)*np.sqrt(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)))))
+			else:
+				loglike += (-(filtPhot['fluxcal']-modelflux)**2./2./(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)+\
+							np.log(1/(np.sqrt(2*np.pi)*np.sqrt(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)))).sum()
+
+				
 			if timeit:
 				time5 = time.time()
 				self.tdelt4 += time5 - time4
@@ -760,6 +776,98 @@ class mcmc(loglike):
 					candidate[i] = np.random.normal(loc=current[i],scale=np.sqrt(prop_cov[i,i]))
 
 		return candidate
+		
+	def lsqguess(self, current, snpars=False, M0=False, M1=False):
+
+		candidate = copy.deepcopy(current)
+		
+		salterr = self.ErrModel(candidate)
+		if self.n_colorpars:
+			colorLaw = SALT2ColorLaw(self.colorwaverange, candidate[self.parlist == 'cl'])
+		else: colorLaw = None
+		if self.n_colorscatpars:
+			colorScat = True
+		else: colorScat = None
+
+		if snpars:
+			print('using scipy minimizer to find SN params...')		
+
+			components = self.SALTModel(candidate)
+			for sn in self.datadict.keys():
+			
+				def lsqwrap(guess):
+
+					candidate[self.parlist == 'x0_%s'%sn] = guess[0]
+					candidate[self.parlist == 'x1_%s'%sn] = guess[1]
+					candidate[self.parlist == 'c_%s'%sn] = guess[2]
+					candidate[self.parlist == 'tpkoff_%s'%sn] = guess[3]
+				
+					args = (None,sn,candidate,components,salterr,colorLaw,colorScat,False)
+					return -self.loglikeforSN(args)
+
+
+				guess = np.array([candidate[self.parlist == 'x0_%s'%sn][0],candidate[self.parlist == 'x1_%s'%sn][0],
+								  candidate[self.parlist == 'c_%s'%sn][0],candidate[self.parlist == 'tpkoff_%s'%sn][0]])
+			
+				result = minimize(lsqwrap,guess)
+				candidate[self.parlist == 'x0_%s'%sn] = result.x[0]
+				candidate[self.parlist == 'x1_%s'%sn] = result.x[1]
+				candidate[self.parlist == 'c_%s'%sn] = result.x[2]
+				candidate[self.parlist == 'tpkoff_%s'%sn] = result.x[3]
+
+		elif M0:
+			print('using scipy minimizer to find M0...')
+			
+			self.lsqfit = True
+			def lsqwrap(guess):
+
+				candidate[self.parlist == 'm0'] = guess
+				components = self.SALTModel(candidate)
+
+				logmin = np.array([])
+				for sn in self.datadict.keys():
+					args = (None,sn,candidate,components,salterr,colorLaw,colorScat,False)
+					logmin = np.append(logmin,self.loglikeforSN(args))
+				logmin *= -1
+				logmin -= self.m0prior(components) + self.m1prior(candidate[self.ix1]) + self.endprior(components)
+				if colorLaw:
+					logmin -= self.EBVprior(colorLaw)
+				
+				print(np.sum(logmin*2))
+				return logmin
+
+			guess = candidate[self.parlist == 'm0']
+			result = least_squares(lsqwrap,guess,max_nfev=6)
+			candidate[self.parlist == 'm0'] = result.x
+			self.lsqfit = False
+			
+		elif M1:
+			print('using scipy minimizer to find M1...')
+			
+			self.lsqfit = True
+			def lsqwrap(guess):
+
+				candidate[self.parlist == 'm0'] = guess
+				components = self.SALTModel(candidate)
+
+				logmin = np.array([])
+				for sn in self.datadict.keys():
+					args = (None,sn,candidate,components,salterr,colorLaw,colorScat,False)
+					logmin = np.append(logmin,self.loglikeforSN(args))
+				logmin *= -1
+				logmin -= self.m0prior(components) + self.m1prior(candidate[self.ix1]) + self.endprior(components)
+				if colorLaw:
+					logmin -= self.EBVprior(colorLaw)
+				
+				print(np.sum(logmin*2))
+				return logmin
+
+			guess = candidate[self.parlist == 'm0']
+			result = least_squares(lsqwrap,guess,max_nfev=6)
+			candidate[self.parlist == 'm0'] = result.x
+			self.lsqfit = False
+
+		return candidate
 
 	def get_propcov_init(self,x):
 		C_0 = np.zeros([len(x),len(x)])
@@ -825,11 +933,21 @@ class mcmc(loglike):
 			if not nstep % 50 and nstep > 250:
 				accept_frac_recent = len(accepted_history[-100:][accepted_history[-100:] == True])/100.
 			if self.modelpar_snpar_tradeoff_nstep:
-				if not nstep % self.modelpar_snpar_tradeoff_nstep and nstep > self.nstep_before_modelpar_tradeoff:
+				if not nstep % self.modelpar_snpar_tradeoff_nstep and nstep > self.nsteps_before_modelpar_tradeoff:
 					if self.adjust_snpars: self.adjust_modelpars = True; self.adjust_snpars = False
 					else: self.adjust_modelpars = False; self.adjust_snpars = True
 
-			X = self.generate_AM_candidate(current=Xlast, M2=M2_recent, n=nstep)
+
+			if ((nstep) % self.nsteps_between_lsqfit) and \
+			   ((nstep) % self.nsteps_between_lsqfit) and \
+			   ((nstep) % self.nsteps_between_lsqfit):
+				X = self.generate_AM_candidate(current=Xlast, M2=M2_recent, n=nstep)	
+			elif not (nstep) % self.nsteps_between_lsqfit:
+				X = self.lsqguess(current=Xlast,snpars=True)
+			#elif not (nstep-2) % self.nsteps_between_lsqfit:
+			#	X = self.lsqguess(current=Xlast,M0=True)
+			#elif not (nstep-3) % self.nsteps_between_lsqfit:
+			#	X = self.lsqguess(current=Xlast,M1=True)
 				
 			# loglike
 			this_loglike = self.maxlikefit(X,pool=pool,debug=debug)
@@ -856,9 +974,9 @@ class mcmc(loglike):
 			mean, M2 = self.update_moments(mean, M2, Xlast, n_adaptive)
 			if not n_adaptive % self.nsteps_adaptive_memory:
 				n_adaptive = 0
-				#ix,iy = np.where(M2 < 1e-5)
-				#iLow = np.where(ix == iy)[0]
-				#M2[ix[iLow],iy[iLow]] = 1e-4
+				ix,iy = np.where(M2 < 1e-5)
+				iLow = np.where(ix == iy)[0]
+				M2[ix[iLow],iy[iLow]] = 1e-5
 				# maybe too hacky
 				
 				if self.adjust_snpars and 'M2_snpars' in self.__dict__.keys(): M2_recent = copy.deepcopy(self.M2_snpars)
