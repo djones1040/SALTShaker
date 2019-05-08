@@ -139,8 +139,10 @@ class TrainSALTBase:
 							help='number of steps to use to estimate adaptive steps (default=%default)')
 		parser.add_argument('--modelpar_snpar_tradeoff_nstep', default=config.get('mcmcparams','modelpar_snpar_tradeoff_nstep'), type=float,
 							help='number of steps when trading between adjusting model params and SN params (default=%default)')
-		parser.add_argument('--nstep_before_modelpar_tradeoff', default=config.get('mcmcparams','nstep_before_modelpar_tradeoff'), type=float,
+		parser.add_argument('--nsteps_before_modelpar_tradeoff', default=config.get('mcmcparams','nsteps_before_modelpar_tradeoff'), type=float,
 							help='number of steps when trading between adjusting model params and SN params (default=%default)')
+		parser.add_argument('--nsteps_between_lsqfit', default=config.get('mcmcparams','nsteps_between_lsqfit'), type=float,
+							help='every x number of steps, adjust the SN params via least squares fitting (default=%default)')
 		parser.add_argument('--adaptive_sigma_opt_scale', default=config.get('mcmcparams','adaptive_sigma_opt_scale'), type=float,
 							help='scaling the adaptive step sizes (default=%default)')
 
@@ -189,8 +191,9 @@ class TrainSALTBase:
 						 'stepsize_c':self.options.stepsize_c,
 						 'stepsize_tpk':self.options.stepsize_tpk,
 						 'fix_t0':self.options.fix_t0,
-						 'nstep_before_modelpar_tradeoff':self.options.nstep_before_modelpar_tradeoff,
-						 'modelpar_snpar_tradeoff_nstep':self.options.modelpar_snpar_tradeoff_nstep}
+						 'nsteps_before_modelpar_tradeoff':self.options.nsteps_before_modelpar_tradeoff,
+						 'modelpar_snpar_tradeoff_nstep':self.options.modelpar_snpar_tradeoff_nstep,
+						 'nsteps_between_lsqfit':self.options.nsteps_between_lsqfit}
 
 		return saltfitkwargs
 
