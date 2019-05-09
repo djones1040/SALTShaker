@@ -106,7 +106,7 @@ class loglike:
 		
 		self.m0guess = -19.49
 		self.m1guess = 1
-		
+		self.extrapolateDecline=0.015
 		# set up the filters
 		self.stdmag = {}
 		self.fluxfactor = {}
@@ -269,9 +269,10 @@ class loglike:
 		return logprior
 
 	def endprior(self,components):
-
+		
 		logprior = norm.logpdf(np.sum(components[0][0,:]),0,0.1) #+ norm.logpdf(np.sum(components[0][-1,:]),0,0.1)
 		logprior += norm.logpdf(np.sum(components[1][0,:]),0,0.1) #+ norm.logpdf(np.sum(components[1][-1,:]),0,0.1)
+		
 		return logprior
 
 	
@@ -312,6 +313,7 @@ class loglike:
 		chi2: float
 			Model chi2 relative to training data	
 		"""
+		#if sn==5999425: import pdb; pdb.set_trace()
 		if timeit: tstart = time.time()
 
 		if args: empty,sn,x,components,salterr,colorLaw,colorScat,debug = args[:]
@@ -357,13 +359,15 @@ class loglike:
 
 		
 		loglike = 0
-		int1d = interp1d(obsphase,saltflux,axis=0,kind='nearest')
-		interr1d = interp1d(obsphase,salterr,axis=0,kind='nearest')
+		int1d = interp1d(obsphase,saltflux,axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
+		interr1d = interp1d(obsphase,salterr,axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
 		for k in specdata.keys():
 			phase=specdata[k]['tobs']+tpkoff
-			if phase < obsphase.min() or phase > obsphase.max():
-				raise RuntimeError('Phase {} is out of extrapolated phase range for SN {} with tpkoff {}'.format(phase,sn,tpkoff))
 			saltfluxinterp = int1d(phase)
+			if phase < obsphase.min():
+				pass
+			elif phase > obsphase.max():
+				saltfluxinterp*=10**(-0.4* self.extrapolateDecline* (phase-obsphase.max()))
 			#Interpolate SALT flux at observed wavelengths and multiply by recalibration factor
 			coeffs=x[self.parlist=='specrecal_{}_{}'.format(sn,k)]
 			coeffs/=factorial(np.arange(len(coeffs)))
@@ -389,10 +393,7 @@ class loglike:
 			phase=photdata['tobs']+tpkoff
 			#Select data from the appropriate filter filter
 			selectFilter=(photdata['filt']==flt)
-			if ((phase<obsphase.min()) | (phase>obsphase.max())).any():
-				raise RuntimeError('Phases {} are out of extrapolated phase range for SN {} with tpkoff {}'.format(
-					phase[((phase<self.phase.min()) | (phase>self.phase.max()))],sn,tpkoff))
-
+			
 			filtPhot={key:photdata[key][selectFilter] for key in photdata}
 			phase=phase[selectFilter]
 
@@ -409,6 +410,9 @@ class loglike:
 			#import pdb; pdb.set_trace()
 			#modelsynflux=np.trapz(pbspl[flt]*saltfluxinterp[:,idx[flt]],obswave[idx[flt]],axis=1)
 			modelflux = modelsynflux*self.fluxfactor[survey][flt]
+			if ( (phase>obsphase.max())).any():
+				modelsynflux[(phase>obsphase.max())]*= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
+
 			#modelerr=np.trapz(pbspl[flt]*salterrinterp[:,idx[flt]],obswave[idx[flt]],axis=1)
 			modelerr = np.sum(pbspl[flt]*salterrinterp[:,idx[flt]], axis=1) * dwave
 
