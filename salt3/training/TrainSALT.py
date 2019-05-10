@@ -54,16 +54,7 @@ class TrainSALT(TrainSALTBase):
 
 
 		
-		if self.options.resume_from_outputdir:
-			salt3m0file = '%s/salt3_template_0.dat'%self.options.outputdir
-			salt3m1file = '%s/salt3_template_1.dat'%self.options.outputdir
-			phase,wave,m0,mtemp,phaseknotloc,waveknotloc,m0knots,m1tmpknots = init_hsiao(
-				salt3m0file,salt2file,self.options.initbfilt,flatnu,normalize=False,**init_options)
-			phase,wave,m1,mtemp,phaseknotloc,waveknotloc,m1knots,m1tmpknots = init_hsiao(
-				salt3m1file,salt2file,self.options.initbfilt,flatnu,normalize=False,**init_options)
-
-		else:
-			phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
+		phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
 				self.options.inithsiaofile,salt2file,self.options.initbfilt,flatnu,normalize=True,**init_options)
 			#phase,wave,m1,mtemp,phaseknotloc,waveknotloc,m1knots,m1tmpknots = init_hsiao(
 			#	salt2m1file,salt2file,self.options.initbfilt,flatnu,normalize=False,**init_options)
@@ -74,10 +65,6 @@ class TrainSALT(TrainSALTBase):
 		init_options['wavesplineres'] = self.options.error_snake_wave_binsize
 		errphaseknotloc,errwaveknotloc = init_errs(
 			self.options.inithsiaofile,salt2file,self.options.initbfilt,**init_options)
-		if self.options.resume_from_outputdir:
-			errphaseknotloc,errwaveknotloc,modelerrguess = init_errs_fromfile(
-				'%s/salt3_lc_dispersion_scaling.dat'%self.options.outputdir,
-				salt2file,self.options.initbfilt,**init_options)
 		
 		# number of parameters
 		n_phaseknots,n_waveknots = len(phaseknotloc)-4,len(waveknotloc)-4
@@ -114,32 +101,27 @@ class TrainSALT(TrainSALTBase):
 
 		# initial guesses
 		n_params=parlist.size
-		guess = np.zeros(parlist.size)
-		guess[parlist == 'm0'] = m0knots
 		if self.options.resume_from_outputdir:
-			guess[parlist == 'modelerr'] = modelerrguess
+			guess = np.genfromtxt('{}/salt3_parameters.dat'.format(self.options.outputdir),dtype=None,skip_header=1,usecols=1)
+			assert(n_params==guess.size)
 		else:
-			guess[parlist == 'modelerr'] = 1e-10 #*np.mean(m0knots)*HC_ERG_AA
-		if self.options.n_components == 2:
-			guess[parlist == 'm1'] = m1knots
-		if self.options.n_colorpars:
-			guess[parlist == 'cl'] = [0.]*self.options.n_colorpars
-		if self.options.n_colorscatpars:
-			guess[parlist == 'clscat'] = [0.]*self.options.n_colorscatpars
+			guess = np.zeros(parlist.size)
+			guess[parlist == 'm0'] = m0knots
+			if self.options.resume_from_outputdir:
+				guess[parlist == 'modelerr'] = modelerrguess
+			else:
+				guess[parlist == 'modelerr'] = 1e-10 #*np.mean(m0knots)*HC_ERG_AA
+			if self.options.n_components == 2:
+				guess[parlist == 'm1'] = m1knots
+			if self.options.n_colorpars:
+				guess[parlist == 'cl'] = [0.]*self.options.n_colorpars
+			if self.options.n_colorscatpars:
+				guess[parlist == 'clscat'] = [0.]*self.options.n_colorscatpars
 
-		guess[(parlist == 'm0') & (guess < 0)] = 0
-		if self.options.resume_from_outputdir:
-			snpars = '%s/salt3train_snparams.txt'%self.options.outputdir
-			snp = txtobj(snpars)
-			for k in datadict.keys():
-				guess[parlist == 'x0_%s'%k] = snp.x0[snp.SN == k][0]
-				guess[parlist == 'x1_%s'%k] = snp.x1[snp.SN == k][0]
-				guess[parlist == 'c_%s'%k] = snp.c[snp.SN == k][0]
-				guess[parlist == 'tpkoff_%s'%k] = snp.tpkoff[snp.SN == k][0]
-		else:
+			guess[(parlist == 'm0') & (guess < 0)] = 0
 			for k in datadict.keys():
 				guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36-10.635))
-		
+		print(guess.size)
 		saltfitkwargs = self.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
 
 		print('training on %i SNe!'%len(datadict.keys()))
@@ -161,7 +143,7 @@ class TrainSALT(TrainSALTBase):
 		print('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
 			  saltfitter.regularizationChi2(x_modelpars,0,1,0),saltfitter.regularizationChi2(x_modelpars,0,0,1))
 		print('Final loglike'); saltfitter.maxlikefit(x_modelpars,None,False)
-
+		print(x_modelpars.size)
 		
 		return phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams,x_modelpars,parlist
