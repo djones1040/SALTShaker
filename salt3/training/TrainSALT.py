@@ -101,10 +101,20 @@ class TrainSALT(TrainSALTBase):
 
 		# initial guesses
 		n_params=parlist.size
+		saltfitkwargs = self.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
+
 		if self.options.resume_from_outputdir:
-			guess = np.genfromtxt('{}/salt3_parameters.dat'.format(self.options.outputdir),dtype=None,skip_header=1,usecols=1)
+			#This caused a crash, unsure why, probably need to figure out a way to save more state elements if I want to try loading in the whole chain
+			chain=np.load('{}/salt3_mcmcchain.npy'.format(self.options.outputdir))
+# 			loglikes=np.load('{}/salt3_loglikes.npy'.format(self.options.outputdir))
+			guess=chain[-1]
+			chain,loglikes=[],[]
+# 			guess = np.genfromtxt('{}/salt3_parameters.dat'.format(self.options.outputdir),dtype=None,skip_header=1,usecols=1)
+
+
 			assert(n_params==guess.size)
 		else:
+			chain,loglikes=[],[]
 			guess = np.zeros(parlist.size)
 			guess[parlist == 'm0'] = m0knots
 			if self.options.resume_from_outputdir:
@@ -118,14 +128,12 @@ class TrainSALT(TrainSALTBase):
 			if self.options.n_colorscatpars:
 				guess[parlist == 'clscat'] = [0.]*self.options.n_colorscatpars
 
-			guess[(parlist == 'm0') & (guess < 0)] = 0
+			guess[(parlist == 'm0') & (guess < 0)] = 1e-4
 			for k in datadict.keys():
 				guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36-10.635))
-		print(guess.size)
-		saltfitkwargs = self.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
-
+		
 		print('training on %i SNe!'%len(datadict.keys()))
-		saltfitter = saltfit.mcmc(guess,datadict,parlist,**saltfitkwargs)
+		saltfitter = saltfit.mcmc(guess,datadict,parlist,chain=chain,loglikes= loglikes,**saltfitkwargs)
 		fitter = fitting(self.options.n_components,self.options.n_colorpars,
 						 n_phaseknots,n_waveknots,
 						 datadict)
@@ -146,23 +154,28 @@ class TrainSALT(TrainSALTBase):
 		print(x_modelpars.size)
 		
 		return phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-			modelerr,clpars,clerr,clscat,SNParams,x_modelpars,parlist
+			modelerr,clpars,clerr,clscat,SNParams,x_modelpars,parlist,saltfitter.chain,saltfitter.loglikes
 
 	def wrtoutput(self,outdir,phase,wave,
 				  M0,M0err,M1,M1err,cov_M0_M1,
 				  modelerr,clpars,
-				  clerr,clscat,SNParams,pars,parlist):
+				  clerr,clscat,SNParams,pars,parlist,chain,loglikes):
 
 		if not os.path.exists(outdir):
 			raise RuntimeError('desired output directory %s doesn\'t exist'%outdir)
 
-		#Save all model parameters
+		#Save final model parameters
 		
 		with  open('{}/salt3_parameters.dat'.format(outdir),'w') as foutpars:
 			foutpars.write('{: <30} {}\n'.format('Parameter Name','Value'))
 			for name,par in zip(parlist,pars):
 				foutpars.write('{: <30} {:.6e}\n'.format(name,par))
-			
+		
+		#Save mcmc chain and log_likelihoods
+		
+		np.save('{}/salt3_mcmcchain.npy'.format(outdir),chain)
+		np.save('{}/salt3_loglikes.npy'.format(outdir),loglikes)
+		
 		# principal components and color law
 		foutm0 = open('%s/salt3_template_0.dat'%outdir,'w')
 		foutm1 = open('%s/salt3_template_1.dat'%outdir,'w')
@@ -324,12 +337,12 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		# fit the model - initial pass
 		if self.options.stage == "all" or self.options.stage == "train":
 			phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-				modelerr,clpars,clerr,clscat,SNParams,pars,parlist = self.fitSALTModel(datadict)
+				modelerr,clpars,clerr,clscat,SNParams,pars,parlist,chain,loglikes = self.fitSALTModel(datadict)
 		
 			# write the output model - M0, M1, c
 			self.wrtoutput(self.options.outputdir,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,
 						   modelerr,clpars,clerr,clscat,SNParams,
-						   pars,parlist)
+						   pars,parlist,chain,loglikes)
 
 		if self.options.stage == "all" or self.options.stage == "validate":
 			self.validate(self.options.outputdir)
