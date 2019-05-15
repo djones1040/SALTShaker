@@ -112,6 +112,10 @@ class loglike:
 		for survey in self.kcordict.keys():
 			if survey == 'default': 
 				self.stdmag[survey] = {}
+				self.bbandoverlap = (self.wave>=self.kcordict['default']['Bwave'].min())&(self.wave<=self.kcordict['default']['Bwave'].max())
+				self.bbandpbspl = np.interp(self.wave[self.bbandoverlap],self.kcordict['default']['Bwave'],self.kcordict['default']['Bwave'])
+				self.bbandpbspl *= self.wave[self.bbandoverlap]
+				self.bbandpbspl /= np.trapz(self.bbandpbspl,self.wave[self.bbandoverlap])*HC_ERG_AA
 				self.stdmag[survey]['B']=synphot(
 					self.kcordict[survey]['primarywave'],self.kcordict[survey]['AB'],
 					filtwave=self.kcordict['default']['Bwave'],filttp=self.kcordict[survey]['Btp'],
@@ -131,8 +135,8 @@ class loglike:
 					filttp=self.kcordict[survey][flt]['filttrans'],
 					zpoff=0) - self.kcordict[survey][flt]['primarymag']
 				self.fluxfactor[survey][flt] = 10**(0.4*(self.stdmag[survey][flt]+27.5))
+									   
 				
-
 		#Count number of photometric and spectroscopic points
 		self.num_spec=0
 		self.num_phot=0
@@ -241,7 +245,7 @@ class loglike:
 			loglike=sum(starmap(self.loglikeforSN,args))
 
 		loglike -= self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad)
-		logp = loglike + self.m0prior(components) + self.m1prior(x[self.ix1]) + self.endprior(components)+self.peakprior(components)
+		logp = loglike + self.m0prior(components) + self.m1prior(x[self.ix1]) + self.endprior(components)+self.peakprior(x,components)
 		if colorLaw:
 			logp += self.EBVprior(colorLaw)
 
@@ -252,7 +256,6 @@ class loglike:
 		return logp
 
 	def m0prior(self,components):
-
 		int1d = interp1d(self.phase,components[0],axis=0)
 		m0B = synphot(self.wave,int1d(0),filtwave=self.kcordict['default']['Bwave'],
 					  filttp=self.kcordict['default']['Btp'])-self.stdmag['default']['B']
@@ -267,9 +270,14 @@ class loglike:
 		
 		return logprior
 		
-	def peakprior(self,components):
-		lightcurve=np.trapz(self.wave[np.newaxis,:]*components[0],self.wave,axis=1)
-		logprior = norm.logpdf(self.phase[np.argmax(lightcurve)],0,1) #+ norm.logpdf(np.sum(components[0][-1,:]),0,0.1)
+	def peakprior(self,x,components):
+		wave=self.wave[self.bbandoverlap]
+		lightcurve=np.sum(self.bbandpbspl[np.newaxis,:]*components[0][:,self.bbandoverlap],axis=1)
+		maxPhase=np.argmax(lightcurve)
+		finePhase=np.arange(self.phase[maxPhase-1],self.phase[maxPhase+1],0.1)
+		fineGrid=self.SALTModel(x,evaluatePhase=finePhase,evaluateWave=wave)[0]
+		lightcurve=np.sum(self.bbandpbspl[np.newaxis,:]*fineGrid,axis=1)
+		logprior = norm.logpdf(finePhase[np.argmax(lightcurve)],0,0.5) #+ norm.logpdf(np.sum(components[0][-1,:]),0,0.1)
 		
 		return logprior
 
@@ -366,6 +374,7 @@ class loglike:
 		loglike = 0
 		int1d = interp1d(obsphase,saltflux,axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
 		interr1d = interp1d(obsphase,salterr,axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
+		intspecerr1d=interr1d#interr1d
 		for k in specdata.keys():
 			phase=specdata[k]['tobs']+tpkoff
 			saltfluxinterp = int1d(phase)
@@ -376,10 +385,17 @@ class loglike:
 			#Interpolate SALT flux at observed wavelengths and multiply by recalibration factor
 			coeffs=x[self.parlist=='specrecal_{}_{}'.format(sn,k)]
 			coeffs/=factorial(np.arange(len(coeffs)))
-			saltfluxinterp2 = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)*\
+			saltfluxinterp = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp)*\
 				np.exp(np.poly1d(coeffs)((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal))
+				
+			modelerr = np.interp( specdata[k]['wavelength'],obswave,intspecerr1d(phase))
+			
+			specvar=(specdata[k]['fluxerr']**2. + (modelerr*saltfluxinterp)**2.)
+			print(np.sqrt(specvar)/saltfluxinterp)
+			print(specdata[k]['fluxerr']/saltfluxinterp)
+			import pdb;pdb.set_trace()
 			#print(np.mean(saltfluxinterp2),np.mean(specdata[k]['flux']))
-			loglike -= np.sum((saltfluxinterp2-specdata[k]['flux'])**2./(specdata[k]['fluxerr']**2. + 0.01**2.))*self.num_phot/self.num_spec/2.
+			loglike += (np.sum(-(saltfluxinterp-specdata[k]['flux'])**2./specvar/2.+np.log(1/(np.sqrt(2*np.pi)*specvar)))) *self.num_phot/self.num_spec
 			#if 'g' in photdata['filt']: import pdb; pdb.set_trace()
 			#if sn == 5999433 and k == 0 and not 'hi':
 			#	import pylab as plt
@@ -430,12 +446,12 @@ class loglike:
 				self.tdelt3 += time4 - time3
 			#import pdb; pdb.set_trace()
 			# likelihood function
+			fluxVar=filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.
+			loglikes=(-(filtPhot['fluxcal']-modelflux)**2./2./(fluxVar)+np.log(1/(np.sqrt(2*np.pi)*np.sqrt(fluxVar))))
 			if self.lsqfit:
-				loglike = np.append(loglike,(-(filtPhot['fluxcal']-modelflux)**2./2./(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)+\
-											 np.log(1/(np.sqrt(2*np.pi)*np.sqrt(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)))))
+				loglike = np.append(loglike,loglikes)
 			else:
-				loglike += (-(filtPhot['fluxcal']-modelflux)**2./2./(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)+\
-							np.log(1/(np.sqrt(2*np.pi)*np.sqrt(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)))).sum()
+				loglike += loglikes.sum()
 
 				
 			if timeit:

@@ -117,10 +117,7 @@ class TrainSALT(TrainSALTBase):
 			chain,loglikes=[],[]
 			guess = np.zeros(parlist.size)
 			guess[parlist == 'm0'] = m0knots
-			if self.options.resume_from_outputdir:
-				guess[parlist == 'modelerr'] = modelerrguess
-			else:
-				guess[parlist == 'modelerr'] = 1e-10 #*np.mean(m0knots)*HC_ERG_AA
+			guess[parlist == 'modelerr'] = 1e-2 #*np.mean(m0knots)*HC_ERG_AA
 			if self.options.n_components == 2:
 				guess[parlist == 'm1'] = m1knots
 			if self.options.n_colorpars:
