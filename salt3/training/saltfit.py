@@ -391,9 +391,6 @@ class loglike:
 			modelerr = np.interp( specdata[k]['wavelength'],obswave,intspecerr1d(phase))
 			
 			specvar=(specdata[k]['fluxerr']**2. + (modelerr*saltfluxinterp)**2.)
-			print(np.sqrt(specvar)/saltfluxinterp)
-			print(specdata[k]['fluxerr']/saltfluxinterp)
-			import pdb;pdb.set_trace()
 			#print(np.mean(saltfluxinterp2),np.mean(specdata[k]['flux']))
 			loglike += (np.sum(-(saltfluxinterp-specdata[k]['flux'])**2./specvar/2.+np.log(1/(np.sqrt(2*np.pi)*specvar)))) *self.num_phot/self.num_spec
 			#if 'g' in photdata['filt']: import pdb; pdb.set_trace()
@@ -435,9 +432,8 @@ class loglike:
 				modelsynflux[(phase>obsphase.max())]*= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))[(phase>obsphase.max())]
 
 			#modelerr=np.trapz(pbspl[flt]*salterrinterp[:,idx[flt]],obswave[idx[flt]],axis=1)
-			modelerr = np.sum(pbspl[flt]*salterrinterp[:,idx[flt]], axis=1) * dwave
+			modelerr = np.sum(pbspl[flt]*salterrinterp[:,idx[flt]], axis=1) * dwave*HC_ERG_AA
 
-			
 			if colorScat: colorerr = splev(self.kcordict[survey][flt]['lambdaeff'],
 										   (self.splinecolorwave,x[self.parlist == 'clscat'],3))
 			else: colorerr = 0.0
@@ -452,7 +448,6 @@ class loglike:
 				loglike = np.append(loglike,loglikes)
 			else:
 				loglike += loglikes.sum()
-
 				
 			if timeit:
 				time5 = time.time()
