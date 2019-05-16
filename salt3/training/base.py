@@ -143,6 +143,8 @@ class TrainSALTBase:
 							help='number of steps when trading between adjusting model params and SN params (default=%default)')
 		parser.add_argument('--nsteps_between_lsqfit', default=config.get('mcmcparams','nsteps_between_lsqfit'), type=float,
 							help='every x number of steps, adjust the SN params via least squares fitting (default=%default)')
+		parser.add_argument('--use_lsqfit', default=config.get('mcmcparams','use_lsqfit'), type=bool,
+							help='if set, periodically adjust the SN params via least squares fitting (default=%default)')
 		parser.add_argument('--adaptive_sigma_opt_scale', default=config.get('mcmcparams','adaptive_sigma_opt_scale'), type=float,
 							help='scaling the adaptive step sizes (default=%default)')
 
@@ -193,7 +195,8 @@ class TrainSALTBase:
 						 'fix_t0':self.options.fix_t0,
 						 'nsteps_before_modelpar_tradeoff':self.options.nsteps_before_modelpar_tradeoff,
 						 'modelpar_snpar_tradeoff_nstep':self.options.modelpar_snpar_tradeoff_nstep,
-						 'nsteps_between_lsqfit':self.options.nsteps_between_lsqfit}
+						 'nsteps_between_lsqfit':self.options.nsteps_between_lsqfit,
+						 'use_lsqfit':self.options.use_lsqfit}
 
 		return saltfitkwargs
 
