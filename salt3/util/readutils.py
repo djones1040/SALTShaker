@@ -118,7 +118,7 @@ def rdSpecData(datadict,speclist):
 					datadict[s]['specdata'][speccount]['mjd'] = m
 					speccount+=1
 			else:
-				print('SNID %s has no photometry so I\'m ignoring it')
+				print('SNID %s has no photometry so I\'m ignoring it'%s)
 
 	else:
 		for s,m,sf in zip(snid,mjd,specfiles):
