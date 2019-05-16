@@ -249,7 +249,7 @@ class loglike:
 			loglike=sum(starmap(self.loglikeforSN,args))
 
 		loglike -= self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad)
-
+		#import pdb; pdb.set_trace()
 		logp = loglike + self.m0prior(components) + self.m1prior(x[self.ix1]) + self.endprior(components)+self.peakprior(x,components)
 
 		if colorLaw:
@@ -431,7 +431,6 @@ class loglike:
 				time3 = time.time()
 				self.tdelt2 += time3 - time2
 			modelsynflux = np.sum(pbspl[flt]*saltfluxinterp[:,idx[flt]], axis=1)*dwave
-			#import pdb; pdb.set_trace()
 			#modelsynflux=np.trapz(pbspl[flt]*saltfluxinterp[:,idx[flt]],obswave[idx[flt]],axis=1)
 			modelflux = modelsynflux*self.fluxfactor[survey][flt]
 			if ( (phase>obsphase.max())).any():
@@ -448,7 +447,6 @@ class loglike:
 				self.tdelt3 += time4 - time3
 			#import pdb; pdb.set_trace()
 			# likelihood function
-
 			fluxVar=filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.
 			loglikes=(-(filtPhot['fluxcal']-modelflux)**2./2./(fluxVar)+np.log(1/(np.sqrt(2*np.pi)*np.sqrt(fluxVar))))
 
@@ -521,16 +519,16 @@ class loglike:
 		m0pars = np.array([])
 		m0err = np.array([])
 		for i in np.where(self.parlist == 'm0')[0]:
-			m0pars = np.append(m0pars,x[nburn:,i].mean())#/_SCALE_FACTOR)
-			m0err = np.append(m0err,x[nburn:,i].std())#/_SCALE_FACTOR)
+			m0pars = np.append(m0pars,x[i,nburn:].mean())#/_SCALE_FACTOR)
+			m0err = np.append(m0err,x[i,nburn:].std())#/_SCALE_FACTOR)
 			if mkplots:
 				if not parcount % 9:
 					subnum = axcount%9+1
 					ax = plt.subplot(3,3,subnum)
 					axcount += 1
-					md,std = np.mean(x[nburn:,i]),np.std(x[nburn:,i])
+					md,std = np.mean(x[i,nburn:]),np.std(x[i,nburn:])
 					histbins = np.linspace(md-3*std,md+3*std,50)
-					ax.hist(x[i][nburn:],bins=histbins)
+					ax.hist(x[i,nburn:],bins=histbins)
 					ax.set_title('M0')
 					if axcount % 9 == 8:
 						pdf_pages.savefig(fig)
@@ -541,16 +539,16 @@ class loglike:
 		m1err = np.array([])
 		parcount = 0
 		for i in np.where(self.parlist == 'm1')[0]:
-			m1pars = np.append(m1pars,x[nburn:,i].mean())
-			m1err = np.append(m1err,x[nburn:,i].std())
+			m1pars = np.append(m1pars,x[i,nburn:].mean())
+			m1err = np.append(m1err,x[i,nburn:].std())
 			if mkplots:
 				if not parcount % 9:
 					subnum = axcount%9+1
 					ax = plt.subplot(3,3,subnum)
 					axcount += 1
-					md,std = np.mean(x[nburn:,i]),np.std(x[nburn:,i])
+					md,std = np.mean(x[i,nburn:]),np.std(x[i,nburn:])
 					histbins = np.linspace(md-3*std,md+3*std,50)
-					ax.hist(x[nburn:,i],bins=histbins)
+					ax.hist(x[i,nburn:],bins=histbins)
 					ax.set_title('M1')
 					if axcount % 9 == 8:
 						pdf_pages.savefig(fig)
@@ -562,52 +560,50 @@ class loglike:
 		chain_len = len(m0pars)
 		iM0 = self.parlist == 'm0'
 		iM1 = self.parlist == 'm1'
-		m0mean = np.repeat(x[nburn:,iM0].mean(axis=0),np.shape(x[nburn:,iM0])[0]).reshape(np.shape(x[nburn:,iM0]))
-		m1mean = np.repeat(x[nburn:,iM1].mean(axis=0),np.shape(x[nburn:,iM1])[0]).reshape(np.shape(x[nburn:,iM1]))
-		m0var = x[nburn:,iM0]-m0mean
-		m1var = x[nburn:,iM1]-m1mean
-		#import pdb; pdb.set_trace()
+		m0mean = np.repeat(x[iM0,nburn:].mean(axis=0),np.shape(x[iM0,nburn:])[0]).reshape(np.shape(x[iM0,nburn:]))
+		m1mean = np.repeat(x[iM1,nburn:].mean(axis=0),np.shape(x[iM1,nburn:])[0]).reshape(np.shape(x[iM1,nburn:]))
+		m0var = x[iM0,nburn:]-m0mean
+		m1var = x[iM1,nburn:]-m1mean
 		for i in range(len(m0pars)):
 			for j in range(len(m1pars)):
-				if i == j: m0_m1_cov[i] = np.sum(m0var[:,j]*m1var[:,i])
+				if i == j: m0_m1_cov[i] = np.sum(m0var[j,:]*m1var[i,:])
 		m0_m1_cov /= chain_len
 
 
 		modelerrpars = np.array([])
 		modelerrerr = np.array([])
 		for i in np.where(self.parlist == 'modelerr')[0]:
-			modelerrpars = np.append(modelerrpars,x[nburn:,i].mean())
-			modelerrerr = np.append(modelerrerr,x[nburn:,i].std())
+			modelerrpars = np.append(modelerrpars,x[i,nburn:].mean())
+			modelerrerr = np.append(modelerrerr,x[i,nburn:].std())
 
 		clpars = np.array([])
 		clerr = np.array([])
 		for i in np.where(self.parlist == 'cl')[0]:
-			clpars = np.append(clpars,x[nburn:,i].mean())
-			clerr = np.append(clpars,x[nburn:,i].std())
+			clpars = np.append(clpars,x[i,nburn:].mean())
+			clerr = np.append(clpars,x[i,nburn:].std())
 
 		clscatpars = np.array([])
 		clscaterr = np.array([])
 		for i in np.where(self.parlist == 'clscat')[0]:
-			clscatpars = np.append(clpars,x[nburn:,i].mean())
-			clscaterr = np.append(clpars,x[nburn:,i].std())
+			clscatpars = np.append(clpars,x[i,nburn:].mean())
+			clscaterr = np.append(clpars,x[i,nburn:].std())
 
 
 
-		#result=np.mean(x[nburn:,:],axis=0)
 		result=np.mean(x[:,nburn:],axis=1)
 
 		resultsdict = {}
 		n_sn = len(self.datadict.keys())
 		for k in self.datadict.keys():
 			tpk_init = self.datadict[k]['photdata']['mjd'][0] - self.datadict[k]['photdata']['tobs'][0]
-			resultsdict[k] = {'x0':x[nburn:,self.parlist == 'x0_%s'%k].mean(),
-							  'x1':x[nburn:,self.parlist == 'x1_%s'%k].mean(),
-							  'c':x[nburn:,self.parlist == 'c_%s'%k].mean(),
-							  'tpkoff':x[nburn:,self.parlist == 'tpkoff_%s'%k].mean(),
-							  'x0err':x[nburn:,self.parlist == 'x0_%s'%k].std(),
-							  'x1err':x[nburn:,self.parlist == 'x1_%s'%k].std(),
-							  'cerr':x[nburn:,self.parlist == 'c_%s'%k].std(),
-							  'tpkofferr':x[nburn:,self.parlist == 'tpkoff_%s'%k].std()}
+			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k,nburn:].mean(),
+							  'x1':x[self.parlist == 'x1_%s'%k,nburn:].mean(),
+							  'c':x[self.parlist == 'c_%s'%k,nburn:].mean(),
+							  'tpkoff':x[self.parlist == 'tpkoff_%s'%k,nburn:].mean(),
+							  'x0err':x[self.parlist == 'x0_%s'%k,nburn:].std(),
+							  'x1err':x[self.parlist == 'x1_%s'%k,nburn:].std(),
+							  'cerr':x[self.parlist == 'c_%s'%k,nburn:].std(),
+							  'tpkofferr':x[self.parlist == 'tpkoff_%s'%k,nburn:].std()}
 
 
 		m0 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars,bsorder,bsorder))
@@ -643,10 +639,10 @@ class loglike:
 			subnum = axcount%9+1
 			ax = plt.subplot(3,3,subnum)
 			axcount += 1
-			md = np.mean(x[self.parlist == '%s_%s'%(snpar,k)][0][nburn:])
-			std = np.std(x[self.parlist == '%s_%s'%(snpar,k)][0][nburn:])
+			md = np.mean(x[self.parlist == '%s_%s'%(snpar,k),nburn:])
+			std = np.std(x[self.parlist == '%s_%s'%(snpar,k),nburn:])
 			histbins = np.linspace(md-3*std,md+3*std,50)
-			ax.hist(x[self.parlist == '%s_%s'%(snpar,k)][0][nburn:],bins=histbins)
+			ax.hist(x[self.parlist == '%s_%s'%(snpar,k),nburn:],bins=histbins)
 			ax.set_title('%s_%s'%(snpar,k))
 			if axcount % 9 == 8:
 				pdf_pages.savefig(fig)
@@ -943,7 +939,7 @@ class mcmc(loglike):
 		
 		return new_mean, new_M2
 	
-	def mcmcfit(self,x,nsteps,nburn,pool=None,debug=False,thin=10):
+	def mcmcfit(self,x,nsteps,nburn,pool=None,debug=False,thin=1):
 		npar = len(x)
 		self.npar = npar
 		
@@ -978,16 +974,18 @@ class mcmc(loglike):
 					if self.adjust_snpars: self.adjust_modelpars = True; self.adjust_snpars = False
 					else: self.adjust_modelpars = False; self.adjust_snpars = True
 
-
-			if not (nstep) % self.nsteps_between_lsqfit:
-				X = self.lsqguess(current=self.chain[-1],snpars=True)
+			if self.use_lsqfit:
+				if not (nstep) % self.nsteps_between_lsqfit:
+					X = self.lsqguess(current=self.chain[-1],snpars=True)
+				else:
+					X = self.generate_AM_candidate(current=self.chain[-1], M2=M2_recent, n=nstep)
+				#elif not (nstep-2) % self.nsteps_between_lsqfit:
+				#	X = self.lsqguess(current=Xlast,M0=True)
+				#elif not (nstep-3) % self.nsteps_between_lsqfit:
+				#	X = self.lsqguess(current=Xlast,M1=True)
 			else:
 				X = self.generate_AM_candidate(current=self.chain[-1], M2=M2_recent, n=nstep)
-			#elif not (nstep-2) % self.nsteps_between_lsqfit:
-			#	X = self.lsqguess(current=Xlast,M0=True)
-			#elif not (nstep-3) % self.nsteps_between_lsqfit:
-			#	X = self.lsqguess(current=Xlast,M1=True)
-				
+			
 			# loglike
 			this_loglike = self.maxlikefit(X,pool=pool,debug=debug)
 
@@ -1062,4 +1060,3 @@ def trapIntegrate(a,b,xs,ys):
 		return ((ys[aInd]-ys[aInd-1])/(xs[aInd]-xs[aInd-1])*((a+xs[aInd])/2-xs[aInd-1])+ys[aInd-1])*(xs[aInd]-a) + ((ys[bInd]-ys[bInd-1])/(xs[bInd]-xs[bInd-1])*((xs[bInd-1]+b)/2-xs[bInd-1])+ys[bInd-1])*(b-xs[bInd-1])
 	else:
 		return np.trapz(ys[(xs>=a)&(xs<b)],xs[(xs>=a)&(xs<b)])+((ys[aInd]-ys[aInd-1])/(xs[aInd]-xs[aInd-1])*((a+xs[aInd])/2-xs[aInd-1])+ys[aInd-1])*(xs[aInd]-a) + ((ys[bInd]-ys[bInd-1])/(xs[bInd]-xs[bInd-1])*((xs[bInd-1]+b)/2-xs[bInd-1])+ys[bInd-1])*(b-xs[bInd-1])
-		
