@@ -43,11 +43,14 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 			coeffs=pars[parlist=='specrecal_{}_{}'.format(sn,k)]
 			coeffs/=factorial(np.arange(len(coeffs)))
 			wave=specdata[k]['wavelength']
+			print(coeffs)
 			modelFlux = model.flux(specdata[k]['tobs'],wave)*np.exp(np.poly1d(coeffs)((wave-np.mean(wave))/2500))
+			unncalledModel=model.flux(specdata[k]['tobs'],wave)
 			#import pdb; pdb.set_trace()
 			plt.clf()
 			plt.plot(wave,modelFlux,'r-','Model spectrum')
 			plt.plot(wave,specdata[k]['flux'],'b-','Spectral data')
+			plt.plot(wave,unncalledModel,'g-','Model spectrum (no calibration)')
 			plt.xlim(wave.min(),wave.max())
 			plt.ylim(0,max(modelFlux.max(),specdata[k]['flux'].max())*1.25)
 			plt.xlabel('Wavelength $\AA$')
