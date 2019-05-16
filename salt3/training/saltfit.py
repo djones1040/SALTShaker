@@ -62,7 +62,8 @@ class loglike:
 	def __init__(self,guess,datadict,parlist,days_interp=5,**kwargs):
 
 		assert type(parlist) == np.ndarray
-
+		self.blah = False
+		self.debug = False
 		self.nstep = 0
 		self.parlist = parlist
 		self.datadict = datadict
@@ -103,6 +104,7 @@ class loglike:
 		# initialize the model
 		self.components = self.SALTModel(guess)
 		self.salterr = self.ErrModel(guess)
+		self.salterr[:] = 1e-10
 		
 		self.m0guess = -19.49
 		self.m1guess = 1
@@ -235,14 +237,16 @@ class loglike:
 		chi2 = 0
 		#Construct arguments for maxlikeforSN method
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
-		args=[(None,sn,x,components,salterr,colorLaw,colorScat,debug,timeit) for sn in self.datadict.keys()]
+		args=[(None,sn,x,components,self.salterr,colorLaw,colorScat,debug) for sn in self.datadict.keys()]
 		if pool:
 			loglike=sum(pool.map(self.loglikeforSN,args))
 		else:
+			#args=(None,list(self.datadict.keys())[4],x,components,salterr,colorLaw,colorScat,debug)
+			#loglike=self.loglikeforSN(args)
 			loglike=sum(starmap(self.loglikeforSN,args))
 
 		loglike -= self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad)
-		logp = loglike + self.m0prior(components) + self.m1prior(x[self.ix1]) + self.endprior(components)
+		logp = loglike + self.m0prior(components) + self.endprior(components) + self.m1prior(x[self.ix1])
 		if colorLaw:
 			logp += self.EBVprior(colorLaw)
 
@@ -340,7 +344,7 @@ class loglike:
 		#for i in range(len(obsphase)):
 		M0 *= self.datadict[sn]['mwextcurve']
 		M1 *= self.datadict[sn]['mwextcurve']
-		
+
 		x0,x1,c,tpkoff = \
 			x[self.parlist == 'x0_%s'%sn][0],x[self.parlist == 'x1_%s'%sn][0],\
 			x[self.parlist == 'c_%s'%sn][0],x[self.parlist == 'tpkoff_%s'%sn][0]
@@ -421,19 +425,22 @@ class loglike:
 				self.tdelt3 += time4 - time3
 			#import pdb; pdb.set_trace()
 			# likelihood function
+			#if flt == 'o':
+			#	print(np.sum(filtPhot['fluxcal']),np.sum(filtPhot['fluxcalerr']),np.sum(modelflux),np.sum(modelerr),np.sum(salterrinterp),np.sum(idx))
 			if self.lsqfit:
 				loglike = np.append(loglike,(-(filtPhot['fluxcal']-modelflux)**2./2./(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)+\
 											 np.log(1/(np.sqrt(2*np.pi)*np.sqrt(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)))))
 			else:
 				loglike += (-(filtPhot['fluxcal']-modelflux)**2./2./(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)+\
 							np.log(1/(np.sqrt(2*np.pi)*np.sqrt(filtPhot['fluxcalerr']**2. + modelflux**2.*modelerr**2. + colorerr**2.)))).sum()
-
+			#print(loglike)
 				
 			if timeit:
 				time5 = time.time()
 				self.tdelt4 += time5 - time4
-			if self.debug and self.nstep > 7000:
-				if self.nstep > 1500 and flt == 'd' and sn == 5999398:
+			#self.debug = True
+			if self.debug:# and self.blah:
+				if sn == 5999389 and flt == 'g':
 					print(sn)
 					import pylab as plt
 					plt.ion()
@@ -441,7 +448,7 @@ class loglike:
 					plt.errorbar(filtPhot['tobs'],modelflux,fmt='o',color='C0',label='model')
 					plt.errorbar(filtPhot['tobs'],filtPhot['fluxcal'],yerr=filtPhot['fluxcalerr'],fmt='o',color='C1',label='obs')
 					import pdb; pdb.set_trace()
-		
+		#if self.blah: print(sn,loglike)
 		return loglike
 
 		
@@ -478,7 +485,7 @@ class loglike:
 		modelerr = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
 						   self.wave if evaluateWave is None else evaluateWave,
 						   (self.errphaseknotloc,self.errwaveknotloc,errpars,bsorder,bsorder))
-		
+		#print(np.sum(errpars),np.sum(modelerr))
 		return modelerr
 
 	def getPars(self,loglikes,x,nburn=500,bsorder=3,mkplots=False):
@@ -491,14 +498,14 @@ class loglike:
 		m0pars = np.array([])
 		m0err = np.array([])
 		for i in np.where(self.parlist == 'm0')[0]:
-			m0pars = np.append(m0pars,x[i][nburn:].mean())#/_SCALE_FACTOR)
-			m0err = np.append(m0err,x[i][nburn:].std())#/_SCALE_FACTOR)
+			m0pars = np.append(m0pars,x[nburn:,i].mean())#/_SCALE_FACTOR)
+			m0err = np.append(m0err,x[nburn:,i].std())#/_SCALE_FACTOR)
 			if mkplots:
 				if not parcount % 9:
 					subnum = axcount%9+1
 					ax = plt.subplot(3,3,subnum)
 					axcount += 1
-					md,std = np.mean(x[i][nburn:]),np.std(x[i][nburn:])
+					md,std = np.mean(x[nburn:,i]),np.std(x[nburn:,i])
 					histbins = np.linspace(md-3*std,md+3*std,50)
 					ax.hist(x[i][nburn:],bins=histbins)
 					ax.set_title('M0')
@@ -511,16 +518,16 @@ class loglike:
 		m1err = np.array([])
 		parcount = 0
 		for i in np.where(self.parlist == 'm1')[0]:
-			m1pars = np.append(m1pars,x[i][nburn:].mean())
-			m1err = np.append(m1err,x[i][nburn:].std())
+			m1pars = np.append(m1pars,x[nburn:,i].mean())
+			m1err = np.append(m1err,x[nburn:,i].std())
 			if mkplots:
 				if not parcount % 9:
 					subnum = axcount%9+1
 					ax = plt.subplot(3,3,subnum)
 					axcount += 1
-					md,std = np.mean(x[i][nburn:]),np.std(x[i][nburn:])
+					md,std = np.mean(x[nburn:,i]),np.std(x[nburn:,i])
 					histbins = np.linspace(md-3*std,md+3*std,50)
-					ax.hist(x[i][nburn:],bins=histbins)
+					ax.hist(x[nburn:,i],bins=histbins)
 					ax.set_title('M1')
 					if axcount % 9 == 8:
 						pdf_pages.savefig(fig)
@@ -532,49 +539,49 @@ class loglike:
 		chain_len = len(m0pars)
 		iM0 = self.parlist == 'm0'
 		iM1 = self.parlist == 'm1'
-		m0mean = np.repeat(x[iM0][:,nburn:].mean(axis=1),np.shape(x[iM0][:,nburn:])[1]).reshape(np.shape(x[iM0][:,nburn:]))
-		m1mean = np.repeat(x[iM1][:,nburn:].mean(axis=1),np.shape(x[iM1][:,nburn:])[1]).reshape(np.shape(x[iM1][:,nburn:]))
-		m0var = x[iM0][:,nburn:]-m0mean
-		m1var = x[iM1][:,nburn:]-m1mean
-
+		m0mean = np.repeat(x[nburn:,iM0].mean(axis=0),np.shape(x[nburn:,iM0])[0]).reshape(np.shape(x[nburn:,iM0]))
+		m1mean = np.repeat(x[nburn:,iM1].mean(axis=0),np.shape(x[nburn:,iM1])[0]).reshape(np.shape(x[nburn:,iM1]))
+		m0var = x[nburn:,iM0]-m0mean
+		m1var = x[nburn:,iM1]-m1mean
+		#import pdb; pdb.set_trace()
 		for i in range(len(m0pars)):
 			for j in range(len(m1pars)):
-				if i == j: m0_m1_cov[i] = np.sum(m0var[j]*m1var[i])
+				if i == j: m0_m1_cov[i] = np.sum(m0var[:,j]*m1var[:,i])
 		m0_m1_cov /= chain_len
 
 
 		modelerrpars = np.array([])
 		modelerrerr = np.array([])
 		for i in np.where(self.parlist == 'modelerr')[0]:
-			modelerrpars = np.append(modelerrpars,x[i][nburn:].mean())
-			modelerrerr = np.append(modelerrerr,x[i][nburn:].std())
+			modelerrpars = np.append(modelerrpars,x[nburn:,i].mean())
+			modelerrerr = np.append(modelerrerr,x[nburn:,i].std())
 
 		clpars = np.array([])
 		clerr = np.array([])
 		for i in np.where(self.parlist == 'cl')[0]:
-			clpars = np.append(clpars,x[i][nburn:].mean())
-			clerr = np.append(clpars,x[i][nburn:].std())
+			clpars = np.append(clpars,x[nburn:,i].mean())
+			clerr = np.append(clpars,x[nburn:,i].std())
 
 		clscatpars = np.array([])
 		clscaterr = np.array([])
 		for i in np.where(self.parlist == 'clscat')[0]:
-			clscatpars = np.append(clpars,x[i][nburn:].mean())
-			clscaterr = np.append(clpars,x[i][nburn:].std())
+			clscatpars = np.append(clpars,x[nburn:,i].mean())
+			clscaterr = np.append(clpars,x[nburn:,i].std())
 
 
-		result=np.mean(x,axis=1)
+		result=np.mean(x[nburn:,:],axis=0)
 		resultsdict = {}
 		n_sn = len(self.datadict.keys())
 		for k in self.datadict.keys():
 			tpk_init = self.datadict[k]['photdata']['mjd'][0] - self.datadict[k]['photdata']['tobs'][0]
-			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k][0][nburn:].mean(),
-							  'x1':x[self.parlist == 'x1_%s'%k][0][nburn:].mean(),
-							  'c':x[self.parlist == 'c_%s'%k][0][nburn:].mean(),
-							  'tpkoff':x[self.parlist == 'tpkoff_%s'%k][0][nburn:].mean(),
-							  'x0err':x[self.parlist == 'x0_%s'%k][0][nburn:].std(),
-							  'x1err':x[self.parlist == 'x1_%s'%k][0][nburn:].std(),
-							  'cerr':x[self.parlist == 'c_%s'%k][0][nburn:].std(),
-							  'tpkofferr':x[self.parlist == 'tpkoff_%s'%k][0][nburn:].std()}
+			resultsdict[k] = {'x0':x[nburn:,self.parlist == 'x0_%s'%k].mean(),
+							  'x1':x[nburn:,self.parlist == 'x1_%s'%k].mean(),
+							  'c':x[nburn:,self.parlist == 'c_%s'%k].mean(),
+							  'tpkoff':x[nburn:,self.parlist == 'tpkoff_%s'%k].mean(),
+							  'x0err':x[nburn:,self.parlist == 'x0_%s'%k].std(),
+							  'x1err':x[nburn:,self.parlist == 'x1_%s'%k].std(),
+							  'cerr':x[nburn:,self.parlist == 'c_%s'%k].std(),
+							  'tpkofferr':x[nburn:,self.parlist == 'tpkoff_%s'%k].std()}
 
 
 		m0 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars,bsorder,bsorder))
@@ -666,7 +673,7 @@ class loglike:
 			survey = self.datadict[sn]['survey']
 			filtwave = self.kcordict[survey]['filtwave']
 			z = self.datadict[sn]['zHelio']
-			
+
 			#For each spectrum, add one point to each bin for every spectral measurement in that bin
 			for k in specdata.keys():
 				restWave=specdata[k]['wavelength']/(1+z)
@@ -770,7 +777,7 @@ class mcmc(loglike):
 			elif self.adjust_modelpars and par != 'm0' and par != 'm1' and par != 'modelerr':
 				candidate[i] = current[i]
 			else:
-				if par.startswith('x0') or par == 'm0' or par == 'modelerr' or par == 'clscat':
+				if par == 'modelerr' or par.startswith('x0') or par == 'm0' or par == 'clscat':
 					candidate[i] = current[i]*10**(0.4*np.random.normal(scale=np.sqrt(prop_cov[i,i])))
 				else:
 					candidate[i] = np.random.normal(loc=current[i],scale=np.sqrt(prop_cov[i,i]))
@@ -781,7 +788,7 @@ class mcmc(loglike):
 
 		candidate = copy.deepcopy(current)
 		
-		salterr = self.ErrModel(candidate)
+		#salterr = self.ErrModel(candidate)
 		if self.n_colorpars:
 			colorLaw = SALT2ColorLaw(self.colorwaverange, candidate[self.parlist == 'cl'])
 		else: colorLaw = None
@@ -791,8 +798,8 @@ class mcmc(loglike):
 
 		if snpars:
 			print('using scipy minimizer to find SN params...')		
-
 			components = self.SALTModel(candidate)
+			print('error hack!')
 			for sn in self.datadict.keys():
 			
 				def lsqwrap(guess):
@@ -801,8 +808,8 @@ class mcmc(loglike):
 					candidate[self.parlist == 'x1_%s'%sn] = guess[1]
 					candidate[self.parlist == 'c_%s'%sn] = guess[2]
 					candidate[self.parlist == 'tpkoff_%s'%sn] = guess[3]
-				
-					args = (None,sn,candidate,components,salterr,colorLaw,colorScat,False)
+
+					args = (None,sn,candidate,components,self.salterr,colorLaw,colorScat,False)
 					return -self.loglikeforSN(args)
 
 
@@ -810,6 +817,7 @@ class mcmc(loglike):
 								  candidate[self.parlist == 'c_%s'%sn][0],candidate[self.parlist == 'tpkoff_%s'%sn][0]])
 			
 				result = minimize(lsqwrap,guess)
+				#self.blah = True
 				candidate[self.parlist == 'x0_%s'%sn] = result.x[0]
 				candidate[self.parlist == 'x1_%s'%sn] = result.x[1]
 				candidate[self.parlist == 'c_%s'%sn] = result.x[2]
@@ -902,7 +910,7 @@ class mcmc(loglike):
 		
 		return new_mean, new_M2
 	
-	def mcmcfit(self,x,nsteps,nburn,pool=None,debug=False,thin=1):
+	def mcmcfit(self,x,nsteps,nburn,pool=None,debug=False,thin=10):
 		npar = len(x)
 		self.npar = npar
 		
@@ -918,7 +926,7 @@ class mcmc(loglike):
 		
 		self.get_propcov_init(x)
 
-		outpars = [[] for i in range(npar)]
+		outpars = np.array([Xlast]) #[[] for i in range(npar)]
 		accept = 0
 		nstep = 0
 		accept_frac = 0.5
@@ -938,16 +946,19 @@ class mcmc(loglike):
 					else: self.adjust_modelpars = False; self.adjust_snpars = True
 
 
-			if ((nstep) % self.nsteps_between_lsqfit) and \
-			   ((nstep) % self.nsteps_between_lsqfit) and \
-			   ((nstep) % self.nsteps_between_lsqfit):
-				X = self.generate_AM_candidate(current=Xlast, M2=M2_recent, n=nstep)	
-			elif not (nstep) % self.nsteps_between_lsqfit:
-				X = self.lsqguess(current=Xlast,snpars=True)
-			#elif not (nstep-2) % self.nsteps_between_lsqfit:
-			#	X = self.lsqguess(current=Xlast,M0=True)
-			#elif not (nstep-3) % self.nsteps_between_lsqfit:
-			#	X = self.lsqguess(current=Xlast,M1=True)
+			if self.use_lsqfit:
+				if ((nstep) % self.nsteps_between_lsqfit): # and \
+				   #   ((nstep) % self.nsteps_between_lsqfit) and \
+				   #   ((nstep) % self.nsteps_between_lsqfit):
+					X = self.generate_AM_candidate(current=Xlast, M2=M2_recent, n=nstep)	
+				elif not (nstep) % self.nsteps_between_lsqfit:
+					X = self.lsqguess(current=Xlast,snpars=True)
+				#elif not (nstep-2) % self.nsteps_between_lsqfit:
+				#	X = self.lsqguess(current=Xlast,M0=True)
+				#elif not (nstep-3) % self.nsteps_between_lsqfit:
+				#	X = self.lsqguess(current=Xlast,M1=True)
+			else:
+				X = self.generate_AM_candidate(current=Xlast, M2=M2_recent, n=nstep)
 				
 			# loglike
 			this_loglike = self.maxlikefit(X,pool=pool,debug=debug)
@@ -956,8 +967,9 @@ class mcmc(loglike):
 			accept_bool = self.accept(loglikes[-1],this_loglike)
 			if accept_bool:
 				if not nstep % thin:
-					for j in range(npar):
-						outpars[j] += [X[j]]
+					outpars = np.append(outpars,[X],axis=0)
+					#for j in range(npar):
+					#	outpars[j] += [X[j]]
 				loglikes+=[this_loglike]
 				loglike_history+=[this_loglike]
 				accept += 1
@@ -966,9 +978,10 @@ class mcmc(loglike):
 					nstep,accept,accept/float(nstep),accept_frac_recent))
 			else:
 				if not nstep % thin:
-					for j in range(npar):
-						outpars[j] += [Xlast[j]]
-				loglike_history += [this_loglike]
+					outpars = np.append(outpars,[Xlast],axis=0)
+					#for j in range(npar):
+					#	outpars[j] += [Xlast[j]]
+				loglike_history += [loglikes[-1]]
 			accepted_history = np.append(accepted_history,accept_bool)
 
 			mean, M2 = self.update_moments(mean, M2, Xlast, n_adaptive)
@@ -992,7 +1005,6 @@ class mcmc(loglike):
 				if self.adjust_snpars: self.M2_snpars = copy.deepcopy(M2_recent)
 				elif self.adjust_modelpars: self.M2_modelpars = copy.deepcopy(M2_recent)
 
-				
 		print('acceptance = %.3f'%(accept/float(nstep)))
 		if nstep < nburn:
 			raise RuntimeError('Not enough steps to wait %i before burn-in'%nburn)
