@@ -148,6 +148,7 @@ def main(outfile,lcfile,salt3dir,
 	ax1.legend()
 	plt.savefig(outfile)
 	plt.show()
+	plt.close(fig)
 
 def customfilt(outfile,lcfile,salt3dir,
 			   m0file='salt3_template_0.dat',
@@ -363,6 +364,7 @@ def customfilt(outfile,lcfile,salt3dir,
 		#if flt == 'c': import pdb; pdb.set_trace()
 	ax1.legend(prop={'size':5})
 	if 'SIM_SALT2x0' in sn.__dict__.keys():
+
 		ax2.text(0.5,0.2,'SN %s\nsimulated $x_0$ = %8.5e, \n$x_1$ = %.2f, $c$ = %.2f, $z$ = %.2f'%(
 			sn.SNID,sn.SIM_SALT2x0,sn.SIM_SALT2x1,sn.SIM_SALT2c,sn.SIM_REDSHIFT_HELIO),
 				 ha='center',va='center',transform=ax2.transAxes,fontsize=7,
@@ -376,11 +378,6 @@ def customfilt(outfile,lcfile,salt3dir,
 	ax1.set_ylabel('Flux')
 	ax2.yaxis.set_ticklabels([])
 	ax3.yaxis.set_ticklabels([])
-	
-	#plt.ion()
-	#plt.show()
-	#plt.close('all')
-	#import pdb; pdb.set_trace()
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='Plot lightcurves from SALT3 model against SALT2 model, Hsiao model, and data')
