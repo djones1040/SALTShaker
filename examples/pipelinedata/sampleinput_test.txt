@@ -11,8 +11,9 @@ set_key=FLAGS COLOR True
 pro=snlc_sim.exe
 baseinput=SIMGEN_BYOSEDTEST.INPUT
 outinput=pipelinetest/TEST_SIMGEN_BYOSEDTEST.INPUT
-set_key=NGEN 5
+set_key= NGENTOT_LC 5
     GENSOURCE RANDOM
+    GENRANGE_REDSHIFT 0.01 0.1
 
 [training]
 pro=TrainSALT.py

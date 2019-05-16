@@ -6,6 +6,7 @@ import configparser
 import pandas as pd
 import os
 import numpy as np
+import time
 
 class SALT3pipe():
     def __init__(self,finput=None):
@@ -47,7 +48,7 @@ class SALT3pipe():
     def run(self):
         self.Simulation.run()
         self.Training.run()
-        self.LCFitting.run()
+        # self.LCFitting.run()
 
 
     def _multivalues_to_df(self,values,colnames=None,stackvalues=False):
@@ -105,10 +106,26 @@ class PyPipeProcedure(PipeProcedure):
 class BYOSED(PyPipeProcedure):
 
     def configure(self,baseinput=None,setkeys=None,
-                  outname="pipeline_byosed_input.input"):
+                  outname="pipeline_byosed_input.input"):   
         self.outname = outname
         super().configure(pro=None,baseinput=baseinput,setkeys=setkeys)
-
+        #rename current byosed param
+        byosed_default = "BYOSED/BYOSED.params"
+        byosed_rename = "{}.{}".format(byosed_default,int(time.time()))
+        if os.path.isfile(byosed_default):
+            shellcommand = "mv {} {}".format(byosed_default,byosed_rename) 
+            shellrun = subprocess.run(list(shellcommand.split()))
+            if shellrun.returncode != 0:
+                raise RuntimeError(shellrun.stdout)
+            else:
+                print("{} renamed as {}".format(byosed_default,byosed_rename))
+        #copy new byosed input to BYOSED folder
+        shellcommand = "cp -r {} {}".format(outname,byosed_default)
+        shellrun = subprocess.run(list(shellcommand.split()))
+        if shellrun.returncode != 0:
+            raise RuntimeError(shellrun.stdout)
+        else:
+            print("{} is copyed to {}".format(byosed_default,outname))
 
 class Simulation(PipeProcedure):
 
@@ -141,7 +158,8 @@ def _run_external_pro(pro,args):
     if isinstance(args, str):
         args = [args]
 
-    res = subprocess.run([pro] + args)
+    print("Running",' '.join([pro] + args))
+    res = subprocess.run(args = list([pro] + args))
     
     if res.returncode == 0:
         print("{} finished successfully.".format(pro.strip()))
@@ -201,7 +219,7 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
         if kw in setkeys.key.values:
             keyvalue = setkeys[setkeys.key==kw].value.values[0]
             kwline[1] = ' '.join(list(filter(None,keyvalue)))+'\n'
-            print("Setting {} = {}".format(kw,kwline[1]))
+            print("Setting {} = {}".format(kw,kwline[1].strip()))
         lines[i] = ": ".join(kwline)
 
     outfile = open(outname,"w")
@@ -217,3 +235,4 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
     print("Write sim input to file:",outname)
 
     return outname
+
