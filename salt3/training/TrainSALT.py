@@ -26,7 +26,7 @@ from sncosmo.constants import HC_ERG_AA
 class TrainSALT(TrainSALTBase):
 	def __init__(self):
 		self.warnings = []
-	
+		
 	def fitSALTModel(self,datadict):
 		
 		if not os.path.exists(self.options.initmodelfile):
@@ -54,30 +54,17 @@ class TrainSALT(TrainSALTBase):
 
 
 		
-		if self.options.resume_from_outputdir:
-			salt3m0file = '%s/salt3_template_0.dat'%self.options.outputdir
-			salt3m1file = '%s/salt3_template_1.dat'%self.options.outputdir
-			phase,wave,m0,mtemp,phaseknotloc,waveknotloc,m0knots,m1tmpknots = init_hsiao(
-				salt3m0file,salt2file,self.options.initbfilt,flatnu,normalize=False,**init_options)
-			phase,wave,m1,mtemp,phaseknotloc,waveknotloc,m1knots,m1tmpknots = init_hsiao(
-				salt3m1file,salt2file,self.options.initbfilt,flatnu,normalize=False,**init_options)
-
-		else:
-			phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
-				self.options.inithsiaofile,salt2file,self.options.initbfilt,flatnu,normalize=True,**init_options)
-			#phase,wave,m1,mtemp,phaseknotloc,waveknotloc,m1knots,m1tmpknots = init_hsiao(
-			#	salt2m1file,salt2file,self.options.initbfilt,flatnu,normalize=False,**init_options)
-			#phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_kaepora(
-			#	salt2file,salt2m1file,salt2file,self.options.initbfilt,flatnu,**init_options)
+		phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
+			self.options.inithsiaofile,salt2file,self.options.initbfilt,flatnu,normalize=True,**init_options)
+		#phase,wave,m1,mtemp,phaseknotloc,waveknotloc,m1knots,m1tmpknots = init_hsiao(
+		#	salt2m1file,salt2file,self.options.initbfilt,flatnu,normalize=False,**init_options)
+		#phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_kaepora(
+		#	salt2file,salt2m1file,salt2file,self.options.initbfilt,flatnu,**init_options)
 
 		init_options['phasesplineres'] = self.options.error_snake_phase_binsize
 		init_options['wavesplineres'] = self.options.error_snake_wave_binsize
 		errphaseknotloc,errwaveknotloc = init_errs(
 			self.options.inithsiaofile,salt2file,self.options.initbfilt,**init_options)
-		if self.options.resume_from_outputdir:
-			errphaseknotloc,errwaveknotloc,modelerrguess = init_errs_fromfile(
-				'%s/salt3_lc_dispersion_scaling.dat'%self.options.outputdir,
-				salt2file,self.options.initbfilt,**init_options)
 		
 		# number of parameters
 		n_phaseknots,n_waveknots = len(phaseknotloc)-4,len(waveknotloc)-4
@@ -115,11 +102,9 @@ class TrainSALT(TrainSALTBase):
 		# initial guesses
 		n_params=parlist.size
 		guess = np.zeros(parlist.size)
+		m0knots[m0knots == 0] = 1e-4
 		guess[parlist == 'm0'] = m0knots
-		if self.options.resume_from_outputdir:
-			guess[parlist == 'modelerr'] = modelerrguess
-		else:
-			guess[parlist == 'modelerr'] = 1e-10 #*np.mean(m0knots)*HC_ERG_AA
+		guess[parlist == 'modelerr'] = 1e-6 #*np.mean(m0knots)*HC_ERG_AA
 		if self.options.n_components == 2:
 			guess[parlist == 'm1'] = m1knots
 		if self.options.n_colorpars:
@@ -127,23 +112,21 @@ class TrainSALT(TrainSALTBase):
 		if self.options.n_colorscatpars:
 			guess[parlist == 'clscat'] = [0.]*self.options.n_colorscatpars
 
-		guess[(parlist == 'm0') & (guess < 0)] = 0
+		guess[(parlist == 'm0') & (guess < 0)] = 1e-4
+		for k in datadict.keys():
+			guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36-10.635))
+
 		if self.options.resume_from_outputdir:
-			snpars = '%s/salt3train_snparams.txt'%self.options.outputdir
-			snp = txtobj(snpars)
-			for k in datadict.keys():
-				guess[parlist == 'x0_%s'%k] = snp.x0[snp.SN == k][0]
-				guess[parlist == 'x1_%s'%k] = snp.x1[snp.SN == k][0]
-				guess[parlist == 'c_%s'%k] = snp.c[snp.SN == k][0]
-				guess[parlist == 'tpkoff_%s'%k] = snp.tpkoff[snp.SN == k][0]
-		else:
-			for k in datadict.keys():
-				guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36-10.635))
-		
+			names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.outputdir,unpack=True,skiprows=1,dtype="U20,f8")
+			for key in np.unique(parlist):
+				guess[parlist == key] = pars[names == key]
+
 		saltfitkwargs = self.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
 
 		print('training on %i SNe!'%len(datadict.keys()))
 		saltfitter = saltfit.mcmc(guess,datadict,parlist,**saltfitkwargs)
+		print('initial loglike: %.1f'%saltfitter.maxlikefit(guess,None,False))
+		#import pdb; pdb.set_trace()
 		fitter = fitting(self.options.n_components,self.options.n_colorpars,
 						 n_phaseknots,n_waveknots,
 						 datadict)
@@ -155,13 +138,14 @@ class TrainSALT(TrainSALTBase):
 			self.options.n_steps_mcmc,self.options.n_burnin_mcmc)
 		for k in datadict.keys():
 			tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
-			if not self.options.fix_t0: SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
-
+			#if not self.options.fix_t0:
+			SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
+			#import pdb; pdb.set_trace()
 		print('MCMC message: %s'%message)
 		print('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
 			  saltfitter.regularizationChi2(x_modelpars,0,1,0),saltfitter.regularizationChi2(x_modelpars,0,0,1))
 		print('Final loglike'); saltfitter.maxlikefit(x_modelpars,None,False)
-
+		#import pdb; pdb.set_trace()
 		
 		return phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams,x_modelpars,parlist
@@ -179,7 +163,7 @@ class TrainSALT(TrainSALTBase):
 		with  open('{}/salt3_parameters.dat'.format(outdir),'w') as foutpars:
 			foutpars.write('{: <30} {}\n'.format('Parameter Name','Value'))
 			for name,par in zip(parlist,pars):
-				foutpars.write('{: <30} {:.6e}\n'.format(name,par))
+				foutpars.write('{: <30} {:.10e}\n'.format(name,par))
 			
 		# principal components and color law
 		foutm0 = open('%s/salt3_template_0.dat'%outdir,'w')
@@ -261,9 +245,11 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 	def validate(self,outputdir):
 
 		import pylab as plt
+		plt.subplots_adjust(left=None, bottom=None, right=None, top=0.85, wspace=0.025, hspace=0)
+
 		#plt.ion()
 		
-		from salt3.validation import ValidateLightcurves
+		from salt3.validation import ValidateLightCurves
 		from salt3.validation import ValidateModel
 
 		x0,x1,c,t0 = np.loadtxt('%s/salt3train_snparams.txt'%outputdir,unpack=True,usecols=[1,2,3,4])
@@ -300,9 +286,22 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 						filtwave=self.kcordict[k]['filtwave'],
 						filttp=self.kcordict[k][k2]['filttrans'],
 						zpoff=0) - self.kcordict[k][k2]['primarymag']
-				
+
+		from matplotlib.backends.backend_pdf import PdfPages
+		plt.close('all')
+		pdf_pages = PdfPages('%s/lcfits.pdf'%outputdir)
+		import matplotlib.gridspec as gridspec
+		gs1 = gridspec.GridSpec(3, 3)
+		gs1.update(wspace=0.0)
+		
+		i = 0
 		for l in snfiles:
-			plt.clf()
+			if not i % 9:
+				fig = plt.figure()
+			try:
+				ax1 = plt.subplot(gs1[i % 9]); ax2 = plt.subplot(gs1[(i+1) % 9]); ax3 = plt.subplot(gs1[(i+2) % 9])
+			except:
+				import pdb; pdb.set_trace()
 			if '/' not in l:
 				l = '%s/%s'%(os.path.dirname(self.options.snlist),l)
 			sn = snana.SuperNova(l)
@@ -317,11 +316,20 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			if not fitc: csn = 0
 			if not fitx1: x1sn = 0
 			
-			ValidateLightcurves.customfilt(
+			ValidateLightCurves.customfilt(
 				'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,outputdir,
 				t0=t0sn,x0=x0sn,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc,
-				bandpassdict=kcordict,n_components=self.options.n_components)
-
+				bandpassdict=self.kcordict,n_components=self.options.n_components,
+				ax1=ax1,ax2=ax2,ax3=ax3)
+			if i % 9 == 6:
+				pdf_pages.savefig()
+			else:
+				for ax in [ax1,ax2,ax3]:
+					ax.xaxis.set_ticklabels([])
+					ax.set_xlabel(None)
+			i += 3
+		pdf_pages.savefig()
+		pdf_pages.close()
 		
 	def main(self):
 

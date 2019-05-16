@@ -15,25 +15,28 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 			   days_interp=5,debug=False,normalize=True):
 
 	phase,wave,flux = np.loadtxt(hsiaofile,unpack=True)
+	
 	refWave,refFlux=np.loadtxt(flatnu,unpack=True)
-
+	iGood = np.where((phase >= phaserange[0]-phasesplineres*6) & (phase <= phaserange[1]+phasesplineres*6) &
+					 (wave >= waverange[0]-wavesplineres*6) & (wave <= waverange[1]+wavesplineres*6))[0]
+	phase,wave,flux = phase[iGood],wave[iGood],flux[iGood]
+	
 	if normalize:
 		m0flux = flux*10**(-0.4*(-19.49+(synphotB(refWave,refFlux,0,0,Bfilt)-synphotB(wave[phase==0],flux[phase==0],0,0,Bfilt))))#*_SCALE_FACTOR
 	else:
 		m0flux = flux[:]
 		
 	#m1phase = phase*1.1
-	splinephase = np.linspace(phaserange[0],phaserange[1],
-							  (phaserange[1]-phaserange[0])/phasesplineres,False)
-	splinewave = np.linspace(waverange[0],waverange[1],
-							 (waverange[1]-waverange[0])/wavesplineres,False)
+	splinephase = np.linspace(phaserange[0]-phasesplineres*3,phaserange[1]+phasesplineres*3,(phaserange[1]-phaserange[0])/phasesplineres+6,False)
+	splinewave = np.linspace(waverange[0]-wavesplineres*5,waverange[1]+wavesplineres*5,(waverange[1]-waverange[0])/wavesplineres+10,False)
+	
 	bspl = bisplrep(phase,wave,m0flux,kx=3,ky=3,
 					tx=splinephase,ty=splinewave,task=-1)
 
-	intphase = np.linspace(phaserange[0],phaserange[1],
-						   (phaserange[1]-phaserange[0])/phaseinterpres,False)
-	intwave = np.linspace(waverange[0],waverange[1],
-						  (waverange[1]-waverange[0])/waveinterpres,False)
+	intphase = np.linspace(phaserange[0],phaserange[1]+phaseinterpres,
+						   (phaserange[1]-phaserange[0])/phaseinterpres+1,False)
+	intwave = np.linspace(waverange[0],waverange[1]+waveinterpres,
+						  (waverange[1]-waverange[0])/waveinterpres+1,False)
 
 
 	m0 = bisplev(intphase,intwave,bspl)

@@ -28,7 +28,6 @@ def rdkcor(surveylist,options,addwarning=None):
 		except:
 			raise RuntimeError('kcor file format is non-standard for kcor file %s'%kcorfile)
 
-
 		for subsurvey in subsurveys:
 			kcorkey = '%s(%s)'%(survey,subsurvey)
 			if not subsurvey: kcorkey = survey[:]
@@ -47,6 +46,7 @@ def rdkcor(surveylist,options,addwarning=None):
 				kcordict[kcorkey]['BD17'] = primarysed['BD17']
 			for filt in zpoff['Filter Name']:
 				kcordict[kcorkey][filt.split('-')[-1].split('/')[-1]] = {}
+				kcordict[kcorkey][filt.split('-')[-1].split('/')[-1]]['fullname'] = filt.split('/')[0][1:]
 				kcordict[kcorkey][filt.split('-')[-1].split('/')[-1]]['filttrans'] = filtertrans[filt]
 				lambdaeff = np.sum(kcordict[kcorkey]['filtwave']*filtertrans[filt])/np.sum(filtertrans[filt])
 				kcordict[kcorkey][filt.split('-')[-1].split('/')[-1]]['lambdaeff'] = lambdaeff
