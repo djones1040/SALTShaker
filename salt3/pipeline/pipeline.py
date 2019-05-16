@@ -5,6 +5,7 @@ import subprocess
 import configparser
 import pandas as pd
 import os
+import numpy as np
 
 class SALT3pipe():
 	def __init__(self,finput=None):
@@ -27,7 +28,8 @@ class SALT3pipe():
 							  setkeys=self.BYOSED.setkeys,
 							  outname=config.get('byosed','outinput'))
 		self.Simulation.setkeys = m2df(config.get('simulation','set_key'),
-									   colnames=['key','value'])
+									   colnames=['key','value'],
+									   stackvalues=True)
 		self.Simulation.configure(baseinput=config.get('simulation','baseinput'),
 								  setkeys=self.Simulation.setkeys,
 								  outname=config.get('simulation','outinput'),
@@ -48,8 +50,16 @@ class SALT3pipe():
 		self.LCFitting.run()
 
 
-	def _multivalues_to_df(self,values,colnames=None):
-		df = pd.DataFrame([s.split() for s in values.split('\n')], columns=colnames)
+	def _multivalues_to_df(self,values,colnames=None,stackvalues=False):
+		df = pd.DataFrame([s.split() for s in values.split('\n')])
+		if stackvalues and df.shape[1] > len(colnames):
+			numbercol = [colnames[-1]+'.'+str(i) for i in range(df.shape[1]-len(colnames)+1)]
+			df.columns = colnames[0:-1] + numbercol
+			lastcol = colnames[-1]
+			df[lastcol] = df[[col for col in df.columns if col.startswith(lastcol)]].values.tolist()
+			df = df.drop(numbercol,axis=1)
+		else:
+			df.columns = colnames
 		return df
 
 
@@ -181,14 +191,17 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
 	lines = basefile.readlines()
 	basekws = []
 	setkeys = pd.DataFrame(setkeys)
+	if np.any(setkeys.key.duplicated()):
+		raise ValueError("Check for duplicated entries for",setkeys.keys[setkeys.keys.duplicated()].unique())
 
 	for i,line in enumerate(lines):
 		kwline = line.split(":")
 		kw = kwline[0]
 		basekws.append(kw)
-		if kw in setkeys.key:
-			print("Setting {} = {}".format(kw,setkeys[kw].value))
-			kwline[1] = setkeys[kw].value
+		if kw in setkeys.key.values:
+			keyvalue = setkeys[setkeys.key==kw].value.values[0]
+			kwline[1] = ' '.join(list(filter(None,keyvalue)))+'\n'
+			print("Setting {} = {}".format(kw,kwline[1]))
 		lines[i] = ": ".join(kwline)
 
 	outfile = open(outname,"w")
@@ -198,7 +211,7 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
 	for key,value in zip(setkeys.key,setkeys.value):
 		if not key in basekws:
 			print("Adding key {}={}".format(key,value))
-			newline = key+": "+value
+			newline = key+": "+' '.join(list(filter(None,value)))
 			outfile.write(newline)
 
 	print("Write sim input to file:",outname)
