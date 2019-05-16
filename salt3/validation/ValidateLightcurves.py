@@ -148,6 +148,7 @@ def main(outfile,lcfile,salt3dir,
 	ax1.legend()
 	plt.savefig(outfile)
 	plt.show()
+	plt.close(fig)
 
 def customfilt(outfile,lcfile,salt3dir,
 			   m0file='salt3_template_0.dat',
@@ -362,7 +363,7 @@ def customfilt(outfile,lcfile,salt3dir,
 		ax2.set_title('$x_0$ = %8.5e, $x_1$ = %.2f,\n$c$ = %.2f, $z$ = %.2f'%(
 			sn.SIM_SALT2x0,sn.SIM_SALT2x1,sn.SIM_SALT2c,sn.SIM_REDSHIFT_HELIO))
 	plt.savefig(outfile)
-
+	plt.close(fig)
 	#plt.ion()
 	#plt.show()
 	#import pdb; pdb.set_trace()
