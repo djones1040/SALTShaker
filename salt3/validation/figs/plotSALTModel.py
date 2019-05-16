@@ -108,11 +108,12 @@ def mkModelPlot(salt3dir='modelfiles/salt3'):
 						 salt2m1flux_0-salt2m1fluxerr_0+spacing*i,
 						 salt2m1flux_0+salt2m1fluxerr_0+spacing*i,
 						 color='b',alpha=0.5)
-		ax2.plot(salt3m1wave,salt3m1flux_0+spacing*i,color='r',label='SALT3')
-		ax2.fill_between(salt3m1wave,
-						 salt3m1flux_0-salt3m1fluxerr_0+spacing*i,
-						 salt3m1flux_0+salt3m1fluxerr_0+spacing*i,
-						 color='r',alpha=0.5)
+		m1scale = np.mean(np.abs(salt2m1flux_0))/np.mean(np.abs(salt3m1flux_0))
+		ax2.plot(salt3m1wave,salt3m1flux_0*m1scale+spacing*i,color='r',label='SALT3')
+		#ax2.fill_between(salt3m1wave,
+		#				 salt3m1flux_0-salt3m1fluxerr_0+spacing*i,
+		#				 salt3m1flux_0+salt3m1fluxerr_0+spacing*i,
+		#				 color='r',alpha=0.5)
 		ax2.set_xlim([2500,9200])
 		ax2.set_ylim([-0.05,0.4])
 
@@ -128,8 +129,8 @@ def mkModelPlot(salt3dir='modelfiles/salt3'):
 	salt2_colormin = float(lines[6].split()[1])
 	salt2_colormax = float(lines[7].split()[1])
 	colorlaw_salt2 = SALT2ColorLaw([salt2_colormin,salt2_colormax],colorlaw_salt2_coeffs)
-	wave = np.arange(salt2_colormin,salt2_colormax,1)
-	ax3.plot(wave,colorlaw_salt2(wave),color='b')
+	wave = np.arange(2000,9200,1,dtype='float')#salt2_colormin,salt2_colormax,1)
+	ax3.plot(wave,colorlaw_salt2(wave),color='b',label='SALT2')
 
 	
 	with open('%s/salt3_color_correction.dat'%salt3dir) as fin:
@@ -142,8 +143,16 @@ def mkModelPlot(salt3dir='modelfiles/salt3'):
 		salt3_colormax = float(lines[7].split()[1])
 
 		colorlaw_salt3 = SALT2ColorLaw([salt3_colormin,salt3_colormax],colorlaw_salt3_coeffs)
-		ax3.plot(wave,colorlaw_salt3(wave),color='r')
-
+		ax3.plot(wave,colorlaw_salt3(wave),color='r',label='SALT3')
+	ax3.legend(prop={'size':13})
+	ax1.set_ylabel('M0',fontsize=15)
+	ax2.set_ylabel('M1',fontsize=15)
+	ax3.set_ylabel('Color Law',fontsize=15)
+	for ax in [ax1,ax2,ax3]:
+		ax.set_xlim([2000,9200])
+	ax1.xaxis.set_ticklabels([])
+	ax2.xaxis.set_ticklabels([])
+	
 def mkModelErrPlot(salt3dir='modelfiles/salt3'):
 	plt.rcParams['figure.figsize'] = (9,3)
 	plt.subplots_adjust(left=None, bottom=None, right=None, top=None,
