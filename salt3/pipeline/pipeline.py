@@ -7,6 +7,7 @@ import pandas as pd
 import os
 import numpy as np
 import time
+import glob
 
 class SALT3pipe():
     def __init__(self,finput=None):
@@ -49,13 +50,45 @@ class SALT3pipe():
                                   pro=config.get('lcfitting','pro'))
 
     def run(self):
-        # self.Simulation.run()
-        # self.Training.run()
+        self.Simulation.run()
+        self.Training.run()
         self.LCFitting.run()
+        return
 
+    def glue(self,pipepros=None,on='phot'):
+        if pipepros is None:
+            return
+        elif not isinstance(pipepros,list) or len(pipepros) !=2:
+            raise ValueError("pipepros must be list of length 2, {} of {} was given".format(type(pipepros),len(pipepros)))       
+        
+        pro1 = self._get_pipepro_from_string(pipepros[0])
+        pro2 = self._get_pipepro_from_string(pipepros[1])
+        pro1_out = pro1.glueto(pro2)
+        if pipepros[1].lower().startswith('lcfit'):
+            pro2_in = pro2._get_input_info().loc[on]
+        else:
+            pro2_in = pro2._get_input_info()
+        pro2_in['value'] = pro1_out
+        setkeys = pd.DataFrame([pro2_in])
+        pro2.configure(setkeys = setkeys,
+                       pro=pro2.pro,baseinput=pro2.baseinput,outname=pro2.outname)
+
+
+    def _get_pipepro_from_string(self,pipepro_str):
+        if pipepro_str.lower().startswith("sim"):
+            pipepro = self.Simulation
+        elif pipepro_str.lower().startswith("train"):
+            pipepro = self.Training
+        elif pipepro_str.lower().startswith("lcfit"):
+            pipepro = self.LCFitting
+        else:
+            raise ValueError("Unknow pipeline procedure:",pipepro.strip())
+        return pipepro
 
     def _multivalues_to_df(self,values,colnames=None,stackvalues=False):
         df = pd.DataFrame([s.split() for s in values.split('\n')])
+        if df.empty:
+            return None
         if stackvalues and df.shape[1] > len(colnames):
             numbercol = [colnames[-1]+'.'+str(i) for i in range(df.shape[1]-len(colnames)+1)]
             df.columns = colnames[0:-1] + numbercol
@@ -82,12 +115,9 @@ class PipeProcedure():
         self.setkeys = setkeys
         self.proargs = proargs
 
-        if setkeys is not None:
-            self.gen_input(outname=self.outname)
-        else:
-            self.finput = baseinput
+        self.gen_input(outname=self.outname)
 
-    def gen_input(self):
+    def gen_input(self,outname=None):
         pass
 
     def run(self):
@@ -97,12 +127,18 @@ class PipeProcedure():
             args = [self.proargs] + [self.finput]
         _run_external_pro(self.pro, args)
 
+    def _get_input_info(self):
+        pass
+    
+    def _get_output_info(self):
+        pass
+
 
 class PyPipeProcedure(PipeProcedure):
 
     def gen_input(self,outname="pipeline_generalpy_input.input"):
         self.outname = outname
-        self.finput = _gen_general_python_input(basefilename=self.baseinput,setkeys=self.setkeys,
+        self.finput,self.keys = _gen_general_python_input(basefilename=self.baseinput,setkeys=self.setkeys,
                                                 outname=outname)
 
 
@@ -128,7 +164,7 @@ class BYOSED(PyPipeProcedure):
         if shellrun.returncode != 0:
             raise RuntimeError(shellrun.stdout)
         else:
-            print("{} is copied to {}".format(byosed_default,outname))
+            print("{} is copied to {}".format(outname,byosed_default))
 
 class Simulation(PipeProcedure):
 
@@ -139,8 +175,34 @@ class Simulation(PipeProcedure):
 
     def gen_input(self,outname="pipeline_sim_input.input"):
         self.outname = outname
-        self.finput = _gen_snana_sim_input(basefilename=self.baseinput,setkeys=self.setkeys,
+        self.finput,self.keys = _gen_snana_sim_input(basefilename=self.baseinput,setkeys=self.setkeys,
                                            outname=outname)
+    
+    def _get_output_info(self):
+        df = {}
+        key = 'GENVERSION'
+        df['key'] = key
+        df['value'] = self.keys[key]
+        return pd.DataFrame([df])
+
+    def glueto(self,pipepro):
+        if not isinstance(pipepro,str):
+            pipepro = type(pipepro).__name__
+        outdir = self._get_output_info().value.values[0]
+        outpath = os.path.join(os.environ['SNDATA_ROOT'],'SIM/',outdir)
+        if os.path.isdir(outdir):
+            res = outdir
+        elif os.path.exists(outpath):
+            res = outpath
+        else:
+            raise ValueError("Path does not exists",outdir,outpath)             
+        if pipepro.lower().startswith('train'):
+            return glob.glob(os.path.join(res,'*.LIST'))
+        elif pipepro.lower().startswith('lcfit'):
+            return res
+        else:
+            raise ValueError("sim can only glue to training or lcfitting")
+        
 
 class Training(PyPipeProcedure):
 
@@ -149,6 +211,33 @@ class Training(PyPipeProcedure):
         self.outname = outname
         self.proargs = proargs
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,proargs=proargs)
+
+    def glueto(self,pipepro):
+        if not isinstance(pipepro,str):
+            pipepro = type(pipepro).__name__
+        if pipepro.lower().startswith('lcfit'):
+            outdir = self._get_output_info()
+            ##copy necessary files to a model folder in SNDATA_ROOT
+        else:
+            raise ValueError("training can only glue to lcfit")
+
+    def _get_input_info(self):
+        df = {}
+        section = 'iodata'
+        key = 'snlist'
+        df['section'] = section
+        df['key'] = key
+        df['value'] = self.keys[section][key]
+        return pd.DataFrame([df])
+    
+    def _get_output_info(self):
+        df = {}
+        section = 'iodata'
+        key = 'outputdir'
+        df['section'] = section
+        df['key'] = key
+        df['value'] = self.keys[section][key]
+        return pd.DataFrame([df])
 
 class LCFitting(PipeProcedure):
 
@@ -159,9 +248,34 @@ class LCFitting(PipeProcedure):
 
     def gen_input(self,outname="pipeline_lcfit_input.input"):
         self.outname = outname
-        self.finput = _gen_snana_fit_input(basefilename=self.baseinput,setkeys=self.setkeys,
+        self.finput,self.keys = _gen_snana_fit_input(basefilename=self.baseinput,setkeys=self.setkeys,
                                            outname=outname)
 
+    def _get_input_info(self):
+        df = {}
+        section = 'SNLCINP'
+        key = 'VERSION_PHOTOMETRY'
+        df['section'] = section
+        df['key'] = key
+        df['value'] = self.keys[section][key]
+        df['type'] = 'phot'
+        df2 = {}
+        section2 = 'FITINP'
+        key2 = 'FITMODEL_NAME'
+        df2['section'] = section2
+        df2['key'] = key2
+        df2['value'] = self.keys[section2][key2]
+        df2['type'] = 'model'
+        return pd.DataFrame([df,df2]).set_index('type')
+
+    def _get_output_info(self):
+        df = {}
+        section = 'SNLCINP'
+        key = 'TEXTFILE_PREFIX'
+        df['section'] = section
+        df['key'] = key
+        df['value'] = self.keys[section][key]
+        return pd.DataFrame([df])
     
 def _run_external_pro(pro,args):
 
@@ -188,20 +302,23 @@ def _gen_general_python_input(basefilename=None,setkeys=None,
         os.makedirs(os.path.dirname(outname))
     
     config.read(basefilename)
-    setkeys = pd.DataFrame(setkeys)
-    for index, row in setkeys.iterrows():
-        sec = row['section']
-        key = row['key']
-        v = row['value']
-        if not sec in config.sections():
-            config.add_section(sec)
-        print("Adding/modifying key {}={} in [{}]".format(key,v,sec))
-        config[sec][key] = v
-    with open(outname, 'w') as f:
-        config.write(f)
+    if setkeys is None:
+        print("No modification on the input file, keeping {} as input".format(basefilename))
+    else:
+        setkeys = pd.DataFrame(setkeys)
+        for index, row in setkeys.iterrows():
+            sec = row['section']
+            key = row['key']
+            v = row['value']
+            if not sec in config.sections():
+                config.add_section(sec)
+            print("Adding/modifying key {}={} in [{}]".format(key,v,sec))
+            config[sec][key] = v
+        with open(outname, 'w') as f:
+            config.write(f)
 
-    print("input file saved as:",outname)
-    return outname
+        print("input file saved as:",outname)
+    return outname,config
 
 
 def _gen_snana_sim_input(basefilename=None,setkeys=None,
@@ -218,33 +335,47 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
     basefile = open(basefilename,"r")
     lines = basefile.readlines()
     basekws = []
-    setkeys = pd.DataFrame(setkeys)
-    if np.any(setkeys.key.duplicated()):
-        raise ValueError("Check for duplicated entries for",setkeys.keys[setkeys.keys.duplicated()].unique())
+    
+    if setkeys is None:
+        print("No modification on the input file, keeping {} as input".format(basefilename))
+        config = {}
+        for i,line in enumerate(lines):
+            if ":" in line and not line.strip().startswith("#"):
+                kwline = line.split(":")
+                kw = kwline[0]
+                config[kw] = kwline[1].strip()
+    else:
+        setkeys = pd.DataFrame(setkeys)
+        if np.any(setkeys.key.duplicated()):
+            raise ValueError("Check for duplicated entries for",setkeys.keys[setkeys.keys.duplicated()].unique())
 
-    for i,line in enumerate(lines):
-        kwline = line.split(":")
-        kw = kwline[0]
-        basekws.append(kw)
-        if kw in setkeys.key.values:
-            keyvalue = setkeys[setkeys.key==kw].value.values[0]
-            kwline[1] = ' '.join(list(filter(None,keyvalue)))+'\n'
-            print("Setting {} = {}".format(kw,kwline[1].strip()))
-        lines[i] = ": ".join(kwline)
+        config = {}
+        for i,line in enumerate(lines):
+            if ":" in line and not line.strip().startswith("#"):
+                kwline = line.split(":")
+                kw = kwline[0]
+                basekws.append(kw)
+                if kw in setkeys.key.values:
+                    keyvalue = setkeys[setkeys.key==kw].value.values[0]
+                    kwline[1] = ' '.join(list(filter(None,keyvalue)))+'\n'
+                    print("Setting {} = {}".format(kw,kwline[1].strip()))
+                lines[i] = ": ".join(kwline)
+                config[kw] = kwline[1].strip()
 
-    outfile = open(outname,"w")
-    for line in lines:
-        outfile.write(line)
+        outfile = open(outname,"w")
+        for line in lines:
+            outfile.write(line)
 
-    for key,value in zip(setkeys.key,setkeys.value):
-        if not key in basekws:
-            print("Adding key {}={}".format(key,value))
-            newline = key+": "+' '.join(list(filter(None,value)))
-            outfile.write(newline)
+        for key,value in zip(setkeys.key,setkeys.value):
+            if not key in basekws:
+                print("Adding key {}={}".format(key,value))
+                newline = key+": "+' '.join(list(filter(None,value)))
+                outfile.write(newline)
+                config[key] = value
 
-    print("Write sim input to file:",outname)
+        print("Write sim input to file:",outname)
 
-    return outname
+    return outname,config
 
 
 def _gen_snana_fit_input(basefilename=None,setkeys=None,
@@ -252,18 +383,21 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
     import f90nml
     nml = f90nml.read(basefilename)
 
-    for index, row in setkeys.iterrows():
-        sec = row['section']
-        key = row['key']
-        v = row['value']
-        if not sec.lower() in nml.keys():
-            raise ValueError("No section named",sec)
-        print("Adding/modifying key {}={} in &{}".format(key,v,sec))
-        nml[sec][key] = v
+    if setkeys is None:
+        print("No modification on the input file, keeping {} as input".format(basefilename))
+    else:
+        for index, row in setkeys.iterrows():
+            sec = row['section']
+            key = row['key']
+            v = row['value']
+            if not sec.lower() in nml.keys():
+                raise ValueError("No section named",sec)
+            print("Adding/modifying key {}={} in &{}".format(key,v,sec))
+            nml[sec][key] = v
 
-    print("Write fit input to file:",outname)
-    _write_nml_to_file(nml,outname)
-    return outname
+        print("Write fit input to file:",outname)
+        _write_nml_to_file(nml,outname)
+    return outname,nml
 
 def _write_nml_to_file(nml,filename):
     outfile = open(filename,"w")
@@ -275,7 +409,6 @@ def _write_nml_to_file(nml,filename):
             if isinstance(value,str):
                 value = "'{}'".format(value)
             elif isinstance(value,list):
-                print(value)
                 value = ','.join([str(x) for x in value if not isinstance(x,str)])
             outfile.write("  {} = {}".format(key2.upper(),value))
             outfile.write("\n")
