@@ -42,13 +42,16 @@ class SALT3pipe():
                                 outname=config.get('training','outinput'),
                                 pro=config.get('training','pro'),
                                 proargs=config.get('training','proargs'))
-        self.LCFitting.setkeys = m2df(config.get('lcfitting','set_key'),colnames=['key','value'])
-
+        self.LCFitting.setkeys = m2df(config.get('lcfitting','set_key'),colnames=['section','key','value'])
+        self.LCFitting.configure(baseinput=config.get('lcfitting','baseinput'),
+                                  setkeys=self.LCFitting.setkeys,
+                                  outname=config.get('lcfitting','outinput'),
+                                  pro=config.get('lcfitting','pro'))
 
     def run(self):
-        self.Simulation.run()
-        self.Training.run()
-        # self.LCFitting.run()
+        # self.Simulation.run()
+        # self.Training.run()
+        self.LCFitting.run()
 
 
     def _multivalues_to_df(self,values,colnames=None,stackvalues=False):
@@ -113,19 +116,19 @@ class BYOSED(PyPipeProcedure):
         byosed_default = "BYOSED/BYOSED.params"
         byosed_rename = "{}.{}".format(byosed_default,int(time.time()))
         if os.path.isfile(byosed_default):
-            shellcommand = "mv {} {}".format(byosed_default,byosed_rename) 
+            shellcommand = "cp -p {} {}".format(byosed_default,byosed_rename) 
             shellrun = subprocess.run(list(shellcommand.split()))
             if shellrun.returncode != 0:
                 raise RuntimeError(shellrun.stdout)
             else:
-                print("{} renamed as {}".format(byosed_default,byosed_rename))
+                print("{} copied as {}".format(byosed_default,byosed_rename))
         #copy new byosed input to BYOSED folder
-        shellcommand = "cp -r {} {}".format(outname,byosed_default)
+        shellcommand = "cp -p {} {}".format(outname,byosed_default)
         shellrun = subprocess.run(list(shellcommand.split()))
         if shellrun.returncode != 0:
             raise RuntimeError(shellrun.stdout)
         else:
-            print("{} is copyed to {}".format(byosed_default,outname))
+            print("{} is copied to {}".format(byosed_default,outname))
 
 class Simulation(PipeProcedure):
 
@@ -149,8 +152,15 @@ class Training(PyPipeProcedure):
 
 class LCFitting(PipeProcedure):
 
-    pass
+    def configure(self,pro=None,baseinput=None,setkeys=None,
+                  outname="pipeline_lcfit_input.input"):
+        self.outname = outname
+        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys)
 
+    def gen_input(self,outname="pipeline_lcfit_input.input"):
+        self.outname = outname
+        self.finput = _gen_snana_fit_input(basefilename=self.baseinput,setkeys=self.setkeys,
+                                           outname=outname)
 
     
 def _run_external_pro(pro,args):
@@ -169,7 +179,7 @@ def _run_external_pro(pro,args):
     return
 
 def _gen_general_python_input(basefilename=None,setkeys=None,
-                                 outname=None):
+                              outname=None):
 
     config = configparser.ConfigParser()
     if not os.path.isfile(basefilename):
@@ -185,7 +195,7 @@ def _gen_general_python_input(basefilename=None,setkeys=None,
         v = row['value']
         if not sec in config.sections():
             config.add_section(sec)
-        print("Adding key {}={} in [{}]".format(key,v,sec))
+        print("Adding/modifying key {}={} in [{}]".format(key,v,sec))
         config[sec][key] = v
     with open(outname, 'w') as f:
         config.write(f)
@@ -236,3 +246,38 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
 
     return outname
 
+
+def _gen_snana_fit_input(basefilename=None,setkeys=None,
+                              outname=None):
+    import f90nml
+    nml = f90nml.read(basefilename)
+
+    for index, row in setkeys.iterrows():
+        sec = row['section']
+        key = row['key']
+        v = row['value']
+        if not sec.lower() in nml.keys():
+            raise ValueError("No section named",sec)
+        print("Adding/modifying key {}={} in &{}".format(key,v,sec))
+        nml[sec][key] = v
+
+    print("Write fit input to file:",outname)
+    _write_nml_to_file(nml,outname)
+    return outname
+
+def _write_nml_to_file(nml,filename):
+    outfile = open(filename,"w")
+    for key in nml.keys():
+        outfile.write('&'+key.upper())
+        outfile.write('\n')
+        for key2 in nml[key].keys():
+            value = nml[key][key2]
+            if isinstance(value,str):
+                value = "'{}'".format(value)
+            elif isinstance(value,list):
+                print(value)
+                value = ','.join([str(x) for x in value if not isinstance(x,str)])
+            outfile.write("  {} = {}".format(key2.upper(),value))
+            outfile.write("\n")
+        outfile.write('&END\n\n')
+    return
