@@ -1,5 +1,5 @@
 ##SALT3 pipeline
-##sim -> training -> fitting
+##sim -> training -> lcfitting ->
 
 import subprocess
 import configparser
@@ -42,7 +42,8 @@ class SALT3pipe():
                                 setkeys=self.Training.setkeys,
                                 outname=config.get('training','outinput'),
                                 pro=config.get('training','pro'),
-                                proargs=config.get('training','proargs'))
+                                proargs=config.get('training','proargs'),
+                                prooptions=config.get('training','prooptions'))
         self.LCFitting.setkeys = m2df(config.get('lcfitting','set_key'),colnames=['section','key','value'])
         self.LCFitting.configure(baseinput=config.get('lcfitting','baseinput'),
                                   setkeys=self.LCFitting.setkeys,
@@ -67,12 +68,16 @@ class SALT3pipe():
         if pipepros[1].lower().startswith('lcfit'):
             pro2_in = pro2._get_input_info().loc[on]
         else:
-            pro2_in = pro2._get_input_info()
+            pro2_in = pro2._get_input_info().loc[0]
         pro2_in['value'] = pro1_out
         setkeys = pd.DataFrame([pro2_in])
+        print("Connecting ",pipepros)
         pro2.configure(setkeys = setkeys,
-                       pro=pro2.pro,baseinput=pro2.baseinput,outname=pro2.outname)
-
+                       pro=pro2.pro,
+                       proargs=pro2.proargs,
+                       baseinput=pro2.baseinput,
+                       prooptions=pro2.prooptions,
+                       outname=pro2.outname)
 
     def _get_pipepro_from_string(self,pipepro_str):
         if pipepro_str.lower().startswith("sim"):
@@ -109,11 +114,12 @@ class PipeProcedure():
         self.outname = None
 
     def configure(self,pro=None,baseinput=None,setkeys=None,
-                  proargs=None):  
+                  proargs=None,prooptions=None,**kwargs):  
         self.pro = pro
         self.baseinput = baseinput
         self.setkeys = setkeys
         self.proargs = proargs
+        self.prooptions = prooptions
 
         self.gen_input(outname=self.outname)
 
@@ -121,10 +127,14 @@ class PipeProcedure():
         pass
 
     def run(self):
-        if self.proargs is None:
-            args = self.finput
-        else:
-            args = [self.proargs] + [self.finput]
+        arglist = [self.proargs] + [self.finput] +[self.prooptions]
+        arglist = list(filter(None,arglist))
+        args = []
+        for arg in arglist:
+            if arg is not None:
+                print(arg)
+                for argitem in arg.split(' '):
+                    args.append(argitem)
         _run_external_pro(self.pro, args)
 
     def _get_input_info(self):
@@ -145,19 +155,21 @@ class PyPipeProcedure(PipeProcedure):
 class BYOSED(PyPipeProcedure):
 
     def configure(self,baseinput=None,setkeys=None,
-                  outname="pipeline_byosed_input.input"):   
+                  outname="pipeline_byosed_input.input",
+                  bkp_orig_param=False,**kwargs):   
         self.outname = outname
         super().configure(pro=None,baseinput=baseinput,setkeys=setkeys)
         #rename current byosed param
         byosed_default = "BYOSED/BYOSED.params"
-        byosed_rename = "{}.{}".format(byosed_default,int(time.time()))
-        if os.path.isfile(byosed_default):
-            shellcommand = "cp -p {} {}".format(byosed_default,byosed_rename) 
-            shellrun = subprocess.run(list(shellcommand.split()))
-            if shellrun.returncode != 0:
-                raise RuntimeError(shellrun.stdout)
-            else:
-                print("{} copied as {}".format(byosed_default,byosed_rename))
+        if bkp_orig_param:
+            byosed_rename = "{}.{}".format(byosed_default,int(time.time()))
+            if os.path.isfile(byosed_default):
+                shellcommand = "cp -p {} {}".format(byosed_default,byosed_rename) 
+                shellrun = subprocess.run(list(shellcommand.split()))
+                if shellrun.returncode != 0:
+                    raise RuntimeError(shellrun.stdout)
+                else:
+                    print("{} copied as {}".format(byosed_default,byosed_rename))
         #copy new byosed input to BYOSED folder
         shellcommand = "cp -p {} {}".format(outname,byosed_default)
         shellrun = subprocess.run(list(shellcommand.split()))
@@ -168,9 +180,10 @@ class BYOSED(PyPipeProcedure):
 
 class Simulation(PipeProcedure):
 
-    def configure(self,pro=None,baseinput=None,setkeys=None,
-                  outname="pipeline_byosed_input.input"):
+    def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
+                  outname="pipeline_byosed_input.input",**kwargs):
         self.outname = outname
+        self.prooptions = prooptions
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys)
 
     def gen_input(self,outname="pipeline_sim_input.input"):
@@ -197,9 +210,14 @@ class Simulation(PipeProcedure):
         else:
             raise ValueError("Path does not exists",outdir,outpath)             
         if pipepro.lower().startswith('train'):
-            return glob.glob(os.path.join(res,'*.LIST'))
+            return glob.glob(os.path.join(res,'*.LIST'))[0]
         elif pipepro.lower().startswith('lcfit'):
-            return res
+            simpath = os.path.join(os.environ['SNDATA_ROOT'],'SIM/')
+            idx = res.find(simpath)
+            if idx !=0:
+                raise ValueError("photometry must be in $SNDATA_ROOT/SIM")
+            else:
+                return res[len(simpath):] 
         else:
             raise ValueError("sim can only glue to training or lcfitting")
         
@@ -207,10 +225,12 @@ class Simulation(PipeProcedure):
 class Training(PyPipeProcedure):
 
     def configure(self,pro=None,baseinput=None,setkeys=None,proargs=None,
-                  outname="pipeline_train_input.input"):
+                  prooptions=None,outname="pipeline_train_input.input",**kwargs):
         self.outname = outname
         self.proargs = proargs
-        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,proargs=proargs)
+        self.prooptions = prooptions
+        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
+                          proargs=proargs,prooptions=prooptions)
 
     def glueto(self,pipepro):
         if not isinstance(pipepro,str):
@@ -241,9 +261,10 @@ class Training(PyPipeProcedure):
 
 class LCFitting(PipeProcedure):
 
-    def configure(self,pro=None,baseinput=None,setkeys=None,
-                  outname="pipeline_lcfit_input.input"):
+    def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
+                  outname="pipeline_lcfit_input.input",**kwargs):
         self.outname = outname
+        self.prooptions = prooptions
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys)
 
     def gen_input(self,outname="pipeline_lcfit_input.input"):

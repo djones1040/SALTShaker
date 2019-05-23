@@ -8,7 +8,7 @@
 
      PHOTFLAG_MSKREJ    = 0, 0
      SNTABLE_LIST       = 'FITRES LCPLOT(text:key)'
-     TEXTFILE_PREFIX    = 'out_2004ey'
+     TEXTFILE_PREFIX    = 'snfit_test'
      !HFILE_OUT          = 'out_2004ey.hbook'
 
      KCOR_FILE          = './kcor/kcor_PS1_LOWZ_COMBINED.fits'
@@ -21,9 +21,9 @@
      OMAT_REF =  0.30
      W0_REF   = -1.00
 
-     CUTWIN_CID = 0, 0
-     SNCCID_LIST = ''
-     SNCID_LIST  = 0
+     !CUTWIN_CID = 0, 0
+     !SNCCID_LIST = ''
+     !SNCID_LIST  = 0
     
      CUTWIN_MJD   = 20000, 99999
      OPT_SETPKMJD = 5
