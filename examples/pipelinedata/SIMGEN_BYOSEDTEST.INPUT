@@ -20,7 +20,8 @@ RANSEED:      28473   # random number seed
 FORMAT_MASK:  2        # 2=text  32=FITS
 
 CIDOFF:     5999386
-NGENTOT_LC:    5
+#NGENTOT_LC:    5
+NGEN_LC: 20
 
 GENVERSION: BYOSEDTEST
 GENSOURCE:  RANDOM   
