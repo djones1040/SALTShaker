@@ -35,7 +35,8 @@ class SALT3pipe():
         self.Simulation.configure(baseinput=config.get('simulation','baseinput'),
                                   setkeys=self.Simulation.setkeys,
                                   outname=config.get('simulation','outinput'),
-                                  pro=config.get('simulation','pro'))
+                                  pro=config.get('simulation','pro'),
+                                  prooptions=config.get('simulation','prooptions'))
         self.Training.setkeys = m2df(config.get('training','set_key'),
                                      colnames=['section','key','value'])
         self.Training.configure(baseinput=config.get('training','baseinput'),
@@ -132,7 +133,6 @@ class PipeProcedure():
         args = []
         for arg in arglist:
             if arg is not None:
-                print(arg)
                 for argitem in arg.split(' '):
                     args.append(argitem)
         _run_external_pro(self.pro, args)
@@ -184,7 +184,7 @@ class Simulation(PipeProcedure):
                   outname="pipeline_byosed_input.input",**kwargs):
         self.outname = outname
         self.prooptions = prooptions
-        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys)
+        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,prooptions=prooptions)
 
     def gen_input(self,outname="pipeline_sim_input.input"):
         self.outname = outname
@@ -265,7 +265,7 @@ class LCFitting(PipeProcedure):
                   outname="pipeline_lcfit_input.input",**kwargs):
         self.outname = outname
         self.prooptions = prooptions
-        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys)
+        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,prooptions=prooptions)
 
     def gen_input(self,outname="pipeline_lcfit_input.input"):
         self.outname = outname
@@ -352,6 +352,8 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
     #read in a default input file
     #add/edit the kw
 
+    if not os.path.isfile(basefilename):
+        raise ValueError("basefilename cannot be None")
     print("Load base sim input file..",basefilename)
     basefile = open(basefilename,"r")
     lines = basefile.readlines()
