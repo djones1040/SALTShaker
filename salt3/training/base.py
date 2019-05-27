@@ -102,6 +102,11 @@ class TrainSALTBase:
 							help='number of angstroms over which to compute scaling of error model (default=%default)')
 
 
+		parser.add_argument('--do_mcmc', default=config.get('trainparams','do_mcmc'), type=bool,
+							help='do MCMC fitting (default=%default)')
+		parser.add_argument('--do_gaussnewton', default=config.get('trainparams','do_gaussnewton'), type=bool,
+							help='do Gauss-Newton least squares (default=%default)')
+
 		# mcmc parameters
 		parser.add_argument('--n_steps_mcmc', default=config.get('mcmcparams','n_steps_mcmc'), type=int,
 							help='number of accepted MCMC steps (default=%default)')
