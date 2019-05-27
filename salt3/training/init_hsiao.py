@@ -17,8 +17,9 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 	phase,wave,flux = np.loadtxt(hsiaofile,unpack=True)
 	
 	refWave,refFlux=np.loadtxt(flatnu,unpack=True)
-	iGood = np.where((phase >= phaserange[0]-phasesplineres*6) & (phase <= phaserange[1]+phasesplineres*6) &
-					 (wave >= waverange[0]-wavesplineres*6) & (wave <= waverange[1]+wavesplineres*6))[0]
+	# was *6
+	iGood = np.where((phase >= phaserange[0]-phasesplineres*0) & (phase <= phaserange[1]+phasesplineres*0) &
+					 (wave >= waverange[0]-wavesplineres*0) & (wave <= waverange[1]+wavesplineres*0))[0]
 	phase,wave,flux = phase[iGood],wave[iGood],flux[iGood]
 	
 	if normalize:
@@ -27,8 +28,9 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 		m0flux = flux[:]
 		
 	#m1phase = phase*1.1
-	splinephase = np.linspace(phaserange[0]-phasesplineres*3,phaserange[1]+phasesplineres*3,(phaserange[1]-phaserange[0])/phasesplineres+6,False)
-	splinewave = np.linspace(waverange[0]-wavesplineres*5,waverange[1]+wavesplineres*5,(waverange[1]-waverange[0])/wavesplineres+10,False)
+	# was *3 (phase), *5 (wave)
+	splinephase = np.linspace(phaserange[0]-phasesplineres*0,phaserange[1]+phasesplineres*0,(phaserange[1]-phaserange[0])/phasesplineres+0*2,False)
+	splinewave = np.linspace(waverange[0]-wavesplineres*0,waverange[1]+wavesplineres*0,(waverange[1]-waverange[0])/wavesplineres+0*2,False)
 	
 	bspl = bisplrep(phase,wave,m0flux,kx=3,ky=3,
 					tx=splinephase,ty=splinewave,task=-1)
