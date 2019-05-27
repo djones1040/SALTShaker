@@ -124,31 +124,42 @@ class TrainSALT(TrainSALTBase):
 		saltfitkwargs = self.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
 
 		print('training on %i SNe!'%len(datadict.keys()))
-		saltfitter = saltfit.mcmc(guess,datadict,parlist,**saltfitkwargs)
-		print('initial loglike: %.1f'%saltfitter.maxlikefit(guess,None,False))
+		if self.options.do_mcmc:
+			saltfitter = saltfit.mcmc(guess,datadict,parlist,**saltfitkwargs)
+			print('initial loglike: %.1f'%saltfitter.maxlikefit(guess,None,False))
 		
-#   conflict from D'Arcy - remove if resolved satisfactorily :)
-#		if self.options.resume_from_outputdir:
-			#This caused a crash, unsure why, probably need to figure out a way to save more state elements if I want to try loading in the whole chain
-#			chain=np.load('{}/salt3_mcmcchain.npy'.format(self.options.outputdir))
-# 			loglikes=np.load('{}/salt3_loglikes.npy'.format(self.options.outputdir))
-#			guess=chain[-1]
-#			chain,loglikes=[],[]
+			fitter = fitting(self.options.n_components,self.options.n_colorpars,
+							 n_phaseknots,n_waveknots,
+							 datadict)
 
-		fitter = fitting(self.options.n_components,self.options.n_colorpars,
-						 n_phaseknots,n_waveknots,
-						 datadict)
+			# do the fitting
+			x_modelpars,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+				modelerr,clpars,clerr,clscat,SNParams,message = fitter.mcmc(
+					saltfitter,guess,self.options.n_processes,
+					self.options.n_steps_mcmc,self.options.n_burnin_mcmc)
+			for k in datadict.keys():
+				tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
+				#if not self.options.fix_t0:
+				SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
+				#import pdb; pdb.set_trace()
 
-		# do the fitting
-		x_modelpars,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-			modelerr,clpars,clerr,clscat,SNParams,message = fitter.mcmc(
-			saltfitter,guess,self.options.n_processes,
-			self.options.n_steps_mcmc,self.options.n_burnin_mcmc)
-		for k in datadict.keys():
-			tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
-			#if not self.options.fix_t0:
-			SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
-			#import pdb; pdb.set_trace()
+		if self.options.do_gaussnewton:
+			if not self.options.do_mcmc: x_modelpars = guess[:]
+			saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)
+			fitter = fitting(self.options.n_components,self.options.n_colorpars,
+							 n_phaseknots,n_waveknots,
+							 datadict)
+			
+			# do the fitting
+			x_modelpars,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+				modelerr,clpars,clerr,clscat,SNParams,message = fitter.gaussnewton(
+					saltfitter,guess,self.options.n_processes,
+					self.options.n_steps_mcmc,self.options.n_burnin_mcmc)
+			for k in datadict.keys():
+				tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
+				SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
+
+		
 		print('MCMC message: %s'%message)
 		print('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
 			  saltfitter.regularizationChi2(x_modelpars,0,1,0),saltfitter.regularizationChi2(x_modelpars,0,0,1))
@@ -305,6 +316,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 		from matplotlib.backends.backend_pdf import PdfPages
 		plt.close('all')
+
 		pdf_pages = PdfPages('%s/lcfits.pdf'%outputdir)
 		import matplotlib.gridspec as gridspec
 		gs1 = gridspec.GridSpec(3, 3)
@@ -318,6 +330,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				ax1 = plt.subplot(gs1[i % 9]); ax2 = plt.subplot(gs1[(i+1) % 9]); ax3 = plt.subplot(gs1[(i+2) % 9])
 			except:
 				import pdb; pdb.set_trace()
+
 			if '/' not in l:
 				l = '%s/%s'%(os.path.dirname(self.options.snlist),l)
 			sn = snana.SuperNova(l)
@@ -344,6 +357,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 					ax.xaxis.set_ticklabels([])
 					ax.set_xlabel(None)
 			i += 3
+
 		pdf_pages.savefig()
 		pdf_pages.close()
 		
