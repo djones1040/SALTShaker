@@ -454,7 +454,7 @@ class loglike:
 		return logpriorB + logpriorV
 	
 	def specmodelvalsforSN(self,x,sn,specdata,int1d,intspecerr1d,int1dM0part,int1dM1part,
-						   saltflux,obswave,colorexp,colorlaw,snpars,z,obsphase,M0):
+						   saltflux,obswave,colorexp,colorlaw,snpars,z,obsphase,M0,components):
 		M0derivinterp = self.M0derivinterp
 		M1derivinterp = self.M1derivinterp
 		x0,x1,c,tpkoff = snpars
@@ -508,16 +508,16 @@ class loglike:
 				for j in range(len(self.im0)):
 					M0deriv = M0derivinterp[j](phase/(1+z))[0]
 					# warning : ignoring changes in tpkoff for derivatives
-					M0derivinterp2 = np.interp(specdata[k]['wavelength'],obswave,M0deriv) #*_SCALE_FACTOR/(1+z)*x0*recalexp*colorexpinterp
+					M0derivinterp2 = np.interp(specdata[k]['wavelength'],obswave,M0deriv)*_SCALE_FACTOR/(1+z)*x0*recalexp*colorexpinterp
 					M1deriv = M1derivinterp[j](phase/(1+z))[0]
 					M1derivinterp2 = np.interp(specdata[k]['wavelength'],obswave,M1deriv)*_SCALE_FACTOR/(1+z)*x0*x1*recalexp*colorexpinterp
 
 					#xtmp = copy.deepcopy(x)
 					#xtmp[j] += 1.0e-3
 					#modcomp = self.SALTModel(xtmp)
-					#M0deriv = (modcomp[0] - self.components[0])/(xtmp[j]-x[j])
-					#M0derivinterp_tmp = interp1d(obsphase,M0deriv,axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
-					#M0derivinterp2 = np.interp(specdata[k]['wavelength'],obswave,M0derivinterp[j](phase/(1+z))[0])
+					#M0deriv = (modcomp[0] - components[0])/(xtmp[j]-x[j])
+					#M0derivinterp = interp1d(obsphase,M0deriv,axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
+					#M0derivinterp2 = np.interp(specdata[k]['wavelength'],obswave,M0deriv)
 					#import pdb; pdb.set_trace()
 					
 					self.datadict[sn]['specdata'][k]['m0deriv'][:,j] = M0derivinterp2/np.sqrt(specvar)
@@ -527,10 +527,11 @@ class loglike:
 					#M0derivsum = np.sum(pbspl[flt]*M0deriv*colorexp, axis=1)*dwave*self.fluxfactor[survey][flt]*_SCALE_FACTOR/(1+z)*x0
 					#self.datadict[sn]['photdata']['m0deriv'][selectFilter,j] = M0derivsum/np.sqrt(photdata['fluxvar'][selectFilter])
 
-			intm01d = interp1d(obsphase,M0,axis=0,kind='nearest')
-			self.datadict[sn]['specdata'][k]['modelflux'] = np.interp(specdata[k]['wavelength'],obswave,intm01d(phase/(1+z))[0]) #saltfluxinterp
+			#intm01d = interp1d(obsphase,M0,axis=0,kind='nearest')
+			self.datadict[sn]['specdata'][k]['m1flux'] = M1interp
+			self.datadict[sn]['specdata'][k]['modelflux'] = saltfluxinterp #np.interp(specdata[k]['wavelength'],obswave,intm01d(phase/(1+z))[0])
 			
-			self.datadict[sn]['specdata'][k]['residuals'] = (specdata[k]['modelflux']-specdata[k]['flux'])/np.sqrt(specvar)*self.num_phot/self.num_spec
+			self.datadict[sn]['specdata'][k]['residuals'] = (specdata[k]['flux']-specdata[k]['modelflux'])/np.sqrt(specvar)*self.num_phot/self.num_spec
 			#if self.compute_derivatives: import pdb; pdb.set_trace()
 			
 	def modelvalsforSN(self,x,components,colorLaw,bsorder=3):
@@ -562,7 +563,7 @@ class loglike:
 			x0,x1,c,tpkoff = x[self.parlist == 'x0_%s'%sn],x[self.parlist == 'x1_%s'%sn],\
 							 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
 			clpars = x[self.parlist == 'cl']
-			x1 = x1 - np.mean(x[self.ix1])
+			#x1 = x1 - np.mean(x[self.ix1])
 			
 			#Calculate spectral model
 			M0 *= self.datadict[sn]['mwextcurve']
@@ -588,7 +589,7 @@ class loglike:
 			# spectra
 			intspecerr1d=interr1d
 			self.specmodelvalsforSN(x,sn,self.datadict[sn]['specdata'],int1d,intspecerr1d,int1dM0part,int1dM1part,
-									saltflux,obswave,colorexp,colorlaw,(x0,x1,c,tpkoff),z,obsphase,M0)
+									saltflux,obswave,colorexp,colorlaw,(x0,x1,c,tpkoff),z,obsphase,M0,components)
 
 			self.datadict[sn]['saltpars'] = {}
 			self.datadict[sn]['saltpars']['x0'] = x0
@@ -741,7 +742,7 @@ class loglike:
 			# easy ones first
 			# d(modelflux)/d(x0), d(modelflux)/d(x1)
 			self.datadict[sn]['photdata']['dmodelflux_dx0'] = photdata['modelflux']/np.sqrt(photdata['fluxvar'])/saltpars['x0']
-			self.datadict[sn]['photdata']['dmodelflux_dx1'] = photdata['m1flux']/np.sqrt(photdata['fluxvar'])/saltpars['x1']*(1-1/self.nsn)
+			self.datadict[sn]['photdata']['dmodelflux_dx1'] = photdata['m1flux']/np.sqrt(photdata['fluxvar'])/saltpars['x1'] #*(1-1/self.nsn)
 															  
 			# derivative of the x1 RMS prior
 			
@@ -757,7 +758,7 @@ class loglike:
 
 			for k in specdata.keys():
 				self.datadict[sn]['specdata'][k]['dmodelflux_dx0'] = specdata[k]['modelflux']/np.sqrt(specdata[k]['specvar'])/saltpars['x0']*self.num_phot/self.num_spec
-				self.datadict[sn]['specdata'][k]['dmodelflux_dx1'] = specdata[k]['modelflux']/np.sqrt(specdata[k]['specvar'])/saltpars['x1']*(1-1/self.nsn)*self.num_phot/self.num_spec
+				self.datadict[sn]['specdata'][k]['dmodelflux_dx1'] = specdata[k]['m1flux']/np.sqrt(specdata[k]['specvar'])/saltpars['x1']*self.num_phot/self.num_spec #*(1-1/self.nsn)
 				self.datadict[sn]['specdata'][k]['dmodelflux_dc'] = specdata[k]['colorderiv']/np.sqrt(specdata[k]['specvar'])*self.num_phot/self.num_spec
 				self.datadict[sn]['specdata'][k]['dmodelflux_dcl'] = specdata[k]['colorlawderiv']*self.num_phot/self.num_spec
 				self.datadict[sn]['specdata'][k]['dmodelflux_dM0'] = specdata[k]['m0deriv']*self.num_phot/self.num_spec
@@ -830,7 +831,7 @@ class loglike:
 		x0,x1,c,tpkoff = \
 			x[self.parlist == 'x0_%s'%sn][0],x[self.parlist == 'x1_%s'%sn][0],\
 			x[self.parlist == 'c_%s'%sn][0],x[self.parlist == 'tpkoff_%s'%sn][0]
-		x1 -= np.mean(x[self.ix1])
+		#x1 -= np.mean(x[self.ix1])
 		if self.fix_t0: tpkoff = 0
 
 		#Calculate spectral model
@@ -867,10 +868,10 @@ class loglike:
 			specvar=(specdata[k]['fluxerr']**2.)# + (1e-3*specdata[k]['modelflux'])**2.)
 
 			if self.lsqfit:
-				loglikes = -(specdata[k]['modelflux']-specdata[k]['flux'])/np.sqrt(specvar)*self.num_phot/self.num_spec
+				loglikes = -(specdata[k]['flux']-specdata[k]['modelflux'])/np.sqrt(specvar)*self.num_phot/self.num_spec
 				loglike = np.append(loglike,loglikes)
 			else:
-				loglike += (np.sum(-(specdata[k]['modelflux']-specdata[k]['flux'])**2./specvar/2.+np.log(1/(np.sqrt(2*np.pi)*specvar)))) *self.num_phot/self.num_spec
+				loglike += (np.sum(-(specdata[k]['flux']-specdata[k]['modelflux'])**2./specvar/2.+np.log(1/(np.sqrt(2*np.pi)*specvar)))) *self.num_phot/self.num_spec
 
 				
 		if timeit: self.tdelt1 += time.time() - tstart
@@ -1025,7 +1026,7 @@ class loglike:
 		for k in self.datadict.keys():
 			tpk_init = self.datadict[k]['photdata']['mjd'][0] - self.datadict[k]['photdata']['tobs'][0]
 			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k],
-							  'x1':x[self.parlist == 'x1_%s'%k] - np.mean(x[self.ix1]),
+							  'x1':x[self.parlist == 'x1_%s'%k],# - np.mean(x[self.ix1]),
 							  'c':x[self.parlist == 'c_%s'%k],
 							  'tpkoff':x[self.parlist == 'tpkoff_%s'%k],
 							  'x0err':x[self.parlist == 'x0_%s'%k],
@@ -1141,7 +1142,7 @@ class loglike:
 		for k in self.datadict.keys():
 			tpk_init = self.datadict[k]['photdata']['mjd'][0] - self.datadict[k]['photdata']['tobs'][0]
 			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k,nburn:].mean(),
-							  'x1':x[self.parlist == 'x1_%s'%k,nburn:].mean() - x[self.ix1,nburn:].mean(),
+							  'x1':x[self.parlist == 'x1_%s'%k,nburn:].mean(),# - x[self.ix1,nburn:].mean(),
 							  'c':x[self.parlist == 'c_%s'%k,nburn:].mean(),
 							  'tpkoff':x[self.parlist == 'tpkoff_%s'%k,nburn:].mean(),
 							  'x0err':x[self.parlist == 'x0_%s'%k,nburn:].std(),
@@ -1679,7 +1680,7 @@ class GaussNewton(loglike):
 		print(warning)
 		self.warnings.append(warning)
 		
-	def convergence_loop(self,guess,loop_niter=3):
+	def convergence_loop(self,guess,loop_niter=5):
 		lastResid = 1e20
 
 		print('Initializing')
@@ -1768,6 +1769,7 @@ class GaussNewton(loglike):
 			  np.mean(X[self.ix1]),np.std(X[self.ix1]),
 			  np.sum(components[0][0,:]),np.sum(components[1][0,:]))
 
+		#print('hack!')
 		Xtmp = copy.deepcopy(X)
 		Xtmp,chi2_all = self.process_fit(Xtmp,fit='all')
 		self.compute_derivatives = True
@@ -1903,7 +1905,7 @@ class GaussNewton(loglike):
 			#Jf[j,self.parlist == 'tpkoff_%s'%sn] = dmodelflux_dtpkoff[j]
 		Jft =  Jf.T
 		tmp = np.dot(np.dot(pinv(np.dot(Jft,Jf)),Jft),r).reshape(self.npar)
-		#import pdb; pdb.set_trace()
+
 		X += tmp
 		print('priors: M0 B abs mag, mean x1, x1 std, M0 start, M1 start')
 		components = self.SALTModel(X)
