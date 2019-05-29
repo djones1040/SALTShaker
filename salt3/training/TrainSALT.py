@@ -277,6 +277,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		#plt.ion()
 		
 		from salt3.validation import ValidateLightCurves
+		from salt3.validation import ValidateSpectra
 		from salt3.validation import ValidateModel
 
 		x0,x1,c,t0 = np.loadtxt('%s/salt3train_snparams.txt'%outputdir,unpack=True,usecols=[1,2,3,4])
@@ -285,6 +286,9 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		ValidateModel.main(
 			'%s/spectralcomp.png'%outputdir,
 			outputdir)
+
+		ValidateSpectra.compareSpectra(self.options.speclist,
+									   self.options.outputdir)
 		
 		snfiles = np.genfromtxt(self.options.snlist,dtype='str')
 		snfiles = np.atleast_1d(snfiles)
