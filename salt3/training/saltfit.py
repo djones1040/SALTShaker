@@ -654,7 +654,11 @@ class loglike:
 # 			# easy ones first
 # 			# d(modelflux)/d(x0), d(modelflux)/d(x1)
 # 			self.datadict[sn]['photdata']['dmodelflux_dx0'] = photdata['modelflux']/np.sqrt(photdata['fluxvar'])/saltpars['x0']
+<<<<<<< HEAD
 # 			self.datadict[sn]['photdata']['dmodelflux_dx1'] = photdata['m1flux']/np.sqrt(photdata['fluxvar'])/saltpars['x1'] #*(1-1/self.nsn)
+=======
+# 			self.datadict[sn]['photdata']['dmodelflux_dx1'] = photdata['m1flux']/np.sqrt(photdata['fluxvar'])/saltpars['x1']*(1-1/self.nsn)
+>>>>>>> 612fd6859a07da78a7baed58d986167fb1a9dd58
 # 															  
 # 			# derivative of the x1 RMS prior
 # 			
@@ -670,7 +674,11 @@ class loglike:
 # 
 # 			for k in specdata.keys():
 # 				self.datadict[sn]['specdata'][k]['dmodelflux_dx0'] = specdata[k]['modelflux']/np.sqrt(specdata[k]['specvar'])/saltpars['x0']*self.num_phot/self.num_spec
+<<<<<<< HEAD
 # 				self.datadict[sn]['specdata'][k]['dmodelflux_dx1'] = specdata[k]['m1flux']/np.sqrt(specdata[k]['specvar'])/saltpars['x1']*self.num_phot/self.num_spec #*(1-1/self.nsn)
+=======
+# 				self.datadict[sn]['specdata'][k]['dmodelflux_dx1'] = specdata[k]['modelflux']/np.sqrt(specdata[k]['specvar'])/saltpars['x1']*(1-1/self.nsn)*self.num_phot/self.num_spec
+>>>>>>> 612fd6859a07da78a7baed58d986167fb1a9dd58
 # 				self.datadict[sn]['specdata'][k]['dmodelflux_dc'] = specdata[k]['colorderiv']/np.sqrt(specdata[k]['specvar'])*self.num_phot/self.num_spec
 # 				self.datadict[sn]['specdata'][k]['dmodelflux_dcl'] = specdata[k]['colorlawderiv']*self.num_phot/self.num_spec
 # 				self.datadict[sn]['specdata'][k]['dmodelflux_dM0'] = specdata[k]['m0deriv']*self.num_phot/self.num_spec
