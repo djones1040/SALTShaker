@@ -38,8 +38,15 @@ set_key=SNLCINP VERSION_PHOTOMETRY SALT3TEST_SIMPLE
     SNLCINP KCOR_FILE kcor/kcor_PS1_LOWZ_COMBINED.fits
     FITINP FILTLIST_FIT bcdeghi
 
-[cosmology]
+[getmu]
+pro=SALT2mu.exe
+baseinput=SALT2mu.default
+outinput=pipelinetest/test_salt2mu.input
+prooptions=
+set_key=file ps1sim_default.fitres
+    prefix test_salt2mu
+
+[cosmofit]
 pro=wfit.exe
-baseinput=[SAMPLE_COSMO_INPUT]
-outinput=[TEST_COSMO_INPUT]
-set_key=[KEY] [VALUE]
+outinput=test.M0DIF
+prooptions= -ompri 0.3 -dompri 0.01
