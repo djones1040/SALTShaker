@@ -63,9 +63,10 @@ class TrainSALT(TrainSALTBase):
 
 		init_options['phasesplineres'] = self.options.error_snake_phase_binsize
 		init_options['wavesplineres'] = self.options.error_snake_wave_binsize
-		errphaseknotloc,errwaveknotloc = init_errs(
-			self.options.inithsiaofile,salt2file,self.options.initbfilt,**init_options)
-		
+		#errphaseknotloc,errwaveknotloc = init_errs(
+		#	self.options.inithsiaofile,salt2file,self.options.initbfilt,**init_options)
+		errphaseknotloc = np.array([-20., -20., -20., -20.,-3.52941176, 0.58823529,   4.70588235,   8.82352941,        12.94117647,  17.05882353,  21.17647059,  25.29411765,        29.41176471,  85.        ,  85.        ,  85.        ,85.]) 
+		errwaveknotloc = np.array([ 1000.,  1000.,  1000.,  1000.,  3600.,  4000.,  4400.,  4800., 5200.,  5600.,  6000.,  6400.,  6800.,  7200., 25000., 25000., 25000., 25000.])
 		# number of parameters
 		n_phaseknots,n_waveknots = len(phaseknotloc)-4,len(waveknotloc)-4
 		n_errphaseknots,n_errwaveknots = len(errphaseknotloc)-4,len(errwaveknotloc)-4
