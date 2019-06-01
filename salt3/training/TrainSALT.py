@@ -287,6 +287,10 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		ValidateModel.main(
 			'%s/spectralcomp.png'%outputdir,
 			outputdir)
+		ValidateModel.m0m1_chi2(
+			'%s/spectralcomp_chi2.png'%outputdir,
+			outputdir)
+
 
 		ValidateSpectra.compareSpectra(self.options.speclist,
 									   self.options.outputdir)
