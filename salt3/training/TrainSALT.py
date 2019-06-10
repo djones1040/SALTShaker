@@ -292,8 +292,9 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			outputdir)
 
 
-		ValidateSpectra.compareSpectra(self.options.speclist,
-									   self.options.outputdir)
+		if self.options.speclist:
+			ValidateSpectra.compareSpectra(self.options.speclist,
+										   self.options.outputdir)
 		
 		snfiles = np.genfromtxt(self.options.snlist,dtype='str')
 		snfiles = np.atleast_1d(snfiles)
