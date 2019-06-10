@@ -108,14 +108,14 @@ def mkModelPlot(salt3dir='modelfiles/salt3'):
 						 salt2m1flux_0-salt2m1fluxerr_0+spacing*i,
 						 salt2m1flux_0+salt2m1fluxerr_0+spacing*i,
 						 color='b',alpha=0.5)
-		m1scale = np.mean(np.abs(salt2m1flux_0))/np.mean(np.abs(salt3m1flux_0))
+		m1scale = np.mean(np.abs(salt2m1flux_0[(salt2m1wave > 4000) & (salt2m1wave < 7000)]))/np.mean(np.abs(salt3m1flux_0[(salt3m1wave > 4000) & (salt3m1wave < 7000)]))
 		ax2.plot(salt3m1wave,salt3m1flux_0*m1scale+spacing*i,color='r',label='SALT3')
 		#ax2.fill_between(salt3m1wave,
 		#				 salt3m1flux_0-salt3m1fluxerr_0+spacing*i,
 		#				 salt3m1flux_0+salt3m1fluxerr_0+spacing*i,
 		#				 color='r',alpha=0.5)
 		ax2.set_xlim([2500,9200])
-		ax2.set_ylim([-0.05,0.4])
+		ax2.set_ylim([-0.05,0.39])
 
 		ax2.text(9100,spacing*(i+0.2),'%s'%plotphasestr,ha='right')
 		
