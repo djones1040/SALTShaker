@@ -208,15 +208,15 @@ class loglike:
 			for i in range(len(self.phase)):
 				self.datadict[sn]['mwextcurve'][i,:] = 10**(-0.4*extinction.fitzpatrick99(self.wave*(1+z),self.datadict[sn]['MWEBV']*3.1))
 
-			self.num_spec+=sum([specdata[k]['flux'].size for key in specdata])
+			self.num_spec += sum([specdata[key]['flux'].size for key in specdata])
 
 			for flt in np.unique(photdata['filt']):
 				self.num_phot+=(photdata['filt']==flt).sum()
-		
+
 		#Store derivatives of a spline with fixed knot locations with respect to each knot value
 		starttime=time.time()
 		self.spline_derivs=[ bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,3,3)) for i in range(self.im0.size)]
-		print('Time to calculate spline_derivs: ',time.time()-starttime)
+		print('Time to calculate spline_derivs: %.2f'%(time.time()-starttime))
 		
 		self.getobswave()
 
@@ -395,16 +395,69 @@ class loglike:
 		logpriorV = norm.logpdf(colorLaw(_V_LAMBDA_EFF)[0], 0.921, 0.02)
 		return logpriorB + logpriorV
 	
-	def specmodelvalsforSN(self,x,sn,specdata,intspecerr1d,int1dM0part,int1dM1part,
-						   obswave,colorexp,colorlaw,snpars,z,obsphase,M0,components):
-		x0,x1,c,tpkoff = snpars
-		snresult={}
+	def specmodelvalsforSN(self,x,sn,components,colorLaw,computeDerivatives,bsorder=3):
+		#self,x,sn,specdata,intspecerr1d,int1dM0part,int1dM1part,
+		#				   obswave,colorexp,colorlaw,snpars,z,obsphase,M0,components):
+
+		if self.n_components == 1:
+			M0 = copy.deepcopy(components[0])
+		elif self.n_components == 2:
+			M0,M1 = copy.deepcopy(components)
+		
+		resultsdict={}
+		z = self.datadict[sn]['zHelio']
+		survey = self.datadict[sn]['survey']
+		filtwave = self.kcordict[survey]['filtwave']
+		obswave = self.datadict[sn]['obswave']
+		obsphase = self.datadict[sn]['obsphase']
+		specdata = self.datadict[sn]['specdata']
+		pbspl = self.datadict[sn]['pbspl']
+		dwave = self.datadict[sn]['dwave']
+		idx = self.datadict[sn]['idx']
+		nspecdata = sum([specdata[key]['flux'].size for key in specdata])
+		
+		intspecerr1d = interp1d(obsphase,self.salterr,axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
+		
+		x0,x1,c,tpkoff = x[self.parlist == 'x0_%s'%sn],x[self.parlist == 'x1_%s'%sn],\
+						 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
+		clpars = x[self.parlist == 'cl']
+		#x1 = x1 - np.mean(x[self.ix1])
+		
+		#Calculate spectral model
+		M0 *= self.datadict[sn]['mwextcurve']
+		M1 *= self.datadict[sn]['mwextcurve']
+		
+		if colorLaw:
+			colorlaw = -0.4 * colorLaw(self.wave)
+			colorexp = 10. ** (colorlaw * c)
+			M0 *= colorexp; M1 *= colorexp
+			
+		M0 *= _SCALE_FACTOR/(1+z); M1 *= _SCALE_FACTOR/(1+z)
+		int1dM0 = interp1d(obsphase,M0,axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
+		int1dM1 = interp1d(obsphase,M1,axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
+
+		resultsdict={}
+		resultsdict['modelflux'] = np.zeros(nspecdata)
+		resultsdict['dataflux'] = np.zeros(nspecdata)
+		resultsdict['uncertainty'] =  np.zeros(nspecdata)
+		if computeDerivatives:
+			resultsdict['dmodelflux_dx0'] = np.zeros((nspecdata,1))
+			resultsdict['dmodelflux_dx1'] = np.zeros((nspecdata,1))
+			resultsdict['dmodelflux_dc']  = np.zeros((nspecdata,1))
+			resultsdict['dmodelflux_dM0'] = np.zeros([nspecdata,len(self.im0)])
+			resultsdict['dmodelflux_dM1'] = np.zeros([nspecdata,len(self.im1)])
+			resultsdict['dmodelflux_dcl'] = np.zeros([nspecdata,self.n_colorpars])
+
+
+		iSpecStart = 0
 		for k in specdata.keys():
+			#import pdb; pdb.set_trace()
+			SpecLen = specdata[k]['flux'].size
 			phase=specdata[k]['tobs']+tpkoff
 			#saltfluxinterp = int1d(phase)
-			M0interp = int1dM0part(phase)
-			M1interp = int1dM1part(phase)
-			saltfluxinterp = x0*(M0interp + x1*M1interp)
+			M0interp = int1dM0(phase)
+			M1interp = int1dM1(phase)
+
 			#Check spectrum is inside proper phase range, extrapolate decline if necessary
 			if phase < obsphase.min():
 				pass
@@ -415,94 +468,141 @@ class loglike:
 			coeffs=x[self.parlist=='specrecal_{}_{}'.format(sn,k)]
 			coeffs/=factorial(np.arange(len(coeffs)))
 			recalexp = np.exp(np.poly1d(coeffs)((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal))
-			
-			
-			saltfluxinterp = np.interp(specdata[k]['wavelength'],obswave,saltfluxinterp[0])*recalexp
+
+
 			M0interp = np.interp(specdata[k]['wavelength'],obswave,M0interp[0])*recalexp
 			M1interp = np.interp(specdata[k]['wavelength'],obswave,M1interp[0])*recalexp
 			colorexpinterp = np.interp(specdata[k]['wavelength'],obswave,colorexp)
 			colorlawinterp = np.interp(specdata[k]['wavelength'],obswave,colorlaw)
 
+			#modulatedFlux = np.interp(specdata[k]['wavelength'],obswave,modulatedFlux[0])*recalexp
+			modulatedFlux = x0*(M0interp + x1*M1interp)*recalexp
+			
+			resultsdict['modelflux'][iSpecStart:iSpecStart+SpecLen] = modulatedFlux
+			resultsdict['dataflux'][iSpecStart:iSpecStart+SpecLen] = specdata[k]['flux']
+
+			
 			modelerr = np.interp( specdata[k]['wavelength'],obswave,intspecerr1d(phase)[0])
 			specvar=(specdata[k]['fluxerr']**2.) # + (1e-3*saltfluxinterp)**2.)
-			self.datadict[sn]['specdata'][k]['specvar'] = specvar + (modelerr*saltfluxinterp)**2
+			resultsdict['uncertainty'][iSpecStart:iSpecStart+SpecLen] = specvar + (modelerr*resultsdict['modelflux'][iSpecStart:iSpecStart+SpecLen])**2
+			#resultsdict['resids']
+			#self.datadict[sn]['specdata'][k]['specvar']
 			
 			# derivatives....
-			if self.compute_derivatives and self.updateDerivatives:
-				self.datadict[sn]['specdata'][k]['colorderiv'] = np.zeros(len(specdata[k]['flux']))
-				self.datadict[sn]['specdata'][k]['colorlawderiv'] = np.zeros([len(specdata[k]['flux']),self.n_colorpars])
-				self.datadict[sn]['specdata'][k]['m0deriv'] = np.zeros([len(specdata[k]['flux']),len(self.im0)])
-				self.datadict[sn]['specdata'][k]['m1deriv'] = np.zeros([len(specdata[k]['flux']),len(self.im1)])
+			if computeDerivatives:
+				#self.datadict[sn]['specdata'][k]['colorderiv'] = np.zeros(len(specdata[k]['flux']))
+				#self.datadict[sn]['specdata'][k]['colorlawderiv'] = np.zeros([len(specdata[k]['flux']),self.n_colorpars])
+				#self.datadict[sn]['specdata'][k]['m0deriv'] = np.zeros([len(specdata[k]['flux']),len(self.im0)])
+				#self.datadict[sn]['specdata'][k]['m1deriv'] = np.zeros([len(specdata[k]['flux']),len(self.im1)])
 				
 				# color
-				ctmp = c + 1e-3
-				modelfluxtmp = (M0interp+M1interp)/colorexpinterp*10.**(colorlawinterp * ctmp)
-				colorderivflux = (modelfluxtmp-saltfluxinterp)/1e-3
-				self.datadict[sn]['specdata'][k]['colorderiv'] = colorderivflux
+				#ctmp = c + 1e-3
+				#modelfluxtmp = (M0interp+M1interp)/colorexpinterp*10.**(colorlawinterp * ctmp)
+				#colorderivflux = (modelfluxtmp-saltfluxinterp)/1e-3
+				#self.datadict[sn]['specdata'][k]['colorderiv'] = colorderivflux
 
+				#import pdb; pdb.set_trace()
+				resultsdict['dmodelflux_dc'][iSpecStart:iSpecStart+SpecLen,0] = x0*(M0interp + x1*M1interp)*np.log(10)*colorlawinterp
+				resultsdict['dmodelflux_dx0'][iSpecStart:iSpecStart+SpecLen,0] = (M0interp + x1*M1interp)
+				resultsdict['dmodelflux_dx1'][iSpecStart:iSpecStart+SpecLen,0] = x0*M1interp
+
+				
 				# color law
 				for i in range(self.n_colorpars):
-					x[self.iCL[i]] += 1e-3
-					colorlawtmp = SALT2ColorLaw(self.colorwaverange, x[self.iCL])
-					modelfluxtmp = (M0interp+M1interp)/colorexpinterp*10.**(-0.4 * colorlawtmp(specdata[k]['wavelength']) * c)*recalexp
-					self.datadict[sn]['specdata'][k]['colorlawderiv'][:,i] = (modelfluxtmp-saltfluxinterp)/1e-3/np.sqrt(specvar)
-					x[self.iCL[i]] -= 1e-3
+					#x[self.iCL[i]] += 1e-3
+					#colorlawtmp = SALT2ColorLaw(self.colorwaverange, x[self.iCL])
+					#modelfluxtmp = (M0interp+M1interp)/colorexpinterp*10.**(-0.4 * colorlawtmp(specdata[k]['wavelength']) * c)*recalexp
+					#self.datadict[sn]['specdata'][k]['colorlawderiv'][:,i] = (modelfluxtmp-saltfluxinterp)/1e-3/np.sqrt(specvar)
+					#x[self.iCL[i]] -= 1e-3
+					dcolorlaw_dcli = SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)
+					resultsdict['dmodelflux_dcl'][iSpecStart:iSpecStart+SpecLen,i] = modulatedFlux*-0.4*np.log(10)*c*dcolorlaw_dcli(specdata[k]['wavelength']/(1+z))
 
-				# M0, M1
-				for j in range(len(self.im0)):
-					M0deriv = M0derivinterp[j](phase/(1+z))[0]
-					# warning : ignoring changes in tpkoff for derivatives
-					M0derivinterp2 = np.interp(specdata[k]['wavelength'],obswave,M0deriv)*_SCALE_FACTOR/(1+z)*x0*recalexp*colorexpinterp
-					M1deriv = M1derivinterp[j](phase/(1+z))[0]
-					M1derivinterp2 = np.interp(specdata[k]['wavelength'],obswave,M1deriv)*_SCALE_FACTOR/(1+z)*x0*x1*recalexp*colorexpinterp
-
-					#xtmp = copy.deepcopy(x)
-					#xtmp[j] += 1.0e-3
-					#modcomp = self.SALTModel(xtmp)
-					#M0deriv = (modcomp[0] - components[0])/(xtmp[j]-x[j])
-					#M0derivinterp = interp1d(obsphase,M0deriv,axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
-					#M0derivinterp2 = np.interp(specdata[k]['wavelength'],obswave,M0deriv)
-					#import pdb; pdb.set_trace()
 					
-					self.datadict[sn]['specdata'][k]['m0deriv'][:,j] = M0derivinterp2/np.sqrt(specvar)
-					self.datadict[sn]['specdata'][k]['m1deriv'][:,j] = M1derivinterp2/np.sqrt(specvar)
-					#if np.sum(M0derivinterp2) != 0:
-					#	import pdb; pdb.set_trace()
-					#M0derivsum = np.sum(pbspl[flt]*M0deriv*colorexp, axis=1)*dwave*self.fluxfactor[survey][flt]*_SCALE_FACTOR/(1+z)*x0
-					#self.datadict[sn]['photdata']['m0deriv'][selectFilter,j] = M0derivsum/np.sqrt(photdata['fluxvar'][selectFilter])
+				# M0, M1
+				if self.computePCs:
+					for j in range(len(self.im0)):
+						#Range of wavelength and phase values affected by changes in knot i
+						waverange=self.waveknotloc[[i%(self.waveknotloc.size-bsorder-1),i%(self.waveknotloc.size-bsorder-1)+bsorder+1]]
+						phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-bsorder-1),i//(self.waveknotloc.size-bsorder-1)+bsorder+1]]
+						#Check if this spectrum is inside values affected by changes in knot i
+						if waverange[0]*(1+z) > specdata[k]['wavelength'].min() or waverange[1]*(1+z) < specdata[k]['wavelength'].max():
+							pass
+						#Check which phases are affected by knot i
+						inPhase=(phase>phaserange[0]*(1+z) ) & (phase<phaserange[1]*(1+z) )
+						if inPhase.any():
+							#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
+							#Integrate only over wavelengths within the relevant range
+							inbounds=(self.wave[idx[flt]]>waverange[0])	 & (self.wave[idx[flt]]<waverange[1])
+							derivInterp = interp1d(phase/(1+z),self.spline_derivs[i][:,inbounds],axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
+							derivInterp2 = np.interp(specdata[k]['wavelength'],obswave,derivInterp)*_SCALE_FACTOR/(1+z)*x0*recalexp*colorexpinterp
+							
+							resultsdict['dmodelflux_dM0'][iSpecStart:iSpecStart+SpecLen,j] = derivInterp2 #*intmult
+							
+							#Dependence is the same for dM1, except with an extra factor of x1
+							resultsdict['dmodelflux_dM1'][iSpecStart:iSpecStart+SpecLen,i] =  resultsdict['dmodelflux_dM0'][iSpecStart:iSpecStart+speclen,i]*x1
+					
+					if ( (phase>obsphase.max())).any():
+						if phase > obsphase.max():
+							resultsdict['dmodelflux_dM0'][iSpecStart:iSpecStart+SpecLen,:] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
+							resultsdict['dmodelflux_dM1'][iSpecStart:iSpecStart+SpecLen,:] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
+
+						
+						#M0deriv = M0derivinterp[j](phase/(1+z))[0]
+						# warning : ignoring changes in tpkoff for derivatives
+						#M0derivinterp2 = np.interp(specdata[k]['wavelength'],obswave,M0deriv)*_SCALE_FACTOR/(1+z)*x0*recalexp*colorexpinterp
+						#M1deriv = M1derivinterp[j](phase/(1+z))[0]
+						#M1derivinterp2 = np.interp(specdata[k]['wavelength'],obswave,M1deriv)*_SCALE_FACTOR/(1+z)*x0*x1*recalexp*colorexpinterp
+
+						#resultsdict['dmodelflux_dM0'][iSpecStart:iSpecStart+speclen,j] = M0derivinterp2/np.sqrt(specvar)
+						#resultsdict['dmodelflux_dM1'][iSpecStart:iSpecStart+speclen,j] = M1derivinterp2/np.sqrt(specvar)
+						#self.datadict[sn]['specdata'][k]['m0deriv'][:,j] = M0derivinterp2/np.sqrt(specvar)
+						#self.datadict[sn]['specdata'][k]['m1deriv'][:,j] = M1derivinterp2/np.sqrt(specvar)
 
 			#intm01d = interp1d(obsphase,M0,axis=0,kind='nearest')
-			self.datadict[sn]['specdata'][k]['m1flux'] = M1interp
-			self.datadict[sn]['specdata'][k]['modelflux'] = saltfluxinterp #np.interp(specdata[k]['wavelength'],obswave,intm01d(phase/(1+z))[0])
+			#self.datadict[sn]['specdata'][k]['m1flux'] = M1interp
+			#self.datadict[sn]['specdata'][k]['modelflux'] = saltfluxinterp #np.interp(specdata[k]['wavelength'],obswave,intm01d(phase/(1+z))[0])
 			
-			self.datadict[sn]['specdata'][k]['residuals'] = (specdata[k]['modelflux']-specdata[k]['flux'])/np.sqrt(specvar)*self.num_phot/self.num_spec
+			#self.datadict[sn]['specdata'][k]['residuals'] = (specdata[k]['modelflux']-specdata[k]['flux'])/np.sqrt(specvar)*self.num_phot/self.num_spec
 			#if self.compute_derivatives: import pdb; pdb.set_trace()
 
-			self.datadict[sn]['specdata'][k]['dmodelflux_dx0'] = specdata[k]['modelflux']/np.sqrt(specvar)/x0*self.num_phot/self.num_spec
-			self.datadict[sn]['specdata'][k]['dmodelflux_dx1'] = specdata[k]['modelflux']/np.sqrt(specvar)/x1*(1-1/self.nsn)*self.num_phot/self.num_spec
-			self.datadict[sn]['specdata'][k]['dmodelflux_dc'] = specdata[k]['colorderiv']/np.sqrt(specvar)*self.num_phot/self.num_spec
-			self.datadict[sn]['specdata'][k]['dmodelflux_dcl'] = specdata[k]['colorlawderiv']*self.num_phot/self.num_spec
-			self.datadict[sn]['specdata'][k]['dmodelflux_dM0'] = specdata[k]['m0deriv']*self.num_phot/self.num_spec
-			self.datadict[sn]['specdata'][k]['dmodelflux_dM1'] = specdata[k]['m1deriv']*self.num_phot/self.num_spec
-
+			#self.datadict[sn]['specdata'][k]['dmodelflux_dx0'] = specdata[k]['modelflux']/np.sqrt(specvar)/x0*self.num_phot/self.num_spec
+			#self.datadict[sn]['specdata'][k]['dmodelflux_dx1'] = specdata[k]['modelflux']/np.sqrt(specvar)/x1*(1-1/self.nsn)*self.num_phot/self.num_spec
+			#self.datadict[sn]['specdata'][k]['dmodelflux_dc'] = specdata[k]['colorderiv']/np.sqrt(specvar)*self.num_phot/self.num_spec
+			#self.datadict[sn]['specdata'][k]['dmodelflux_dcl'] = specdata[k]['colorlawderiv']*self.num_phot/self.num_spec
+			#self.datadict[sn]['specdata'][k]['dmodelflux_dM0'] = specdata[k]['m0deriv']*self.num_phot/self.num_spec
+			#self.datadict[sn]['specdata'][k]['dmodelflux_dM1'] = specdata[k]['m1deriv']*self.num_phot/self.num_spec
+			iSpecStart += SpecLen
+		return resultsdict
 			
 	def photResidsForSN(self,x,sn,components,colorLaw,computeDerivatives,bsorder=3):
-		modeldict=self.modelvalsforSN(x,sn,components,colorLaw,computeDerivatives,bsorder)
+		modeldict=self.photmodelvalsforSN(x,sn,components,colorLaw,computeDerivatives,bsorder)
 		residsdict={key.replace('dmodelflux','dphotresid'):modeldict[key]/(modeldict['uncertainty'][:,np.newaxis]) for key in modeldict if 'modelflux' in key}
 		residsdict['photresid']=(modeldict['modelflux']-self.datadict[sn]['photdata']['fluxcal'])/modeldict['uncertainty']
 		residsdict['weights']=1/modeldict['uncertainty']
 		return residsdict
-			
+
+	def specResidsForSN(self,x,sn,components,colorLaw,computeDerivatives,bsorder=3):
+		modeldict=self.specmodelvalsforSN(x,sn,components,colorLaw,computeDerivatives,bsorder)
+
+		#residsdict = {}
+		#for key in modeldict:
+		#	if 'modelflux' in key:
+		#		import pdb; pdb.set_trace()
+		#		residsdict[key.replace('dmodelflux','dspecresid')] = modeldict[key]/(modeldict['uncertainty'][:,np.newaxis])
 		
-	def modelvalsforSN(self,x,sn,components,colorLaw,computeDerivatives,bsorder=3):
+		residsdict={key.replace('dmodelflux','dspecresid'):modeldict[key]/(modeldict['uncertainty'][:,np.newaxis])*self.num_phot/self.num_spec for key in modeldict if 'modelflux' in key}
+
+		residsdict['specresid']=(modeldict['modelflux']-modeldict['dataflux'])/modeldict['uncertainty']*self.num_phot/self.num_spec
+		residsdict['weights']=1/modeldict['uncertainty']
+		return residsdict
+	
+		
+	def photmodelvalsforSN(self,x,sn,components,colorLaw,computeDerivatives,bsorder=3):
 		if self.n_components == 1:
 			M0 = copy.deepcopy(components[0])
 		elif self.n_components == 2:
 			M0,M1 = copy.deepcopy(components)
-			#M0_interpolated = self.M0_interpolated
-			#M1_interpolated = self.M1_interpolated
 		
-		resultsdict={}
 		z = self.datadict[sn]['zHelio']
 		survey = self.datadict[sn]['survey']
 		filtwave = self.kcordict[survey]['filtwave']
@@ -534,9 +634,9 @@ class loglike:
 		int1dM1 = interp1d(obsphase,M1,axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
 
 		# spectra
-		intspecerr1d=interr1d
-		self.specmodelvalsforSN(x,sn,self.datadict[sn]['specdata'],intspecerr1d,int1dM0,int1dM1,
-								obswave,colorexp,colorlaw,(x0,x1,c,tpkoff),z,obsphase,M0,components)
+		#intspecerr1d=interr1d
+		#self.specmodelvalsforSN(x,sn,self.datadict[sn]['specdata'],intspecerr1d,int1dM0,int1dM1,
+		#						obswave,colorexp,colorlaw,(x0,x1,c,tpkoff),z,obsphase,M0,components)
 
 		resultsdict={}
 		resultsdict['modelflux'] = np.zeros(len(photdata['filt']))
@@ -593,6 +693,7 @@ class loglike:
 			
 			if computeDerivatives:
 				#d model / dc is total flux (M0 and M1 components (already modulated with passband)) times the color law and a factor of ln(10)
+				#import pdb; pdb.set_trace()
 				resultsdict['dmodelflux_dc'][selectFilter,0]=np.sum((modulatedFlux)*np.log(10)*colorlaw[np.newaxis,idx[flt]], axis=1)*dwave*self.fluxfactor[survey][flt]
 				#empderiv = np.sum((modulatedFlux/(10. ** (colorlaw * c))*10. ** (colorlaw * (c+0.001)) - modulatedFlux)/1.0e-3, axis=1)*dwave*self.fluxfactor[survey][flt]
 				#import pdb; pdb.set_trace()
@@ -621,7 +722,7 @@ class loglike:
 							#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
 							#Integrate only over wavelengths within the relevant range
 							inbounds=(self.wave[idx[flt]]>waverange[0])	 & (self.wave[idx[flt]]<waverange[1])
-							derivInterp = interp1d(obsphase,self.spline_derivs[i][:,inbounds],axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
+							derivInterp = interp1d(obsphase/(1+z),self.spline_derivs[i][:,inbounds],axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
 
 							resultsdict['dmodelflux_dM0'][np.where(selectFilter)[0][inPhase],i] =  \
 								np.sum( passbandColorExp[:,inbounds] * derivInterp(phase[inPhase]), axis=1)*\
@@ -630,36 +731,12 @@ class loglike:
 							#Dependence is the same for dM1, except with an extra factor of x1
 							resultsdict['dmodelflux_dM1'][np.where(selectFilter)[0][inPhase],i] =  resultsdict['dmodelflux_dM0'][selectFilter,i][inPhase]*x1
 					if ( (phase>obsphase.max())).any():
-						resultsdict['dmodelflux_dM0'][selectFilter,:][(phase>obsphase.max())]*= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))[(phase>obsphase.max())]
-						resultsdict['dmodelflux_dM1'][selectFilter,:][(phase>obsphase.max())]*= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))[(phase>obsphase.max())]
+						resultsdict['dmodelflux_dM0'][np.where(selectFilter)[0][(phase>obsphase.max())],:] *= \
+							10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))[(phase>obsphase.max())]
+						resultsdict['dmodelflux_dM1'][np.where(selectFilter)[0][(phase>obsphase.max())],:] *= \
+							10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))[(phase>obsphase.max())]
 			
 		return resultsdict
-
-#	def derivativesforSN(self,x,components,colorLaw):
-# 
-#		for sn in self.datadict.keys():
-#			photdata = self.datadict[sn]['photdata']
-#			specdata = self.datadict[sn]['specdata']
-#			saltpars = self.datadict[sn]['saltpars']
-# 
-#			# easy ones first
-#			# d(modelflux)/d(x0), d(modelflux)/d(x1)
-#			self.datadict[sn]['photdata']['dmodelflux_dx0'] = photdata['modelflux']/np.sqrt(photdata['fluxvar'])/saltpars['x0']
-#			self.datadict[sn]['photdata']['dmodelflux_dx1'] = photdata['m1flux']/np.sqrt(photdata['fluxvar'])/saltpars['x1']*(1-1/self.nsn)
-#															  
-#			# derivative of the x1 RMS prior
-#			
-#			# principal components...
-#			self.datadict[sn]['photdata']['dmodelflux_dM0'] = photdata['m0deriv']
-#			self.datadict[sn]['photdata']['dmodelflux_dM1'] = photdata['m1deriv']
-# 
-#			for k in specdata.keys():
-#				self.datadict[sn]['specdata'][k]['dmodelflux_dx0'] = specdata[k]['modelflux']/np.sqrt(specdata[k]['specvar'])/saltpars['x0']*self.num_phot/self.num_spec
-#				self.datadict[sn]['specdata'][k]['dmodelflux_dx1'] = specdata[k]['modelflux']/np.sqrt(specdata[k]['specvar'])/saltpars['x1']*(1-1/self.nsn)*self.num_phot/self.num_spec
-#				self.datadict[sn]['specdata'][k]['dmodelflux_dc'] = specdata[k]['colorderiv']/np.sqrt(specdata[k]['specvar'])*self.num_phot/self.num_spec
-#				self.datadict[sn]['specdata'][k]['dmodelflux_dcl'] = specdata[k]['colorlawderiv']*self.num_phot/self.num_spec
-#				self.datadict[sn]['specdata'][k]['dmodelflux_dM0'] = specdata[k]['m0deriv']*self.num_phot/self.num_spec
-#				self.datadict[sn]['specdata'][k]['dmodelflux_dM1'] = specdata[k]['m1deriv']*self.num_phot/self.num_spec
 
 
 	def derivativesforPrior(self,x,components,colorLaw):
@@ -733,7 +810,7 @@ class loglike:
 
 		if args: empty,sn,x,components,salterr,colorLaw,colorScat,debug = args[:]
 		x = np.array(x)
-
+		
 		#Set up SALT model
 		if components is None:
 			components = self.SALTModel(x)
@@ -742,6 +819,17 @@ class loglike:
 		if self.n_components == 1: M0 = copy.deepcopy(components[0])
 		elif self.n_components == 2: M0,M1 = copy.deepcopy(components)
 
+		photResidsDict = self.photResidsForSN(x,sn,components,colorLaw,False,bsorder=3)
+		specResidsDict = self.specResidsForSN(x,sn,components,colorLaw,False,bsorder=3)
+		
+		if self.lsqfit:
+			loglike=-1*np.append(photResidsDict['photresid'],specResidsDict['specresid'])
+			#loglike = np.append(loglike,loglikes)
+		else:
+			loglike=-1*((photResidsDict['photresid']**2.).sum() + (specResidsDict['specresid']**2.).sum())
+		#import pdb; pdb.set_trace()
+			
+		return loglike
 		
 		#Declare variables
 		if timeit: tstartinit = time.time()
@@ -776,7 +864,7 @@ class loglike:
 		saltflux *= _SCALE_FACTOR/(1+z)
 
 
-		modeldict=self.modelvalsforSN(x,sn,components,colorLaw,False,3)
+		modeldict=self.photmodelvalsforSN(x,sn,components,colorLaw,False,3)
 		
 		if self.lsqfit: loglike = np.array([])
 		else: loglike = 0
@@ -1614,7 +1702,7 @@ class GaussNewton(loglike):
 		print(warning)
 		self.warnings.append(warning)
 		
-	def convergence_loop(self,guess,loop_niter=1):
+	def convergence_loop(self,guess,loop_niter=10):
 		lastResid = 1e20
 
 		print('Initializing')
@@ -1669,19 +1757,33 @@ class GaussNewton(loglike):
 
 		idx = 0
 		for sn in self.datadict.keys():
-			residsdict=self.photResidsForSN(guess,sn,components,colorLaw,computeDerivatives)
-			idxp = residsdict['photresid'].size
+			photresidsdict=self.photResidsForSN(guess,sn,components,colorLaw,computeDerivatives)
+			idxp = photresidsdict['photresid'].size
 
-			residuals[idx:idx+idxp] = residsdict['photresid']
+			residuals[idx:idx+idxp] = photresidsdict['photresid']
 			if computeDerivatives:
-				jacobian[idx:idx+idxp,self.parlist=='cl'] = residsdict['dphotresid_dcl']
-				jacobian[idx:idx+idxp,self.parlist=='m0'] = residsdict['dphotresid_dM0']
-				jacobian[idx:idx+idxp,self.parlist=='m1'] = residsdict['dphotresid_dM1']
+				jacobian[idx:idx+idxp,self.parlist=='cl'] = photresidsdict['dphotresid_dcl']
+				jacobian[idx:idx+idxp,self.parlist=='m0'] = photresidsdict['dphotresid_dM0']
+				jacobian[idx:idx+idxp,self.parlist=='m1'] = photresidsdict['dphotresid_dM1']
 
 				for snparam in ('x0','x1','c'): #tpkoff should go here
-					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = residsdict['dphotresid_d{}'.format(snparam)]
+					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = photresidsdict['dphotresid_d{}'.format(snparam)]
 			idx += idxp
 
+			specresidsdict=self.specResidsForSN(guess,sn,components,colorLaw,computeDerivatives)
+			idxp = specresidsdict['specresid'].size
+
+			residuals[idx:idx+idxp] = specresidsdict['specresid']
+			if computeDerivatives:
+				jacobian[idx:idx+idxp,self.parlist=='cl'] = specresidsdict['dspecresid_dcl']
+				jacobian[idx:idx+idxp,self.parlist=='m0'] = specresidsdict['dspecresid_dM0']
+				jacobian[idx:idx+idxp,self.parlist=='m1'] = specresidsdict['dspecresid_dM1']
+
+				for snparam in ('x0','x1','c'): #tpkoff should go here
+					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = specresidsdict['dspecresid_d{}'.format(snparam)]
+			idx += idxp
+
+			
 #			for k in specdata.keys():
 #				idxp = len(specdata[k]['flux'])
 #				if fit == 'all' or fit == 'colorlaw':
@@ -1787,9 +1889,9 @@ class GaussNewton(loglike):
 			includePars=np.zeros(self.npar,dtype=bool)
 			if fit=='components':
 				includePars[self.im0]=True
-				includePars[self.im1]=False
+				includePars[self.im1]=True
 			elif fit=='sn':
-				print('hack: x0 only')
+				#print('hack: x0 only')
 				includePars[self.ix0]=True
 				includePars[self.ix1]=True
 			elif fit=='color':
@@ -1803,7 +1905,8 @@ restricted parameter set has not been implemented: {}""".format(fit))
 		jacobian=jacobian[:,includePars]
 		stepsize = np.dot(np.dot(pinv(np.dot(jacobian.T,jacobian)),jacobian.T),
 						  residuals.reshape(residuals.size,1)).reshape(includePars.sum())
-		
+
+
 		X[includePars] -= stepsize
 		
 		print('priors: M0 B abs mag, mean x1, x1 std, M0 start, M1 start')
