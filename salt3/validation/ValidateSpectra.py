@@ -50,7 +50,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 			coeffs=pars[parlist=='specrecal_{}_{}'.format(sn,k)]
 			coeffs/=factorial(np.arange(len(coeffs)))
 			wave=specdata[k]['wavelength']
-			print(coeffs)
+			#print(coeffs)
 			modelFlux = model.flux(specdata[k]['tobs'],wave)*np.exp(np.poly1d(coeffs)((wave-np.mean(wave))/2500))
 			unncalledModel=model.flux(specdata[k]['tobs'],wave)
 
@@ -59,14 +59,15 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 			ax = plt.subplot(3,1,axcount % 3 + 1)
 			
 			#ax.clf()
-			ax.plot(wave,modelFlux,'r-',label='Model spectrum')
+			if len(coeffs): ax.plot(wave,modelFlux,'r-',label='Model spectrum')
 			ax.plot(wave,specdata[k]['flux'],'b-',label='Spectral data')
-			ax.plot(wave,unncalledModel,'g-',label='Model spectrum (no calibration)')
+			ax.plot(wave,unncalledModel,'g-',label='SALT3 Model spectrum\n(no calibration)')
 			ax.set_xlim(wave.min(),wave.max())
-			ax.set_ylim(0,max(modelFlux.max(),specdata[k]['flux'].max())*1.25)
+			#ax.set_ylim(0,max(modelFlux.max(),specdata[k]['flux'].max())*1.25)
+			ax.set_ylim(0,specdata[k]['flux'].max()*1.25)
 			ax.set_xlabel('Wavelength $\AA$')
 			ax.set_ylabel('Flux')
-			ax.legend()
+			ax.legend(loc='upper right',prop={'size':8})
 			#plt.savefig('{}/speccomp_{}_{}.png'.format(outdir,sn,k),dpi=288)
 			axcount += 1
 
