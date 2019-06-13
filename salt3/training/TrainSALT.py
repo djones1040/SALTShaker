@@ -13,15 +13,17 @@ from scipy.linalg import lstsq
 from salt3.util import snana,readutils
 from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
 from scipy.optimize import minimize, least_squares, differential_evolution
-from salt3.training.saltfit import fitting
+
 from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs, init_errs_fromfile
-from salt3.training import saltfit
 from salt3.training.base import TrainSALTBase
 from salt3.initfiles import init_rootdir
 from salt3.util.txtobj import txtobj
 from astropy.io import fits
 from astropy.cosmology import Planck15 as cosmo
 from sncosmo.constants import HC_ERG_AA
+
+from salt3.training.saltfit import fitting
+from salt3.training import saltfit as saltfit
 
 class TrainSALT(TrainSALTBase):
 	def __init__(self):
