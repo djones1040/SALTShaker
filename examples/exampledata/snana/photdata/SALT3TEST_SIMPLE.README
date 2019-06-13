@@ -3,11 +3,11 @@
  BRIEF_DESCRIPTION: simulate RANDOM SNe with GENMODEL = SALT2.JLA-B14 
 
   HOST MACHINE: (null) 
-  USERNAME:  david 
+  USERNAME:  David 
   SNDATA_ROOT:  /usr/local/SNDATA_ROOT 
-  SNANA_DIR:     /usr/local/SNANA_CURRENT 
-  SNANA_VERSION: v10_67e 
-  Current Dir:  /Users/david/Dropbox/research/SALT3/examples/exampledata/snana 
+  SNANA_DIR:     /usr/local/SNANA 
+  SNANA_VERSION: v10_71k 
+  Current Dir:  /Users/David/Dropbox/research/SALT3/examples/exampledata/snana 
 
  PERFECT LIGHTCURVES REQUESTED: 
 	 MWEBV_FLAG                   : 1 -> 0 
@@ -34,7 +34,7 @@
 	 Generation VERSION: SALT3TEST_SIMPLE 
 	 Generation source : RANDOM 
 	 Generation FILTERS: bcdeghijlmnopqrsuvwxyzACDEFHIJK 
-	 KCOR lookup tables: /usr/local/SNDATA_ROOT/kcor/PS1/Pantheon/kcor_PS1_LOWZ_COMBINED.fits 
+	 KCOR lookup tables: kcor/kcor_SPEC_PS1_LOWZ_COMBINED.fits 
 	 Flux-smearing is OFF 
 	 Reported flux-uncertainty includes SKY+GALAXY+SOURCE
 	 Zeropt-smearing is OFF 
@@ -72,7 +72,7 @@
 	 RISETIME-SHIFT(days) SIGMA(lo,hi) : 0.0 , 0.0  (Mean= 0.0) 
 	 FALLTIME-SHIFT(days) SIGMA(lo,hi) : 0.0 , 0.0  (Mean= 0.0) 
 	 Shape-par(x1): Peak=0.55  SIG-+= 1.000,0.450  SKEW=0.00,0.00  BND=-5.00,4.00
-	 SALT2c: Peak=0.00  SIG-+= 0.000,0.000  SKEW=0.00,0.00  BND=0.00,0.00
+	 SALT2c: Peak=0.00  SIG-+= 0.100,0.100  SKEW=0.00,0.00  BND=-0.30,0.30
 	 Alpha : Peak=0.17  SIG-+= 0.000,0.000  SKEW=0.00,0.00  BND=0.00,0.40
 	 Beta  : Peak=3.03  SIG-+= 0.000,0.000  SKEW=0.00,0.00  BND=0.50,9.90
 
@@ -87,10 +87,10 @@
 
   AVWARP_OVERFLOWS:  NONE. 
 
- TAKE_SPECTRUM w.r.t peakMJD: 
-    TOBS =  -7.0 to   0.0   SNR(5000:6000) = 20.000 + 0.000*z + 0.000*z^2
-    TOBS =   0.0 to   7.0   SNR(5000:6000) = 20.000 + 0.000*z + 0.000*z^2
-    TOBS =  15.0 to  20.0   SNR(5000:6000) = 20.000 + 0.000*z + 0.000*z^2
+  TAKE_SPECTRUM: 
+    TOBS =  -7.0 to   0.0    SNR-zPOLY:20,0,0  
+    TOBS =   0.0 to   7.0    SNR-zPOLY:20,0,0  
+    TOBS =  15.0 to  20.0    SNR-zPOLY:20,0,0  
 
   Cosmology Parameters: 
 	 H0 =  70.00 km/s per MPc 
@@ -128,13 +128,14 @@
 
   Random Number Sync: 
 	 RANDOM SEED: 28473   (RANLIST_START_GENSMEAR: 1)
-	 FIRST/LAST Random Number (List=1): 0.129730 0.717924  
-	 FIRST/LAST Random Number (List=2): 0.407840 0.507058  
-	 FIRST/LAST Random Number (List=3): 0.221022 0.225745  
+	 FIRST/LAST Random Number (List=1): 0.129730 0.047927  
+	 FIRST/LAST Random Number (List=2): 0.407840 0.372953  
+	 FIRST/LAST Random Number (List=3): 0.221022 0.088409  
 
-  Generation Statistics (total CPU=0.0 minutes): 
-	 Generated   742 simulated light curves (742/sec) 
-	 Wrote        50 simulated light curves to SNDATA files (50/sec). 
+  Generation Statistics (total CPU=0.1 minutes): 
+	 Generated   742 simulated light curves (186/sec) 
+	 Wrote        50 simulated light curves to SNDATA files (12/sec). 
+	 Wrote      2217 simulated spectra to SNDATA files 
   Spectroscopic-type: 739 -> 50 (before -> after cuts)
   Photometric-type:   0 -> 0 (before -> after cuts)
   Rejection Statistics: 
