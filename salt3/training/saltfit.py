@@ -535,13 +535,8 @@ class loglike:
 				
 				# color law
 				for i in range(self.n_colorpars):
-					#dcolorlaw_dcli = SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)
-					#specresultsdict['dmodelflux_dcl'][iSpecStart:iSpecStart+SpecLen,i] = modulatedFlux*-0.4*np.log(10)*c*dcolorlaw_dcli(specdata[k]['wavelength']/(1+z))
-					x[self.iCL[i]] += 1e-7
-					colorlawtmp = SALT2ColorLaw(self.colorwaverange, x[self.iCL])
-					modelfluxtmp = modulatedFlux/10**(-0.4 * c * colorLaw(specdata[k]['wavelength']/(1+z)))*10.**(-0.4 * colorlawtmp(specdata[k]['wavelength']/(1+z)) * c)
-					x[self.iCL[i]] -= 1e-7
-					specresultsdict['dmodelflux_dcl'][iSpecStart:iSpecStart+SpecLen,i] = (modelfluxtmp-modulatedFlux)/1e-7
+					dcolorlaw_dcli = SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(specdata[k]['wavelength']/(1+z))-SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(specdata[k]['wavelength']/(1+z))
+					specresultsdict['dmodelflux_dcl'][iSpecStart:iSpecStart+SpecLen,i] = modulatedFlux*-0.4*np.log(10)*c*dcolorlaw_dcli
 					
 				# M0, M1
 				if self.computePCs:
@@ -637,26 +632,13 @@ class loglike:
 				photresultsdict['dmodelflux_dc'][selectFilter,0]=np.sum((modulatedFlux)*np.log(10)*colorlaw[np.newaxis,idx[flt]], axis=1)*dwave*self.fluxfactor[survey][flt]
 				#empderiv = np.sum((modulatedFlux/(10. ** (colorlaw * c))*10. ** (colorlaw * (c+0.001)) - modulatedFlux)/1.0e-3, axis=1)*dwave*self.fluxfactor[survey][flt]
 				#import pdb; pdb.set_trace()
-				if sn=='5999406': import pdb;pdb.set_trace()
 				
 				for i in range(self.n_colorpars):
 					#Color law is linear wrt to the color law parameters; therefore derivative of the color law
-					# with respect to color law parameter i is the color law with all other values zeroed
-					x[self.iCL[i]] += 1e-7
-					colorlawtmp = SALT2ColorLaw(self.colorwaverange, x[self.iCL])
-					modelsynM0fluxtmp=np.sum(modulatedM0/colorexp*10.**(-0.4 * colorlawtmp(self.wave) * c), axis=1)*dwave*self.fluxfactor[survey][flt]
-					modelsynM1fluxtmp=np.sum(modulatedM1/colorexp*10.**(-0.4 * colorlawtmp(self.wave) * c), axis=1)*dwave*self.fluxfactor[survey][flt]
-					modelfluxtmp = x0* (modelsynM0fluxtmp+ x1*modelsynM1fluxtmp)
-
-					#dcolorlaw_dcli = SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)
+					# with respect to color law parameter i is the color law with all other values zeroed minus the color law with all values zeroed
+					dcolorlaw_dcli = SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(self.wave[idx[flt]])-SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(self.wave[idx[flt]])
 					#Multiply M0 and M1 components (already modulated with passband) by c* d colorlaw / d cl_i, with associated normalizations
-					#photresultsdict['dmodelflux_dcl'][selectFilter,i] = np.sum((modulatedFlux)*-0.4*np.log(10)*c*dcolorlaw_dcli(self.wave[idx[flt]])[np.newaxis,:], axis=1)*dwave*self.fluxfactor[survey][flt]
-
-					deriv = (modelfluxtmp - modelflux)/1e-7
-					photresultsdict['dmodelflux_dcl'][selectFilter,i] = deriv
-					#self.datadict[sn]['specdata'][k]['colorlawderiv'][:,i] = (modelfluxtmp-saltfluxinterp)/1e-3/np.sqrt(specvar)
-					x[self.iCL[i]] -= 1e-7
-
+					photresultsdict['dmodelflux_dcl'][selectFilter,i] = np.sum((modulatedFlux)*-0.4*np.log(10)*c*dcolorlaw_dcli[np.newaxis,:], axis=1)*dwave*self.fluxfactor[survey][flt]
 					
 				if self.computePCs:
 					passbandColorExp=pbspl[flt]*colorexp[idx[flt]]
