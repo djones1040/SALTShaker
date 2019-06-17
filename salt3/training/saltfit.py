@@ -317,13 +317,10 @@ class loglike:
 		else:
 			loglike=sum(starmap(self.loglikeforSN,args))
 
-		loglike -= self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad)
+		loglike -= self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad)/2
 
 		
 		logp = loglike + self.m0prior(components)[0] + self.m1prior(x[self.ix1]) + self.endprior(components)+self.peakprior(x,components)
-
-		if colorLaw:
-			logp += self.EBVprior(colorLaw)
 			
 		self.nstep += 1
 		if not self.lsqfit: print(logp*-2)
@@ -420,21 +417,20 @@ class loglike:
 		return logpriorB + logpriorV
 				
 	def ResidsForSN(self,x,sn,components,colorLaw,computeDerivatives,
-					bsorder=3,loglike=False):
+					bsorder=3):
 		photmodeldict,specmodeldict=self.modelvalsforSN(x,sn,components,colorLaw,computeDerivatives,bsorder)
 		
 		photresidsdict={key.replace('dmodelflux','dphotresid'):photmodeldict[key]/(photmodeldict['uncertainty'][:,np.newaxis]) for key in photmodeldict if 'modelflux' in key}
-		if not loglike: photresidsdict['photresid']=(photmodeldict['modelflux']-self.datadict[sn]['photdata']['fluxcal'])/photmodeldict['uncertainty']
-		else: photresidsdict['photresid']=((photmodeldict['modelflux']-self.datadict[sn]['photdata']['fluxcal'])/photmodeldict['uncertainty'])**2./2 +\
-			np.log(1/(np.sqrt(2*np.pi)*photmodeldict['uncertainty']))
-		photresidsdict['weights']=1/photmodeldict['uncertainty']
+		photresidsdict['photresid']=(photmodeldict['modelflux']-self.datadict[sn]['photdata']['fluxcal'])/photmodeldict['uncertainty']
+		photresidsdict['lognorm']=np.log(1/(np.sqrt(2*np.pi)*photmodeldict['uncertainty'])).sum()
 
-		specresidsdict={key.replace('dmodelflux','dspecresid'):specmodeldict[key]/(specmodeldict['uncertainty'][:,np.newaxis])*self.num_phot/self.num_spec for key in specmodeldict if 'modelflux' in key}
-		if not loglike: specresidsdict['specresid']=(specmodeldict['modelflux']-specmodeldict['dataflux'])/specmodeldict['uncertainty']*self.num_phot/self.num_spec
-		else: specresidsdict['specresid']=((specmodeldict['modelflux']-specmodeldict['dataflux'])/specmodeldict['uncertainty'])**2./2*self.num_phot/self.num_spec +\
-			np.log(1/(np.sqrt(2*np.pi)*specmodeldict['uncertainty']))
-		specresidsdict['weights']=1/specmodeldict['uncertainty']
-
+		#Suppress the effect of the spectra by multiplying chi^2 by number of photometric points over number of spectral points
+		spectralSuppression=np.sqrt(self.num_phot/self.num_spec)
+		
+		specresidsdict={key.replace('dmodelflux','dspecresid'):specmodeldict[key]/(specmodeldict['uncertainty'][:,np.newaxis])*spectralSuppression for key in specmodeldict if 'modelflux' in key}
+		specresidsdict['specresid']=(specmodeldict['modelflux']-specmodeldict['dataflux'])/specmodeldict['uncertainty']*spectralSuppression
+		#Not sure if this is the best way to account for the spectral suppression in the log normalization term?
+		specresidsdict['lognorm']=np.log(spectralSuppression/(np.sqrt(2*np.pi)*specmodeldict['uncertainty'])).sum()
 		return photresidsdict,specresidsdict
 		
 	def modelvalsforSN(self,x,sn,components,colorLaw,computeDerivatives,bsorder=3):
@@ -777,13 +773,10 @@ class loglike:
 		elif self.n_components == 2: M0,M1 = copy.deepcopy(components)
 
 		photResidsDict,specResidsDict = self.ResidsForSN(x,sn,components,colorLaw,False,
-											  bsorder=3,loglike=True)
+											  bsorder=3)
 		
-		#if self.lsqfit:
-		#	loglike=-1*np.append(photResidsDict['photresid'],specResidsDict['specresid'])
-		#	#loglike = np.append(loglike,loglikes)
-		#else:
-		loglike=-1*((photResidsDict['photresid']).sum() + (specResidsDict['specresid']).sum())
+
+		loglike= - (photResidsDict['photresid']**2).sum() / 2.   -(specResidsDict['specresid']**2).sum()/2.+photResidsDict['lognorm']+specResidsDict['lognorm']
 		
 		return loglike
 				
