@@ -279,7 +279,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 		#plt.ion()
 		
-		from salt3.validation import ValidateLightCurves
+		from salt3.validation import ValidateLightcurves
 		from salt3.validation import ValidateSpectra
 		from salt3.validation import ValidateModel
 
@@ -357,7 +357,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			if not fitc: csn = 0
 			if not fitx1: x1sn = 0
 			
-			ValidateLightCurves.customfilt(
+			ValidateLightcurves.customfilt(
 				'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,outputdir,
 				t0=t0sn,x0=x0sn,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc,
 				bandpassdict=self.kcordict,n_components=self.options.n_components,
