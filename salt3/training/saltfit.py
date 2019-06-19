@@ -1599,6 +1599,7 @@ class GaussNewton(loglike):
 
 				for snparam in ('x0','x1','c'): #tpkoff should go here
 					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = photresidsdict['dphotresid_d{}'.format(snparam)]
+				#import pdb; pdb.set_trace()
 			idx += idxp
 
 			idxp = specresidsdict['specresid'].size
@@ -1646,7 +1647,7 @@ class GaussNewton(loglike):
 			  np.mean(X[self.ix1]),np.std(X[self.ix1]),
 			  np.sum(components[0][0,:]),np.sum(components[1][0,:]))
 
-		#print('hack!')
+		print('hack!')
 		Xtmp = copy.deepcopy(X)
 		Xtmp,chi2_all = self.process_fit(Xtmp,fit='all')
 		
@@ -1705,7 +1706,7 @@ restricted parameter set has not been implemented: {}""".format(fit))
 		stepsize = np.dot(np.dot(pinv(np.dot(jacobian.T,jacobian)),jacobian.T),
 						  residuals.reshape(residuals.size,1)).reshape(includePars.sum())
 
-
+		#import pdb; pdb.set_trace()
 		X[includePars] -= stepsize
 		
 		print('priors: M0 B abs mag, mean x1, x1 std, M0 start, M1 start')
