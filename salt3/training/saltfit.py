@@ -515,16 +515,17 @@ class GaussNewton(saltresids.SALTResids):
 			residuals[idx] = self.m0prior_lsq(components)[0]
 			idx += 1
 			x1mean=np.mean(guess[self.ix1])
-			residuals[idx] = x1mean/0.01
+			priorwidth=0.01
+			residuals[idx] = x1mean/priorwidth
 			for sn in self.datadict.keys():
-				jacobian[idx,self.parlist == 'x1_%s'%sn] = 1/len(self.datadict.keys())
+				jacobian[idx,self.parlist == 'x1_%s'%sn] = 1/len(self.datadict.keys())/priorwidth
 
 			idx += 1
 			x1std=np.std(guess[self.ix1])
-			residuals[idx] = (x1std-1)/0.01
+			residuals[idx] = (x1std-1)/priorwidth
 			if x1std!=0:
 				for sn in self.datadict.keys():
-					jacobian[idx,self.parlist == 'x1_%s'%sn] = (guess[self.parlist == 'x1_%s'%sn]-x1mean)/(len(self.datadict.keys())*x1std)
+					jacobian[idx,self.parlist == 'x1_%s'%sn] = (guess[self.parlist == 'x1_%s'%sn]-x1mean)/(len(self.datadict.keys())*x1std*priorwidth)
 				
 			idx += 1
 			jacobian[idx:idx+1,self.parlist == 'm0'] = self.priorderivdict['M0end'][self.parlist == 'm0']
