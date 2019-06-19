@@ -116,8 +116,11 @@ class TrainSALT(TrainSALTBase):
 			guess[parlist == 'clscat'] = [0.]*self.options.n_colorscatpars
 
 		guess[(parlist == 'm0') & (guess < 0)] = 1e-4
+		i=0
 		for k in datadict.keys():
 			guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36-10.635))
+			#guess[parlist == 'x1_%s'%k] = 1 if i%2==0 else -1
+			i+=1
 
 		if self.options.resume_from_outputdir:
 			names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.outputdir,unpack=True,skiprows=1,dtype="U20,f8")
@@ -279,7 +282,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 		#plt.ion()
 		
-		from salt3.validation import ValidateLightCurves
+		from salt3.validation import ValidateLightcurves
 		from salt3.validation import ValidateSpectra
 		from salt3.validation import ValidateModel
 
@@ -357,7 +360,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			if not fitc: csn = 0
 			if not fitx1: x1sn = 0
 			
-			ValidateLightCurves.customfilt(
+			ValidateLightcurves.customfilt(
 				'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,outputdir,
 				t0=t0sn,x0=x0sn,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc,
 				bandpassdict=self.kcordict,n_components=self.options.n_components,
