@@ -37,16 +37,16 @@ class TrainSALTBase:
 		parser.add_argument('--outputdir', default=config.get('iodata','outputdir'), type=str,
 							help="""data directory for spectroscopy, format should be ASCII 
 							with columns wavelength, flux, fluxerr (optional) (default=%default)""")
-		parser.add_argument('--initmodelfile', default=config.get('iodata','initmodelfile'), type=str,
-							help="""initial model to begin training, ASCII with columns
+		parser.add_argument('--initm0modelfile', default=config.get('iodata','initm0modelfile'), type=str,
+							help="""initial M0 model to begin training, ASCII with columns
 							phase, wavelength, flux (default=%default)""")
-		parser.add_argument('--initx1modelfile', default=config.get('iodata','initx1modelfile'), type=str,
-							help="""initial model with x1=1 to begin training, ASCII with columns
+		parser.add_argument('--initm1modelfile', default=config.get('iodata','initm1modelfile'), type=str,
+							help="""initial M1 model with x1=1 to begin training, ASCII with columns
 							phase, wavelength, flux (default=%default)""")
 		parser.add_argument('--initbfilt', default=config.get('iodata','initbfilt'), type=str,
 							help="""initial B-filter to get the normalization of the initial model (default=%default)""")
 		parser.add_argument('--resume_from_outputdir', default=config.get('iodata','resume_from_outputdir'), type=bool,
-							help='if set, initialize using output parameters from previous run')
+							help='if set, initialize using output parameters from previous run. If directory, initialize using ouptut parameters from specified directory')
 
 
 		# training model parameters
@@ -106,7 +106,9 @@ class TrainSALTBase:
 							help='do MCMC fitting (default=%default)')
 		parser.add_argument('--do_gaussnewton', default=config.get('trainparams','do_gaussnewton'), type=bool,
 							help='do Gauss-Newton least squares (default=%default)')
-
+		parser.add_argument('--gaussnewton_maxiter', default=config.get('trainparams','gaussnewton_maxiter'), type=int,
+							help='maximum iterations for Gauss-Newton (default=%default)')
+		
 		# mcmc parameters
 		parser.add_argument('--n_steps_mcmc', default=config.get('mcmcparams','n_steps_mcmc'), type=int,
 							help='number of accepted MCMC steps (default=%default)')
@@ -175,7 +177,7 @@ class TrainSALTBase:
 						 'waveres':self.options.wavesplineres,'phaseoutres':self.options.phaseoutres,
 						 'waveoutres':self.options.waveoutres,
 						 'colorwaverange':self.options.colorwaverange,
-						 'kcordict':self.kcordict,'initmodelfile':self.options.initmodelfile,
+						 'kcordict':self.kcordict,'initm0modelfile':self.options.initm0modelfile,
 						 'initbfilt':self.options.initbfilt,'regulargradientphase':self.options.regulargradientphase,
 						 'regulargradientwave':self.options.regulargradientwave,'regulardyad':self.options.regulardyad,
 						 'filter_mass_tolerance':self.options.filter_mass_tolerance,
