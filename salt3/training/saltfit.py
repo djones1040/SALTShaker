@@ -495,6 +495,7 @@ class GaussNewton(saltresids.SALTResids):
 
 				for snparam in ('x0','x1','c'): #tpkoff should go here
 					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = photresidsdict['dphotresid_d{}'.format(snparam)]
+				#import pdb; pdb.set_trace()
 			idx += idxp
 
 			idxp = specresidsdict['specresid'].size
@@ -548,7 +549,7 @@ class GaussNewton(saltresids.SALTResids):
 			  np.mean(X[self.ix1]),np.std(X[self.ix1]),
 			  np.sum(components[0][0,:]),np.sum(components[1][0,:]))
 
-		#print('hack!')
+		print('hack!')
 		Xtmp = copy.deepcopy(X)
 		Xtmp,chi2_all = self.process_fit(Xtmp,fit='all')
 		
