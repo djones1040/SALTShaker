@@ -428,7 +428,7 @@ class GaussNewton(saltresids.SALTResids):
 		print(warning)
 		self.warnings.append(warning)
 		
-	def convergence_loop(self,guess,loop_niter=10):
+	def convergence_loop(self,guess,loop_niter=3):
 		lastResid = 1e20
 
 		print('Initializing')
@@ -495,7 +495,7 @@ class GaussNewton(saltresids.SALTResids):
 
 				for snparam in ('x0','x1','c'): #tpkoff should go here
 					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = photresidsdict['dphotresid_d{}'.format(snparam)]
-				#import pdb; pdb.set_trace()
+					#if snparam == 'x1': import pdb; pdb.set_trace()
 			idx += idxp
 
 			idxp = specresidsdict['specresid'].size
@@ -629,7 +629,7 @@ restricted parameter set has not been implemented: {}""".format(fit))
 
 		# quick eval
 
-		chi2 = np.sum(self.lsqwrap(X,False,doPriors=doPriors)**2.)
+		chi2 = np.sum(self.lsqwrap(X,False,False,doPriors=doPriors)**2.)
 		print("chi2: old, new, diff")
 		print((residuals**2).sum(),chi2,(residuals**2).sum()-chi2)
 
