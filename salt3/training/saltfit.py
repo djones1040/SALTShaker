@@ -480,7 +480,7 @@ class GaussNewton(saltresids.SALTResids):
 		residuals = np.zeros( numResids)
 		jacobian =	np.zeros((numResids,self.npar)) # Jacobian matrix from r
 		if doPriors:
-			self.derivativesforPrior(guess,components,colorLaw,bsorder=3)
+			self.derivativesforPrior(guess,components,colorLaw)
 
 		idx = 0
 		for sn in self.datadict.keys():
@@ -614,6 +614,8 @@ restricted parameter set has not been implemented: {}""".format(fit))
 		if self.i>4 and fit=='all' and not self.debug: 
 			import pdb;pdb.set_trace()
 			self.debug=True
+		if np.any(np.isnan(stepsize)):
+			import pdb;pdb.set_trace()
 		#import pdb; pdb.set_trace()
 		X[includePars] -= stepsize
 		
