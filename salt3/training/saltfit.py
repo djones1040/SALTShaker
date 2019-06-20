@@ -39,12 +39,14 @@ class fitting:
 
 	def gaussnewton(self,gn,guess,
 					n_processes,n_mcmc_steps,
-					n_burnin_mcmc):
+					n_burnin_mcmc,
+					gaussnewton_maxiter):
 
 		gn.debug = False
 		x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams = \
-			gn.convergence_loop(guess)
+			gn.convergence_loop(
+				guess,loop_niter=gaussnewton_maxiter)
 
 		return x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams,'Gauss-Newton MCMC was successful'
@@ -433,7 +435,8 @@ class GaussNewton(saltresids.SALTResids):
 		self.i=0
 		print('Initializing')
 
-		residuals = self.lsqwrap(guess,False,False,doPriors=True)
+		print("warning: temporarily turned off priors")
+		residuals = self.lsqwrap(guess,False,False,doPriors=False)
 		chi2_init = (residuals**2.).sum()
 		X = copy.deepcopy(guess[:])
 
@@ -549,7 +552,7 @@ class GaussNewton(saltresids.SALTResids):
 			  np.mean(X[self.ix1]),np.std(X[self.ix1]),
 			  np.sum(components[0][0,:]),np.sum(components[1][0,:]))
 
-		print('hack!')
+		#print('hack!')
 		Xtmp = copy.deepcopy(X)
 		Xtmp,chi2_all = self.process_fit(Xtmp,fit='all')
 		
@@ -572,17 +575,6 @@ class GaussNewton(saltresids.SALTResids):
 		
 		if fit == 'all' or fit == 'components': computePCDerivs = True
 		else: computePCDerivs = False
-
-#			if fit == 'all' or fit == 'colorlaw':
-#			if fit == 'all' or fit == 'component0' or fit == 'components' or fit == 'components0phot':
-#			if fit == 'all' or fit == 'component1' or fit == 'components':
-#			if fit == 'all' or fit == 'component1' or fit == 'components' or fit == 'component1spec':
-#			if fit == 'all' or fit == 'component0' or fit == 'components' or fit == 'component0spec':
-#			if fit == 'all' or fit == 'sn' or fit == 'x0' or fit == 'x0spec' or fit == 'snspec':
-#			if fit == 'all' or fit == 'sn' or fit == 'x0' or fit == 'x0phot' or fit == 'snphot':
-#			if fit == 'all' or fit == 'color':
-#			if not fit.startswith('x0'):
-#				if fit == 'all' or fit == 'color':
 
 		residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors)
 		if fit == 'all':
