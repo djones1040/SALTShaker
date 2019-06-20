@@ -56,7 +56,7 @@ class SALTResids:
 							   'tBmax':np.zeros(self.npar)}
 		self.npriors = 7
 		self.priors = np.array(self.priorderivdict.keys())
-		
+		self.bsorder=3
 		self.guess = guess
 		self.lsqfit = False
 		self.nsn = len(self.datadict.keys())
@@ -372,9 +372,8 @@ class SALTResids:
 		logpriorV = norm.logpdf(colorLaw(_V_LAMBDA_EFF)[0], 0.921, 0.02)
 		return logpriorB + logpriorV
 				
-	def ResidsForSN(self,x,sn,components,colorLaw,computeDerivatives,computePCDerivs=True,
-					bsorder=3):
-		photmodeldict,specmodeldict=self.modelvalsforSN(x,sn,components,colorLaw,computeDerivatives,bsorder)
+	def ResidsForSN(self,x,sn,components,colorLaw,computeDerivatives,computePCDerivs=True):
+		photmodeldict,specmodeldict=self.modelvalsforSN(x,sn,components,colorLaw,computeDerivatives,computePCDerivs)
 		
 		photresidsdict={key.replace('dmodelflux','dphotresid'):photmodeldict[key]/(photmodeldict['uncertainty'][:,np.newaxis]) for key in photmodeldict if 'modelflux' in key}
 		photresidsdict['photresid']=(photmodeldict['modelflux']-self.datadict[sn]['photdata']['fluxcal'])/photmodeldict['uncertainty']
@@ -389,7 +388,7 @@ class SALTResids:
 		specresidsdict['lognorm']=np.log(spectralSuppression/(np.sqrt(2*np.pi)*specmodeldict['uncertainty'])).sum()
 		return photresidsdict,specresidsdict
 		
-	def modelvalsforSN(self,x,sn,components,colorLaw,computeDerivatives,computePCDerivs,bsorder=3):
+	def modelvalsforSN(self,x,sn,components,colorLaw,computeDerivatives,computePCDerivs):
 		# model pars, initialization
 		if self.n_components == 1:
 			M0 = copy.deepcopy(components[0])
@@ -495,8 +494,8 @@ class SALTResids:
 					intmult = _SCALE_FACTOR/(1+z)*x0*recalexp*colorexpinterp
 					for i in range(len(self.im0)):
 						#Range of wavelength and phase values affected by changes in knot i
-						waverange=self.waveknotloc[[i%(self.waveknotloc.size-bsorder-1),i%(self.waveknotloc.size-bsorder-1)+bsorder+1]]
-						phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-bsorder-1),i//(self.waveknotloc.size-bsorder-1)+bsorder+1]]
+						waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+						phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
 						#Check if this spectrum is inside values affected by changes in knot i
 						if waverange[0]*(1+z) > specdata[k]['wavelength'].min() or waverange[1]*(1+z) < specdata[k]['wavelength'].max():
 							pass
@@ -597,8 +596,8 @@ class SALTResids:
 					intmult = dwave*self.fluxfactor[survey][flt]*_SCALE_FACTOR/(1+z)*x0
 					for i in range(len(self.im0)):
 						#Range of wavelength and phase values affected by changes in knot i
-						waverange=self.waveknotloc[[i%(self.waveknotloc.size-bsorder-1),i%(self.waveknotloc.size-bsorder-1)+bsorder+1]]
-						phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-bsorder-1),i//(self.waveknotloc.size-bsorder-1)+bsorder+1]]
+						waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+						phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
 						#Check if this filter is inside values affected by changes in knot i
 						if waverange[0]*(1+z) > self.kcordict[survey][flt]['maxlam'] or waverange[1]*(1+z) < self.kcordict[survey][flt]['minlam']:
 							pass
@@ -627,7 +626,7 @@ class SALTResids:
 		return photresultsdict,specresultsdict
 
 
-	def derivativesforPrior(self,x,components,colorLaw,bsorder=3):
+	def derivativesforPrior(self,x,components,colorLaw):
 
 		passbandColorExp = self.kcordict['default']['Bpbspl'] #*10**(-0.4*colorLaw(self.wave))
 		intmult = (self.wave[1] - self.wave[0])*self.kcordict['default']['fluxfactor']
@@ -638,8 +637,8 @@ class SALTResids:
 			modcomp = self.SALTModel(xtmp)
 			xtmp[i] -= 1.0e-3; xtmp[h] -= 1.0e-3
 			
-			waverange=self.waveknotloc[[i%(self.waveknotloc.size-bsorder-1),i%(self.waveknotloc.size-bsorder-1)+bsorder+1]]
-			phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-bsorder-1),i//(self.waveknotloc.size-bsorder-1)+bsorder+1]]
+			waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+			phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
 			#Check if this filter is inside values affected by changes in knot i
 			if waverange[0] > self.kcordict['default']['maxlam'] or waverange[1] < self.kcordict['default']['minlam']:
 				pass
@@ -728,8 +727,7 @@ class SALTResids:
 		if self.n_components == 1: M0 = copy.deepcopy(components[0])
 		elif self.n_components == 2: M0,M1 = copy.deepcopy(components)
 
-		photResidsDict,specResidsDict = self.ResidsForSN(x,sn,components,colorLaw,False,
-											  bsorder=3)
+		photResidsDict,specResidsDict = self.ResidsForSN(x,sn,components,colorLaw,False)
 		
 
 		loglike= - (photResidsDict['photresid']**2).sum() / 2.   -(specResidsDict['specresid']**2).sum()/2.+photResidsDict['lognorm']+specResidsDict['lognorm']
@@ -740,14 +738,14 @@ class SALTResids:
 
 		return chi2
 	
-	def SALTModel(self,x,bsorder=3,evaluatePhase=None,evaluateWave=None):
+	def SALTModel(self,x,evaluatePhase=None,evaluateWave=None):
 		
 		try: m0pars = x[self.m0min:self.m0max]
 		except: import pdb; pdb.set_trace()
 		try:
 			m0 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
 						 self.wave if evaluateWave is None else evaluateWave,
-						 (self.phaseknotloc,self.waveknotloc,m0pars,bsorder,bsorder))
+						 (self.phaseknotloc,self.waveknotloc,m0pars,self.bsorder,self.bsorder))
 		except:
 			import pdb; pdb.set_trace()
 			
@@ -755,7 +753,7 @@ class SALTResids:
 			m1pars = x[self.parlist == 'm1']
 			m1 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
 						 self.wave if evaluateWave is None else evaluateWave,
-						 (self.phaseknotloc,self.waveknotloc,m1pars,bsorder,bsorder))
+						 (self.phaseknotloc,self.waveknotloc,m1pars,self.bsorder,self.bsorder))
 			components = (m0,m1)
 		elif self.n_components == 1:
 			components = (m0,)
@@ -764,14 +762,14 @@ class SALTResids:
 			
 		return components
 
-	def SALTModelDeriv(self,x,bsorder=3,evaluatePhase=None,evaluateWave=None):
+	def SALTModelDeriv(self,x,evaluatePhase=None,evaluateWave=None):
 		
 		try: m0pars = x[self.m0min:self.m0max]
 		except: import pdb; pdb.set_trace()
 		try:
 			m0 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
 						 self.wave if evaluateWave is None else evaluateWave,
-						 (self.phaseknotloc,self.waveknotloc,m0pars,bsorder,bsorder),
+						 (self.phaseknotloc,self.waveknotloc,m0pars,self.bsorder,self.bsorder),
 						 dx=1,dy=1)
 		except:
 			import pdb; pdb.set_trace()
@@ -780,7 +778,7 @@ class SALTResids:
 			m1pars = x[self.parlist == 'm1']
 			m1 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
 						 self.wave if evaluateWave is None else evaluateWave,
-						 (self.phaseknotloc,self.waveknotloc,m1pars,bsorder,bsorder),
+						 (self.phaseknotloc,self.waveknotloc,m1pars,self.bsorder,self.bsorder),
 						 dx=1,dy=1)
 			components = (m0,m1)
 		elif self.n_components == 1:
@@ -791,18 +789,18 @@ class SALTResids:
 		return components
 
 	
-	def ErrModel(self,x,bsorder=3,evaluatePhase=None,evaluateWave=None):
+	def ErrModel(self,x,evaluatePhase=None,evaluateWave=None):
 
 		try: errpars = x[self.errmin:self.errmax]
 		except: import pdb; pdb.set_trace()
 
 		modelerr = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
 						   self.wave if evaluateWave is None else evaluateWave,
-						   (self.errphaseknotloc,self.errwaveknotloc,errpars,bsorder,bsorder))
+						   (self.errphaseknotloc,self.errwaveknotloc,errpars,self.bsorder,self.bsorder))
 
 		return modelerr
 
-	def getParsGN(self,x,bsorder=3):
+	def getParsGN(self,x):
 
 		m0pars = x[self.parlist == 'm0']
 		m0err = np.zeros(len(x[self.parlist == 'm0']))
@@ -836,28 +834,28 @@ class SALTResids:
 							  'tpkofferr':x[self.parlist == 'tpkoff_%s'%k]}
 
 
-		m0 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars,bsorder,bsorder))
-		m0errp = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars+m0err,bsorder,bsorder))
-		m0errm = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars-m0err,bsorder,bsorder))
+		m0 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars,self.bsorder,self.bsorder))
+		m0errp = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars+m0err,self.bsorder,self.bsorder))
+		m0errm = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars-m0err,self.bsorder,self.bsorder))
 		m0err = (m0errp-m0errm)/2.
 		if len(m1pars):
-			m1 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars,bsorder,bsorder))
-			m1errp = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars+m1err,bsorder,bsorder))
-			m1errm = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars-m1err,bsorder,bsorder))
+			m1 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars,self.bsorder,self.bsorder))
+			m1errp = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars+m1err,self.bsorder,self.bsorder))
+			m1errm = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars-m1err,self.bsorder,self.bsorder))
 			m1err = (m1errp-m1errm)/2.
 		else:
 			m1 = np.zeros(np.shape(m0))
 			m1err = np.zeros(np.shape(m0))
 
-		cov_m0_m1 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0_m1_cov,bsorder,bsorder))
-		modelerr = bisplev(self.phase,self.wave,(self.errphaseknotloc,self.errwaveknotloc,modelerrpars,bsorder,bsorder))
+		cov_m0_m1 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0_m1_cov,self.bsorder,self.bsorder))
+		modelerr = bisplev(self.phase,self.wave,(self.errphaseknotloc,self.errwaveknotloc,modelerrpars,self.bsorder,self.bsorder))
 		clscat = splev(self.wave,(self.errwaveknotloc,clscatpars,3))
 		if not len(clpars): clpars = []
 
 		return(x,self.phase,self.wave,m0,m0err,m1,m1err,cov_m0_m1,modelerr,
 			   clpars,clerr,clscat,resultsdict)
 
-	def getPars(self,loglikes,x,nburn=500,bsorder=3,mkplots=False):
+	def getPars(self,loglikes,x,nburn=500,mkplots=False):
 
 		axcount = 0; parcount = 0
 		from matplotlib.backends.backend_pdf import PdfPages
@@ -952,21 +950,21 @@ class SALTResids:
 							  'tpkofferr':x[self.parlist == 'tpkoff_%s'%k,nburn:].std()}
 
 
-		m0 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars,bsorder,bsorder))
-		m0errp = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars+m0err,bsorder,bsorder))
-		m0errm = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars-m0err,bsorder,bsorder))
+		m0 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars,self.bsorder,self.bsorder))
+		m0errp = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars+m0err,self.bsorder,self.bsorder))
+		m0errm = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars-m0err,self.bsorder,self.bsorder))
 		m0err = (m0errp-m0errm)/2.
 		if len(m1pars):
-			m1 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars,bsorder,bsorder))
-			m1errp = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars+m1err,bsorder,bsorder))
-			m1errm = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars-m1err,bsorder,bsorder))
+			m1 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars,self.bsorder,self.bsorder))
+			m1errp = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars+m1err,self.bsorder,self.bsorder))
+			m1errm = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars-m1err,self.bsorder,self.bsorder))
 			m1err = (m1errp-m1errm)/2.
 		else:
 			m1 = np.zeros(np.shape(m0))
 			m1err = np.zeros(np.shape(m0))
 
-		cov_m0_m1 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0_m1_cov,bsorder,bsorder))
-		modelerr = bisplev(self.phase,self.wave,(self.errphaseknotloc,self.errwaveknotloc,modelerrpars,bsorder,bsorder))
+		cov_m0_m1 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0_m1_cov,self.bsorder,self.bsorder))
+		modelerr = bisplev(self.phase,self.wave,(self.errphaseknotloc,self.errwaveknotloc,modelerrpars,self.bsorder,self.bsorder))
 		#phaseout,waveout,fluxout = np.array([]),np.array([]),np.array([])
 		#for i in range(len(self.phase)):
 		#	for j in range(len(self.wave)):
@@ -1085,23 +1083,50 @@ class SALTResids:
 		plt.clf()
 
 
-	def regularizationChi2(self, x,gradientPhase,gradientWave,dyad):
+	def regularizationChi2(self, x,component,gradientPhase,gradientWave,dyad):
 		
-		fluxes=self.SALTModel(x,evaluatePhase=self.phasebins[:-1],evaluateWave=self.wavebins[:-1])
+		phase=(self.phasebins[:-1]+self.phasebins[1:])/2
+		wave=(self.wavebins[:-1]+self.wavebins[1:])/2
+		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)[component]
+		
+		for i in range(len(self.im0)):
+			#Range of wavelength and phase values affected by changes in knot i
+			waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+			phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+			#Check which phases are affected by knot i
+			inPhase=(phase>phaserange[0] ) & (phase<phaserange[1] )
+			inWave=(wave>waverange[0])&(wave<waverange[1])
+			#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
+			#Integrate only over wavelengths within the relevant range
+			inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
+			derivInterp = interp1d(obsphase/(1+z),self.spline_derivs[i][:,inbounds],axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
+			#import pdb; pdb.set_trace()
+			derivInterp2 = np.interp(specdata[k]['wavelength'],obswave[inbounds],derivInterp(phase[0]/(1+z)))*intmult
+			
+			specresultsdict['dmodelflux_dM0'][iSpecStart:iSpecStart+SpecLen,i] = derivInterp2
+			#Dependence is the same for dM1, except with an extra factor of x1
+			specresultsdict['dmodelflux_dM1'][iSpecStart:iSpecStart+SpecLen,i] =  specresultsdict['dmodelflux_dM0'][iSpecStart:iSpecStart+SpecLen,i]*x1
+		
+		if ( (phase>obsphase.max())).any():
+			if phase > obsphase.max():
+				specresultsdict['dmodelflux_dM0'][iSpecStart:iSpecStart+SpecLen,:] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
+				specresultsdict['dmodelflux_dM1'][iSpecStart:iSpecStart+SpecLen,:] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
 
-		chi2wavegrad=0
-		chi2phasegrad=0
-		chi2dyad=0
-		for i in range(self.n_components):
-			exponent=1
-			fluxvals=fluxes[i]/np.mean(fluxes[i])
-			if gradientWave !=0:
-				chi2wavegrad+= self.waveres**exponent/((self.wavebins.size-1)**2 *(self.phasebins.size-1)) * (( (fluxvals[:,:,np.newaxis]-fluxvals[:,np.newaxis,:])**2	 /	 (np.sqrt(self.neff[:,:,np.newaxis]*self.neff[:,np.newaxis,:])* np.abs(self.wavebins[np.newaxis,np.newaxis,:-1]-self.wavebins[np.newaxis,:-1,np.newaxis])**exponent))[:,~np.diag(np.ones(self.wavebins.size-1,dtype=bool))]).sum()
-			if gradientPhase != 0:
-				chi2phasegrad+= self.phaseres**exponent/((self.phasebins.size-1)**2 *(self.wavebins.size-1) ) * ((	(fluxvals[np.newaxis,:,:]-fluxvals[:,np.newaxis,:])**2	 /	 (np.sqrt(self.neff[np.newaxis,:,:]*self.neff[:,np.newaxis,:])* np.abs(self.phasebins[:-1,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:-1,np.newaxis])**exponent))[~np.diag(np.ones(self.phasebins.size-1,dtype=bool)),:]).sum()
-			if dyad!= 0:
-				chi2dyadvals=(	 (fluxvals[:,np.newaxis,:,np.newaxis] * fluxvals[np.newaxis,:,np.newaxis,:] - fluxvals[np.newaxis,:,:,np.newaxis] * fluxvals[:,np.newaxis,np.newaxis,:])**2)   /   (np.sqrt(np.sqrt(self.neff[np.newaxis,:,np.newaxis,:]*self.neff[np.newaxis,:,:,np.newaxis]*self.neff[:,np.newaxis,:,np.newaxis]*self.neff[:,np.newaxis,np.newaxis,:]))*np.abs(self.wavebins[np.newaxis,np.newaxis,:-1,np.newaxis]-self.wavebins[np.newaxis,np.newaxis,np.newaxis,:-1])*np.abs(self.phasebins[:-1,np.newaxis,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:-1,np.newaxis,np.newaxis]))
-				chi2dyad+=self.phaseres*self.waveres/( (self.wavebins.size-1) *(self.phasebins.size-1))**2	* chi2dyadvals[~np.isnan(chi2dyadvals)].sum()
+		
+		fluxvals=fluxes[i]/np.mean(fluxes[i])
+		if gradientWave !=0:
+			waveGradResids= ( (fluxvals[:,:,np.newaxis]-fluxvals[:,np.newaxis,:]) /	np.sqrt( (np.sqrt(self.neff[:,:,np.newaxis]*self.neff[:,np.newaxis,:])* np.abs(wave[np.newaxis,np.newaxis,:]-wave[np.newaxis,:,np.newaxis]))))[:,~np.diag(np.ones(self.wavebins.size-1,dtype=bool))].flatten()
+			#normalization term
+			waveGradResids*= np.sqrt(gradientWave*self.waveres/((self.wavebins.size-1)**2 *(self.phasebins.size-1)))
+			
+			waveGradJac=0#???
+			
+		if gradientPhase != 0:
+			phaseGradResids=((fluxvals[np.newaxis,:,:]-fluxvals[:,np.newaxis,:])	 /	 np.sqrt((np.sqrt(self.neff[np.newaxis,:,:]*self.neff[:,np.newaxis,:])* np.abs(phase[:,np.newaxis,np.newaxis]-phase[np.newaxis,:,np.newaxis]))))[~np.diag(np.ones(self.phasebins.size-1,dtype=bool)),:].flatten()
+			phaseGradResids*= np.sqrt(gradientPhase*self.phaseres/((self.phasebins.size-1)**2 *(self.wavebins.size-1) ))
+		if dyad!= 0:
+			chi2dyadvals=(	 (fluxvals[:,np.newaxis,:,np.newaxis] * fluxvals[np.newaxis,:,np.newaxis,:] - fluxvals[np.newaxis,:,:,np.newaxis] * fluxvals[:,np.newaxis,np.newaxis,:])**2)   /   (np.sqrt(np.sqrt(self.neff[np.newaxis,:,np.newaxis,:]*self.neff[np.newaxis,:,:,np.newaxis]*self.neff[:,np.newaxis,:,np.newaxis]*self.neff[:,np.newaxis,np.newaxis,:]))*np.abs(self.wavebins[np.newaxis,np.newaxis,:-1,np.newaxis]-self.wavebins[np.newaxis,np.newaxis,np.newaxis,:-1])*np.abs(self.phasebins[:-1,np.newaxis,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:-1,np.newaxis,np.newaxis]))
+			chi2dyad+=self.phaseres*self.waveres/( (self.wavebins.size-1) *(self.phasebins.size-1))**2	* chi2dyadvals[~np.isnan(chi2dyadvals)].sum()
 		
 		return gradientWave*chi2wavegrad+dyad*chi2dyad+gradientPhase*chi2phasegrad
 
