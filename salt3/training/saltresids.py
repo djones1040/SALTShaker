@@ -96,12 +96,6 @@ class SALTResids:
 									  self.waverange[1]+self.waveres*0,
 									  (self.waverange[1]-self.waverange[0])/self.waveres+0*2,False)
 
-		
-		self.hsiaoflux = init_hsiao.get_hsiao(hsiaofile=self.initmodelfile,Bfilt=self.initbfilt,
-											  phaserange=self.phaserange,waverange=self.waverange,
-											  phaseinterpres=self.phaseoutres,waveinterpres=self.waveoutres,
-											  phasesplineres=self.phaseres,wavesplineres=self.waveres,
-											  days_interp=0)
 
 		self.neff=0
 		self.updateEffectivePoints(guess)
@@ -386,6 +380,7 @@ class SALTResids:
 		specresidsdict['specresid']=(specmodeldict['modelflux']-specmodeldict['dataflux'])/specmodeldict['uncertainty']*spectralSuppression
 		#Not sure if this is the best way to account for the spectral suppression in the log normalization term?
 		specresidsdict['lognorm']=np.log(spectralSuppression/(np.sqrt(2*np.pi)*specmodeldict['uncertainty'])).sum()
+
 		return photresidsdict,specresidsdict
 		
 	def modelvalsforSN(self,x,sn,components,colorLaw,computeDerivatives,computePCDerivs):
@@ -408,7 +403,7 @@ class SALTResids:
 
 		nspecdata = sum([specdata[key]['flux'].size for key in specdata])
 		interr1d = interp1d(obsphase,self.salterr,axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
-		
+
 		x0,x1,c,tpkoff = x[self.parlist == 'x0_%s'%sn],x[self.parlist == 'x1_%s'%sn],\
 						 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
 		clpars = x[self.parlist == 'cl']

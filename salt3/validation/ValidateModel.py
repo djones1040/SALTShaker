@@ -8,12 +8,12 @@ import argparse
 def main(outfile,salt3dir,
 		 m0file='salt3_template_0.dat',
 		 m1file='salt3_template_1.dat',
-		 clfile='salt2_color_correction.dat',
-		 cdfile='salt2_color_dispersion.dat',
-		 errscalefile='salt2_lc_dispersion_scaling.dat',
-		 lcrv00file='salt2_lc_relative_variance_0.dat',
-		 lcrv11file='salt2_lc_relative_variance_1.dat',
-		 lcrv01file='salt2_lc_relative_covariance_01.dat'):
+		 clfile='salt3_color_correction.dat',
+		 cdfile='salt3_color_dispersion.dat',
+		 errscalefile='salt3_lc_dispersion_scaling.dat',
+		 lcrv00file='salt3_lc_relative_variance_0.dat',
+		 lcrv11file='salt3_lc_relative_variance_1.dat',
+		 lcrv01file='salt3_lc_relative_covariance_01.dat'):
 	plt.clf()
 	
 	hsiao_model = sncosmo.Model(source='hsiao')
@@ -69,12 +69,12 @@ def main(outfile,salt3dir,
 def m0m1_chi2(outfile,salt3dir,
 			  m0file='salt3_template_0.dat',
 			  m1file='salt3_template_1.dat',
-			  clfile='salt2_color_correction.dat',
-			  cdfile='salt2_color_dispersion.dat',
-			  errscalefile='salt2_lc_dispersion_scaling.dat',
-			  lcrv00file='salt2_lc_relative_variance_0.dat',
-			  lcrv11file='salt2_lc_relative_variance_1.dat',
-			  lcrv01file='salt2_lc_relative_covariance_01.dat'):
+			  clfile='salt3_color_correction.dat',
+			  cdfile='salt3_color_dispersion.dat',
+			  errscalefile='salt3_lc_dispersion_scaling.dat',
+			  lcrv00file='salt3_lc_relative_variance_0.dat',
+			  lcrv11file='salt3_lc_relative_variance_1.dat',
+			  lcrv01file='salt3_lc_relative_covariance_01.dat'):
 	plt.clf()
 
 	hsiao_model = sncosmo.Model(source='hsiao')
