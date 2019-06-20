@@ -435,8 +435,7 @@ class GaussNewton(saltresids.SALTResids):
 		self.i=0
 		print('Initializing')
 
-		print("warning: temporarily turned off priors")
-		residuals = self.lsqwrap(guess,False,False,doPriors=False)
+		residuals = self.lsqwrap(guess,False,False,doPriors=True)
 		chi2_init = (residuals**2.).sum()
 		X = copy.deepcopy(guess[:])
 
