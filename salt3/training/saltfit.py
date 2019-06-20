@@ -416,7 +416,7 @@ class GaussNewton(saltresids.SALTResids):
 		self.loglikes=loglikes
 		self.chain=chain
 		self.warnings = []
-		
+		self.debug=False
 		super().__init__(guess,datadict,parlist,**kwargs)
 		self.lsqfit = False
 		
@@ -430,7 +430,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 	def convergence_loop(self,guess,loop_niter=10):
 		lastResid = 1e20
-
+		self.i=0
 		print('Initializing')
 
 		residuals = self.lsqwrap(guess,False,False,doPriors=True)
@@ -439,7 +439,7 @@ class GaussNewton(saltresids.SALTResids):
 
 		print('starting loop')
 		for superloop in range(loop_niter):
-
+			self.i=superloop
 			X,chi2 = self.robust_process_fit(X,chi2_init)
 			
 			if chi2_init-chi2 < -1.e-6:
@@ -451,7 +451,7 @@ class GaussNewton(saltresids.SALTResids):
 				return xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 					modelerr,clpars,clerr,clscat,SNParams
 
-
+			
 			print('finished iteration %i, chi2 improved by %.1f'%(superloop+1,chi2_init-chi2))
 			chi2_init = chi2
 			
@@ -460,10 +460,10 @@ class GaussNewton(saltresids.SALTResids):
 			self.getParsGN(X)
 		return xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams
-	
+		
 		#raise RuntimeError("convergence_loop reached 100000 iterations without convergence")
 
-	def lsqwrap(self,guess,computeDerivatives,computePCDerivs,doPriors=True):
+	def lsqwrap(self,guess,computeDerivatives,computePCDerivs=True,doPriors=True):
 		tstart = time.time()
 
 		if self.n_colorscatpars:
@@ -568,7 +568,7 @@ class GaussNewton(saltresids.SALTResids):
 		return X,chi2 #_init
 	
 	def process_fit(self,X,fit='all',doPriors=True):
-
+		
 		if fit == 'all' or fit == 'components': computePCDerivs = True
 		else: computePCDerivs = False
 
@@ -610,7 +610,9 @@ restricted parameter set has not been implemented: {}""".format(fit))
 		jacobian=jacobian[:,includePars]
 		stepsize = np.dot(np.dot(pinv(np.dot(jacobian.T,jacobian)),jacobian.T),
 						  residuals.reshape(residuals.size,1)).reshape(includePars.sum())
-
+		if self.i>4 and fit=='all' and not self.debug: 
+			import pdb;pdb.set_trace()
+			self.debug=True
 		#import pdb; pdb.set_trace()
 		X[includePars] -= stepsize
 		
