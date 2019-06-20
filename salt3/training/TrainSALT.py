@@ -41,8 +41,7 @@ class TrainSALT(TrainSALTBase):
 			if self.options.initm1modelfile:
 				self.options.initm1modelfile = '%s/%s'%(init_rootdir,self.options.initm1modelfile)
 		
-			
-		if not os.path.exists(self.options.initm0modelfile):
+		if self.options.initm0modelfile and not os.path.exists(self.options.initm0modelfile):
 			raise RuntimeError('model initialization file not found in local directory or %s'%init_rootdir)
 
 		# initial guesses
