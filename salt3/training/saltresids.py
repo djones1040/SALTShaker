@@ -165,7 +165,15 @@ class SALTResids:
 
 		#Store derivatives of a spline with fixed knot locations with respect to each knot value
 		starttime=time.time()
-		self.spline_derivs=[ bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,3,3)) for i in range(self.im0.size)]
+		self.spline_derivs=[ bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder)) for i in range(self.im0.size)]
+		
+		phase=(self.phasebins[:-1]+self.phasebins[1:])/2
+		wave=(self.wavebins[:-1]+self.wavebins[1:])/2
+		self.regularizationDerivs=[np.zeros((phase.size,wave.size,self.im0.size)) for i in range(4)]
+		for i in range(len(self.im0)):
+			for j,derivs in enumerate([(0,0),(1,0),(0,1),(1,1)]):
+				self.regularizationDerivs[j][:,:,i]=bisplev(phase,wave,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder),dx=derivs[0],dy=derivs[1])
+			
 		print('Time to calculate spline_derivs: %.2f'%(time.time()-starttime))
 
 		M0derivinterp,M1derivinterp,modcompall = [],[],[]
@@ -757,7 +765,7 @@ class SALTResids:
 			
 		return components
 
-	def SALTModelDeriv(self,x,evaluatePhase=None,evaluateWave=None):
+	def SALTModelDeriv(self,x,dx,dy,evaluatePhase=None,evaluateWave=None):
 		
 		try: m0pars = x[self.m0min:self.m0max]
 		except: import pdb; pdb.set_trace()
@@ -765,7 +773,7 @@ class SALTResids:
 			m0 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
 						 self.wave if evaluateWave is None else evaluateWave,
 						 (self.phaseknotloc,self.waveknotloc,m0pars,self.bsorder,self.bsorder),
-						 dx=1,dy=1)
+						 dx=dx,dy=dy)
 		except:
 			import pdb; pdb.set_trace()
 			
@@ -774,7 +782,7 @@ class SALTResids:
 			m1 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
 						 self.wave if evaluateWave is None else evaluateWave,
 						 (self.phaseknotloc,self.waveknotloc,m1pars,self.bsorder,self.bsorder),
-						 dx=1,dy=1)
+						 dx=dx,dy=dy)
 			components = (m0,m1)
 		elif self.n_components == 1:
 			components = (m0,)
@@ -1078,53 +1086,55 @@ class SALTResids:
 		plt.clf()
 
 
-	def regularizationChi2(self, x,component,gradientPhase,gradientWave,dyad):
+	def dyadicRegularization(self,x):
+				
+		phase=(self.phasebins[:-1]+self.phasebins[1:])/2
+		wave=(self.wavebins[:-1]+self.wavebins[1:])/2
+		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
+		dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
+		dfluxdphase=self.SALTModelDeriv(x,1,0,phase,wave)
+		d2fluxdphasedwave=self.SALTModelDeriv(x,1,1,phase,wave)
+=		resids=[]
+		jac=[]
+		for i in range(len(fluxes)):
+			#Determine a scale for the fluxes by sum of squares (since x1 can have negative values)
+			scale=np.sqrt(np.mean(fluxes[i]**2))
+			#Derivative of scale with respect to model parameters
+			scaleDeriv= np.mean(fluxes[i][:,:,np.newaxis]*self.regularizationDerivs[0],axis=(0,1))/scale
+			#Derivatives of the derivatives with respect to phase and wavelength with respect to model parameters
+			derivs=[(self.regularizationDerivs[j] * scale - scaleDeriv[np.newaxis,np.newaxis,:]*fluxes[i][:,:,np.newaxis])/ scale for j in range(4)]
+			#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
+			normalization=np.sqrt(1/(scale**2 * (self.wavebins.size-1) *(self.phasebins.size-1)))
+			#0 if model is locally separable in phase and wavelength i.e. flux=g(phase)* h(wavelength) for arbitrary functions g and h
+			resids += [normalization* ((dfluxdphase[i] *dfluxdwave[i] -d2fluxdphasedwave[i] *fluxes[i] )  /	np.sqrt( self.neff )).flatten()]
+			jac    += [normalization* (( derivs[1]*dfluxdwave[i][:,:,np.newaxis] + derivs[2]* dfluxdphase[i][:,:,np.newaxis] - derivs[3]* fluxes[i][:,:,np.newaxis] - derivs[0]* d2fluxdphasedwave[i][:,:,np.newaxis] ) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
+			
+		return resids,jac
+		
+	def gradientRegularization(self, x):
 		
 		phase=(self.phasebins[:-1]+self.phasebins[1:])/2
 		wave=(self.wavebins[:-1]+self.wavebins[1:])/2
-		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)[component]
-		
-		for i in range(len(self.im0)):
-			#Range of wavelength and phase values affected by changes in knot i
-			waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
-			phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
-			#Check which phases are affected by knot i
-			inPhase=(phase>phaserange[0] ) & (phase<phaserange[1] )
-			inWave=(wave>waverange[0])&(wave<waverange[1])
-			#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
-			#Integrate only over wavelengths within the relevant range
-			inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
-			derivInterp = interp1d(obsphase/(1+z),self.spline_derivs[i][:,inbounds],axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
-			#import pdb; pdb.set_trace()
-			derivInterp2 = np.interp(specdata[k]['wavelength'],obswave[inbounds],derivInterp(phase[0]/(1+z)))*intmult
-			
-			specresultsdict['dmodelflux_dM0'][iSpecStart:iSpecStart+SpecLen,i] = derivInterp2
-			#Dependence is the same for dM1, except with an extra factor of x1
-			specresultsdict['dmodelflux_dM1'][iSpecStart:iSpecStart+SpecLen,i] =  specresultsdict['dmodelflux_dM0'][iSpecStart:iSpecStart+SpecLen,i]*x1
-		
-		if ( (phase>obsphase.max())).any():
-			if phase > obsphase.max():
-				specresultsdict['dmodelflux_dM0'][iSpecStart:iSpecStart+SpecLen,:] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
-				specresultsdict['dmodelflux_dM1'][iSpecStart:iSpecStart+SpecLen,:] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
-
-		
-		fluxvals=fluxes[i]/np.mean(fluxes[i])
-		if gradientWave !=0:
-			waveGradResids= ( (fluxvals[:,:,np.newaxis]-fluxvals[:,np.newaxis,:]) /	np.sqrt( (np.sqrt(self.neff[:,:,np.newaxis]*self.neff[:,np.newaxis,:])* np.abs(wave[np.newaxis,np.newaxis,:]-wave[np.newaxis,:,np.newaxis]))))[:,~np.diag(np.ones(self.wavebins.size-1,dtype=bool))].flatten()
-			#normalization term
-			waveGradResids*= np.sqrt(gradientWave*self.waveres/((self.wavebins.size-1)**2 *(self.phasebins.size-1)))
-			
-			waveGradJac=0#???
-			
-		if gradientPhase != 0:
-			phaseGradResids=((fluxvals[np.newaxis,:,:]-fluxvals[:,np.newaxis,:])	 /	 np.sqrt((np.sqrt(self.neff[np.newaxis,:,:]*self.neff[:,np.newaxis,:])* np.abs(phase[:,np.newaxis,np.newaxis]-phase[np.newaxis,:,np.newaxis]))))[~np.diag(np.ones(self.phasebins.size-1,dtype=bool)),:].flatten()
-			phaseGradResids*= np.sqrt(gradientPhase*self.phaseres/((self.phasebins.size-1)**2 *(self.wavebins.size-1) ))
-		if dyad!= 0:
-			chi2dyadvals=(	 (fluxvals[:,np.newaxis,:,np.newaxis] * fluxvals[np.newaxis,:,np.newaxis,:] - fluxvals[np.newaxis,:,:,np.newaxis] * fluxvals[:,np.newaxis,np.newaxis,:])**2)   /   (np.sqrt(np.sqrt(self.neff[np.newaxis,:,np.newaxis,:]*self.neff[np.newaxis,:,:,np.newaxis]*self.neff[:,np.newaxis,:,np.newaxis]*self.neff[:,np.newaxis,np.newaxis,:]))*np.abs(self.wavebins[np.newaxis,np.newaxis,:-1,np.newaxis]-self.wavebins[np.newaxis,np.newaxis,np.newaxis,:-1])*np.abs(self.phasebins[:-1,np.newaxis,np.newaxis,np.newaxis]-self.phasebins[np.newaxis,:-1,np.newaxis,np.newaxis]))
-			chi2dyad+=self.phaseres*self.waveres/( (self.wavebins.size-1) *(self.phasebins.size-1))**2	* chi2dyadvals[~np.isnan(chi2dyadvals)].sum()
-		
-		return gradientWave*chi2wavegrad+dyad*chi2dyad+gradientPhase*chi2phasegrad
-
+		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
+		dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
+		waveGradResids=[]
+		waveGradJac=[]
+		for i in range(len(fluxes)):
+			import pdb;pdb.set_trace()
+			#Determine a scale for the fluxes by sum of squares (since x1 can have negative values)
+			scale=np.sqrt(np.mean(fluxes[i]**2))
+			#Normalize gradient by flux scale
+			normedGrad=dfluxdwave[i]/scale
+			#Derivative of scale with respect to model parameters
+			scaleDeriv= np.mean(fluxvals[:,:,np.newaxis]*self.regularizationDerivs[0],axis=(0,1))
+			#Derivative of normalized gradient with respect to model parameters
+			normedGradDerivs=(self.regularizationDerivs[2] * scale - scaleDeriv[np.newaxis,np.newaxis,:]*dfluxdwave[i][:,:,np.newaxis])/ scale**2
+			#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
+			normalization=np.sqrt(1/((self.wavebins.size-1) *(self.phasebins.size-1)))
+			#Minimize model derivative w.r.t wavelength in unconstrained regions
+			waveGradResids+= [normalization* ( normedGrad /	np.sqrt( self.neff )).flatten()]
+			waveGradJac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
+		return waveGradResids,waveGradJac
 def trapIntegrate(a,b,xs,ys):
 	if (a<xs.min()) or (b>xs.max()):
 		raise ValueError('Bounds of integration outside of provided values')

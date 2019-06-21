@@ -608,6 +608,10 @@ restricted parameter set has not been implemented: {}""".format(fit))
 		if np.any(np.isnan(stepsize)):
 			import pdb;pdb.set_trace()
 		#import pdb; pdb.set_trace()
+		
+		
+		self.dyadicRegularization(X)
+		self.gradientRegularization(X)
 		X[includePars] -= stepsize
 		
 		print('priors: M0 B abs mag, mean x1, x1 std, M0 start, M1 start')
