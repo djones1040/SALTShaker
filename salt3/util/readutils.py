@@ -4,6 +4,7 @@ from salt3.util import snana
 from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
 from astropy.io import fits
 from salt3.initfiles import init_rootdir
+from salt3.data import data_rootdir
 from astroquery.irsa_dust import IrsaDust
 from astropy.coordinates import SkyCoord
 import astropy.units as u
@@ -16,7 +17,10 @@ def rdkcor(surveylist,options,addwarning=None):
 		subsurveys = options.__dict__['%s_subsurveylist'%survey].split(',')
 		kcorfile = os.path.expandvars(kcorfile)
 		if not os.path.exists(kcorfile):
-			raise RuntimeError('kcor file %s does not exist'%kcorfile)
+			print('kcor file %s does not exist.  Checking %s'%(kcorfile,data_rootdir))
+			kcorfile = '%s/%s'%(data_rootdir,kcorfile)
+			if not os.path.exists(kcorfile):
+				raise RuntimeError('kcor file %s does not exist'%kcorfile)
 
 		try:
 			hdu = fits.open(kcorfile)
