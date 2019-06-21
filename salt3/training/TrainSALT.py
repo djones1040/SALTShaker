@@ -123,7 +123,10 @@ class TrainSALT(TrainSALTBase):
 			i+=1
 
 		if self.options.resume_from_outputdir:
-			names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.outputdir,unpack=True,skiprows=1,dtype="U20,f8")
+			try:
+				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.resume_from_outputdir,unpack=True,skiprows=1,dtype="U20,f8")
+			except:
+				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.outputdir,unpack=True,skiprows=1,dtype="U20,f8")
 			for key in np.unique(parlist):
 				guess[parlist == key] = pars[names == key]
 

@@ -46,7 +46,7 @@ class TrainSALTBase:
 		parser.add_argument('--initbfilt', default=config.get('iodata','initbfilt'), type=str,
 							help="""initial B-filter to get the normalization of the initial model (default=%default)""")
 		parser.add_argument('--resume_from_outputdir', default=config.get('iodata','resume_from_outputdir'), type=bool,
-							help='if set, initialize using output parameters from previous run')
+							help='if set, initialize using output parameters from previous run. If directory, initialize using ouptut parameters from specified directory')
 
 
 		# training model parameters
