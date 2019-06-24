@@ -170,8 +170,8 @@ class TrainSALT(TrainSALTBase):
 
 		
 		print('MCMC message: %s'%message)
-		print('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
-			  saltfitter.regularizationChi2(x_modelpars,0,1,0),saltfitter.regularizationChi2(x_modelpars,0,0,1))
+		#print('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
+		#	  saltfitter.regularizationChi2(x_modelpars,0,1,0),saltfitter.regularizationChi2(x_modelpars,0,0,1))
 		print('Final loglike'); saltfitter.maxlikefit(x_modelpars,None,False)
 
 		print(x_modelpars.size)
