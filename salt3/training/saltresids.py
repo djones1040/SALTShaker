@@ -725,7 +725,7 @@ class SALTResids:
 					#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
 					#Integrate only over wavelengths within the relevant range
 					inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
-					derivInterp = interp1d(self.phase,self.spline_derivs[i,:,inbounds],axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
+					derivInterp = interp1d(self.phase,self.spline_derivs[i,:,inbounds],axis=1,kind='nearest',bounds_error=False,fill_value="extrapolate")
 
 					m0Bmod = self.m0prior(self.modcomp[j],m0=True)
 					self.priorderivdict['Bmax'][i] = (m0Bmod-m0B)/1.0e-3/0.01
