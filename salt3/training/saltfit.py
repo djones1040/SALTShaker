@@ -516,8 +516,8 @@ class GaussNewton(saltresids.SALTResids):
 		# priors
 		if doPriors:
 			print('no m0 prior')
-			#jacobian[idx,self.parlist == 'm0'] = self.priorderivdict['Bmax'][self.parlist == 'm0']
-			#residuals[idx] = self.m0prior_lsq(components)[0]
+			jacobian[idx,self.parlist == 'm0'] = self.priorderivdict['Bmax'][self.parlist == 'm0']
+			residuals[idx] = self.m0prior_lsq(components)[0]
 			idx += 1
 			x1mean=np.mean(guess[self.ix1])
 			priorwidth=0.01
