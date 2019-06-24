@@ -515,8 +515,9 @@ class GaussNewton(saltresids.SALTResids):
 
 		# priors
 		if doPriors:
-			jacobian[idx,self.parlist == 'm0'] = self.priorderivdict['Bmax'][self.parlist == 'm0']
-			residuals[idx] = self.m0prior_lsq(components)[0]
+			print('no m0 prior')
+			#jacobian[idx,self.parlist == 'm0'] = self.priorderivdict['Bmax'][self.parlist == 'm0']
+			#residuals[idx] = self.m0prior_lsq(components)[0]
 			idx += 1
 			x1mean=np.mean(guess[self.ix1])
 			priorwidth=0.01
@@ -558,7 +559,7 @@ class GaussNewton(saltresids.SALTResids):
 		else: computePCDerivs = False
 		Xtmp,chi2_all = self.process_fit(Xtmp,fit='all',computePCDerivs=computePCDerivs)
 		
-		if chi2_init - chi2_all > 1:
+		if chi2_init - chi2_all > 100000:
 			return Xtmp,chi2_all
 		else:
 			# "basic flipflop"??!?!
