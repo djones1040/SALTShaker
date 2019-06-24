@@ -100,6 +100,10 @@ class TrainSALTBase:
 							help='number of days over which to compute scaling of error model (default=%default)')
 		parser.add_argument('--error_snake_wave_binsize', default=config.get('trainparams','error_snake_wave_binsize'), type=float,
 							help='number of angstroms over which to compute scaling of error model (default=%default)')
+		parser.add_argument('--usePriors', default=config.get('trainparams','usePriors'), type=str,
+							help='Names of priors to be applied to the dataset (default=%default)')
+		parser.add_argument('--priorWidths', default=config.get('trainparams','priorWidths'), type=str,
+							help='Widths of priors to be applied to the dataset (default=%default)')
 
 
 		parser.add_argument('--do_mcmc', default=config.get('trainparams','do_mcmc'), type=bool,
@@ -172,7 +176,8 @@ class TrainSALTBase:
 		return parser
 
 	def get_saltkw(self,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc):
-		saltfitkwargs = {'phaseknotloc':phaseknotloc,'waveknotloc':waveknotloc,
+		saltfitkwargs = {'usePriors':self.options.usePriors,'priorWidths':self.options.priorWidths,
+						'phaseknotloc':phaseknotloc,'waveknotloc':waveknotloc,
 						 'errphaseknotloc':errphaseknotloc,'errwaveknotloc':errwaveknotloc,
 						 'phaserange':self.options.phaserange,
 						 'waverange':self.options.waverange,'phaseres':self.options.phasesplineres,
