@@ -1101,14 +1101,14 @@ class SALTResids:
 			scale=np.sqrt(np.mean(fluxes[i]**2))
 			#Derivative of scale with respect to model parameters
 			scaleDeriv= np.mean(fluxes[i][:,:,np.newaxis]*self.regularizationDerivs[0],axis=(0,1))/scale
-			#Derivatives of the derivatives with respect to phase and wavelength with respect to model parameters
-			derivs=[(self.regularizationDerivs[j] * scale - scaleDeriv[np.newaxis,np.newaxis,:]*fluxes[i][:,:,np.newaxis])/ scale for j in range(4)]
 			#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
-			normalization=np.sqrt(1/(scale**2 * (self.wavebins.size-1) *(self.phasebins.size-1)))
+			normalization=np.sqrt(1/( (self.wavebins.size-1) *(self.phasebins.size-1)))
 			#0 if model is locally separable in phase and wavelength i.e. flux=g(phase)* h(wavelength) for arbitrary functions g and h
-			resids += [normalization* ((dfluxdphase[i] *dfluxdwave[i] -d2fluxdphasedwave[i] *fluxes[i] )  /	np.sqrt( self.neff )).flatten()]
-			jac    += [normalization* (( derivs[1]*dfluxdwave[i][:,:,np.newaxis] + derivs[2]* dfluxdphase[i][:,:,np.newaxis] - derivs[3]* fluxes[i][:,:,np.newaxis] - derivs[0]* d2fluxdphasedwave[i][:,:,np.newaxis] ) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
+			numerator=(dfluxdphase[i] *dfluxdwave[i] -d2fluxdphasedwave[i] *fluxes[i] )
+			dnumerator=( self.regularizationDerivs[1]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2]* dfluxdphase[i][:,:,np.newaxis] - self.regularizationDerivs[3]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0]* d2fluxdphasedwave[i][:,:,np.newaxis] )
 			
+			resids += [normalization* (numerator / (scale**2 * np.sqrt( self.neff ))).flatten()]
+			jac    += [normalization* (dnumerator*scale**2 - scaleDeriv[np.newaxis,np.newaxis,:]*2*scale*numerator[:,:,np.newaxis] / (scale**4 * np.sqrt( self.neff )[:,:,np.newaxis])).reshape(-1, self.im0.size)]
 		return resids,jac
 		
 	def gradientRegularization(self, x):
