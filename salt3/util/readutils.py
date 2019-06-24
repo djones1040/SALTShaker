@@ -77,15 +77,10 @@ def rdSpecData(datadict,speclist):
 	if not os.path.exists(speclist):
 		raise RuntimeError('speclist %s does not exist')
 	
-	try:
-		snid,mjd,specfiles = np.genfromtxt(speclist,unpack=True,dtype='str')
-		snid,mjd,specfiles = np.atleast_1d(snid),np.atleast_1d(mjd),np.atleast_1d(specfiles)
-		snanaSpec=False
-	except:
-		specfiles=np.genfromtxt(speclist,dtype='str')
-		specfiles=np.atleast_1d(specfiles)
-		snanaSpec=True
-		
+	specfiles=np.genfromtxt(speclist,dtype='str')
+	specfiles=np.atleast_1d(specfiles)
+	snanaSpec=True
+
 	if snanaSpec:
 		for sf in specfiles:
 		
