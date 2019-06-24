@@ -16,6 +16,9 @@ from numpy.random import standard_normal
 from scipy.linalg import cholesky
 from sncosmo.utils import integration_grid
 from numpy.linalg import inv,pinv
+from inspect import signature
+from functools import partial
+
 import time
 import numpy as np
 import pylab as plt
@@ -27,7 +30,14 @@ _SCALE_FACTOR = 1e-12
 _B_LAMBDA_EFF = np.array([4302.57])	 # B-band-ish wavelength
 _V_LAMBDA_EFF = np.array([5428.55])	 # V-band-ish wavelength
 
-
+__priors__=dict()
+def prior(prior):
+	"""Decorator to register a given function as a valid prior"""
+	#Check that the method accepts 4 inputs: a SALTResids object, a width, parameter vector, model components
+	assert(len(signature(prior).parameters)==4)
+	__priors__[prior.__name__]=prior
+	return prior
+	
 class SALTResids:
 	def __init__(self,guess,datadict,parlist,**kwargs):
 		
@@ -46,23 +56,15 @@ class SALTResids:
 		#self.n_data = ndata
 
 		
-		# initialize derivatives for the priors
-		self.priorderivdict = {'Bmax':np.zeros(self.npar),
-							   'x1mean':np.zeros(self.npar),
-							   'x1std':np.zeros(self.npar),
-							   'colorlaw':np.zeros(self.npar),
-							   'M0end':np.zeros(self.npar),
-							   'M1end':np.zeros(self.npar),
-							   'tBmax':np.zeros(self.npar)}
-		self.npriors = 7
-		self.priors = np.array(self.priorderivdict.keys())
 		self.bsorder=3
 		self.guess = guess
-		self.lsqfit = False
 		self.nsn = len(self.datadict.keys())
 		
 		for key, value in kwargs.items(): 
 			self.__dict__[key] = value
+		
+		self.usePriors=self.usePriors.split(',')
+		self.priorWidths=[float(x) for x in self.priorWidths.split(',')]
 
 		# pre-set some indices
 		self.m0min = np.min(np.where(self.parlist == 'm0')[0])
@@ -178,18 +180,14 @@ class SALTResids:
 				self.regularizationDerivs[j][:,:,i]=bisplev(phase,wave,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder),dx=derivs[0],dy=derivs[1])
 			
 		print('Time to calculate spline_derivs: %.2f'%(time.time()-starttime))
-
-		M0derivinterp,M1derivinterp,modcompall = [],[],[]
-		for i,h,j in zip(self.im0,self.im1,range(len(self.im0))):
-			xtmp = copy.deepcopy(guess)
-			xtmp[i] += 1.0e-3; xtmp[h] += 1.0e-3
-			modcomp = self.SALTModel(xtmp)
-			modcompall += [modcomp]
-		self.modcomp = modcompall
+		
+		
+		self.priors={ key: partial(__priors__[key],self) for key in __priors__}
 		
 		self.getobswave()
 
-							
+		
+		
 	def getobswave(self):
 		"for each filter, setting up some things needed for synthetic photometry"
 		
@@ -278,104 +276,21 @@ class SALTResids:
 		else:
 			loglike=sum(starmap(self.loglikeforSN,args))
 
-		if self.regularize: loglike -= self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad)/2
-
+		if self.regularize: 
+			pass
+			#loglike -= self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad)/2
 		
-		logp = loglike + self.m0prior(components) + self.m1prior(x[self.ix1]) + self.endprior(components)+self.peakprior(x,components)
+		priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,x)
+		
+		logp = loglike - (residuals**2).sum()/2
 		
 		self.nstep += 1
-		if not self.lsqfit: print(logp*-2)
-		else: print(logp.sum()*-2)
+		print(logp.sum()*-2)
 
 		if timeit:
 			print('%.3f %.3f %.3f %.3f %.3f'%(self.tdelt0,self.tdelt1,self.tdelt2,self.tdelt3,self.tdelt4))
 
 		return logp
-
-	def m0prior(self,components,m0=False):
-		int1d = interp1d(self.phase,components[0],axis=0,kind='nearest')
-		m0Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
-			self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
-
-		if m0Bflux > 0:
-			m0B = -2.5*np.log10(m0Bflux) + 27.5
-		else: m0B = 99
-		if m0: return -2.5*np.log10(m0Bflux) + 27.5
-		else:
-			logprior = norm.logpdf(m0B,self.m0guess,0.1)
-			return logprior
-
-	def m0prior_lsq(self,components,m0=False):
-		int1d = interp1d(self.phase,components[0],axis=0)
-		m0Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
-			self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
-		m0B = -2.5*np.log10(m0Bflux) + 27.5
-		return (m0B-self.m0guess)/0.01
-
-	def m1prior(self,x1pars):
-
-		logprior = norm.logpdf(np.std(x1pars),self.m1guess,0.02)
-
-		return logprior
-
-	def m1priormean(self,x1pars):
-
-		logprior = norm.logpdf(np.mean(x1pars),0,0.02)
-
-		return logprior
-
-	def m1priorstd(self,x1pars):
-
-		logprior = norm.logpdf(np.std(x1pars),self.m1guess,0.02)
-
-		return logprior
-		
-	def peakprior(self,x,components):
-		wave=self.wave[self.bbandoverlap]
-		lightcurve=np.sum(self.bbandpbspl[np.newaxis,:]*components[0][:,self.bbandoverlap],axis=1)
-		# from D'Arcy - disabled for now!!	(barfs if model goes crazy w/o regularization)
-		#maxPhase=np.argmax(lightcurve)
-		#finePhase=np.arange(self.phase[maxPhase-1],self.phase[maxPhase+1],0.1)
-		finePhase=np.arange(self.phase[self.maxPhase-1],self.phase[self.maxPhase+1],0.1)
-		fineGrid=self.SALTModel(x,evaluatePhase=finePhase,evaluateWave=wave)[0]
-		lightcurve=np.sum(self.bbandpbspl[np.newaxis,:]*fineGrid,axis=1)
-		logprior = norm.logpdf(finePhase[np.argmax(lightcurve)],0,0.5)
-		
-		return logprior
-
-	def endprior(self,components):
-		
-		logprior = norm.logpdf(np.sum(components[0][0,:]),0,0.1)
-		logprior += norm.logpdf(np.sum(components[1][0,:]),0,0.1)
-		
-		return logprior
-
-	def m0endprior(self,components):
-		
-		logprior = norm.logpdf(np.sum(components[0][0,:]),0,0.1)
-		
-		return logprior
-
-	def m1endprior(self,components):
-		
-		logprior = norm.logpdf(np.sum(components[1][0,:]),0,0.1)
-		
-		return logprior
-
-	def m0endprior_lsq(self,components):
-		
-		return np.sum(components[0][0,:])/0.1
-
-	def m1endprior_lsq(self,components):
-		
-		return np.sum(components[1][0,:])/0.1
-
-	
-	def EBVprior(self,colorLaw):
-		# 0.4*np.log(10) = 0.921
-		logpriorB = norm.logpdf(colorLaw(_B_LAMBDA_EFF)[0], 0.0, 0.02)
-		logpriorV = norm.logpdf(colorLaw(_V_LAMBDA_EFF)[0], 0.921, 0.02)
-		return logpriorB + logpriorV
 				
 	def ResidsForSN(self,x,sn,components,colorLaw,computeDerivatives,computePCDerivs=False):
 		photmodeldict,specmodeldict=self.modelvalsforSN(x,sn,components,colorLaw,computeDerivatives,computePCDerivs)
@@ -529,7 +444,7 @@ class SALTResids:
 						if waverange[0]*(1+z) > specdata[k]['wavelength'].min() or waverange[1]*(1+z) < specdata[k]['wavelength'].max():
 							pass
 						#Check which phases are affected by knot i
-						inPhase=(phase>phaserange[0]*(1+z) ) & (phase<phaserange[1]*(1+z) )
+						inPhase=(phase>=phaserange[0]*(1+z) ) & (phase<=phaserange[1]*(1+z) )
 						if inPhase.any():
 							#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
 							#Integrate only over wavelengths within the relevant range
@@ -649,7 +564,7 @@ class SALTResids:
 						if waverange[0]*(1+z) > self.kcordict[survey][flt]['maxlam'] or waverange[1]*(1+z) < self.kcordict[survey][flt]['minlam']:
 							pass
 						#Check which phases are affected by knot i
-						inPhase=(phase>phaserange[0]*(1+z) ) & (phase<phaserange[1]*(1+z) )
+						inPhase=(phase>=phaserange[0]*(1+z) ) & (phase<=phaserange[1]*(1+z) )
 						if inPhase.any():
 							#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
 							#Integrate only over wavelengths within the relevant range
@@ -700,62 +615,117 @@ class SALTResids:
 	#def getPCPhotDerivatives(self,phase,obsphase,passbandColorExp,intmult,z,computePCDerivs,photresultsdict,i,survey,flt,selectFilter,x1):
     #
 	#	return photresultsdict
-				
-	def derivativesforPrior(self,x,components,colorLaw,computePCDerivs):
+	
+	@prior
+	def peakprior(self,width,x,components):
+		wave=self.wave[self.bbandoverlap]
+		lightcurve=np.sum(self.bbandpbspl[np.newaxis,:]*components[0][:,self.bbandoverlap],axis=1)
+		# from D'Arcy - disabled for now!!	(barfs if model goes crazy w/o regularization)
+		#maxPhase=np.argmax(lightcurve)
+		#finePhase=np.arange(self.phase[maxPhase-1],self.phase[maxPhase+1],0.1)
+		finePhase=np.arange(self.phase[self.maxPhase-1],self.phase[self.maxPhase+1],0.1)
+		fineGrid=self.SALTModel(x,evaluatePhase=finePhase,evaluateWave=wave)[0]
+		lightcurve=np.sum(self.bbandpbspl[np.newaxis,:]*fineGrid,axis=1)
 
-		if computePCDerivs:
-			passbandColorExp = self.kcordict['default']['Bpbspl'] #*10**(-0.4*colorLaw(self.wave))
+		value=finePhase[np.argmax(lightcurve)]	
+		#Need to write the derivative with respect to parameters
+		return value/width,value,np.zeros(self.npar)
+	
+	@prior
+	def m0prior(self,width,x,components):
+		int1d = interp1d(self.phase,components[0],axis=0)
+		m0Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
+			self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
+		m0B = -2.5*np.log10(m0Bflux) + 27.5
+		residual = (m0B-self.m0guess) / width
+		#This derivative is constant, and never needs to be recalculated, so I store it in a hidden attribute
+		try:
+			jacobian= self.__m0priorderiv__.copy()
+		except:
+			jacobian = np.zeros(self.npar)
+			passbandColorExp = self.kcordict['default']['Bpbspl']
 			intmult = (self.wave[1] - self.wave[0])*self.kcordict['default']['fluxfactor']
-			xtmp = copy.deepcopy(x)
-			m0B = self.m0prior(components,m0=True)
-			for i,h,j in zip(self.im0,self.im1,range(len(self.im0))):
-				xtmp[i] += 1.0e-3; xtmp[h] += 1.0e-3
-				modcomp = self.SALTModel(xtmp)
-				xtmp[i] -= 1.0e-3; xtmp[h] -= 1.0e-3
-			
+			for i in range(self.im0.size):
 				waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
 				phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
 				#Check if this filter is inside values affected by changes in knot i
 				if waverange[0] > self.kcordict['default']['maxlam'] or waverange[1] < self.kcordict['default']['minlam']:
 					pass
-				# Check which phases are affected by knot i
-				inPhase=(0>phaserange[0] ) & (0<phaserange[1])
-				if inPhase.any():
+				if (0>=phaserange[0] ) & (0<=phaserange[1]):
 					#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
 					#Integrate only over wavelengths within the relevant range
 					inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
 					derivInterp = interp1d(self.phase,self.spline_derivs[i,:,inbounds],axis=1,kind='nearest',bounds_error=False,fill_value="extrapolate")
+					jacobian[self.im0[i]] = np.sum( passbandColorExp[inbounds] * derivInterp(0))*intmult
+			self.__m0priorderiv__=jacobian.copy()
+		jacobian/=width
+		return residual,m0B,jacobian
+		
+	@prior
+	def x1mean(self,width,x,components):
+		"""Prior such that the mean of the x1 population is 0"""
+		x1mean=np.mean(x[self.ix1])
+		residual = x1mean/width
+		jacobian=np.zeros(self.npar)
+		jacobian[self.ix1] = 1/len(self.datadict.keys())/width
+		return residual,x1mean,jacobian
+		
+	@prior
+	def x1std(self,width,x,components):
+		"""Prior such that the standard deviation of the x1 population is 1"""
+		x1s=x[self.ix1]
+		x1mean=np.mean(x1s)
+		x1std=np.std(x1s)
+		residual = (x1std-1)/width
+		jacobian=np.zeros(self.npar)
+		if x1std!=0:
+			jacobian[self.ix1] = (x1s-x1mean)/(len(self.datadict.keys())*x1std*width)
+		return residual,x1std,jacobian
 
-					m0Bmod = self.m0prior(self.modcomp[j],m0=True)
-					self.priorderivdict['Bmax'][i] = (m0Bmod-m0B)/1.0e-3/0.01
-					#\
-						#	np.sum( passbandColorExp[inbounds] * derivInterp(0))*\
-						#	intmult/0.01
-
-				self.priorderivdict['M0end'][i] = (self.m0endprior_lsq(modcomp)-self.m0endprior_lsq(components))/1.0e-3
-				self.priorderivdict['M1end'][h] = (self.m1endprior_lsq(modcomp)-self.m1endprior_lsq(components))/1.0e-3
-			
-		#colorpars = x[self.parlist == 'cl']			
-		#for i,j in zip(self.iCL,range(self.n_colorpars)):
-		#	colorpars[j] += 1.0e-3
-		#	modcolorLaw = SALT2ColorLaw(self.colorwaverange, colorpars)
-		#	colorpars[j] -= 1.0e-3
-		#	self.priorderivdict['colorlaw'][i] = (self.EBVprior(modcolorLaw)-self.EBVprior(colorLaw))/1.0e-3
-			
-		#x1tmp = np.zeros(self.nsn)
-		#for sn,i in zip(self.datadict.keys(),range(len(self.datadict.keys()))):
-		#	x1tmp[i] = x[self.parlist == 'x1_%s'%sn] # - np.mean(x[self.ix1])
-		#x1 = copy.deepcopy(x1tmp)
-
-		x1tmp = x[self.ix1]
-		for sn,i in zip(self.datadict.keys(),range(len(self.datadict.keys()))):
-
-			x1tmp[i] += 1.0e-4
-			self.priorderivdict['x1std'][self.parlist == 'x1_%s'%sn] = (np.std(x1tmp)/0.01-np.std(x[self.ix1])/0.01)/1.0e-4
-			self.priorderivdict['x1mean'][self.parlist == 'x1_%s'%sn] = (np.mean(x1tmp)/0.01-np.mean(x[self.ix1])/0.01)/1.0e-4
-			x1tmp[i] -= 1.0e-4
-
-
+	@prior
+	def m0endprior(self,width,x,components):
+		"""Prior such that at early times there is no flux"""
+		value=np.sum(components[0][0,:])
+		residual = value/width
+		try:
+			jacobian=self.__m0endpriorderiv__.copy()
+		except:
+			jacobian=np.zeros(self.npar)
+			for i in range(self.im0.size):
+				if i <(self.waveknotloc.size-self.bsorder-1) :
+					jacobian[self.im0[i]] = np.sum( self.spline_derivs[i,0,:] )
+			self.__m0endpriorderiv__=jacobian.copy()
+		jacobian/=width
+		return residual,value,jacobian
+	@prior
+	def m1endprior(self,width,x,components):
+		"""Prior such that at early times there is no effect of stretch"""
+		value=np.sum(components[1][0,:])
+		residual = value/width
+		try:
+			jacobian=self.__m1endpriorderiv__.copy()
+		except:
+			jacobian=np.zeros(self.npar)
+			for i in range(self.im0.size):
+				if i <(self.waveknotloc.size-self.bsorder-1) :
+					jacobian[self.im1[i]] = np.sum( self.spline_derivs[i,0,:] )
+			self.__m1endpriorderiv__=jacobian.copy()
+		jacobian/=width
+		return residual,value,jacobian
+	
+	def priorResids(self,priors,widths,x):
+		"""Given a list of names of priors and widths returns a residuals vector, list of prior values, and Jacobian """
+		components = self.SALTModel(x)
+		residuals=np.zeros(len(priors))
+		jacobian=np.zeros((len(priors),self.npar))
+		values=np.zeros(len(priors))
+		for idx,(prior,width) in enumerate(zip(priors,widths)):
+			try:
+				priorFunction=self.priors[prior]
+			except:
+				raise ValueError('Invalid prior supplied: {}'.format(prior))
+			residuals[idx],values[idx],jacobian[idx]=priorFunction(width,x,components)
+		return residuals,values,jacobian
 
 	def loglikeforSN(self,args,sn=None,x=None,components=None,salterr=None,
 					 colorLaw=None,colorScat=None,
@@ -1159,7 +1129,6 @@ class SALTResids:
 
 
 	def dyadicRegularization(self,x):
-				
 		phase=(self.phasebins[:-1]+self.phasebins[1:])/2
 		wave=(self.wavebins[:-1]+self.wavebins[1:])/2
 		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
@@ -1173,18 +1142,41 @@ class SALTResids:
 			scale=np.sqrt(np.mean(fluxes[i]**2))
 			#Derivative of scale with respect to model parameters
 			scaleDeriv= np.mean(fluxes[i][:,:,np.newaxis]*self.regularizationDerivs[0],axis=(0,1))/scale
-			#Derivatives of the derivatives with respect to phase and wavelength with respect to model parameters
-			derivs=[(self.regularizationDerivs[j] * scale - scaleDeriv[np.newaxis,np.newaxis,:]*fluxes[i][:,:,np.newaxis])/ scale for j in range(4)]
 			#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
-			normalization=np.sqrt(1/(scale**2 * (self.wavebins.size-1) *(self.phasebins.size-1)))
+			normalization=np.sqrt(1/( (self.wavebins.size-1) *(self.phasebins.size-1)))
 			#0 if model is locally separable in phase and wavelength i.e. flux=g(phase)* h(wavelength) for arbitrary functions g and h
-			resids += [normalization* ((dfluxdphase[i] *dfluxdwave[i] -d2fluxdphasedwave[i] *fluxes[i] )  /	np.sqrt( self.neff )).flatten()]
-			jac    += [normalization* (( derivs[1]*dfluxdwave[i][:,:,np.newaxis] + derivs[2]* dfluxdphase[i][:,:,np.newaxis] - derivs[3]* fluxes[i][:,:,np.newaxis] - derivs[0]* d2fluxdphasedwave[i][:,:,np.newaxis] ) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
+			numerator=(dfluxdphase[i] *dfluxdwave[i] -d2fluxdphasedwave[i] *fluxes[i] )
+			dnumerator=( self.regularizationDerivs[1]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2]* dfluxdphase[i][:,:,np.newaxis] - self.regularizationDerivs[3]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0]* d2fluxdphasedwave[i][:,:,np.newaxis] )
 			
+			resids += [normalization* (numerator / (scale**2 * np.sqrt( self.neff ))).flatten()]
+			jac    += [normalization* (dnumerator*scale**2 - scaleDeriv[np.newaxis,np.newaxis,:]*2*scale*numerator[:,:,np.newaxis] / (scale**4 * np.sqrt( self.neff )[:,:,np.newaxis])).reshape(-1, self.im0.size)]
 		return resids,jac
-		
-	def gradientRegularization(self, x):
-		
+	
+	def phaseGradientRegularization(self, x):
+		phase=(self.phasebins[:-1]+self.phasebins[1:])/2
+		wave=(self.wavebins[:-1]+self.wavebins[1:])/2
+		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
+		dfluxdphase=self.SALTModelDeriv(x,1,0,phase,wave)
+		resids=[]
+		jac=[]
+		for i in range(len(fluxes)):
+			import pdb;pdb.set_trace()
+			#Determine a scale for the fluxes by sum of squares (since x1 can have negative values)
+			scale=np.sqrt(np.mean(fluxes[i]**2))
+			#Normalize gradient by flux scale
+			normedGrad=dfluxdphase[i]/scale
+			#Derivative of scale with respect to model parameters
+			scaleDeriv= np.mean(fluxes[i][:,:,np.newaxis]*self.regularizationDerivs[0],axis=(0,1))/scale
+			#Derivative of normalized gradient with respect to model parameters
+			normedGradDerivs=(self.regularizationDerivs[1] * scale - scaleDeriv[np.newaxis,np.newaxis,:]*dfluxdwave[i][:,:,np.newaxis])/ scale**2
+			#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
+			normalization=np.sqrt(1/((self.wavebins.size-1) *(self.phasebins.size-1)))
+			#Minimize model derivative w.r.t wavelength in unconstrained regions
+			resids+= [normalization* ( normedGrad /	np.sqrt( self.neff )).flatten()]
+			jac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
+		return resids,jac
+	
+	def waveGradientRegularization(self, x):
 		phase=(self.phasebins[:-1]+self.phasebins[1:])/2
 		wave=(self.wavebins[:-1]+self.wavebins[1:])/2
 		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
@@ -1198,7 +1190,7 @@ class SALTResids:
 			#Normalize gradient by flux scale
 			normedGrad=dfluxdwave[i]/scale
 			#Derivative of scale with respect to model parameters
-			scaleDeriv= np.mean(fluxvals[:,:,np.newaxis]*self.regularizationDerivs[0],axis=(0,1))
+			scaleDeriv= np.mean(fluxes[i][:,:,np.newaxis]*self.regularizationDerivs[0],axis=(0,1))/scale
 			#Derivative of normalized gradient with respect to model parameters
 			normedGradDerivs=(self.regularizationDerivs[2] * scale - scaleDeriv[np.newaxis,np.newaxis,:]*dfluxdwave[i][:,:,np.newaxis])/ scale**2
 			#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
@@ -1207,6 +1199,7 @@ class SALTResids:
 			waveGradResids+= [normalization* ( normedGrad /	np.sqrt( self.neff )).flatten()]
 			waveGradJac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
 		return waveGradResids,waveGradJac
+		
 def trapIntegrate(a,b,xs,ys):
 	if (a<xs.min()) or (b>xs.max()):
 		raise ValueError('Bounds of integration outside of provided values')

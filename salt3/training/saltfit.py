@@ -478,11 +478,9 @@ class GaussNewton(saltresids.SALTResids):
 		
 		components = self.SALTModel(guess)
 		# set model vals
-		numResids=self.num_phot+self.num_spec + (5 if doPriors else 0)
+		numResids=self.num_phot+self.num_spec + (len(self.usePriors) if doPriors else 0)
 		residuals = np.zeros( numResids)
 		jacobian =	np.zeros((numResids,self.npar)) # Jacobian matrix from r
-		if doPriors:
-			self.derivativesforPrior(guess,components,colorLaw,computePCDerivs)
 		
 		idx = 0
 		for sn in self.datadict.keys():
@@ -512,33 +510,15 @@ class GaussNewton(saltresids.SALTResids):
 				for snparam in ('x0','x1','c'): #tpkoff should go here
 					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = specresidsdict['dspecresid_d{}'.format(snparam)]
 			idx += idxp
-
-		# priors
-		if doPriors:
-			print('no m0 prior')
-			jacobian[idx,self.parlist == 'm0'] = self.priorderivdict['Bmax'][self.parlist == 'm0']
-			residuals[idx] = self.m0prior_lsq(components)[0]
-			idx += 1
-			x1mean=np.mean(guess[self.ix1])
-			priorwidth=0.01
-			residuals[idx] = x1mean/priorwidth
-			for sn in self.datadict.keys():
-				jacobian[idx,self.parlist == 'x1_%s'%sn] = 1/len(self.datadict.keys())/priorwidth
-
-			idx += 1
-			x1std=np.std(guess[self.ix1])
-			residuals[idx] = (x1std-1)/priorwidth
-			if x1std!=0:
-				for sn in self.datadict.keys():
-					jacobian[idx,self.parlist == 'x1_%s'%sn] = (guess[self.parlist == 'x1_%s'%sn]-x1mean)/(len(self.datadict.keys())*x1std*priorwidth)
-				
-			idx += 1
-			jacobian[idx:idx+1,self.parlist == 'm0'] = self.priorderivdict['M0end'][self.parlist == 'm0']
-			residuals[idx] = self.m0endprior_lsq(components)
-			idx += 1
-			jacobian[idx:idx+1,self.parlist == 'm1'] = self.priorderivdict['M1end'][self.parlist == 'm1']
-			residuals[idx] = self.m1endprior_lsq(components)
+		print('priors: ',*self.usePriors)
 		
+		# priors
+		priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,guess)
+		print(*priorVals)
+		if doPriors:
+			residuals[idx:idx+len(self.usePriors)]=priorResids
+			jacobian[idx:idx+len(self.usePriors),:]=priorJac
+
 		if computeDerivatives:
 			print('loop took %i seconds'%(time.time()-tstart))
 			return residuals,jacobian
@@ -546,12 +526,6 @@ class GaussNewton(saltresids.SALTResids):
 			return residuals
 	
 	def robust_process_fit(self,X,chi2_init,iter):
-
-		print('initial priors: M0 B abs mag, mean x1, x1 std, M0 start, M1 start')
-		components = self.SALTModel(X)
-		print(self.m0prior(components,m0=True)[0],
-			  np.mean(X[self.ix1]),np.std(X[self.ix1]),
-			  np.sum(components[0][0,:]),np.sum(components[1][0,:]))
 
 		#print('hack!')
 		Xtmp = copy.deepcopy(X)
@@ -625,25 +599,17 @@ restricted parameter set has not been implemented: {}""".format(fit))
 		#	import pdb;pdb.set_trace()
 		#	self.debug=True
 		if np.any(np.isnan(stepsize)):
+			print('NaN detected in stepsize; exitting to debugger')
 			import pdb;pdb.set_trace()
 		
 
-		if self.regularize:
-			self.dyadicRegularization(X)
-			self.gradientRegularization(X)
+# 		if self.regularize:
+# 			self.dyadicRegularization(X)
+# 			self.gradientRegularization(X)
+			
 		X[includePars] -= stepsize
 		
-		print('priors: M0 B abs mag, mean x1, x1 std, M0 start, M1 start')
-		components = self.SALTModel(X)
-		# check new spectra
-		#plt.plot(specdata[0]['wavelength'],specdata[0]['flux'])
-		#plt.plot(specdata[0]['wavelength'],specdata[0]['modelflux'])
-		# off by like 1e-5
-
-		print(self.m0prior(components,m0=True)[0],
-			  np.mean(X[self.ix1]),np.std(X[self.ix1]),
-			  np.sum(components[0][0,:]),np.sum(components[1][0,:]))
-
+		
 
 		# quick eval
 
