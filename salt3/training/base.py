@@ -108,6 +108,8 @@ class TrainSALTBase:
 							help='do Gauss-Newton least squares (default=%default)')
 		parser.add_argument('--gaussnewton_maxiter', default=config.get('trainparams','gaussnewton_maxiter'), type=int,
 							help='maximum iterations for Gauss-Newton (default=%default)')
+		parser.add_argument('--regularize', default=config.get('trainparams','regularize'), type=bool,
+							help='turn on regularization if set (default=%default)')
 		
 		# mcmc parameters
 		parser.add_argument('--n_steps_mcmc', default=config.get('mcmcparams','n_steps_mcmc'), type=int,
@@ -203,7 +205,8 @@ class TrainSALTBase:
 						 'nsteps_before_modelpar_tradeoff':self.options.nsteps_before_modelpar_tradeoff,
 						 'modelpar_snpar_tradeoff_nstep':self.options.modelpar_snpar_tradeoff_nstep,
 						 'nsteps_between_lsqfit':self.options.nsteps_between_lsqfit,
-						 'use_lsqfit':self.options.use_lsqfit}
+						 'use_lsqfit':self.options.use_lsqfit,
+						 'regularize':self.options.regularize}
 
 		return saltfitkwargs
 

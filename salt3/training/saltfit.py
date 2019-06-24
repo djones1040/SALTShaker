@@ -442,7 +442,7 @@ class GaussNewton(saltresids.SALTResids):
 		print('starting loop')
 		for superloop in range(loop_niter):
 			self.i=superloop
-			X,chi2 = self.robust_process_fit(X,chi2_init)
+			X,chi2 = self.robust_process_fit(X,chi2_init,superloop)
 			
 			if chi2_init-chi2 < -1.e-6:
 				self.addwarning("MESSAGE WARNING chi2 has increased")
@@ -465,7 +465,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 		#raise RuntimeError("convergence_loop reached 100000 iterations without convergence")
 
-	def lsqwrap(self,guess,computeDerivatives,computePCDerivs=True,doPriors=True):
+	def lsqwrap(self,guess,computeDerivatives,computePCDerivs=True,doPriors=True,fit='all'):
 		tstart = time.time()
 
 		if self.n_colorscatpars:
@@ -482,11 +482,12 @@ class GaussNewton(saltresids.SALTResids):
 		residuals = np.zeros( numResids)
 		jacobian =	np.zeros((numResids,self.npar)) # Jacobian matrix from r
 		if doPriors:
-			self.derivativesforPrior(guess,components,colorLaw)
-
+			self.derivativesforPrior(guess,components,colorLaw,computePCDerivs)
+		
 		idx = 0
 		for sn in self.datadict.keys():
 			photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,components,colorLaw,computeDerivatives,computePCDerivs)
+			
 			idxp = photresidsdict['photresid'].size
 
 			residuals[idx:idx+idxp] = photresidsdict['photresid']
@@ -543,7 +544,7 @@ class GaussNewton(saltresids.SALTResids):
 		else:
 			return residuals
 	
-	def robust_process_fit(self,X,chi2_init):
+	def robust_process_fit(self,X,chi2_init,iter):
 
 		print('initial priors: M0 B abs mag, mean x1, x1 std, M0 start, M1 start')
 		components = self.SALTModel(X)
@@ -553,16 +554,22 @@ class GaussNewton(saltresids.SALTResids):
 
 		#print('hack!')
 		Xtmp = copy.deepcopy(X)
-		Xtmp,chi2_all = self.process_fit(Xtmp,fit='all')
+		if iter == 0: computePCDerivs = True
+		else: computePCDerivs = False
+		Xtmp,chi2_all = self.process_fit(Xtmp,fit='all',computePCDerivs=computePCDerivs)
 		
 		if chi2_init - chi2_all > 1:
 			return Xtmp,chi2_all
 		else:
 			# "basic flipflop"??!?!
-			print("fitting SNe")
-			X,chi2 = self.process_fit(X,fit='sn')
-			print("fitting principal components")
-			X,chi2 = self.process_fit(X,fit='components')
+			print("fitting x0")
+			X,chi2 = self.process_fit(X,fit='x0')
+			print("fitting x1")
+			X,chi2 = self.process_fit(X,fit='x1')
+			print("fitting principal component 0")
+			X,chi2 = self.process_fit(X,fit='component0')
+			print("fitting principal component 1")
+			X,chi2 = self.process_fit(X,fit='component1')
 			print("fitting color")
 			X,chi2 = self.process_fit(X,fit='color')
 			print("fitting color law")
@@ -570,12 +577,15 @@ class GaussNewton(saltresids.SALTResids):
 
 		return X,chi2 #_init
 	
-	def process_fit(self,X,fit='all',doPriors=True):
+	def process_fit(self,X,fit='all',snid=None,doPriors=True,computePCDerivs=False):
 		
-		if fit == 'all' or fit == 'components': computePCDerivs = True
-		else: computePCDerivs = False
-
-		residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors)
+		#if fit == 'all' or fit == 'components': computePCDerivs = 3
+		#elif fit == 'component0': computePCDerivs=1
+		#elif fit == 'component1': computePCDerivs=2
+		#else: computePCDerivs = 0
+		#computePCDerivs = True
+		#doPriors=False
+		residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors,fit)
 		if fit == 'all':
 			includePars=np.ones(self.npar,dtype=bool)
 		else:
@@ -583,9 +593,17 @@ class GaussNewton(saltresids.SALTResids):
 			if fit=='components':
 				includePars[self.im0]=True
 				includePars[self.im1]=True
+			elif fit=='component0':
+				includePars[self.im0]=True
+			elif fit=='component1':
+				includePars[self.im1]=True
 			elif fit=='sn':
 				#print('hack: x0 only')
 				includePars[self.ix0]=True
+				includePars[self.ix1]=True
+			elif fit=='x0':
+				includePars[self.ix0]=True
+			elif fit=='x1':
 				includePars[self.ix1]=True
 			elif fit=='color':
 				includePars[self.ic]=True
@@ -602,16 +620,16 @@ restricted parameter set has not been implemented: {}""".format(fit))
 		jacobian=jacobian[:,includePars]
 		stepsize = np.dot(np.dot(pinv(np.dot(jacobian.T,jacobian)),jacobian.T),
 						  residuals.reshape(residuals.size,1)).reshape(includePars.sum())
-		if self.i>4 and fit=='all' and not self.debug: 
-			import pdb;pdb.set_trace()
-			self.debug=True
+		#if self.i>4 and fit=='all' and not self.debug: 
+		#	import pdb;pdb.set_trace()
+		#	self.debug=True
 		if np.any(np.isnan(stepsize)):
 			import pdb;pdb.set_trace()
-		#import pdb; pdb.set_trace()
 		
-		
-		self.dyadicRegularization(X)
-		self.gradientRegularization(X)
+
+		if self.regularize:
+			self.dyadicRegularization(X)
+			self.gradientRegularization(X)
 		X[includePars] -= stepsize
 		
 		print('priors: M0 B abs mag, mean x1, x1 std, M0 start, M1 start')
