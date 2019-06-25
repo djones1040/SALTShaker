@@ -442,7 +442,7 @@ class GaussNewton(saltresids.SALTResids):
 		print('starting loop')
 		for superloop in range(loop_niter):
 			self.i=superloop
-			X,chi2 = self.robust_process_fit(X,chi2_init,superloop)
+			X,chi2 = self.robust_process_fit(X,chi2_init,superloop,chi2_init)
 			
 			if chi2_init-chi2 < -1.e-6:
 				self.addwarning("MESSAGE WARNING chi2 has increased")
@@ -496,7 +496,6 @@ class GaussNewton(saltresids.SALTResids):
 
 				for snparam in ('x0','x1','c'): #tpkoff should go here
 					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = photresidsdict['dphotresid_d{}'.format(snparam)]
-					#if snparam == 'x1': import pdb; pdb.set_trace()
 			idx += idxp
 
 			idxp = specresidsdict['specresid'].size
@@ -515,6 +514,7 @@ class GaussNewton(saltresids.SALTResids):
 		# priors
 		priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,guess)
 		print(*priorVals)
+		#doPriors = False
 		if doPriors:
 			residuals[idx:idx+len(self.usePriors)]=priorResids
 			jacobian[idx:idx+len(self.usePriors),:]=priorJac
@@ -525,15 +525,15 @@ class GaussNewton(saltresids.SALTResids):
 		else:
 			return residuals
 	
-	def robust_process_fit(self,X,chi2_init,iter):
+	def robust_process_fit(self,X,chi2_init,iter,chi2_last):
 
 		#print('hack!')
 		Xtmp = copy.deepcopy(X)
 		if iter == 0: computePCDerivs = True
 		else: computePCDerivs = False
 		Xtmp,chi2_all = self.process_fit(Xtmp,fit='all',computePCDerivs=computePCDerivs)
-		
-		if chi2_init - chi2_all > 100000:
+
+		if chi2_init - chi2_all > 1 and chi2_all/chi2_last < 0.9:
 			return Xtmp,chi2_all
 		else:
 			# "basic flipflop"??!?!
@@ -616,6 +616,8 @@ restricted parameter set has not been implemented: {}""".format(fit))
 		chi2 = np.sum(self.lsqwrap(X,False,False,doPriors=doPriors)**2.)
 		print("chi2: old, new, diff")
 		print((residuals**2).sum(),chi2,(residuals**2).sum()-chi2)
-
+		#if chi2 != chi2:
+		#	import pdb; pdb.set_trace()
+		
 		return X,chi2
 	
