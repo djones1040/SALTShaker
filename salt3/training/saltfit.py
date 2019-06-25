@@ -548,7 +548,7 @@ class GaussNewton(saltresids.SALTResids):
 		else: computePCDerivs = False
 		Xtmp,chi2_all = self.process_fit(Xtmp,fit='all',computePCDerivs=computePCDerivs)
 		
-		if chi2_init - chi2_all > 1:
+		if chi2_init - chi2_all > 100000:
 			return Xtmp,chi2_all
 		else:
 			# "basic flipflop"??!?!
