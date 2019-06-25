@@ -287,8 +287,18 @@ class SALTResids:
 		if len(self.usePriors):
 			priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,x)
 		
+		priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,x)
+		
 		logp = loglike - (priorResids**2).sum()/2
 		
+		if self.regularize:
+			regResids=[]
+			regJac=[]
+			for regularization, weight in [(self.phaseGradientRegularization, self.regulargradientphase),(self.waveGradientRegularization,self.regulargradientwave ),(self.dyadicRegularization,self.regulardyad)]:
+				if weight ==0:
+					continue
+				logp-= sum([(res**2).sum()*weight/2 for res in regularization(x,False)[0]])
+
 		self.nstep += 1
 		print(logp.sum()*-2)
 
@@ -658,10 +668,6 @@ class SALTResids:
 			specresultsdict['dmodelflux_dM1'] = self.__dict__['dmodelflux_dM0_spec_%s'%sn]*x0*x1
 			
 		return photresultsdict,specresultsdict
-
-	#def getPCPhotDerivatives(self,phase,obsphase,passbandColorExp,intmult,z,computePCDerivs,photresultsdict,i,survey,flt,selectFilter,x1):
-    #
-	#	return photresultsdict
 	
 	@prior
 	def peakprior(self,width,x,components):
@@ -680,6 +686,7 @@ class SALTResids:
 	
 	@prior
 	def m0prior(self,width,x,components):
+		"""Prior on the magnitude of the M0 component at t=0"""
 		int1d = interp1d(self.phase,components[0],axis=0)
 		m0Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
 			self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
@@ -1175,7 +1182,7 @@ class SALTResids:
 		plt.clf()
 
 
-	def dyadicRegularization(self,x):
+	def dyadicRegularization(self,x, computeJac=True):
 		phase=(self.phasebins[:-1]+self.phasebins[1:])/2
 		wave=(self.wavebins[:-1]+self.wavebins[1:])/2
 		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
@@ -1196,10 +1203,10 @@ class SALTResids:
 			dnumerator=( self.regularizationDerivs[1]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2]* dfluxdphase[i][:,:,np.newaxis] - self.regularizationDerivs[3]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0]* d2fluxdphasedwave[i][:,:,np.newaxis] )
 			
 			resids += [normalization* (numerator / (scale**2 * np.sqrt( self.neff ))).flatten()]
-			jac    += [normalization* (dnumerator*scale**2 - scaleDeriv[np.newaxis,np.newaxis,:]*2*scale*numerator[:,:,np.newaxis] / (scale**4 * np.sqrt( self.neff )[:,:,np.newaxis])).reshape(-1, self.im0.size)]
-		return resids,jac
+			if computeJac: jac    += [normalization* (dnumerator*scale**2 - scaleDeriv[np.newaxis,np.newaxis,:]*2*scale*numerator[:,:,np.newaxis] / (scale**4 * np.sqrt( self.neff )[:,:,np.newaxis])).reshape(-1, self.im0.size)]
+		return resids,jac 
 	
-	def phaseGradientRegularization(self, x):
+	def phaseGradientRegularization(self, x, computeJac=True):
 		phase=(self.phasebins[:-1]+self.phasebins[1:])/2
 		wave=(self.wavebins[:-1]+self.wavebins[1:])/2
 		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
@@ -1207,7 +1214,6 @@ class SALTResids:
 		resids=[]
 		jac=[]
 		for i in range(len(fluxes)):
-			import pdb;pdb.set_trace()
 			#Determine a scale for the fluxes by sum of squares (since x1 can have negative values)
 			scale=np.sqrt(np.mean(fluxes[i]**2))
 			#Normalize gradient by flux scale
@@ -1220,10 +1226,10 @@ class SALTResids:
 			normalization=np.sqrt(1/((self.wavebins.size-1) *(self.phasebins.size-1)))
 			#Minimize model derivative w.r.t wavelength in unconstrained regions
 			resids+= [normalization* ( normedGrad /	np.sqrt( self.neff )).flatten()]
-			jac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
-		return resids,jac
+			if computeJac: jac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
+		return resids,jac  
 	
-	def waveGradientRegularization(self, x):
+	def waveGradientRegularization(self, x,computeJac=True):
 		phase=(self.phasebins[:-1]+self.phasebins[1:])/2
 		wave=(self.wavebins[:-1]+self.wavebins[1:])/2
 		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
@@ -1231,7 +1237,6 @@ class SALTResids:
 		waveGradResids=[]
 		waveGradJac=[]
 		for i in range(len(fluxes)):
-			import pdb;pdb.set_trace()
 			#Determine a scale for the fluxes by sum of squares (since x1 can have negative values)
 			scale=np.sqrt(np.mean(fluxes[i]**2))
 			#Normalize gradient by flux scale
@@ -1244,8 +1249,8 @@ class SALTResids:
 			normalization=np.sqrt(1/((self.wavebins.size-1) *(self.phasebins.size-1)))
 			#Minimize model derivative w.r.t wavelength in unconstrained regions
 			waveGradResids+= [normalization* ( normedGrad /	np.sqrt( self.neff )).flatten()]
-			waveGradJac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
-		return waveGradResids,waveGradJac
+			if computeJac: waveGradJac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
+		return waveGradResids,waveGradJac 
 		
 def trapIntegrate(a,b,xs,ys):
 	if (a<xs.min()) or (b>xs.max()):
