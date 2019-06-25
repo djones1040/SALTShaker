@@ -299,7 +299,6 @@ class SALTResids:
 			print('%.3f %.3f %.3f %.3f %.3f'%(self.tdelt0,self.tdelt1,self.tdelt2,self.tdelt3,self.tdelt4))
 
 		return logp
-
 				
 	def ResidsForSN(self,x,sn,components,colorLaw,computeDerivatives,computePCDerivs=False):
 		photmodeldict,specmodeldict=self.modelvalsforSN(x,sn,components,colorLaw,computeDerivatives,computePCDerivs)
@@ -307,7 +306,6 @@ class SALTResids:
 		photresidsdict={key.replace('dmodelflux','dphotresid'):photmodeldict[key]/(photmodeldict['uncertainty'][:,np.newaxis]) for key in photmodeldict if 'modelflux' in key}
 		photresidsdict['photresid']=(photmodeldict['modelflux']-self.datadict[sn]['photdata']['fluxcal'])/photmodeldict['uncertainty']
 		photresidsdict['lognorm']=np.log(1/(np.sqrt(2*np.pi)*photmodeldict['uncertainty'])).sum()
-
 		#Suppress the effect of the spectra by multiplying chi^2 by number of photometric points over number of spectral points
 		spectralSuppression=np.sqrt(self.num_phot/self.num_spec)
 		
@@ -404,22 +402,27 @@ class SALTResids:
 			recalexp = np.exp(np.poly1d(coeffs)((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal))
 
 
-			M0interp = np.interp(specdata[k]['wavelength'],obswave,M0interp[0])*recalexp
-			M1interp = np.interp(specdata[k]['wavelength'],obswave,M1interp[0])*recalexp
+			M0int = interp1d(obswave,M0interp[0],kind='nearest',bounds_error=False,fill_value="extrapolate")
+			M0interp = M0int(specdata[k]['wavelength'])*recalexp
+			M1int = interp1d(obswave,M1interp[0],kind='nearest',bounds_error=False,fill_value="extrapolate")
+			M1interp = M1int(specdata[k]['wavelength'])*recalexp
+			
 			# hack
 			#M0interpmod = np.interp(specdata[k]['wavelength'],obswave,M0interpmod[0])*recalexp
 			#M1interpmod = np.interp(specdata[k]['wavelength'],obswave,M1interpmod[0])*recalexp
 
-			colorexpinterp = np.interp(specdata[k]['wavelength'],obswave,colorexp)
-			colorlawinterp = np.interp(specdata[k]['wavelength'],obswave,colorlaw)
+			colorexpint = interp1d(obswave,colorexp,kind='nearest',bounds_error=False,fill_value="extrapolate")
+			colorexpinterp = colorexpint(specdata[k]['wavelength'])
+			colorlawint = interp1d(obswave,colorlaw,kind='nearest',bounds_error=False,fill_value="extrapolate")
+			colorlawinterp = colorlawint(specdata[k]['wavelength'])
 
 			modulatedFlux = x0*(M0interp + x1*M1interp)*recalexp
 			
 			specresultsdict['modelflux'][iSpecStart:iSpecStart+SpecLen] = modulatedFlux
 			specresultsdict['dataflux'][iSpecStart:iSpecStart+SpecLen] = specdata[k]['flux']
-
 			
-			modelerr = np.interp( specdata[k]['wavelength'],obswave,intspecerr1d(phase)[0])
+			modelint = interp1d( obswave,intspecerr1d(phase)[0],kind='nearest',bounds_error=False,fill_value="extrapolate")
+			modelerr = modelint( specdata[k]['wavelength'])
 			specvar=(specdata[k]['fluxerr']**2.) # + (1e-3*saltfluxinterp)**2.)
 			specresultsdict['uncertainty'][iSpecStart:iSpecStart+SpecLen] = np.sqrt(specvar) #+ (modelerr*specresultsdict['modelflux'][iSpecStart:iSpecStart+SpecLen])**2
 			
@@ -441,7 +444,6 @@ class SALTResids:
 					intmult = _SCALE_FACTOR/(1+z)*x0*recalexp*colorexpinterp
 					intmultnox = _SCALE_FACTOR/(1+z)*recalexp*colorexpinterp
 					for i in range(len(self.im0)):
-						#import pdb; pdb.set_trace()
 						
 						#Range of wavelength and phase values affected by changes in knot i
 						waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
@@ -457,8 +459,8 @@ class SALTResids:
 							inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
 
 							derivInterp = interp1d(obsphase/(1+z),self.spline_derivs[i,:,inbounds],axis=1,kind='nearest',bounds_error=False,fill_value="extrapolate")
-							#import pdb; pdb.set_trace()
-							derivInterp2 = np.interp(specdata[k]['wavelength'],obswave[inbounds],derivInterp(phase[0]/(1+z)))
+							derivInterpWave = interp1d(obswave[inbounds],derivInterp(phase[0]/(1+z)),kind='nearest',bounds_error=False,fill_value="extrapolate")
+							derivInterp2 = derivInterpWave(specdata[k]['wavelength'])
 							#if computePCDerivs != 2:
 							specresultsdict['dmodelflux_dM0'][iSpecStart:iSpecStart+SpecLen,i] = derivInterp2*intmult
 							specresultsdict['dmodelflux_dM0_nox'][iSpecStart:iSpecStart+SpecLen,i] = derivInterp2*intmultnox
@@ -543,15 +545,12 @@ class SALTResids:
 			photresultsdict['modelflux'][selectFilter] = modelflux
 			# modelflux
 			photresultsdict['uncertainty'][selectFilter] = np.sqrt(photdata['fluxcalerr'][selectFilter]**2. + (0*modelerr)**2. + colorerr**2.)
-
 			
 			if computeDerivatives:
 				#d model / dc is total flux (M0 and M1 components (already modulated with passband)) times the color law and a factor of ln(10)
-				#import pdb; pdb.set_trace()
 				photresultsdict['dmodelflux_dc'][selectFilter,0]=np.sum((modulatedFlux)*np.log(10)*colorlaw[np.newaxis,idx[flt]], axis=1)*dwave*self.fluxfactor[survey][flt]
 				#empderiv = np.sum((modulatedFlux/(10. ** (colorlaw * c))*10. ** (colorlaw * (c+1e-7)) - modulatedFlux)/1.0e-7, axis=1)*dwave*self.fluxfactor[survey][flt]
 				#empderiv = (x0* (modelsynM0fluxmod+ x1*modelsynM1fluxmod) - x0* (modelsynM0flux+ x1*modelsynM1flux))/1e-7
-				#import pdb; pdb.set_trace()
 				
 				for i in range(self.n_colorpars):
 					#Color law is linear wrt to the color law parameters; therefore derivative of the color law
@@ -588,7 +587,6 @@ class SALTResids:
 								np.sum( passbandColorExp[:,inbounds] * derivInterp(phase[inPhase]/(1+z)).transpose(), axis=1)*\
 								intmultnox
 
-							#import pdb; pdb.set_trace()
 							#Dependence is the same for dM1, except with an extra factor of x1
 							#if computePCDerivs != 1:
 							photresultsdict['dmodelflux_dM1'][np.where(selectFilter)[0][inPhase],i] = \
