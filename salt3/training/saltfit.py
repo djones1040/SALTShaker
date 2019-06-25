@@ -477,8 +477,12 @@ class GaussNewton(saltresids.SALTResids):
 		else: colorLaw = None
 		
 		components = self.SALTModel(guess)
-		# set model vals
+
 		numResids=self.num_phot+self.num_spec + (len(self.usePriors) if doPriors else 0)
+		if self.regularize:
+			numRegResids=sum([ self.n_components*(self.phasebins.size-1) * (self.wavebins.size -1) for weight in [self.regulargradientphase,self.regulargradientwave ,self.regulardyad] if not weight == 0])
+			numResids+=numRegResids
+			
 		residuals = np.zeros( numResids)
 		jacobian =	np.zeros((numResids,self.npar)) # Jacobian matrix from r
 		
@@ -516,8 +520,19 @@ class GaussNewton(saltresids.SALTResids):
 		priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,guess)
 		print(*priorVals)
 		if doPriors:
-			residuals[idx:idx+len(self.usePriors)]=priorResids
-			jacobian[idx:idx+len(self.usePriors),:]=priorJac
+			residuals[idx:idx+priorResids.size]=priorResids
+			jacobian[idx:idx+priorResids.size,:]=priorJac
+			idx+=priorResids.size
+			
+		if self.regularize:
+			for regularization, weight in [(self.phaseGradientRegularization, self.regulargradientphase),(self.waveGradientRegularization,self.regulargradientwave ),(self.dyadicRegularization,self.regulardyad)]:
+				if weight ==0:
+					continue
+				for regResids,regJac,indices in zip( *regularization(guess,computeDerivatives), [self.im0,self.im1]):
+					residuals[idx:idx+regResids.size]=regResids*np.sqrt(weight)
+					if computeDerivatives:
+						jacobian[idx:idx+regResids.size,indices]=regJac*np.sqrt(weight)
+					idx+=regResids.size
 
 		if computeDerivatives:
 			print('loop took %i seconds'%(time.time()-tstart))
@@ -601,11 +616,6 @@ restricted parameter set has not been implemented: {}""".format(fit))
 		if np.any(np.isnan(stepsize)):
 			print('NaN detected in stepsize; exitting to debugger')
 			import pdb;pdb.set_trace()
-		
-
-# 		if self.regularize:
-# 			self.dyadicRegularization(X)
-# 			self.gradientRegularization(X)
 			
 		X[includePars] -= stepsize
 		
