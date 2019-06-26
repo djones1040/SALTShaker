@@ -7,7 +7,7 @@ from salt3.util.synphot import synphot
 from sncosmo.salt2utils import SALT2ColorLaw
 import time
 from itertools import starmap
-from salt3.training import init_hsiao,saltresids
+from salt3.training import init_hsiao,saltresids #_master as saltresids
 from sncosmo.models import StretchSource
 from scipy.optimize import minimize, least_squares
 from scipy.stats import norm
@@ -512,15 +512,17 @@ class GaussNewton(saltresids.SALTResids):
 					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = specresidsdict['dspecresid_d{}'.format(snparam)]
 			idx += idxp
 		print('priors: ',*self.usePriors)
-		
+
 		# priors
-		priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,guess)
-		print(*priorVals)
-		#doPriors = False
-		if doPriors:
-			residuals[idx:idx+priorResids.size]=priorResids
-			jacobian[idx:idx+priorResids.size,:]=priorJac
-			idx+=priorResids.size
+		print('hack')
+		if not 'hi':
+			priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,guess)
+			print(*priorVals)
+			#doPriors = False
+			if doPriors:
+				residuals[idx:idx+priorResids.size]=priorResids
+				jacobian[idx:idx+priorResids.size,:]=priorJac
+				idx+=priorResids.size
 			
 		if self.regularize:
 			for regularization, weight in [(self.phaseGradientRegularization, self.regulargradientphase),(self.waveGradientRegularization,self.regulargradientwave ),(self.dyadicRegularization,self.regulardyad)]:
@@ -538,13 +540,13 @@ class GaussNewton(saltresids.SALTResids):
 		else:
 			return residuals
 	
-	def robust_process_fit(self,X,chi2_init,iter,chi2_last):
+	def robust_process_fit(self,X,chi2_init,niter,chi2_last):
 
 		#print('hack!')
 		Xtmp = copy.deepcopy(X)
-		if iter == 0: computePCDerivs = True
+		if niter == 0: computePCDerivs = True
 		else: computePCDerivs = False
-		Xtmp,chi2_all = self.process_fit(Xtmp,fit='all',computePCDerivs=computePCDerivs)
+		Xtmp,chi2_all = self.process_fit(Xtmp,fit='all',computePCDerivs=True)
 
 		if chi2_init - chi2_all > 1 and chi2_all/chi2_last < 0.9:
 			return Xtmp,chi2_all
@@ -613,7 +615,7 @@ restricted parameter set has not been implemented: {}""".format(fit))
 		if np.any(np.isnan(stepsize)):
 			print('NaN detected in stepsize; exitting to debugger')
 			import pdb;pdb.set_trace()
-			
+
 		X[includePars] -= stepsize
 
 		# quick eval
