@@ -28,16 +28,16 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 		
 	#m1phase = phase*1.1
 	# was *3 (phase), *5 (wave)
-	splinephase = np.linspace(phaserange[0]-phasesplineres*0,phaserange[1]+phasesplineres*0,(phaserange[1]-phaserange[0])/phasesplineres+0*2,False)
-	splinewave = np.linspace(waverange[0]-wavesplineres*0,waverange[1]+wavesplineres*0,(waverange[1]-waverange[0])/wavesplineres+0*2,False)
+	splinephase = np.linspace(phaserange[0]-phasesplineres*0,phaserange[1]+phasesplineres*0,int((phaserange[1]-phaserange[0])/phasesplineres)+0*2,False)
+	splinewave = np.linspace(waverange[0]-wavesplineres*0,waverange[1]+wavesplineres*0,int((waverange[1]-waverange[0])/wavesplineres)+0*2,False)
 	
 	bspl = bisplrep(phase,wave,m0flux,kx=3,ky=3,
 					tx=splinephase,ty=splinewave,task=-1)
 
 	intphase = np.linspace(phaserange[0],phaserange[1]+phaseinterpres,
-						   (phaserange[1]-phaserange[0])/phaseinterpres+1,False)
+						   int((phaserange[1]-phaserange[0])/phaseinterpres)+1,False)
 	intwave = np.linspace(waverange[0],waverange[1]+waveinterpres,
-						  (waverange[1]-waverange[0])/waveinterpres+1,False)
+						  int((waverange[1]-waverange[0])/waveinterpres)+1,False)
 
 
 	m0 = bisplev(intphase,intwave,bspl)

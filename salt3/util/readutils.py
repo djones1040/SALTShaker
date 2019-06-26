@@ -8,6 +8,7 @@ from salt3.data import data_rootdir
 from astroquery.irsa_dust import IrsaDust
 from astropy.coordinates import SkyCoord
 import astropy.units as u
+import warnings
 
 def rdkcor(surveylist,options,addwarning=None):
 
@@ -21,16 +22,17 @@ def rdkcor(surveylist,options,addwarning=None):
 			kcorfile = '%s/%s'%(data_rootdir,kcorfile)
 			if not os.path.exists(kcorfile):
 				raise RuntimeError('kcor file %s does not exist'%kcorfile)
-
-		try:
-			hdu = fits.open(kcorfile)
-			zpoff = hdu[1].data
-			snsed = hdu[2].data
-			filtertrans = hdu[5].data
-			primarysed = hdu[6].data
-			hdu.close()
-		except:
-			raise RuntimeError('kcor file format is non-standard for kcor file %s'%kcorfile)
+		with warnings.catch_warnings():
+			warnings.simplefilter("ignore")
+			try:
+				hdu = fits.open(kcorfile)
+				zpoff = hdu[1].data
+				snsed = hdu[2].data
+				filtertrans = hdu[5].data
+				primarysed = hdu[6].data
+				hdu.close()
+			except:
+				raise RuntimeError('kcor file format is non-standard for kcor file %s'%kcorfile)
 
 		for subsurvey in subsurveys:
 			kcorkey = '%s(%s)'%(survey,subsurvey)

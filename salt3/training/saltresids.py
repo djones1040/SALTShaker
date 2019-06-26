@@ -85,22 +85,22 @@ class SALTResids:
 		# set some phase/wavelength arrays
 		self.splinecolorwave = np.linspace(self.colorwaverange[0],self.colorwaverange[1],self.n_colorpars)
 		self.phasebins = np.linspace(self.phaserange[0],self.phaserange[1],
-							 1+ (self.phaserange[1]-self.phaserange[0])/self.phaseres)
+							 1+ int((self.phaserange[1]-self.phaserange[0])/self.phaseres))
 		self.wavebins = np.linspace(self.waverange[0],self.waverange[1],
-							 1+(self.waverange[1]-self.waverange[0])/self.waveres)
+							 1+int((self.waverange[1]-self.waverange[0])/self.waveres))
 
 		self.phase = np.linspace(self.phaserange[0],self.phaserange[1],
-								 (self.phaserange[1]-self.phaserange[0])/self.phaseoutres,False)
+								 int((self.phaserange[1]-self.phaserange[0])/self.phaseoutres),False)
 		self.wave = np.linspace(self.waverange[0],self.waverange[1],
-								(self.waverange[1]-self.waverange[0])/self.waveoutres,False)
+								int((self.waverange[1]-self.waverange[0])/self.waveoutres),False)
 		self.maxPhase=np.where(abs(self.phase) == np.min(abs(self.phase)))[0]
 		
 		self.splinephase = np.linspace(self.phaserange[0]-self.phaseres*0,
 									   self.phaserange[1]+self.phaseres*0,
-									   (self.phaserange[1]-self.phaserange[0])/self.phaseres+0*2,False)
+									   int((self.phaserange[1]-self.phaserange[0])/self.phaseres),False)
 		self.splinewave = np.linspace(self.waverange[0]-self.waveres*0,
 									  self.waverange[1]+self.waveres*0,
-									  (self.waverange[1]-self.waverange[0])/self.waveres+0*2,False)
+									  int((self.waverange[1]-self.waverange[0])/self.waveres),False)
 
 
 		self.neff=0
