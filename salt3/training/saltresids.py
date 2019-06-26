@@ -434,13 +434,13 @@ class SALTResids:
 			
 			# derivatives....
 			if computeDerivatives:
-				#specresultsdict['dmodelflux_dc'][iSpecStart:iSpecStart+SpecLen,0] = x0*(M0interp + x1*M1interp)*np.log(10)*colorlawinterp
+				specresultsdict['dmodelflux_dc'][iSpecStart:iSpecStart+SpecLen,0] = x0*(M0interp + x1*M1interp)*np.log(10)*colorlawinterp
 
-				empderiv = (x0*(M0interpmod + x1*M1interpmod) - x0*(M0interp + x1*M1interp))/1e-7
+				#empderiv = (x0*(M0interpmod + x1*M1interpmod) - x0*(M0interp + x1*M1interp))/1e-7
 				#print(np.sum(specresultsdict['dmodelflux_dc'][iSpecStart:iSpecStart+SpecLen,0]),np.sum(empderiv))
 				#photresultsdict['dmodelflux_dc'][selectFilter,0]=np.sum((modulatedFlux)*np.log(10)*colorlaw[np.newaxis,idx[flt]], axis=1)*dwave*self.fluxfactor[survey][flt]
 				#import pdb; pdb.set_trace()
-				specresultsdict['dmodelflux_dc'][iSpecStart:iSpecStart+SpecLen,0] = empderiv
+				#specresultsdict['dmodelflux_dc'][iSpecStart:iSpecStart+SpecLen,0] = empderiv
 				specresultsdict['dmodelflux_dx0'][iSpecStart:iSpecStart+SpecLen,0] = (M0interp + x1*M1interp)
 				specresultsdict['dmodelflux_dx1'][iSpecStart:iSpecStart+SpecLen,0] = x0*M1interp
 

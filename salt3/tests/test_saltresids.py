@@ -1,9 +1,10 @@
 import unittest
-from salt3.training import saltfit
+from salt3.training import saltresids
 from salt3.training.TrainSALT import TrainSALT
 import numpy as np
 import pickle, argparse, configparser,warnings
 from salt3.util import snana,readutils
+from sncosmo.salt2utils import SALT2ColorLaw
 
 class TRAINING_Test(unittest.TestCase):
 	
@@ -24,13 +25,115 @@ class TRAINING_Test(unittest.TestCase):
 									   ts.addwarning,speclist=options.speclist)
 		datadict = ts.mkcuts(datadict)
 	
-		parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc = ts.initialParameters(datadict)
+		self.parlist,self.guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc = ts.initialParameters(datadict)
 		saltfitkwargs = ts.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
 
-		self.saltfitter = saltfit.GaussNewton(guess,datadict,parlist,**saltfitkwargs)			
-	
-	def test_init_chi2func(self):
-		self.assertTrue(True)
+		self.resids = saltresids.SALTResids(self.guess,datadict,self.parlist,**saltfitkwargs)	
+		
+	def test_prior_jacobian(self):
+		"""Checks that all designated priors are properly calculating the jacobian of their residuals to within 1%"""
+				#Define simple models for m0,m1
+				
+		for prior in self.resids.priors:
+			print('Testing prior', prior)
+			components=self.resids.SALTModel(self.guess)
+			resid,val,jacobian=self.resids.priors[prior](0.3145,self.guess,components)
+			dx=1e-3
+			def incrementOneParam(i):
+				guess=self.guess.copy()
+				guess[i]+=dx
+				components=self.resids.SALTModel(guess)
+				return self.resids.priors[prior](0.3145,guess,components)[0]
+			dPriordX=(np.vectorize(incrementOneParam)(np.arange(self.guess.size))-resid)/dx
+			#import pdb;pdb.set_trace()
+			#Check that all derivatives that should be 0 are zero
+			try:
+				self.assertTrue(np.all((dPriordX==0)==(jacobian==0)))
+				self.assertTrue(np.allclose(jacobian,dPriordX,rtol=1e-2))
+			except:
+				import pdb;pdb.set_trace()
+
+	def test_photresid_jacobian(self):
+		"""Checks that the the jacobian of the photometric residuals is being correctly calculated to within 1%"""
+				#Define simple models for m0,m1
+		dx=1e-3
+		rtol=1e-2
+		sn=self.resids.datadict.keys().__iter__().__next__()
+		components = self.resids.SALTModel(self.resids.guess)
+		salterr = self.resids.ErrModel(self.resids.guess)
+		if self.resids.n_colorpars:
+			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.resids.guess[self.resids.parlist == 'cl'])
+		else: colorLaw = None
+		if self.resids.n_colorscatpars:
+			colorScat = True
+		else: colorScat = None
+		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,True,True)
+		
+		residuals = photresidsdict['photresid']
+		
+		jacobian=np.zeros((residuals.size,self.parlist.size))
+		jacobian[:,self.parlist=='cl'] = photresidsdict['dphotresid_dcl']
+		jacobian[:,self.parlist=='m0'] = photresidsdict['dphotresid_dM0']
+		jacobian[:,self.parlist=='m1'] = photresidsdict['dphotresid_dM1']
+		for snparam in ('x0','x1','c'): #tpkoff should go here
+			jacobian[:,self.parlist == '{}_{}'.format(snparam,sn)] = photresidsdict['dphotresid_d{}'.format(snparam)]
+		def incrementOneParam(i):
+			guess=self.guess.copy()
+			guess[i]+=dx
+			components=self.resids.SALTModel(guess)
+			if self.resids.n_colorpars:
+				colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
+			else: colorLaw = None
+			return self.resids.ResidsForSN(guess,sn,components,colorLaw,False)[0]['photresid']
+		dResiddX=np.zeros((residuals.size,self.parlist.size))
+		for i in range(self.guess.size):
+			dResiddX[:,i]=(incrementOneParam(i)-residuals)/dx
+		try:
+			self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
+		except:
+			import pdb;pdb.set_trace()
+
+	def test_specresid_jacobian(self):
+		"""Checks that the the jacobian of the spectroscopic residuals is being correctly calculated to within 1%"""
+				#Define simple models for m0,m1
+		dx=1e-3
+		rtol=1e-2
+		sn=self.resids.datadict.keys().__iter__().__next__()
+		components = self.resids.SALTModel(self.resids.guess)
+		salterr = self.resids.ErrModel(self.resids.guess)
+		if self.resids.n_colorpars:
+			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.resids.guess[self.resids.parlist == 'cl'])
+		else: colorLaw = None
+		if self.resids.n_colorscatpars:
+			colorScat = True
+		else: colorScat = None
+		specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,True,True)[1]
+		
+		residuals = specresidsdict['specresid']
+		
+		jacobian=np.zeros((residuals.size,self.parlist.size))
+		jacobian[:,self.parlist=='cl'] = specresidsdict['dspecresid_dcl']
+		jacobian[:,self.parlist=='m0'] = specresidsdict['dspecresid_dM0']
+		jacobian[:,self.parlist=='m1'] = specresidsdict['dspecresid_dM1']
+		for snparam in ('x0','x1','c'): #tpkoff should go here
+			jacobian[:,self.parlist == '{}_{}'.format(snparam,sn)] = specresidsdict['dspecresid_d{}'.format(snparam)]
+		def incrementOneParam(i):
+			guess=self.guess.copy()
+			guess[i]+=dx
+			components=self.resids.SALTModel(guess)
+			if self.resids.n_colorpars:
+				colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
+			else: colorLaw = None
+			return self.resids.ResidsForSN(guess,sn,components,colorLaw,False)[1]['specresid']
+		dResiddX=np.zeros((residuals.size,self.parlist.size))
+		for i in range(self.guess.size):
+			dResiddX[:,i]=(incrementOneParam(i)-residuals)/dx
+		try:
+			self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
+		except:
+			import pdb;pdb.set_trace()
+# 	def test_init_chi2func(self):
+# 		self.assertTrue(True)
 # 		waverange = [2000,9200]
 # 		colorwaverange = [2800,7000]
 # 		phaserange = [-14,50]
@@ -66,8 +169,8 @@ class TRAINING_Test(unittest.TestCase):
 # 
 # 		#saltfitter.chi2fit(guess)
 # 		self.assertTrue('stdmag' in saltfitter.__dict__.keys())
-	def test_chi2forSN(self):
-		self.assertTrue(True)
+# 	def test_chi2forSN(self):
+# 		self.assertTrue(True)
 # 		waverange = [2000,9200]
 # 		colorwaverange = [2800,7000]
 # 		phaserange = [-14,50]
@@ -103,8 +206,8 @@ class TRAINING_Test(unittest.TestCase):
 # 		ts = TrainSALT()
 # 		ts.rdkcor(kcorpath)
 		
-	def test_synphot(self):
-		self.assertTrue(True)
+# 	def test_synphot(self):
+# 		self.assertTrue(True)
 # 		waverange = [2000,9200]
 # 		colorwaverange = [2800,7000]
 # 		phaserange = [-19,55]
@@ -152,3 +255,5 @@ class TRAINING_Test(unittest.TestCase):
 # 			self.assertTrue(np.abs(abmag-ts.kcordict['PS1MD'][flt]['zpoff']-saltfitter.stdmag['PS1MD'][flt]) < 0.001)
 # 			self.assertTrue(np.abs(vegamag-abmag-abo) < 0.015)
 # 
+if __name__ == "__main__":
+    unittest.main()
