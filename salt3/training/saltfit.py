@@ -414,9 +414,7 @@ class mcmc(saltresids.SALTResids):
 		return return_bool
 
 class GaussNewton(saltresids.SALTResids):
-	def __init__(self,guess,datadict,parlist,chain=[],loglikes=[],**kwargs):
-		self.loglikes=loglikes
-		self.chain=chain
+	def __init__(self,guess,datadict,parlist,**kwargs):
 		self.warnings = []
 		self.debug=False
 		super().__init__(guess,datadict,parlist,**kwargs)
