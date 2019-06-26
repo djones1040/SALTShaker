@@ -512,15 +512,13 @@ class GaussNewton(saltresids.SALTResids):
 		print('priors: ',*self.usePriors)
 
 		# priors
-		print('hack')
-		if not 'hi':
-			priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,guess)
-			print(*priorVals)
+		priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,guess)
+		print(*priorVals)
 			#doPriors = False
-			if doPriors:
-				residuals[idx:idx+priorResids.size]=priorResids
-				jacobian[idx:idx+priorResids.size,:]=priorJac
-				idx+=priorResids.size
+		if doPriors:
+			residuals[idx:idx+priorResids.size]=priorResids
+			jacobian[idx:idx+priorResids.size,:]=priorJac
+			idx+=priorResids.size
 			
 		if self.regularize:
 			for regularization, weight in [(self.phaseGradientRegularization, self.regulargradientphase),(self.waveGradientRegularization,self.regulargradientwave ),(self.dyadicRegularization,self.regulardyad)]:
