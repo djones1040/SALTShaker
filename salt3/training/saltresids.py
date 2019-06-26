@@ -727,7 +727,7 @@ class SALTResids:
 					#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
 					#Integrate only over wavelengths within the relevant range
 					inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
-					derivInterp = interp1d(self.phase,self.spline_derivs[i,:,inbounds],axis=1,kind='nearest',bounds_error=False,fill_value="extrapolate")
+					derivInterp = interp1d(self.phase,self.spline_derivs[i][:,inbounds],axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
 					fluxDeriv[self.im0[i]] = np.sum( passbandColorExp[inbounds] * derivInterp(0))*intmult 
 			self.__m0priorfluxderiv__=fluxDeriv.copy()
 		
@@ -766,7 +766,7 @@ class SALTResids:
 			jacobian=np.zeros(self.npar)
 			for i in range(self.im0.size):
 				if i <(self.waveknotloc.size-self.bsorder-1) :
-					jacobian[self.im0[i]] = np.sum( self.spline_derivs[i,0,:] )
+					jacobian[self.im0[i]] = np.sum( self.spline_derivs[i][0,:] )
 			self.__m0endpriorderiv__=jacobian.copy()
 		jacobian/=width
 		return residual,value,jacobian
@@ -782,7 +782,7 @@ class SALTResids:
 			jacobian=np.zeros(self.npar)
 			for i in range(self.im0.size):
 				if i <(self.waveknotloc.size-self.bsorder-1) :
-					jacobian[self.im1[i]] = np.sum( self.spline_derivs[i,0,:] )
+					jacobian[self.im1[i]] = np.sum( self.spline_derivs[i][0,:] )
 			self.__m1endpriorderiv__=jacobian.copy()
 		jacobian/=width
 		return residual,value,jacobian
