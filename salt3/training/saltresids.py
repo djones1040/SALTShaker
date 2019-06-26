@@ -693,9 +693,9 @@ class SALTResids:
 		residual = (m0B-self.m0guess) / width
 		#This derivative is constant, and never needs to be recalculated, so I store it in a hidden attribute
 		try:
-			jacobian= self.__m0priorderiv__.copy()
+			fluxDeriv= self.__m0priorfluxderiv__.copy()
 		except:
-			jacobian = np.zeros(self.npar)
+			fluxDeriv= np.zeros(self.npar)
 			passbandColorExp = self.kcordict['default']['Bpbspl']
 			intmult = (self.wave[1] - self.wave[0])*self.kcordict['default']['fluxfactor']
 			for i in range(self.im0.size):
@@ -709,9 +709,10 @@ class SALTResids:
 					#Integrate only over wavelengths within the relevant range
 					inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
 					derivInterp = interp1d(self.phase,self.spline_derivs[i,:,inbounds],axis=1,kind='nearest',bounds_error=False,fill_value="extrapolate")
-					jacobian[self.im0[i]] = np.sum( passbandColorExp[inbounds] * derivInterp(0))*intmult
-			self.__m0priorderiv__=jacobian.copy()
-		jacobian/=width
+					fluxDeriv[self.im0[i]] = np.sum( passbandColorExp[inbounds] * derivInterp(0))*intmult 
+			self.__m0priorfluxderiv__=fluxDeriv.copy()
+		
+		jacobian=-fluxDeriv* (2.5 / (np.log(10) *m0Bflux * width))
 		return residual,m0B,jacobian
 		
 	@prior
