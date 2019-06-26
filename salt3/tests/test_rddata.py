@@ -1,6 +1,6 @@
 import unittest
 from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
-from salt3.util import snana
+from salt3.util import snana,readutils
 from salt3.training.TrainSALT import TrainSALT
 from salt3.training.init_hsiao import init_hsiao
 import numpy as np
@@ -9,48 +9,56 @@ class RdTest(unittest.TestCase):
 
 	def test_t0_measure(self):
 
-		sn = snana.SuperNova('examples/exampledata/photdata/ASASSN-16bc.snana.dat')
+		sn = snana.SuperNova('testdata/SALT3TEST_SIMPLE_SN5999390.DAT')
 		t0,msg = estimate_tpk_bazin(sn.MJD,sn.FLUXCAL,sn.FLUXCALERR)
 
 		self.assertTrue('termination condition is satisfied' in msg)
-		print(t0)
-		self.assertTrue(np.abs(t0-57425) < 5)
+		self.assertTrue(np.abs(t0-float(sn.SIM_PEAKMJD.replace('days',''))) < 5)
 
 	def test_rddata(self):
 
-		snlist = 'examples/exampledata/photdata/PHOTFILES.LIST'
-		nsn = len(np.loadtxt(snlist,dtype='str'))
+		snlist = 'testdata/SALT3TEST_SIMPLE.LIST'
+		nsn = (np.loadtxt(snlist,dtype='str')).size
 		ts = TrainSALT()
-		datadict = ts.rdAllData(snlist)
+		options= type('test', (), {})()
+		options.PS1_LOWZ_COMBINED_kcorfile='kcor/kcor_PS1_LOWZ_COMBINED.fits'
+		options.PS1_LOWZ_COMBINED_subsurveylist='CFA3S,CFA3K,CFA4p1,CFA4p2,CSP,CFA1,CFA2'
+		kcordict=readutils.rdkcor(['PS1_LOWZ_COMBINED'],options,addwarning=lambda x: None)
+		datadict = readutils.rdAllData(snlist,False,kcordict,ts.addwarning)
 
 		self.assertTrue(len(datadict.keys()) == nsn)
 
 	def test_rdspecdata(self):
 
-		snlist = 'examples/exampledata/photdata/PHOTFILES.LIST'
-		speclist = 'examples/exampledata/specdata/SPECFILES.LIST'
-		nsn = len(np.loadtxt(snlist,dtype='str'))
+		snlist = 'testdata/SALT3TEST_SIMPLE.LIST'
+		speclist = 'testdata/SALT3TEST_SIMPLE.LIST'
+		nsn = np.loadtxt(snlist,dtype='str').size
 		ts = TrainSALT()
-		datadict = ts.rdAllData(snlist,speclist)
+		options= type('test', (), {})()
+		options.PS1_LOWZ_COMBINED_kcorfile='kcor/kcor_PS1_LOWZ_COMBINED.fits'
+		options.PS1_LOWZ_COMBINED_subsurveylist='CFA3S,CFA3K,CFA4p1,CFA4p2,CSP,CFA1,CFA2'
+		
+		kcordict=readutils.rdkcor(['PS1_LOWZ_COMBINED'],options,addwarning=lambda x: None)
+		datadict = readutils.rdAllData(snlist,False,kcordict,ts.addwarning,speclist)
 
 		self.assertTrue(len(datadict.keys()) == nsn)
 		
 	def test_rdkcor(self):
-
-		kcorfile = 'examples/kcor/kcor_PS1_PS1MD.fits'
-		survey = 'PS1MD'
-		kcorpath = ('%s,%s'%(survey,kcorfile),)
+		survey = 'PS1MD(PS1MD)'
 		ts = TrainSALT()
-		ts.rdkcor(kcorpath)
+		options= type('test', (), {})()
+		options.PS1MD_kcorfile='kcor/kcor_PS1_PS1MD.fits'
+		options.PS1MD_subsurveylist='PS1MD'
+		ts.kcordict=readutils.rdkcor(['PS1MD'],options,addwarning=lambda x: None)
 
 		self.assertTrue('kcordict' in ts.__dict__.keys())
-		self.assertTrue('g' in ts.kcordict['PS1MD'].keys())
-		self.assertTrue('r' in ts.kcordict['PS1MD'].keys())
-		self.assertTrue('i' in ts.kcordict['PS1MD'].keys())
-		self.assertTrue('z' in ts.kcordict['PS1MD'].keys())
+		self.assertTrue('g' in ts.kcordict[survey].keys())
+		self.assertTrue('r' in ts.kcordict[survey].keys())
+		self.assertTrue('i' in ts.kcordict[survey].keys())
+		self.assertTrue('z' in ts.kcordict[survey].keys())
 		
-		self.assertTrue(len(ts.kcordict['PS1MD']['g']['filttrans']) == len(ts.kcordict['PS1MD']['filtwave']))
-		self.assertTrue(len(ts.kcordict['PS1MD']['primarywave']) == len(ts.kcordict['PS1MD']['AB']))
+		self.assertTrue(len(ts.kcordict[survey]['g']['filttrans']) == len(ts.kcordict[survey]['filtwave']))
+		self.assertTrue(len(ts.kcordict[survey]['primarywave']) == len(ts.kcordict[survey]['AB']))
 
 		
 	def test_read_hsiao(self):
@@ -65,8 +73,9 @@ class RdTest(unittest.TestCase):
 		n_phaseknots = int((phaserange[1]-phaserange[0])/phasesplineres)-4
 		n_waveknots = int((waverange[1]-waverange[0])/wavesplineres)-4
 		
-		phase,wave,m0,m1,m0knots,m1knots = init_hsiao(
-			initmodelfile,phaserange=phaserange,waverange=waverange,
+		phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(initmodelfile,
+			 Bfilt='salt3/initfiles/Bessell90_B.dat',
+			   flatnu='salt3/initfiles/flatnu.dat',phaserange=phaserange,waverange=waverange,
 			phasesplineres=phasesplineres,wavesplineres=wavesplineres,
 			phaseinterpres=phaseoutres,waveinterpres=waveoutres)
 

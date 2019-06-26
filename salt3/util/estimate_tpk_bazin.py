@@ -21,8 +21,6 @@ def estimate_tpk_bazin(time, flux, fluxerr, t0=None, max_nfev=10000000):
 	flux,fluxerr,scaled_time = flux[iTime],fluxerr[iTime],scaled_time[iTime]
 	if len(scaled_time) < 3:
 		return -99,'failed'
-	if t0 < time.min():
-		return -99,'failed'
 	
 	if not t0:
 		t0 = scaled_time[flux.argmax()]

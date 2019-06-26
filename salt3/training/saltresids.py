@@ -85,22 +85,22 @@ class SALTResids:
 		# set some phase/wavelength arrays
 		self.splinecolorwave = np.linspace(self.colorwaverange[0],self.colorwaverange[1],self.n_colorpars)
 		self.phasebins = np.linspace(self.phaserange[0],self.phaserange[1],
-							 1+ (self.phaserange[1]-self.phaserange[0])/self.phaseres)
+							 1+ int((self.phaserange[1]-self.phaserange[0])/self.phaseres))
 		self.wavebins = np.linspace(self.waverange[0],self.waverange[1],
-							 1+(self.waverange[1]-self.waverange[0])/self.waveres)
+							 1+int((self.waverange[1]-self.waverange[0])/self.waveres))
 
 		self.phase = np.linspace(self.phaserange[0],self.phaserange[1],
-								 (self.phaserange[1]-self.phaserange[0])/self.phaseoutres,False)
+								 int((self.phaserange[1]-self.phaserange[0])/self.phaseoutres),False)
 		self.wave = np.linspace(self.waverange[0],self.waverange[1],
-								(self.waverange[1]-self.waverange[0])/self.waveoutres,False)
+								int((self.waverange[1]-self.waverange[0])/self.waveoutres),False)
 		self.maxPhase=np.where(abs(self.phase) == np.min(abs(self.phase)))[0]
 		
 		self.splinephase = np.linspace(self.phaserange[0]-self.phaseres*0,
 									   self.phaserange[1]+self.phaseres*0,
-									   (self.phaserange[1]-self.phaserange[0])/self.phaseres+0*2,False)
+									   int((self.phaserange[1]-self.phaserange[0])/self.phaseres),False)
 		self.splinewave = np.linspace(self.waverange[0]-self.waveres*0,
 									  self.waverange[1]+self.waveres*0,
-									  (self.waverange[1]-self.waverange[0])/self.waveres+0*2,False)
+									  int((self.waverange[1]-self.waverange[0])/self.waveres),False)
 
 
 		self.neff=0
@@ -712,9 +712,9 @@ class SALTResids:
 		residual = (m0B-self.m0guess) / width
 		#This derivative is constant, and never needs to be recalculated, so I store it in a hidden attribute
 		try:
-			jacobian= self.__m0priorderiv__.copy()
+			fluxDeriv= self.__m0priorfluxderiv__.copy()
 		except:
-			jacobian = np.zeros(self.npar)
+			fluxDeriv= np.zeros(self.npar)
 			passbandColorExp = self.kcordict['default']['Bpbspl']
 			intmult = (self.wave[1] - self.wave[0])*self.kcordict['default']['fluxfactor']
 			for i in range(self.im0.size):
@@ -728,9 +728,10 @@ class SALTResids:
 					#Integrate only over wavelengths within the relevant range
 					inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
 					derivInterp = interp1d(self.phase,self.spline_derivs[i,:,inbounds],axis=1,kind='nearest',bounds_error=False,fill_value="extrapolate")
-					jacobian[self.im0[i]] = np.sum( passbandColorExp[inbounds] * derivInterp(0))*intmult
-			self.__m0priorderiv__=jacobian.copy()
-		jacobian/=width
+					fluxDeriv[self.im0[i]] = np.sum( passbandColorExp[inbounds] * derivInterp(0))*intmult 
+			self.__m0priorfluxderiv__=fluxDeriv.copy()
+		
+		jacobian=-fluxDeriv* (2.5 / (np.log(10) *m0Bflux * width))
 		return residual,m0B,jacobian
 		
 	@prior
