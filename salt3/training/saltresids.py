@@ -108,7 +108,6 @@ class SALTResids:
 		self.salterr[:] = 1e-10
 		
 		self.m0guess = -19.49 #10**(-0.4*(-19.49-27.5))
-		self.m1guess = 1
 		self.extrapolateDecline=0.015
 		# set up the filters
 		self.stdmag = {}
@@ -620,7 +619,7 @@ class SALTResids:
 			
 		return photresultsdict,specresultsdict
 	
-	@prior
+	#@prior
 	def peakprior(self,width,x,components):
 		wave=self.wave[self.bbandoverlap]
 		lightcurve=np.sum(self.bbandpbspl[np.newaxis,:]*components[0][:,self.bbandoverlap],axis=1)
@@ -702,6 +701,7 @@ class SALTResids:
 			self.__m0endpriorderiv__=jacobian.copy()
 		jacobian/=width
 		return residual,value,jacobian
+
 	@prior
 	def m1endprior(self,width,x,components):
 		"""Prior such that at early times there is no effect of stretch"""
@@ -1082,22 +1082,22 @@ class SALTResids:
 			
 			#For each photometric filter, weight the contribution by  
 			for flt in np.unique(photdata['filt']):
-				g = (self.wavebins[:-1]	 >= filtwave[0]/(1+z)) & (self.wavebins[1:] <= filtwave[-1]/(1+z))	# overlap range
+				
 				if flt+'-neffweighting' in self.datadict[sn]:
 					pbspl=self.datadict[sn][flt+'-neffweighting']
 				else:
 					filttrans = self.kcordict[survey][flt]['filttrans']
-					pbspl = np.zeros(g.sum())
-					for i in range(g.sum()):
-						j=np.where(g)[0][i]
-						pbspl[i]=trapIntegrate(self.wavebins[j],self.wavebins[j+1],filtwave/(1+z),filttrans*filtwave/(1+z))
+					g = (self.wavebins[:-1]	 >= filtwave[0]/(1+z)) & (self.wavebins[1:] <= filtwave[-1]/(1+z))	# overlap range
+					pbspl = np.zeros(g.size)
+					for j in np.where(g)[0]:
+						pbspl[j]=trapIntegrate(self.wavebins[j],self.wavebins[j+1],filtwave/(1+z),filttrans*filtwave/(1+z))
 					#Normalize it so that total number of points added is 1
 					pbspl /= np.sum(pbspl)
 					self.datadict[sn][flt+'-neffweighting']=pbspl
 				#Couple of things going on: -1 to ensure everything lines up, clip to put extrapolated points on last phasebin
 				phaseindices=np.clip(np.searchsorted(self.phasebins,(photdata['tobs'][(photdata['filt']==flt)]+tpkoff)/(1+z))-1,0,self.phasebins.size-2)
 				#Consider weighting neff by variance for each measurement?
-				self.neff[phaseindices,:][:,g]+=pbspl[np.newaxis,:]
+				self.neff[phaseindices,:]+=pbspl[np.newaxis,:]
 
 		#Smear it out a bit along phase axis
 		self.neff=gaussian_filter1d(self.neff,1,0)

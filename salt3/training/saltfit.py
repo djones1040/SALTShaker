@@ -432,7 +432,6 @@ class GaussNewton(saltresids.SALTResids):
 		
 	def convergence_loop(self,guess,loop_niter=3):
 		lastResid = 1e20
-		self.i=0
 		print('Initializing')
 
 		residuals = self.lsqwrap(guess,False,False,doPriors=True)
@@ -441,7 +440,6 @@ class GaussNewton(saltresids.SALTResids):
 
 		print('starting loop')
 		for superloop in range(loop_niter):
-			self.i=superloop
 			X,chi2 = self.robust_process_fit(X,chi2_init,superloop)
 			
 			if chi2_init-chi2 < -1.e-6:
@@ -588,7 +586,6 @@ class GaussNewton(saltresids.SALTResids):
 			elif fit=='component1':
 				includePars[self.im1]=True
 			elif fit=='sn':
-				#print('hack: x0 only')
 				includePars[self.ix0]=True
 				includePars[self.ix1]=True
 			elif fit=='x0':
@@ -618,8 +615,6 @@ restricted parameter set has not been implemented: {}""".format(fit))
 			import pdb;pdb.set_trace()
 			
 		X[includePars] -= stepsize
-		
-		
 
 		# quick eval
 
