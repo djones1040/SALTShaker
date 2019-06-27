@@ -1,4 +1,4 @@
-##Tests for pipeline
+"""Tests for pipeline"""
 import sys
 sys.path.append('/home/mi/salt3/SALT3/salt3')
 from pipeline.pipeline import *

@@ -32,7 +32,8 @@ Overview
    training
    simulation
    validation
-
+   pipeline
+   
 
 Indices and tables
 ==================
