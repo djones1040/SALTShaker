@@ -1,5 +1,11 @@
 ##SALT3 INPUT
 
+[survey]
+kcor=
+
+[data]
+snlist=/home/mi/snana/SNDATA_ROOT/SIM/BYOSEDTEST/BYOSEDTEST.LIST
+
 [byosed]
 baseinput=BYOSED_base.params
 outinput=pipelinetest/TEST_BYOSED.params

@@ -5,6 +5,7 @@
      USE_MINOS = T
      
      VERSION_PHOTOMETRY = 'BYOSEDTEST'
+     !VERSION_PHOTOMETRY = '/home/mi/salt3/SALT3/examples/pipelinedata/exampledata/snana/photdata/SALT3TEST_SIMPLE.LIST'
 
      PHOTFLAG_MSKREJ    = 0, 0
      SNTABLE_LIST       = 'FITRES LCPLOT(text:key)'
