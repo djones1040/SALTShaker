@@ -28,9 +28,8 @@ from salt3.training import saltfit as saltfit
 class TrainSALT(TrainSALTBase):
 	def __init__(self):
 		self.warnings = []
-		
-	def fitSALTModel(self,datadict):
-
+	
+	def initialParameters(self,datadict):
 		from salt3.initfiles import init_rootdir
 		self.options.inithsiaofile = '%s/hsiao07.dat'%(init_rootdir)
 		flatnu='%s/flatnu.dat'%(init_rootdir)
@@ -41,8 +40,7 @@ class TrainSALT(TrainSALTBase):
 			if self.options.initm1modelfile:
 				self.options.initm1modelfile = '%s/%s'%(init_rootdir,self.options.initm1modelfile)
 		
-			
-		if not os.path.exists(self.options.initm0modelfile):
+		if self.options.initm0modelfile and not os.path.exists(self.options.initm0modelfile):
 			raise RuntimeError('model initialization file not found in local directory or %s'%init_rootdir)
 
 		# initial guesses
@@ -124,52 +122,50 @@ class TrainSALT(TrainSALTBase):
 			i+=1
 
 		if self.options.resume_from_outputdir:
-			names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.outputdir,unpack=True,skiprows=1,dtype="U20,f8")
+			try:
+				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.resume_from_outputdir,unpack=True,skiprows=1,dtype="U20,f8")
+			except:
+				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.outputdir,unpack=True,skiprows=1,dtype="U20,f8")
 			for key in np.unique(parlist):
 				guess[parlist == key] = pars[names == key]
-
+		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
+	
+	def fitSALTModel(self,datadict):
+		parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc = self.initialParameters(datadict)
 		saltfitkwargs = self.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
+		n_phaseknots,n_waveknots = len(phaseknotloc)-4,len(waveknotloc)-4
+		n_errphaseknots,n_errwaveknots = len(errphaseknotloc)-4,len(errwaveknotloc)-4
 
+		fitter = fitting(self.options.n_components,self.options.n_colorpars,
+						 n_phaseknots,n_waveknots,
+						 datadict)
 		print('training on %i SNe!'%len(datadict.keys()))
 		if self.options.do_mcmc:
 			saltfitter = saltfit.mcmc(guess,datadict,parlist,**saltfitkwargs)
 			print('initial loglike: %.1f'%saltfitter.maxlikefit(guess,None,False))
-		
-			fitter = fitting(self.options.n_components,self.options.n_colorpars,
-							 n_phaseknots,n_waveknots,
-							 datadict)
-
 			# do the fitting
 			x_modelpars,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 				modelerr,clpars,clerr,clscat,SNParams,message = fitter.mcmc(
 					saltfitter,guess,self.options.n_processes,
 					self.options.n_steps_mcmc,self.options.n_burnin_mcmc)
-			for k in datadict.keys():
-				tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
-				#if not self.options.fix_t0:
-				SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
 
 		if self.options.do_gaussnewton:
 			if not self.options.do_mcmc: x_modelpars = guess[:]
-			saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)
-			fitter = fitting(self.options.n_components,self.options.n_colorpars,
-							 n_phaseknots,n_waveknots,
-							 datadict)
-			
+			saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)			
 			# do the fitting
 			x_modelpars,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 				modelerr,clpars,clerr,clscat,SNParams,message = fitter.gaussnewton(
-					saltfitter,guess,self.options.n_processes,
+					saltfitter,x_modelpars,self.options.n_processes,
 					self.options.n_steps_mcmc,self.options.n_burnin_mcmc,
 					self.options.gaussnewton_maxiter)
-			for k in datadict.keys():
-				tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
-				SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
+		for k in datadict.keys():
+			tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
+			SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
 
 		
 		print('MCMC message: %s'%message)
-		print('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
-			  saltfitter.regularizationChi2(x_modelpars,0,1,0),saltfitter.regularizationChi2(x_modelpars,0,0,1))
+		#print('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
+		#	  saltfitter.regularizationChi2(x_modelpars,0,1,0),saltfitter.regularizationChi2(x_modelpars,0,0,1))
 		print('Final loglike'); saltfitter.maxlikefit(x_modelpars,None,False)
 
 		print(x_modelpars.size)
@@ -177,9 +173,14 @@ class TrainSALT(TrainSALTBase):
 
 		#print('Finishing...To write files, hit c')
 		#import pdb; pdb.set_trace()
-		
+
+		if 'chain' in saltfitter.__dict__.keys():
+			chain = saltfitter.chain
+			loglikes = saltfitter.loglikes
+		else: chain,loglikes = None,None
+			
 		return phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-			modelerr,clpars,clerr,clscat,SNParams,x_modelpars,parlist,saltfitter.chain,saltfitter.loglikes
+			modelerr,clpars,clerr,clscat,SNParams,x_modelpars,parlist,chain,loglikes
 
 	def wrtoutput(self,outdir,phase,wave,
 				  M0,M0err,M1,M1err,cov_M0_M1,
