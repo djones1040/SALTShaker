@@ -173,9 +173,14 @@ class TrainSALT(TrainSALTBase):
 
 		#print('Finishing...To write files, hit c')
 		#import pdb; pdb.set_trace()
-		
+
+		if 'chain' in saltfitter.__dict__.keys():
+			chain = saltfitter.chain
+			loglikes = saltfitter.loglikes
+		else: chain,loglikes = None,None
+			
 		return phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-			modelerr,clpars,clerr,clscat,SNParams,x_modelpars,parlist,saltfitter.chain,saltfitter.loglikes
+			modelerr,clpars,clerr,clscat,SNParams,x_modelpars,parlist,chain,loglikes
 
 	def wrtoutput(self,outdir,phase,wave,
 				  M0,M0err,M1,M1err,cov_M0_M1,
