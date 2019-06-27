@@ -4,8 +4,53 @@ from salt3.util import readutils
 from matplotlib import pyplot as plt
 from scipy.special import factorial
 from matplotlib.backends.backend_pdf import PdfPages
+#0.178516, 7.485606e-08, -1.054627, 0.7379956
+from sncosmo.salt2utils import SALT2ColorLaw
+from scipy.interpolate import interp1d
 
+def flux(salt3dir,obsphase,obswave,z,x0,x1,c):
+	m0phase,m0wave,m0flux = np.loadtxt('%s/salt3_template_0.dat'%salt3dir,unpack=True)
+	m1phase,m1wave,m1flux = np.loadtxt('%s/salt3_template_1.dat'%salt3dir,unpack=True)
+	m0flux = m0flux.reshape([len(np.unique(m0phase)),len(np.unique(m0wave))])
+	m1flux = m1flux.reshape([len(np.unique(m1phase)),len(np.unique(m1wave))])
+	
+	try:
+		with open('%s/salt3_color_correction.dat'%(salt3dir)) as fin:
+			lines = fin.readlines()
+		if len(lines):
+			for i in range(len(lines)):
+				lines[i] = lines[i].replace('\n','')
+			colorlaw_salt3_coeffs = np.array(lines[1:5]).astype('float')
+			salt3_colormin = float(lines[6].split()[1])
+			salt3_colormax = float(lines[7].split()[1])
 
+			salt3colorlaw = SALT2ColorLaw([2800,7000],colorlaw_salt3_coeffs)
+	except:
+		pass
+	
+	#z,x0,x1,c = 0.178516, 7.485606e-08, -1.054627, 0.7379956
+	#obsphase = -4.119
+	modelflux = x0*(m0flux + x1*m1flux)*10**(-0.4*c*salt3colorlaw(np.unique(m0wave)))*1e-12/(1+z)
+	# 
+	m0interp = interp1d(np.unique(m0phase)*(1+z),m0flux*10**(-0.4*c*salt3colorlaw(np.unique(m0wave)))*1e-12/(1+z),axis=0,
+						kind='nearest')#,bounds_error=False,fill_value="extrapolate")
+	m0phaseinterp = m0interp(obsphase)
+	m0interp = np.interp(obswave,np.unique(m0wave)*(1+z),m0phaseinterp)
+
+	m1interp = interp1d(np.unique(m0phase)*(1+z),m1flux*10**(-0.4*c*salt3colorlaw(np.unique(m0wave)))*1e-12/(1+z),axis=0,
+						kind='nearest')#,bounds_error=False,fill_value="extrapolate")
+	m1phaseinterp = m1interp(obsphase)
+	m1interp = np.interp(obswave,np.unique(m0wave)*(1+z),m1phaseinterp)
+
+	
+	intphase = interp1d(np.unique(m0phase)*(1+z),modelflux,axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
+	modelflux_phase = intphase(obsphase)
+	intwave = interp1d(np.unique(m0wave)*(1+z),modelflux_phase,kind='nearest',bounds_error=False,fill_value="extrapolate")
+	modelflux_wave = intwave(obswave)
+	modelflux_wave = x0*(m0interp + x1*m1interp)
+	#import pdb; pdb.set_trace()
+	return modelflux_wave
+	
 def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 				   m0file='salt3_template_0.dat',
 				   m1file='salt3_template_1.dat',
@@ -45,6 +90,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 			print('SN {} is not in parameters, skipping'.format(sn))
 			continue
 		model.update(snPars)
+		#import pdb; pdb.set_trace()
 		for k in specdata.keys():
 
 			coeffs=pars[parlist=='specrecal_{}_{}'.format(sn,k)]
@@ -52,7 +98,8 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 			wave=specdata[k]['wavelength']
 			#print(coeffs)
 			modelFlux = model.flux(specdata[k]['tobs'],wave)*np.exp(np.poly1d(coeffs)((wave-np.mean(wave))/2500))
-			unncalledModel=model.flux(specdata[k]['tobs'],wave)
+			unncalledModel=model.flux(specdata[k]['tobs']+snPars['t0'],wave)
+			unncalledModel = flux(salt3dir,specdata[k]['tobs']+snPars['t0'],specdata[k]['wavelength'],snPars['z'],snPars['x0'],snPars['x1'],snPars['c'])
 
 			if not axcount % 3:
 				fig = plt.figure()
@@ -60,7 +107,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 			
 			#ax.clf()
 			if len(coeffs): ax.plot(wave,modelFlux,'r-',label='Model spectrum')
-			ax.plot(wave,specdata[k]['flux'],'b-',label='Spectral data')
+			ax.plot(wave,specdata[k]['flux'],'b-',label='Spectral data, phase = %.1f'%(specdata[k]['tobs']-snPars['t0']))
 			ax.plot(wave,unncalledModel,'g-',label='SALT3 Model spectrum\n(no calibration)')
 			ax.set_xlim(wave.min(),wave.max())
 			#ax.set_ylim(0,max(modelFlux.max(),specdata[k]['flux'].max())*1.25)
@@ -70,7 +117,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 			ax.legend(loc='upper right',prop={'size':8})
 			#plt.savefig('{}/speccomp_{}_{}.png'.format(outdir,sn,k),dpi=288)
 			axcount += 1
-
+			#import pdb; pdb.set_trace()
 			if not axcount % 3:
 				pdf_pages.savefig()
 
