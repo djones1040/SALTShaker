@@ -363,7 +363,7 @@ class SALTResids:
 			
 		M0 *= _SCALE_FACTOR/(1+z); M1 *= _SCALE_FACTOR/(1+z)
 		# hack
-		M0mod *= _SCALE_FACTOR/(1+z); M1mod *= _SCALE_FACTOR/(1+z)
+		#M0mod *= _SCALE_FACTOR/(1+z); M1mod *= _SCALE_FACTOR/(1+z)
 		int1dM0 = interp1d(obsphase,M0,axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
 		int1dM1 = interp1d(obsphase,M1,axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
 		# hack
@@ -460,14 +460,14 @@ class SALTResids:
 						waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
 						phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
 						#Check if this spectrum is inside values affected by changes in knot i
-						if waverange[0]*(1+z) > specdata[k]['wavelength'].min() or waverange[1]*(1+z) < specdata[k]['wavelength'].max():
-							pass
+						#if waverange[0]*(1+z) > specdata[k]['wavelength'].min() or waverange[1]*(1+z) < specdata[k]['wavelength'].max():
+						#	pass
 						#Check which phases are affected by knot i
 						inPhase=(phase>=(phaserange[0]-self.phaseres)*(1+z) ) & (phase<=(phaserange[1]+self.phaseres)*(1+z) )
 						if inPhase.any():
 							#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
 							#Integrate only over wavelengths within the relevant range
-							inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
+							inbounds=(self.wave>waverange[0]-self.waveres) & (self.wave<waverange[1]+self.waveres)
 
 							derivInterp = interp1d(obsphase,self.spline_derivs[i][:,inbounds],axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
 							derivInterpWave = interp1d(obswave[inbounds],derivInterp(phase[0]),kind='nearest',bounds_error=False,fill_value="extrapolate")
