@@ -45,8 +45,8 @@ class TrainSALTBase:
 							phase, wavelength, flux (default=%default)""")
 		parser.add_argument('--initbfilt', default=config.get('iodata','initbfilt'), type=str,
 							help="""initial B-filter to get the normalization of the initial model (default=%default)""")
-		parser.add_argument('--resume_from_outputdir', default=config.get('iodata','resume_from_outputdir'), type=bool,
-							help='if set, initialize using output parameters from previous run')
+		parser.add_argument('--resume_from_outputdir', default=config.get('iodata','resume_from_outputdir'), type=str,
+							help='if set, initialize using output parameters from previous run. If directory, initialize using ouptut parameters from specified directory')
 
 
 		# training model parameters
@@ -100,6 +100,10 @@ class TrainSALTBase:
 							help='number of days over which to compute scaling of error model (default=%default)')
 		parser.add_argument('--error_snake_wave_binsize', default=config.get('trainparams','error_snake_wave_binsize'), type=float,
 							help='number of angstroms over which to compute scaling of error model (default=%default)')
+		parser.add_argument('--usePriors', default=config.get('trainparams','usePriors'), type=str,
+							help='Names of priors to be applied to the dataset (default=%default)')
+		parser.add_argument('--priorWidths', default=config.get('trainparams','priorWidths'), type=str,
+							help='Widths of priors to be applied to the dataset (default=%default)')
 
 
 		parser.add_argument('--do_mcmc', default=config.get('trainparams','do_mcmc'), type=bool,
@@ -108,6 +112,8 @@ class TrainSALTBase:
 							help='do Gauss-Newton least squares (default=%default)')
 		parser.add_argument('--gaussnewton_maxiter', default=config.get('trainparams','gaussnewton_maxiter'), type=int,
 							help='maximum iterations for Gauss-Newton (default=%default)')
+		parser.add_argument('--regularize', default=config.get('trainparams','regularize'), type=bool,
+							help='turn on regularization if set (default=%default)')
 		
 		# mcmc parameters
 		parser.add_argument('--n_steps_mcmc', default=config.get('mcmcparams','n_steps_mcmc'), type=int,
@@ -170,7 +176,8 @@ class TrainSALTBase:
 		return parser
 
 	def get_saltkw(self,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc):
-		saltfitkwargs = {'phaseknotloc':phaseknotloc,'waveknotloc':waveknotloc,
+		saltfitkwargs = {'usePriors':self.options.usePriors,'priorWidths':self.options.priorWidths,
+						'phaseknotloc':phaseknotloc,'waveknotloc':waveknotloc,
 						 'errphaseknotloc':errphaseknotloc,'errwaveknotloc':errwaveknotloc,
 						 'phaserange':self.options.phaserange,
 						 'waverange':self.options.waverange,'phaseres':self.options.phasesplineres,
@@ -203,7 +210,8 @@ class TrainSALTBase:
 						 'nsteps_before_modelpar_tradeoff':self.options.nsteps_before_modelpar_tradeoff,
 						 'modelpar_snpar_tradeoff_nstep':self.options.modelpar_snpar_tradeoff_nstep,
 						 'nsteps_between_lsqfit':self.options.nsteps_between_lsqfit,
-						 'use_lsqfit':self.options.use_lsqfit}
+						 'use_lsqfit':self.options.use_lsqfit,
+						 'regularize':self.options.regularize}
 
 		return saltfitkwargs
 

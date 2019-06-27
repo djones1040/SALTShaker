@@ -7,7 +7,7 @@ from salt3.util.synphot import synphot
 from sncosmo.salt2utils import SALT2ColorLaw
 import time
 from itertools import starmap
-from salt3.training import init_hsiao,saltresids
+from salt3.training import init_hsiao,saltresids #_master as saltresids
 from sncosmo.models import StretchSource
 from scipy.optimize import minimize, least_squares
 from scipy.stats import norm
@@ -414,9 +414,7 @@ class mcmc(saltresids.SALTResids):
 		return return_bool
 
 class GaussNewton(saltresids.SALTResids):
-	def __init__(self,guess,datadict,parlist,chain=[],loglikes=[],**kwargs):
-		self.loglikes=loglikes
-		self.chain=chain
+	def __init__(self,guess,datadict,parlist,**kwargs):
 		self.warnings = []
 		self.debug=False
 		super().__init__(guess,datadict,parlist,**kwargs)
@@ -432,7 +430,6 @@ class GaussNewton(saltresids.SALTResids):
 		
 	def convergence_loop(self,guess,loop_niter=3):
 		lastResid = 1e20
-		self.i=0
 		print('Initializing')
 
 		residuals = self.lsqwrap(guess,False,False,doPriors=True)
@@ -441,8 +438,7 @@ class GaussNewton(saltresids.SALTResids):
 
 		print('starting loop')
 		for superloop in range(loop_niter):
-			self.i=superloop
-			X,chi2 = self.robust_process_fit(X,chi2_init)
+			X,chi2 = self.robust_process_fit(X,chi2_init,superloop,chi2_init)
 			
 			if chi2_init-chi2 < -1.e-6:
 				self.addwarning("MESSAGE WARNING chi2 has increased")
@@ -465,7 +461,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 		#raise RuntimeError("convergence_loop reached 100000 iterations without convergence")
 
-	def lsqwrap(self,guess,computeDerivatives,computePCDerivs=True,doPriors=True):
+	def lsqwrap(self,guess,computeDerivatives,computePCDerivs=True,doPriors=True,fit='all'):
 		tstart = time.time()
 
 		if self.n_colorscatpars:
@@ -477,16 +473,19 @@ class GaussNewton(saltresids.SALTResids):
 		else: colorLaw = None
 		
 		components = self.SALTModel(guess)
-		# set model vals
-		numResids=self.num_phot+self.num_spec + (5 if doPriors else 0)
+
+		numResids=self.num_phot+self.num_spec + (len(self.usePriors) if doPriors else 0)
+		if self.regularize:
+			numRegResids=sum([ self.n_components*(self.phasebins.size-1) * (self.wavebins.size -1) for weight in [self.regulargradientphase,self.regulargradientwave ,self.regulardyad] if not weight == 0])
+			numResids+=numRegResids
+			
 		residuals = np.zeros( numResids)
 		jacobian =	np.zeros((numResids,self.npar)) # Jacobian matrix from r
-		if doPriors:
-			self.derivativesforPrior(guess,components,colorLaw,bsorder=3)
-
+		
 		idx = 0
 		for sn in self.datadict.keys():
 			photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,components,colorLaw,computeDerivatives,computePCDerivs)
+			
 			idxp = photresidsdict['photresid'].size
 
 			residuals[idx:idx+idxp] = photresidsdict['photresid']
@@ -497,7 +496,6 @@ class GaussNewton(saltresids.SALTResids):
 
 				for snparam in ('x0','x1','c'): #tpkoff should go here
 					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = photresidsdict['dphotresid_d{}'.format(snparam)]
-					#if snparam == 'x1': import pdb; pdb.set_trace()
 			idx += idxp
 
 			idxp = specresidsdict['specresid'].size
@@ -511,58 +509,53 @@ class GaussNewton(saltresids.SALTResids):
 				for snparam in ('x0','x1','c'): #tpkoff should go here
 					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = specresidsdict['dspecresid_d{}'.format(snparam)]
 			idx += idxp
+		print('priors: ',*self.usePriors)
 
 		# priors
+		priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,guess)
+		print(*priorVals)
+			#doPriors = False
 		if doPriors:
-			jacobian[idx,self.parlist == 'm0'] = self.priorderivdict['Bmax'][self.parlist == 'm0']
-			residuals[idx] = self.m0prior_lsq(components)[0]
-			idx += 1
-			x1mean=np.mean(guess[self.ix1])
-			priorwidth=0.01
-			residuals[idx] = x1mean/priorwidth
-			for sn in self.datadict.keys():
-				jacobian[idx,self.parlist == 'x1_%s'%sn] = 1/len(self.datadict.keys())/priorwidth
+			residuals[idx:idx+priorResids.size]=priorResids
+			jacobian[idx:idx+priorResids.size,:]=priorJac
+			idx+=priorResids.size
+			
+		if self.regularize:
+			for regularization, weight in [(self.phaseGradientRegularization, self.regulargradientphase),(self.waveGradientRegularization,self.regulargradientwave ),(self.dyadicRegularization,self.regulardyad)]:
+				if weight ==0:
+					continue
+				for regResids,regJac,indices in zip( *regularization(guess,computeDerivatives), [self.im0,self.im1]):
+					residuals[idx:idx+regResids.size]=regResids*np.sqrt(weight)
+					if computeDerivatives:
+						jacobian[idx:idx+regResids.size,indices]=regJac*np.sqrt(weight)
+					idx+=regResids.size
 
-			idx += 1
-			x1std=np.std(guess[self.ix1])
-			residuals[idx] = (x1std-1)/priorwidth
-			if x1std!=0:
-				for sn in self.datadict.keys():
-					jacobian[idx,self.parlist == 'x1_%s'%sn] = (guess[self.parlist == 'x1_%s'%sn]-x1mean)/(len(self.datadict.keys())*x1std*priorwidth)
-				
-			idx += 1
-			jacobian[idx:idx+1,self.parlist == 'm0'] = self.priorderivdict['M0end'][self.parlist == 'm0']
-			residuals[idx] = self.m0endprior_lsq(components)
-			idx += 1
-			jacobian[idx:idx+1,self.parlist == 'm1'] = self.priorderivdict['M1end'][self.parlist == 'm1']
-			residuals[idx] = self.m1endprior_lsq(components)
-		
 		if computeDerivatives:
 			print('loop took %i seconds'%(time.time()-tstart))
 			return residuals,jacobian
 		else:
 			return residuals
 	
-	def robust_process_fit(self,X,chi2_init):
-
-		print('initial priors: M0 B abs mag, mean x1, x1 std, M0 start, M1 start')
-		components = self.SALTModel(X)
-		print(self.m0prior(components,m0=True)[0],
-			  np.mean(X[self.ix1]),np.std(X[self.ix1]),
-			  np.sum(components[0][0,:]),np.sum(components[1][0,:]))
+	def robust_process_fit(self,X,chi2_init,niter,chi2_last):
 
 		#print('hack!')
 		Xtmp = copy.deepcopy(X)
-		Xtmp,chi2_all = self.process_fit(Xtmp,fit='all')
-		
-		if chi2_init - chi2_all > 1:
+		if niter == 0: computePCDerivs = True
+		else: computePCDerivs = False
+		Xtmp,chi2_all = self.process_fit(Xtmp,fit='all',computePCDerivs=True)
+
+		if chi2_init - chi2_all > 1 and chi2_all/chi2_last < 0.9:
 			return Xtmp,chi2_all
 		else:
 			# "basic flipflop"??!?!
-			print("fitting SNe")
-			X,chi2 = self.process_fit(X,fit='sn')
-			print("fitting principal components")
-			X,chi2 = self.process_fit(X,fit='components')
+			print("fitting x0")
+			X,chi2 = self.process_fit(X,fit='x0')
+			print("fitting x1")
+			X,chi2 = self.process_fit(X,fit='x1')
+			print("fitting principal component 0")
+			X,chi2 = self.process_fit(X,fit='component0')
+			print("fitting principal component 1")
+			X,chi2 = self.process_fit(X,fit='component1')
 			print("fitting color")
 			X,chi2 = self.process_fit(X,fit='color')
 			print("fitting color law")
@@ -570,12 +563,15 @@ class GaussNewton(saltresids.SALTResids):
 
 		return X,chi2 #_init
 	
-	def process_fit(self,X,fit='all',doPriors=True):
+	def process_fit(self,X,fit='all',snid=None,doPriors=True,computePCDerivs=False):
 		
-		if fit == 'all' or fit == 'components': computePCDerivs = True
-		else: computePCDerivs = False
-
-		residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors)
+		#if fit == 'all' or fit == 'components': computePCDerivs = 3
+		#elif fit == 'component0': computePCDerivs=1
+		#elif fit == 'component1': computePCDerivs=2
+		#else: computePCDerivs = 0
+		#computePCDerivs = True
+		#doPriors=False
+		residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors,fit)
 		if fit == 'all':
 			includePars=np.ones(self.npar,dtype=bool)
 		else:
@@ -583,9 +579,16 @@ class GaussNewton(saltresids.SALTResids):
 			if fit=='components':
 				includePars[self.im0]=True
 				includePars[self.im1]=True
+			elif fit=='component0':
+				includePars[self.im0]=True
+			elif fit=='component1':
+				includePars[self.im1]=True
 			elif fit=='sn':
-				#print('hack: x0 only')
 				includePars[self.ix0]=True
+				includePars[self.ix1]=True
+			elif fit=='x0':
+				includePars[self.ix0]=True
+			elif fit=='x1':
 				includePars[self.ix1]=True
 			elif fit=='color':
 				includePars[self.ic]=True
@@ -602,29 +605,22 @@ restricted parameter set has not been implemented: {}""".format(fit))
 		jacobian=jacobian[:,includePars]
 		stepsize = np.dot(np.dot(pinv(np.dot(jacobian.T,jacobian)),jacobian.T),
 						  residuals.reshape(residuals.size,1)).reshape(includePars.sum())
-		if self.i>4 and fit=='all' and not self.debug: 
+		#if self.i>4 and fit=='all' and not self.debug: 
+		#	import pdb;pdb.set_trace()
+		#	self.debug=True
+		if np.any(np.isnan(stepsize)):
+			print('NaN detected in stepsize; exitting to debugger')
 			import pdb;pdb.set_trace()
-			self.debug=True
-		#import pdb; pdb.set_trace()
+
 		X[includePars] -= stepsize
-		
-		print('priors: M0 B abs mag, mean x1, x1 std, M0 start, M1 start')
-		components = self.SALTModel(X)
-		# check new spectra
-		#plt.plot(specdata[0]['wavelength'],specdata[0]['flux'])
-		#plt.plot(specdata[0]['wavelength'],specdata[0]['modelflux'])
-		# off by like 1e-5
-
-		print(self.m0prior(components,m0=True)[0],
-			  np.mean(X[self.ix1]),np.std(X[self.ix1]),
-			  np.sum(components[0][0,:]),np.sum(components[1][0,:]))
-
 
 		# quick eval
 
 		chi2 = np.sum(self.lsqwrap(X,False,False,doPriors=doPriors)**2.)
 		print("chi2: old, new, diff")
 		print((residuals**2).sum(),chi2,(residuals**2).sum()-chi2)
-
+		#if chi2 != chi2:
+		#	import pdb; pdb.set_trace()
+		
 		return X,chi2
 	
