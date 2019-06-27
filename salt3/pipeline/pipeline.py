@@ -1,5 +1,5 @@
 ##SALT3 pipeline
-##sim -> training -> lcfitting ->
+##sim -> training -> lcfitting -> salt2mu -> wfit
 
 import subprocess
 import configparser
@@ -16,6 +16,8 @@ class SALT3pipe():
         self.Simulation = Simulation()
         self.Training = Training()
         self.LCFitting = LCFitting()
+        self.GetMu = GetMu()
+        self.CosmoFit = CosmoFit()
 
     def gen_input(self):
         pass
@@ -47,15 +49,28 @@ class SALT3pipe():
                                 prooptions=config.get('training','prooptions'))
         self.LCFitting.setkeys = m2df(config.get('lcfitting','set_key'),colnames=['section','key','value'])
         self.LCFitting.configure(baseinput=config.get('lcfitting','baseinput'),
-                                  setkeys=self.LCFitting.setkeys,
-                                  outname=config.get('lcfitting','outinput'),
-                                  pro=config.get('lcfitting','pro'))
+                                 setkeys=self.LCFitting.setkeys,
+                                 outname=config.get('lcfitting','outinput'),
+                                 pro=config.get('lcfitting','pro'))
+        self.GetMu.setkeys = m2df(config.get('getmu','set_key'),colnames=['key','value'])
+        self.GetMu.configure(baseinput=config.get('getmu','baseinput'),
+                             setkeys=self.GetMu.setkeys,
+                             outname=config.get('getmu','outinput'),
+                             pro=config.get('getmu','pro'),
+                             prooptions=config.get('getmu','prooptions'))
+
+        self.CosmoFit.configure(outname=config.get('cosmofit','outinput'),
+                                pro=config.get('cosmofit','pro'),
+                                prooptions=config.get('getmu','prooptions'))
+
 
     def run(self):
         self.Simulation.run()
         self.Training.run()
         self.LCFitting.run()
-        return
+        self.GetMu.run()
+        self.CosmoFit.run()
+        
 
     def glue(self,pipepros=None,on='phot'):
         if pipepros is None:
@@ -73,12 +88,17 @@ class SALT3pipe():
         pro2_in['value'] = pro1_out
         setkeys = pd.DataFrame([pro2_in])
         print("Connecting ",pipepros)
-        pro2.configure(setkeys = setkeys,
-                       pro=pro2.pro,
-                       proargs=pro2.proargs,
-                       baseinput=pro2.baseinput,
-                       prooptions=pro2.prooptions,
-                       outname=pro2.outname)
+        if not pipepros[1].lower().startswith('cosmofit'):
+            pro2.configure(setkeys = setkeys,
+                           pro=pro2.pro,
+                           proargs=pro2.proargs,
+                           baseinput=pro2.outname,
+                           prooptions=pro2.prooptions,
+                           outname=pro2.outname)
+        else:
+            pro2.configure(pro=pro2.pro,
+                           prooptions=pro2.prooptions,
+                           outname=setkeys['value'].values[0])            
 
     def _get_pipepro_from_string(self,pipepro_str):
         if pipepro_str.lower().startswith("sim"):
@@ -87,6 +107,10 @@ class SALT3pipe():
             pipepro = self.Training
         elif pipepro_str.lower().startswith("lcfit"):
             pipepro = self.LCFitting
+        elif pipepro_str.lower().startswith("getmu"):
+            pipepro = self.GetMu
+        elif pipepro_str.lower().startswith("cosmofit"):
+            pipepro = self.CosmoFit
         else:
             raise ValueError("Unknow pipeline procedure:",pipepro.strip())
         return pipepro
@@ -270,7 +294,17 @@ class LCFitting(PipeProcedure):
     def gen_input(self,outname="pipeline_lcfit_input.input"):
         self.outname = outname
         self.finput,self.keys = _gen_snana_fit_input(basefilename=self.baseinput,setkeys=self.setkeys,
-                                           outname=outname)
+                                                     outname=outname)
+
+
+    def glueto(self,pipepro):
+        if not isinstance(pipepro,str):
+            pipepro = type(pipepro).__name__
+        if pipepro.lower().startswith('getmu'):
+            outprefix = self._get_output_info().value.values[0]
+            return glob.glob((str(outprefix)+'*.FITRES.TEXT'))[0]
+        else:
+            raise ValueError("lcfitting can only glue to getmu")
 
     def _get_input_info(self):
         df = {}
@@ -297,7 +331,54 @@ class LCFitting(PipeProcedure):
         df['key'] = key
         df['value'] = self.keys[section][key]
         return pd.DataFrame([df])
-    
+ 
+class GetMu(PipeProcedure):
+    def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
+                  outname="pipeline_getmu_input.input",**kwargs):
+        self.outname = outname
+        self.prooptions = prooptions
+        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,prooptions=prooptions)
+
+    def gen_input(self,outname="pipeline_getmu_input.input"):
+        self.outname = outname
+        self.finput,self.keys = _gen_general_input(basefilename=self.baseinput,setkeys=self.setkeys,
+                                                          outname=outname)        
+    def glueto(self,pipepro):
+        if not isinstance(pipepro,str):
+            pipepro = type(pipepro).__name__
+        if pipepro.lower().startswith('cosmofit'):
+            return self._get_output_info()['value'].values[0]
+        else:
+            raise ValueError("getmu can only glue to cosmofit")
+   
+    def _get_input_info(self):
+        df = {}
+        key = 'file'
+        df['key'] = key
+        df['value'] = self.keys[key]
+        return pd.DataFrame([df])
+
+    def _get_output_info(self):
+        df = {}
+        key = 'prefix'
+        df['key'] = key
+        df['value'] = self.keys[key].strip()+'.M0DIF'
+        return pd.DataFrame([df])
+
+class CosmoFit(PipeProcedure):
+    def configure(self,setkeys=None,pro=None,outname=None,prooptions=None,**kwargs):
+        if setkeys is not None:
+            outname = setkeys.value.values[0]
+        self.prooptions = prooptions
+        self.finput = outname
+
+        super().configure(pro=pro,outname=outname,prooptions=prooptions)
+
+    def _get_input_info(self):
+        df = {}
+        df['value'] = 'test'
+        return pd.DataFrame([df])
+
 def _run_external_pro(pro,args):
 
     if isinstance(args, str):
@@ -340,7 +421,6 @@ def _gen_general_python_input(basefilename=None,setkeys=None,
 
         print("input file saved as:",outname)
     return outname,config
-
 
 def _gen_snana_sim_input(basefilename=None,setkeys=None,
                          outname=None):
@@ -421,6 +501,39 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
         print("Write fit input to file:",outname)
         _write_nml_to_file(nml,outname)
     return outname,nml
+
+def _gen_general_input(basefilename=None,setkeys=None,outname=None):
+    config = _read_simple_config_file(basefilename)
+    if setkeys is None:
+        print("No modification on the input file, keeping {} as input".format(basefilename))
+    else:
+        for index, row in setkeys.iterrows():
+            key = row['key']
+            v = row['value']
+            print("Adding/modifying key {}={}".format(key,v))
+            config[key] = v
+
+        print("input file saved as:",outname)
+        _write_simple_config_file(config,outname)
+
+    return outname,config
+
+def _read_simple_config_file(filename,sep='='):
+    config = {}
+    f = open(filename,"r")
+    lines = f.readlines()
+    for line in lines:    
+        if sep in line and not line.strip().startswith("#"):
+            key,value = line.split(sep)
+            config[key] = value.rstrip()
+    return config
+
+def _write_simple_config_file(config,filename,sep='='):
+    outfile = open(filename,"w")
+    for key in config.keys():
+        value = config[key]
+        outfile.write("{}={}\n".format(key,value))
+    return
 
 def _write_nml_to_file(nml,filename):
     outfile = open(filename,"w")

@@ -126,11 +126,11 @@ class SuperNova( object ) :
 		sn_lc=jla.SuperNova(full_path_of_jla_data/lc-sn_name.list)
 		sn_lc.writesnanafile(full_path_of_jla_data/lc-sn_name.list)
 		"""
-		from numpy import array,log10,unique,where
+		from numpy import array,log10,unique,where,absolute
 		if verbose:	 print("Writing data from light curve file %s to snana format"%(datfile))
 		fout = open(datfile+'.snana.dat','w')
-		list_snana_headers=['SURVEY','SNID','RA','DEC','MWEBV','REDSHIFT_HELIO']
-		list_jla_headers=['SURVEY','SN','RA','DEC','MWEBV','Z_HELIO']
+		list_snana_headers=['SURVEY','SNID','RA','DEC','MWEBV','REDSHIFT_HELIO','MJDPK']
+		list_jla_headers=['SURVEY','SN','RA','DEC','MWEBV','Z_HELIO','DayMax']
 		for key in list_jla_headers : 
 			if key in self.__dict__ :
 				icol = list_jla_headers.index(key)
@@ -142,17 +142,20 @@ class SuperNova( object ) :
 		print('NVAR: 6',file=fout)
 		print('VARLIST:  MJD	FLT FIELD	FLUXCAL	  FLUXCALERR ZPT\n',file=fout)
 		for i in range(self.nobs):
-			print('OBS: %9.3f  %s  %s %8.7f %8.7f %8.4f'%(
-					self.Mjd[i], self.Filter[i], 'NULL', self.Flux[i], 
-					self.Fluxerr[i],self.ZP[i] ),file=fout)
+			Factor_275=(27.5-self.ZP[i])/(-2.5)
+			flux_275=self.Flux[i]/(10**Factor_275)
+			fluxerr_275=absolute(1.0/10**Factor_275)*self.Fluxerr[i]
+			print('OBS: %9.3f  %s  %s %8.7f %8.7f %s'%(
+					self.Mjd[i], self.Filter[i], 'NULL', flux_275, 
+					fluxerr_275,'27.5' ),file=fout)
 		print('END_PHOTOMETRY:\n',file=fout)
 		print('# =============================================',file=fout)
 		self.datfile = os.path.abspath(datfile)
 		folder_data=datfile[0:datfile.rfind('/')]+'/'
 		list_file_spec=glob.glob(folder_data+'spectrum*'+self.__dict__['SN']+'*.list')
 		print('\nNSPECTRA: %i \n'%len(list_file_spec),file=fout)
-		print('\nNVAR_SPEC: 4',file=fout)
-		print('VARNAMES_SPEC: LAMMIN LAMMAX  FLAM  FLAMERR\n',file=fout)
+		print('\nNVAR_SPEC: 5',file=fout)
+		print('VARNAMES_SPEC: LAMMIN LAMMAX  FLAM  FLAMERR DQ\n',file=fout)
 		counter=0
 		for specfile in sorted(list_file_spec):
 			counter=counter+1
@@ -160,10 +163,10 @@ class SuperNova( object ) :
 			print('SPECTRUM_ID: %i'%counter,file=fout)
 			print('SPECTRUM_MJD: %9.2f'%sn_spectrum.mjdspec,file=fout)
 			resolution=sn_spectrum.WAVE[1]-sn_spectrum.WAVE[0]
-			for wl,fl,flerr in zip(sn_spectrum.WAVE,sn_spectrum.FLUX,sn_spectrum.FLUXERR):
+			for wl,fl,flerr,dq in zip(sn_spectrum.WAVE,sn_spectrum.FLUX,sn_spectrum.FLUXERR,sn_spectrum.VALID):
 				wl_l=wl-resolution/2.0
 				wl_u=wl+resolution/2.0
-				print('SPEC: %9.2f %9.2f %9.5e %9.5e'%(wl_l,wl_u,fl,flerr),file=fout)
+				print('SPEC: %9.2f %9.2f %9.5e %9.5e %i'%(wl_l,wl_u,fl,flerr,dq),file=fout)
 			print('SPECTRUM_END:\n',file=fout)	
 		fout.close()
 
