@@ -356,14 +356,14 @@ class SALTResids:
 			colorlaw = -0.4 * colorLaw(self.wave)
 			colorexp = 10. ** (colorlaw * c)
 			# hack
-			#colorexpmod = 10. ** (colorlaw * (c+1e-7))
+			#colorexpmod = 10. ** (colorlaw * (c+1e-3))
 			#M0mod = M0*colorexpmod; M1mod = M1*colorexpmod
 			M0 *= colorexp; M1 *= colorexp
 
 			
 		M0 *= _SCALE_FACTOR/(1+z); M1 *= _SCALE_FACTOR/(1+z)
 		# hack
-		#M0mod *= _SCALE_FACTOR/(1+z); M1mod *= _SCALE_FACTOR/(1+z)
+		M0mod *= _SCALE_FACTOR/(1+z); M1mod *= _SCALE_FACTOR/(1+z)
 		int1dM0 = interp1d(obsphase,M0,axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
 		int1dM1 = interp1d(obsphase,M1,axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
 		# hack
@@ -436,7 +436,7 @@ class SALTResids:
 			if computeDerivatives:
 				specresultsdict['dmodelflux_dc'][iSpecStart:iSpecStart+SpecLen,0] = x0*(M0interp + x1*M1interp)*np.log(10)*colorlawinterp
 
-				#empderiv = (x0*(M0interpmod + x1*M1interpmod) - x0*(M0interp + x1*M1interp))/1e-7
+				#empderiv = (x0*(M0interpmod + x1*M1interpmod) - x0*(M0interp + x1*M1interp))/1e-3
 				#print(np.sum(specresultsdict['dmodelflux_dc'][iSpecStart:iSpecStart+SpecLen,0]),np.sum(empderiv))
 				#photresultsdict['dmodelflux_dc'][selectFilter,0]=np.sum((modulatedFlux)*np.log(10)*colorlaw[np.newaxis,idx[flt]], axis=1)*dwave*self.fluxfactor[survey][flt]
 				#import pdb; pdb.set_trace()
@@ -469,8 +469,8 @@ class SALTResids:
 							#Integrate only over wavelengths within the relevant range
 							inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
 
-							derivInterp = interp1d(obsphase,self.spline_derivs[i,:,:],axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
-							derivInterpWave = interp1d(obswave,derivInterp(phase[0]),kind='nearest',bounds_error=False,fill_value="extrapolate")
+							derivInterp = interp1d(obsphase,self.spline_derivs[i][:,inbounds],axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
+							derivInterpWave = interp1d(obswave[inbounds],derivInterp(phase[0]),kind='nearest',bounds_error=False,fill_value="extrapolate")
 							derivInterp2 = derivInterpWave(specdata[k]['wavelength'])
 							#if computePCDerivs != 2:
 							specresultsdict['dmodelflux_dM0'][iSpecStart:iSpecStart+SpecLen,i] = derivInterp2*intmult
@@ -546,7 +546,7 @@ class SALTResids:
 				#modulatedM0mod= pbspl[flt]*M0interpmod[:,idx[flt]]
 				#modulatedM1mod=pbspl[flt]*M1interpmod[:,idx[flt]]
 
-				
+
 				if ( (phase>obsphase.max())).any():
 					iMax = np.where(phase>obsphase.max())[0]
 					for i in iMax:
