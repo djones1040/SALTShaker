@@ -11,7 +11,7 @@ The SALT3 Training pipeline consists of several procedures that will be run in s
 Param File
 ==========
 
-General Sturcture
+General Structure
 -----------------
 
 Each section in the param file defines one procedure in the pipeline. The gerenal structure is as follows:

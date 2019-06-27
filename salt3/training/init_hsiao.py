@@ -7,7 +7,6 @@ from sncosmo.constants import HC_ERG_AA
 _SCALE_FACTOR = 1e-12
 
 def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
-			   salt2file='initfiles/salt2_template_0.dat.gz',
 			   Bfilt='initfiles/Bessell90_B.dat',
 			   flatnu='initfiles/flatnu.dat',
 			   phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
@@ -17,8 +16,9 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 	phase,wave,flux = np.loadtxt(hsiaofile,unpack=True)
 	
 	refWave,refFlux=np.loadtxt(flatnu,unpack=True)
-	iGood = np.where((phase >= phaserange[0]-phasesplineres*6) & (phase <= phaserange[1]+phasesplineres*6) &
-					 (wave >= waverange[0]-wavesplineres*6) & (wave <= waverange[1]+wavesplineres*6))[0]
+	# was *6
+	iGood = np.where((phase >= phaserange[0]-phasesplineres*0) & (phase <= phaserange[1]+phasesplineres*0) &
+					 (wave >= waverange[0]-wavesplineres*0) & (wave <= waverange[1]+wavesplineres*0))[0]
 	phase,wave,flux = phase[iGood],wave[iGood],flux[iGood]
 	
 	if normalize:
@@ -27,8 +27,9 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 		m0flux = flux[:]
 		
 	#m1phase = phase*1.1
-	splinephase = np.linspace(phaserange[0]-phasesplineres*3,phaserange[1]+phasesplineres*3,(phaserange[1]-phaserange[0])/phasesplineres+6,False)
-	splinewave = np.linspace(waverange[0]-wavesplineres*5,waverange[1]+wavesplineres*5,(waverange[1]-waverange[0])/wavesplineres+10,False)
+	# was *3 (phase), *5 (wave)
+	splinephase = np.linspace(phaserange[0]-phasesplineres*0,phaserange[1]+phasesplineres*0,(phaserange[1]-phaserange[0])/phasesplineres+0*2,False)
+	splinewave = np.linspace(waverange[0]-wavesplineres*0,waverange[1]+wavesplineres*0,(waverange[1]-waverange[0])/wavesplineres+0*2,False)
 	
 	bspl = bisplrep(phase,wave,m0flux,kx=3,ky=3,
 					tx=splinephase,ty=splinewave,task=-1)
@@ -61,7 +62,6 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 
 def init_kaepora(x10file='initfiles/Kaepora_dm15_1.1.txt',
 				 x11file='initfiles/Kaepora_dm15_0.94.txt',
-				 salt2file='initfiles/salt2_template_0.dat.gz',
 				 Bfilt='initfiles/Bessell90_B.dat',
 				 flatnu='initfiles/flatnu.dat',
 				 phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
@@ -111,7 +111,6 @@ def init_kaepora(x10file='initfiles/Kaepora_dm15_1.1.txt',
 	return intphase,intwave,m0,m1,bspl[0],bspl[1],bspl[2],bsplm1[2]
 
 def init_errs(hsiaofile='initfiles/Hsiao07.dat',
-			  salt2file='initfiles/salt2_template_0.dat.gz',
 			  Bfilt='initfiles/Bessell90_B.dat',
 			  phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
 			  waveinterpres=2.0,phasesplineres=6,wavesplineres=1200,
@@ -131,7 +130,6 @@ def init_errs(hsiaofile='initfiles/Hsiao07.dat',
 	return bspl[0],bspl[1]
 
 def init_errs_fromfile(hsiaofile='initfiles/Hsiao07.dat',
-					   salt2file='initfiles/salt2_template_0.dat.gz',
 					   Bfilt='initfiles/Bessell90_B.dat',
 					   phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
 					   waveinterpres=2.0,phasesplineres=6,wavesplineres=1200,
