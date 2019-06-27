@@ -18,6 +18,7 @@ class SALT3pipe():
         self.LCFitting = LCFitting()
         self.GetMu = GetMu()
         self.CosmoFit = CosmoFit()
+        self.Data = Data()
 
     def gen_input(self):
         pass
@@ -26,6 +27,9 @@ class SALT3pipe():
         config = configparser.ConfigParser()
         config.read(self.finput)
         m2df = self._multivalues_to_df
+
+        self.Data.configure(snlist=config.get('data','snlist'))
+
         self.BYOSED.setkeys = m2df(config.get('byosed','set_key'),
                                    colnames=['section','key','value'])
         self.BYOSED.configure(baseinput=config.get('byosed','baseinput'),
@@ -65,7 +69,7 @@ class SALT3pipe():
 
 
     def run(self):
-        self.Simulation.run()
+        # self.Simulation.run()
         self.Training.run()
         self.LCFitting.run()
         self.GetMu.run()
@@ -111,6 +115,8 @@ class SALT3pipe():
             pipepro = self.GetMu
         elif pipepro_str.lower().startswith("cosmofit"):
             pipepro = self.CosmoFit
+        elif pipepro_str.lower().startswith("data"):
+            pipepro = self.Data
         else:
             raise ValueError("Unknow pipeline procedure:",pipepro.strip())
         return pipepro
@@ -174,6 +180,36 @@ class PyPipeProcedure(PipeProcedure):
         self.outname = outname
         self.finput,self.keys = _gen_general_python_input(basefilename=self.baseinput,setkeys=self.setkeys,
                                                 outname=outname)
+
+class Data(PipeProcedure):
+
+    def configure(self,snlist=None):
+        self.keys = {'snlist':snlist}
+
+    def _get_output_info(self):
+        df = {}
+        key = 'snlist'
+        df['key'] = key
+        df['value'] = self.keys[key]
+        return pd.DataFrame([df])
+
+    def glueto(self,pipepro):
+        if not isinstance(pipepro,str):
+            pipepro = type(pipepro).__name__
+        snlist = self._get_output_info().value.values[0]
+        if not os.path.exists(snlist):
+            raise ValueError("Path does not exists",snlist)             
+        if pipepro.lower().startswith('train'):
+            return snlist
+        elif pipepro.lower().startswith('lcfit'):
+            simpath = os.path.join(os.environ['SNDATA_ROOT'],'SIM/')
+            idx = snlist.find(simpath)
+            if idx !=0:
+                raise ValueError("photometry must be in $SNDATA_ROOT/SIM")
+            else:
+                return os.path.dirname(snlist[len(simpath):]) 
+        else:
+            raise ValueError("data can only glue to training or lcfitting")
 
 
 class BYOSED(PyPipeProcedure):
