@@ -30,10 +30,12 @@ class TrainSALTBase:
 		# input/output files
 		parser.add_argument('--snlist', default=config.get('iodata','snlist'), type=str,
 							help="""list of SNANA-formatted SN data files, including both photometry and spectroscopy. (default=%default)""")
-		parser.add_argument('--speclist', default=config.get('iodata','speclist'), type=str,
-							help="""optional list of ascii spectra, which will be written to the 
-							SNANA-formatted SN light curve files provided by the snlist argument.
-							List format should be space-delimited SNID, MJD-OBS (or DATE-OBS), spectrum filename (default=%default)""")
+		parser.add_argument('--dospec', default=config.get('iodata','dospec'), type=bool,
+							help="""if set, look for spectra in the snlist files (default=%default)""")
+		#parser.add_argument('--speclist', default=config.get('iodata','speclist'), type=str,
+		#					help="""optional list of ascii spectra, which will be written to the 
+		#					SNANA-formatted SN light curve files provided by the snlist argument.
+		#					List format should be space-delimited SNID, MJD-OBS (or DATE-OBS), spectrum filename (default=%default)""")
 		parser.add_argument('--outputdir', default=config.get('iodata','outputdir'), type=str,
 							help="""data directory for spectroscopy, format should be ASCII 
 							with columns wavelength, flux, fluxerr (optional) (default=%default)""")
