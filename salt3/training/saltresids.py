@@ -612,8 +612,9 @@ class SALTResids:
 							#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
 							#Integrate only over wavelengths within the relevant range
 							inbounds=(self.wave[idx[flt]]>waverange[0])	 & (self.wave[idx[flt]]<waverange[1])
-							derivInterp = interp1d(obsphase/(1+z),self.spline_derivs[i][:,inbounds],axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
-
+							derivInterp = interp1d(obsphase/(1+z),self.spline_derivs[i][:,np.where(idx[flt])[0][inbounds]],
+												   axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
+							
 							photresultsdict['dmodelflux_dM0'][np.where(selectFilter)[0][inPhase],i] =  \
 								np.sum( passbandColorExp[:,inbounds] * derivInterp(phase[inPhase]/(1+z)), axis=1)*\
 								intmult
@@ -786,6 +787,106 @@ class SALTResids:
 			self.__m1endpriorderiv__=jacobian.copy()
 		jacobian/=width
 		return residual,value,jacobian
+
+	@prior
+	def m0endprior_lowlam(self,width,x,components):
+		"""Prior such that at early times there is no flux"""
+		value=np.sum(components[0][0,0:50])
+		residual = value/width
+		try:
+			jacobian=self.__m0endpriorlowlamderiv__.copy()
+		except:
+			jacobian=np.zeros(self.npar)
+			for i in range(self.im0.size):
+				if i <(self.waveknotloc.size-self.bsorder-1) :
+					jacobian[self.im0[i]] = np.sum( self.spline_derivs[i][0,0:50] )
+			self.__m0endpriorlowlamderiv__=jacobian.copy()
+		jacobian/=width
+		return residual,value,jacobian
+
+	@prior
+	def m0endprior_midlam(self,width,x,components):
+		"""Prior such that at early times there is no flux"""
+		value=np.sum(components[0][0,int(self.im0.size/2-25):int(self.im0.size/2+26)])
+		residual = value/width
+		try:
+			jacobian=self.__m0endpriormidlamderiv__.copy()
+		except:
+			jacobian=np.zeros(self.npar)
+			for i in range(self.im0.size):
+				if i <(self.waveknotloc.size-self.bsorder-1) :
+					jacobian[self.im0[i]] = np.sum( self.spline_derivs[i][0,int(self.im0.size/2-25):int(self.im0.size/2+26)] )
+			self.__m0endpriormidlamderiv__=jacobian.copy()
+		jacobian/=width
+		return residual,value,jacobian
+
+	
+	@prior
+	def m0endprior_highlam(self,width,x,components):
+		"""Prior such that at early times there is no flux"""
+		value=np.sum(components[0][0,-50:])
+		residual = value/width
+		try:
+			jacobian=self.__m0endpriorhighlamderiv__.copy()
+		except:
+			jacobian=np.zeros(self.npar)
+			for i in range(self.im0.size):
+				if i <(self.waveknotloc.size-self.bsorder-1) :
+					jacobian[self.im0[i]] = np.sum( self.spline_derivs[i][0,-50:] )
+			self.__m0endpriorhighlamderiv__=jacobian.copy()
+		jacobian/=width
+		return residual,value,jacobian
+
+	@prior
+	def m1endprior_lowlam(self,width,x,components):
+		"""Prior such that at early times there is no flux"""
+		value=np.sum(components[1][0,0:50])
+		residual = value/width
+		try:
+			jacobian=self.__m1endpriorlowlamderiv__.copy()
+		except:
+			jacobian=np.zeros(self.npar)
+			for i in range(self.im0.size):
+				if i <(self.waveknotloc.size-self.bsorder-1) :
+					jacobian[self.im1[i]] = np.sum( self.spline_derivs[i][0,0:50] )
+			self.__m1endpriorlowlamderiv__=jacobian.copy()
+		jacobian/=width
+		return residual,value,jacobian
+
+	@prior
+	def m1endprior_midlam(self,width,x,components):
+		"""Prior such that at early times there is no flux"""
+		value=np.sum(components[1][0,int(self.im0.size/2-25):int(self.im0.size/2+26)])
+		residual = value/width
+		try:
+			jacobian=self.__m1endpriormidlamderiv__.copy()
+		except:
+			jacobian=np.zeros(self.npar)
+			for i in range(self.im0.size):
+				if i <(self.waveknotloc.size-self.bsorder-1) :
+					jacobian[self.im1[i]] = np.sum( self.spline_derivs[i][0,int(self.im0.size/2-25):int(self.im0.size/2+26)] )
+			self.__m1endpriormidlamderiv__=jacobian.copy()
+		jacobian/=width
+		return residual,value,jacobian
+
+	
+	@prior
+	def m1endprior_highlam(self,width,x,components):
+		"""Prior such that at early times there is no flux"""
+		value=np.sum(components[1][0,-50:])
+		residual = value/width
+		try:
+			jacobian=self.__m1endpriorhighlamderiv__.copy()
+		except:
+			jacobian=np.zeros(self.npar)
+			for i in range(self.im0.size):
+				if i <(self.waveknotloc.size-self.bsorder-1) :
+					jacobian[self.im1[i]] = np.sum( self.spline_derivs[i][0,-50:] )
+			self.__m1endpriorhighlamderiv__=jacobian.copy()
+		jacobian/=width
+		return residual,value,jacobian
+	
+	
 	
 	def priorResids(self,priors,widths,x):
 		"""Given a list of names of priors and widths returns a residuals vector, list of prior values, and Jacobian """
@@ -850,7 +951,7 @@ class SALTResids:
 		
 
 		loglike= - (photResidsDict['photresid']**2).sum() / 2.   -(specResidsDict['specresid']**2).sum()/2.+photResidsDict['lognorm']+specResidsDict['lognorm']
-		
+
 		return loglike
 				
 	def specchi2(self):
@@ -1171,7 +1272,7 @@ class SALTResids:
 		#Smear it out a bit along phase axis
 		self.neff=gaussian_filter1d(self.neff,1,0)
 
-		self.neff=np.clip(self.neff,1e-2*self.neff.max(),None)
+		self.neff=np.clip(self.neff,1e-5*self.neff.max(),None)
 		self.plotEffectivePoints([-12.5,0,12.5,40],'neff.png')
 		self.plotEffectivePoints(None,'neff-heatmap.png')
 
@@ -1241,7 +1342,7 @@ class SALTResids:
 			#Derivative of scale with respect to model parameters
 			scaleDeriv= np.mean(fluxes[i][:,:,np.newaxis]*self.regularizationDerivs[0],axis=(0,1))/scale
 			#Derivative of normalized gradient with respect to model parameters
-			normedGradDerivs=(self.regularizationDerivs[1] * scale - scaleDeriv[np.newaxis,np.newaxis,:]*dfluxdwave[i][:,:,np.newaxis])/ scale**2
+			normedGradDerivs=(self.regularizationDerivs[1] * scale - scaleDeriv[np.newaxis,np.newaxis,:]*dfluxdphase[i][:,:,np.newaxis])/ scale**2
 			#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
 			normalization=np.sqrt(1/((self.wavebins.size-1) *(self.phasebins.size-1)))
 			#Minimize model derivative w.r.t wavelength in unconstrained regions
