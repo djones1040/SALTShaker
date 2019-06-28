@@ -302,8 +302,8 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			outputdir)
 
 
-		if self.options.speclist:
-			ValidateSpectra.compareSpectra(self.options.speclist,
+		if self.options.dospec:
+			ValidateSpectra.compareSpectra(self.options.snlist,
 										   self.options.outputdir)
 		
 		snfiles = np.genfromtxt(self.options.snlist,dtype='str')
@@ -390,7 +390,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		
 		# read the data
 		datadict = readutils.rdAllData(self.options.snlist,self.options.estimate_tpk,self.kcordict,
-									   self.addwarning,speclist=self.options.speclist)
+									   self.addwarning,dospec=self.options.dospec)
 		
 		if not os.path.exists(self.options.outputdir):
 			os.makedirs(self.options.outputdir)

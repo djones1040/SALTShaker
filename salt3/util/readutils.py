@@ -18,8 +18,8 @@ def rdkcor(surveylist,options,addwarning=None):
 		subsurveys = options.__dict__['%s_subsurveylist'%survey].split(',')
 		kcorfile = os.path.expandvars(kcorfile)
 		if not os.path.exists(kcorfile):
-			print('kcor file %s does not exist.  Checking %s'%(kcorfile,data_rootdir))
-			kcorfile = '%s/%s'%(data_rootdir,kcorfile)
+			print('kcor file %s does not exist.	 Checking %s/kcor'%(kcorfile,data_rootdir))
+			kcorfile = '%s/kcor/%s'%(data_rootdir,kcorfile)
 			if not os.path.exists(kcorfile):
 				raise RuntimeError('kcor file %s does not exist'%kcorfile)
 		with warnings.catch_warnings():
@@ -101,7 +101,10 @@ def rdSpecData(datadict,speclist):
 					speccount = len(datadict[s]['specdata'].keys())
 					
 				if len(sn.SPECTRA)==0:
-					raise ValueError('File {} contains no supernova spectra'.format(sf))
+					print('warning: File {} contains no supernova spectra'.format(sf))
+					continue
+				
+					#raise ValueError('File {} contains no supernova spectra'.format(sf))
 				for k in sn.SPECTRA:
 					spec=sn.SPECTRA[k]
 					m=spec['SPECTRUM_MJD']
@@ -158,11 +161,16 @@ def rdSpecData(datadict,speclist):
 
 	return datadict
 
-def rdAllData(snlist,estimate_tpk,kcordict,addwarning,speclist=None):
+def rdAllData(snlist,estimate_tpk,kcordict,addwarning,dospec=False):
 	datadict = {}
 
+
 	if not os.path.exists(snlist):
-		raise RuntimeError('SN list %s doesn\'t exist'%snlist)
+		print('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
+		snlist = '%s/trainingdata/%s'%(data_rootdir,snlist)
+	if not os.path.exists(snlist):
+		raise RuntimeError('SN list file %s does not exist'%snlist)
+
 	snfiles = np.genfromtxt(snlist,dtype='str')
 	snfiles = np.atleast_1d(snfiles)
 
@@ -175,7 +183,7 @@ def rdAllData(snlist,estimate_tpk,kcordict,addwarning,speclist=None):
 		sn = snana.SuperNova(f)
 
 		if sn.SNID in datadict.keys():
-			addwarning('SNID %s is a duplicate!  Skipping'%sn.SNID)
+			addwarning('SNID %s is a duplicate!	 Skipping'%sn.SNID)
 			continue
 
 		if not 'SURVEY' in sn.__dict__.keys():
@@ -199,13 +207,17 @@ def rdAllData(snlist,estimate_tpk,kcordict,addwarning,speclist=None):
 				raise RuntimeError('need a blue filter to estimate tmax')
 		else:
 			tpk = sn.SEARCH_PEAKMJD
+			if type(tpk) == str:
+				tpk = float(sn.SEARCH_PEAKMJD.split()[0])
 			tpkmsg = 'termination condition is satisfied'
 
 		# at least one epoch 3 days before max
-		if not len(sn.MJD[sn.MJD < tpk-3]):
-			addwarning('skipping SN %s; no epochs 3 days pre-max'%sn.SNID)
-			continue
-
+		try:
+			if not len(sn.MJD[sn.MJD < tpk-3]):
+				addwarning('skipping SN %s; no epochs 3 days pre-max'%sn.SNID)
+				continue
+		except: import pdb; pdb.set_trace()
+			
 		if 'termination condition is satisfied' not in tpkmsg:
 			addwarning('skipping SN %s; can\'t estimate t_max'%sn.SNID)
 			continue
@@ -220,7 +232,7 @@ def rdAllData(snlist,estimate_tpk,kcordict,addwarning,speclist=None):
 		#datadict[snid]['zHelio'] = zHel
 		
 		# TODO: flux errors
-		datadict[sn.SNID]['specdata'] = {} 				
+		datadict[sn.SNID]['specdata'] = {}				
 		datadict[sn.SNID]['photdata'] = {}
 		datadict[sn.SNID]['photdata']['tobs'] = sn.MJD - tpk
 		datadict[sn.SNID]['photdata']['mjd'] = sn.MJD
@@ -235,13 +247,13 @@ def rdAllData(snlist,estimate_tpk,kcordict,addwarning,speclist=None):
 			sc = SkyCoord(sn.RA,sn.DEC,frame="fk5",unit=u.deg)
 			datadict[sn.SNID]['MWEBV'] = IrsaDust.get_query_table(sc)['ext SandF mean'][0]
 		else:
-			raise RuntimeError('Could not determine E(B-V) from files.  Set MWEBV keyword in input file header for SN %s'%sn.SNID)
+			raise RuntimeError('Could not determine E(B-V) from files.	Set MWEBV keyword in input file header for SN %s'%sn.SNID)
 			
 	if not len(datadict.keys()):
 		raise RuntimeError('no light curve data to train on!!')
 		
-	if speclist:
-		datadict = rdSpecData(datadict,speclist)
+	if dospec:
+		datadict = rdSpecData(datadict,snlist)
 		
 	return datadict
 	
