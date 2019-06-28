@@ -22,7 +22,7 @@ class TRAINING_Test(unittest.TestCase):
 		# TODO: ASCII filter files
 		# read the data
 		datadict = readutils.rdAllData(options.snlist,options.estimate_tpk,kcordict,
-									   ts.addwarning,speclist=options.speclist)
+									   ts.addwarning,dospec=options.dospec)
 		datadict = ts.mkcuts(datadict)
 		self.parlist,self.guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc = ts.initialParameters(datadict)
 		saltfitkwargs = ts.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)

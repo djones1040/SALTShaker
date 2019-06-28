@@ -1,0 +1,100 @@
+#######################################################
+#
+# Simulate CFA3-Keplercam: 
+# start with files in ~/salt2-training/magSmear_paper
+#
+# Apr 24 2013: set NTOT = 4400 and remove NGEN_UNIT key from MASTER-input file.
+#
+#########################################################
+
+
+SIMLIB_FILE:  PS1/Pantheon/PS1_LOWZ_COMBINED.SIMLIB
+
+#SIMLIB_NREPEAT:  50
+USE_SIMLIB_REDSHIFT:   0
+USE_SIMLIB_PEAKMJD:    1
+NEWMJD_DIF:  0.002
+#SOLID_ANGLE:  3.14  ! PI = 1/4 of sky
+CLEARPROMPT:   0
+RANSEED:       28473   # random number seed
+FORMAT_MASK:   2        # 2=text  32=FITS
+
+CIDOFF:      5999386
+#NGENTOT_LC:    5
+NGEN_LC: 20
+
+GENVERSION:  BYOSEDTEST
+GENSOURCE: RANDOM
+GENMODEL:  ./BYOSED/BYOSED.INPUT
+
+KCOR_FILE:  PS1/Pantheon/kcor_PS1_LOWZ_COMBINED.fits
+EFFERR_STOPGEN:  0.0000000001
+
+# selection criteria for generation
+GENFILTERS:  bcdeghijlmnopqrsuvwxyzACDEFHIJK
+
+GENRANGE_PEAKMJD:   49200.0  55500.0 
+GENSIGMA_SEARCH_PEAKMJD:   1.0         # sigma-smearing for  SEARCH_PEAKMJD
+GENSIGMA_VPEC:  250
+
+GENRANGE_REDSHIFT: 0.01 0.1
+GENSIGMA_REDSHIFT:   0.000001
+DNDZ:  POWERLAW  2.6E-5  2.2
+
+GENRANGE_TREST:    -19.0  49.0     # rest epoch relative to peak (days)
+
+OPT_MWEBV:       1
+GENSIGMA_MWEBV_RATIO:  0.16
+
+
+SMEARFLAG_FLUX:     1   # photo-stat smearing of signal, sky, etc ...
+SMEARFLAG_ZEROPT:   1   # smear zero-point with zptsig
+
+
+# ---------------------------
+#GENPEAK_SALT2x1:     0.44
+#GENRANGE_SALT2x1:   -4.0  +4.0     # x1 (stretch) range
+#GENSIGMA_SALT2x1:    3.12   0.724     # bifurcated sigmas
+
+GENMEAN_SALT2x1:      0.55
+GENRANGE_SALT2x1:    -5.0  +4.0     # x1 (stretch) range
+GENSIGMA_SALT2x1:     1.0  0.45      # bifurcated sigmas
+
+GENPROB2_SALT2x1:      0.55
+GENPEAK2_SALT2x1:    -1.5     # x1 (stretch) range
+GENSIGMA2_SALT2x1:     0.5  0.5      # bifurcated sigmas
+
+
+GENPEAK_SALT2c:      -0.055
+GENRANGE_SALT2c:    -0.4   0.4     # color range
+GENSIGMA_SALT2c:     0.023   0.15     # bifurcated sigmas
+
+
+# SALT2 alpha and beta
+
+GENPEAK_SALT2ALPHA:  0.165 0.165
+GENPEAK_SALT2BETA:  3.032 3.032
+
+# -------------------------------
+APPLY_SEARCHEFF_OPT:   3
+#APPLY_SEARCHEFF_OPT:  1
+APPLY_CUTWIN_OPT:      1
+CUTWIN_NEPOCH:    5 3.              # require 5 epochs (no S/N requirement)
+#CUTWIN_SNRMAX:   6 BVr 2 -20. 60.   # require 2 of griz with S/N > 6
+CUTWIN_TRESTMIN:  -20  10
+CUTWIN_TRESTMAX:    9  40
+CUTWIN_MWEBV:       0 .20
+
+# -----------------------
+# cosmological params for lightcurve generation and redshift distribution
+OMEGA_MATTER:   0.3
+OMEGA_LAMBDA:   0.7
+W0_LAMBDA:     -1.00
+H0:             70.0
+
+#HOSTLIB_FILE: $PS1MD_ROOT/simlib/DS_empty.HOSTLIB
+#HOSTLIB_STOREPAR: LOGMASS
+#HOSTLIB_DZTOL: 0.03 0 0.
+
+# -----------------------
+SIMGEN_DUMPALL:   6  CID Z MJD0 S2mb  S2c S2x1

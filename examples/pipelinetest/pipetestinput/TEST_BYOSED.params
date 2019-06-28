@@ -1,0 +1,21 @@
+[MAIN]
+sed_file = Hsiao07.dat
+magsmear = 0.0
+magoff = 0.0
+
+[FLAGS]
+color = True
+stretch = True
+
+[STRETCH]
+warp_function = stretch_func.dat
+dist_peak = 0.5
+dist_sigma = 1.0 0.7
+dist_limits = -2.5 2.5
+
+[COLOR]
+warp_function = color_func.dat
+dist_peak = 0.0
+dist_sigma = 0.07 0.1
+dist_limits = -0.3 0.3
+

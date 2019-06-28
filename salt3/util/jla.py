@@ -171,7 +171,7 @@ class SuperNova( object ) :
 		fout.close()
 
 		return( None )
-
+	
 class SuperNovaSpectrum( object ) :
 	""" object class for a single SN spectrum from spectrum-sname-#.list file
 	"""
