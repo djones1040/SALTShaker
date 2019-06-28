@@ -38,6 +38,7 @@ class TRAINING_Test(unittest.TestCase):
 			components=self.resids.SALTModel(self.guess)
 			resid,val,jacobian=self.resids.priors[prior](0.3145,self.guess,components)
 			dx=1e-3
+			rtol=1e-2
 			def incrementOneParam(i):
 				guess=self.guess.copy()
 				guess[i]+=dx
@@ -46,11 +47,9 @@ class TRAINING_Test(unittest.TestCase):
 			dPriordX=(np.vectorize(incrementOneParam)(np.arange(self.guess.size))-resid)/dx
 			#import pdb;pdb.set_trace()
 			#Check that all derivatives that should be 0 are zero
-			try:
-				self.assertTrue(np.all((dPriordX==0)==(jacobian==0)))
-				self.assertTrue(np.allclose(jacobian,dPriordX,rtol=1e-2))
-			except:
-				import pdb;pdb.set_trace()
+			if  not np.allclose(dPriordX,jacobian,rtol): print('Problems with derivatives for prior {} : '.format(prior),np.unique(self.parlist[np.where(~np.isclose(dPriordX,jacobian,rtol))]))
+			self.assertTrue(np.all((dPriordX==0)==(jacobian==0)))
+			self.assertTrue(np.allclose(jacobian,dPriordX,rtol))
 
 	def test_photresid_jacobian(self):
 		"""Checks that the the jacobian of the photometric residuals is being correctly calculated to within 1%"""
@@ -87,10 +86,8 @@ class TRAINING_Test(unittest.TestCase):
 		dResiddX=np.zeros((residuals.size,self.parlist.size))
 		for i in range(self.guess.size):
 			dResiddX[:,i]=(incrementOneParam(i)-residuals)/dx
-		try:
-			self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
-		except:
-			import pdb;pdb.set_trace()
+		if not np.allclose(dResiddX,jacobian,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol))[1]]))
+		self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
 
 	def test_specresid_jacobian(self):
 		"""Checks that the the jacobian of the spectroscopic residuals is being correctly calculated to within 1%"""
@@ -127,51 +124,11 @@ class TRAINING_Test(unittest.TestCase):
 		dResiddX=np.zeros((residuals.size,self.parlist.size))
 		for i in range(self.guess.size):
 			dResiddX[:,i]=(incrementOneParam(i)-residuals)/dx
-		try:
-			self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
-		except:
-			import pdb;pdb.set_trace()
+		if not np.allclose(dResiddX,jacobian,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol))[1]]))
+		self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
 
 
-	def test_specresid_jacobian(self):
-		"""Checks that the the jacobian of the spectroscopic residuals is being correctly calculated to within 1%"""
-				#Define simple models for m0,m1
-		dx=1e-3
-		rtol=1e-2
-		sn=self.resids.datadict.keys().__iter__().__next__()
-		components = self.resids.SALTModel(self.resids.guess)
-		salterr = self.resids.ErrModel(self.resids.guess)
-		if self.resids.n_colorpars:
-			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.resids.guess[self.resids.parlist == 'cl'])
-		else: colorLaw = None
-		if self.resids.n_colorscatpars:
-			colorScat = True
-		else: colorScat = None
-		specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,True,True)[1]
-		
-		residuals = specresidsdict['specresid']
-		
-		jacobian=np.zeros((residuals.size,self.parlist.size))
-		jacobian[:,self.parlist=='cl'] = specresidsdict['dspecresid_dcl']
-		jacobian[:,self.parlist=='m0'] = specresidsdict['dspecresid_dM0']
-		jacobian[:,self.parlist=='m1'] = specresidsdict['dspecresid_dM1']
-		for snparam in ('x0','x1','c'): #tpkoff should go here
-			jacobian[:,self.parlist == '{}_{}'.format(snparam,sn)] = specresidsdict['dspecresid_d{}'.format(snparam)]
-		def incrementOneParam(i):
-			guess=self.guess.copy()
-			guess[i]+=dx
-			components=self.resids.SALTModel(guess)
-			if self.resids.n_colorpars:
-				colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
-			else: colorLaw = None
-			return self.resids.ResidsForSN(guess,sn,components,colorLaw,False)[1]['specresid']
-		dResiddX=np.zeros((residuals.size,self.parlist.size))
-		for i in range(self.guess.size):
-			dResiddX[:,i]=(incrementOneParam(i)-residuals)/dx
-		try:
-			self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
-		except:
-			import pdb;pdb.set_trace()
+
 # 	def test_init_chi2func(self):
 # 		self.assertTrue(True)
 # 		waverange = [2000,9200]
