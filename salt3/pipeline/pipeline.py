@@ -444,7 +444,7 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
         config = {}
         for i,line in enumerate(lines):
             if ":" in line and not line.strip().startswith("#"):
-                kwline = line.split(":")
+                kwline = line.split(":",maxsplit=1)
                 kw = kwline[0]
                 config[kw] = kwline[1].strip()
     else:
@@ -455,7 +455,7 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
         config = {}
         for i,line in enumerate(lines):
             if ":" in line and not line.strip().startswith("#"):
-                kwline = line.split(":")
+                kwline = line.split(":",maxsplit=1)
                 kw = kwline[0]
                 basekws.append(kw)
                 if kw in setkeys.key.values:

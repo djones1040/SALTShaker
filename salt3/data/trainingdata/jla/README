@@ -1,0 +1,33 @@
+Created on 2013-03-05 (Marc Betoule)
+Results from the application of following cuts to the SDSS3 spectro sample:
+  * z < 0.25
+  * dme < 0.5
+  * x1e < 0.5
+  * -3 < x1 < 3
+  * -0.3 < c < 0.3
+  * MWEBV < 0.15
+  * Few post-max data (despite low reported uncertainty on t0): SDSS19899, SDSS20470, SDSS21510 , SDSS10434
+  * Few pre-max data: SDSS12780, SDSS12781, SDSS13072, SDSS18768, SDSS6780, SDSS12853 (2006ey)
+  * Poor fit, probably related to problem in the photometry: SDSS12907, SDSS16287, SDSS18643, SDSS6773(2005iu), SDSS20528 (2007qr), SDSS18456, SDSS19381 (2007nk), SDSS3256 (2005hn), SDSS83 (2004ie)
+  * Poor fit, probable 1986G-like: SDSS17886 (sn2007jh)
+  * Poor fit, probable 2002cx-like: SDSS20208 (sn2007qd)
+  * kills 3 sigma outliers on the hubble diagram kills SDSS14782, SDSS15369, SDSS15459, SDSS17568
+
++ Visual check of all remaining light-curves (207 left).
+
+------------------------------------------------------
+Modified on 2013-06-20 (Marc Betoule)
+
+  * Remove 4 SNe from the SDSS presurvey (CID < 250)
+  
+  * Alter measurement errors for color-transformed measurements,
+    i.e. in the so-called "STANDARD" instrument (see
+    smallstudies/lowz_errors/lowz_errors.sh)
+
+  * Set Zero point errors according to the prescriptions in:
+  http://supernovae.in2p3.fr/jla/doku.php?id=posts:update_on_u-band_scatter_and_anomaly
+
+------------------------------------------------------
+Modified on 2013-07-20 (Marc Betoule)
+
+  * Add 0.005 mag error to covariance matrix
