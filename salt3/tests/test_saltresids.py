@@ -24,7 +24,6 @@ class TRAINING_Test(unittest.TestCase):
 		datadict = readutils.rdAllData(options.snlist,options.estimate_tpk,kcordict,
 									   ts.addwarning,speclist=options.speclist)
 		datadict = ts.mkcuts(datadict)
-	
 		self.parlist,self.guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc = ts.initialParameters(datadict)
 		saltfitkwargs = ts.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
 
@@ -92,6 +91,47 @@ class TRAINING_Test(unittest.TestCase):
 			self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
 		except:
 			import pdb;pdb.set_trace()
+
+	def test_specresid_jacobian(self):
+		"""Checks that the the jacobian of the spectroscopic residuals is being correctly calculated to within 1%"""
+				#Define simple models for m0,m1
+		dx=1e-3
+		rtol=1e-2
+		sn=self.resids.datadict.keys().__iter__().__next__()
+		components = self.resids.SALTModel(self.resids.guess)
+		salterr = self.resids.ErrModel(self.resids.guess)
+		if self.resids.n_colorpars:
+			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.resids.guess[self.resids.parlist == 'cl'])
+		else: colorLaw = None
+		if self.resids.n_colorscatpars:
+			colorScat = True
+		else: colorScat = None
+		specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,True,True)[1]
+		
+		residuals = specresidsdict['specresid']
+		
+		jacobian=np.zeros((residuals.size,self.parlist.size))
+		jacobian[:,self.parlist=='cl'] = specresidsdict['dspecresid_dcl']
+		jacobian[:,self.parlist=='m0'] = specresidsdict['dspecresid_dM0']
+		jacobian[:,self.parlist=='m1'] = specresidsdict['dspecresid_dM1']
+		for snparam in ('x0','x1','c'): #tpkoff should go here
+			jacobian[:,self.parlist == '{}_{}'.format(snparam,sn)] = specresidsdict['dspecresid_d{}'.format(snparam)]
+		def incrementOneParam(i):
+			guess=self.guess.copy()
+			guess[i]+=dx
+			components=self.resids.SALTModel(guess)
+			if self.resids.n_colorpars:
+				colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
+			else: colorLaw = None
+			return self.resids.ResidsForSN(guess,sn,components,colorLaw,False)[1]['specresid']
+		dResiddX=np.zeros((residuals.size,self.parlist.size))
+		for i in range(self.guess.size):
+			dResiddX[:,i]=(incrementOneParam(i)-residuals)/dx
+		try:
+			self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
+		except:
+			import pdb;pdb.set_trace()
+
 
 	def test_specresid_jacobian(self):
 		"""Checks that the the jacobian of the spectroscopic residuals is being correctly calculated to within 1%"""
