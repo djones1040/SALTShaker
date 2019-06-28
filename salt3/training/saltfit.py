@@ -432,6 +432,9 @@ class GaussNewton(saltresids.SALTResids):
 		lastResid = 1e20
 		print('Initializing')
 
+		if len(self.usePriors) != len(self.priorWidths):
+			raise RuntimeError('length of priors does not equal length of prior widths!')
+
 		residuals = self.lsqwrap(guess,False,False,doPriors=True)
 		chi2_init = (residuals**2.).sum()
 		X = copy.deepcopy(guess[:])
