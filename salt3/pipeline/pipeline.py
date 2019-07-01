@@ -298,6 +298,9 @@ class Training(PyPipeProcedure):
         if pipepro.lower().startswith('lcfit'):
             outdir = self._get_output_info()
             ##copy necessary files to a model folder in SNDATA_ROOT
+        elif pipepro.lower().startswith('training'):
+            ### set model dir for snana
+            pass
         else:
             raise ValueError("training can only glue to lcfit")
 
