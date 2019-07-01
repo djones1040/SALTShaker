@@ -39,5 +39,5 @@ mag0=-29.7754
 uave=1
 sntype=-1
 hgtype=-1
-file=ps1sim_default.fitres
+file=snfit_test.FITRES.TEXT
 prefix=test_salt2mu

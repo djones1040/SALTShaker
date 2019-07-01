@@ -28,7 +28,7 @@ class SALT3pipe():
         config.read(self.finput)
         m2df = self._multivalues_to_df
 
-        self.Data.configure(snlist=config.get('data','snlist'))
+        # self.Data.configure(snlist=config.get('data','snlist'))
 
         self.BYOSED.setkeys = m2df(config.get('byosed','set_key'),
                                    colnames=['section','key','value'])
@@ -69,7 +69,7 @@ class SALT3pipe():
 
 
     def run(self):
-        # self.Simulation.run()
+        self.Simulation.run()
         self.Training.run()
         self.LCFitting.run()
         self.GetMu.run()
@@ -220,7 +220,7 @@ class BYOSED(PyPipeProcedure):
         self.outname = outname
         super().configure(pro=None,baseinput=baseinput,setkeys=setkeys)
         #rename current byosed param
-        byosed_default = "BYOSED/BYOSED.params"
+        byosed_default = "byosed/BYOSED.params"
         if bkp_orig_param:
             byosed_rename = "{}.{}".format(byosed_default,int(time.time()))
             if os.path.isfile(byosed_default):
@@ -298,9 +298,6 @@ class Training(PyPipeProcedure):
         if pipepro.lower().startswith('lcfit'):
             outdir = self._get_output_info()
             ##copy necessary files to a model folder in SNDATA_ROOT
-        elif pipepro.lower().startswith('training'):
-            ### set model dir for snana
-            pass
         else:
             raise ValueError("training can only glue to lcfit")
 
@@ -341,7 +338,7 @@ class LCFitting(PipeProcedure):
             pipepro = type(pipepro).__name__
         if pipepro.lower().startswith('getmu'):
             outprefix = self._get_output_info().value.values[0]
-            return glob.glob((str(outprefix)+'*.FITRES.TEXT'))[0]
+            return str(outprefix)+'.FITRES.TEXT'
         else:
             raise ValueError("lcfitting can only glue to getmu")
 
@@ -483,7 +480,7 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
         config = {}
         for i,line in enumerate(lines):
             if ":" in line and not line.strip().startswith("#"):
-                kwline = line.split(":",maxsplit=1)
+                kwline = line.split(":")
                 kw = kwline[0]
                 config[kw] = kwline[1].strip()
     else:
@@ -494,7 +491,7 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
         config = {}
         for i,line in enumerate(lines):
             if ":" in line and not line.strip().startswith("#"):
-                kwline = line.split(":",maxsplit=1)
+                kwline = line.split(":")
                 kw = kwline[0]
                 basekws.append(kw)
                 if kw in setkeys.key.values:
