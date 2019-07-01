@@ -24,6 +24,7 @@ from sncosmo.constants import HC_ERG_AA
 
 from salt3.training.saltfit import fitting
 from salt3.training import saltfit as saltfit
+from salt3.data import data_rootdir
 
 class TrainSALT(TrainSALTBase):
 	def __init__(self):
@@ -247,7 +248,15 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		foutclscat.close()
 		
 		# best-fit and simulated SN params
-		snfiles = np.genfromtxt(self.options.snlist,dtype='str')
+		snlist = self.options.snlist[:]
+		if not os.path.exists(snlist):
+			print('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
+			snlist = '%s/trainingdata/%s'%(data_rootdir,snlist)
+			if not os.path.exists(snlist):
+				raise RuntimeError('SN list file %s does not exist'%snlist)
+
+		
+		snfiles = np.genfromtxt(snlist,dtype='str')
 		snfiles = np.atleast_1d(snfiles)
 		
 		foutsn = open('%s/salt3train_snparams.txt'%outdir,'w')
@@ -258,7 +267,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				if str(k) not in l: continue
 				foundfile = True
 				if '/' not in l:
-					l = '%s/%s'%(os.path.dirname(self.options.snlist),l)
+					l = '%s/%s'%(os.path.dirname(snlist),l)
 				sn = snana.SuperNova(l)
 				sn.SNID = str(sn.SNID)
 				if 'SIM_SALT2x0' in sn.__dict__.keys(): SIM_x0 = sn.SIM_SALT2x0
@@ -282,6 +291,14 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 	def validate(self,outputdir):
 
+		snlist = self.options.snlist[:]
+		if not os.path.exists(snlist):
+			print('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
+			snlist = '%s/trainingdata/%s'%(data_rootdir,snlist)
+			if not os.path.exists(snlist):
+				raise RuntimeError('SN list file %s does not exist'%snlist)
+
+		
 		import pylab as plt
 		plt.subplots_adjust(left=None, bottom=None, right=None, top=0.85, wspace=0.025, hspace=0)
 
@@ -303,10 +320,10 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 
 		if self.options.dospec:
-			ValidateSpectra.compareSpectra(self.options.snlist,
-										   self.options.outputdir)
+			ValidateSpectra.compareSpectra(snlist,
+										   self.options.outputdir,maxspec=50)
 		
-		snfiles = np.genfromtxt(self.options.snlist,dtype='str')
+		snfiles = np.genfromtxt(snlist,dtype='str')
 		snfiles = np.atleast_1d(snfiles)
 		fitx1,fitc = False,False
 		if self.options.n_components == 2:
@@ -343,7 +360,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		gs1.update(wspace=0.0)
 		
 		i = 0
-		for l in snfiles:
+		for l in snfiles[0:50]:
 			if not i % 9:
 				fig = plt.figure()
 			try:
@@ -352,7 +369,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				import pdb; pdb.set_trace()
 
 			if '/' not in l:
-				l = '%s/%s'%(os.path.dirname(self.options.snlist),l)
+				l = '%s/%s'%(os.path.dirname(snlist),l)
 			sn = snana.SuperNova(l)
 			sn.SNID = str(sn.SNID)
 
@@ -448,9 +465,12 @@ Dependencies: sncosmo?
 	salt.options = options
 	salt.verbose = options.verbose
 	salt.clobber = options.clobber
+
+	if salt.options.stage not in ['all','validate','train']:
+		raise RuntimeError('stage must be one of all, validate, train')
 	
 	salt.main()
-
+	
 	if len(salt.warnings):
 		print('There were warnings!!')
 		print(salt.warnings)
