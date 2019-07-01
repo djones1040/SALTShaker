@@ -24,7 +24,6 @@ class TRAINING_Test(unittest.TestCase):
 		datadict = readutils.rdAllData(options.snlist,options.estimate_tpk,kcordict,
 									   ts.addwarning,dospec=options.dospec)
 		datadict = ts.mkcuts(datadict)
-	
 		self.parlist,self.guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc = ts.initialParameters(datadict)
 		saltfitkwargs = ts.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
 
@@ -39,6 +38,7 @@ class TRAINING_Test(unittest.TestCase):
 			components=self.resids.SALTModel(self.guess)
 			resid,val,jacobian=self.resids.priors[prior](0.3145,self.guess,components)
 			dx=1e-3
+			rtol=1e-2
 			def incrementOneParam(i):
 				guess=self.guess.copy()
 				guess[i]+=dx
@@ -47,11 +47,9 @@ class TRAINING_Test(unittest.TestCase):
 			dPriordX=(np.vectorize(incrementOneParam)(np.arange(self.guess.size))-resid)/dx
 			#import pdb;pdb.set_trace()
 			#Check that all derivatives that should be 0 are zero
-			try:
-				self.assertTrue(np.all((dPriordX==0)==(jacobian==0)))
-				self.assertTrue(np.allclose(jacobian,dPriordX,rtol=1e-2))
-			except:
-				import pdb;pdb.set_trace()
+			if  not np.allclose(dPriordX,jacobian,rtol): print('Problems with derivatives for prior {} : '.format(prior),np.unique(self.parlist[np.where(~np.isclose(dPriordX,jacobian,rtol))]))
+			self.assertTrue(np.all((dPriordX==0)==(jacobian==0)))
+			self.assertTrue(np.allclose(jacobian,dPriordX,rtol))
 
 	def test_photresid_jacobian(self):
 		"""Checks that the the jacobian of the photometric residuals is being correctly calculated to within 1%"""
@@ -88,10 +86,8 @@ class TRAINING_Test(unittest.TestCase):
 		dResiddX=np.zeros((residuals.size,self.parlist.size))
 		for i in range(self.guess.size):
 			dResiddX[:,i]=(incrementOneParam(i)-residuals)/dx
-		try:
-			self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
-		except:
-			import pdb;pdb.set_trace()
+		if not np.allclose(dResiddX,jacobian,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol))[1]]))
+		self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
 
 	def test_specresid_jacobian(self):
 		"""Checks that the the jacobian of the spectroscopic residuals is being correctly calculated to within 1%"""
@@ -128,10 +124,11 @@ class TRAINING_Test(unittest.TestCase):
 		dResiddX=np.zeros((residuals.size,self.parlist.size))
 		for i in range(self.guess.size):
 			dResiddX[:,i]=(incrementOneParam(i)-residuals)/dx
-		try:
-			self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
-		except:
-			import pdb;pdb.set_trace()
+		if not np.allclose(dResiddX,jacobian,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol))[1]]))
+		self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
+
+
+
 # 	def test_init_chi2func(self):
 # 		self.assertTrue(True)
 # 		waverange = [2000,9200]
