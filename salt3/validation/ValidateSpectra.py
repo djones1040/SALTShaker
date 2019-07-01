@@ -33,12 +33,12 @@ def flux(salt3dir,obsphase,obswave,z,x0,x1,c):
 	modelflux = x0*(m0flux + x1*m1flux)*10**(-0.4*c*salt3colorlaw(np.unique(m0wave)))*1e-12/(1+z)
 	# 
 	m0interp = interp1d(np.unique(m0phase)*(1+z),m0flux*10**(-0.4*c*salt3colorlaw(np.unique(m0wave)))*1e-12/(1+z),axis=0,
-						kind='nearest')#,bounds_error=False,fill_value="extrapolate")
+						kind='nearest',bounds_error=False,fill_value="extrapolate")
 	m0phaseinterp = m0interp(obsphase)
 	m0interp = np.interp(obswave,np.unique(m0wave)*(1+z),m0phaseinterp)
 
 	m1interp = interp1d(np.unique(m0phase)*(1+z),m1flux*10**(-0.4*c*salt3colorlaw(np.unique(m0wave)))*1e-12/(1+z),axis=0,
-						kind='nearest')#,bounds_error=False,fill_value="extrapolate")
+						kind='nearest',bounds_error=False,fill_value="extrapolate")
 	m1phaseinterp = m1interp(obsphase)
 	m1interp = np.interp(obswave,np.unique(m0wave)*(1+z),m1phaseinterp)
 
@@ -60,7 +60,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 				   lcrv00file='salt3_lc_relative_variance_0.dat',
 				   lcrv11file='salt3_lc_relative_variance_1.dat',
 				   lcrv01file='salt3_lc_relative_covariance_01.dat',
-				   ax=None):
+				   ax=None,maxspec=None):
 
 	plt.close('all')
 	datadict=readutils.rdAllData(speclist,False,None,lambda x: None,speclist)
@@ -92,35 +92,38 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 		model.update(snPars)
 		#import pdb; pdb.set_trace()
 		for k in specdata.keys():
+			try:
+				coeffs=pars[parlist=='specrecal_{}_{}'.format(sn,k)]
+				coeffs/=factorial(np.arange(len(coeffs)))
+				wave=specdata[k]['wavelength']
+				#print(coeffs)
+				modelFlux = model.flux(specdata[k]['tobs'],wave)*np.exp(np.poly1d(coeffs)((wave-np.mean(wave))/2500))
+				unncalledModel=model.flux(specdata[k]['tobs']+snPars['t0'],wave)
+				unncalledModel = flux(salt3dir,specdata[k]['tobs']+snPars['t0'],specdata[k]['wavelength'],snPars['z'],snPars['x0'],snPars['x1'],snPars['c'])
 
-			coeffs=pars[parlist=='specrecal_{}_{}'.format(sn,k)]
-			coeffs/=factorial(np.arange(len(coeffs)))
-			wave=specdata[k]['wavelength']
-			#print(coeffs)
-			modelFlux = model.flux(specdata[k]['tobs'],wave)*np.exp(np.poly1d(coeffs)((wave-np.mean(wave))/2500))
-			unncalledModel=model.flux(specdata[k]['tobs']+snPars['t0'],wave)
-			unncalledModel = flux(salt3dir,specdata[k]['tobs']+snPars['t0'],specdata[k]['wavelength'],snPars['z'],snPars['x0'],snPars['x1'],snPars['c'])
-
-			if not axcount % 3:
-				fig = plt.figure()
-			ax = plt.subplot(3,1,axcount % 3 + 1)
+				if not axcount % 3:
+					fig = plt.figure()
+				ax = plt.subplot(3,1,axcount % 3 + 1)
 			
-			#ax.clf()
-			if len(coeffs): ax.plot(wave,modelFlux,'r-',label='Model spectrum')
-			ax.plot(wave,specdata[k]['flux'],'b-',label='Spectral data, phase = %.1f'%(specdata[k]['tobs']-snPars['t0']))
-			ax.plot(wave,unncalledModel,'g-',label='SALT3 Model spectrum\n(no calibration)')
-			ax.set_xlim(wave.min(),wave.max())
-			#ax.set_ylim(0,max(modelFlux.max(),specdata[k]['flux'].max())*1.25)
-			ax.set_ylim(0,specdata[k]['flux'].max()*1.25)
-			ax.set_xlabel('Wavelength $\AA$')
-			ax.set_ylabel('Flux')
-			ax.legend(loc='upper right',prop={'size':8})
-			#plt.savefig('{}/speccomp_{}_{}.png'.format(outdir,sn,k),dpi=288)
-			axcount += 1
-			#import pdb; pdb.set_trace()
-			if not axcount % 3:
-				pdf_pages.savefig()
-
+				#ax.clf()
+				if len(coeffs): ax.plot(wave,modelFlux,'r-',label='Model spectrum')
+				ax.plot(wave,specdata[k]['flux'],'b-',label='Spectral data, phase = %.1f'%(specdata[k]['tobs']-snPars['t0']))
+				ax.plot(wave,unncalledModel,'g-',label='SALT3 Model spectrum\n(no calibration)')
+				ax.set_xlim(wave.min(),wave.max())
+				#ax.set_ylim(0,max(modelFlux.max(),specdata[k]['flux'].max())*1.25)
+				ax.set_ylim(0,specdata[k]['flux'].max()*1.25)
+				ax.set_xlabel('Wavelength $\AA$')
+				ax.set_ylabel('Flux')
+				ax.legend(loc='upper right',prop={'size':8})
+				#plt.savefig('{}/speccomp_{}_{}.png'.format(outdir,sn,k),dpi=288)
+				axcount += 1
+				#import pdb; pdb.set_trace()
+				if not axcount % 3:
+					pdf_pages.savefig()
+				if maxspec and axcount >= maxspec:
+					break
+			except:
+				continue
 	pdf_pages.savefig()
 	pdf_pages.close()
 			

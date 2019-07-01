@@ -477,7 +477,8 @@ class GaussNewton(saltresids.SALTResids):
 		
 		components = self.SALTModel(guess)
 
-		numResids=self.num_phot+self.num_spec + (len(self.usePriors) if doPriors else 0)
+		alllam_vals = range(0,self.im0.size)
+		numResids=self.num_phot+self.num_spec + (len(self.usePriors)+2*len(alllam_vals)-2 if doPriors else 0)
 		if self.regularize:
 			numRegResids=sum([ self.n_components*(self.phasebins.size-1) * (self.wavebins.size -1) for weight in [self.regulargradientphase,self.regulargradientwave ,self.regulardyad] if not weight == 0])
 			numResids+=numRegResids
@@ -512,11 +513,12 @@ class GaussNewton(saltresids.SALTResids):
 				for snparam in ('x0','x1','c'): #tpkoff should go here
 					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = specresidsdict['dspecresid_d{}'.format(snparam)]
 			idx += idxp
-		print('priors: ',*self.usePriors)
+		print('hack')
+		#print('priors: ',*self.usePriors)
 
 		# priors
 		priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,guess)
-		print(*priorVals)
+		#print(*priorVals)
 			#doPriors = False
 		if doPriors:
 			residuals[idx:idx+priorResids.size]=priorResids

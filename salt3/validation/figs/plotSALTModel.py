@@ -6,7 +6,8 @@ import pylab as plt
 from scipy.interpolate import interp1d, interp2d
 from sncosmo.salt2utils import SALT2ColorLaw
 
-def mkModelPlot(salt3dir='modelfiles/salt3'):
+def mkModelPlot(salt3dir='modelfiles/salt3',
+				xlimits=[2000,9200]):
 	plt.rcParams['figure.figsize'] = (9,3)
 	plt.subplots_adjust(left=None, bottom=None, right=None, top=None,
 						wspace=0, hspace=0)
@@ -86,10 +87,10 @@ def mkModelPlot(salt3dir='modelfiles/salt3'):
 						 salt3m0flux_0-salt3m0fluxerr_0+spacing*i,
 						 salt3m0flux_0+salt3m0fluxerr_0+spacing*i,
 						 color='r',alpha=0.5)
-		ax1.set_xlim([2500,9200])
+		ax1.set_xlim(xlimits)
 		ax1.set_ylim([0,1.35])
 
-		ax1.text(9100,spacing*(i+0.2),'%s'%plotphasestr,ha='right')
+		ax1.text(xlimits[1]-100,spacing*(i+0.2),'%s'%plotphasestr,ha='right')
 		
 	spacing = 0.15		
 	for plotphase,i,plotphasestr in zip([-5,0,10],range(3),['-5','+0','+10']):
@@ -114,10 +115,10 @@ def mkModelPlot(salt3dir='modelfiles/salt3'):
 		#				 salt3m1flux_0-salt3m1fluxerr_0+spacing*i,
 		#				 salt3m1flux_0+salt3m1fluxerr_0+spacing*i,
 		#				 color='r',alpha=0.5)
-		ax2.set_xlim([2500,9200])
+		ax2.set_xlim(xlimits)
 		ax2.set_ylim([-0.05,0.39])
 
-		ax2.text(9100,spacing*(i+0.2),'%s'%plotphasestr,ha='right')
+		ax2.text(xlimits[1]-100,spacing*(i+0.2),'%s'%plotphasestr,ha='right')
 		
 		#import pdb; pdb.set_trace()
 		
@@ -149,11 +150,12 @@ def mkModelPlot(salt3dir='modelfiles/salt3'):
 	ax2.set_ylabel('M1',fontsize=15)
 	ax3.set_ylabel('Color Law',fontsize=15)
 	for ax in [ax1,ax2,ax3]:
-		ax.set_xlim([2000,9200])
+		ax.set_xlim(xlimits)
 	ax1.xaxis.set_ticklabels([])
 	ax2.xaxis.set_ticklabels([])
+	ax3.set_xlabel('Wavelength ($\AA$)',fontsize=15)
 	
-def mkModelErrPlot(salt3dir='modelfiles/salt3'):
+def mkModelErrPlot(salt3dir='modelfiles/salt3',xlimits=[2000,9200]):
 	plt.rcParams['figure.figsize'] = (9,3)
 	plt.subplots_adjust(left=None, bottom=None, right=None, top=None,
 						wspace=0, hspace=0)
@@ -197,10 +199,10 @@ def mkModelErrPlot(salt3dir='modelfiles/salt3'):
 
 		ax1.plot(salt2scalewave,salt2scaleflux_0+spacing*i,color='b',label='SALT2')
 		ax1.plot(salt3scalewave,salt3scaleflux_0+spacing*i,color='r',label='SALT3')
-		ax1.set_xlim([2500,9200])
+		ax1.set_xlim(xlimits)
 		ax1.set_ylim([0,1.35])
 
-		ax1.text(9100,spacing*(i+0.2),'%s'%plotphasestr,ha='right')
+		ax1.text(xlimits[1]-100,spacing*(i+0.2),'%s'%plotphasestr,ha='right')
 
 	for plotphase,i,plotphasestr in zip([-5,0,10],range(3),['-5','+0','+10']):
 		int_salt2cdisp = interp2d(salt2cdispwave,salt2cdispphase,salt2cdispflux)
@@ -211,10 +213,10 @@ def mkModelErrPlot(salt3dir='modelfiles/salt3'):
 
 		ax2.plot(salt2cdispwave,salt2cdispflux_0+spacing*i,color='b',label='SALT2')
 		ax2.plot(salt3cdispwave,salt3cdispflux_0+spacing*i,color='r',label='SALT3')
-		ax2.set_xlim([2500,9200])
+		ax2.set_xlim(xlimits)
 		ax2.set_ylim([0,1.35])
 
-		ax2.text(9100,spacing*(i+0.2),'%s'%plotphasestr,ha='right')
+		ax2.text(xlimits[1]-100,spacing*(i+0.2),'%s'%plotphasestr,ha='right')
 		
 	
 if __name__ == "__main__":

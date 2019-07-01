@@ -3,6 +3,11 @@ import argparse
 import configparser
 import numpy as np
 
+def boolean_string(s):
+    if s not in {'False', 'True', '1', '0'}:
+        raise ValueError('Not a valid boolean string')
+    return (s == 'True') | (s == '1')
+
 class TrainSALTBase:
 	def __init__(self):
 		self.warnings = []
@@ -114,7 +119,7 @@ class TrainSALTBase:
 							help='do Gauss-Newton least squares (default=%default)')
 		parser.add_argument('--gaussnewton_maxiter', default=config.get('trainparams','gaussnewton_maxiter'), type=int,
 							help='maximum iterations for Gauss-Newton (default=%default)')
-		parser.add_argument('--regularize', default=config.get('trainparams','regularize'), type=bool,
+		parser.add_argument('--regularize', default=config.get('trainparams','regularize'), type=boolean_string,
 							help='turn on regularization if set (default=%default)')
 		
 		# mcmc parameters
