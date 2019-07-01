@@ -52,15 +52,15 @@ SMEARFLAG_ZEROPT:   1   # smear zero-point with zptsig
 
 # take spectrum within 1 week prior to peak (rest-frame),
 # with SNR=20 for 5000-6000 A range
-TAKE_SPECTRUM:   TOBS(-7:0)  SNR_ZPOLY(20,0,0)  SNR_LAMOBS(5000:6000)
+TAKE_SPECTRUM:   TOBS(-7: 0)  SNR_ZPOLY(20,0,0)  SNR_LAMOBS(5000: 6000)
 
 # take another spectrum within 1 week (obs-frame) after peak
 # with SNR=20 for obs-frame 5000-6000 A range
-TAKE_SPECTRUM:   TOBS(0:7)  SNR_ZPOLY(20,0,0)  SNR_LAMOBS(5000:6000)
+TAKE_SPECTRUM:   TOBS(0: 7)  SNR_ZPOLY(20,0,0)  SNR_LAMOBS(5000: 6000)
 
 # take late spectrum between +15 and +20 days, with fixed
 # 1hr exposure time, regardless of SNR
-TAKE_SPECTRUM:   TOBS(15:20)  SNR_ZPOLY(20,0,0)  SNR_LAMOBS(5000:6000)
+TAKE_SPECTRUM:   TOBS(15: 20)  SNR_ZPOLY(20,0,0)  SNR_LAMOBS(5000: 6000)
 
 # ---------------------------
 #GENPEAK_SALT2x1:     0.44

@@ -56,7 +56,7 @@
   &END
 
  &FITINP
-     FITMODEL_NAME  = 'SALT2.JLA-B14'
+     FITMODEL_NAME  = '/home/mi/salt3/SALT3/examples/pipelinetest/SALT3.test'
      FILTLIST_FIT = 'bcdeghijlmnopq'
 
      FUDGEALL_ITER1_MAXFRAC = 0.01
