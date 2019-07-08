@@ -127,7 +127,7 @@ class TrainSALT(TrainSALTBase):
 				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.resume_from_outputdir,unpack=True,skiprows=1,dtype="U20,f8")
 			except:
 				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.outputdir,unpack=True,skiprows=1,dtype="U20,f8")
-			for key in np.unique(parlist):
+			for key in np.unique(names):
 				guess[parlist == key] = pars[names == key]
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	

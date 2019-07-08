@@ -444,7 +444,12 @@ class SALTResids:
 				specresultsdict['dmodelflux_dc'][iSpecStart:iSpecStart+SpecLen,0] = modulatedFlux *np.log(10)*colorlawinterp
 				specresultsdict['dmodelflux_dx0'][iSpecStart:iSpecStart+SpecLen,0] = (M0interp + x1*M1interp)
 				specresultsdict['dmodelflux_dx1'][iSpecStart:iSpecStart+SpecLen,0] = x0*M1interp
-				if self.specrecal : specresultsdict['dmodelflux_dspecrecal_{}'.format(k)][iSpecStart:iSpecStart+SpecLen,0] = modulatedFlux[:,np.newaxis] * (((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal)[:,np.newaxis] ** np.arange(coeffs.size)[np.newaxis,:]) / factorial(np.arange(coeffs.size))[np.newaxis,:]
+				if self.specrecal : 
+					import pdb;pdb.set_trace()
+					specresultsdict['dmodelflux_dspecrecal_{}'.format(k)][iSpecStart:iSpecStart+SpecLen,:] = \
+					modulatedFlux[:,np.newaxis] * \
+					(((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal)[:,np.newaxis] ** np.arange(coeffs.size)[np.newaxis,:]) \
+					/ factorial(np.arange(coeffs.size))[np.newaxis,:]
 
 				
 				# color law
