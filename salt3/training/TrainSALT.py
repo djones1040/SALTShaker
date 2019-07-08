@@ -98,7 +98,7 @@ class TrainSALT(TrainSALTBase):
 				order=self.options.n_min_specrecal+int(np.log((specdata[k]['wavelength'].max() - \
 					specdata[k]['wavelength'].min())/self.options.specrange_wavescale_specrecal) + \
 					np.unique(photdata['filt']).size* self.options.n_specrecal_per_lightcurve)
-				if self.options.n_specrecal:
+				if self.options.specrecal:
 					parlist=np.append(parlist,['specrecal_{}_{}'.format(sn,k)]*order)
 
 

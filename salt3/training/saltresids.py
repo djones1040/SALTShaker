@@ -387,7 +387,9 @@ class SALTResids:
 			specresultsdict['dmodelflux_dM0_nox'] = np.zeros([nspecdata,len(self.im0)])
 			specresultsdict['dmodelflux_dM1'] = np.zeros([nspecdata,len(self.im1)])
 			specresultsdict['dmodelflux_dcl'] = np.zeros([nspecdata,self.n_colorpars])
-
+			if self.specrecal : 
+				for k in specdata.keys(): 
+					specresultsdict['dmodelflux_dspecrecal_{}'.format(k)]= np.zeros([nspecdata,(self.parlist=='specrecal_{}_{}'.format(sn,k)).sum()])
 
 		iSpecStart = 0
 		for k in specdata.keys():
@@ -421,7 +423,7 @@ class SALTResids:
 				colorlawint = interp1d(obswave,colorlaw,kind='nearest',bounds_error=False,fill_value="extrapolate")
 				colorlawinterp = colorlawint(specdata[k]['wavelength'])
 
-				modulatedFlux = x0*(M0interp + x1*M1interp)*recalexp
+				modulatedFlux = x0*(M0interp + x1*M1interp)
 				
 				specresultsdict['modelflux'][iSpecStart:iSpecStart+SpecLen] = modulatedFlux
 			else:
@@ -439,10 +441,10 @@ class SALTResids:
 			
 			# derivatives....
 			if computeDerivatives:
-				specresultsdict['dmodelflux_dc'][iSpecStart:iSpecStart+SpecLen,0] = x0*(M0interp + x1*M1interp)*np.log(10)*colorlawinterp
-
+				specresultsdict['dmodelflux_dc'][iSpecStart:iSpecStart+SpecLen,0] = modulatedFlux *np.log(10)*colorlawinterp
 				specresultsdict['dmodelflux_dx0'][iSpecStart:iSpecStart+SpecLen,0] = (M0interp + x1*M1interp)
 				specresultsdict['dmodelflux_dx1'][iSpecStart:iSpecStart+SpecLen,0] = x0*M1interp
+				if self.specrecal : specresultsdict['dmodelflux_dspecrecal_{}'.format(k)][iSpecStart:iSpecStart+SpecLen,0] = modulatedFlux[:,np.newaxis] * (((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal)[:,np.newaxis] ** np.arange(coeffs.size)[np.newaxis,:]) / factorial(np.arange(coeffs.size))[np.newaxis,:]
 
 				
 				# color law
