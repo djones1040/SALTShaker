@@ -53,7 +53,7 @@ class TRAINING_Test(unittest.TestCase):
 
 	def test_photresid_jacobian(self):
 		"""Checks that the the jacobian of the photometric residuals is being correctly calculated to within 1%"""
-				#Define simple models for m0,m1
+		print("Checking photometric derivatives")
 		dx=1e-3
 		rtol=1e-2
 		sn=self.resids.datadict.keys().__iter__().__next__()
@@ -91,7 +91,7 @@ class TRAINING_Test(unittest.TestCase):
 
 	def test_specresid_jacobian(self):
 		"""Checks that the the jacobian of the spectroscopic residuals is being correctly calculated to within 1%"""
-				#Define simple models for m0,m1
+		print("Checking spectral derivatives")
 		dx=1e-3
 		rtol=1e-2
 		sn=self.resids.datadict.keys().__iter__().__next__()
@@ -127,8 +127,25 @@ class TRAINING_Test(unittest.TestCase):
 		if not np.allclose(dResiddX,jacobian,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol))[1]]))
 		self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
 
-
-
+	def test_regularization_jacobian(self):
+		"""Checks that the the jacobian of the spectroscopic residuals is being correctly calculated to within 1%"""
+		dx=1e-8
+		rtol=1e-2
+		for regularization, name in [(self.resids.dyadicRegularization,'Dyadic'),(self.resids.phaseGradientRegularization, 'Phase gradient'),(self.resids.waveGradientRegularization,'Wave gradient' )]:
+			
+			def incrementOneParam(i):
+				guess=self.guess.copy()
+				guess[i]+=dx
+				return regularization(guess,False)[0][0]
+			
+			print('Checking jacobian of {} regularization'.format(name))
+			#Only checking the first component, since they're calculated using the same code
+			residuals,jacobian=[x[0] for x in regularization(self.guess,True)]
+			dResiddX=np.zeros((residuals.size,self.resids.im0.size))
+			for i,j in enumerate(self.resids.im0):
+				dResiddX[:,i]=(incrementOneParam(j)-residuals)/dx
+			self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
+	
 # 	def test_init_chi2func(self):
 # 		self.assertTrue(True)
 # 		waverange = [2000,9200]
