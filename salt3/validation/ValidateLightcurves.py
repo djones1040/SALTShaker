@@ -267,7 +267,7 @@ def customfilt(outfile,lcfile,salt3dir,
 	if n_components == 1: salt3flux = x0*salt3flux
 	elif n_components == 2: salt3flux = x0*(salt3flux + x1*salt3m1flux)
 	if c:
-		salt3flux *= 10. ** (-0.4 * salt3colorlaw(salt3wave/(1+float(sn.SIM_REDSHIFT_HELIO))) * c)
+		salt3flux *= 10. ** (-0.4 * salt3colorlaw(salt3wave/(1+float(sn.REDSHIFT_HELIO.split()[0]))) * c)
 	salt3flux *= _SCALE_FACTOR
 
 	if 'SIM_SALT2x0' in sn.__dict__.keys():
