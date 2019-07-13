@@ -26,7 +26,6 @@
 
   <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
   <link rel="stylesheet" href="_static/gallery.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -86,6 +85,7 @@
 <li class="toctree-l1"><a class="reference internal" href="training.html">Training the SALT3 Model</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Creating Simulated Data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="validation.html">Validating the Trained Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pipeline.html">Running the Pipeline</a></li>
 </ul>
 
             
@@ -171,7 +171,7 @@ want to add in. This file is separated into the following required and optional 
 smearing) and <strong>MAGOFF</strong> (magnitude offsets) definitions to be applied to the base SED defined by
 sed_file. You may also define <strong>CLOBBER</strong> and <strong>VERBOSE</strong> flags here as well. This section may look
 like the following:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
 
 <span class="n">SED_FILE</span><span class="p">:</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
 <span class="n">MAGSMEAR</span><span class="p">:</span> <span class="mf">0.0</span>
@@ -186,7 +186,7 @@ like the following:</p>
 this section exists, then it supersedes later sections and defines the warping effects to be used.
 If it does not exist, all defined warping effects are used. Adding this onto the <strong>[MAIN]</strong> section,
 the params file might now look like the following:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
 
 <span class="n">SED_FILE</span><span class="p">:</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
 <span class="n">MAGSMEAR</span><span class="p">:</span> <span class="mf">0.0</span>
@@ -244,7 +244,7 @@ variables in no particular order:</p>
 <li>A file name to be read that contains a list of phase, wave, value like the following:</li>
 </ul>
 </div></blockquote>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1">#p w v</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1">#p w v</span>
 <span class="o">-</span><span class="mi">20</span> <span class="mi">1000</span> <span class="mf">25.75805</span>
 <span class="o">-</span><span class="mi">20</span> <span class="mi">1010</span> <span class="mf">25.64852</span>
 <span class="o">-</span><span class="mi">20</span> <span class="mi">1020</span> <span class="mf">25.53899</span>
@@ -259,7 +259,7 @@ where I have defined color and stretch effects in my <strong>[FLAGS]</strong> se
 sections. If I do not define a <strong>[FLAGS]</strong> section, then whatever sections that exist apart from
 the <strong>[MAIN]</strong> section are assumed to be warping effects. One such section might look like the
 following:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">COLOR</span><span class="p">]</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">COLOR</span><span class="p">]</span>
 
 <span class="n">WARP_FUNCTION</span><span class="p">:</span> <span class="n">color_func</span><span class="o">.</span><span class="n">dat</span>
 <span class="n">DIST_PEAK</span><span class="p">:</span> <span class="mf">0.0</span>
@@ -268,7 +268,7 @@ following:</p>
 </pre></div>
 </div>
 <p>All together, after adding in the stretch section as well, a <strong>BYOSED.params</strong> file might look something like this:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
 
 <span class="n">SED_FILE</span><span class="p">:</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
 <span class="n">MAGSMEAR</span><span class="p">:</span> <span class="mf">0.0</span>
@@ -297,7 +297,7 @@ following:</p>
 </div>
 <p>Or, if you do not define a flags section, color and stretch will automatically be used as
 warping effects with the following <strong>BYOSED.params</strong> file:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
 
 <span class="n">SED_FILE</span><span class="p">:</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
 <span class="n">MAGSMEAR</span><span class="p">:</span> <span class="mf">0.0</span>
@@ -327,19 +327,19 @@ included. Anything but a color effect (which should affect the final SED as a fu
 wavelength and possibly phase) is applied additively, while the color effect is applied
 multiplicatively. This is similar to the existing SALT2 framework. For the example file
 above, the final flux would look like this</p>
-<div class="math notranslate nohighlight">
+<div class="math">
 \[F(\lambda,\phi)=A\Big[H(\lambda,\phi)+S(\lambda,\phi)s\Big]\times10^{-0.4C(\lambda,\phi)c}\]</div>
 <p>Where here F is the final flux, H is the Hsiao template, S is the defined stretch function,
 C is the defined color function, s is the scale parameter pulled from the distribution defined
 for the stretch function, and c is the scale parameter pulled from the distribution defined
 for the color function. In principle this could look like the following if you had N such effects:</p>
-<div class="math notranslate nohighlight">
+<div class="math">
 \[F(\lambda,\phi)=A\Big[H(\lambda,\phi)+X_1(\lambda,\phi)x_1+X_2(\lambda,\phi)x_2+...+X_N(\lambda,\phi)x_N\Big]\times10^{-0.4C(\lambda,\phi)c}\]</div>
 </div>
 <div class="section" id="example-files">
 <h2>Example Files<a class="headerlink" href="#example-files" title="Permalink to this headline">¶</a></h2>
-<p>These are example files that can be used for your <a class="reference download internal" download="" href="_downloads/31048a48119141d933e197dbbe68b5ce/Hsiao07.dat"><code class="xref download docutils literal notranslate"><span class="pre">sed_file</span></code></a> and <a class="reference download internal" download="" href="_downloads/4f54295f1ca0d16638464a73230d1438/BYOSED.params"><code class="xref download docutils literal notranslate"><span class="pre">BYOSED.params</span></code></a>.
-The color and stretch functions are defined by accompanying <a class="reference download internal" download="" href="_downloads/1661be1058340fe90580bbfa1a4a8d99/color_func.dat"><code class="xref download docutils literal notranslate"><span class="pre">color</span></code></a> and <a class="reference download internal" download="" href="_downloads/32c6fa9f657b4fd05cb6a93b2a0b6435/stretch_func.dat"><code class="xref download docutils literal notranslate"><span class="pre">stretch</span></code></a> files.</p>
+<p>These are example files that can be used for your <a class="reference download internal" href="_downloads/Hsiao07.dat" download=""><code class="xref download docutils literal"><span class="pre">sed_file</span></code></a> and <a class="reference download internal" href="_downloads/BYOSED.params" download=""><code class="xref download docutils literal"><span class="pre">BYOSED.params</span></code></a>.
+The color and stretch functions are defined by accompanying <a class="reference download internal" href="_downloads/color_func.dat" download=""><code class="xref download docutils literal"><span class="pre">color</span></code></a> and <a class="reference download internal" href="_downloads/stretch_func.dat" download=""><code class="xref download docutils literal"><span class="pre">stretch</span></code></a> files.</p>
 </div>
 </div>
 
@@ -363,7 +363,7 @@ The color and stretch functions are defined by accompanying <a class="reference 
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2018, David Jones, Rick Kessler
+        &copy; Copyright 2018, David Jones, Rick Kessler.
 
     </p>
   </div>
@@ -382,15 +382,21 @@ The color and stretch functions are defined by accompanying <a class="reference 
 
   
 
-    
-    
-      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script type="text/javascript" src="_static/jquery.js"></script>
-        <script type="text/javascript" src="_static/underscore.js"></script>
-        <script type="text/javascript" src="_static/doctools.js"></script>
-        <script type="text/javascript" src="_static/language_data.js"></script>
-        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
-    
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'',
+            LANGUAGE:'None',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
   
 

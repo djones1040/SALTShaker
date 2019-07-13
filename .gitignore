@@ -5,3 +5,6 @@ build
 dist
 *.egg-info
 v
+.*
+*npy
+.DS_Store
