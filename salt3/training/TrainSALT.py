@@ -98,7 +98,7 @@ class TrainSALT(TrainSALTBase):
 				order=self.options.n_min_specrecal+int(np.log((specdata[k]['wavelength'].max() - \
 					specdata[k]['wavelength'].min())/self.options.specrange_wavescale_specrecal) + \
 					np.unique(photdata['filt']).size* self.options.n_specrecal_per_lightcurve)
-				if self.options.n_specrecal:
+				if self.options.specrecal:
 					parlist=np.append(parlist,['specrecal_{}_{}'.format(sn,k)]*order)
 
 
@@ -127,7 +127,7 @@ class TrainSALT(TrainSALTBase):
 				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.resume_from_outputdir,unpack=True,skiprows=1,dtype="U20,f8")
 			except:
 				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.outputdir,unpack=True,skiprows=1,dtype="U20,f8")
-			for key in np.unique(parlist):
+			for key in np.unique(names):
 				guess[parlist == key] = pars[names == key]
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	

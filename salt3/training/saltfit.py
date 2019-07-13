@@ -509,7 +509,10 @@ class GaussNewton(saltresids.SALTResids):
 				jacobian[idx:idx+idxp,self.parlist=='cl'] = specresidsdict['dspecresid_dcl']
 				jacobian[idx:idx+idxp,self.parlist=='m0'] = specresidsdict['dspecresid_dM0']
 				jacobian[idx:idx+idxp,self.parlist=='m1'] = specresidsdict['dspecresid_dM1']
-
+				if self.specrecal : 
+					for k in self.datadict[sn]['specdata']:
+						jacobian[idx:idx+idxp,self.parlist=='specrecal_{}_{}'.format(sn,k)] = specresidsdict['dspecresid_dspecrecal_{}'.format(k)]
+					
 				for snparam in ('x0','x1','c'): #tpkoff should go here
 					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = specresidsdict['dspecresid_d{}'.format(snparam)]
 			idx += idxp
