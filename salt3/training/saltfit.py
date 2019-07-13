@@ -21,7 +21,7 @@ from multiprocessing import Pool, get_context
 import copy
 import scipy.stats as ss
 from numpy.random import standard_normal
-from scipy.linalg import cholesky
+from scipy import linalg
 from emcee.interruptible_pool import InterruptiblePool
 from sncosmo.utils import integration_grid
 from numpy.linalg import inv,pinv
@@ -608,8 +608,33 @@ restricted parameter set has not been implemented: {}""".format(fit))
 		
 		print('Number of parameters fit this round: {}'.format(includePars.sum()))
 		jacobian=jacobian[:,includePars]
-		stepsize = np.dot(np.dot(pinv(np.dot(jacobian.T,jacobian)),jacobian.T),
-						  residuals.reshape(residuals.size,1)).reshape(includePars.sum())
+		gramMatrix=np.dot(jacobian.T,jacobian)
+		def recursiveSolver(G,iteration=0,errorMode='repair_eigs'):
+			try:
+				 return linalg.cho_solve(linalg.cho_factor(G), np.dot(jacobian.T,residuals.reshape(residuals.size,1))).reshape(includePars.sum())
+			except:
+				if errorMode=='repair_eigs':
+					print('Attempting to repair eigenvalues of Gram matrix for iteration {}'.format(iteration+1))
+					eigs,vecs=linalg.eigh(gramMatrix)
+					eigs[eigs<0]=10**iteration
+					g=np.dot(vecs,np.dot(np.diag(eigs),vecs.T))
+					if iteration > 2:
+						return recursiveSolver(g,errorMode='diagonal')
+					else:
+						return recursiveSolver(g,iteration+1,errorMode)
+				elif errorMode=='diagonal':
+					print('Adding diagonal component to Gram matrix for iteration {}'.format(iteration+1))
+					return 
+					if iteration > 2:
+						return recursiveSolver(gramMatrix+ np.diag(np.ones(G.shape[0]))* (10 **iteration),errorMode='pinv')
+					else:
+						return recursiveSolver(gramMatrix+ np.diag(np.ones(G.shape[0]))* (10 **iteration),iteration+1,errorMode)
+
+				elif errorMode=='pinv':
+					print("Failed to repair Gram matrix, using pseudoinverse")
+					return np.dot(np.dot(pinv(gramMatrix),jacobian.T), residuals.reshape(residuals.size,1)).reshape(includePars.sum())
+
+		stepsize=recursiveSolver(gramMatrix)
 		#if self.i>4 and fit=='all' and not self.debug: 
 		#	import pdb;pdb.set_trace()
 		#	self.debug=True
