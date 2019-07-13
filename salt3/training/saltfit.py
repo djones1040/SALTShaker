@@ -21,7 +21,7 @@ from multiprocessing import Pool, get_context
 import copy
 import scipy.stats as ss
 from numpy.random import standard_normal
-from scipy.linalg import cholesky
+from scipy import linalg
 from emcee.interruptible_pool import InterruptiblePool
 from sncosmo.utils import integration_grid
 from numpy.linalg import inv,pinv
@@ -611,8 +611,7 @@ restricted parameter set has not been implemented: {}""".format(fit))
 		
 		print('Number of parameters fit this round: {}'.format(includePars.sum()))
 		jacobian=jacobian[:,includePars]
-		stepsize = np.dot(np.dot(pinv(np.dot(jacobian.T,jacobian)),jacobian.T),
-						  residuals.reshape(residuals.size,1)).reshape(includePars.sum())
+		stepsize=linalg.lstsq(jacobian,residuals)[0]
 		#if self.i>4 and fit=='all' and not self.debug: 
 		#	import pdb;pdb.set_trace()
 		#	self.debug=True
