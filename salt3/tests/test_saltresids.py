@@ -32,11 +32,11 @@ class TRAINING_Test(unittest.TestCase):
 	def test_prior_jacobian(self):
 		"""Checks that all designated priors are properly calculating the jacobian of their residuals to within 1%"""
 				#Define simple models for m0,m1
-				
 		for prior in self.resids.priors:
 			print('Testing prior', prior)
 			components=self.resids.SALTModel(self.guess)
 			resid,val,jacobian=self.resids.priors[prior](0.3145,self.guess,components)
+			self.assertTrue(self.resids.priors[prior].numResids==resid.size)
 			dx=1e-3
 			rtol=1e-2
 			def incrementOneParam(i):
@@ -44,7 +44,10 @@ class TRAINING_Test(unittest.TestCase):
 				guess[i]+=dx
 				components=self.resids.SALTModel(guess)
 				return self.resids.priors[prior](0.3145,guess,components)[0]
-			dPriordX=(np.vectorize(incrementOneParam)(np.arange(self.guess.size))-resid)/dx
+			dPriordX=np.zeros((resid.size,self.guess.size))
+			for i in range(self.guess.size):
+				dPriordX[:,i]=(incrementOneParam(i)-resid)/dx
+		
 			#import pdb;pdb.set_trace()
 			#Check that all derivatives that should be 0 are zero
 			if  not np.allclose(dPriordX,jacobian,rtol): print('Problems with derivatives for prior {} : '.format(prior),np.unique(self.parlist[np.where(~np.isclose(dPriordX,jacobian,rtol))]))
