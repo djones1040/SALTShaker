@@ -89,6 +89,23 @@ class TRAINING_Test(unittest.TestCase):
 		if not np.allclose(dResiddX,jacobian,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol))[1]]))
 		self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
 
+	def test_computeDerivatives(self):
+		"""Checks that the computeDerivatives parameter of the ResidsForSN function is not affecting the residuals"""
+		sn=self.resids.datadict.keys().__iter__().__next__()
+		components = self.resids.SALTModel(self.resids.guess)
+		salterr = self.resids.ErrModel(self.resids.guess)
+		if self.resids.n_colorpars:
+			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.resids.guess[self.resids.parlist == 'cl'])
+		else: colorLaw = None
+		if self.resids.n_colorscatpars:
+			colorScat = True
+		else: colorScat = None
+		combinations= [(True,True),(True,False),(False,False)]
+		results=[self.resids.ResidsForSN(self.guess,sn,components,colorLaw,*x) for x in combinations]
+		first=results[0]
+		self.assertTrue([np.allclose(first[0]['photresid'],result[0]['photresid']) for result in results[1:]])
+		self.assertTrue([np.allclose(first[1]['specresid'],result[1]['specresid']) for result in results[1:]])
+
 	def test_specresid_jacobian(self):
 		"""Checks that the the jacobian of the spectroscopic residuals is being correctly calculated to within 1%"""
 		print("Checking spectral derivatives")
@@ -106,11 +123,12 @@ class TRAINING_Test(unittest.TestCase):
 		specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,True,True)[1]
 		
 		residuals = specresidsdict['specresid']
-		
 		jacobian=np.zeros((residuals.size,self.parlist.size))
 		jacobian[:,self.parlist=='cl'] = specresidsdict['dspecresid_dcl']
 		jacobian[:,self.parlist=='m0'] = specresidsdict['dspecresid_dM0']
 		jacobian[:,self.parlist=='m1'] = specresidsdict['dspecresid_dM1']
+		for k in self.resids.datadict[sn]['specdata']:
+			jacobian[:,self.parlist=='specrecal_{}_{}'.format(sn,k)] = specresidsdict['dspecresid_dspecrecal_{}'.format(k)]
 		for snparam in ('x0','x1','c'): #tpkoff should go here
 			jacobian[:,self.parlist == '{}_{}'.format(snparam,sn)] = specresidsdict['dspecresid_d{}'.format(snparam)]
 		def incrementOneParam(i):

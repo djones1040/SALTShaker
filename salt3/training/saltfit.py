@@ -568,6 +568,8 @@ class GaussNewton(saltresids.SALTResids):
 			X,chi2 = self.process_fit(X,fit='color')
 			print("fitting color law")
 			X,chi2 = self.process_fit(X,fit='colorlaw')
+			print('fitting spectral recalibration')
+			X,chi2 = self.process_fit(X,fit='spectralrecalibration')
 
 		return X,chi2 #_init
 	
@@ -602,6 +604,8 @@ class GaussNewton(saltresids.SALTResids):
 				includePars[self.ic]=True
 			elif fit=='colorlaw':
 				includePars[self.iCL]=True
+			elif fit=='spectralrecalibration':
+				includePars[self.ispcrcl]=True
 			else:
 				raise NotImplementedError("""This option for a Gaussian Process fit with a 
 restricted parameter set has not been implemented: {}""".format(fit))
