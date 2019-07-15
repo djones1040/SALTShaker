@@ -185,10 +185,16 @@ class SALTResids:
 			
 		print('Time to calculate spline_derivs: %.2f'%(time.time()-starttime))
 		
+		self.getobswave()
 		
 		self.priors={ key: partial(__priors__[key],self) for key in __priors__}
-		
-		self.getobswave()
+		for prior in self.priors: 
+			result=self.priors[prior](1,self.guess,self.SALTModel(self.guess))
+			try:
+				self.priors[prior].numResids=result[0].size
+			except:
+				self.priors[prior].numResids=1
+		self.numPriorResids=sum([self.priors[x].numResids for x in self.priors])		
 
 		
 		
@@ -283,13 +289,10 @@ class SALTResids:
 		if self.regularize: 
 			pass
 			#loglike -= self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad)/2
-
+		logp = loglike
 		if len(self.usePriors):
-			priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,x)
-		
-		priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,x)
-		
-		logp = loglike - (priorResids**2).sum()/2
+			priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,x)	
+			logp -=(priorResids**2).sum()/2
 		
 		if self.regularize:
 			regResids=[]
@@ -705,193 +708,46 @@ class SALTResids:
 		return residual,x1std,jacobian
 
 	@prior
-	def m0endprior(self,width,x,components):
+	def m0endprior_alllam(self,width,x,components):
 		"""Prior such that at early times there is no flux"""
-		value=np.sum(components[0][0,:])
+		upper,lower=components[0].shape[1],0
+		value=components[0][0,lower:upper]
 		residual = value/width
-		try:
-			jacobian=self.__m0endpriorderiv__.copy()
-		except:
-			jacobian=np.zeros(self.npar)
-			for i in range(self.im0.size):
-				if i <(self.waveknotloc.size-self.bsorder-1) :
-					jacobian[self.im0[i]] = np.sum( self.spline_derivs[i][0,:] )
-			self.__m0endpriorderiv__=jacobian.copy()
+		jacobian=np.zeros((upper-lower,self.npar))
+		for i in range((self.waveknotloc.size-self.bsorder-1)):
+			jacobian[lower:upper,self.im0[i]] = self.spline_derivs[i][0,lower:upper]
 		jacobian/=width
 		return residual,value,jacobian
 
 	@prior
-	def m1endprior(self,width,x,components):
-		"""Prior such that at early times there is no effect of stretch"""
-		value=np.sum(components[1][0,:])
-		residual = value/width
-		try:
-			jacobian=self.__m1endpriorderiv__.copy()
-		except:
-			jacobian=np.zeros(self.npar)
-			for i in range(self.im0.size):
-				if i <(self.waveknotloc.size-self.bsorder-1) :
-					jacobian[self.im1[i]] = np.sum( self.spline_derivs[i][0,:] )
-			self.__m1endpriorderiv__=jacobian.copy()
-		jacobian/=width
-		return residual,value,jacobian
-
-	@prior
-	def m0endprior_alllam(self,width,x,components,idx):
+	def m1endprior_alllam(self,width,x,components):
 		"""Prior such that at early times there is no flux"""
+		upper,lower=components[0].shape[1],0
+		value=components[1][0,lower:upper]
+		residual = value/width
+		jacobian=np.zeros((upper-lower,self.npar))
+		for i in range((self.waveknotloc.size-self.bsorder-1)):
+			jacobian[lower:upper,self.im1[i]] = self.spline_derivs[i][0,lower:upper]
+		jacobian/=width
+		return residual,value,jacobian	
 		
-		value=components[0][0,idx]
-		residual = value/width
-		#try:
-		#	jacobian=self.__m0endprioralllamderiv__.copy()
-		#except:
-		jacobian=np.zeros(self.npar)
-		for i in range(self.im0.size):
-			if i <(self.waveknotloc.size-self.bsorder-1) :
-				jacobian[self.im0[i]] = self.spline_derivs[i][0,idx]
-		#self.__m0endprioralllamderiv__=jacobian.copy()
-		jacobian/=width
-		#import pdb; pdb.set_trace()
-		return residual,value,jacobian
-
-	@prior
-	def m1endprior_alllam(self,width,x,components,idx):
-		"""Prior such that at early times there is no flux"""
-		
-		value=components[1][0,idx]
-		residual = value/width
-		#try:
-		#	jacobian=self.__m0endprioralllamderiv__.copy()
-		#except:
-		jacobian=np.zeros(self.npar)
-		for i in range(self.im1.size):
-			if i <(self.waveknotloc.size-self.bsorder-1) :
-				jacobian[self.im1[i]] = self.spline_derivs[i][0,idx]
-		#self.__m0endprioralllamderiv__=jacobian.copy()
-		jacobian/=width
-		#import pdb; pdb.set_trace()
-		return residual,value,jacobian
-
-	
-	@prior
-	def m0endprior_lowlam(self,width,x,components):
-		"""Prior such that at early times there is no flux"""
-		value=np.sum(components[0][0,0:50])
-		residual = value/width
-		try:
-			jacobian=self.__m0endpriorlowlamderiv__.copy()
-		except:
-			jacobian=np.zeros(self.npar)
-			for i in range(self.im0.size):
-				if i <(self.waveknotloc.size-self.bsorder-1) :
-					jacobian[self.im0[i]] = np.sum( self.spline_derivs[i][0,0:50] )
-			self.__m0endpriorlowlamderiv__=jacobian.copy()
-		jacobian/=width
-		return residual,value,jacobian
-
-	@prior
-	def m0endprior_midlam(self,width,x,components):
-		"""Prior such that at early times there is no flux"""
-		value=np.sum(components[0][0,int(self.im0.size/2-25):int(self.im0.size/2+26)])
-		residual = value/width
-		try:
-			jacobian=self.__m0endpriormidlamderiv__.copy()
-		except:
-			jacobian=np.zeros(self.npar)
-			for i in range(self.im0.size):
-				if i <(self.waveknotloc.size-self.bsorder-1) :
-					jacobian[self.im0[i]] = np.sum( self.spline_derivs[i][0,int(self.im0.size/2-25):int(self.im0.size/2+26)] )
-			self.__m0endpriormidlamderiv__=jacobian.copy()
-		jacobian/=width
-		return residual,value,jacobian
-
-	
-	@prior
-	def m0endprior_highlam(self,width,x,components):
-		"""Prior such that at early times there is no flux"""
-		value=np.sum(components[0][0,-50:])
-		residual = value/width
-		try:
-			jacobian=self.__m0endpriorhighlamderiv__.copy()
-		except:
-			jacobian=np.zeros(self.npar)
-			for i in range(self.im0.size):
-				if i <(self.waveknotloc.size-self.bsorder-1) :
-					jacobian[self.im0[i]] = np.sum( self.spline_derivs[i][0,-50:] )
-			self.__m0endpriorhighlamderiv__=jacobian.copy()
-		jacobian/=width
-		return residual,value,jacobian
-
-	@prior
-	def m1endprior_lowlam(self,width,x,components):
-		"""Prior such that at early times there is no flux"""
-		value=np.sum(components[1][0,0:50])
-		residual = value/width
-		try:
-			jacobian=self.__m1endpriorlowlamderiv__.copy()
-		except:
-			jacobian=np.zeros(self.npar)
-			for i in range(self.im0.size):
-				if i <(self.waveknotloc.size-self.bsorder-1) :
-					jacobian[self.im1[i]] = np.sum( self.spline_derivs[i][0,0:50] )
-			self.__m1endpriorlowlamderiv__=jacobian.copy()
-		jacobian/=width
-		return residual,value,jacobian
-
-	@prior
-	def m1endprior_midlam(self,width,x,components):
-		"""Prior such that at early times there is no flux"""
-		value=np.sum(components[1][0,int(self.im0.size/2-25):int(self.im0.size/2+26)])
-		residual = value/width
-		try:
-			jacobian=self.__m1endpriormidlamderiv__.copy()
-		except:
-			jacobian=np.zeros(self.npar)
-			for i in range(self.im0.size):
-				if i <(self.waveknotloc.size-self.bsorder-1) :
-					jacobian[self.im1[i]] = np.sum( self.spline_derivs[i][0,int(self.im0.size/2-25):int(self.im0.size/2+26)] )
-			self.__m1endpriormidlamderiv__=jacobian.copy()
-		jacobian/=width
-		return residual,value,jacobian
-
-	
-	@prior
-	def m1endprior_highlam(self,width,x,components):
-		"""Prior such that at early times there is no flux"""
-		value=np.sum(components[1][0,-50:])
-		residual = value/width
-		try:
-			jacobian=self.__m1endpriorhighlamderiv__.copy()
-		except:
-			jacobian=np.zeros(self.npar)
-			for i in range(self.im0.size):
-				if i <(self.waveknotloc.size-self.bsorder-1) :
-					jacobian[self.im1[i]] = np.sum( self.spline_derivs[i][0,-50:] )
-			self.__m1endpriorhighlamderiv__=jacobian.copy()
-		jacobian/=width
-		return residual,value,jacobian
-	
-	
-	
 	def priorResids(self,priors,widths,x):
 		"""Given a list of names of priors and widths returns a residuals vector, list of prior values, and Jacobian """
 
 		alllam_vals = range(0,self.im0.size)
 		components = self.SALTModel(x)
-		residuals=np.zeros(len(priors)+2*len(alllam_vals)-2)
-		jacobian=np.zeros((len(priors)+2*len(alllam_vals)-2,self.npar))
-		values=np.zeros(len(priors)+2*len(alllam_vals)-2)
-		for idx,(prior,width) in enumerate(zip(priors,widths)):
+		residuals=np.zeros(self.numPriorResids)
+		jacobian=np.zeros((self.numPriorResids,self.npar))
+		values=np.zeros(self.numPriorResids)
+		idx=0
+		for prior,width in zip(priors,widths):
 			try:
 				priorFunction=self.priors[prior]
 			except:
-				raise ValueError('Invalid prior supplied: {}'.format(prior))
-			if prior == 'm0endprior_alllam' or prior == 'm1endprior_alllam':
-				for i in np.array(alllam_vals)[3:-3]:
-					residuals[idx],values[idx],jacobian[idx]=priorFunction(width,x,components,i)
-					idx += 1
-			else:
-				residuals[idx],values[idx],jacobian[idx]=priorFunction(width,x,components)
+				raise ValueError('Invalid prior supplied: {}'.format(prior)) 
+			
+			residuals[idx:idx+priorFunction.numResids],values[idx:idx+priorFunction.numResids],jacobian[idx:idx+priorFunction.numResids,:]=priorFunction(width,x,components)
+			idx+=priorFunction.numResids
 		return residuals,values,jacobian
 
 	def loglikeforSN(self,args,sn=None,x=None,components=None,salterr=None,
