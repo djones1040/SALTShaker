@@ -1172,6 +1172,7 @@ class SALTResids:
 			dnumerator=( self.regularizationDerivs[1]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2]* dfluxdphase[i][:,:,np.newaxis] - self.regularizationDerivs[3]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0]* d2fluxdphasedwave[i][:,:,np.newaxis] )			
 			resids += [normalization* (numerator / (scale**2 * np.sqrt( self.neff ))).flatten()]
 			if computeJac: jac += [((dnumerator*(scale**2 )- scaleDeriv[np.newaxis,np.newaxis,:]*2*scale*numerator[:,:,np.newaxis])/np.sqrt(self.neff)[:,:,np.newaxis]*normalization / scale**4  ).reshape(-1, self.im0.size)]
+			else: jac+=[None]
 		return resids,jac 
 	
 	def phaseGradientRegularization(self, x, computeJac=True):
@@ -1195,6 +1196,7 @@ class SALTResids:
 			#Minimize model derivative w.r.t wavelength in unconstrained regions
 			resids+= [normalization* ( normedGrad /	np.sqrt( self.neff )).flatten()]
 			if computeJac: jac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
+			else: jac+=[None]
 		return resids,jac  
 	
 	def waveGradientRegularization(self, x,computeJac=True):
@@ -1203,7 +1205,7 @@ class SALTResids:
 		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
 		dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
 		waveGradResids=[]
-		waveGradJac=[]
+		jac=[]
 		for i in range(len(fluxes)):
 			#Determine a scale for the fluxes by sum of squares (since x1 can have negative values)
 			scale=np.sqrt(np.mean(fluxes[i]**2))
@@ -1217,8 +1219,9 @@ class SALTResids:
 			normalization=np.sqrt(1/((self.wavebins.size-1) *(self.phasebins.size-1)))
 			#Minimize model derivative w.r.t wavelength in unconstrained regions
 			waveGradResids+= [normalization* ( normedGrad /	np.sqrt( self.neff )).flatten()]
-			if computeJac: waveGradJac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
-		return waveGradResids,waveGradJac 
+			if computeJac: jac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
+			else: jac+=[None]
+		return waveGradResids,jac 
 		
 def trapIntegrate(a,b,xs,ys):
 	if (a<xs.min()) or (b>xs.max()):

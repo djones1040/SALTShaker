@@ -464,7 +464,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 		#raise RuntimeError("convergence_loop reached 100000 iterations without convergence")
 
-	def lsqwrap(self,guess,computeDerivatives,computePCDerivs=True,doPriors=True,fit='all'):
+	def lsqwrap(self,guess,computeDerivatives,computePCDerivs=True,doPriors=True):
 		tstart = time.time()
 
 		if self.n_colorscatpars:
@@ -550,7 +550,6 @@ class GaussNewton(saltresids.SALTResids):
 		if niter == 0: computePCDerivs = True
 		else: computePCDerivs = False
 		Xtmp,chi2_all = self.process_fit(Xtmp,fit='all',computePCDerivs=True)
-
 		if chi2_init - chi2_all > 1 and chi2_all/chi2_last < 0.9:
 			return Xtmp,chi2_all
 		else:
@@ -580,7 +579,7 @@ class GaussNewton(saltresids.SALTResids):
 		#else: computePCDerivs = 0
 		#computePCDerivs = True
 		#doPriors=False
-		residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors,fit)
+		residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors)
 		if fit == 'all':
 			includePars=np.ones(self.npar,dtype=bool)
 		else:
