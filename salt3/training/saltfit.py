@@ -441,7 +441,7 @@ class GaussNewton(saltresids.SALTResids):
 
 		print('starting loop')
 		for superloop in range(loop_niter):
-			X,chi2 = self.robust_process_fit(X,chi2_init,superloop,chi2_init)
+			X,chi2,converged = self.robust_process_fit(X,chi2_init,superloop)
 			
 			if chi2_init-chi2 < -1.e-6:
 				self.addwarning("MESSAGE WARNING chi2 has increased")
@@ -454,6 +454,9 @@ class GaussNewton(saltresids.SALTResids):
 
 			
 			print('finished iteration %i, chi2 improved by %.1f'%(superloop+1,chi2_init-chi2))
+			if converged:
+				print('Gauss-Newton optimizer could not further improve chi2')
+				break
 			chi2_init = chi2
 			
 		xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
@@ -515,14 +518,10 @@ class GaussNewton(saltresids.SALTResids):
 				for snparam in ('x0','x1','c'): #tpkoff should go here
 					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = specresidsdict['dspecresid_d{}'.format(snparam)]
 			idx += idxp
-		print('hack')
-		#print('priors: ',*self.usePriors)
 
 		# priors
-		priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,guess)
-		#print(*priorVals)
-			#doPriors = False
 		if doPriors:
+			priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,guess)
 			residuals[idx:idx+priorResids.size]=priorResids
 			jacobian[idx:idx+priorResids.size,:]=priorJac
 			idx+=priorResids.size
@@ -543,36 +542,27 @@ class GaussNewton(saltresids.SALTResids):
 		else:
 			return residuals
 	
-	def robust_process_fit(self,X,chi2_init,niter,chi2_last):
+	def robust_process_fit(self,X_init,chi2_init,niter):
+		X,chi2=X_init,chi2_init
+		for message,fit in [('all parameters','all'),(" x0",'x0'),('x1','x1'),('principal component 0','component0'),
+			('principal component 1','component1'),('color','color'),('color law','colorlaw'),('spectral recalibration','spectralrecalibration')]:
+			print('fitting '+message)
+			Xprop,chi2prop = self.process_fit(X,fit=fit,computePCDerivs= (fit=='component0') or (fit=='all'))
+			if chi2prop<chi2:
+				if (fit=='all') and (chi2prop/chi2 < 0.9):
+					print('Terminating iteration ',niter,', continuing with all parameter fit')
+					return Xprop,chi2prop,False
+				else:
+					X,chi2=Xprop,chi2prop
 
-		#print('hack!')
-		Xtmp = copy.deepcopy(X)
-		if niter == 0: computePCDerivs = True
-		else: computePCDerivs = False
-		Xtmp,chi2_all = self.process_fit(Xtmp,fit='all',computePCDerivs=True)
-		if chi2_init - chi2_all > 1 and chi2_all/chi2_last < 0.9:
-			return Xtmp,chi2_all
+		if X is X_init:
+			return X,chi2,True
 		else:
-			# "basic flipflop"??!?!
-			print("fitting x0")
-			X,chi2 = self.process_fit(X,fit='x0')
-			print("fitting x1")
-			X,chi2 = self.process_fit(X,fit='x1')
-			print("fitting principal component 0")
-			X,chi2 = self.process_fit(X,fit='component0')
-			print("fitting principal component 1")
-			X,chi2 = self.process_fit(X,fit='component1')
-			print("fitting color")
-			X,chi2 = self.process_fit(X,fit='color')
-			print("fitting color law")
-			X,chi2 = self.process_fit(X,fit='colorlaw')
-			print('fitting spectral recalibration')
-			X,chi2 = self.process_fit(X,fit='spectralrecalibration')
-
-		return X,chi2 #_init
+			return X,chi2,False
+		 #_init
 	
 	def process_fit(self,X,fit='all',snid=None,doPriors=True,computePCDerivs=False):
-		
+		X=X.copy()
 		#if fit == 'all' or fit == 'components': computePCDerivs = 3
 		#elif fit == 'component0': computePCDerivs=1
 		#elif fit == 'component1': computePCDerivs=2
@@ -614,6 +604,8 @@ restricted parameter set has not been implemented: {}""".format(fit))
 		print('Number of parameters fit this round: {}'.format(includePars.sum()))
 		jacobian=jacobian[:,includePars]
 		stepsize=linalg.lstsq(jacobian,residuals)[0]
+		verify=np.dot(jacobian,stepsize)
+		print('Solution is {:.0%} aligned to correct result'.format(np.dot(verify,residuals) / np.sqrt((residuals**2).sum()*(verify**2).sum())))
 		#if self.i>4 and fit=='all' and not self.debug: 
 		#	import pdb;pdb.set_trace()
 		#	self.debug=True
