@@ -515,7 +515,6 @@ class GaussNewton(saltresids.SALTResids):
 				for snparam in ('x0','x1','c'): #tpkoff should go here
 					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = specresidsdict['dspecresid_d{}'.format(snparam)]
 			idx += idxp
-		print('hack')
 		#print('priors: ',*self.usePriors)
 
 		# priors
