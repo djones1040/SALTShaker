@@ -423,6 +423,36 @@ class GaussNewton(saltresids.SALTResids):
 		self._robustify = False
 		self._writetmp = False
 		self.chi2_diff_cutoff = 1
+		self.fitOptions={}
+		for message,fit in [('all parameters','all'),('all parameters grouped','all-grouped'),(" x0",'x0'),('x1','x1'),('principal component 0','component0'),
+			('principal component 1','component1'),('color','color'),('color law','colorlaw'),('spectral recalibration','spectralrecalibration')]:
+			if 'all' in fit: includePars=np.ones(self.npar,dtype=bool)
+			else:
+				includePars=np.zeros(self.npar,dtype=bool)
+				if fit=='components':
+					includePars[self.im0]=True
+					includePars[self.im1]=True
+				elif fit=='component0':
+					includePars[self.im0]=True
+				elif fit=='component1':
+					includePars[self.im1]=True
+				elif fit=='sn':
+					includePars[self.ix0]=True
+					includePars[self.ix1]=True
+				elif fit=='x0':
+					includePars[self.ix0]=True
+				elif fit=='x1':
+					includePars[self.ix1]=True
+				elif fit=='color':
+					includePars[self.ic]=True
+				elif fit=='colorlaw':
+					includePars[self.iCL]=True
+				elif fit=='spectralrecalibration':
+					includePars[self.ispcrcl]=True
+				else:
+					raise NotImplementedError("""This option for a Gaussian Process fit with a 
+	restricted parameter set has not been implemented: {}""".format(fit))
+			self.fitOptions[fit]=(message,includePars)
 
 	def addwarning(self,warning):
 		print(warning)
@@ -544,17 +574,20 @@ class GaussNewton(saltresids.SALTResids):
 	
 	def robust_process_fit(self,X_init,chi2_init,niter):
 		X,chi2=X_init,chi2_init
-		for message,fit in [('all parameters','all'),(" x0",'x0'),('x1','x1'),('principal component 0','component0'),
-			('principal component 1','component1'),('color','color'),('color law','colorlaw'),('spectral recalibration','spectralrecalibration')]:
-			print('fitting '+message)
-			Xprop,chi2prop = self.process_fit(X,fit=fit,computePCDerivs= (fit=='component0') or (fit=='all'))
+		for fit in  self.fitOptions:
+			if fit=='all':continue
+			print('fitting '+self.fitOptions[fit][0])
+			Xprop,chi2prop = self.process_fit(X,fit=fit,computePCDerivs= (fit=='component0') or ('all' in fit))
 			if chi2prop<chi2:
-				if (fit=='all') and (chi2prop/chi2 < 0.9):
-					print('Terminating iteration ',niter,', continuing with all parameter fit')
-					return Xprop,chi2prop,False
+				if (fit=='all'):
+					if (chi2prop/chi2 < 0.9):
+						print('Terminating iteration ',niter,', continuing with all parameter fit')
+						return Xprop,chi2prop,False
+					else:
+						pass
 				else:
 					X,chi2=Xprop,chi2prop
-
+		#In this case GN optimizer can do no better
 		if X is X_init:
 			return X,chi2,True
 		else:
@@ -570,50 +603,34 @@ class GaussNewton(saltresids.SALTResids):
 		#computePCDerivs = True
 		#doPriors=False
 		residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors)
-		if fit == 'all':
-			includePars=np.ones(self.npar,dtype=bool)
-		else:
-			includePars=np.zeros(self.npar,dtype=bool)
-			if fit=='components':
-				includePars[self.im0]=True
-				includePars[self.im1]=True
-			elif fit=='component0':
-				includePars[self.im0]=True
-			elif fit=='component1':
-				includePars[self.im1]=True
-			elif fit=='sn':
-				includePars[self.ix0]=True
-				includePars[self.ix1]=True
-			elif fit=='x0':
-				includePars[self.ix0]=True
-			elif fit=='x1':
-				includePars[self.ix1]=True
-			elif fit=='color':
-				includePars[self.ic]=True
-			elif fit=='colorlaw':
-				includePars[self.iCL]=True
-			elif fit=='spectralrecalibration':
-				includePars[self.ispcrcl]=True
-			else:
-				raise NotImplementedError("""This option for a Gaussian Process fit with a 
-restricted parameter set has not been implemented: {}""".format(fit))
-
-		#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
-		includePars=includePars & ~(np.all(0==jacobian,axis=0))
 		
-		print('Number of parameters fit this round: {}'.format(includePars.sum()))
-		jacobian=jacobian[:,includePars]
-		stepsize=linalg.lstsq(jacobian,residuals)[0]
-		verify=np.dot(jacobian,stepsize)
-		print('Solution is {:.0%} aligned to correct result'.format(np.dot(verify,residuals) / np.sqrt((residuals**2).sum()*(verify**2).sum())))
-		#if self.i>4 and fit=='all' and not self.debug: 
-		#	import pdb;pdb.set_trace()
-		#	self.debug=True
-		if np.any(np.isnan(stepsize)):
-			print('NaN detected in stepsize; exitting to debugger')
-			import pdb;pdb.set_trace()
+		
+		if fit=='all-grouped':
+			designMatrix=np.zeros((self.parlist.size,len([fit for fit in self.fitOptions if 'all' not in fit])))
+			
+			for i,fit in enumerate([fit for fit in self.fitOptions if 'all' not in fit]):
+				includePars=self.fitOptions[fit][1] & ~(np.all(0==jacobian,axis=0))
+				designMatrix[includePars,i]=linalg.lstsq(jacobian[:,includePars],residuals)[0]
 
-		X[includePars] -= stepsize
+			designJacobian=np.dot(jacobian,designMatrix)
+			stepsize=linalg.lstsq(designJacobian,residuals)[0]
+			X-=np.dot(designMatrix,stepsize)
+				
+		else:
+			#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
+			includePars=self.fitOptions[fit][1] & ~(np.all(0==jacobian,axis=0))
+		
+			print('Number of parameters fit this round: {}'.format(includePars.sum()))
+			jacobian=jacobian[:,includePars]
+			stepsize=linalg.lstsq(jacobian,residuals)[0]
+			#if self.i>4 and fit=='all' and not self.debug: 
+			#	import pdb;pdb.set_trace()
+			#	self.debug=True
+			if np.any(np.isnan(stepsize)):
+				print('NaN detected in stepsize; exitting to debugger')
+				import pdb;pdb.set_trace()
+
+			X[includePars] -= stepsize
 
 		# quick eval
 
@@ -622,6 +639,6 @@ restricted parameter set has not been implemented: {}""".format(fit))
 		print((residuals**2).sum(),chi2,(residuals**2).sum()-chi2)
 		#if chi2 != chi2:
 		#	import pdb; pdb.set_trace()
-		
+		if ((residuals**2).sum()-chi2) < -1e16 : import pdb;pdb.set_trace()
 		return X,chi2
 	
