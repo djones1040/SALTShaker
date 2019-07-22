@@ -85,10 +85,6 @@ class SALTResids:
 		
 		# set some phase/wavelength arrays
 		self.splinecolorwave = np.linspace(self.colorwaverange[0],self.colorwaverange[1],self.n_colorpars)
-		self.phasebins = np.linspace(self.phaserange[0],self.phaserange[1],
-							 1+ int((self.phaserange[1]-self.phaserange[0])/self.phaseres))
-		self.wavebins = np.linspace(self.waverange[0],self.waverange[1],
-							 1+int((self.waverange[1]-self.waverange[0])/self.waveres))
 
 		self.phase = np.linspace(self.phaserange[0],self.phaserange[1],
 								 int((self.phaserange[1]-self.phaserange[0])/self.phaseoutres),False)
@@ -105,7 +101,6 @@ class SALTResids:
 
 
 		self.neff=0
-		self.updateEffectivePoints(guess)
 
 		# initialize the model
 		self.components = self.SALTModel(guess)
@@ -175,18 +170,24 @@ class SALTResids:
 		#for i in range(self.im0.size):
 		#	self.spline_derivs[i,:,:]=bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
 		self.spline_derivs=[ bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder)) for i in range(self.im0.size)]
+		import code; code.interact(local=locals())
+		#phaseIndices,waveIndices=np.unravel_index(np.arange(1728),(self.phaseknotloc.size-self.bsorder-1,self.waveknotloc.size-self.bsorder-1))
+		self.waveBins=self.waveknotloc[:-4],self.waveknotloc[4:]
+		self.phaseBins=self.phaseknotloc[:-4],self.phaseknotloc[4:]
 		
-		phase=(self.phasebins[:-1]+self.phasebins[1:])/2
-		wave=(self.wavebins[:-1]+self.wavebins[1:])/2
+		self.phaseBinCenters=np.array([(self.phase[:,np.newaxis]* basis).sum()/basis.sum() for basis in self.spline_derivs[::self.waveknotloc.size-self.bsorder-1]])
+		self.waveBinCenters=np.array([(self.wave[np.newaxis,:]* basis).sum()/basis.sum() for basis in self.spline_derivs[:self.waveknotloc.size-self.bsorder-1]])
 		self.regularizationDerivs=[np.zeros((phase.size,wave.size,self.im0.size)) for i in range(4)]
 		for i in range(len(self.im0)):
 			for j,derivs in enumerate([(0,0),(1,0),(0,1),(1,1)]):
-				self.regularizationDerivs[j][:,:,i]=bisplev(phase,wave,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder),dx=derivs[0],dy=derivs[1])
+				self.regularizationDerivs[j][:,:,i]=bisplev(self.phaseBinCenters,self.waveBinCenters,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder),dx=derivs[0],dy=derivs[1])
 			
 		print('Time to calculate spline_derivs: %.2f'%(time.time()-starttime))
 		
-		self.getobswave()
 		
+		self.getobswave()
+		self.updateEffectivePoints(guess)
+
 		self.priors={ key: partial(__priors__[key],self) for key in __priors__}
 		for prior in self.priors: 
 			result=self.priors[prior](1,self.guess,self.SALTModel(self.guess))
@@ -1080,7 +1081,8 @@ class SALTResids:
 					
 		"""
 		#Clean out array
-		self.neff=np.zeros((self.phasebins.size-1,self.wavebins.size-1))
+		self.neff=np.zeros((self.phaseBinCenters.size,self.waveBinCenters.size))
+		
 		for sn in self.datadict.keys():
 			tpkoff=x[self.parlist == 'tpkoff_%s'%sn]
 			photdata = self.datadict[sn]['photdata']
@@ -1088,14 +1090,22 @@ class SALTResids:
 			survey = self.datadict[sn]['survey']
 			filtwave = self.kcordict[survey]['filtwave']
 			z = self.datadict[sn]['zHelio']
-
 			#For each spectrum, add one point to each bin for every spectral measurement in that bin
+			
 			for k in specdata.keys():
+				
 				restWave=specdata[k]['wavelength']/(1+z)
-				restWave=restWave[(restWave>self.wavebins.min())&(restWave<self.wavebins.max())]
-				phase=(specdata[k]['tobs']+tpkoff)/(1+z)
-				phaseIndex=np.clip(np.searchsorted(self.phasebins,phase)-1,0,self.phasebins.size-2)[0]
-				waveIndices=np.clip(np.searchsorted(self.wavebins,restWave)-1,0,self.wavebins.size-2)
+				restWave=restWave[(restWave>self.waveBins[0][0])&(restWave<self.waveBins[1][-1])]
+				phase=np.clip((specdata[k]['tobs']+tpkoff)/(1+z),self.phaseBins[0][0]+1e-3,self.phaseBins[1][-1]-1e-3)
+				
+				phaseIndices,waveIndices=np.unravel_index(np.arange(1728),(self.phaseBinCenters.size,self.waveBinCenters.size))
+# 				phaseIndices= np.where((phase>self.phaseBins[0])&(phase<self.phaseBins[1]))[0]
+# 				waveIndices= np.where((wave>self.waveBins[0])&(wave<self.waveBins[1]))[0]
+				basisAffected=(phase>self.phaseBins[0][phaseIndices]) & (phase<self.phaseBins[1][phaseIndices]) & (restWave.min()<self.waveBins[1])&(restWave.max()>self.waveBins[0])
+				
+				
+				
+				waveIndices=np.clip(np.searchsorted(self.waveBins,restWave)-1,0,self.waveBins.size-2)
 				self.neff[phaseIndex][waveIndices]+=1			
 			
 			#For each photometric filter, weight the contribution by  
@@ -1105,15 +1115,15 @@ class SALTResids:
 					pbspl=self.datadict[sn][flt+'-neffweighting']
 				else:
 					filttrans = self.kcordict[survey][flt]['filttrans']
-					g = (self.wavebins[:-1]	 >= filtwave[0]/(1+z)) & (self.wavebins[1:] <= filtwave[-1]/(1+z))	# overlap range
+					g = (self.waveBins[:-1]	 >= filtwave[0]/(1+z)) & (self.waveBins[1:] <= filtwave[-1]/(1+z))	# overlap range
 					pbspl = np.zeros(g.size)
 					for j in np.where(g)[0]:
-						pbspl[j]=trapIntegrate(self.wavebins[j],self.wavebins[j+1],filtwave/(1+z),filttrans*filtwave/(1+z))
+						pbspl[j]=trapIntegrate(self.waveBins[j],self.waveBins[j+1],filtwave/(1+z),filttrans*filtwave/(1+z))
 					#Normalize it so that total number of points added is 1
 					pbspl /= np.sum(pbspl)
 					self.datadict[sn][flt+'-neffweighting']=pbspl
 				#Couple of things going on: -1 to ensure everything lines up, clip to put extrapolated points on last phasebin
-				phaseindices=np.clip(np.searchsorted(self.phasebins,(photdata['tobs'][(photdata['filt']==flt)]+tpkoff)/(1+z))-1,0,self.phasebins.size-2)
+				phaseindices=np.clip(np.searchsorted(self.phaseBins,(photdata['tobs'][(photdata['filt']==flt)]+tpkoff)/(1+z))-1,0,self.phaseBins.size-2)
 				#Consider weighting neff by variance for each measurement?
 				self.neff[phaseindices,:]+=pbspl[np.newaxis,:]
 
@@ -1129,19 +1139,19 @@ class SALTResids:
 		import matplotlib.pyplot as plt
 		if phases is None:
 			plt.imshow(self.neff,cmap='Greys',aspect='auto')
-			xticks=np.linspace(0,self.wavebins.size,8,False)
-			plt.xticks(xticks,['{:.0f}'.format(self.wavebins[int(x)]) for x in xticks])
+			xticks=np.linspace(0,self.waveBins.size,8,False)
+			plt.xticks(xticks,['{:.0f}'.format(self.waveBins[int(x)]) for x in xticks])
 			plt.xlabel('$\lambda$ / Angstrom')
-			yticks=np.linspace(0,self.phasebins.size,8,False)
-			plt.yticks(yticks,['{:.0f}'.format(self.phasebins[int(x)]) for x in yticks])
+			yticks=np.linspace(0,self.phaseBins.size,8,False)
+			plt.yticks(yticks,['{:.0f}'.format(self.phaseBins[int(x)]) for x in yticks])
 			plt.ylabel('Phase / days')
 		else:
-			inds=np.searchsorted(self.phasebins,phases)
+			inds=np.searchsorted(self.phaseBins,phases)
 			for i in inds:
-				plt.plot(self.wavebins[:-1],self.neff[i,:],label='{:.1f} days'.format(self.phasebins[i]))
+				plt.plot(self.waveBins[:-1],self.neff[i,:],label='{:.1f} days'.format(self.phaseBins[i]))
 			plt.ylabel('$N_eff$')
 			plt.xlabel('$\lambda (\AA)$')
-			plt.xlim(self.wavebins.min(),self.wavebins.max())
+			plt.xlim(self.waveBins.min(),self.waveBins.max())
 			plt.legend()
 		
 		if output is None:
@@ -1152,8 +1162,8 @@ class SALTResids:
 
 
 	def dyadicRegularization(self,x, computeJac=True):
-		phase=(self.phasebins[:-1]+self.phasebins[1:])/2
-		wave=(self.wavebins[:-1]+self.wavebins[1:])/2
+		phase=self.phaseBinCenters
+		wave=self.waveBinCenters
 		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
 		dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
 		dfluxdphase=self.SALTModelDeriv(x,1,0,phase,wave)
@@ -1166,7 +1176,7 @@ class SALTResids:
 			#Derivative of scale with respect to model parameters
 			scaleDeriv= np.mean(fluxes[i][:,:,np.newaxis]*self.regularizationDerivs[0],axis=(0,1))/scale
 			#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
-			normalization=np.sqrt(1/( (self.wavebins.size-1) *(self.phasebins.size-1)))
+			normalization=np.sqrt(1/( (self.waveBins.size-1) *(self.phaseBins.size-1)))
 			#0 if model is locally separable in phase and wavelength i.e. flux=g(phase)* h(wavelength) for arbitrary functions g and h
 			numerator=(dfluxdphase[i] *dfluxdwave[i] -d2fluxdphasedwave[i] *fluxes[i] )
 			dnumerator=( self.regularizationDerivs[1]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2]* dfluxdphase[i][:,:,np.newaxis] - self.regularizationDerivs[3]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0]* d2fluxdphasedwave[i][:,:,np.newaxis] )			
@@ -1176,8 +1186,8 @@ class SALTResids:
 		return resids,jac 
 	
 	def phaseGradientRegularization(self, x, computeJac=True):
-		phase=(self.phasebins[:-1]+self.phasebins[1:])/2
-		wave=(self.wavebins[:-1]+self.wavebins[1:])/2
+		phase=self.phaseBinCenters
+		wave=self.waveBinCenters
 		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
 		dfluxdphase=self.SALTModelDeriv(x,1,0,phase,wave)
 		resids=[]
@@ -1192,7 +1202,7 @@ class SALTResids:
 			#Derivative of normalized gradient with respect to model parameters
 			normedGradDerivs=(self.regularizationDerivs[1] * scale - scaleDeriv[np.newaxis,np.newaxis,:]*dfluxdphase[i][:,:,np.newaxis])/ scale**2
 			#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
-			normalization=np.sqrt(1/((self.wavebins.size-1) *(self.phasebins.size-1)))
+			normalization=np.sqrt(1/((self.waveBins.size-1) *(self.phaseBins.size-1)))
 			#Minimize model derivative w.r.t wavelength in unconstrained regions
 			resids+= [normalization* ( normedGrad /	np.sqrt( self.neff )).flatten()]
 			if computeJac: jac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
@@ -1200,8 +1210,8 @@ class SALTResids:
 		return resids,jac  
 	
 	def waveGradientRegularization(self, x,computeJac=True):
-		phase=(self.phasebins[:-1]+self.phasebins[1:])/2
-		wave=(self.wavebins[:-1]+self.wavebins[1:])/2
+		phase=self.phaseBinCenters
+		wave=self.waveBinCenters
 		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
 		dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
 		waveGradResids=[]
@@ -1216,7 +1226,7 @@ class SALTResids:
 			#Derivative of normalized gradient with respect to model parameters
 			normedGradDerivs=(self.regularizationDerivs[2] * scale - scaleDeriv[np.newaxis,np.newaxis,:]*dfluxdwave[i][:,:,np.newaxis])/ scale**2
 			#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
-			normalization=np.sqrt(1/((self.wavebins.size-1) *(self.phasebins.size-1)))
+			normalization=np.sqrt(1/((self.waveBins.size-1) *(self.phaseBins.size-1)))
 			#Minimize model derivative w.r.t wavelength in unconstrained regions
 			waveGradResids+= [normalization* ( normedGrad /	np.sqrt( self.neff )).flatten()]
 			if computeJac: jac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
