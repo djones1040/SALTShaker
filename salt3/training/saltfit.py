@@ -25,8 +25,8 @@ from scipy import linalg
 from emcee.interruptible_pool import InterruptiblePool
 from sncosmo.utils import integration_grid
 from numpy.linalg import inv,pinv
-
-
+from iminuit import Minuit
+import iminuit
 class fitting:
 	def __init__(self,n_components,n_colorpars,
 				 n_phaseknots,n_waveknots,datadict):
@@ -413,6 +413,7 @@ class mcmc(saltresids.SALTResids):
 				return_bool = True
 		return return_bool
 
+
 class GaussNewton(saltresids.SALTResids):
 	def __init__(self,guess,datadict,parlist,**kwargs):
 		self.warnings = []
@@ -420,6 +421,23 @@ class GaussNewton(saltresids.SALTResids):
 		super().__init__(guess,datadict,parlist,**kwargs)
 		self.lsqfit = False
 		
+		mins,maxes=np.zeros(self.parlist.size),np.zeros(self.parlist.size)
+		mins[self.im1]=-1
+		maxes[self.im1]=1
+		mins[self.im0]=0
+		maxes[self.im0]=1
+		maxes[self.ix0]=1
+		mins[self.ix0]=0
+		mins[self.ic]=-10
+		maxes[self.ic]=10
+		mins[self.ix1]=-10
+		maxes[self.ix1]=10
+		mins[self.iCL]=-10
+		maxes[self.iCL]=10
+		mins[self.ispcrcl]=-1
+		maxes[self.ispcrcl]=1
+		self.bounds=mins,maxes
+
 		self._robustify = False
 		self._writetmp = False
 		self.chi2_diff_cutoff = 1
@@ -496,6 +514,25 @@ class GaussNewton(saltresids.SALTResids):
 			modelerr,clpars,clerr,clscat,SNParams
 		
 		#raise RuntimeError("convergence_loop reached 100000 iterations without convergence")
+	
+	def minuitOptimize(self,X,fit='all'):
+		def fn(Y):
+			Xnew=X.copy()
+			Xnew[includePars]=Y
+			return (self.lsqwrap(Xnew,False,False)**2 ).sum()
+		
+		def grad(Y):
+			Xnew=X.copy()
+			Xnew[includePars]=Y
+			resids,jac=self.lsqwrap(Xnew,True,True)
+			return (2*resids[:,np.newaxis]*jac).sum(axis=0)
+		includePars=self.fitOptions[fit][1] & ~ (np.array([x=='modelerr' or x.startswith('tpkoff') for x in self.parlist]))
+		import pdb;pdb.set_trace()
+
+		result = iminuit.minimize(fn,X[includePars],jac=grad,bounds=np.stack(self.bounds,axis=1)[includePars,:],options= dict(maxfev=5,disp=False))
+		X=X.copy()
+		X[includePars]=result.x
+		return X,result.fun
 
 	def lsqwrap(self,guess,computeDerivatives,computePCDerivs=True,doPriors=True):
 		tstart = time.time()
@@ -574,6 +611,7 @@ class GaussNewton(saltresids.SALTResids):
 	
 	def robust_process_fit(self,X_init,chi2_init,niter):
 		X,chi2=X_init,chi2_init
+		#X,loglike=self.minuitOptimize(X,'all')
 		for fit in  self.fitOptions:
 			if fit=='all':continue
 			print('fitting '+self.fitOptions[fit][0])
@@ -602,6 +640,7 @@ class GaussNewton(saltresids.SALTResids):
 		#else: computePCDerivs = 0
 		#computePCDerivs = True
 		#doPriors=False
+		
 		residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors)
 		
 		
