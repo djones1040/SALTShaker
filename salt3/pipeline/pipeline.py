@@ -32,7 +32,7 @@ class SALT3pipe():
             pipepros = pipe_default             
         elif mode.startswith('customize'):
             if skip is not None:
-                if np.isscalar(skip):
+                if isinstance(skip,str):
                     skip = [skip]
                 pipepros = [x for x in pipe_default if x not in skip]
         self.pipepros = pipepros

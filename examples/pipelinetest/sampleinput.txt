@@ -1,5 +1,8 @@
 ##SALT3 INPUT
 
+[data]
+snlist=/home/mi/snana/SNDATA_ROOT/SIM/BYOSEDTEST/BYOSEDTEST.LIST
+
 [byosed]
 baseinput=byosed/BYOSED_base.params
 outinput=pipelinetest/TEST_BYOSED.params
@@ -9,8 +12,10 @@ set_key= FLAGS COLOR True
     
 [simulation]
 pro=snlc_sim.exe
-baseinput=simulation/SIMGEN_BYOSEDTEST.INPUT
-outinput=pipelinetest/TEST_SIMGEN_BYOSEDTEST.INPUT
+#baseinput=simulation/SIMGEN_BYOSEDTEST.INPUT
+#outinput=pipelinetest/TEST_SIMGEN_BYOSEDTEST.INPUT
+baseinput=simulation/SIMGEN_SALT3TEST.INPUT
+outinput=pipelinetest/TEST_SIMGEN_SALT3TEST.INPUT
 prooptions=
 set_key= NGEN_LC 20
     GENSOURCE RANDOM
