@@ -81,7 +81,7 @@ class TrainSALTBase:
 							help='number of degrees of the phase-independent color law polynomial (default=%default)')
 		parser.add_argument('--n_colorscatpars', default=config.get('trainparams','n_colorscatpars'), type=int,
 							help='number of parameters in the broadband scatter model (default=%default)')
-		parser.add_argument('--n_specrecal', default=config.get('trainparams','n_specrecal'), type=int,
+		parser.add_argument('--specrecal', default=config.get('trainparams','specrecal'), type=int,
 							help='number of parameters defining the spectral recalibration (default=%default)')
 		parser.add_argument('--n_processes', default=config.get('trainparams','n_processes'), type=int,
 							help='number of processes to use in calculating chi2 (default=%default)')
@@ -183,7 +183,8 @@ class TrainSALTBase:
 		return parser
 
 	def get_saltkw(self,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc):
-		saltfitkwargs = {'usePriors':self.options.usePriors,'priorWidths':self.options.priorWidths,
+		saltfitkwargs = {'specrecal':self.options.specrecal,
+						'usePriors':self.options.usePriors,'priorWidths':self.options.priorWidths,
 						'phaseknotloc':phaseknotloc,'waveknotloc':waveknotloc,
 						 'errphaseknotloc':errphaseknotloc,'errwaveknotloc':errwaveknotloc,
 						 'phaserange':self.options.phaserange,

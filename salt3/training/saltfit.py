@@ -21,7 +21,7 @@ from multiprocessing import Pool, get_context
 import copy
 import scipy.stats as ss
 from numpy.random import standard_normal
-from scipy.linalg import cholesky
+from scipy import linalg
 from emcee.interruptible_pool import InterruptiblePool
 from sncosmo.utils import integration_grid
 from numpy.linalg import inv,pinv
@@ -464,7 +464,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 		#raise RuntimeError("convergence_loop reached 100000 iterations without convergence")
 
-	def lsqwrap(self,guess,computeDerivatives,computePCDerivs=True,doPriors=True,fit='all'):
+	def lsqwrap(self,guess,computeDerivatives,computePCDerivs=True,doPriors=True):
 		tstart = time.time()
 
 		if self.n_colorscatpars:
@@ -477,8 +477,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 		components = self.SALTModel(guess)
 
-		alllam_vals = range(0,self.im0.size)
-		numResids=self.num_phot+self.num_spec + (len(self.usePriors)+2*len(alllam_vals)-2 if doPriors else 0)
+		numResids=self.num_phot+self.num_spec + (self.numPriorResids if doPriors else 0)
 		if self.regularize:
 			numRegResids=sum([ self.n_components*(self.phasebins.size-1) * (self.wavebins.size -1) for weight in [self.regulargradientphase,self.regulargradientwave ,self.regulardyad] if not weight == 0])
 			numResids+=numRegResids
@@ -509,11 +508,13 @@ class GaussNewton(saltresids.SALTResids):
 				jacobian[idx:idx+idxp,self.parlist=='cl'] = specresidsdict['dspecresid_dcl']
 				jacobian[idx:idx+idxp,self.parlist=='m0'] = specresidsdict['dspecresid_dM0']
 				jacobian[idx:idx+idxp,self.parlist=='m1'] = specresidsdict['dspecresid_dM1']
-
+				if self.specrecal : 
+					for k in self.datadict[sn]['specdata']:
+						jacobian[idx:idx+idxp,self.parlist=='specrecal_{}_{}'.format(sn,k)] = specresidsdict['dspecresid_dspecrecal_{}'.format(k)]
+					
 				for snparam in ('x0','x1','c'): #tpkoff should go here
 					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = specresidsdict['dspecresid_d{}'.format(snparam)]
 			idx += idxp
-		print('hack')
 		#print('priors: ',*self.usePriors)
 
 		# priors
@@ -548,7 +549,6 @@ class GaussNewton(saltresids.SALTResids):
 		if niter == 0: computePCDerivs = True
 		else: computePCDerivs = False
 		Xtmp,chi2_all = self.process_fit(Xtmp,fit='all',computePCDerivs=True)
-
 		if chi2_init - chi2_all > 1 and chi2_all/chi2_last < 0.9:
 			return Xtmp,chi2_all
 		else:
@@ -565,6 +565,8 @@ class GaussNewton(saltresids.SALTResids):
 			X,chi2 = self.process_fit(X,fit='color')
 			print("fitting color law")
 			X,chi2 = self.process_fit(X,fit='colorlaw')
+			print('fitting spectral recalibration')
+			X,chi2 = self.process_fit(X,fit='spectralrecalibration')
 
 		return X,chi2 #_init
 	
@@ -576,7 +578,7 @@ class GaussNewton(saltresids.SALTResids):
 		#else: computePCDerivs = 0
 		#computePCDerivs = True
 		#doPriors=False
-		residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors,fit)
+		residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors)
 		if fit == 'all':
 			includePars=np.ones(self.npar,dtype=bool)
 		else:
@@ -599,6 +601,8 @@ class GaussNewton(saltresids.SALTResids):
 				includePars[self.ic]=True
 			elif fit=='colorlaw':
 				includePars[self.iCL]=True
+			elif fit=='spectralrecalibration':
+				includePars[self.ispcrcl]=True
 			else:
 				raise NotImplementedError("""This option for a Gaussian Process fit with a 
 restricted parameter set has not been implemented: {}""".format(fit))
@@ -608,8 +612,7 @@ restricted parameter set has not been implemented: {}""".format(fit))
 		
 		print('Number of parameters fit this round: {}'.format(includePars.sum()))
 		jacobian=jacobian[:,includePars]
-		stepsize = np.dot(np.dot(pinv(np.dot(jacobian.T,jacobian)),jacobian.T),
-						  residuals.reshape(residuals.size,1)).reshape(includePars.sum())
+		stepsize=linalg.lstsq(jacobian,residuals)[0]
 		#if self.i>4 and fit=='all' and not self.debug: 
 		#	import pdb;pdb.set_trace()
 		#	self.debug=True

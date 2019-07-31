@@ -26,7 +26,6 @@
 
   <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
   <link rel="stylesheet" href="_static/gallery.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -86,6 +85,7 @@
 <li class="toctree-l1"><a class="reference internal" href="training.html">Training the SALT3 Model</a></li>
 <li class="toctree-l1"><a class="reference internal" href="simulation.html">Creating Simulated Data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="validation.html">Validating the Trained Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pipeline.html">Running the Pipeline</a></li>
 </ul>
 
             
@@ -153,7 +153,7 @@
   <div class="section" id="spectroscopic-and-photometric-training-data">
 <h1>Spectroscopic and Photometric Training Data<a class="headerlink" href="#spectroscopic-and-photometric-training-data" title="Permalink to this headline">¶</a></h1>
 <p>A number of light curves and spectra are provided
-in the <code class="code docutils literal notranslate"><span class="pre">examples/exampledata/</span></code> directory
+in the <code class="code docutils literal"><span class="pre">examples/exampledata/</span></code> directory
 for training.  Light curves and spectra are
 combined into a single <a class="reference external" href="http://http://snana.uchicago.edu/">SNANA-formatted</a>
 file.</p>
@@ -163,17 +163,17 @@ file.</p>
 consists of a number of header keys giving information
 about each SN, followed by photometry and spectroscopy.
 Example SNANA-formatted data with both photometry and
-spectra are provided in the <code class="code docutils literal notranslate"><span class="pre">examples/exampledata/phot+specdata/</span></code>
+spectra are provided in the <code class="code docutils literal"><span class="pre">examples/exampledata/phot+specdata/</span></code>
 directory.</p>
 <p>An example of the minimum required header is below:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SURVEY</span><span class="p">:</span>  <span class="n">PS1MD</span> <span class="c1"># matches SN to the filter functions given by each kcor file</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">SURVEY</span><span class="p">:</span>  <span class="n">PS1MD</span> <span class="c1"># matches SN to the filter functions given by each kcor file</span>
 <span class="n">SNID</span><span class="p">:</span>  <span class="n">ASASSN</span><span class="o">-</span><span class="mi">16</span><span class="n">bc</span> <span class="c1"># SN identifier</span>
 <span class="n">REDSHIFT_HELIO</span><span class="p">:</span>  <span class="mf">0.05</span> <span class="o">+-</span> <span class="mf">0.01</span> <span class="c1"># needed so that SALT model can be redshifted to match the data</span>
 </pre></div>
 </div>
 <p>Below the header, the photometry is included in the following
 format:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">NOBS</span><span class="p">:</span> <span class="mi">64</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">NOBS</span><span class="p">:</span> <span class="mi">64</span>
 <span class="n">NVAR</span><span class="p">:</span>   <span class="mi">7</span>
 <span class="n">VARLIST</span><span class="p">:</span>  <span class="n">MJD</span>  <span class="n">FLT</span> <span class="n">FIELD</span>   <span class="n">FLUXCAL</span>   <span class="n">FLUXCALERR</span>    <span class="n">MAG</span>     <span class="n">MAGERR</span>
 <span class="n">OBS</span><span class="p">:</span> <span class="mf">57422.54</span> <span class="n">g</span> <span class="n">NULL</span>  <span class="mf">21576.285</span> <span class="mf">214.793</span> <span class="mf">16.665</span> <span class="mf">0.011</span>
@@ -189,14 +189,14 @@ FLUXCAL, and FLUXCALERR values.  FLUXCAL and FLUXCALERR use a
 zeropoint of 27.5 mag.</p>
 <p>The beginning of the spectroscopy section is identified by the following
 header lines:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">NVAR_SPEC</span><span class="p">:</span> <span class="mi">3</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">NVAR_SPEC</span><span class="p">:</span> <span class="mi">3</span>
 <span class="n">VARNAMES_SPEC</span><span class="p">:</span> <span class="n">LAMAVG</span>  <span class="n">FLAM</span>  <span class="n">FLAMERR</span>
 </pre></div>
 </div>
 <p>Where the columns are wavelength (angstrom), flux (erg/cm^2/s/A), and flux
 uncertainty (not currently used).  Each spectrum has
 the following format:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SPECTRUM_ID</span><span class="p">:</span>       <span class="mi">1</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">SPECTRUM_ID</span><span class="p">:</span>       <span class="mi">1</span>
 <span class="n">SPECTRUM_MJD</span><span class="p">:</span>      <span class="mf">54998.378</span>  <span class="c1"># Tobs =  -13.832</span>
 <span class="n">SPECTRUM_TEXPOSE</span><span class="p">:</span>  <span class="mf">100000.000</span>  <span class="c1"># seconds</span>
 <span class="n">SPECTRUM_NLAM</span><span class="p">:</span>     <span class="mi">352</span> <span class="p">(</span><span class="n">of</span> <span class="mi">352</span><span class="p">)</span>  <span class="c1"># Number of valid wavelength bins</span>
@@ -209,7 +209,7 @@ the following format:</p>
 <span class="n">END_SPECTRUM</span><span class="p">:</span>
 </pre></div>
 </div>
-<p>the <code class="code docutils literal notranslate"><span class="pre">salt3/util/</span></code> directory will soon include utilities for
+<p>the <code class="code docutils literal"><span class="pre">salt3/util/</span></code> directory will soon include utilities for
 adding ASCII spectra to a pre-existing light curve file.</p>
 </div>
 </div>
@@ -234,7 +234,7 @@ adding ASCII spectra to a pre-existing light curve file.</p>
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2018, David Jones, Rick Kessler
+        &copy; Copyright 2018, David Jones, Rick Kessler.
 
     </p>
   </div>
@@ -253,15 +253,21 @@ adding ASCII spectra to a pre-existing light curve file.</p>
 
   
 
-    
-    
-      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script type="text/javascript" src="_static/jquery.js"></script>
-        <script type="text/javascript" src="_static/underscore.js"></script>
-        <script type="text/javascript" src="_static/doctools.js"></script>
-        <script type="text/javascript" src="_static/language_data.js"></script>
-        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
-    
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'',
+            LANGUAGE:'None',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
   
 

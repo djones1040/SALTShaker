@@ -32,11 +32,11 @@ class TRAINING_Test(unittest.TestCase):
 	def test_prior_jacobian(self):
 		"""Checks that all designated priors are properly calculating the jacobian of their residuals to within 1%"""
 				#Define simple models for m0,m1
-				
 		for prior in self.resids.priors:
 			print('Testing prior', prior)
 			components=self.resids.SALTModel(self.guess)
 			resid,val,jacobian=self.resids.priors[prior](0.3145,self.guess,components)
+			self.assertTrue(self.resids.priors[prior].numResids==resid.size)
 			dx=1e-3
 			rtol=1e-2
 			def incrementOneParam(i):
@@ -44,7 +44,10 @@ class TRAINING_Test(unittest.TestCase):
 				guess[i]+=dx
 				components=self.resids.SALTModel(guess)
 				return self.resids.priors[prior](0.3145,guess,components)[0]
-			dPriordX=(np.vectorize(incrementOneParam)(np.arange(self.guess.size))-resid)/dx
+			dPriordX=np.zeros((resid.size,self.guess.size))
+			for i in range(self.guess.size):
+				dPriordX[:,i]=(incrementOneParam(i)-resid)/dx
+		
 			#import pdb;pdb.set_trace()
 			#Check that all derivatives that should be 0 are zero
 			if  not np.allclose(dPriordX,jacobian,rtol): print('Problems with derivatives for prior {} : '.format(prior),np.unique(self.parlist[np.where(~np.isclose(dPriordX,jacobian,rtol))]))
@@ -53,7 +56,7 @@ class TRAINING_Test(unittest.TestCase):
 
 	def test_photresid_jacobian(self):
 		"""Checks that the the jacobian of the photometric residuals is being correctly calculated to within 1%"""
-				#Define simple models for m0,m1
+		print("Checking photometric derivatives")
 		dx=1e-3
 		rtol=1e-2
 		sn=self.resids.datadict.keys().__iter__().__next__()
@@ -89,9 +92,26 @@ class TRAINING_Test(unittest.TestCase):
 		if not np.allclose(dResiddX,jacobian,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol))[1]]))
 		self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
 
+	def test_computeDerivatives(self):
+		"""Checks that the computeDerivatives parameter of the ResidsForSN function is not affecting the residuals"""
+		sn=self.resids.datadict.keys().__iter__().__next__()
+		components = self.resids.SALTModel(self.resids.guess)
+		salterr = self.resids.ErrModel(self.resids.guess)
+		if self.resids.n_colorpars:
+			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.resids.guess[self.resids.parlist == 'cl'])
+		else: colorLaw = None
+		if self.resids.n_colorscatpars:
+			colorScat = True
+		else: colorScat = None
+		combinations= [(True,True),(True,False),(False,False)]
+		results=[self.resids.ResidsForSN(self.guess,sn,components,colorLaw,*x) for x in combinations]
+		first=results[0]
+		self.assertTrue([np.allclose(first[0]['photresid'],result[0]['photresid']) for result in results[1:]])
+		self.assertTrue([np.allclose(first[1]['specresid'],result[1]['specresid']) for result in results[1:]])
+
 	def test_specresid_jacobian(self):
 		"""Checks that the the jacobian of the spectroscopic residuals is being correctly calculated to within 1%"""
-				#Define simple models for m0,m1
+		print("Checking spectral derivatives")
 		dx=1e-3
 		rtol=1e-2
 		sn=self.resids.datadict.keys().__iter__().__next__()
@@ -106,11 +126,12 @@ class TRAINING_Test(unittest.TestCase):
 		specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,True,True)[1]
 		
 		residuals = specresidsdict['specresid']
-		
 		jacobian=np.zeros((residuals.size,self.parlist.size))
 		jacobian[:,self.parlist=='cl'] = specresidsdict['dspecresid_dcl']
 		jacobian[:,self.parlist=='m0'] = specresidsdict['dspecresid_dM0']
 		jacobian[:,self.parlist=='m1'] = specresidsdict['dspecresid_dM1']
+		for k in self.resids.datadict[sn]['specdata']:
+			jacobian[:,self.parlist=='specrecal_{}_{}'.format(sn,k)] = specresidsdict['dspecresid_dspecrecal_{}'.format(k)]
 		for snparam in ('x0','x1','c'): #tpkoff should go here
 			jacobian[:,self.parlist == '{}_{}'.format(snparam,sn)] = specresidsdict['dspecresid_d{}'.format(snparam)]
 		def incrementOneParam(i):
@@ -127,8 +148,25 @@ class TRAINING_Test(unittest.TestCase):
 		if not np.allclose(dResiddX,jacobian,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol))[1]]))
 		self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
 
-
-
+	def test_regularization_jacobian(self):
+		"""Checks that the the jacobian of the spectroscopic residuals is being correctly calculated to within 1%"""
+		dx=1e-8
+		rtol=1e-2
+		for regularization, name in [(self.resids.dyadicRegularization,'Dyadic'),(self.resids.phaseGradientRegularization, 'Phase gradient'),(self.resids.waveGradientRegularization,'Wave gradient' )]:
+			
+			def incrementOneParam(i):
+				guess=self.guess.copy()
+				guess[i]+=dx
+				return regularization(guess,False)[0][0]
+			
+			print('Checking jacobian of {} regularization'.format(name))
+			#Only checking the first component, since they're calculated using the same code
+			residuals,jacobian=[x[0] for x in regularization(self.guess,True)]
+			dResiddX=np.zeros((residuals.size,self.resids.im0.size))
+			for i,j in enumerate(self.resids.im0):
+				dResiddX[:,i]=(incrementOneParam(j)-residuals)/dx
+			self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
+	
 # 	def test_init_chi2func(self):
 # 		self.assertTrue(True)
 # 		waverange = [2000,9200]
