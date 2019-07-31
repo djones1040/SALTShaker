@@ -21,7 +21,7 @@ class RdTest(unittest.TestCase):
 		nsn = (np.loadtxt(snlist,dtype='str')).size
 		ts = TrainSALT()
 		options= type('test', (), {})()
-		options.PS1_LOWZ_COMBINED_kcorfile='kcor/kcor_PS1_LOWZ_COMBINED.fits'
+		options.PS1_LOWZ_COMBINED_kcorfile='kcor_PS1_LOWZ_COMBINED.fits'
 		options.PS1_LOWZ_COMBINED_subsurveylist='CFA3S,CFA3K,CFA4p1,CFA4p2,CSP,CFA1,CFA2'
 		kcordict=readutils.rdkcor(['PS1_LOWZ_COMBINED'],options,addwarning=lambda x: None)
 		datadict = readutils.rdAllData(snlist,False,kcordict,ts.addwarning)
@@ -35,7 +35,7 @@ class RdTest(unittest.TestCase):
 		nsn = np.loadtxt(snlist,dtype='str').size
 		ts = TrainSALT()
 		options= type('test', (), {})()
-		options.PS1_LOWZ_COMBINED_kcorfile='kcor/kcor_PS1_LOWZ_COMBINED.fits'
+		options.PS1_LOWZ_COMBINED_kcorfile='kcor_PS1_LOWZ_COMBINED.fits'
 		options.PS1_LOWZ_COMBINED_subsurveylist='CFA3S,CFA3K,CFA4p1,CFA4p2,CSP,CFA1,CFA2'
 		
 		kcordict=readutils.rdkcor(['PS1_LOWZ_COMBINED'],options,addwarning=lambda x: None)
@@ -47,7 +47,7 @@ class RdTest(unittest.TestCase):
 		survey = 'PS1MD(PS1MD)'
 		ts = TrainSALT()
 		options= type('test', (), {})()
-		options.PS1MD_kcorfile='kcor/kcor_PS1_PS1MD.fits'
+		options.PS1MD_kcorfile='kcor_PS1_PS1MD.fits'
 		options.PS1MD_subsurveylist='PS1MD'
 		ts.kcordict=readutils.rdkcor(['PS1MD'],options,addwarning=lambda x: None)
 
