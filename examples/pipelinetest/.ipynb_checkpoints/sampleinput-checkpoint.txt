@@ -1,7 +1,7 @@
 ##SALT3 INPUT
 
 [data]
-snlist=/home/mi/snana/SNDATA_ROOT/SIM/BYOSEDTEST/BYOSEDTEST.LIST
+snlist=/home/mi/snana/SNDATA_ROOT/SIM/SALT3TEST_SIMPLE/SALT3TEST_SIMPLE.LIST
 
 [byosed]
 baseinput=byosed/BYOSED_base.params
@@ -25,7 +25,8 @@ set_key= NGEN_LC 20
 pro=TrainSALT.py
 proargs = -c 
 baseinput=training/SALT_SNANA.conf
-prooptions = --resume_from_outputdir 0
+prooptions = 
+#--resume_from_outputdir 0
 #--stage validate
 outinput=pipelinetest/TEST_SALT.conf
 set_key=iodata snlist exampledata/snana/data/SALT3TEST_SIMPLE.LIST

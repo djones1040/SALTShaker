@@ -23,7 +23,7 @@ class SALT3pipe():
     def gen_input(self):
         pass
 
-    def build(self,mode='default',data=True,skip=None):
+    def build(self,mode='default',data=True,skip=None,onlyrun=None):
         if data:
             pipe_default = ['data','train','lcfit','getmu','cosmofit']
         else:
@@ -31,12 +31,18 @@ class SALT3pipe():
         if mode.startswith('default'):
             pipepros = pipe_default             
         elif mode.startswith('customize'):
-            if skip is not None:
+            if skip is not None and onlyrun is None:
                 if isinstance(skip,str):
                     skip = [skip]
                 pipepros = [x for x in pipe_default if x not in skip]
+            elif skip is None and onlyrun is not None:
+                if isinstance(onlyrun,str):
+                    onlyrun = [onlyrun]
+                pipepros = onlyrun
+            else:
+                raise ValueError("skip and onlyrun cannot be used together")
         self.pipepros = pipepros
-        print(self.pipepros)
+        print("Current procedures: ", self.pipepros)
 
     def configure(self):
         config = configparser.ConfigParser()
@@ -371,17 +377,7 @@ class Training(PyPipeProcedure):
             outdir = self._get_output_info().value.values[0]
             ##copy necessary files to a model folder in SNDATA_ROOT
             modeldir = 'lcfitting/SALT3.test'
-            if not os.path.exists(modeldir):
-                os.makedirs(modeldir)
-            if os.path.isdir(modeldir):
-                if not glob.glob('{}/*.dat'.format(outdir)):
-                    raise ValueError("[glueto lcfitting] File does not exists. Run training first")
-                shellcommand = "cp -p {} {}".format(' '.join(glob.glob(outdir+'/*.dat')),modeldir) 
-                shellrun = subprocess.run(list(shellcommand.split()))
-                if shellrun.returncode != 0:
-                    raise RuntimeError(shellrun.stderr)
-                else:
-                    print("salt3 model files copied to {}".format(modeldir))
+            self.__transfer_model_files(outdir,modeldir)
             return modeldir
         else:
             raise ValueError("training can only glue to lcfit")
@@ -403,6 +399,26 @@ class Training(PyPipeProcedure):
         df['key'] = key
         df['value'] = self.keys[section][key]
         return pd.DataFrame([df])
+
+    def __transfer_model_files(self,outdir,modeldir,rename=True):
+        modelfiles = glob.glob('{}/*.dat'.format(outdir))
+        if not modelfiles:
+            raise ValueError("[glueto lcfitting] File does not exists. Run training first")
+        shellcommand = "cp -p {} {}".format(' '.join(modelfiles),modeldir) 
+        shellrun = subprocess.run(list(shellcommand.split()))
+        if shellrun.returncode != 0:
+            raise RuntimeError(shellrun.stderr)
+        else:
+            print("salt3 model files copied to {}".format(modeldir))
+        if rename:
+            files_to_rename = glob.glob('{}/*.dat'.format(modeldir))
+            try:
+                for f in modelfiles:
+                    shellcommand = "mv {} {}".format(f,f.replace('salt3','salt2'))
+                    shellrun = subprocess.run(list(shellcommand.split()))
+            except:
+                raise ValueError("Can not rename salt3 files")
+
 
 class LCFitting(PipeProcedure):
 
