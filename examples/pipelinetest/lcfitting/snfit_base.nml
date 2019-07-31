@@ -56,15 +56,15 @@
   &END
 
  &FITINP
-     FITMODEL_NAME  = '/home/mi/salt3/SALT3/examples/pipelinetest/SALT3.test'
+     FITMODEL_NAME  = 'lcfitting/SALT3.test'
      FILTLIST_FIT = 'bcdeghijlmnopq'
 
      FUDGEALL_ITER1_MAXFRAC = 0.01
      PRIOR_MJDSIG        = 10
      PRIOR_SHAPE_RANGE   = -4.0, 4.0
 
-     FITWIN_SHAPE     = -3.00, +3.00
-     FITWIN_COLOR     = -0.30, +0.30
+     FITWIN_SHAPE     = -3.00, 3.00
+     FITWIN_COLOR     = -0.30, 0.30
      FITWIN_PROB      =  0.01,  1.01
      FITWIN_TREST     = -15.0, 45.0
      DELCHI2_REJECT   = 10

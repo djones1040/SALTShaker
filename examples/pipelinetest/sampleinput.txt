@@ -20,8 +20,7 @@ set_key= NGEN_LC 20
 pro=TrainSALT.py
 proargs = -c 
 baseinput=training/SALT_SNANA.conf
-prooptions = 
-#--resume_from_outputdir 1
+prooptions = --resume_from_outputdir 0
 #--stage validate
 outinput=pipelinetest/TEST_SALT.conf
 set_key=iodata snlist exampledata/snana/data/SALT3TEST_SIMPLE.LIST
