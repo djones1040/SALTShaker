@@ -56,7 +56,7 @@
   &END
 
  &FITINP
-     FITMODEL_NAME  = 'lcfitting/SALT3.test'
+     FITMODEL_NAME  = 'SALT2.Guy10'
      FILTLIST_FIT = 'bcdeghijlmnopq'
 
      FUDGEALL_ITER1_MAXFRAC = 0.01
