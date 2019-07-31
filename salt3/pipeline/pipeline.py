@@ -23,57 +23,99 @@ class SALT3pipe():
     def gen_input(self):
         pass
 
+    def build(self,mode='default',data=True,skip=None):
+        if data:
+            pipe_default = ['data','train','lcfit','getmu','cosmofit']
+        else:
+            pipe_default = ['byosed','sim','train','lcfit','getmu','cosmofit']
+        if mode.startswith('default'):
+            pipepros = pipe_default             
+        elif mode.startswith('customize'):
+            if skip is not None:
+                if np.isscalar(skip):
+                    skip = [skip]
+                pipepros = [x for x in pipe_default if x not in skip]
+        self.pipepros = pipepros
+        print(self.pipepros)
+
     def configure(self):
         config = configparser.ConfigParser()
         config.read(self.finput)
         m2df = self._multivalues_to_df
 
+        for prostr in self.pipepros:
+            sectionname = [x for x in config.sections() if x.startswith(prostr)]
+            if len(sectionname) == 1:
+                prostr = sectionname[0]
+            pipepro = self._get_pipepro_from_string(prostr)
+            setkeys = self._get_config_option(config,prostr,'set_key')
+            if setkeys is not None:
+                pipepro.setkeys = m2df(setkeys)
+            else:
+                pipepro.setkeys = None
+            baseinput = self._get_config_option(config,prostr,'baseinput')
+            outname = self._get_config_option(config,prostr,'outinput')
+            pro = self._get_config_option(config,prostr,'pro')
+            proargs = self._get_config_option(config,prostr,'proargs')
+            prooptions = self._get_config_option(config,prostr,'prooptions')
+            snlist = self._get_config_option(config,prostr,'snlist')
+            pipepro.configure(baseinput=baseinput,
+                              setkeys=pipepro.setkeys,
+                              outname=outname,
+                              pro=pro,
+                              proargs=proargs,
+                              prooptions=prooptions,
+                              snlist=snlist)
+
         # self.Data.configure(snlist=config.get('data','snlist'))
 
-        self.BYOSED.setkeys = m2df(config.get('byosed','set_key'),
-                                   colnames=['section','key','value'])
-        self.BYOSED.configure(baseinput=config.get('byosed','baseinput'),
-                              setkeys=self.BYOSED.setkeys,
-                              outname=config.get('byosed','outinput'))
-        self.Simulation.setkeys = m2df(config.get('simulation','set_key'),
-                                       colnames=['key','value'],
-                                       stackvalues=True)
-        self.Simulation.configure(baseinput=config.get('simulation','baseinput'),
-                                  setkeys=self.Simulation.setkeys,
-                                  outname=config.get('simulation','outinput'),
-                                  pro=config.get('simulation','pro'),
-                                  prooptions=config.get('simulation','prooptions'))
-        self.Training.setkeys = m2df(config.get('training','set_key'),
-                                     colnames=['section','key','value'])
-        self.Training.configure(baseinput=config.get('training','baseinput'),
-                                setkeys=self.Training.setkeys,
-                                outname=config.get('training','outinput'),
-                                pro=config.get('training','pro'),
-                                proargs=config.get('training','proargs'),
-                                prooptions=config.get('training','prooptions'))
-        self.LCFitting.setkeys = m2df(config.get('lcfitting','set_key'),colnames=['section','key','value'])
-        self.LCFitting.configure(baseinput=config.get('lcfitting','baseinput'),
-                                 setkeys=self.LCFitting.setkeys,
-                                 outname=config.get('lcfitting','outinput'),
-                                 pro=config.get('lcfitting','pro'))
-        self.GetMu.setkeys = m2df(config.get('getmu','set_key'),colnames=['key','value'])
-        self.GetMu.configure(baseinput=config.get('getmu','baseinput'),
-                             setkeys=self.GetMu.setkeys,
-                             outname=config.get('getmu','outinput'),
-                             pro=config.get('getmu','pro'),
-                             prooptions=config.get('getmu','prooptions'))
+        # self.BYOSED.setkeys = m2df(config.get('byosed','set_key'),
+        #                            colnames=['section','key','value'])
+        # self.BYOSED.configure(baseinput=config.get('byosed','baseinput'),
+        #                       setkeys=self.BYOSED.setkeys,
+        #                       outname=config.get('byosed','outinput'))
+        # self.Simulation.setkeys = m2df(config.get('simulation','set_key'),
+        #                                colnames=['key','value'],
+        #                                stackvalues=True)
+        # self.Simulation.configure(baseinput=config.get('simulation','baseinput'),
+        #                           setkeys=self.Simulation.setkeys,
+        #                           outname=config.get('simulation','outinput'),
+        #                           pro=config.get('simulation','pro'),
+        #                           prooptions=config.get('simulation','prooptions'))
+        # self.Training.setkeys = m2df(config.get('training','set_key'),
+        #                              colnames=['section','key','value'])
+        # self.Training.configure(baseinput=config.get('training','baseinput'),
+        #                         setkeys=self.Training.setkeys,
+        #                         outname=config.get('training','outinput'),
+        #                         pro=config.get('training','pro'),
+        #                         proargs=config.get('training','proargs'),
+        #                         prooptions=config.get('training','prooptions'))
+        # self.LCFitting.setkeys = m2df(config.get('lcfitting','set_key'),colnames=['section','key','value'])
+        # self.LCFitting.configure(baseinput=config.get('lcfitting','baseinput'),
+        #                          setkeys=self.LCFitting.setkeys,
+        #                          outname=config.get('lcfitting','outinput'),
+        #                          pro=config.get('lcfitting','pro'))
+        # self.GetMu.setkeys = m2df(config.get('getmu','set_key'),colnames=['key','value'])
+        # self.GetMu.configure(baseinput=config.get('getmu','baseinput'),
+        #                      setkeys=self.GetMu.setkeys,
+        #                      outname=config.get('getmu','outinput'),
+        #                      pro=config.get('getmu','pro'),
+        #                      prooptions=config.get('getmu','prooptions'))
 
-        self.CosmoFit.configure(outname=config.get('cosmofit','outinput'),
-                                pro=config.get('cosmofit','pro'),
-                                prooptions=config.get('getmu','prooptions'))
+        # self.CosmoFit.configure(outname=config.get('cosmofit','outinput'),
+        #                         pro=config.get('cosmofit','pro'),
+        #                         prooptions=config.get('getmu','prooptions'))
 
 
     def run(self):
-        self.Simulation.run()
-        self.Training.run()
-        self.LCFitting.run()
-        self.GetMu.run()
-        self.CosmoFit.run()
+        for prostr in self.pipepros:
+            pipepro = self._get_pipepro_from_string(prostr)
+            pipepro.run()
+        # self.Simulation.run()
+        # self.Training.run()
+        # self.LCFitting.run()
+        # self.GetMu.run()
+        # self.CosmoFit.run()
         
 
     def glue(self,pipepros=None,on='phot'):
@@ -104,6 +146,13 @@ class SALT3pipe():
                            prooptions=pro2.prooptions,
                            outname=setkeys['value'].values[0])            
 
+    def _get_config_option(self,config,prostr,option):
+        if config.has_option(prostr, option):
+            option_value = config.get(prostr,option)
+        else:
+            option_value = None
+        return option_value
+
     def _get_pipepro_from_string(self,pipepro_str):
         if pipepro_str.lower().startswith("sim"):
             pipepro = self.Simulation
@@ -117,6 +166,8 @@ class SALT3pipe():
             pipepro = self.CosmoFit
         elif pipepro_str.lower().startswith("data"):
             pipepro = self.Data
+        elif pipepro_str.lower().startswith("byosed"):
+            pipepro = self.BYOSED
         else:
             raise ValueError("Unknow pipeline procedure:",pipepro.strip())
         return pipepro
@@ -125,6 +176,15 @@ class SALT3pipe():
         df = pd.DataFrame([s.split() for s in values.split('\n')])
         if df.empty:
             return None
+        if colnames is None:
+            if df.shape[1] == 2:
+                colnames = ['key','value']
+            elif df.shape[1] == 3:
+                if np.any(df.isna()):
+                    colnames = ['key','value']
+                    stackvalues = True
+                else:
+                    colnames=['section','key','value']
         if stackvalues and df.shape[1] > len(colnames):
             numbercol = [colnames[-1]+'.'+str(i) for i in range(df.shape[1]-len(colnames)+1)]
             df.columns = colnames[0:-1] + numbercol
@@ -183,7 +243,7 @@ class PyPipeProcedure(PipeProcedure):
 
 class Data(PipeProcedure):
 
-    def configure(self,snlist=None):
+    def configure(self,snlist=None,**kwargs):
         self.keys = {'snlist':snlist}
 
     def _get_output_info(self):
@@ -210,17 +270,26 @@ class Data(PipeProcedure):
                 return os.path.dirname(snlist[len(simpath):]) 
         else:
             raise ValueError("data can only glue to training or lcfitting")
+    
+    def run(self):
+        pass
 
 
 class BYOSED(PyPipeProcedure):
 
     def configure(self,baseinput=None,setkeys=None,
-                  outname="pipeline_byosed_input.input",
+                  outname="pipeline_byosed_input.input",byosed_default="BYOSED/BYOSED.params",
                   bkp_orig_param=False,**kwargs):   
         self.outname = outname
         super().configure(pro=None,baseinput=baseinput,setkeys=setkeys)
         #rename current byosed param
-        byosed_default = "byosed/BYOSED.params"
+        if os.path.exists(os.path.dirname(byosed_default)):
+            byosed_default = byosed_default
+        elif os.path.exists(os.path.dirname(byosed_default.lower())):
+            byosed_default = byosed_default.lower()
+        else:
+            raise ValueError("Directory {} does not exists".format(os.path.dirname(byosed_default)))
+
         if bkp_orig_param:
             byosed_rename = "{}.{}".format(byosed_default,int(time.time()))
             if os.path.isfile(byosed_default):
@@ -237,6 +306,9 @@ class BYOSED(PyPipeProcedure):
             raise RuntimeError(shellrun.stdout)
         else:
             print("{} is copied to {}".format(outname,byosed_default))
+
+    def run(self):
+        pass
 
 class Simulation(PipeProcedure):
 
@@ -296,8 +368,21 @@ class Training(PyPipeProcedure):
         if not isinstance(pipepro,str):
             pipepro = type(pipepro).__name__
         if pipepro.lower().startswith('lcfit'):
-            outdir = self._get_output_info()
+            outdir = self._get_output_info().value.values[0]
             ##copy necessary files to a model folder in SNDATA_ROOT
+            modeldir = 'lcfitting/SALT3.test'
+            if not os.path.exists(modeldir):
+                os.makedirs(modeldir)
+            if os.path.isdir(modeldir):
+                if not glob.glob('{}/*.dat'.format(outdir)):
+                    raise ValueError("[glueto lcfitting] File does not exists. Run training first")
+                shellcommand = "cp -p {} {}".format(' '.join(glob.glob(outdir+'/*.dat')),modeldir) 
+                shellrun = subprocess.run(list(shellcommand.split()))
+                if shellrun.returncode != 0:
+                    raise RuntimeError(shellrun.stderr)
+                else:
+                    print("salt3 model files copied to {}".format(modeldir))
+            return modeldir
         else:
             raise ValueError("training can only glue to lcfit")
 
