@@ -521,7 +521,7 @@ class SALTResids:
 					#derivInterp = RectBivariateSpline(obsphase,obswave,self.spline_derivs,kx=1,ky=1)
 					#derivInterpWave = interp1d(obswavelist,derivInterp(phase[0]),kind='nearest',bounds_error=False,fill_value="extrapolate")
 					#derivInterp2 = derivInterpWave(specdata[k]['wavelength'])
-					derivInterp = self.spline_deriv_interp((phase[0],specdata[k]['wavelength']),method="nearest")
+					derivInterp = self.spline_deriv_interp((phase[0]/(1+z),specdata[k]['wavelength']/(1+z)),method="nearest")
 					specresultsdict['dmodelflux_dM0'][iSpecStart:iSpecStart+SpecLen,:] = derivInterp*intmult[:,np.newaxis]
 					specresultsdict['dmodelflux_dM0_nox'][iSpecStart:iSpecStart+SpecLen,:] = derivInterp*intmultnox[:,np.newaxis]
 					specresultsdict['dmodelflux_dM1'][iSpecStart:iSpecStart+SpecLen,:] =  derivInterp*intmult[:,np.newaxis]*x1
