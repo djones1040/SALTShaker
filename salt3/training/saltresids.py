@@ -1,4 +1,4 @@
-from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator
+from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
 from scipy.integrate import trapz
 from salt3.util.synphot import synphot
 from sncosmo.salt2utils import SALT2ColorLaw
@@ -168,7 +168,7 @@ class SALTResids:
 		self.waveBins=self.waveknotloc[:-(self.bsorder+1)],self.waveknotloc[(self.bsorder+1):]
 		self.phaseBins=self.phaseknotloc[:-(self.bsorder+1)],self.phaseknotloc[(self.bsorder+1):]
 		
-		import pdb; pdb.set_trace()
+
 		self.phaseBinCenters=np.array([(self.phase[:,np.newaxis]* self.spline_derivs[:,:,i*(self.waveBins[0].size)]).sum()/self.spline_derivs[:,:,i*(self.waveBins[0].size)].sum() for i in range(self.phaseBins[0].size) ])
 		self.waveBinCenters=np.array([(self.wave[np.newaxis,:]* self.spline_derivs[:,:,i]).sum()/self.spline_derivs[:,:,i].sum() for i in range(self.waveBins[0].size)])
 		self.regularizationDerivs=[np.zeros((self.phaseBinCenters.size,self.waveBinCenters.size,self.im0.size)) for i in range(4)]
@@ -180,7 +180,8 @@ class SALTResids:
 		
 		
 		self.getobswave()
-		self.updateEffectivePoints(guess)
+		if self.regularize:
+			self.updateEffectivePoints(guess)
 
 		self.priors={ key: partial(__priors__[key],self) for key in __priors__}
 		for prior in self.priors: 
@@ -461,31 +462,79 @@ class SALTResids:
 				if computePCDerivs:
 					intmult = _SCALE_FACTOR/(1+z)*x0*recalexp*colorexpinterp
 					intmultnox = _SCALE_FACTOR/(1+z)*recalexp*colorexpinterp
-					for i in range(len(self.im0)):
+					#tstart = time.time()
+					#for i in range(len(self.im0)):
 						
 						#Range of wavelength and phase values affected by changes in knot i
-						waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
-						phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+					#	waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+					#	phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
 						#Check if this spectrum is inside values affected by changes in knot i
 						#if waverange[0]*(1+z) > specdata[k]['wavelength'].min() or waverange[1]*(1+z) < specdata[k]['wavelength'].max():
 						#	pass
 						#Check which phases are affected by knot i
-						inPhase=(phase>=(phaserange[0]-self.phaseres)*(1+z) ) & (phase<=(phaserange[1]+self.phaseres)*(1+z) )
-						if inPhase.any():
+					#	inPhase=(phase>=(phaserange[0]-self.phaseres)*(1+z) ) & (phase<=(phaserange[1]+self.phaseres)*(1+z) )
+					#	if inPhase.any():
 							#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
 							#Integrate only over wavelengths within the relevant range
-							inbounds=(self.wave>waverange[0]-self.waveres) & (self.wave<waverange[1]+self.waveres)
+					#		inbounds=(self.wave>waverange[0]-self.waveres) & (self.wave<waverange[1]+self.waveres)
 
-							derivInterp = interp1d(obsphase,self.spline_derivs[:,inbounds,i],axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
-							derivInterpWave = interp1d(obswave[inbounds],derivInterp(phase[0]),kind='nearest',bounds_error=False,fill_value="extrapolate")
-							derivInterp2 = derivInterpWave(specdata[k]['wavelength'])
+					#		derivInterp = interp1d(obsphase,self.spline_derivs[:,inbounds,i],axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
+					#		derivInterpWave = interp1d(obswave[inbounds],derivInterp(phase[0]),kind='nearest',bounds_error=False,fill_value="extrapolate")
+					#		derivInterp2 = derivInterpWave(specdata[k]['wavelength'])
+							
 							#if computePCDerivs != 2:
-							specresultsdict['dmodelflux_dM0'][iSpecStart:iSpecStart+SpecLen,i] = derivInterp2*intmult
-							specresultsdict['dmodelflux_dM0_nox'][iSpecStart:iSpecStart+SpecLen,i] = derivInterp2*intmultnox
+					#		specresultsdict['dmodelflux_dM0'][iSpecStart:iSpecStart+SpecLen,i] = derivInterp2*intmult
+					#		specresultsdict['dmodelflux_dM0_nox'][iSpecStart:iSpecStart+SpecLen,i] = derivInterp2*intmultnox
 							#Dependence is the same for dM1, except with an extra factor of x1
 							#if computePCDerivs != 1:
-							specresultsdict['dmodelflux_dM1'][iSpecStart:iSpecStart+SpecLen,i] =  derivInterp2*intmult*x1
-														
+					#		specresultsdict['dmodelflux_dM1'][iSpecStart:iSpecStart+SpecLen,i] =  derivInterp2*intmult*x1
+
+					#t1 = time.time()
+					#import pdb; pdb.set_trace()
+					#idx = np.zeros(np.shape(self.spline_derivs),dtype='bool')
+					#obswavelist = np.array([])
+					#obsphaselist = np.array([])
+					#for i in range(len(self.im0)):
+					#	waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+					#	phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+					#	inPhase=(phase>=(phaserange[0]-self.phaseres)*(1+z) ) & (phase<=(phaserange[1]+self.phaseres)*(1+z) )
+					#	if inPhase.any():
+					#		inWave=(self.wave>waverange[0]-self.waveres) & (self.wave<waverange[1]+self.waveres)
+					#		inPhase2=(self.phase>=(phaserange[0]-self.phaseres)*(1+z) ) & (self.phase<=(phaserange[1]+self.phaseres)*(1+z) )
+					#		#import pdb; pdb.set_trace()
+					#		newidx = inPhase2[:,np.newaxis] & inWave[np.newaxis,:]
+					#		idx[:,:,i][newidx] = True
+					#		obswavelist = np.append(obswavelist,list(obswave[inWave])*len(obsphase[inPhase2]))
+					#		obsphaselist = np.append(obsphaselist,list(obsphase[inPhase2])*len(obswave[inWave]))
+							
+					#RegularGridInterpolator((self.phase,self.wave),self.spline_derivs,'nearest',False,None)
+							
+					#import pdb; pdb.set_trace()
+					#derivInterp = interp1d(obsphaselist,self.spline_derivs[idx], #.reshape(len(obsphase),int(len(self.spline_derivs[idx])/len(obsphase))),
+					#					   kind='nearest',bounds_error=False,fill_value="extrapolate") # axis=0
+					#derivInterpWave = interp1d(obswavelist,derivInterp(phase[0]),kind='nearest',bounds_error=False,fill_value="extrapolate")
+					#derivInterp2 = derivInterpWave(specdata[k]['wavelength'])
+					#specresultsdict['dmodelflux_dM0'][iSpecStart:iSpecStart+SpecLen,:] = derivInterp2*intmult[:,np.newaxis]
+					#specresultsdict['dmodelflux_dM0_nox'][iSpecStart:iSpecStart+SpecLen,:] = derivInterp2*intmultnox[:,np.newaxis]
+					#specresultsdict['dmodelflux_dM1'][iSpecStart:iSpecStart+SpecLen,:] =  derivInterp2*intmult[:,np.newaxis]*x1
+					#t2 = time.time()
+					#derivInterp = RectBivariateSpline(obsphase,obswave,self.spline_derivs,kx=1,ky=1)
+					#derivInterpWave = interp1d(obswavelist,derivInterp(phase[0]),kind='nearest',bounds_error=False,fill_value="extrapolate")
+					#derivInterp2 = derivInterpWave(specdata[k]['wavelength'])
+					derivInterp = self.spline_deriv_interp((phase[0],specdata[k]['wavelength']),method="nearest")
+					specresultsdict['dmodelflux_dM0'][iSpecStart:iSpecStart+SpecLen,:] = derivInterp*intmult[:,np.newaxis]
+					specresultsdict['dmodelflux_dM0_nox'][iSpecStart:iSpecStart+SpecLen,:] = derivInterp*intmultnox[:,np.newaxis]
+					specresultsdict['dmodelflux_dM1'][iSpecStart:iSpecStart+SpecLen,:] =  derivInterp*intmult[:,np.newaxis]*x1
+					
+
+					#t3 = time.time()
+					#print('normal took %.1f sec'%(t1-tstart))
+					#print('array-based took %.1f sec'%(t2-t1))
+					#print('2nd array-based took %.1f sec'%(t3-t2))
+					
+
+					#import pdb; pdb.set_trace()
+							
 					if ( (phase>obsphase.max())).any():
 						if phase > obsphase.max():
 							#if computePCDerivs != 2:
@@ -586,32 +635,18 @@ class SALTResids:
 					passbandColorExp=pbspl[flt]*colorexp[idx[flt]]
 					intmult = dwave*self.fluxfactor[survey][flt]*_SCALE_FACTOR/(1+z)*x0
 					intmultnox = dwave*self.fluxfactor[survey][flt]*_SCALE_FACTOR/(1+z)
-					for i in range(len(self.im0)):
-					#def getPCPhotDerivatives(i):
-						#Range of wavelength and phase values affected by changes in knot i
-						waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
-						phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
-						#Check if this filter is inside values affected by changes in knot i
-						if waverange[0]*(1+z) > self.kcordict[survey][flt]['maxlam'] or waverange[1]*(1+z) < self.kcordict[survey][flt]['minlam']:
-							pass
-						#Check which phases are affected by knot i
-						inPhase=(phase>=(phaserange[0]-self.phaseres)*(1+z) ) & (phase<=(phaserange[1]+self.phaseres)*(1+z) )
-						if inPhase.any():
-							#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
-							#Integrate only over wavelengths within the relevant range
-							inbounds=(self.wave[idx[flt]]>waverange[0])	 & (self.wave[idx[flt]]<waverange[1])
-							derivInterp = interp1d(obsphase/(1+z),self.spline_derivs[:,np.where(idx[flt])[0][inbounds],i],
-												   axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
-							
-							photresultsdict['dmodelflux_dM0'][np.where(selectFilter)[0][inPhase],i] =  \
-								np.sum( passbandColorExp[:,inbounds] * derivInterp(phase[inPhase]/(1+z)), axis=1)*\
-								intmult
-							photresultsdict['dmodelflux_dM0_nox'][np.where(selectFilter)[0][inPhase],i] =  \
-								np.sum( passbandColorExp[:,inbounds] * derivInterp(phase[inPhase]/(1+z)), axis=1)*\
-								intmultnox
-							photresultsdict['dmodelflux_dM1'][np.where(selectFilter)[0][inPhase],i] = \
-								photresultsdict['dmodelflux_dM0'][selectFilter,i][inPhase]*x1
-						
+
+					for pdx,p in enumerate(np.where(selectFilter)[0]):
+						derivInterp = self.spline_deriv_interp(
+							(phase[pdx]/(1+z),self.wave[idx[flt]]),
+							method="nearest")
+					
+						summation = np.sum( passbandColorExp[:,:,np.newaxis] * derivInterp, axis=1)
+						photresultsdict['dmodelflux_dM0'][p,:] = summation*intmult
+						photresultsdict['dmodelflux_dM0_nox'][p,:] = summation*intmultnox
+						photresultsdict['dmodelflux_dM1'][p,:] = \
+							photresultsdict['dmodelflux_dM0'][p,:]*x1
+					
 					if ( (phase>obsphase.max())).any():
 						iMax = np.where(phase>obsphase.max())[0]
 						for i in iMax:
@@ -1123,22 +1158,24 @@ class SALTResids:
 		#self.neff=gaussian_filter1d(self.neff,1,0)
 
 		self.neff=np.clip(self.neff,1e-10*self.neff.max(),None)
-		self.plotEffectivePoints([-12.5,0,12.5,40],'neff.png')
-		self.plotEffectivePoints(None,'neff-heatmap.png')
+		# hack!
+		#self.plotEffectivePoints([-12.5,0,12.5,40],'neff.png')
+		#self.plotEffectivePoints(None,'neff-heatmap.png')
 
 	def plotEffectivePoints(self,phases=None,output=None):
 
 		import matplotlib.pyplot as plt
 		if phases is None:
 			plt.imshow(self.neff,cmap='Greys',aspect='auto')
-			xticks=np.linspace(0,self.waveBins.size,8,False)
+			xticks=np.linspace(0,self.waveBins[0].size,8,False)
 			plt.xticks(xticks,['{:.0f}'.format(self.waveBins[int(x)]) for x in xticks])
 			plt.xlabel('$\lambda$ / Angstrom')
-			yticks=np.linspace(0,self.phaseBins.size,8,False)
+			yticks=np.linspace(0,self.phaseBins[0].size,8,False)
 			plt.yticks(yticks,['{:.0f}'.format(self.phaseBins[int(x)]) for x in yticks])
 			plt.ylabel('Phase / days')
 		else:
 			inds=np.searchsorted(self.phaseBinCenters,phases)
+			# hack!
 			for i in inds:
 				plt.plot(self.waveBins[:-1],self.neff[i,:],label='{:.1f} days'.format(self.phaseBinCenters[i]))
 			plt.ylabel('$N_eff$')
@@ -1168,7 +1205,7 @@ class SALTResids:
 			#Derivative of scale with respect to model parameters
 			scaleDeriv= np.mean(fluxes[i][:,:,np.newaxis]*self.regularizationDerivs[0],axis=(0,1))/scale
 			#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
-			normalization=np.sqrt(1/( (self.waveBins.size-1) *(self.phaseBins.size-1)))
+			normalization=np.sqrt(1/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
 			#0 if model is locally separable in phase and wavelength i.e. flux=g(phase)* h(wavelength) for arbitrary functions g and h
 			numerator=(dfluxdphase[i] *dfluxdwave[i] -d2fluxdphasedwave[i] *fluxes[i] )
 			dnumerator=( self.regularizationDerivs[1]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2]* dfluxdphase[i][:,:,np.newaxis] - self.regularizationDerivs[3]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0]* d2fluxdphasedwave[i][:,:,np.newaxis] )			
@@ -1194,7 +1231,7 @@ class SALTResids:
 			#Derivative of normalized gradient with respect to model parameters
 			normedGradDerivs=(self.regularizationDerivs[1] * scale - scaleDeriv[np.newaxis,np.newaxis,:]*dfluxdphase[i][:,:,np.newaxis])/ scale**2
 			#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
-			normalization=np.sqrt(1/((self.waveBins.size-1) *(self.phaseBins.size-1)))
+			normalization=np.sqrt(1/((self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
 			#Minimize model derivative w.r.t wavelength in unconstrained regions
 			resids+= [normalization* ( normedGrad /	np.sqrt( self.neff )).flatten()]
 			if computeJac: jac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
@@ -1218,7 +1255,7 @@ class SALTResids:
 			#Derivative of normalized gradient with respect to model parameters
 			normedGradDerivs=(self.regularizationDerivs[2] * scale - scaleDeriv[np.newaxis,np.newaxis,:]*dfluxdwave[i][:,:,np.newaxis])/ scale**2
 			#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
-			normalization=np.sqrt(1/((self.waveBins.size-1) *(self.phaseBins.size-1)))
+			normalization=np.sqrt(1/((self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
 			#Minimize model derivative w.r.t wavelength in unconstrained regions
 			waveGradResids+= [normalization* ( normedGrad /	np.sqrt( self.neff )).flatten()]
 			if computeJac: jac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
