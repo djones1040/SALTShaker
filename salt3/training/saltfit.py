@@ -26,7 +26,9 @@ from emcee.interruptible_pool import InterruptiblePool
 from sncosmo.utils import integration_grid
 from numpy.linalg import inv,pinv
 from iminuit import Minuit
-import iminuit
+import iminuit,warnings
+
+
 class fitting:
 	def __init__(self,n_components,n_colorpars,
 				 n_phaseknots,n_waveknots,datadict):
@@ -544,7 +546,7 @@ class GaussNewton(saltresids.SALTResids):
 		if self.n_colorpars:
 			colorLaw = SALT2ColorLaw(self.colorwaverange, guess[self.parlist == 'cl'])
 		else: colorLaw = None
-		
+		salterr=self.ErrModel(guess)
 		components = self.SALTModel(guess)
 
 		numResids=self.num_phot+self.num_spec + (self.numPriorResids if doPriors else 0)
@@ -557,7 +559,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 		idx = 0
 		for sn in self.datadict.keys():
-			photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,components,colorLaw,computeDerivatives,computePCDerivs)
+			photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,components,colorLaw,salterr,computeDerivatives,computePCDerivs)
 			
 			idxp = photresidsdict['photresid'].size
 
