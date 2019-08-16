@@ -12,20 +12,10 @@
 # col 11 -> FLUX_REST      :  optional rest-frame flux 
 # col 12 -> SIM_FLUX_REST  :  optional rest-frame SIM flux 
 VARNAMES: CID IFIT
-SN: 5999387  1 
-SN: 5999388  1 
-SN: 5999389  1 
 SN: 5999390  1 
 SN: 5999391  1 
-SN: 5999393  1 
-SN: 5999394  1 
-SN: 5999395  1 
 SN: 5999396  1 
-SN: 5999397  1 
-SN: 5999399  1 
-SN: 5999400  1 
-SN: 5999401  1 
-SN: 5999402  1 
 SN: 5999403  1 
 SN: 5999404  1 
 SN: 5999405  1 
+SN: 5999406  1 

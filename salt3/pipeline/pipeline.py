@@ -129,6 +129,7 @@ class SALT3pipe():
             return
         elif not isinstance(pipepros,list) or len(pipepros) !=2:
             raise ValueError("pipepros must be list of length 2, {} of {} was given".format(type(pipepros),len(pipepros)))       
+        print("Connecting ",pipepros)
         
         pro1 = self._get_pipepro_from_string(pipepros[0])
         pro2 = self._get_pipepro_from_string(pipepros[1])
@@ -139,7 +140,6 @@ class SALT3pipe():
             pro2_in = pro2._get_input_info().loc[0]
         pro2_in['value'] = pro1_out
         setkeys = pd.DataFrame([pro2_in])
-        print("Connecting ",pipepros)
         if not pipepros[1].lower().startswith('cosmofit'):
             pro2.configure(setkeys = setkeys,
                            pro=pro2.pro,
@@ -212,7 +212,10 @@ class PipeProcedure():
 
     def configure(self,pro=None,baseinput=None,setkeys=None,
                   proargs=None,prooptions=None,**kwargs):  
-        self.pro = pro
+        if pro is not None and "$" in pro:
+            self.pro = os.path.expandvars(pro)
+        else:
+            self.pro = pro
         self.baseinput = baseinput
         self.setkeys = setkeys
         self.proargs = proargs
@@ -377,7 +380,7 @@ class Training(PyPipeProcedure):
             outdir = self._get_output_info().value.values[0]
             ##copy necessary files to a model folder in SNDATA_ROOT
             modeldir = 'lcfitting/SALT3.test'
-            self.__transfer_model_files(outdir,modeldir)
+            self.__transfer_model_files(outdir,modeldir,rename=False)
             return modeldir
         else:
             raise ValueError("training can only glue to lcfit")
@@ -400,7 +403,7 @@ class Training(PyPipeProcedure):
         df['value'] = self.keys[section][key]
         return pd.DataFrame([df])
 
-    def __transfer_model_files(self,outdir,modeldir,rename=True):
+    def __transfer_model_files(self,outdir,modeldir,write_info=True,rename=True):
         modelfiles = glob.glob('{}/*.dat'.format(outdir))
         if not modelfiles:
             raise ValueError("[glueto lcfitting] File does not exists. Run training first")
@@ -410,14 +413,74 @@ class Training(PyPipeProcedure):
             raise RuntimeError(shellrun.stderr)
         else:
             print("salt3 model files copied to {}".format(modeldir))
+        
+        if write_info:
+            fcolor = os.path.join(modeldir,'salt3_color_correction.dat')
+            pardict = self.__read_color_law(fcolor)
+            finfo = os.path.join(modeldir,'SALT2.INFO')
+            if not os.path.exists(finfo):
+                subprocess.run(['touch',finfo])
+            self.__modify_info_file(finfo,pardict)
+                
         if rename:
             files_to_rename = glob.glob('{}/*.dat'.format(modeldir))
             try:
-                for f in modelfiles:
+                for f in files_to_rename:
                     shellcommand = "mv {} {}".format(f,f.replace('salt3','salt2'))
                     shellrun = subprocess.run(list(shellcommand.split()))
             except:
                 raise ValueError("Can not rename salt3 files")
+    
+    def __modify_info_file(self,finfo,pardict):
+        f = open(finfo,"r")
+        lines = f.readlines()
+        keys = []
+        for i,line in enumerate(lines):
+            if line.strip().startswith('#') or ':' not in line:
+                continue
+            key,value = line.split(':')[0],line.split(':')[1]
+            keys.append(key)
+            if key == 'RESTLAMBDA_RANGE':
+                lines[i] = '{}: {} {}\n'.format(key, pardict['min_lambda'], pardict['max_lambda'])
+            elif key == 'COLORLAW_VERSION':
+                lines[i] = '{}: {}\n'.format(key, pardict['version'])
+            elif key == 'COLORCOR_PARAMS':
+                lines[i] = '{}: {} {} {} {}\n'.format(key, pardict['min_lambda'], 
+                                                       pardict['max_lambda'],
+                                                       pardict['npar'],
+                                                       ' '.join(['{:.6f}'.format(x) for x in pardict['pvalues']]))
+        outfile = open(finfo,"w")
+        for line in lines:
+            outfile.write(line)                                    
+        if 'RESTLAMBDA_RANGE' not in keys:
+            line =  '{}: {} {}\n'.format('RESTLAMBDA_RANGE', pardict['min_lambda'], pardict['max_lambda'])
+            outfile.write(line)
+        elif 'COLORLAW_VERSION' not in keys:
+            line = '{}: {}\n'.format('COLORLAW_VERSION', pardict['version'])
+            outfile.write(line)
+        elif 'COLORCOR_PARAMS' not in keys:
+            lines[i] = '{}: {} {} {} {}\n'.format('COLORCOR_PARAMS', pardict['min_lambda'], 
+                                       pardict['max_lambda'],
+                                       pardict['npar'],
+                                       ' '.join(['{:.2f}'.format(x) for x in pardict['pvalues']]))
+            outfile.write(line)           
+        
+    def __read_color_law(self,fcolor):
+        f = open(fcolor,"r")
+        lines = f.readlines()
+        pardict = {}
+        pars = []
+        for i,line in enumerate(lines):
+            if i == 0:
+                pardict['npar'] = int(line)
+            elif i in range(1,5):
+                pars.append(float(line))
+            else:
+                pname = line.split('Salt2ExtinctionLaw.')[1].split(' ')[0].strip()
+                pvalue = line.split('Salt2ExtinctionLaw.')[1].split(' ')[1].strip()
+                pardict[pname] = pvalue
+        pardict['pvalues'] = pars
+        return pardict    
 
 
 class LCFitting(PipeProcedure):
