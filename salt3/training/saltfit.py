@@ -565,27 +565,14 @@ class GaussNewton(saltresids.SALTResids):
 
 			residuals[idx:idx+idxp] = photresidsdict['photresid']
 			if computeDerivatives:
-				jacobian[idx:idx+idxp,self.parlist=='cl'] = photresidsdict['dphotresid_dcl']
-				jacobian[idx:idx+idxp,self.parlist=='m0'] = photresidsdict['dphotresid_dM0']
-				jacobian[idx:idx+idxp,self.parlist=='m1'] = photresidsdict['dphotresid_dM1']
-
-				for snparam in ('x0','x1','c'): #tpkoff should go here
-					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = photresidsdict['dphotresid_d{}'.format(snparam)]
+				jacobian[idx:idx+idxp,:] = photresidsdict['photresid_jacobian']
 			idx += idxp
 
 			idxp = specresidsdict['specresid'].size
 
 			residuals[idx:idx+idxp] = specresidsdict['specresid']
 			if computeDerivatives:
-				jacobian[idx:idx+idxp,self.parlist=='cl'] = specresidsdict['dspecresid_dcl']
-				jacobian[idx:idx+idxp,self.parlist=='m0'] = specresidsdict['dspecresid_dM0']
-				jacobian[idx:idx+idxp,self.parlist=='m1'] = specresidsdict['dspecresid_dM1']
-				if self.specrecal : 
-					for k in self.datadict[sn]['specdata']:
-						jacobian[idx:idx+idxp,self.parlist=='specrecal_{}_{}'.format(sn,k)] = specresidsdict['dspecresid_dspecrecal_{}'.format(k)]
-					
-				for snparam in ('x0','x1','c'): #tpkoff should go here
-					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = specresidsdict['dspecresid_d{}'.format(snparam)]
+				jacobian[idx:idx+idxp,:]=specresidsdict['specresid_jacobian']
 			idx += idxp
 
 		# priors

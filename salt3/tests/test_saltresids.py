@@ -68,16 +68,11 @@ class TRAINING_Test(unittest.TestCase):
 		if self.resids.n_colorscatpars:
 			colorScat = True
 		else: colorScat = None
-		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,True,True)
+		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,salterr,True,True)
 		
 		residuals = photresidsdict['photresid']
 		
-		jacobian=np.zeros((residuals.size,self.parlist.size))
-		jacobian[:,self.parlist=='cl'] = photresidsdict['dphotresid_dcl']
-		jacobian[:,self.parlist=='m0'] = photresidsdict['dphotresid_dM0']
-		jacobian[:,self.parlist=='m1'] = photresidsdict['dphotresid_dM1']
-		for snparam in ('x0','x1','c'): #tpkoff should go here
-			jacobian[:,self.parlist == '{}_{}'.format(snparam,sn)] = photresidsdict['dphotresid_d{}'.format(snparam)]
+		jacobian=photresidsdict['photresid_jacobian']
 		def incrementOneParam(i):
 			guess=self.guess.copy()
 			guess[i]+=dx
@@ -85,7 +80,7 @@ class TRAINING_Test(unittest.TestCase):
 			if self.resids.n_colorpars:
 				colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
 			else: colorLaw = None
-			return self.resids.ResidsForSN(guess,sn,components,colorLaw,False)[0]['photresid']
+			return self.resids.ResidsForSN(guess,sn,components,colorLaw,salterr,False)[0]['photresid']
 		dResiddX=np.zeros((residuals.size,self.parlist.size))
 		for i in range(self.guess.size):
 			dResiddX[:,i]=(incrementOneParam(i)-residuals)/dx
@@ -104,7 +99,7 @@ class TRAINING_Test(unittest.TestCase):
 			colorScat = True
 		else: colorScat = None
 		combinations= [(True,True),(True,False),(False,False)]
-		results=[self.resids.ResidsForSN(self.guess,sn,components,colorLaw,*x) for x in combinations]
+		results=[self.resids.ResidsForSN(self.guess,sn,components,colorLaw,salterr,*x) for x in combinations]
 		first=results[0]
 		self.assertTrue([np.allclose(first[0]['photresid'],result[0]['photresid']) for result in results[1:]])
 		self.assertTrue([np.allclose(first[1]['specresid'],result[1]['specresid']) for result in results[1:]])
@@ -123,17 +118,11 @@ class TRAINING_Test(unittest.TestCase):
 		if self.resids.n_colorscatpars:
 			colorScat = True
 		else: colorScat = None
-		specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,True,True)[1]
+		
+		specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,salterr,True,True)[1]
 		
 		residuals = specresidsdict['specresid']
-		jacobian=np.zeros((residuals.size,self.parlist.size))
-		jacobian[:,self.parlist=='cl'] = specresidsdict['dspecresid_dcl']
-		jacobian[:,self.parlist=='m0'] = specresidsdict['dspecresid_dM0']
-		jacobian[:,self.parlist=='m1'] = specresidsdict['dspecresid_dM1']
-		for k in self.resids.datadict[sn]['specdata']:
-			jacobian[:,self.parlist=='specrecal_{}_{}'.format(sn,k)] = specresidsdict['dspecresid_dspecrecal_{}'.format(k)]
-		for snparam in ('x0','x1','c'): #tpkoff should go here
-			jacobian[:,self.parlist == '{}_{}'.format(snparam,sn)] = specresidsdict['dspecresid_d{}'.format(snparam)]
+		jacobian=specresidsdict['specresid_jacobian']
 		def incrementOneParam(i):
 			guess=self.guess.copy()
 			guess[i]+=dx
@@ -141,7 +130,7 @@ class TRAINING_Test(unittest.TestCase):
 			if self.resids.n_colorpars:
 				colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
 			else: colorLaw = None
-			return self.resids.ResidsForSN(guess,sn,components,colorLaw,False)[1]['specresid']
+			return self.resids.ResidsForSN(guess,sn,components,colorLaw,salterr,False)[1]['specresid']
 		dResiddX=np.zeros((residuals.size,self.parlist.size))
 		for i in range(self.guess.size):
 			dResiddX[:,i]=(incrementOneParam(i)-residuals)/dx

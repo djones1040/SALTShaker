@@ -1,30 +1,34 @@
-from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
-from scipy.integrate import trapz
 from salt3.util.synphot import synphot
-from sncosmo.salt2utils import SALT2ColorLaw
-from itertools import starmap
 from salt3.training import init_hsiao
+
 from sncosmo.models import StretchSource
+from sncosmo.salt2utils import SALT2ColorLaw
+from sncosmo.constants import HC_ERG_AA, MODEL_BANDFLUX_SPACING
+from sncosmo.utils import integration_grid
+
+import scipy.stats as ss
 from scipy.optimize import minimize, least_squares
 from scipy.stats import norm
 from scipy.ndimage import gaussian_filter1d
 from scipy.special import factorial
-from astropy.cosmology import Planck15 as cosmo
-from sncosmo.constants import HC_ERG_AA, MODEL_BANDFLUX_SPACING
-from multiprocessing import Pool, get_context
-from numpy.random import standard_normal
+from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
+from scipy.integrate import trapz
 from scipy.linalg import cholesky
-from sncosmo.utils import integration_grid
+
+import numpy as np
+from numpy.random import standard_normal
 from numpy.linalg import inv,pinv
+
+from astropy.cosmology import Planck15 as cosmo
+from multiprocessing import Pool, get_context
 from inspect import signature
 from functools import partial
+from itertools import starmap
 
 import time
-import numpy as np
 import pylab as plt
 import extinction
 import copy
-import scipy.stats as ss
 import warnings
 
 _SCALE_FACTOR = 1e-12
@@ -335,16 +339,15 @@ class SALTResids:
 				self.__photFixedUncertainty__[sn]=uncertainty
 		
 		photresidsdict={'photresid': (photmodeldict['modelflux']-self.datadict[sn]['photdata']['fluxcal'])/uncertainty}
-		for key in photmodeldict: 
-			if 'dmodelflux' in key:
-				dresid=photmodeldict[key]/uncertainty[:,np.newaxis]
-				photresidsdict[key.replace('dmodelflux','dphotresid')]= dresid
 		
 		photresidsdict['lognorm']=np.log(1/(np.sqrt(2*np.pi)*uncertainty)).sum()
 		if computeDerivatives:
-			dUncertaintydModelerr= photmodeldict['dmodeluncertainty_dmodelerr']*(photmodeldict['modeluncertainty'] *(photmodeldict['modelflux'])**2 / uncertainty)[:,np.newaxis] 
-			photresidsdict['dspecresid_dmodelerr']= - dUncertaintydModelerr*(photresidsdict['photresid'] /uncertainty)[:,np.newaxis]
-			photresidsdict['dlognorm_dmodelerr']= - (dUncertaintydModelerr/uncertainty[:,np.newaxis]).sum()
+			photresidsdict['photresid_jacobian']=photmodeldict['modelflux_jacobian']/(uncertainty[:,np.newaxis])
+			if not fixUncertainty:
+				dUncertaintydModelerr= photmodeldict['dmodeluncertainty_dmodelerr']*(photmodeldict['modeluncertainty'] *(photmodeldict['modelflux'])**2 / uncertainty)[:,np.newaxis] 
+				#photresidsdict['photresid_jacobian'][:,self.imodelerr]
+				photresidsdict['dphotresid_dmodelerr']= - dUncertaintydModelerr*(photresidsdict['photresid'] /uncertainty)[:,np.newaxis]
+				photresidsdict['dlognorm_dmodelerr']= - (dUncertaintydModelerr/uncertainty[:,np.newaxis]).sum()
 
 		#Suppress the effect of the spectra by multiplying chi^2 by number of photometric points over number of spectral points
 		spectralSuppression=np.sqrt(self.num_phot/self.num_spec)
@@ -356,10 +359,10 @@ class SALTResids:
 			except KeyError: 
 				self.__specFixedUncertainty__[sn]=uncertainty
 				
-		specresidsdict={key.replace('dmodelflux','dspecresid'):specmodeldict[key]/(uncertainty[:,np.newaxis]) for key in specmodeldict if 'dmodelflux' in key}
-		specresidsdict['specresid']=(specmodeldict['modelflux']-specmodeldict['dataflux'])/uncertainty		
+		specresidsdict={'specresid':(specmodeldict['modelflux']-specmodeldict['dataflux'])/uncertainty}	
 		specresidsdict['lognorm']=np.log(1/(np.sqrt(2*np.pi)*uncertainty)).sum()
 		if computeDerivatives:
+			specresidsdict['specresid_jacobian']=specmodeldict['modelflux_jacobian']/(uncertainty[:,np.newaxis]) 
 			dUncertaintydModelerr= specmodeldict['dmodeluncertainty_dmodelerr']*(specmodeldict['modeluncertainty'] *(specmodeldict['modelflux']*spectralSuppression)**2 / uncertainty)[:,np.newaxis] 
 			specresidsdict['dspecresid_dmodelerr']= - dUncertaintydModelerr *(specresidsdict['specresid'] /uncertainty)[:,np.newaxis]
 			specresidsdict['dlognorm_dmodelerr']= - (dUncertaintydModelerr/uncertainty[:,np.newaxis]).sum()
@@ -424,18 +427,10 @@ class SALTResids:
 		specresultsdict['fluxuncertainty'] =  np.zeros(nspecdata)
 		specresultsdict['modeluncertainty'] =  np.zeros(nspecdata)
 		if computeDerivatives:
-			specresultsdict['dmodelflux_dx0'] = np.zeros((nspecdata,1))
-			specresultsdict['dmodelflux_dx1'] = np.zeros((nspecdata,1))
-			specresultsdict['dmodelflux_dc']  = np.zeros((nspecdata,1))
-			specresultsdict['dmodelflux_dM0'] = np.zeros([nspecdata,len(self.im0)])
-			specresultsdict['dmodelflux_dM0_nox'] = np.zeros([nspecdata,len(self.im0)])
-			specresultsdict['dmodelflux_dM1'] = np.zeros([nspecdata,len(self.im1)])
-			specresultsdict['dmodelflux_dcl'] = np.zeros([nspecdata,self.n_colorpars])
+			specresultsdict['modelflux_jacobian'] = np.zeros((nspecdata,self.npar))
 			specresultsdict['dmodeluncertainty_dmodelerr']=np.zeros([nspecdata,self.imodelerr.size])
-			if self.specrecal : 
-				for k in specdata.keys(): 
-					specresultsdict['dmodelflux_dspecrecal_{}'.format(k)]= np.zeros([nspecdata,(self.parlist=='specrecal_{}_{}'.format(sn,k)).sum()])
-
+			if computePCDerivs:
+				self.__dict__['dmodelflux_dM0_spec_%s'%sn]=np.zeros([nspecdata,self.im0.size])
 		iSpecStart = 0
 		for k in specdata.keys():
 			SpecLen = specdata[k]['flux'].size
@@ -487,12 +482,11 @@ class SALTResids:
 			
 			# derivatives....
 			if computeDerivatives:
-				specresultsdict['dmodelflux_dc'][iSpecStart:iSpecStart+SpecLen,0] = modulatedFlux *np.log(10)*colorlawinterp
-				specresultsdict['dmodelflux_dx0'][iSpecStart:iSpecStart+SpecLen,0] = (M0interp + x1*M1interp)
-				specresultsdict['dmodelflux_dx1'][iSpecStart:iSpecStart+SpecLen,0] = x0*M1interp
+				specresultsdict['modelflux_jacobian'][iSpecStart:iSpecStart+SpecLen,np.where(self.parlist == 'c_{}'.format(sn))[0][0]] = modulatedFlux *np.log(10)*colorlawinterp
+				specresultsdict['modelflux_jacobian'][iSpecStart:iSpecStart+SpecLen,np.where(self.parlist == 'x0_{}'.format(sn))[0][0]] = (M0interp + x1*M1interp)
+				specresultsdict['modelflux_jacobian'][iSpecStart:iSpecStart+SpecLen,np.where(self.parlist == 'x1_{}'.format(sn))[0][0]] = x0*M1interp
 				if self.specrecal : 
-					specresultsdict['dmodelflux_dspecrecal_{}'.format(k)][iSpecStart:iSpecStart+SpecLen,:] = \
-					modulatedFlux[:,np.newaxis] * \
+					specresultsdict['modelflux_jacobian'][iSpecStart:iSpecStart+SpecLen,self.parlist == 'specrecal_{}_{}'.format(sn,k)]  = modulatedFlux[:,np.newaxis] * \
 					(((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal)[:,np.newaxis] ** (coeffs.size-1-np.arange(coeffs.size))[np.newaxis,:]) \
 					/ factorial(np.arange(coeffs.size))[np.newaxis,:]
 
@@ -500,26 +494,29 @@ class SALTResids:
 				# color law
 				for i in range(self.n_colorpars):
 					dcolorlaw_dcli = SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(specdata[k]['wavelength']/(1+z))-SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(specdata[k]['wavelength']/(1+z))
-					specresultsdict['dmodelflux_dcl'][iSpecStart:iSpecStart+SpecLen,i] = modulatedFlux*-0.4*np.log(10)*c*dcolorlaw_dcli
-					
+					specresultsdict['modelflux_jacobian'][iSpecStart:iSpecStart+SpecLen,self.iCL[i]] = modulatedFlux*-0.4*np.log(10)*c*dcolorlaw_dcli
+				
+				specresultsdict['dmodeluncertainty_dmodelerr'][iSpecStart:iSpecStart+SpecLen,:] = self.errorspline_deriv_interp((phase[0]/(1+z),specdata[k]['wavelength']/(1+z)),method=self.interpMethod)
+
 				# M0, M1
 				if computePCDerivs:
 					intmult = _SCALE_FACTOR/(1+z)*x0*recalexp*colorexpinterp
 					intmultnox = _SCALE_FACTOR/(1+z)*recalexp*colorexpinterp
 
-					derivInterp = self.spline_deriv_interp((phase[0]/(1+z),specdata[k]['wavelength']/(1+z)),method="nearest")
-					specresultsdict['dmodelflux_dM0'][iSpecStart:iSpecStart+SpecLen,:] = derivInterp*intmult[:,np.newaxis]
-					specresultsdict['dmodelflux_dM0_nox'][iSpecStart:iSpecStart+SpecLen,:] = derivInterp*intmultnox[:,np.newaxis]
-					specresultsdict['dmodelflux_dM1'][iSpecStart:iSpecStart+SpecLen,:] =  derivInterp*intmult[:,np.newaxis]*x1
+					derivInterp = self.spline_deriv_interp((phase[0]/(1+z),specdata[k]['wavelength']/(1+z)),method=self.interpMethod)
+					specresultsdict['modelflux_jacobian'][iSpecStart:iSpecStart+SpecLen,self.im0]  = derivInterp*intmult[:,np.newaxis]
+					specresultsdict['modelflux_jacobian'][iSpecStart:iSpecStart+SpecLen,self.im1] =  derivInterp*intmult[:,np.newaxis]*x1
+					self.__dict__['dmodelflux_dM0_spec_%s'%sn][iSpecStart:iSpecStart+SpecLen,:] = derivInterp*intmultnox[:,np.newaxis]
 					
 							
 					if ( (phase>obsphase.max())).any():
 						if phase > obsphase.max():
 							#if computePCDerivs != 2:
-							specresultsdict['dmodelflux_dM0'][iSpecStart:iSpecStart+SpecLen,:] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
-							specresultsdict['dmodelflux_dM0_nox'][iSpecStart:iSpecStart+SpecLen,:] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
+							specresultsdict['modelflux_jacobian'][iSpecStart:iSpecStart+SpecLen,self.im0] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
+							specresultsdict['modelflux_jacobian'][iSpecStart:iSpecStart+SpecLen,self.im1] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
+
+							self.__dict__['dmodelflux_dM0_spec_%s'%sn][iSpecStart:iSpecStart+SpecLen,:] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
 							#if computePCDerivs != 1:
-							specresultsdict['dmodelflux_dM1'][iSpecStart:iSpecStart+SpecLen,:] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
 
 			iSpecStart += SpecLen
 
@@ -529,21 +526,14 @@ class SALTResids:
 		photresultsdict['fluxuncertainty'] =  np.zeros(len(photdata['filt']))
 		photresultsdict['modeluncertainty'] =  np.zeros(len(photdata['filt']))
 		if computeDerivatives:
-			photresultsdict['dmodelflux_dx0'] = np.zeros((photdata['filt'].size,1))
-			photresultsdict['dmodelflux_dx1'] = np.zeros((photdata['filt'].size,1))
-			photresultsdict['dmodelflux_dc']  = np.zeros((photdata['filt'].size,1))
+			photresultsdict['modelflux_jacobian'] = np.zeros((photdata['filt'].size,self.parlist.size))
 			photresultsdict['dmodeluncertainty_dmodelerr']=np.zeros([photdata['filt'].size,self.imodelerr.size])
-			photresultsdict['dmodelflux_dcl'] = np.zeros([photdata['filt'].size,self.n_colorpars])
 			if computePCDerivs:
-				photresultsdict['dmodelflux_dM0'] = np.zeros([photdata['filt'].size,len(self.im0)])#*1e-6 #+ 1e-5
-				photresultsdict['dmodelflux_dM0_nox'] = np.zeros([photdata['filt'].size,len(self.im0)])#*1e-6 #+ 1e-5
-				photresultsdict['dmodelflux_dM1'] = np.zeros([photdata['filt'].size,len(self.im1)])#*1e-6 #+ 1e-5
+				self.__dict__['dmodelflux_dM0_phot_%s'%sn] = np.zeros([photdata['filt'].size,len(self.im0)])#*1e-6 #+ 1e-5
 		for flt in np.unique(photdata['filt']):
-			phase=photdata['tobs']+tpkoff
 			#Select data from the appropriate filter filter
 			selectFilter=(photdata['filt']==flt)
-			
-			filtPhot={key:photdata[key][selectFilter] for key in photdata}
+			phase=photdata['tobs']+tpkoff
 			phase=phase[selectFilter]
 			nphase = len(phase)
 
@@ -566,20 +556,17 @@ class SALTResids:
 
 
 				if ( (phase>obsphase.max())).any():
-					iMax = np.where(phase>obsphase.max())[0]
-					for i in iMax:
-						modulatedM0[i] *= 10**(-0.4*self.extrapolateDecline*(phase[i]-obsphase.max()))
-						modulatedM1[i] *= 10**(-0.4*self.extrapolateDecline*(phase[i]-obsphase.max()))
-						#modulatedM0mod[i] *= 10**(-0.4*self.extrapolateDecline*(phase[i]-obsphase.max()))
-						#modulatedM1mod[i] *= 10**(-0.4*self.extrapolateDecline*(phase[i]-obsphase.max()))
+					decayFactor=10**(-0.4*self.extrapolateDecline*(phase[phase>obsphase.max()]-obsphase.max()))
+					modulatedM0[np.where(phase>obsphase.max())[0]] *= decayFactor
+					modulatedM1[np.where(phase>obsphase.max())[0]] *= decayFactor
 						
 				modelsynM0flux=np.sum(modulatedM0, axis=1)*dwave*self.fluxfactor[survey][flt]
 				modelsynM1flux=np.sum(modulatedM1, axis=1)*dwave*self.fluxfactor[survey][flt]
 				#modelsynM0fluxmod=np.sum(modulatedM0mod, axis=1)*dwave*self.fluxfactor[survey][flt]
 				#modelsynM1fluxmod=np.sum(modulatedM1mod, axis=1)*dwave*self.fluxfactor[survey][flt]
 				
-				photresultsdict['dmodelflux_dx0'][selectFilter,0] = modelsynM0flux+ x1*modelsynM1flux
-				photresultsdict['dmodelflux_dx1'][selectFilter,0] = modelsynM1flux*x0
+				photresultsdict['modelflux_jacobian'][selectFilter,self.parlist == 'x0_{}'.format(sn)] = modelsynM0flux+ x1*modelsynM1flux
+				photresultsdict['modelflux_jacobian'][selectFilter,self.parlist == 'x1_{}'.format(sn)] = modelsynM1flux*x0
 				
 				modulatedFlux= x0*(modulatedM0 +modulatedM1*x1)
 				#modulatedFluxmod= x0*(modulatedM0mod +modulatedM1mod*x1)
@@ -600,14 +587,17 @@ class SALTResids:
 			
 			if computeDerivatives:
 				#d model / dc is total flux (M0 and M1 components (already modulated with passband)) times the color law and a factor of ln(10)
-				photresultsdict['dmodelflux_dc'][selectFilter,0]=np.sum((modulatedFlux)*np.log(10)*colorlaw[np.newaxis,idx[flt]], axis=1)*dwave*self.fluxfactor[survey][flt]
-				
+				photresultsdict['modelflux_jacobian'][selectFilter,self.parlist == 'c_{}'.format(sn)]=np.sum((modulatedFlux)*np.log(10)*colorlaw[np.newaxis,idx[flt]], axis=1)*dwave*self.fluxfactor[survey][flt]
+				for pdx,p in enumerate(np.where(selectFilter)[0]):
+					derivInterp = self.errorspline_deriv_interp(
+								(phase[pdx]/(1+z),self.wave[idx[flt]]),method=self.interpMethod)
+					photresultsdict['dmodeluncertainty_dmodelerr'][p,:]= np.sum((pbspl[flt][:,:,np.newaxis]/pbspl[flt].sum()) * derivInterp,axis=1)
 				for i in range(self.n_colorpars):
 					#Color law is linear wrt to the color law parameters; therefore derivative of the color law
 					# with respect to color law parameter i is the color law with all other values zeroed minus the color law with all values zeroed
 					dcolorlaw_dcli = SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(self.wave[idx[flt]])-SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(self.wave[idx[flt]])
 					#Multiply M0 and M1 components (already modulated with passband) by c* d colorlaw / d cl_i, with associated normalizations
-					photresultsdict['dmodelflux_dcl'][selectFilter,i] = np.sum((modulatedFlux)*-0.4*np.log(10)*c*dcolorlaw_dcli[np.newaxis,:], axis=1)*dwave*self.fluxfactor[survey][flt]
+					photresultsdict['modelflux_jacobian'][selectFilter,self.iCL[i]] = np.sum((modulatedFlux)*-0.4*np.log(10)*c*dcolorlaw_dcli[np.newaxis,:], axis=1)*dwave*self.fluxfactor[survey][flt]
 					
 				if computePCDerivs:
 					passbandColorExp=pbspl[flt]*colorexp[idx[flt]]
@@ -617,35 +607,23 @@ class SALTResids:
 					for pdx,p in enumerate(np.where(selectFilter)[0]):
 						derivInterp = self.spline_deriv_interp(
 							(phase[pdx]/(1+z),self.wave[idx[flt]]),
-							method="nearest")
+							method=self.interpMethod)
 					
 						summation = np.sum( passbandColorExp[:,:,np.newaxis] * derivInterp, axis=1)
-						photresultsdict['dmodelflux_dM0'][p,:] = summation*intmult
-						photresultsdict['dmodelflux_dM0_nox'][p,:] = summation*intmultnox
-						photresultsdict['dmodelflux_dM1'][p,:] = \
-							photresultsdict['dmodelflux_dM0'][p,:]*x1
+						photresultsdict['modelflux_jacobian'][p,self.im0]= summation*intmult
+						photresultsdict['modelflux_jacobian'][p,self.im1] = summation*intmult*x1
+						self.__dict__['dmodelflux_dM0_phot_%s'%sn][p,:] = summation*intmultnox
 					
-					if ( (phase>obsphase.max())).any():
-						iMax = np.where(phase>obsphase.max())[0]
-						for i in iMax:
-							#if computePCDerivs != 1:
-							photresultsdict['dmodelflux_dM0'][np.where(selectFilter)[0][i],:] *= \
-							   10**(-0.4*self.extrapolateDecline*(phase[i]-obsphase.max()))
-							photresultsdict['dmodelflux_dM0_nox'][np.where(selectFilter)[0][i],:] *= \
-							   10**(-0.4*self.extrapolateDecline*(phase[i]-obsphase.max()))
-							#if computePCDerivs != 2:
-							photresultsdict['dmodelflux_dM1'][np.where(selectFilter)[0][i],:] *= \
-								10**(-0.4*self.extrapolateDecline*(phase[i]-obsphase.max()))
+		if computeDerivatives and ( (phase>obsphase.max())).any():
+			decayFactor= 10**(-0.4*self.extrapolateDecline*(phase[i]-obsphase.max()))
+			photresultsdict['modelflux_jacobian'][(phase>obsphase.max())[:,np.newaxis] & ((self.parlist=='m0') | (self.parlist=='m1'))[np.newaxis,:]] *= decayFactor
+			photresultsdict['dmodelflux_dM0_nox'][phase>obsphase.max(),:] *= decayFactor
 
-		if computePCDerivs:
-			self.__dict__['dmodelflux_dM0_phot_%s'%sn] = photresultsdict['dmodelflux_dM0_nox']
-			self.__dict__['dmodelflux_dM0_spec_%s'%sn] = specresultsdict['dmodelflux_dM0_nox']
-				
-		elif computeDerivatives:
-			photresultsdict['dmodelflux_dM0'] = self.__dict__['dmodelflux_dM0_phot_%s'%sn]*x0
-			photresultsdict['dmodelflux_dM1'] = self.__dict__['dmodelflux_dM0_phot_%s'%sn]*x0*x1
-			specresultsdict['dmodelflux_dM0'] = self.__dict__['dmodelflux_dM0_spec_%s'%sn]*x0
-			specresultsdict['dmodelflux_dM1'] = self.__dict__['dmodelflux_dM0_spec_%s'%sn]*x0*x1
+		if not computePCDerivs and computeDerivatives:
+			photresultsdict['modelflux_jacobian'][:,self.im0] = self.__dict__['dmodelflux_dM0_phot_%s'%sn]*x0
+			photresultsdict['modelflux_jacobian'][:,self.im1]= self.__dict__['dmodelflux_dM0_phot_%s'%sn]*x0*x1
+			specresultsdict['modelflux_jacobian'][:,self.im0] = self.__dict__['dmodelflux_dM0_spec_%s'%sn]*x0
+			specresultsdict['modelflux_jacobian'][:,self.im1] = self.__dict__['dmodelflux_dM0_spec_%s'%sn]*x0*x1
 
 		return photresultsdict,specresultsdict
 	
@@ -1136,7 +1114,7 @@ class SALTResids:
 				basisAffected=(phaseAffected[:,:,np.newaxis] & waveAffected[np.newaxis,np.newaxis,:]).reshape((phase.size,self.im0.size))
 				for pdx,p in enumerate(np.where(selectFilter)[0]):
 					
-					derivInterp = self.spline_deriv_interp((phase[pdx],self.wave[idx[flt]]),method="nearest")[:,basisAffected[pdx]]
+					derivInterp = self.spline_deriv_interp((phase[pdx],self.wave[idx[flt]]),method=self.interpMethod)[:,basisAffected[pdx]]
 					
 					summation = np.sum( pbspl[flt].reshape((pbspl[flt].size,1)) * derivInterp, axis=0)/ np.sum(pbspl[flt])
 					if phase[pdx]>=self.phaseBins[1][-1]: summation*=10**(-0.4*self.extrapolateDecline*((1+z)*(phase[pdx]-self.phaseBins[1][-1])))
