@@ -77,11 +77,11 @@ class SALTResids:
 		self.errmax = np.max(np.where(self.parlist == 'modelerr')[0])
 		self.ix1 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x1')])
 		self.ix0 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x0')])
-		self.ic	 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('c')])
+		self.ic	 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('c_')])
 		self.im0 = np.where(self.parlist == 'm0')[0]
 		self.im1 = np.where(self.parlist == 'm1')[0]
 		self.iCL = np.where(self.parlist == 'cl')[0]
-		self.ispcrcl = np.where([i for i, si in enumerate(self.parlist) if si.startswith('specrecal')])[0]
+		self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specrecal')])
 		
 		# set some phase/wavelength arrays
 		self.splinecolorwave = np.linspace(self.colorwaverange[0],self.colorwaverange[1],self.n_colorpars)
