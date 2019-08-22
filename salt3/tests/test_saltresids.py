@@ -83,6 +83,7 @@ class TRAINING_Test(unittest.TestCase):
 		dResiddX=np.zeros((residuals.size,self.parlist.size))
 		for i in range(self.guess.size):
 			dResiddX[:,i]=(incrementOneParam(i)-residuals)/dx
+
 		if not np.allclose(dResiddX,jacobian,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol))[1]]))
 		self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
 
