@@ -561,18 +561,18 @@ class GaussNewton(saltresids.SALTResids):
 		for sn in self.datadict.keys():
 			photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,components,colorLaw,salterr,computeDerivatives,computePCDerivs)
 			
-			idxp = photresidsdict['photresid'].size
+			idxp = photresidsdict['resid'].size
 
-			residuals[idx:idx+idxp] = photresidsdict['photresid']
+			residuals[idx:idx+idxp] = photresidsdict['resid']
 			if computeDerivatives:
-				jacobian[idx:idx+idxp,:] = photresidsdict['photresid_jacobian']
+				jacobian[idx:idx+idxp,:] = photresidsdict['resid_jacobian']
 			idx += idxp
 
-			idxp = specresidsdict['specresid'].size
+			idxp = specresidsdict['resid'].size
 
-			residuals[idx:idx+idxp] = specresidsdict['specresid']
+			residuals[idx:idx+idxp] = specresidsdict['resid']
 			if computeDerivatives:
-				jacobian[idx:idx+idxp,:]=specresidsdict['specresid_jacobian']
+				jacobian[idx:idx+idxp,:]=specresidsdict['resid_jacobian']
 			idx += idxp
 
 		# priors

@@ -328,46 +328,43 @@ class SALTResids:
 	def ResidsForSN(self,x,sn,components,colorLaw,saltErr,computeDerivatives,computePCDerivs=False,fixUncertainty=True):
 		
 		photmodeldict,specmodeldict=self.modelvalsforSN(x,sn,components,colorLaw,saltErr,computeDerivatives,computePCDerivs)
-		uncertainty=np.hypot(photmodeldict['fluxuncertainty'],photmodeldict['modeluncertainty']*photmodeldict['modelflux'])
 		
-		if not fixUncertainty: 
-			self.__photFixedUncertainty__[sn]=uncertainty
-		else: 
-			try:
-				uncertainty=self.__photFixedUncertainty__[sn]
-			except KeyError:
-				self.__photFixedUncertainty__[sn]=uncertainty
-		
-		photresidsdict={'photresid': (photmodeldict['modelflux']-self.datadict[sn]['photdata']['fluxcal'])/uncertainty}
-		
-		photresidsdict['lognorm']=np.log(1/(np.sqrt(2*np.pi)*uncertainty)).sum()
-		if computeDerivatives:
-			photresidsdict['photresid_jacobian']=photmodeldict['modelflux_jacobian']/(uncertainty[:,np.newaxis])
-			if not fixUncertainty:
-				dUncertaintydModelerr= photmodeldict['dmodeluncertainty_dmodelerr']*(photmodeldict['modeluncertainty'] *(photmodeldict['modelflux'])**2 / uncertainty)[:,np.newaxis] 
-				#photresidsdict['photresid_jacobian'][:,self.imodelerr]
-				photresidsdict['dphotresid_dmodelerr']= - dUncertaintydModelerr*(photresidsdict['photresid'] /uncertainty)[:,np.newaxis]
-				photresidsdict['dlognorm_dmodelerr']= - (dUncertaintydModelerr/uncertainty[:,np.newaxis]).sum()
-
-		#Suppress the effect of the spectra by multiplying chi^2 by number of photometric points over number of spectral points
-		spectralSuppression=np.sqrt(self.num_phot/self.num_spec)
-		uncertainty=np.hypot(specmodeldict['fluxuncertainty'],specmodeldict['modeluncertainty']*specmodeldict['modelflux'])*spectralSuppression
-		if not fixUncertainty: self.__specFixedUncertainty__[sn]=uncertainty
-		else: 
-			try:
-				uncertainty=self.__specFixedUncertainty__[sn]
-			except KeyError: 
-				self.__specFixedUncertainty__[sn]=uncertainty
+		residslist=[]
+		for modeldict,name in [(photmodeldict,'phot'),(specmodeldict,'spec')]:
+			uncertainty=np.hypot(modeldict['fluxuncertainty'],modeldict['modeluncertainty']*modeldict['modelflux'])
+			#Suppress the effect of the spectra by multiplying chi^2 by number of photometric points over number of spectral points
+			if name =='spec': spectralSuppression=np.sqrt(self.num_phot/self.num_spec)
+			else: spectralSuppression=1
+			#If fixing the error, retrieve from storage
+			key='__{}_{}_fixed_uncertainty__'.format(name,sn)
+			if fixUncertainty: 
+				try:
+					uncertainty=self.__dict__[key]
+				except KeyError:
+					self.__dict__[key]=uncertainty
+			else: 
+				#Otherwise, store current uncertainties and calculate log-normalization term
+				self.__dict__[key]=uncertainty
 				
-		specresidsdict={'specresid':(specmodeldict['modelflux']-specmodeldict['dataflux'])/uncertainty}	
-		specresidsdict['lognorm']=np.log(1/(np.sqrt(2*np.pi)*uncertainty)).sum()
-		if computeDerivatives:
-			specresidsdict['specresid_jacobian']=specmodeldict['modelflux_jacobian']/(uncertainty[:,np.newaxis]) 
-			dUncertaintydModelerr= specmodeldict['dmodeluncertainty_dmodelerr']*(specmodeldict['modeluncertainty'] *(specmodeldict['modelflux']*spectralSuppression)**2 / uncertainty)[:,np.newaxis] 
-			specresidsdict['dspecresid_dmodelerr']= - dUncertaintydModelerr *(specresidsdict['specresid'] /uncertainty)[:,np.newaxis]
-			specresidsdict['dlognorm_dmodelerr']= - (dUncertaintydModelerr/uncertainty[:,np.newaxis]).sum()
-		return photresidsdict,specresidsdict
-	
+			
+			residsdict={'resid': spectralSuppression * (modeldict['modelflux']-modeldict['dataflux'])/uncertainty}
+			if not fixUncertainty:
+				residsdict['lognorm']=np.log(1/(np.sqrt(2*np.pi)*uncertainty)).sum()
+			
+			if computeDerivatives:
+				import pdb;pdb.set_trace()
+				residsdict['resid_jacobian']=spectralSuppression * modeldict['modelflux_jacobian']/(uncertainty[:,np.newaxis])
+				if not fixUncertainty:
+					dUncertaintydModelerr=  modeldict['dmodeluncertainty_dmodelerr'] *(modeldict['modeluncertainty'] * (modeldict['modelflux']**2) / uncertainty) [:,np.newaxis] 
+					residsdict['lognorm_grad']= - (modeldict['modelflux_jacobian'] * ( modeldict['modeluncertainty']**2 * modeldict['modelflux'] / (uncertainty**2))[:,np.newaxis] ).sum(axis=0)
+					residsdict['lognorm_grad'][self.imodelerr]= - (dUncertaintydModelerr/uncertainty[:,np.newaxis]).sum(axis=0)
+					
+					residsdict['resid_jacobian']*= ((modeldict['fluxuncertainty'] / uncertainty)**2)[:,np.newaxis]
+					residsdict['resid_jacobian'][:,self.imodelerr]=  - dUncertaintydModelerr*(residsdict['resid'] /uncertainty)[:,np.newaxis]
+
+			residslist+=[residsdict]
+		return tuple(residslist)
+			
 	def specValsForSN(self,x,sn,componentsModInterp,colorlaw,colorexp,interr1d,computeDerivatives,computePCDerivs):
 		z = self.datadict[sn]['zHelio']
 		survey = self.datadict[sn]['survey']
@@ -513,6 +510,7 @@ class SALTResids:
 
 		photresultsdict={}
 		photresultsdict['modelflux'] = np.zeros(len(photdata['filt']))
+		photresultsdict['dataflux'] = photdata['fluxcal']
 		photresultsdict['fluxuncertainty'] =  np.zeros(len(photdata['filt']))
 		photresultsdict['modeluncertainty'] =  np.zeros(len(photdata['filt']))
 		if computeDerivatives:
@@ -628,15 +626,7 @@ class SALTResids:
 		# model pars, initialization
 		M0,M1 = copy.deepcopy(components)
 		z = self.datadict[sn]['zHelio']
-		survey = self.datadict[sn]['survey']
-		filtwave = self.kcordict[survey]['filtwave']
-		obswave = self.datadict[sn]['obswave'] #self.wave*(1+z)
 		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
-		photdata = self.datadict[sn]['photdata']
-		specdata = self.datadict[sn]['specdata']
-		pbspl = self.datadict[sn]['pbspl']
-		dwave = self.datadict[sn]['dwave']
-		idx = self.datadict[sn]['idx']
 		x0,x1,c,tpkoff = x[self.parlist == 'x0_%s'%sn],x[self.parlist == 'x1_%s'%sn],\
 						 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
 
