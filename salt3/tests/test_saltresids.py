@@ -6,7 +6,11 @@ import pickle, argparse, configparser,warnings
 from salt3.util import snana,readutils
 from sncosmo.salt2utils import SALT2ColorLaw
 
+
+
 class TRAINING_Test(unittest.TestCase):
+	
+	
 	
 	def setUp(self):
 		ts=TrainSALT()
@@ -69,9 +73,9 @@ class TRAINING_Test(unittest.TestCase):
 		else: colorScat = None
 		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,salterr,True,True)
 		
-		residuals = photresidsdict['photresid']
+		residuals = photresidsdict['resid']
 		
-		jacobian=photresidsdict['photresid_jacobian']
+		jacobian=photresidsdict['resid_jacobian']
 		def incrementOneParam(i):
 			guess=self.guess.copy()
 			guess[i]+=dx
@@ -79,7 +83,7 @@ class TRAINING_Test(unittest.TestCase):
 			if self.resids.n_colorpars:
 				colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
 			else: colorLaw = None
-			return self.resids.ResidsForSN(guess,sn,components,colorLaw,salterr,False)[0]['photresid']
+			return self.resids.ResidsForSN(guess,sn,components,colorLaw,salterr,False)[0]['resid']
 		dResiddX=np.zeros((residuals.size,self.parlist.size))
 		for i in range(self.guess.size):
 			dResiddX[:,i]=(incrementOneParam(i)-residuals)/dx
@@ -87,6 +91,82 @@ class TRAINING_Test(unittest.TestCase):
 		if not np.allclose(dResiddX,jacobian,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol))[1]]))
 		self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
 
+	def test_photresid_jacobian_vary_uncertainty(self):
+		"""Check that lognorm gradient and residuals' jacobian are correctly calculated with fixUncertainty=False"""
+		print("Checking spectral derivatives")
+		dx=1e-8
+		rtol=1e-2
+		atol=1e-2
+		sn=self.resids.datadict.keys().__iter__().__next__()
+		components = self.resids.SALTModel(self.resids.guess)
+		salterr = self.resids.ErrModel(self.resids.guess)
+		colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.resids.guess[self.resids.parlist == 'cl'])
+		
+		residsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,salterr,True,True,fixUncertainty=False)[0]
+		grad=residsdict['lognorm_grad']
+		jacobian=residsdict['resid_jacobian']
+
+		residsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,salterr,False,False,fixUncertainty=False)[0]
+		residuals = residsdict['resid']
+		lognorm= residsdict['lognorm']
+
+		def incrementOneParam(i):
+			guess=self.guess.copy()
+			guess[i]+=dx
+			components=self.resids.SALTModel(guess)
+			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
+			salterr=self.resids.ErrModel(guess)
+			return self.resids.ResidsForSN(guess,sn,components,colorLaw,salterr,False,fixUncertainty=False)[0]
+		dResiddX=np.zeros((residuals.size,self.parlist.size))
+		dLognormdX=np.zeros(self.parlist.size)
+		for i in range(self.guess.size):
+			residsdict=incrementOneParam(i)
+			dResiddX[:,i]=(residsdict['resid']-residuals)/dx
+			dLognormdX[i]=(residsdict['lognorm']-lognorm)/dx
+		if not np.allclose(dResiddX,jacobian,rtol): print('Problems with residual derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol,atol))[1]]))
+		if not np.allclose(dLognormdX,grad,rtol): print('Problems with lognorm derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dLognormdX,grad,rtol,atol))[0]]))
+		self.assertTrue(np.allclose(dResiddX,jacobian,rtol,atol))
+		self.assertTrue(np.allclose(dLognormdX,grad,rtol,atol))
+
+
+	def test_specresid_jacobian_vary_uncertainty(self):
+		"""Check that lognorm gradient and residuals' jacobian are correctly calculated with fixUncertainty=False"""
+		print("Checking spectral derivatives")
+		dx=1e-8
+		rtol=1e-2
+		atol=1e-2
+		sn=self.resids.datadict.keys().__iter__().__next__()
+		components = self.resids.SALTModel(self.resids.guess)
+		salterr = self.resids.ErrModel(self.resids.guess)
+		colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.resids.guess[self.resids.parlist == 'cl'])
+		
+		specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,salterr,True,True,fixUncertainty=False)[1]
+		grad=specresidsdict['lognorm_grad']
+		jacobian=specresidsdict['resid_jacobian']
+
+		specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,salterr,False,False,fixUncertainty=False)[1]
+		residuals = specresidsdict['resid']
+		lognorm= specresidsdict['lognorm']
+
+		def incrementOneParam(i):
+			guess=self.guess.copy()
+			guess[i]+=dx
+			components=self.resids.SALTModel(guess)
+			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
+			salterr=self.resids.ErrModel(guess)
+			return self.resids.ResidsForSN(guess,sn,components,colorLaw,salterr,False,fixUncertainty=False)[1]
+		dResiddX=np.zeros((residuals.size,self.parlist.size))
+		dLognormdX=np.zeros(self.parlist.size)
+		for i in range(self.guess.size):
+			residsdict=incrementOneParam(i)
+			dResiddX[:,i]=(residsdict['resid']-residuals)/dx
+			dLognormdX[i]=(residsdict['lognorm']-lognorm)/dx
+		if not np.allclose(dResiddX,jacobian,rtol,atol): print('Problems with residual derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol,atol))[1]]))
+		if not np.allclose(dLognormdX,grad,rtol,atol): print('Problems with lognorm derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dLognormdX,grad,rtol,atol))[0]]))
+		self.assertTrue(np.allclose(dResiddX,jacobian,rtol,atol))
+		self.assertTrue(np.allclose(dLognormdX,grad,rtol,atol))
+
+	
 	def test_computeDerivatives(self):
 		"""Checks that the computeDerivatives parameter of the ResidsForSN function is not affecting the residuals"""
 		sn=self.resids.datadict.keys().__iter__().__next__()
@@ -101,8 +181,8 @@ class TRAINING_Test(unittest.TestCase):
 		combinations= [(True,True),(True,False),(False,False)]
 		results=[self.resids.ResidsForSN(self.guess,sn,components,colorLaw,salterr,*x) for x in combinations]
 		first=results[0]
-		self.assertTrue([np.allclose(first[0]['photresid'],result[0]['photresid']) for result in results[1:]])
-		self.assertTrue([np.allclose(first[1]['specresid'],result[1]['specresid']) for result in results[1:]])
+		self.assertTrue([np.allclose(first[0]['resid'],result[0]['resid']) for result in results[1:]])
+		self.assertTrue([np.allclose(first[1]['resid'],result[1]['resid']) for result in results[1:]])
 
 	def test_specresid_jacobian(self):
 		"""Checks that the the jacobian of the spectroscopic residuals is being correctly calculated to within 1%"""
@@ -121,8 +201,8 @@ class TRAINING_Test(unittest.TestCase):
 		
 		specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,salterr,True,True)[1]
 		
-		residuals = specresidsdict['specresid']
-		jacobian=specresidsdict['specresid_jacobian']
+		residuals = specresidsdict['resid']
+		jacobian=specresidsdict['resid_jacobian']
 		def incrementOneParam(i):
 			guess=self.guess.copy()
 			guess[i]+=dx
@@ -130,7 +210,7 @@ class TRAINING_Test(unittest.TestCase):
 			if self.resids.n_colorpars:
 				colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
 			else: colorLaw = None
-			return self.resids.ResidsForSN(guess,sn,components,colorLaw,salterr,False)[1]['specresid']
+			return self.resids.ResidsForSN(guess,sn,components,colorLaw,salterr,False)[1]['resid']
 		dResiddX=np.zeros((residuals.size,self.parlist.size))
 		for i in range(self.guess.size):
 			dResiddX[:,i]=(incrementOneParam(i)-residuals)/dx
