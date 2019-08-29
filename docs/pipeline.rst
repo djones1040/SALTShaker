@@ -63,11 +63,13 @@ The default pipeline includes all the stages. Currently they are :code:`['byosed
 This can be set simply by
 
 ::
+
     pipe.build()
     
 The option :code:`data` can be turned on/off to use data/sims, for example:
 
 ::
+
     pipe.build(data=False)
     
 The default value is :code:`data=True`
@@ -87,14 +89,17 @@ Connecting the input/output of different stages using the 'glue' method
 The :code:`glue` method can be called so that the input and output of the gluing stages are properly connected. This will overwrite the config (input) files of the stages and should be called after :code:`configure`.
 
 ::
+    
     pipe.glue(['sim','train'])
     
 For some stages that are connected with multiple stages, the :code:`on` option specify what input/output files to glue on:
 
 ::
+    
     pipe.glue(['train','lcfit'],on='model')
 
 ::
+    
     pipe.glue(['sim','lcfit'],on='phot')
 
 
@@ -104,6 +109,7 @@ Running the pipeline
 After calling :code:`build` and :code:`glue`, call the :code:`run` method the execute the pipeline:
 
 ::
+    
     pipe.run()
     
 Note the :code:`build`, :code:`configure`, :code:`glue` and :code:`run` methods can be called multiple times to build a customized pipeline. Keep in mind each time :code:`configure` is called, it modifies the config (input) file of certain stages in specified in :code:`build`; and each time :code:`glue` is called, it overwrites the existing config (input) file. So these methods should be called logically given how the pipeline is run. 
@@ -111,6 +117,7 @@ Note the :code:`build`, :code:`configure`, :code:`glue` and :code:`run` methods 
 The following example will run the Simulation and Training stages first with their input/output properly connected, then run the LCfitting, Getmu, and Cosmofit stages. Since to glue Training and Lcfitting (lcfitting using the trained model), the training code need to be run first so that the trained model files exist.
 
 ::
+    
     def test_pipeline():
         pipe = SALT3pipe(finput='sampleinput.txt')
         pipe.build(data=False,mode='customize',onlyrun=['byosed','sim','train'])
