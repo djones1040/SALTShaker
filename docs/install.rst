@@ -14,6 +14,7 @@ the code::
 
   conda create -n salt3 python=3.7
   conda activate salt3
+  conda install numpy
 
 In your local directory::
   
