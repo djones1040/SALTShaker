@@ -14,6 +14,8 @@ the code::
 
   conda create -n salt3 python=3.7
   conda activate salt3
+  conda install numpy
+  conda install cython
 
 In your local directory::
   
