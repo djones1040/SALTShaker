@@ -35,7 +35,7 @@ baseinput=lcfitting/snfit_base.nml
 outinput=pipelinetest/snfit_TEST.nml
 prooptions=
 set_key=SNLCINP VERSION_PHOTOMETRY SALT3TEST_SIMPLE
-    SNLCINP KCOR_FILE kcor/kcor_PS1_LOWZ_COMBINED.fits
+    SNLCINP KCOR_FILE lcfitting/kcor_PS1_LOWZ_COMBINED.fits
     FITINP FILTLIST_FIT bcdeghi
 
 [getmu]
