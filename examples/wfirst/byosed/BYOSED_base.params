@@ -1,0 +1,33 @@
+[MAIN]
+
+SED_FILE: Hsiao07.dat
+MAGSMEAR: 0.0
+MAGOFF: 0.0
+
+
+#color-law must be labeled as 'color', any additive function
+#can be named anything
+
+[FLAGS]
+
+COLOR: True
+STRETCH: True
+
+[STRETCH]
+
+#define function
+WARP_FUNCTION: stretch_func.dat
+
+#define distribution for scale parameter
+DIST_PEAK: 0.5
+DIST_SIGMA: 1.0 0.7
+DIST_LIMITS: -2.5 2.5
+
+[COLOR]
+
+#define function
+WARP_FUNCTION: color_func.dat
+#define distribution for scale parameter
+DIST_PEAK: 0.0
+DIST_SIGMA: 0.07 0.1
+DIST_LIMITS: -0.3 0.3

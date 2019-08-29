@@ -1,0 +1,63 @@
+# This job runs the nominal fit, but cannot be used for
+# systematics because the filters are different for DEEP
+# compared to SHALLOW and MEDIUM. To run systematics with
+# FITOPT keys, select one of the three survey tiers,
+# replace VERSION+FITOPT with VERSION key, and the add
+# FITOPT keys.
+#
+# Table output is TEXT and ROOT.
+#
+OUTDIR: SIMFIT_OUT
+BATCH_INFO:  sbatch  BATCH.TEMPLATE  60
+
+VERSION+FITOPT:  WFIRST_IMG-Allz_DEEP     FILTLIST_FIT YJHF
+VERSION+FITOPT:  WFIRST_IMG-Allz_MEDIUM   FILTLIST_FIT ZYJR
+VERSION+FITOPT:  WFIRST_IMG-Allz_SHALLOW  FILTLIST_FIT ZYJR
+
+# ------
+# append a few things to the TEXT output
+APPEND_FITRES: FITRES RA DECL zHEL zHELERR TGAPMAX
+#SALT2mu_INFILE:  SALT2mu_PS1.input
+
+   &SNLCINP
+    VERSION_PHOTOMETRY = 'WFIRST_IMG-Allz_DEEP'
+    ROOTFILE_OUT  = 'bla.root'
+    KCOR_FILE     = 'WFIRST/H17/kcor_WFIRST.fits'
+     
+     NFIT_ITERATION = 2
+     INTERP_OPT     = 1
+     
+     ABORT_ON_NOEPOCHS = F
+      
+     OPT_MWEBV = 1 
+     MWEBV_SCALE = 1.0
+     MWEBV_SHIFT = 0.0 
+
+     CUTWIN_SNRMAX        = 10.0
+     CUTWIN_NFILT_SNRMAX  = 1.0, 99
+     CUTWIN_SNRMAX2       = 5.0, 999999
+     CUTWIN_NFILT_SNRMAX2 = 2, 99
+     
+  &END
+ 
+  &FITINP
+
+    RESTLAMBDA_FITRANGE = 3000. , 20000.    
+    FITMODEL_NAME  = 'SALT2.WFIRST-H17' 
+   
+    OPT_COVAR    = 1
+    OPT_XTMW_ERR = 1
+    FUDGEALL_ITER1_MAXFRAC = 0.02
+
+    PRIOR_MJDSIG        = 5.0
+    PRIOR_LUMIPAR_RANGE = -5.0, 5.0
+    PRIOR_LUMIPAR_SIGMA = 0.1
+
+    FITWIN_TREST  = -15.0, 45.0
+    FITWIN_SHAPE  =  -3.0, 3.0
+    FITWIN_COLOR  =  -0.3, 0.3
+    FITWIN_PROB   =  0.01, 1.01
+    
+    FILTLIST_FIT = 'YJHF'
+  &END
+  
