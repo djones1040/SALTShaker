@@ -6,9 +6,8 @@ snlist=/home/midai/salt3_local/SALT3/examples/pipelinetest/training/data/SALT3TE
 [byosed]
 baseinput=byosed/BYOSED_base.params
 outinput=pipelinetest/TEST_BYOSED.params
-set_key= FLAGS COLOR True
-    FLAGS STRETCH True
-    COLOR DIST_PEAK 0.0
+set_key= FLAGS COLOR False
+    FLAGS STRETCH False
     
 [simulation]
 pro=snlc_sim.exe
