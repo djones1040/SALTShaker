@@ -1,0 +1,91 @@
+
+SIMLIB_FILE:   Allz_DEEP.SIMLIB
+
+NGENTOT_LC: 200
+GENVERSION: WFIRST_CHANGEME_SALT2
+RANSEED: 12945       # random number seed
+
+CIDOFF: 10000
+
+GENSOURCE:   RANDOM
+GENMODEL:    SALT2.WFIRST-H17
+GENMAG_SMEAR_MODELNAME:  G10
+
+KCOR_FILE:  $SNDATA_ROOT/kcor/WFIRST/H17/kcor_WFIRST.fits
+
+# selection criteria for generation
+GENFILTERS:  YJHF
+
+GENRANGE_PEAKMJD:  54930.0 55775.0
+GENSIGMA_SEARCH_PEAKMJD:  1.0     # sigma-smearing for  SEARCH_PEAKMJD (days)
+
+GENRANGE_TREST:   -20.0     90.0     # rest epoch relative to peak (days)
+
+
+SOLID_ANGLE: 0.001
+
+SEARCHEFF_PIPELINE_LOGIC_FILE: $WFIRST_ROOT/models/searcheff/SEARCHEFF_PIPELINE_LOGIC.DAT
+SEARCHEFF_PIPELINE_EFF_FILE:   $WFIRST_ROOT/models/searcheff/SEARCHEFF_PIPELINE_WFIRST.DAT
+NEWMJD_DIF: 0.4
+
+HOSTLIB_DZTOL: 0.01 0.0 0
+HOSTLIB_FILE:  Imaging.hostlib
+HOSTLIB_MSKOPT: 2
+HOSTLIB_FIXRAN_RADIUS: 0.0 # fix radial random number (0-1)
+
+GENRANGE_REDSHIFT:  0.01  2.99
+GENSIGMA_REDSHIFT:  0.001
+
+DNDZ: POWERLAW2 2.5E-5  1.5 0.0 1.0    # from Didlay 2008
+DNDZ: POWERLAW2 9.7E-5 -0.5 1.0 3.0    # high-z extenstion from Lou
+
+APPLY_SEARCHEFF_OPT: 1
+APPLY_CUTWIN_OPT: 1
+
+CUTWIN_TRESTMIN: -19 -5         #at least 1 epoch before -5 d (rest-frame)
+CUTWIN_TRESTMAX: +30 +80        #at least 1 epoch past +30 d
+CUTWIN_TGAPMAX:  0   20         #largest Trest gap (days)
+CUTWIN_T0GAPMAX: 0   10         #largest Trest gap near peak (days)
+
+OPT_MWEBV: 1  # SFD98
+
+# smear flags: 0=off, 1=on
+SMEARFLAG_FLUX:    1  # photo-stat smearing of signal, sky, etc ...
+SMEARFLAG_ZEROPT:  1  # smear zero-point with zptsig
+
+
+# cosmological params for lightcurve generation and redshift distribution
+OMEGA_MATTER:  0.3
+OMEGA_LAMBDA:  0.7
+W0_LAMBDA:    -1.00
+H0:           70.0   
+
+FORMAT_MASK: 32
+
+# include Y & J that are common to shallow,medium,deep
+SIMGEN_DUMP:  29
+  CID GENTYPE  SNTYPE  NON1A_INDEX  ZCMB
+  LIBID RA DECL MWEBV MU PEAKMJD
+  MAGT0_Y MAGT0_J 
+  SNRMAX_Y SNRMAX_J 
+  SNRMAX SNRMAX2 SNRMAX3 
+  NOBS TRESTMIN TRESTMAX TGAPMAX  
+  S2alpha S2beta S2x0 S2x1 S2c
+  CUTMASK  SIM_SEARCHEFF_MASK
+
+
+# --------------------------
+# define SALT2 params from SK2016, using G10 High-z row
+
+GENPEAK_SALT2c:    -0.054
+GENSIGMA_SALT2c:    0.043  0.101     # bifurcated sigmas
+GENRANGE_SALT2c:   -0.300  0.500     # color range
+
+GENPEAK_SALT2x1:     0.973  # from SK16
+GENSIGMA_SALT2x1:    1.472   0.222     # bifurcated sigmas
+GENRANGE_SALT2x1:   -3.0     2.0       # x1 (stretch) range
+
+GENALPHA_SALT2:  0.14
+GENBETA_SALT2:   3.1
+
+# ----------------------
