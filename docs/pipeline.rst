@@ -42,11 +42,13 @@ Running the Pipeline
 The pipeline class
 ------------------
 
-The pipeline can be run using the SALT3pipe class:
+The pipeline can be run using the SALT3pipe class.  In
+the :code:`examples/pipelinetest` directory,
+you can run the pipeline with the following commands:
 
 ::
 
-    from pipeline.pipeline import *
+    from salt3.pipeline.pipeline import *
     pipe = SALT3pipe(finput='sampleinput.txt')
     pipe.configure()
     pipe.run()

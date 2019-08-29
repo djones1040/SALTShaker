@@ -1,0 +1,45 @@
+
+BATCH_INFO:  sbatch  BATCH.TEMPLATE 30
+
+# specify the three survey tiers: DEEP, MEDIUM, SHALLOW
+
+GENVERSION: WFIRST_IMG-Allz_DEEP
+GENOPT: GENFILTERS YJHF   SOLID_ANGLE 0.00270
+GENOPT: SIMLIB_FILE Allz_DEEP.SIMLIB
+
+GENVERSION: WFIRST_IMG-Allz_MEDIUM
+GENOPT: GENFILTERS ZYJR   SOLID_ANGLE 0.00601
+GENOPT: SIMLIB_FILE Allz_MEDIUM.SIMLIB 
+
+GENVERSION: WFIRST_IMG-Allz_SHALLOW
+GENOPT: GENFILTERS ZYJR   SOLID_ANGLE 0.01487
+GENOPT: SIMLIB_FILE Allz_SHALLOW.SIMLIB
+
+ENDLIST_GENVERSION:
+
+RESET_CIDOFF:  2  # uniqe random CID among all versions
+
+# specify sim-input files for snlc_sim.exe
+SIMGEN_INFILE_Ia:       SIMGEN_WFIRST_Allz_SALT2.input
+SIMGEN_INFILE_NONIa:    SIMGEN_WFIRST_Allz_NONIA.input
+NGEN_UNIT:  0.1  SURVEY   # each job is 0.1 of a WFIRST survey
+
+# define required global items to ensure uniformity among all jobs
+H0: 70
+ZRANGE:      0.01 2.99
+GENPREFIX:   WFIRST_Imaging-Allz
+FORMAT_MASK: 48          # 2=TERSE    16=RanCID  32=FITS-FORMAT
+
+# the same RANSEED means that each job has new seed,
+# but that all jobs are re-combined as if only one
+# job had run.
+RANSEED:  123459  
+RANSEED:  123459  
+RANSEED:  123459  
+RANSEED:  123459  
+RANSEED:  123459  
+RANSEED:  123459  
+RANSEED:  123459  
+RANSEED:  123459  
+RANSEED:  123459  
+RANSEED:  123459  
