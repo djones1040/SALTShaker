@@ -132,7 +132,7 @@ class TrainSALT(TrainSALTBase):
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
 	def fitSALTModel(self,datadict):
-		parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc = self.initialParameters(datadict)
+		parlist,x_modelpars,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc = self.initialParameters(datadict)
 		saltfitkwargs = self.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
 		n_phaseknots,n_waveknots = len(phaseknotloc)-4,len(waveknotloc)-4
 		n_errphaseknots,n_errwaveknots = len(errphaseknotloc)-4,len(errwaveknotloc)-4
@@ -141,27 +141,30 @@ class TrainSALT(TrainSALTBase):
 						 n_phaseknots,n_waveknots,
 						 datadict)
 		print('training on %i SNe!'%len(datadict.keys()))
-		if self.options.do_mcmc:
-			saltfitter = saltfit.mcmc(guess,datadict,parlist,**saltfitkwargs)
-			print('initial loglike: %.1f'%saltfitter.maxlikefit(guess,None,False))
-			# do the fitting
-			x_modelpars,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-				modelerr,clpars,clerr,clscat,SNParams,message = fitter.mcmc(
-					saltfitter,guess,self.options.n_processes,
-					self.options.n_steps_mcmc,self.options.n_burnin_mcmc)
+		for i in range(self.options.n_repeat):
+			if i == 0: laststepsize = None
+			
+			if self.options.do_mcmc:
+				saltfitter = saltfit.mcmc(x_modelpars,datadict,parlist,**saltfitkwargs)
+				print('initial loglike: %.1f'%saltfitter.maxlikefit(x_modelpars,None,False))
+				# do the fitting
+				x_modelpars,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+					modelerr,clpars,clerr,clscat,SNParams,message = fitter.mcmc(
+						saltfitter,x_modelpars,self.options.n_processes,
+						self.options.n_steps_mcmc,self.options.n_burnin_mcmc)#,
+						#stepsizes=laststepsize)
 
-		if self.options.do_gaussnewton:
-			if not self.options.do_mcmc: x_modelpars = guess[:]
-			saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)			
-			# do the fitting
-			x_modelpars,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-				modelerr,clpars,clerr,clscat,SNParams,message = fitter.gaussnewton(
-					saltfitter,x_modelpars,self.options.n_processes,
-					self.options.n_steps_mcmc,self.options.n_burnin_mcmc,
-					self.options.gaussnewton_maxiter)
-		for k in datadict.keys():
-			tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
-			SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
+			if self.options.do_gaussnewton:
+				saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)			
+				# do the fitting
+				x_modelpars,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+					modelerr,clpars,clerr,clscat,SNParams,laststepsize,message = fitter.gaussnewton(
+						saltfitter,x_modelpars,self.options.n_processes,
+						self.options.n_steps_mcmc,self.options.n_burnin_mcmc,
+						self.options.gaussnewton_maxiter)
+			for k in datadict.keys():
+				tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
+				SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
 
 		
 		print('MCMC message: %s'%message)
