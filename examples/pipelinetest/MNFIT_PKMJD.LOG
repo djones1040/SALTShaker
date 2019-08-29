@@ -1,0 +1,1185 @@
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999387  FILTER=b
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999387  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999387  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999387  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999388  FILTER=b
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999388  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999388  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999388  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999389  FILTER=b
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999389  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999389  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999389  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999390  FILTER=b
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999390  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999390  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999390  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999391  FILTER=b
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999391  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999391  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999391  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999392  FILTER=b
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999392  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999392  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999392  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999393  FILTER=b
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999393  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999393  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999393  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999394  FILTER=b
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999394  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999394  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999394  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999395  FILTER=b
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999395  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999395  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999395  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999396  FILTER=b
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999396  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999396  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999396  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999397  FILTER=b
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999397  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999397  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999397  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999398  FILTER=b
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999398  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999398  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999398  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999399  FILTER=b
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999399  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999399  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999399  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999400  FILTER=b
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999400  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999400  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999400  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999401  FILTER=b
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999401  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999401  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999401  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999402  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999402  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999402  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999403  FILTER=b
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999403  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999403  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999403  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999404  FILTER=b
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999404  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999404  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999404  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999405  FILTER=b
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999405  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999405  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999405  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999406  FILTER=b
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999406  FILTER=c
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999406  FILTER=d
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
+
+ ############################################################
+         MNFIT_PKMJD for CID=5999406  FILTER=e
+ ############################################################
+
+  MINUIT RELEASE 96.03  INITIALIZED.   DIMENSIONS 100/110  EPSMAC=  0.89E-15
+ **********
+ **    1 **SET NOWARNINGS
+ **********
+ PARAMETER   1 IS CONSTANT.      IGNORED.
+ PARAMETER   2 IS CONSTANT.      IGNORED.
+ PARAMETER   3 IS CONSTANT.      IGNORED.
+ PARAMETER   4 IS CONSTANT.      IGNORED.
+ PARAMETER   9 IS CONSTANT.      IGNORED.
+ PARAMETER  10 IS CONSTANT.      IGNORED.
