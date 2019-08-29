@@ -251,7 +251,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		foutclscat.close()
 		
 		# best-fit and simulated SN params
-		snlist = self.options.snlist[:]
+		snlist = os.path.expandvars(self.options.snlist[:])
 		if not os.path.exists(snlist):
 			print('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
 			snlist = '%s/trainingdata/%s'%(data_rootdir,snlist)
