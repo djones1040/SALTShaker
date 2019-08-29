@@ -44,29 +44,32 @@ class fitting:
 
 		gn.debug = False
 		x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-			modelerr,clpars,clerr,clscat,SNParams = \
+			modelerr,clpars,clerr,clscat,SNParams,stepsizes = \
 			gn.convergence_loop(
 				guess,loop_niter=gaussnewton_maxiter)
 
 		return x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-			modelerr,clpars,clerr,clscat,SNParams,'Gauss-Newton MCMC was successful'
+			modelerr,clpars,clerr,clscat,SNParams,stepsizes,\
+			'Gauss-Newton MCMC was successful'
 
 		
 	def mcmc(self,saltfitter,guess,
 			 n_processes,n_mcmc_steps,
-			 n_burnin_mcmc):
-
+			 n_burnin_mcmc,stepsizes=None):
+		
 		saltfitter.debug = False
 		if n_processes > 1:
 			with InterruptiblePool(n_processes) as pool:
 		#	with multiprocessing.Pool(n_processes) as pool:
 				x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 					modelerr,clpars,clerr,clscat,SNParams = \
-					saltfitter.mcmcfit(guess,n_mcmc_steps,n_burnin_mcmc,pool=pool)
+					saltfitter.mcmcfit(
+						guess,n_mcmc_steps,n_burnin_mcmc,pool=pool,stepsizes=stepsizes)
 		else:
 			x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 				modelerr,clpars,clerr,clscat,SNParams = \
-				saltfitter.mcmcfit(guess,n_mcmc_steps,n_burnin_mcmc,pool=None)
+				saltfitter.mcmcfit(
+					guess,n_mcmc_steps,n_burnin_mcmc,pool=None,stepsizes=stepsizes)
 
 		return x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams,'Adaptive MCMC was successful'
@@ -90,7 +93,7 @@ class mcmc(saltresids.SALTResids):
 			# We can always divide M2 by n-1 since n > init_period
 			return np.sqrt((s_opt/(self.nsteps_adaptive_memory - 1))*M2), True
 	
-	def generate_AM_candidate(self, current, M2, n):
+	def generate_AM_candidate(self, current, M2, n, steps_from_gn=False):
 		prop_std,adjust_flag = self.get_proposal_cov(M2, n)
 		
 		#tstart = time.time()
@@ -102,10 +105,10 @@ class mcmc(saltresids.SALTResids):
 			elif self.adjust_modelpars and par != 'm0' and par != 'm1' and par != 'modelerr':
 				candidate[i] = current[i]
 			else:
-				if par == 'modelerr' or par.startswith('x0') or par == 'm0' or par == 'clscat':
+				if not steps_from_gn and (par == 'modelerr' or par.startswith('x0') or par == 'm0' or par == 'clscat'):
 					candidate[i] = current[i]*10**(0.4*np.random.normal(scale=prop_std[i,i]))
-				#else:
-				#	candidate[i] = np.random.normal(loc=current[i],scale=prop_std[i,i])
+				else:
+					pass
 		#print(time.time()-tstart)
 		return candidate
 		
@@ -268,25 +271,30 @@ class mcmc(saltresids.SALTResids):
 			
 		return candidate
 
-	def get_propcov_init(self,x):
+	def get_propcov_init(self,x,stepsizes=None):
 		C_0 = np.zeros([len(x),len(x)])
-		for i,par in zip(range(self.npar),self.parlist):
-			if par == 'm0':
-				C_0[i,i] = self.stepsize_magscale_M0**2.
-			if par == 'modelerr':
-				C_0[i,i] = (self.stepsize_magscale_err)**2.
-			elif par == 'm1':
-				C_0[i,i] = (self.stepsize_magadd_M1)**2.
-			elif par.startswith('x0'):
-				C_0[i,i] = self.stepsize_x0**2.
-			elif par.startswith('x1'):
-				C_0[i,i] = self.stepsize_x1**2.
-			elif par == 'clscat':
-				C_0[i,i] = (self.stepsize_magscale_clscat)**2.
-			elif par.startswith('c'): C_0[i,i] = (self.stepsize_c)**2.
-			elif par.startswith('specrecal'): C_0[i,i] = self.stepsize_specrecal**2.
-			elif par.startswith('tpkoff'):
-				C_0[i,i] = self.stepsize_tpk**2.
+
+		if stepsizes is not None:
+			for i,par in zip(range(self.npar),self.parlist):
+				C_0[i,i] = stepsizes[i]**2.
+		else:
+			for i,par in zip(range(self.npar),self.parlist):
+				if par == 'm0':
+					C_0[i,i] = self.stepsize_magscale_M0**2.
+				elif par == 'modelerr':
+					C_0[i,i] = (self.stepsize_magscale_err)**2.
+				elif par == 'm1':
+					C_0[i,i] = (self.stepsize_magadd_M1)**2.
+				elif par.startswith('x0'):
+					C_0[i,i] = self.stepsize_x0**2.
+				elif par.startswith('x1'):
+					C_0[i,i] = self.stepsize_x1**2.
+				elif par == 'clscat':
+					C_0[i,i] = (self.stepsize_magscale_clscat)**2.
+				elif par.startswith('c'): C_0[i,i] = (self.stepsize_c)**2.
+				elif par.startswith('specrecal'): C_0[i,i] = self.stepsize_specrecal**2.
+				elif par.startswith('tpkoff'):
+					C_0[i,i] = self.stepsize_tpk**2.
 
 		self.AMpars = {'C_0':C_0,
 					   'sigma_0':0.1/np.sqrt(self.npar),
@@ -301,10 +309,10 @@ class mcmc(saltresids.SALTResids):
 		
 		return new_mean, new_M2
 	
-	def mcmcfit(self,x,nsteps,nburn,pool=None,debug=False,thin=1):
+	def mcmcfit(self,x,nsteps,nburn,pool=None,debug=False,thin=1,stepsizes=None):
 		npar = len(x)
 		self.npar = npar
-		
+		self.chain,self.loglikes = [],[]
 		# initial log likelihood
 		if self.chain==[]:
 			self.chain+=[x]
@@ -315,9 +323,15 @@ class mcmc(saltresids.SALTResids):
 		self.errstddev = self.stepsize_magscale_err
 		mean, M2 = x[:], np.zeros([len(x),len(x)])
 		mean_recent, M2_recent = x[:], np.zeros([len(x),len(x)])
-		
-		self.get_propcov_init(x)
 
+		if stepsizes is not None:
+			steps_from_gn = True
+			stepsizes[stepsizes > 0.1] = 0.1
+			stepsizes *= 1e-14
+			#import pdb; pdb.set_trace()
+		else: steps_from_gn = False
+		self.get_propcov_init(x,stepsizes=stepsizes)
+		#import pdb; pdb.set_trace()
 		accept = 0
 		nstep = 0
 		accept_frac = 0.5
@@ -343,15 +357,16 @@ class mcmc(saltresids.SALTResids):
 				if not (nstep) % self.nsteps_between_lsqfit:
 					X = self.lsqguess(current=self.chain[-1],doMangle=True)
 				else:
-					X = self.generate_AM_candidate(current=self.chain[-1], M2=M2_recent, n=nstep)
+					X = self.generate_AM_candidate(current=self.chain[-1], M2=M2_recent, n=nstep, steps_from_gn=steps_from_gn)
 				#elif not (nstep-3) % self.nsteps_between_lsqfit:
 				#	X = self.lsqguess(current=Xlast,M1=True)
 			else:
-				X = self.generate_AM_candidate(current=self.chain[-1], M2=M2_recent, n=nstep)
+				X = self.generate_AM_candidate(current=self.chain[-1], M2=M2_recent, n=nstep, steps_from_gn=steps_from_gn)
 
 			# loglike
 			this_loglike = self.maxlikefit(X,pool=pool,debug=debug)
-
+			#if this_loglike < -1e10:
+			#	import pdb; pdb.set_trace()
 			# accepted?
 			accept_bool = self.accept(self.loglikes[-1],this_loglike)
 			if accept_bool:
@@ -438,7 +453,8 @@ class GaussNewton(saltresids.SALTResids):
 		residuals = self.lsqwrap(guess,False,False,doPriors=True)
 		chi2_init = (residuals**2.).sum()
 		X = copy.deepcopy(guess[:])
-
+		Xlast = copy.deepcopy(guess[:])
+		
 		print('starting loop')
 		for superloop in range(loop_niter):
 			X,chi2 = self.robust_process_fit(X,chi2_init,superloop,chi2_init)
@@ -449,21 +465,36 @@ class GaussNewton(saltresids.SALTResids):
 				xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 					modelerr,clpars,clerr,clscat,SNParams = \
 					self.getParsGN(X)
+				stepsizes = self.getstepsizes(X,Xlast)
 				return xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-					modelerr,clpars,clerr,clscat,SNParams
+					modelerr,clpars,clerr,clscat,SNParams,stepsizes
 
 			
 			print('finished iteration %i, chi2 improved by %.1f'%(superloop+1,chi2_init-chi2))
 			chi2_init = chi2
+			stepsizes = self.getstepsizes(X,Xlast)
+			Xlast = copy.deepcopy(X)
 			
 		xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams = \
 			self.getParsGN(X)
+
 		return xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-			modelerr,clpars,clerr,clscat,SNParams
+			modelerr,clpars,clerr,clscat,SNParams,stepsizes
 		
 		#raise RuntimeError("convergence_loop reached 100000 iterations without convergence")
 
+	def getstepsizes(self,X,Xlast):
+		stepsizes = X-Xlast
+		#stepsizes[self.parlist == 'm0'] = \
+		#	(X[self.parlist == 'm0']-Xlast[self.parlist == 'm0'])/Xlast[self.parlist == 'm0']
+		#stepsizes[self.parlist == 'modelerr'] = \
+		#	(X[self.parlist == 'modelerr']-Xlast[self.parlist == 'modelerr'])/Xlast[self.parlist == 'modelerr']
+		#stepsizes[self.parlist == 'clscat'] = \
+		#	(X[self.parlist == 'clscat']-Xlast[self.parlist == 'clscat'])/Xlast[self.parlist == 'clscat']
+		#import pdb; pdb.set_trace()
+		return stepsizes
+	
 	def lsqwrap(self,guess,computeDerivatives,computePCDerivs=True,doPriors=True):
 		tstart = time.time()
 
