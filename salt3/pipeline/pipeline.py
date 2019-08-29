@@ -49,6 +49,9 @@ class SALT3pipe():
         config.read(self.finput)
         m2df = self._multivalues_to_df
 
+        if not hasattr(self, 'pipepros'):
+            raise ValueError("Pipeline stages are not specified, call self.build() first.")
+        
         for prostr in self.pipepros:
             sectionname = [x for x in config.sections() if x.startswith(prostr)]
             if len(sectionname) == 1:
@@ -128,7 +131,11 @@ class SALT3pipe():
         if pipepros is None:
             return
         elif not isinstance(pipepros,list) or len(pipepros) !=2:
-            raise ValueError("pipepros must be list of length 2, {} of {} was given".format(type(pipepros),len(pipepros)))       
+            raise ValueError("pipepros must be list of length 2, {} of {} was given".format(type(pipepros),len(pipepros))) 
+        elif not set(pipepros).issubset(self.pipepros):
+            raise ValueError("one or more stages are not configured, check options in self.build()")
+            
+        
         print("Connecting ",pipepros)
         
         pro1 = self._get_pipepro_from_string(pipepros[0])
