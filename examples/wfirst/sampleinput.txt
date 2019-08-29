@@ -1,0 +1,52 @@
+##SALT3 INPUT
+
+[byosed]
+baseinput=byosed/BYOSED_base.params
+outinput=pipelinetest/TEST_BYOSED.params
+set_key= FLAGS COLOR True
+    FLAGS STRETCH True
+    COLOR DIST_PEAK 0.0
+    
+[simulation]
+pro=snlc_sim.exe
+baseinput=simulation/SIMGEN_BYOSEDTEST.INPUT
+outinput=pipelinetest/TEST_SIMGEN_BYOSEDTEST.INPUT
+prooptions=
+set_key= NGEN_LC 20
+    GENSOURCE RANDOM
+    GENRANGE_REDSHIFT 0.01 0.1
+
+[training]
+pro=trainsalt
+proargs = -c 
+baseinput=training/SALT_SNANA.conf
+prooptions = 
+#--resume_from_outputdir 1
+#--stage validate
+outinput=pipelinetest/TEST_SALT.conf
+set_key=iodata snlist $SNDATA_ROOT/SIM/BYOSEDTEST/BYOSEDTEST.LIST
+    trainparams waverange 2000,9200
+    mcmcparams n_steps_mcmc 50
+    mcmcparams n_burnin_mcmc 10
+
+[lcfitting]
+pro=snlc_fit.exe
+baseinput=lcfitting/snfit_base.nml
+outinput=pipelinetest/snfit_TEST.nml
+prooptions=
+set_key=SNLCINP VERSION_PHOTOMETRY SALT3TEST_SIMPLE
+    SNLCINP KCOR_FILE kcor/kcor_PS1_LOWZ_COMBINED.fits
+    FITINP FILTLIST_FIT bcdeghi
+
+[getmu]
+pro=SALT2mu.exe
+baseinput=getmu/SALT2mu.default
+outinput=pipelinetest/test_salt2mu.input
+prooptions=
+set_key=file ps1sim_default.fitres
+    prefix test_salt2mu
+
+[cosmofit]
+pro=wfit.exe
+outinput=cosmofit/test.M0DIF
+prooptions= -ompri 0.3 -dompri 0.01
