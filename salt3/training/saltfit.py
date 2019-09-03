@@ -416,6 +416,12 @@ class mcmc(saltresids.SALTResids):
 		return return_bool
 
 
+
+
+	
+	
+
+
 class GaussNewton(saltresids.SALTResids):
 	def __init__(self,guess,datadict,parlist,**kwargs):
 		self.warnings = []
@@ -438,14 +444,17 @@ class GaussNewton(saltresids.SALTResids):
 		maxes[self.iCL]=10
 		mins[self.ispcrcl]=-1
 		maxes[self.ispcrcl]=1
-		self.bounds=mins,maxes
+		mins[self.imodelerr]=0
+		maxes[self.imodelerr]=1
+		self.bounds=list(zip(mins,maxes))
+
 
 		self._robustify = False
 		self._writetmp = False
 		self.chi2_diff_cutoff = 1
 		self.fitOptions={}
 		for message,fit in [('all parameters','all'),('all parameters grouped','all-grouped'),(" x0",'x0'),('x1','x1'),('principal component 0','component0'),
-			('principal component 1','component1'),('color','color'),('color law','colorlaw'),('spectral recalibration','spectralrecalibration')]:
+			('principal component 1','component1'),('color','color'),('color law','colorlaw'),('spectral recalibration','spectralrecalibration'),('error model','modelerr')]:
 			if 'all' in fit: includePars=np.ones(self.npar,dtype=bool)
 			else:
 				includePars=np.zeros(self.npar,dtype=bool)
@@ -469,6 +478,8 @@ class GaussNewton(saltresids.SALTResids):
 					includePars[self.iCL]=True
 				elif fit=='spectralrecalibration':
 					includePars[self.ispcrcl]=True
+				elif fit=='modelerr':
+					includePars[self.imodelerr]=True
 				else:
 					raise NotImplementedError("""This option for a Gaussian Process fit with a 
 	restricted parameter set has not been implemented: {}""".format(fit))
@@ -491,6 +502,9 @@ class GaussNewton(saltresids.SALTResids):
 
 		print('starting loop')
 		for superloop in range(loop_niter):
+			if superloop % 3 ==0:
+				print('Optimizing model error')
+				X,loglike=self.minuitOptimize(X,'modelerr')
 			X,chi2,converged = self.robust_process_fit(X,chi2_init,superloop)
 			
 			if chi2_init-chi2 < -1.e-6:
@@ -518,23 +532,30 @@ class GaussNewton(saltresids.SALTResids):
 		#raise RuntimeError("convergence_loop reached 100000 iterations without convergence")
 	
 	def minuitOptimize(self,X,fit='all'):
+		includePars=self.fitOptions[fit][1] & ~ (np.array([ x.startswith('tpkoff') for x in self.parlist]))
 		def fn(Y):
 			Xnew=X.copy()
 			Xnew[includePars]=Y
-			return (self.lsqwrap(Xnew,False,False)**2 ).sum()
-		
+			return - self.maxlikefit(Xnew)
 		def grad(Y):
 			Xnew=X.copy()
 			Xnew[includePars]=Y
-			resids,jac=self.lsqwrap(Xnew,True,True)
-			return (2*resids[:,np.newaxis]*jac).sum(axis=0)
-		includePars=self.fitOptions[fit][1] & ~ (np.array([x=='modelerr' or x.startswith('tpkoff') for x in self.parlist]))
-		import pdb;pdb.set_trace()
-
-		result = iminuit.minimize(fn,X[includePars],jac=grad,bounds=np.stack(self.bounds,axis=1)[includePars,:],options= dict(maxfev=5,disp=False))
+			return - self.maxlikefit(Xnew,computeDerivatives=True)[1]
+		print('Initialized log likelihood: ' ,self.maxlikefit(X))
+		params=['x'+str(i) for i in range(includePars.sum())]
+		initVals=X[includePars].copy()
+		kwargs={'limit_'+params[i] : self.bounds[np.where(includePars)[0][i]] for i in range(includePars.sum())}
+		kwargs.update({params[i]: initVals[i] for i in range(includePars.sum())})
+		kwargs.update({'error_'+params[i]: np.sqrt(np.abs(X[includePars][i])) for i in range(includePars.sum())})
+		m=Minuit(fn,use_array_call=True,forced_parameters=params,grad=grad,errordef=1,**kwargs)
+		result,paramResults=m.migrad(10)
 		X=X.copy()
-		X[includePars]=result.x
-		return X,result.fun
+		X[includePars]=np.array([x.value for x  in paramResults])
+		if np.allclose(X[includePars],initVals):
+			import pdb;pdb.set_trace()
+		print('Final log likelihood: ', result.fval)
+		return X,result.fval
+
 
 	def lsqwrap(self,guess,computeDerivatives,computePCDerivs=True,doPriors=True):
 		tstart = time.time()
@@ -600,7 +621,7 @@ class GaussNewton(saltresids.SALTResids):
 	
 	def robust_process_fit(self,X_init,chi2_init,niter):
 		X,chi2=X_init,chi2_init
-		#X,loglike=self.minuitOptimize(X,'all')
+		
 		for fit in  self.fitOptions:
 			if fit=='all':continue
 			print('fitting '+self.fitOptions[fit][0])

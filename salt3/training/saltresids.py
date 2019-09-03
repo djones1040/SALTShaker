@@ -253,7 +253,7 @@ class SALTResids:
 		self.kcordict['default']['Bpbspl'] = pbspl
 		self.kcordict['default']['Bdwave'] = self.wave[1] - self.wave[0]
 				
-	def maxlikefit(self,x,pool=None,debug=False,timeit=False):
+	def maxlikefit(self,x,pool=None,debug=False,timeit=False,computeDerivatives=False,computePCDerivs=False):
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic data given during initialization
 		
@@ -295,35 +295,40 @@ class SALTResids:
 		chi2 = 0
 		#Construct arguments for maxlikeforSN method
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
-		args=[(None,sn,x,components,salterr,colorLaw,colorScat,debug,timeit) for sn in self.datadict.keys()]
-		if pool:
-			loglike=sum(pool.map(self.loglikeforSN,args))
+		args=[(None,sn,x,components,salterr,colorLaw,colorScat,debug,timeit,computeDerivatives,computePCDerivs) for sn in self.datadict.keys()]
+		mapFun=pool.map if pool else starmap
+		if computeDerivatives:
+			result=list(mapFun(self.loglikeforSN,args))
+			loglike=sum([r[0] for r in result])
+			grad=sum([r[1] for r in result])
 		else:
-			loglike=sum(starmap(self.loglikeforSN,args))
+			loglike=sum(mapFun(self.loglikeforSN,args))
 
-		if self.regularize: 
-			pass
-			#loglike -= self.regularizationChi2(x,self.regulargradientphase,self.regulargradientwave,self.regulardyad)/2
 		logp = loglike
 		if len(self.usePriors):
 			priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,x)	
 			logp -=(priorResids**2).sum()/2
+			if computeDerivatives:
+				grad-= (priorResids [:,np.newaxis] * priorJac).sum(axis=0)
 		
 		if self.regularize:
-			regResids=[]
-			regJac=[]
 			for regularization, weight in [(self.phaseGradientRegularization, self.regulargradientphase),(self.waveGradientRegularization,self.regulargradientwave ),(self.dyadicRegularization,self.regulardyad)]:
 				if weight ==0:
 					continue
-				logp-= sum([(res**2).sum()*weight/2 for res in regularization(x,False)[0]])
-
+				regResids,regJac=regularization(x,computeDerivatives)
+				logp-= sum([(res**2).sum()*weight/2 for res in regResids])
+				if computeDerivatives:
+					for idx,res,jac in zip([self.im0,self.im1],regResids,regJac):
+						grad[idx] -= (res[:,np.newaxis]*jac ).sum(axis=0)
 		self.nstep += 1
 		print(logp.sum()*-2)
 
 		if timeit:
 			print('%.3f %.3f %.3f %.3f %.3f'%(self.tdelt0,self.tdelt1,self.tdelt2,self.tdelt3,self.tdelt4))
-
-		return logp
+		if computeDerivatives:
+			return logp,grad
+		else:
+			return logp
 				
 	def ResidsForSN(self,x,sn,components,colorLaw,saltErr,computeDerivatives,computePCDerivs=False,fixUncertainty=True):
 		
@@ -352,7 +357,6 @@ class SALTResids:
 				residsdict['lognorm']=np.log(1/(np.sqrt(2*np.pi)*uncertainty)).sum()
 			
 			if computeDerivatives:
-				import pdb;pdb.set_trace()
 				residsdict['resid_jacobian']=spectralSuppression * modeldict['modelflux_jacobian']/(uncertainty[:,np.newaxis])
 				if not fixUncertainty:
 					dUncertaintydModelerr=  modeldict['dmodeluncertainty_dmodelerr'] *(modeldict['modeluncertainty'] * (modeldict['modelflux']**2) / uncertainty) [:,np.newaxis] 
@@ -484,7 +488,7 @@ class SALTResids:
 
 			iSpecStart += SpecLen
 			
-		if not computePCDerivs and computeDerivatives:
+		if not computePCDerivs and computeDerivatives and 'dmodelflux_dM0_spec_%s'%sn in self.__dict__ :
 			specresultsdict['modelflux_jacobian'][:,self.im0] = self.__dict__['dmodelflux_dM0_spec_%s'%sn]*x0
 			specresultsdict['modelflux_jacobian'][:,self.im1] = self.__dict__['dmodelflux_dM0_spec_%s'%sn]*x0*x1
 
@@ -507,7 +511,7 @@ class SALTResids:
 			int1dM0,int1dM1=componentsModInterp
 		else:
 			int1d=componentsModInterp
-
+		
 		photresultsdict={}
 		photresultsdict['modelflux'] = np.zeros(len(photdata['filt']))
 		photresultsdict['dataflux'] = photdata['fluxcal']
@@ -616,9 +620,9 @@ class SALTResids:
 						photresultsdict['modelflux_jacobian'][idx,self.im0]*=decayFactor
 						photresultsdict['modelflux_jacobian'][idx,self.im1]*=decayFactor
 						self.__dict__['dmodelflux_dM0_phot_%s'%sn][idx,:] *= decayFactor
-			else:
-				photresultsdict['modelflux_jacobian'][:,self.im0] = self.__dict__['dmodelflux_dM0_phot_%s'%sn]*x0
-				photresultsdict['modelflux_jacobian'][:,self.im1]= self.__dict__['dmodelflux_dM0_phot_%s'%sn]*x0*x1
+			elif 'dmodelflux_dM0_phot_%s'%sn  in self.__dict__:
+					photresultsdict['modelflux_jacobian'][:,self.im0] = self.__dict__['dmodelflux_dM0_phot_%s'%sn]*x0
+					photresultsdict['modelflux_jacobian'][:,self.im1]= self.__dict__['dmodelflux_dM0_phot_%s'%sn]*x0*x1
 		return photresultsdict
 	
 	
@@ -768,7 +772,7 @@ class SALTResids:
 
 	def loglikeforSN(self,args,sn=None,x=None,components=None,salterr=None,
 					 colorLaw=None,colorScat=None,
-					 debug=False,timeit=False):
+					 debug=False,timeit=False,computeDerivatives=False,computePCDerivs=False):
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic observations of a single SN 
 
@@ -808,15 +812,15 @@ class SALTResids:
 			components = self.SALTModel(x)
 		if salterr is None:
 			salterr = self.ErrModel(x)
-		if self.n_components == 1: M0 = copy.deepcopy(components[0])
-		elif self.n_components == 2: M0,M1 = copy.deepcopy(components)
 
-		photResidsDict,specResidsDict = self.ResidsForSN(x,sn,components,colorLaw,salterr,False,fixUncertainty=False)
+		photResidsDict,specResidsDict = self.ResidsForSN(x,sn,components,colorLaw,salterr,computeDerivatives,computePCDerivs,fixUncertainty=False)
 		
-
-		loglike= - (photResidsDict['photresid']**2).sum() / 2.   -(specResidsDict['specresid']**2).sum()/2.+photResidsDict['lognorm']+specResidsDict['lognorm']
-
-		return loglike
+		loglike= - (photResidsDict['resid']**2).sum() / 2.   -(specResidsDict['resid']**2).sum()/2.+photResidsDict['lognorm']+specResidsDict['lognorm']
+		if computeDerivatives: 
+			grad_loglike=  - (photResidsDict['resid'][:,np.newaxis] * photResidsDict['resid_jacobian']).sum(axis=0) - (specResidsDict['resid'][:,np.newaxis] * specResidsDict['resid_jacobian']).sum(axis=0) + photResidsDict['lognorm_grad'] +specResidsDict['lognorm_grad']
+			return loglike,grad_loglike
+		else:
+			return loglike
 				
 	def specchi2(self):
 

@@ -93,7 +93,7 @@ class TRAINING_Test(unittest.TestCase):
 
 	def test_photresid_jacobian_vary_uncertainty(self):
 		"""Check that lognorm gradient and residuals' jacobian are correctly calculated with fixUncertainty=False"""
-		print("Checking spectral derivatives")
+		print("Checking photometric derivatives including uncertainties")
 		dx=1e-8
 		rtol=1e-2
 		atol=1e-2
