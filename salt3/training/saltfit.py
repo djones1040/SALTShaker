@@ -25,6 +25,8 @@ from scipy import linalg
 from emcee.interruptible_pool import InterruptiblePool
 from sncosmo.utils import integration_grid
 from numpy.linalg import inv,pinv
+from iminuit import Minuit
+import iminuit,warnings
 
 
 class fitting:
@@ -428,6 +430,13 @@ class mcmc(saltresids.SALTResids):
 				return_bool = True
 		return return_bool
 
+
+
+
+	
+	
+
+
 class GaussNewton(saltresids.SALTResids):
 	def __init__(self,guess,datadict,parlist,**kwargs):
 		self.warnings = []
@@ -435,9 +444,61 @@ class GaussNewton(saltresids.SALTResids):
 		super().__init__(guess,datadict,parlist,**kwargs)
 		self.lsqfit = False
 		
+		mins,maxes=np.zeros(self.parlist.size),np.zeros(self.parlist.size)
+		mins[self.im1]=-1
+		maxes[self.im1]=1
+		mins[self.im0]=0
+		maxes[self.im0]=1
+		maxes[self.ix0]=1
+		mins[self.ix0]=0
+		mins[self.ic]=-10
+		maxes[self.ic]=10
+		mins[self.ix1]=-10
+		maxes[self.ix1]=10
+		mins[self.iCL]=-10
+		maxes[self.iCL]=10
+		mins[self.ispcrcl]=-1
+		maxes[self.ispcrcl]=1
+		mins[self.imodelerr]=0
+		maxes[self.imodelerr]=1
+		self.bounds=list(zip(mins,maxes))
+
+
 		self._robustify = False
 		self._writetmp = False
 		self.chi2_diff_cutoff = 1
+		self.fitOptions={}
+		for message,fit in [('all parameters','all'),('all parameters grouped','all-grouped'),(" x0",'x0'),('x1','x1'),('principal component 0','component0'),
+			('principal component 1','component1'),('color','color'),('color law','colorlaw'),('spectral recalibration','spectralrecalibration'),('error model','modelerr')]:
+			if 'all' in fit: includePars=np.ones(self.npar,dtype=bool)
+			else:
+				includePars=np.zeros(self.npar,dtype=bool)
+				if fit=='components':
+					includePars[self.im0]=True
+					includePars[self.im1]=True
+				elif fit=='component0':
+					includePars[self.im0]=True
+				elif fit=='component1':
+					includePars[self.im1]=True
+				elif fit=='sn':
+					includePars[self.ix0]=True
+					includePars[self.ix1]=True
+				elif fit=='x0':
+					includePars[self.ix0]=True
+				elif fit=='x1':
+					includePars[self.ix1]=True
+				elif fit=='color':
+					includePars[self.ic]=True
+				elif fit=='colorlaw':
+					includePars[self.iCL]=True
+				elif fit=='spectralrecalibration':
+					includePars[self.ispcrcl]=True
+				elif fit=='modelerr':
+					includePars[self.imodelerr]=True
+				else:
+					raise NotImplementedError("""This option for a Gaussian Process fit with a 
+	restricted parameter set has not been implemented: {}""".format(fit))
+			self.fitOptions[fit]=(message,includePars)
 
 	def addwarning(self,warning):
 		print(warning)
@@ -457,7 +518,10 @@ class GaussNewton(saltresids.SALTResids):
 		
 		print('starting loop')
 		for superloop in range(loop_niter):
-			X,chi2 = self.robust_process_fit(X,chi2_init,superloop,chi2_init)
+			if superloop % 3 ==0:
+				print('Optimizing model error')
+				X,loglike=self.minuitOptimize(X,'modelerr')
+			X,chi2,converged = self.robust_process_fit(X,chi2_init,superloop)
 			
 			if chi2_init-chi2 < -1.e-6:
 				self.addwarning("MESSAGE WARNING chi2 has increased")
@@ -471,6 +535,9 @@ class GaussNewton(saltresids.SALTResids):
 
 			
 			print('finished iteration %i, chi2 improved by %.1f'%(superloop+1,chi2_init-chi2))
+			if converged:
+				print('Gauss-Newton optimizer could not further improve chi2')
+				break
 			chi2_init = chi2
 			stepsizes = self.getstepsizes(X,Xlast)
 			Xlast = copy.deepcopy(X)
@@ -483,6 +550,32 @@ class GaussNewton(saltresids.SALTResids):
 			modelerr,clpars,clerr,clscat,SNParams,stepsizes
 		
 		#raise RuntimeError("convergence_loop reached 100000 iterations without convergence")
+	
+	def minuitOptimize(self,X,fit='all'):
+		includePars=self.fitOptions[fit][1] & ~ (np.array([ x.startswith('tpkoff') for x in self.parlist]))
+		def fn(Y):
+			Xnew=X.copy()
+			Xnew[includePars]=Y
+			return - self.maxlikefit(Xnew)
+		def grad(Y):
+			Xnew=X.copy()
+			Xnew[includePars]=Y
+			return - self.maxlikefit(Xnew,computeDerivatives=True)[1]
+		print('Initialized log likelihood: ' ,self.maxlikefit(X))
+		params=['x'+str(i) for i in range(includePars.sum())]
+		initVals=X[includePars].copy()
+		kwargs={'limit_'+params[i] : self.bounds[np.where(includePars)[0][i]] for i in range(includePars.sum())}
+		kwargs.update({params[i]: initVals[i] for i in range(includePars.sum())})
+		kwargs.update({'error_'+params[i]: np.sqrt(np.abs(X[includePars][i])) for i in range(includePars.sum())})
+		m=Minuit(fn,use_array_call=True,forced_parameters=params,grad=grad,errordef=1,**kwargs)
+		result,paramResults=m.migrad(10)
+		X=X.copy()
+		X[includePars]=np.array([x.value for x  in paramResults])
+		if np.allclose(X[includePars],initVals):
+			import pdb;pdb.set_trace()
+		print('Final log likelihood: ', result.fval)
+		return X,result.fval
+
 
 	def getstepsizes(self,X,Xlast):
 		stepsizes = X-Xlast
@@ -505,12 +598,12 @@ class GaussNewton(saltresids.SALTResids):
 		if self.n_colorpars:
 			colorLaw = SALT2ColorLaw(self.colorwaverange, guess[self.parlist == 'cl'])
 		else: colorLaw = None
-		
+		salterr=self.ErrModel(guess)
 		components = self.SALTModel(guess)
 
 		numResids=self.num_phot+self.num_spec + (self.numPriorResids if doPriors else 0)
 		if self.regularize:
-			numRegResids=sum([ self.n_components*(self.phasebins.size-1) * (self.wavebins.size -1) for weight in [self.regulargradientphase,self.regulargradientwave ,self.regulardyad] if not weight == 0])
+			numRegResids=sum([ self.n_components*(self.im0.size) for weight in [self.regulargradientphase,self.regulargradientwave ,self.regulardyad] if not weight == 0])
 			numResids+=numRegResids
 			
 		residuals = np.zeros( numResids)
@@ -518,41 +611,25 @@ class GaussNewton(saltresids.SALTResids):
 		
 		idx = 0
 		for sn in self.datadict.keys():
-			photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,components,colorLaw,computeDerivatives,computePCDerivs)
+			photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,components,colorLaw,salterr,computeDerivatives,computePCDerivs)
 			
-			idxp = photresidsdict['photresid'].size
+			idxp = photresidsdict['resid'].size
 
-			residuals[idx:idx+idxp] = photresidsdict['photresid']
+			residuals[idx:idx+idxp] = photresidsdict['resid']
 			if computeDerivatives:
-				jacobian[idx:idx+idxp,self.parlist=='cl'] = photresidsdict['dphotresid_dcl']
-				jacobian[idx:idx+idxp,self.parlist=='m0'] = photresidsdict['dphotresid_dM0']
-				jacobian[idx:idx+idxp,self.parlist=='m1'] = photresidsdict['dphotresid_dM1']
-
-				for snparam in ('x0','x1','c'): #tpkoff should go here
-					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = photresidsdict['dphotresid_d{}'.format(snparam)]
+				jacobian[idx:idx+idxp,:] = photresidsdict['resid_jacobian']
 			idx += idxp
 
-			idxp = specresidsdict['specresid'].size
+			idxp = specresidsdict['resid'].size
 
-			residuals[idx:idx+idxp] = specresidsdict['specresid']
+			residuals[idx:idx+idxp] = specresidsdict['resid']
 			if computeDerivatives:
-				jacobian[idx:idx+idxp,self.parlist=='cl'] = specresidsdict['dspecresid_dcl']
-				jacobian[idx:idx+idxp,self.parlist=='m0'] = specresidsdict['dspecresid_dM0']
-				jacobian[idx:idx+idxp,self.parlist=='m1'] = specresidsdict['dspecresid_dM1']
-				if self.specrecal : 
-					for k in self.datadict[sn]['specdata']:
-						jacobian[idx:idx+idxp,self.parlist=='specrecal_{}_{}'.format(sn,k)] = specresidsdict['dspecresid_dspecrecal_{}'.format(k)]
-					
-				for snparam in ('x0','x1','c'): #tpkoff should go here
-					jacobian[idx:idx+idxp,self.parlist == '{}_{}'.format(snparam,sn)] = specresidsdict['dspecresid_d{}'.format(snparam)]
+				jacobian[idx:idx+idxp,:]=specresidsdict['resid_jacobian']
 			idx += idxp
-		#print('priors: ',*self.usePriors)
 
 		# priors
-		priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,guess)
-		#print(*priorVals)
-			#doPriors = False
 		if doPriors:
+			priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,guess)
 			residuals[idx:idx+priorResids.size]=priorResids
 			jacobian[idx:idx+priorResids.size,:]=priorJac
 			idx+=priorResids.size
@@ -573,85 +650,67 @@ class GaussNewton(saltresids.SALTResids):
 		else:
 			return residuals
 	
-	def robust_process_fit(self,X,chi2_init,niter,chi2_last):
-
-		#print('hack!')
-		Xtmp = copy.deepcopy(X)
-		if niter == 0: computePCDerivs = True
-		else: computePCDerivs = False
-		Xtmp,chi2_all = self.process_fit(Xtmp,fit='all',computePCDerivs=True)
-		if chi2_init - chi2_all > 1 and chi2_all/chi2_last < 0.9:
-			return Xtmp,chi2_all
+	def robust_process_fit(self,X_init,chi2_init,niter):
+		X,chi2=X_init,chi2_init
+		
+		for fit in  self.fitOptions:
+			if fit=='all':continue
+			print('fitting '+self.fitOptions[fit][0])
+			Xprop,chi2prop = self.process_fit(X,fit=fit,computePCDerivs= (fit=='component0') or ('all' in fit))
+			if chi2prop<chi2:
+				if (fit=='all'):
+					if (chi2prop/chi2 < 0.9):
+						print('Terminating iteration ',niter,', continuing with all parameter fit')
+						return Xprop,chi2prop,False
+					else:
+						pass
+				else:
+					X,chi2=Xprop,chi2prop
+		#In this case GN optimizer can do no better
+		if X is X_init:
+			return X,chi2,True
 		else:
-			# "basic flipflop"??!?!
-			print("fitting x0")
-			X,chi2 = self.process_fit(X,fit='x0')
-			print("fitting x1")
-			X,chi2 = self.process_fit(X,fit='x1')
-			print("fitting principal component 0")
-			X,chi2 = self.process_fit(X,fit='component0')
-			print("fitting principal component 1")
-			X,chi2 = self.process_fit(X,fit='component1')
-			print("fitting color")
-			X,chi2 = self.process_fit(X,fit='color')
-			print("fitting color law")
-			X,chi2 = self.process_fit(X,fit='colorlaw')
-			print('fitting spectral recalibration')
-			X,chi2 = self.process_fit(X,fit='spectralrecalibration')
-
-		return X,chi2 #_init
+			return X,chi2,False
+		 #_init
 	
 	def process_fit(self,X,fit='all',snid=None,doPriors=True,computePCDerivs=False):
-		
+		X=X.copy()
 		#if fit == 'all' or fit == 'components': computePCDerivs = 3
 		#elif fit == 'component0': computePCDerivs=1
 		#elif fit == 'component1': computePCDerivs=2
 		#else: computePCDerivs = 0
 		#computePCDerivs = True
 		#doPriors=False
-		residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors)
-		if fit == 'all':
-			includePars=np.ones(self.npar,dtype=bool)
-		else:
-			includePars=np.zeros(self.npar,dtype=bool)
-			if fit=='components':
-				includePars[self.im0]=True
-				includePars[self.im1]=True
-			elif fit=='component0':
-				includePars[self.im0]=True
-			elif fit=='component1':
-				includePars[self.im1]=True
-			elif fit=='sn':
-				includePars[self.ix0]=True
-				includePars[self.ix1]=True
-			elif fit=='x0':
-				includePars[self.ix0]=True
-			elif fit=='x1':
-				includePars[self.ix1]=True
-			elif fit=='color':
-				includePars[self.ic]=True
-			elif fit=='colorlaw':
-				includePars[self.iCL]=True
-			elif fit=='spectralrecalibration':
-				includePars[self.ispcrcl]=True
-			else:
-				raise NotImplementedError("""This option for a Gaussian Process fit with a 
-restricted parameter set has not been implemented: {}""".format(fit))
-
-		#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
-		includePars=includePars & ~(np.all(0==jacobian,axis=0))
 		
-		print('Number of parameters fit this round: {}'.format(includePars.sum()))
-		jacobian=jacobian[:,includePars]
-		stepsize=linalg.lstsq(jacobian,residuals)[0]
-		#if self.i>4 and fit=='all' and not self.debug: 
-		#	import pdb;pdb.set_trace()
-		#	self.debug=True
-		if np.any(np.isnan(stepsize)):
-			print('NaN detected in stepsize; exitting to debugger')
-			import pdb;pdb.set_trace()
+		residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors)
+		
+		
+		if fit=='all-grouped':
+			designMatrix=np.zeros((self.parlist.size,len([fit for fit in self.fitOptions if 'all' not in fit])))
+			
+			for i,fit in enumerate([fit for fit in self.fitOptions if 'all' not in fit]):
+				includePars=self.fitOptions[fit][1] & ~(np.all(0==jacobian,axis=0))
+				designMatrix[includePars,i]=linalg.lstsq(jacobian[:,includePars],residuals)[0]
 
-		X[includePars] -= stepsize
+			designJacobian=np.dot(jacobian,designMatrix)
+			stepsize=linalg.lstsq(designJacobian,residuals)[0]
+			X-=np.dot(designMatrix,stepsize)
+				
+		else:
+			#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
+			includePars=self.fitOptions[fit][1] & ~(np.all(0==jacobian,axis=0))
+		
+			print('Number of parameters fit this round: {}'.format(includePars.sum()))
+			jacobian=jacobian[:,includePars]
+			stepsize=linalg.lstsq(jacobian,residuals)[0]
+			#if self.i>4 and fit=='all' and not self.debug: 
+			#	import pdb;pdb.set_trace()
+			#	self.debug=True
+			if np.any(np.isnan(stepsize)):
+				print('NaN detected in stepsize; exitting to debugger')
+				import pdb;pdb.set_trace()
+
+			X[includePars] -= stepsize
 
 		# quick eval
 
@@ -660,6 +719,6 @@ restricted parameter set has not been implemented: {}""".format(fit))
 		print((residuals**2).sum(),chi2,(residuals**2).sum()-chi2)
 		#if chi2 != chi2:
 		#	import pdb; pdb.set_trace()
-		
+		if ((residuals**2).sum()-chi2) < -1e16 : import pdb;pdb.set_trace()
 		return X,chi2
 	
