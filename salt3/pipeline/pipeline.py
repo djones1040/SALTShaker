@@ -18,58 +18,110 @@ class SALT3pipe():
         self.LCFitting = LCFitting()
         self.GetMu = GetMu()
         self.CosmoFit = CosmoFit()
+        self.Data = Data()
 
     def gen_input(self):
         pass
+
+    def build(self,mode='default',data=True,skip=None,onlyrun=None):
+        if data:
+            pipe_default = ['data','train','lcfit','getmu','cosmofit']
+        else:
+            pipe_default = ['byosed','sim','train','lcfit','getmu','cosmofit']
+        if mode.startswith('default'):
+            pipepros = pipe_default             
+        elif mode.startswith('customize'):
+            if skip is not None and onlyrun is None:
+                if isinstance(skip,str):
+                    skip = [skip]
+                pipepros = [x for x in pipe_default if x not in skip]
+            elif skip is None and onlyrun is not None:
+                if isinstance(onlyrun,str):
+                    onlyrun = [onlyrun]
+                pipepros = onlyrun
+            else:
+                raise ValueError("skip and onlyrun cannot be used together")
+        self.pipepros = pipepros
+        print("Current procedures: ", self.pipepros)
 
     def configure(self):
         config = configparser.ConfigParser()
         config.read(self.finput)
         m2df = self._multivalues_to_df
-        self.BYOSED.setkeys = m2df(config.get('byosed','set_key'),
-                                   colnames=['section','key','value'])
-        self.BYOSED.configure(baseinput=config.get('byosed','baseinput'),
-                              setkeys=self.BYOSED.setkeys,
-                              outname=config.get('byosed','outinput'))
-        self.Simulation.setkeys = m2df(config.get('simulation','set_key'),
-                                       colnames=['key','value'],
-                                       stackvalues=True)
-        self.Simulation.configure(baseinput=config.get('simulation','baseinput'),
-                                  setkeys=self.Simulation.setkeys,
-                                  outname=config.get('simulation','outinput'),
-                                  pro=config.get('simulation','pro'),
-                                  prooptions=config.get('simulation','prooptions'))
-        self.Training.setkeys = m2df(config.get('training','set_key'),
-                                     colnames=['section','key','value'])
-        self.Training.configure(baseinput=config.get('training','baseinput'),
-                                setkeys=self.Training.setkeys,
-                                outname=config.get('training','outinput'),
-                                pro=config.get('training','pro'),
-                                proargs=config.get('training','proargs'),
-                                prooptions=config.get('training','prooptions'))
-        self.LCFitting.setkeys = m2df(config.get('lcfitting','set_key'),colnames=['section','key','value'])
-        self.LCFitting.configure(baseinput=config.get('lcfitting','baseinput'),
-                                 setkeys=self.LCFitting.setkeys,
-                                 outname=config.get('lcfitting','outinput'),
-                                 pro=config.get('lcfitting','pro'))
-        self.GetMu.setkeys = m2df(config.get('getmu','set_key'),colnames=['key','value'])
-        self.GetMu.configure(baseinput=config.get('getmu','baseinput'),
-                             setkeys=self.GetMu.setkeys,
-                             outname=config.get('getmu','outinput'),
-                             pro=config.get('getmu','pro'),
-                             prooptions=config.get('getmu','prooptions'))
 
-        self.CosmoFit.configure(outname=config.get('cosmofit','outinput'),
-                                pro=config.get('cosmofit','pro'),
-                                prooptions=config.get('getmu','prooptions'))
+        for prostr in self.pipepros:
+            sectionname = [x for x in config.sections() if x.startswith(prostr)]
+            if len(sectionname) == 1:
+                prostr = sectionname[0]
+            pipepro = self._get_pipepro_from_string(prostr)
+            setkeys = self._get_config_option(config,prostr,'set_key')
+            if setkeys is not None:
+                pipepro.setkeys = m2df(setkeys)
+            else:
+                pipepro.setkeys = None
+            baseinput = self._get_config_option(config,prostr,'baseinput')
+            outname = self._get_config_option(config,prostr,'outinput')
+            pro = self._get_config_option(config,prostr,'pro')
+            proargs = self._get_config_option(config,prostr,'proargs')
+            prooptions = self._get_config_option(config,prostr,'prooptions')
+            snlist = self._get_config_option(config,prostr,'snlist')
+            pipepro.configure(baseinput=baseinput,
+                              setkeys=pipepro.setkeys,
+                              outname=outname,
+                              pro=pro,
+                              proargs=proargs,
+                              prooptions=prooptions,
+                              snlist=snlist)
+
+        # self.Data.configure(snlist=config.get('data','snlist'))
+
+        # self.BYOSED.setkeys = m2df(config.get('byosed','set_key'),
+        #                            colnames=['section','key','value'])
+        # self.BYOSED.configure(baseinput=config.get('byosed','baseinput'),
+        #                       setkeys=self.BYOSED.setkeys,
+        #                       outname=config.get('byosed','outinput'))
+        # self.Simulation.setkeys = m2df(config.get('simulation','set_key'),
+        #                                colnames=['key','value'],
+        #                                stackvalues=True)
+        # self.Simulation.configure(baseinput=config.get('simulation','baseinput'),
+        #                           setkeys=self.Simulation.setkeys,
+        #                           outname=config.get('simulation','outinput'),
+        #                           pro=config.get('simulation','pro'),
+        #                           prooptions=config.get('simulation','prooptions'))
+        # self.Training.setkeys = m2df(config.get('training','set_key'),
+        #                              colnames=['section','key','value'])
+        # self.Training.configure(baseinput=config.get('training','baseinput'),
+        #                         setkeys=self.Training.setkeys,
+        #                         outname=config.get('training','outinput'),
+        #                         pro=config.get('training','pro'),
+        #                         proargs=config.get('training','proargs'),
+        #                         prooptions=config.get('training','prooptions'))
+        # self.LCFitting.setkeys = m2df(config.get('lcfitting','set_key'),colnames=['section','key','value'])
+        # self.LCFitting.configure(baseinput=config.get('lcfitting','baseinput'),
+        #                          setkeys=self.LCFitting.setkeys,
+        #                          outname=config.get('lcfitting','outinput'),
+        #                          pro=config.get('lcfitting','pro'))
+        # self.GetMu.setkeys = m2df(config.get('getmu','set_key'),colnames=['key','value'])
+        # self.GetMu.configure(baseinput=config.get('getmu','baseinput'),
+        #                      setkeys=self.GetMu.setkeys,
+        #                      outname=config.get('getmu','outinput'),
+        #                      pro=config.get('getmu','pro'),
+        #                      prooptions=config.get('getmu','prooptions'))
+
+        # self.CosmoFit.configure(outname=config.get('cosmofit','outinput'),
+        #                         pro=config.get('cosmofit','pro'),
+        #                         prooptions=config.get('getmu','prooptions'))
 
 
     def run(self):
-        self.Simulation.run()
-        self.Training.run()
-        self.LCFitting.run()
-        self.GetMu.run()
-        self.CosmoFit.run()
+        for prostr in self.pipepros:
+            pipepro = self._get_pipepro_from_string(prostr)
+            pipepro.run()
+        # self.Simulation.run()
+        # self.Training.run()
+        # self.LCFitting.run()
+        # self.GetMu.run()
+        # self.CosmoFit.run()
         
 
     def glue(self,pipepros=None,on='phot'):
@@ -77,6 +129,7 @@ class SALT3pipe():
             return
         elif not isinstance(pipepros,list) or len(pipepros) !=2:
             raise ValueError("pipepros must be list of length 2, {} of {} was given".format(type(pipepros),len(pipepros)))       
+        print("Connecting ",pipepros)
         
         pro1 = self._get_pipepro_from_string(pipepros[0])
         pro2 = self._get_pipepro_from_string(pipepros[1])
@@ -87,7 +140,6 @@ class SALT3pipe():
             pro2_in = pro2._get_input_info().loc[0]
         pro2_in['value'] = pro1_out
         setkeys = pd.DataFrame([pro2_in])
-        print("Connecting ",pipepros)
         if not pipepros[1].lower().startswith('cosmofit'):
             pro2.configure(setkeys = setkeys,
                            pro=pro2.pro,
@@ -100,6 +152,13 @@ class SALT3pipe():
                            prooptions=pro2.prooptions,
                            outname=setkeys['value'].values[0])            
 
+    def _get_config_option(self,config,prostr,option):
+        if config.has_option(prostr, option):
+            option_value = config.get(prostr,option)
+        else:
+            option_value = None
+        return option_value
+
     def _get_pipepro_from_string(self,pipepro_str):
         if pipepro_str.lower().startswith("sim"):
             pipepro = self.Simulation
@@ -111,6 +170,10 @@ class SALT3pipe():
             pipepro = self.GetMu
         elif pipepro_str.lower().startswith("cosmofit"):
             pipepro = self.CosmoFit
+        elif pipepro_str.lower().startswith("data"):
+            pipepro = self.Data
+        elif pipepro_str.lower().startswith("byosed"):
+            pipepro = self.BYOSED
         else:
             raise ValueError("Unknow pipeline procedure:",pipepro.strip())
         return pipepro
@@ -119,6 +182,15 @@ class SALT3pipe():
         df = pd.DataFrame([s.split() for s in values.split('\n')])
         if df.empty:
             return None
+        if colnames is None:
+            if df.shape[1] == 2:
+                colnames = ['key','value']
+            elif df.shape[1] == 3:
+                if np.any(df.isna()):
+                    colnames = ['key','value']
+                    stackvalues = True
+                else:
+                    colnames=['section','key','value']
         if stackvalues and df.shape[1] > len(colnames):
             numbercol = [colnames[-1]+'.'+str(i) for i in range(df.shape[1]-len(colnames)+1)]
             df.columns = colnames[0:-1] + numbercol
@@ -140,7 +212,10 @@ class PipeProcedure():
 
     def configure(self,pro=None,baseinput=None,setkeys=None,
                   proargs=None,prooptions=None,**kwargs):  
-        self.pro = pro
+        if pro is not None and "$" in pro:
+            self.pro = os.path.expandvars(pro)
+        else:
+            self.pro = pro
         self.baseinput = baseinput
         self.setkeys = setkeys
         self.proargs = proargs
@@ -175,16 +250,55 @@ class PyPipeProcedure(PipeProcedure):
         self.finput,self.keys = _gen_general_python_input(basefilename=self.baseinput,setkeys=self.setkeys,
                                                 outname=outname)
 
+class Data(PipeProcedure):
+
+    def configure(self,snlist=None,**kwargs):
+        self.keys = {'snlist':snlist}
+
+    def _get_output_info(self):
+        df = {}
+        key = 'snlist'
+        df['key'] = key
+        df['value'] = self.keys[key]
+        return pd.DataFrame([df])
+
+    def glueto(self,pipepro):
+        if not isinstance(pipepro,str):
+            pipepro = type(pipepro).__name__
+        snlist = self._get_output_info().value.values[0]
+        if not os.path.exists(snlist):
+            raise ValueError("Path does not exists",snlist)             
+        if pipepro.lower().startswith('train'):
+            return snlist
+        elif pipepro.lower().startswith('lcfit'):
+            simpath = os.path.join(os.environ['SNDATA_ROOT'],'SIM/')
+            idx = snlist.find(simpath)
+            if idx !=0:
+                raise ValueError("photometry must be in $SNDATA_ROOT/SIM")
+            else:
+                return os.path.dirname(snlist[len(simpath):]) 
+        else:
+            raise ValueError("data can only glue to training or lcfitting")
+    
+    def run(self):
+        pass
+
 
 class BYOSED(PyPipeProcedure):
 
     def configure(self,baseinput=None,setkeys=None,
-                  outname="pipeline_byosed_input.input",
+                  outname="pipeline_byosed_input.input",byosed_default="BYOSED/BYOSED.params",
                   bkp_orig_param=False,**kwargs):   
         self.outname = outname
         super().configure(pro=None,baseinput=baseinput,setkeys=setkeys)
         #rename current byosed param
-        byosed_default = "BYOSED/BYOSED.params"
+        if os.path.exists(os.path.dirname(byosed_default)):
+            byosed_default = byosed_default
+        elif os.path.exists(os.path.dirname(byosed_default.lower())):
+            byosed_default = byosed_default.lower()
+        else:
+            raise ValueError("Directory {} does not exists".format(os.path.dirname(byosed_default)))
+
         if bkp_orig_param:
             byosed_rename = "{}.{}".format(byosed_default,int(time.time()))
             if os.path.isfile(byosed_default):
@@ -201,6 +315,9 @@ class BYOSED(PyPipeProcedure):
             raise RuntimeError(shellrun.stdout)
         else:
             print("{} is copied to {}".format(outname,byosed_default))
+
+    def run(self):
+        pass
 
 class Simulation(PipeProcedure):
 
@@ -260,8 +377,11 @@ class Training(PyPipeProcedure):
         if not isinstance(pipepro,str):
             pipepro = type(pipepro).__name__
         if pipepro.lower().startswith('lcfit'):
-            outdir = self._get_output_info()
+            outdir = self._get_output_info().value.values[0]
             ##copy necessary files to a model folder in SNDATA_ROOT
+            modeldir = 'lcfitting/SALT3.test'
+            self.__transfer_model_files(outdir,modeldir,rename=False)
+            return modeldir
         else:
             raise ValueError("training can only glue to lcfit")
 
@@ -283,6 +403,86 @@ class Training(PyPipeProcedure):
         df['value'] = self.keys[section][key]
         return pd.DataFrame([df])
 
+    def __transfer_model_files(self,outdir,modeldir,write_info=True,rename=True):
+        modelfiles = glob.glob('{}/*.dat'.format(outdir))
+        if not modelfiles:
+            raise ValueError("[glueto lcfitting] File does not exists. Run training first")
+        shellcommand = "cp -p {} {}".format(' '.join(modelfiles),modeldir) 
+        shellrun = subprocess.run(list(shellcommand.split()))
+        if shellrun.returncode != 0:
+            raise RuntimeError(shellrun.stderr)
+        else:
+            print("salt3 model files copied to {}".format(modeldir))
+        
+        if write_info:
+            fcolor = os.path.join(modeldir,'salt3_color_correction.dat')
+            pardict = self.__read_color_law(fcolor)
+            finfo = os.path.join(modeldir,'SALT2.INFO')
+            if not os.path.exists(finfo):
+                subprocess.run(['touch',finfo])
+            self.__modify_info_file(finfo,pardict)
+                
+        if rename:
+            files_to_rename = glob.glob('{}/*.dat'.format(modeldir))
+            try:
+                for f in files_to_rename:
+                    shellcommand = "mv {} {}".format(f,f.replace('salt3','salt2'))
+                    shellrun = subprocess.run(list(shellcommand.split()))
+            except:
+                raise ValueError("Can not rename salt3 files")
+    
+    def __modify_info_file(self,finfo,pardict):
+        f = open(finfo,"r")
+        lines = f.readlines()
+        keys = []
+        for i,line in enumerate(lines):
+            if line.strip().startswith('#') or ':' not in line:
+                continue
+            key,value = line.split(':')[0],line.split(':')[1]
+            keys.append(key)
+            if key == 'RESTLAMBDA_RANGE':
+                lines[i] = '{}: {} {}\n'.format(key, pardict['min_lambda'], pardict['max_lambda'])
+            elif key == 'COLORLAW_VERSION':
+                lines[i] = '{}: {}\n'.format(key, pardict['version'])
+            elif key == 'COLORCOR_PARAMS':
+                lines[i] = '{}: {} {} {} {}\n'.format(key, pardict['min_lambda'], 
+                                                       pardict['max_lambda'],
+                                                       pardict['npar'],
+                                                       ' '.join(['{:.6f}'.format(x) for x in pardict['pvalues']]))
+        outfile = open(finfo,"w")
+        for line in lines:
+            outfile.write(line)                                    
+        if 'RESTLAMBDA_RANGE' not in keys:
+            line =  '{}: {} {}\n'.format('RESTLAMBDA_RANGE', pardict['min_lambda'], pardict['max_lambda'])
+            outfile.write(line)
+        elif 'COLORLAW_VERSION' not in keys:
+            line = '{}: {}\n'.format('COLORLAW_VERSION', pardict['version'])
+            outfile.write(line)
+        elif 'COLORCOR_PARAMS' not in keys:
+            lines[i] = '{}: {} {} {} {}\n'.format('COLORCOR_PARAMS', pardict['min_lambda'], 
+                                       pardict['max_lambda'],
+                                       pardict['npar'],
+                                       ' '.join(['{:.2f}'.format(x) for x in pardict['pvalues']]))
+            outfile.write(line)           
+        
+    def __read_color_law(self,fcolor):
+        f = open(fcolor,"r")
+        lines = f.readlines()
+        pardict = {}
+        pars = []
+        for i,line in enumerate(lines):
+            if i == 0:
+                pardict['npar'] = int(line)
+            elif i in range(1,5):
+                pars.append(float(line))
+            else:
+                pname = line.split('Salt2ExtinctionLaw.')[1].split(' ')[0].strip()
+                pvalue = line.split('Salt2ExtinctionLaw.')[1].split(' ')[1].strip()
+                pardict[pname] = pvalue
+        pardict['pvalues'] = pars
+        return pardict    
+
+
 class LCFitting(PipeProcedure):
 
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
@@ -302,7 +502,7 @@ class LCFitting(PipeProcedure):
             pipepro = type(pipepro).__name__
         if pipepro.lower().startswith('getmu'):
             outprefix = self._get_output_info().value.values[0]
-            return glob.glob((str(outprefix)+'*.FITRES.TEXT'))[0]
+            return str(outprefix)+'.FITRES.TEXT'
         else:
             raise ValueError("lcfitting can only glue to getmu")
 

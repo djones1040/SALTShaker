@@ -1,0 +1,2106 @@
+==1362== Memcheck, a memory error detector
+==1362== Copyright (C) 2002-2013, and GNU GPL'd, by Julian Seward et al.
+==1362== Using Valgrind-3.9.0 and LibVEX; rerun with -h for copyright info
+==1362== Command: snlc_sim.exe SIMGEN_BYOSEDTEST.INPUT
+==1362== 
+
+ ****************************************************************** 
+   Begin execution of snlc_sim.exe    
+   Full command: snlc_sim.exe SIMGEN_BYOSEDTEST.INPUT 
+
+ SNDATA_ROOT = /project/rkessler/PRODUCTS/SNDATA_ROOT 
+ SNANA_DIR   = /project2/rkessler/SURVEYS/WFIRST/ROOT/BYOSED_dev/snana 
+  
+  ######################################################## 
+     INIT_SNVAR: Init variables.
+  ######################################################## 
+  
+   Allocate 12.50 MB for CIDMASK array (to check duplicates)
+   HOST MACHINE =    ()
+   SNDATA_ROOT = /project/rkessler/PRODUCTS/SNDATA_ROOT
+   SNANA_DIR = /project2/rkessler/SURVEYS/WFIRST/ROOT/BYOSED_dev/snana    (v10_65l)
+   sizeof(INPUTS) =   0.957 MB 
+   sizeof(GENLC)  =   8.200 MB 
+ --------------------------------------------------------
+  Read user input file 1: SIMGEN_BYOSEDTEST.INPUT 
+
+
+ ****************************************************************** 
+    prep_user_inputs summary   
+	 SIMLIB file        : /project/rkessler/SURVEYS/PS1MD/ROOT/simlib/PS1_LOWZ_COMBINED.SIMLIB   (start LIBID=0)
+	 Generation Version : BYOSEDTEST 
+	 Generation source  : RANDOM 
+	 Generation model   : BYOSED.TEST 
+	 Number of LC to Generate: 0 
+	 OMEGA_(MATTER,LAMBDA)= 0.300, 0.700,    W= -1.00   H0= 70.0 
+	 KCOR  file : /project/rkessler/SURVEYS/PS1MD/ROOT/LOWZ/kcor_PS1_LOWZ_COMBINED.fits 
+	 Observer Gen-FILTERS  :  bcdeghijlmnopqrsuvwxyzACDEFHIJK  
+	 Random number seed: 28473 
+	 Gen-Range for RA(deg)  : -360.000 to  360.000 
+	 Gen-Range for DEC(deg): -360.000 to  360.000 
+	 Gen-Range for ZCMB :  0.509 to  0.583  (sigma= 0.0000, bias=0.00000) 
+	 Gen-Range for PEAKMJD  :  49200.0 to  55500.0  
+	 Gen-Range for Trest    :    -19.0 to     49.0  days 
+	 Gen-Range for SHAPEPAR  :      0.0 to      0.0  
+	 Gen-Range for AV  : 0.00 to 0.00  (dN/dAv = exp(-AV/0.00) 
+	 Gen-Mean  for RV  : 3.10  
+	 Gen-sigma for RV  : 0.00 , 0.00 (lower , upper ) 
+	 Gen-Range for RV  : 2.10 to 4.10 
+	 ZP offsets (bcdeghijlmnopqrsuvwxyzACDEFHIJK) :  0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000
+	 MODEL mag offsets (bcdeghijlmnopqrsuvwxyzACDEFHIJK) :   0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00  0.00
+
+
+ ****************************************************************** 
+    init_RANDOMsource : CIDOFF=5999386   
+
+ ****************************************************************** 
+   SIMLIB_readGlobalHeader_TEXT  
+	 Opened : /project/rkessler/SURVEYS/PS1MD/ROOT/simlib/PS1_LOWZ_COMBINED.SIMLIB 
+
+ ****************************************************************** 
+   SIMLIB_prepGlobalHeader  
+	 SIMLIB Survey    : PS1_LOWZ_COMBINED 
+	 SIMLIB telescope : UNKNOWN 
+	 SIMLIB Filters   : abcdefghijklmnopqrstuvwxyzABCDEFGHIJK 
+	 SIMLIB PSF unit:    ARCSEC_FWHM 
+	 SIMLIB SKYSIG unit: ADU_PER_SQARCSEC 
+
+ *********************************** 
+   SIMULATED VOLUME, TIME, RATE(POWERLAW)
+	 Survey dOmega  = 1.0418e-11 steradians  ( 0.00000 PI) 
+	 Redshift range =  0.5090 -  0.5830
+	 <redsfhit>     =  0.5472  (volume-weighted) 
+	 Survey Volume  = 1.0188e-02  sr*(MPc/h70)^3 
+	 Survey Time    = 17.2603  years/season 
+	 Co-moving Time = 11.1561  years/season  [ T/(1+<z>) ] 
+	 Co-moving V*T  = 1.1366e-01  sr*(MPc/h70)^3 * yr / season 
+	 POWERLAW MODEL:  2.60e-05*(1+z)^2.20  (0.0 < z < 4.0) 
+	    MODEL-RATE(z=0.51) = 6.428e-05/Mpc^3/yr    
+	 Number of EVENTS per season = 7.719051e-06 
+
+  
+  ============================================= 
+  RDKCOR_FITS: Read Calib/Kcor tables.
+    Opened /project/rkessler/SURVEYS/PS1MD/ROOT/LOWZ/kcor_PS1_LOWZ_COMBINED.fits
+    with Blocksize=  1   and ISTAT=     0
+  
+      RDKCOR_FITS_HEAD    
+         Read VERSION      =   3  (kcor.exe version)
+         Read NPRIM        =   1  primary refs
+         Read NFILTERS     =  74  filters
+         Read NKCOR        =   0  K-COR tables
+      RDKCOR_FITS_ZPT 
+      RDKCOR_FITS_SNSED 
+      RDKCOR_FITS_KCOR  
+      RDKCOR_FITS_MAGS  
+      RDKCOR_FITS_FILTERS 
+      RDKCOR_FITS_PRIMARYSED  
+      FTCLOSE  
+         ---------------------- 
+         !!! RDKCOR_SUMMARY !!! 
+         ---------------------- 
+    Primary spectrum: BD17                                    
+  
+  FILTER SUMMARY (RDKCOR) : 
+  internal                    LAM  LAM   rest-lam      primary
+  index name                  AVG  RMS   kcor range    mag   ZP
+ ------------------------------------------------------------------
+  30 CFA3S-B/b               4358  363      0-    0   9.840  0.037
+  31 CFA3S-V/c               5418  346      0-    0   9.470 -0.002
+  32 CFA3S-R/d               6558  651      0-    0   9.134 -0.200
+  33 CFA3S-I/e               8020  471      0-    0   8.837 -0.419
+  02 CFA41-B/g               4355  367      0-    0   9.862  0.056
+  53 CFA41-V/h               5435  352      0-    0   9.473  0.004
+  04 CFA41-r/i               6254  441      0-    0   9.355 -0.001
+  54 CFA41-i/j               7625  435      0-    0   9.251 -0.013
+  56 CFA41-B/l               4355  367      0-    0   9.862  0.056
+  57 CFA41-V/m               5435  352      0-    0   9.473  0.004
+  58 CFA41-r/n               6254  441      0-    0   9.355 -0.001
+  59 CFA41-i/o               7625  435      0-    0   9.251 -0.013
+  60 CFA42-B/p               4483  318      0-    0   9.864  0.138
+  61 CFA42-V/q               5440  348      0-    0   9.473  0.005
+  03 CFA42-r/r               6254  441      0-    0   9.363  0.007
+  62 CFA42-i/s               7625  435      0-    0   9.251 -0.013
+  01 CSP-B/u                 4397  334      0-    0   9.868  0.094
+  64 CSP-o/v                 5417  323      0-    0   9.478  0.008
+  65 CSP-m/w                 5382  333      0-    0   9.473 -0.006
+  66 CSP-n/x                 5388  307      0-    0   9.479  0.004
+  17 CSP-g/y                 4791  432      0-    0   9.653  0.019
+  05 CSP-r/z                 6240  393      0-    0   9.353 -0.003
+  36 CSP-i/A                 7632  404      0-    0   9.234 -0.029
+  37 Bessell-B/C             4393  353      0-    0   9.907  0.131
+  38 Bessell-V/D             5492  358      0-    0   9.464  0.006
+  39 Bessell-R/E             6545  627      0-    0   9.166 -0.168
+  40 Bessell-I/F             8045  463      0-    0   8.846 -0.410
+  08 Bessell-B/H             4393  353      0-    0   9.907  0.131
+  15 Bessell-V/I             5492  358      0-    0   9.464  0.006
+  07 Bessell-R/J             6545  627      0-    0   9.166 -0.168
+  09 Bessell-I/K             8045  463      0-    0   8.846 -0.410
+ ------------------------------------------------------------------
+    NFILTDEF[SURVEY,REST] =   31   0
+  
+  
+   RDKCOR: Done. 
+  ---------------------------------------------- 
+  
+    Zeropoint offsets (ZPOFF) from : KCOR file
+         Will apply net MAGOBS_SHIFT_ZP(b) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(c) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(d) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(e) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(g) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(h) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(i) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(j) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(l) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(m) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(n) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(o) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(p) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(q) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(r) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(s) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(u) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(v) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(w) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(x) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(y) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(z) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(A) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(C) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(D) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(E) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(F) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(H) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(I) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(J) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(K) =  0.0000
+
+
+ ****************************************************************** 
+   init_genmag_BYOSED  
+   path = '/project/rkessler/PRODUCTS/SNDATA_ROOT/models/BYOSED/BYOSED.TEST' 
+   Read primary ref 'BD17' with 1041 lambda bins 
+
+   Defined                                 Lambda           BD17     BD17 
+   Filter                  <LAMBDA>        Range(step)      mag    ZP 
+   ----------------------------------------------------------------------
+   id=30 (   CFA3S-B/b)   ( 4358.3 + 0)   3450- 5900( 10)   9.840  15.314  
+   id=31 (   CFA3S-V/c)   ( 5417.9 + 0)   4700- 6900( 10)   9.470  14.965  
+   id=32 (   CFA3S-R/d)   ( 6558.4 + 0)   5500- 9010( 10)   9.134  15.042  
+   id=33 (   CFA3S-I/e)   ( 8019.8 + 0)   7000- 9010( 10)   8.837  14.446  
+   id=02 (   CFA41-B/g)   ( 4355.2 + 0)   3500- 5740( 10)   9.862  15.362  
+   id=53 (   CFA41-V/h)   ( 5435.0 + 0)   4670- 6700( 10)   9.473  15.003  
+   id=04 (   CFA41-r/i)   ( 6253.5 + 0)   5190- 7540( 10)   9.355  15.230  
+   id=54 (   CFA41-i/j)   ( 7625.3 + 0)   6290- 8680( 10)   9.251  14.909  
+   id=56 (   CFA41-B/l)   ( 4355.2 + 0)   3500- 5740( 10)   9.862  15.362  
+   id=57 (   CFA41-V/m)   ( 5435.0 + 0)   4670- 6700( 10)   9.473  15.003  
+   id=58 (   CFA41-r/n)   ( 6253.5 + 0)   5190- 7540( 10)   9.355  15.230  
+   id=59 (   CFA41-i/o)   ( 7625.3 + 0)   6290- 8680( 10)   9.251  14.909  
+   id=60 (   CFA42-B/p)   ( 4482.9 + 0)   3570- 5800( 10)   9.864  15.219  
+   id=61 (   CFA42-V/q)   ( 5439.6 + 0)   4770- 6600( 10)   9.473  14.995  
+   id=03 (   CFA42-r/r)   ( 6253.5 + 0)   5190- 7540( 10)   9.363  15.238  
+   id=62 (   CFA42-i/s)   ( 7625.3 + 0)   6290- 8680( 10)   9.251  14.909  
+   id=01 (     CSP-B/u)   ( 4397.2 + 0)   3480- 5440( 10)   9.868  14.313  
+   id=64 (     CSP-o/v)   ( 5416.9 + 0)   4490- 6550( 10)   9.478  14.482  
+   id=65 (     CSP-m/w)   ( 5382.2 + 0)   4490- 6550( 10)   9.473  14.518  
+   id=66 (     CSP-n/x)   ( 5387.9 + 0)   4760- 6520( 10)   9.479  14.435  
+   id=17 (     CSP-g/y)   ( 4790.7 + 0)   3700- 5740( 10)   9.653  15.136  
+   id=05 (     CSP-r/z)   ( 6240.1 + 0)   5340- 7170( 10)   9.353  14.907  
+   id=36 (     CSP-i/A)   ( 7631.6 + 0)   6740- 8640( 10)   9.234  14.755  
+   id=37 ( Bessell-B/C)   ( 4393.3 + 0)   3600- 5610( 10)   9.907  15.279  
+   id=38 ( Bessell-V/D)   ( 5491.8 + 0)   4700- 7010( 10)   9.464  14.840  
+   id=39 ( Bessell-R/E)   ( 6545.4 + 0)   5520- 9030( 10)   9.166  15.051  
+   id=40 ( Bessell-I/F)   ( 8044.6 + 0)   7010- 9220( 10)   8.846  14.584  
+   id=08 ( Bessell-B/H)   ( 4393.3 + 0)   3600- 5610( 10)   9.907  15.279  
+   id=15 ( Bessell-V/I)   ( 5491.8 + 0)   4700- 7010( 10)   9.464  14.840  
+   id=07 ( Bessell-R/J)   ( 6545.4 + 0)   5520- 9030( 10)   9.166  15.051  
+   id=09 ( Bessell-I/K)   ( 8044.6 + 0)   7010- 9220( 10)   8.846  14.584  
+   ----------------------------------------------------------------------
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988364: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE95074E: code_dealloc (codeobject.c:364)
+==1362==    by 0xEA1D009: PyImport_ImportFrozenModuleObject (import.c:1275)
+==1362==    by 0xEA1D12E: PyImport_ImportFrozenModule (import.c:1291)
+==1362==    by 0xEA2AD8E: import_init (pythonrun.c:283)
+==1362==    by 0xEA2B4C8: _Py_InitializeEx_Private (pythonrun.c:449)
+==1362==    by 0x4F41C2: init_genmag_BYOSED (genmag_BYOSED.c:91)
+==1362==    by 0x4467B2: init_genmodel (snlc_sim.c:20264)
+==1362==    by 0x40B00B: main (snlc_sim.c:221)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE98837E: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE95074E: code_dealloc (codeobject.c:364)
+==1362==    by 0xEA1D009: PyImport_ImportFrozenModuleObject (import.c:1275)
+==1362==    by 0xEA1D12E: PyImport_ImportFrozenModule (import.c:1291)
+==1362==    by 0xEA2AD8E: import_init (pythonrun.c:283)
+==1362==    by 0xEA2B4C8: _Py_InitializeEx_Private (pythonrun.c:449)
+==1362==    by 0x4F41C2: init_genmag_BYOSED (genmag_BYOSED.c:91)
+==1362==    by 0x4467B2: init_genmodel (snlc_sim.c:20264)
+==1362==    by 0x40B00B: main (snlc_sim.c:221)
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988364: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE994C26: tupledealloc (tupleobject.c:249)
+==1362==    by 0xE9507CE: code_dealloc (codeobject.c:365)
+==1362==    by 0xEA1D009: PyImport_ImportFrozenModuleObject (import.c:1275)
+==1362==    by 0xEA1D12E: PyImport_ImportFrozenModule (import.c:1291)
+==1362==    by 0xEA2AD8E: import_init (pythonrun.c:283)
+==1362==    by 0xEA2B4C8: _Py_InitializeEx_Private (pythonrun.c:449)
+==1362==    by 0x4F41C2: init_genmag_BYOSED (genmag_BYOSED.c:91)
+==1362==    by 0x4467B2: init_genmodel (snlc_sim.c:20264)
+==1362==    by 0x40B00B: main (snlc_sim.c:221)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE98837E: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE994C26: tupledealloc (tupleobject.c:249)
+==1362==    by 0xE9507CE: code_dealloc (codeobject.c:365)
+==1362==    by 0xEA1D009: PyImport_ImportFrozenModuleObject (import.c:1275)
+==1362==    by 0xEA1D12E: PyImport_ImportFrozenModule (import.c:1291)
+==1362==    by 0xEA2AD8E: import_init (pythonrun.c:283)
+==1362==    by 0xEA2B4C8: _Py_InitializeEx_Private (pythonrun.c:449)
+==1362==    by 0x4F41C2: init_genmag_BYOSED (genmag_BYOSED.c:91)
+==1362==    by 0x4467B2: init_genmodel (snlc_sim.c:20264)
+==1362==    by 0x40B00B: main (snlc_sim.c:221)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE9382A7: _PyObject_CallMethodIdObjArgs (abstract.c:2337)
+==1362==    by 0xEA1C226: PyImport_ImportModuleLevelObject (import.c:1636)
+==1362==  Address 0x180d5020 is 2,880 bytes inside a block of size 3,926 free'd
+==1362==    at 0xE0A8C9C: realloc (vg_replace_malloc.c:687)
+==1362==    by 0xE946B50: _PyBytes_Resize (bytesobject.c:2834)
+==1362==    by 0xEA792C1: fileio_readall (fileio.c:709)
+==1362==    by 0xEA796E7: fileio_read (fileio.c:734)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE988C11: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xE946B50: _PyBytes_Resize (bytesobject.c:2834)
+==1362==    by 0xEA792C1: fileio_readall (fileio.c:709)
+==1362==    by 0xEA796E7: fileio_read (fileio.c:734)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==  Address 0x180db020 is 16 bytes before a block of size 32 alloc'd
+==1362==    at 0xE0A8AAA: malloc (vg_replace_malloc.c:291)
+==1362==    by 0xE978F5C: new_dict_with_shared_keys (dictobject.c:412)
+==1362==    by 0xE97BEDC: _PyObjectDict_SetItem (dictobject.c:3778)
+==1362==    by 0xE9866B3: _PyObject_GenericSetAttrWithDict (object.c:1143)
+==1362==    by 0xE986A99: PyObject_SetAttr (object.c:914)
+==1362==    by 0xEA0283C: PyEval_EvalFrameEx (ceval.c:2121)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE94FD3B: method_call (classobject.c:347)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE99F8F2: slot_tp_init (typeobject.c:6023)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE95074E: code_dealloc (codeobject.c:364)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE9382A7: _PyObject_CallMethodIdObjArgs (abstract.c:2337)
+==1362==    by 0xEA1C226: PyImport_ImportModuleLevelObject (import.c:1636)
+==1362==  Address 0x180f5020 is 32,816 bytes inside a block of size 35,510 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE9382A7: _PyObject_CallMethodIdObjArgs (abstract.c:2337)
+==1362==    by 0xEA1C226: PyImport_ImportModuleLevelObject (import.c:1636)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE994C26: tupledealloc (tupleobject.c:249)
+==1362==    by 0xE9507CE: code_dealloc (codeobject.c:365)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE9382A7: _PyObject_CallMethodIdObjArgs (abstract.c:2337)
+==1362==  Address 0x180f5020 is 32,816 bytes inside a block of size 35,510 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE9382A7: _PyObject_CallMethodIdObjArgs (abstract.c:2337)
+==1362==    by 0xEA1C226: PyImport_ImportModuleLevelObject (import.c:1636)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE994C26: tupledealloc (tupleobject.c:249)
+==1362==    by 0xE9507BE: code_dealloc (codeobject.c:366)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE9382A7: _PyObject_CallMethodIdObjArgs (abstract.c:2337)
+==1362==  Address 0x180fb020 is 10 bytes after a block of size 1,046 alloc'd
+==1362==    at 0xE0A8AAA: malloc (vg_replace_malloc.c:291)
+==1362==    by 0xE988057: _PyObject_Malloc (obmalloc.c:1314)
+==1362==    by 0xE9ACBE9: PyUnicode_New (unicodeobject.c:1093)
+==1362==    by 0xE9BA252: _PyUnicode_FromUCS1 (unicodeobject.c:1978)
+==1362==    by 0xEA1E7BA: r_object (marshal.c:1062)
+==1362==    by 0xEA1E919: r_object (marshal.c:1123)
+==1362==    by 0xEA1F560: r_object (marshal.c:1283)
+==1362==    by 0xEA1E919: r_object (marshal.c:1123)
+==1362==    by 0xEA1F560: r_object (marshal.c:1283)
+==1362==    by 0xEA1FD98: marshal_loads (marshal.c:1381)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE950726: code_dealloc (codeobject.c:376)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE9382A7: _PyObject_CallMethodIdObjArgs (abstract.c:2337)
+==1362==    by 0xEA1C226: PyImport_ImportModuleLevelObject (import.c:1636)
+==1362==  Address 0x180fb020 is 10 bytes after a block of size 1,046 alloc'd
+==1362==    at 0xE0A8AAA: malloc (vg_replace_malloc.c:291)
+==1362==    by 0xE988057: _PyObject_Malloc (obmalloc.c:1314)
+==1362==    by 0xE9ACBE9: PyUnicode_New (unicodeobject.c:1093)
+==1362==    by 0xE9BA252: _PyUnicode_FromUCS1 (unicodeobject.c:1978)
+==1362==    by 0xEA1E7BA: r_object (marshal.c:1062)
+==1362==    by 0xEA1E919: r_object (marshal.c:1123)
+==1362==    by 0xEA1F560: r_object (marshal.c:1283)
+==1362==    by 0xEA1E919: r_object (marshal.c:1123)
+==1362==    by 0xEA1F560: r_object (marshal.c:1283)
+==1362==    by 0xEA1FD98: marshal_loads (marshal.c:1381)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE95075E: code_dealloc (codeobject.c:372)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE9382A7: _PyObject_CallMethodIdObjArgs (abstract.c:2337)
+==1362==    by 0xEA1C226: PyImport_ImportModuleLevelObject (import.c:1636)
+==1362==  Address 0x1812d020 is 640 bytes inside a block of size 3,696 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE967F76: list_dealloc (listobject.c:328)
+==1362==    by 0xEA1FDC7: marshal_loads (marshal.c:1688)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE994C26: tupledealloc (tupleobject.c:249)
+==1362==    by 0xE9507CE: code_dealloc (codeobject.c:365)
+==1362==    by 0xE994C0D: tupledealloc (tupleobject.c:236)
+==1362==    by 0xE9507CE: code_dealloc (codeobject.c:365)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==  Address 0x1815d020 is 6,432 bytes inside a block of size 8,504 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE9382A7: _PyObject_CallMethodIdObjArgs (abstract.c:2337)
+==1362==    by 0xEA1C226: PyImport_ImportModuleLevelObject (import.c:1636)
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988C1A: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xE946B50: _PyBytes_Resize (bytesobject.c:2834)
+==1362==    by 0xEA792C1: fileio_readall (fileio.c:709)
+==1362==    by 0xEA796E7: fileio_read (fileio.c:734)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE988C69: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xE946B50: _PyBytes_Resize (bytesobject.c:2834)
+==1362==    by 0xEA792C1: fileio_readall (fileio.c:709)
+==1362==    by 0xEA796E7: fileio_read (fileio.c:734)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE950726: code_dealloc (codeobject.c:376)
+==1362==    by 0xE994C0D: tupledealloc (tupleobject.c:236)
+==1362==    by 0xE9507CE: code_dealloc (codeobject.c:365)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==  Address 0x18294020 is 448 bytes inside a block of size 1,568 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE97AB61: dictresize (dictobject.c:982)
+==1362==    by 0xE97AEB4: insertdict (dictobject.c:792)
+==1362==    by 0xEA04F14: PyEval_EvalFrameEx (ceval.c:2041)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362==    by 0xEA04D14: PyEval_EvalFrameEx (ceval.c:4555)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE988C11: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xE946B50: _PyBytes_Resize (bytesobject.c:2834)
+==1362==    by 0xEA7D007: buffered_read1 (bufferedio.c:987)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE938427: PyObject_CallMethodObjArgs (abstract.c:2308)
+==1362==    by 0xEA84ADC: textiowrapper_read_chunk (textio.c:1486)
+==1362==    by 0xEA8503F: _textiowrapper_readline (textio.c:1790)
+==1362==    by 0xEA857E3: textiowrapper_iternext (textio.c:2640)
+==1362==    by 0xE95651C: enum_next (enumobject.c:130)
+==1362==    by 0xEA01A78: PyEval_EvalFrameEx (ceval.c:2660)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==  Address 0x187b8020 is 0 bytes after a block of size 32 alloc'd
+==1362==    at 0xE0A8AAA: malloc (vg_replace_malloc.c:291)
+==1362==    by 0xE978F5C: new_dict_with_shared_keys (dictobject.c:412)
+==1362==    by 0xE97BEDC: _PyObjectDict_SetItem (dictobject.c:3778)
+==1362==    by 0xE9866B3: _PyObject_GenericSetAttrWithDict (object.c:1143)
+==1362==    by 0xE986A99: PyObject_SetAttr (object.c:914)
+==1362==    by 0xEA0283C: PyEval_EvalFrameEx (ceval.c:2121)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE94FD3B: method_call (classobject.c:347)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xEA84C06: textiowrapper_read_chunk (textio.c:1542)
+==1362==    by 0xEA8503F: _textiowrapper_readline (textio.c:1790)
+==1362==    by 0xEA857E3: textiowrapper_iternext (textio.c:2640)
+==1362==    by 0xE95651C: enum_next (enumobject.c:130)
+==1362==    by 0xEA01A78: PyEval_EvalFrameEx (ceval.c:2660)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==  Address 0x187ba020 is 7,840 bytes inside a block of size 8,225 free'd
+==1362==    at 0xE0A8C9C: realloc (vg_replace_malloc.c:687)
+==1362==    by 0xE946B50: _PyBytes_Resize (bytesobject.c:2834)
+==1362==    by 0xEA7D007: buffered_read1 (bufferedio.c:987)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE938427: PyObject_CallMethodObjArgs (abstract.c:2308)
+==1362==    by 0xEA84ADC: textiowrapper_read_chunk (textio.c:1486)
+==1362==    by 0xEA8503F: _textiowrapper_readline (textio.c:1790)
+==1362==    by 0xEA857E3: textiowrapper_iternext (textio.c:2640)
+==1362==    by 0xE95651C: enum_next (enumobject.c:130)
+==1362==    by 0xEA01A78: PyEval_EvalFrameEx (ceval.c:2660)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988364: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE92C1AC: PyGrammar_AddAccelerators (acceler.c:124)
+==1362==    by 0xE92D7F4: PyParser_New (parser.c:77)
+==1362==    by 0xE930206: parsetok (parsetok.c:191)
+==1362==    by 0xEA28CD1: PyParser_ASTFromStringObject (pythonrun.c:2311)
+==1362==    by 0xEA2B9B2: PyRun_StringFlags (pythonrun.c:2102)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE98837E: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE92C1AC: PyGrammar_AddAccelerators (acceler.c:124)
+==1362==    by 0xE92D7F4: PyParser_New (parser.c:77)
+==1362==    by 0xE930206: parsetok (parsetok.c:191)
+==1362==    by 0xEA28CD1: PyParser_ASTFromStringObject (pythonrun.c:2311)
+==1362==    by 0xEA2B9B2: PyRun_StringFlags (pythonrun.c:2102)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE92C1AC: PyGrammar_AddAccelerators (acceler.c:124)
+==1362==    by 0xE92D7F4: PyParser_New (parser.c:77)
+==1362==    by 0xE930206: parsetok (parsetok.c:191)
+==1362==    by 0xEA28CD1: PyParser_ASTFromStringObject (pythonrun.c:2311)
+==1362==    by 0xEA2B9B2: PyRun_StringFlags (pythonrun.c:2102)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==  Address 0x187bd020 is 304 bytes inside a block of size 676 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE92C1AC: PyGrammar_AddAccelerators (acceler.c:124)
+==1362==    by 0xE92D7F4: PyParser_New (parser.c:77)
+==1362==    by 0xE930206: parsetok (parsetok.c:191)
+==1362==    by 0xEA28CD1: PyParser_ASTFromStringObject (pythonrun.c:2311)
+==1362==    by 0xEA2B9B2: PyRun_StringFlags (pythonrun.c:2102)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xEA0739D: compiler_unit_free (compile.c:505)
+==1362==    by 0xEA10DF8: PyAST_CompileObject (compile.c:642)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==  Address 0x1881b020 is 288 bytes inside a block of size 768 free'd
+==1362==    at 0xE0A8C9C: realloc (vg_replace_malloc.c:687)
+==1362==    by 0xEA07908: compiler_next_instr (compile.c:821)
+==1362==    by 0xEA091C9: compiler_nameop (compile.c:1187)
+==1362==    by 0xEA0C66F: compiler_call_helper (compile.c:3005)
+==1362==    by 0xEA0C66F: compiler_call_helper (compile.c:3005)
+==1362==    by 0xEA0DDD1: compiler_visit_stmt (compile.c:2534)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988364: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xEA84C06: textiowrapper_read_chunk (textio.c:1542)
+==1362==    by 0xEA8503F: _textiowrapper_readline (textio.c:1790)
+==1362==    by 0xEA857E3: textiowrapper_iternext (textio.c:2640)
+==1362==    by 0xE95651C: enum_next (enumobject.c:130)
+==1362==    by 0xEA01A78: PyEval_EvalFrameEx (ceval.c:2660)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE98837E: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xEA84C06: textiowrapper_read_chunk (textio.c:1542)
+==1362==    by 0xEA8503F: _textiowrapper_readline (textio.c:1790)
+==1362==    by 0xEA857E3: textiowrapper_iternext (textio.c:2640)
+==1362==    by 0xE95651C: enum_next (enumobject.c:130)
+==1362==    by 0xEA01A78: PyEval_EvalFrameEx (ceval.c:2660)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988C1A: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xEA07908: compiler_next_instr (compile.c:821)
+==1362==    by 0xEA091C9: compiler_nameop (compile.c:1187)
+==1362==    by 0xEA0C66F: compiler_call_helper (compile.c:3005)
+==1362==    by 0xEA0C66F: compiler_call_helper (compile.c:3005)
+==1362==    by 0xEA0DDD1: compiler_visit_stmt (compile.c:2534)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE988C69: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xEA07908: compiler_next_instr (compile.c:821)
+==1362==    by 0xEA091C9: compiler_nameop (compile.c:1187)
+==1362==    by 0xEA0C66F: compiler_call_helper (compile.c:3005)
+==1362==    by 0xEA0C66F: compiler_call_helper (compile.c:3005)
+==1362==    by 0xEA0DDD1: compiler_visit_stmt (compile.c:2534)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988364: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE92CA82: freechildren (node.c:146)
+==1362==    by 0xE92CB4D: PyNode_Free (node.c:124)
+==1362==    by 0xEA28D04: PyParser_ASTFromStringObject (pythonrun.c:2321)
+==1362==    by 0xEA2B9B2: PyRun_StringFlags (pythonrun.c:2102)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE98837E: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE92CA82: freechildren (node.c:146)
+==1362==    by 0xE92CB4D: PyNode_Free (node.c:124)
+==1362==    by 0xEA28D04: PyParser_ASTFromStringObject (pythonrun.c:2321)
+==1362==    by 0xEA2B9B2: PyRun_StringFlags (pythonrun.c:2102)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE988C11: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xEA07908: compiler_next_instr (compile.c:821)
+==1362==    by 0xEA091C9: compiler_nameop (compile.c:1187)
+==1362==    by 0xEA0DE4D: compiler_visit_stmt (compile.c:2538)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==  Address 0x18878020 is not stack'd, malloc'd or (recently) free'd
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE988C11: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xEA07908: compiler_next_instr (compile.c:821)
+==1362==    by 0xEA091C9: compiler_nameop (compile.c:1187)
+==1362==    by 0xEA0C66F: compiler_call_helper (compile.c:3005)
+==1362==    by 0xEA0C66F: compiler_call_helper (compile.c:3005)
+==1362==    by 0xEA0DDD1: compiler_visit_stmt (compile.c:2534)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==  Address 0x18bff020 is 144 bytes inside a block of size 224 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE97AB61: dictresize (dictobject.c:982)
+==1362==    by 0xE97AEB4: insertdict (dictobject.c:792)
+==1362==    by 0xEA2D155: symtable_add_def (symtable.c:1049)
+==1362==    by 0xEA2D811: symtable_visit_expr (symtable.c:1479)
+==1362==    by 0xEA2E56C: symtable_visit_stmt (symtable.c:1231)
+==1362==    by 0xEA302FC: PySymtable_BuildObject (symtable.c:279)
+==1362==    by 0xEA10BC8: PyAST_CompileObject (compile.c:325)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE9B2FD3: _PyUnicodeWriter_PrepareInternal (unicodeobject.c:13321)
+==1362==    by 0xE9C9B6E: PyUnicode_DecodeUTF8Stateful (unicodeobject.c:13333)
+==1362==    by 0xEA1EDA7: r_object (marshal.c:1089)
+==1362==    by 0xEA1E919: r_object (marshal.c:1123)
+==1362==    by 0xEA1F560: r_object (marshal.c:1283)
+==1362==    by 0xEA1FD98: marshal_loads (marshal.c:1381)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==  Address 0x1889b020 is 240 bytes inside a block of size 848 free'd
+==1362==    at 0xE0A8C9C: realloc (vg_replace_malloc.c:687)
+==1362==    by 0xE96A4AD: PyList_Append (listobject.c:63)
+==1362==    by 0xEA1E214: r_ref (marshal.c:833)
+==1362==    by 0xEA1EF9C: r_object (marshal.c:1099)
+==1362==    by 0xEA1E919: r_object (marshal.c:1123)
+==1362==    by 0xEA1F560: r_object (marshal.c:1283)
+==1362==    by 0xEA1FD98: marshal_loads (marshal.c:1381)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE988C11: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xE9B0353: resize_compact (unicodeobject.c:730)
+==1362==    by 0xE9C2143: _PyUnicodeWriter_Finish (unicodeobject.c:13501)
+==1362==    by 0xE9C8F92: PyUnicode_DecodeUTF8Stateful (unicodeobject.c:4805)
+==1362==    by 0xEA1EDA7: r_object (marshal.c:1089)
+==1362==    by 0xEA1E919: r_object (marshal.c:1123)
+==1362==    by 0xEA1F560: r_object (marshal.c:1283)
+==1362==    by 0xEA1FD98: marshal_loads (marshal.c:1381)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==  Address 0x18c06020 is 208 bytes inside a block of size 1,008 free'd
+==1362==    at 0xE0A8C9C: realloc (vg_replace_malloc.c:687)
+==1362==    by 0xE96A4AD: PyList_Append (listobject.c:63)
+==1362==    by 0xEA1E214: r_ref (marshal.c:833)
+==1362==    by 0xEA1EF9C: r_object (marshal.c:1099)
+==1362==    by 0xEA1E919: r_object (marshal.c:1123)
+==1362==    by 0xEA1F560: r_object (marshal.c:1283)
+==1362==    by 0xEA1FD98: marshal_loads (marshal.c:1381)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE988C11: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xEA44AE4: _PyObject_GC_Resize (gcmodule.c:1778)
+==1362==    by 0xE964A14: PyFrame_New (frameobject.c:684)
+==1362==    by 0xEA0640E: PyEval_EvalCodeEx (ceval.c:3411)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362==    by 0xEA04D14: PyEval_EvalFrameEx (ceval.c:4555)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==  Address 0x18270020 is 48 bytes inside a block of size 224 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE97A88B: dict_dealloc (dictobject.c:1391)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA066D8: PyEval_EvalCodeEx (ceval.c:3596)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE95074E: code_dealloc (codeobject.c:364)
+==1362==    by 0xE994C0D: tupledealloc (tupleobject.c:236)
+==1362==    by 0xE9507CE: code_dealloc (codeobject.c:365)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==  Address 0x18fee020 is 128 bytes inside a block of size 280 free'd
+==1362==    at 0xE0A8C9C: realloc (vg_replace_malloc.c:687)
+==1362==    by 0xE96A4AD: PyList_Append (listobject.c:63)
+==1362==    by 0xEA1E214: r_ref (marshal.c:833)
+==1362==    by 0xEA1EF9C: r_object (marshal.c:1099)
+==1362==    by 0xEA1E919: r_object (marshal.c:1123)
+==1362==    by 0xEA1F579: r_object (marshal.c:1286)
+==1362==    by 0xEA1E919: r_object (marshal.c:1123)
+==1362==    by 0xEA1F560: r_object (marshal.c:1283)
+==1362==    by 0xEA1FD98: marshal_loads (marshal.c:1381)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE999E4B: type_dealloc (typeobject.c:2888)
+==1362==    by 0xEA45EB1: collect (gcmodule.c:867)
+==1362==    by 0xEA46517: _PyObject_GC_Malloc (gcmodule.c:1140)
+==1362==    by 0xEA465B1: _PyObject_GC_NewVar (gcmodule.c:1765)
+==1362==    by 0xE994E3E: PyTuple_New (tupleobject.c:104)
+==1362==    by 0xEA1E8CD: r_object (marshal.c:1117)
+==1362==    by 0xEA1E919: r_object (marshal.c:1123)
+==1362==    by 0xEA1F560: r_object (marshal.c:1283)
+==1362==    by 0xEA1FD98: marshal_loads (marshal.c:1381)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==  Address 0x18824020 is 64 bytes inside a block of size 224 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE97A88B: dict_dealloc (dictobject.c:1391)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA066D8: PyEval_EvalCodeEx (ceval.c:3596)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE988C11: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xEA44AE4: _PyObject_GC_Resize (gcmodule.c:1778)
+==1362==    by 0xE964A14: PyFrame_New (frameobject.c:684)
+==1362==    by 0xEA06074: PyEval_EvalFrameEx (ceval.c:4320)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==  Address 0x1ab67020 is 0 bytes after a block of size 32 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE97A729: dict_dealloc (dictobject.c:1385)
+==1362==    by 0xE998D91: subtype_dealloc (typeobject.c:1157)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA066D8: PyEval_EvalCodeEx (ceval.c:3596)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362==    by 0xEA04D14: PyEval_EvalFrameEx (ceval.c:4555)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE994C26: tupledealloc (tupleobject.c:249)
+==1362==    by 0xE9507BE: code_dealloc (codeobject.c:366)
+==1362==    by 0xE994C0D: tupledealloc (tupleobject.c:236)
+==1362==    by 0xE9507CE: code_dealloc (codeobject.c:365)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==  Address 0x1acc0020 is 1,712 bytes inside a block of size 2,152 free'd
+==1362==    at 0xE0A8C9C: realloc (vg_replace_malloc.c:687)
+==1362==    by 0xE96A4AD: PyList_Append (listobject.c:63)
+==1362==    by 0xEA1E214: r_ref (marshal.c:833)
+==1362==    by 0xEA1EF9C: r_object (marshal.c:1099)
+==1362==    by 0xEA1E919: r_object (marshal.c:1123)
+==1362==    by 0xEA1F592: r_object (marshal.c:1289)
+==1362==    by 0xEA1E919: r_object (marshal.c:1123)
+==1362==    by 0xEA1F560: r_object (marshal.c:1283)
+==1362==    by 0xEA1E919: r_object (marshal.c:1123)
+==1362==    by 0xEA1F560: r_object (marshal.c:1283)
+==1362==    by 0xEA1FD98: marshal_loads (marshal.c:1381)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE988C11: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xE9B0353: resize_compact (unicodeobject.c:730)
+==1362==    by 0xE9B2F6A: _PyUnicodeWriter_PrepareInternal (unicodeobject.c:13308)
+==1362==    by 0xE9C1C6F: _PyUnicodeWriter_WriteSubstring (unicodeobject.c:13402)
+==1362==    by 0xE9C4221: build_string (unicode_format.h:879)
+==1362==    by 0xE9C48B8: do_string_format (unicode_format.h:950)
+==1362==    by 0xEA05168: PyEval_EvalFrameEx (ceval.c:4460)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362==  Address 0x1ae41020 is 16 bytes after a block of size 224 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE97A88B: dict_dealloc (dictobject.c:1391)
+==1362==    by 0xEA03F26: PyEval_EvalFrameEx (ceval.c:4466)
+==1362==    by 0xE95DC65: gen_send_ex (genobject.c:104)
+==1362==    by 0xE96B805: listextend (listobject.c:855)
+==1362==    by 0xE9394B1: PySequence_List (abstract.c:1741)
+==1362==    by 0xE93955B: PySequence_Fast (abstract.c:1770)
+==1362==    by 0xE9BA52F: PyUnicode_Join (unicodeobject.c:9671)
+==1362==    by 0xEA0527D: PyEval_EvalFrameEx (ceval.c:4221)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE988C11: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xE9B0353: resize_compact (unicodeobject.c:730)
+==1362==    by 0xE9C2143: _PyUnicodeWriter_Finish (unicodeobject.c:13501)
+==1362==    by 0xE9C4699: build_string (unicode_format.h:924)
+==1362==    by 0xE9C48B8: do_string_format (unicode_format.h:950)
+==1362==    by 0xEA05168: PyEval_EvalFrameEx (ceval.c:4460)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362==    by 0xEA04D14: PyEval_EvalFrameEx (ceval.c:4555)
+==1362==  Address 0x1ae41020 is 16 bytes after a block of size 224 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE97A88B: dict_dealloc (dictobject.c:1391)
+==1362==    by 0xEA03F26: PyEval_EvalFrameEx (ceval.c:4466)
+==1362==    by 0xE95DC65: gen_send_ex (genobject.c:104)
+==1362==    by 0xE96B805: listextend (listobject.c:855)
+==1362==    by 0xE9394B1: PySequence_List (abstract.c:1741)
+==1362==    by 0xE93955B: PySequence_Fast (abstract.c:1770)
+==1362==    by 0xE9BA52F: PyUnicode_Join (unicodeobject.c:9671)
+==1362==    by 0xEA0527D: PyEval_EvalFrameEx (ceval.c:4221)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE92CA24: freechildren (node.c:146)
+==1362==    by 0xE92CB4D: PyNode_Free (node.c:124)
+==1362==    by 0xEA28D04: PyParser_ASTFromStringObject (pythonrun.c:2321)
+==1362==    by 0xEA2B9B2: PyRun_StringFlags (pythonrun.c:2102)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362==  Address 0x1ae4f020 is 34,384 bytes inside a block of size 36,032 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE9304E5: parsetok (parsetok.c:314)
+==1362==    by 0xEA28CD1: PyParser_ASTFromStringObject (pythonrun.c:2311)
+==1362==    by 0xEA2B9B2: PyRun_StringFlags (pythonrun.c:2102)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362==    by 0xEA04D14: PyEval_EvalFrameEx (ceval.c:4555)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xEA0739D: compiler_unit_free (compile.c:505)
+==1362==    by 0xEA08045: compiler_exit_scope (compile.c:642)
+==1362==    by 0xEA0D89C: compiler_function (compile.c:1695)
+==1362==    by 0xEA0F6BD: compiler_class (compile.c:1348)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==  Address 0x1ae5a020 is 784 bytes inside a block of size 2,048 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xEA2441A: PyCode_Optimize (peephole.c:712)
+==1362==    by 0xEA0A041: assemble (compile.c:4259)
+==1362==    by 0xEA0D885: compiler_function (compile.c:1692)
+==1362==    by 0xEA0F6BD: compiler_class (compile.c:1348)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE988C11: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xEA07908: compiler_next_instr (compile.c:821)
+==1362==    by 0xEA0A5BB: compiler_make_closure (compile.c:1187)
+==1362==    by 0xEA0D8DA: compiler_function (compile.c:1705)
+==1362==    by 0xEA0F6BD: compiler_class (compile.c:1348)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==  Address 0x1ae5a020 is 784 bytes inside a block of size 2,048 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xEA2441A: PyCode_Optimize (peephole.c:712)
+==1362==    by 0xEA0A041: assemble (compile.c:4259)
+==1362==    by 0xEA0D885: compiler_function (compile.c:1692)
+==1362==    by 0xEA0F6BD: compiler_class (compile.c:1348)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE988C11: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xEA07908: compiler_next_instr (compile.c:821)
+==1362==    by 0xEA079A7: compiler_addop_i (compile.c:1187)
+==1362==    by 0xEA0C7C5: compiler_call_helper (compile.c:3029)
+==1362==    by 0xEA0C66F: compiler_call_helper (compile.c:3005)
+==1362==    by 0xEA0DDD1: compiler_visit_stmt (compile.c:2534)
+==1362==    by 0xEA0F6BD: compiler_class (compile.c:1348)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==  Address 0x1ae60020 is 336 bytes inside a block of size 2,048 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xEA2441A: PyCode_Optimize (peephole.c:712)
+==1362==    by 0xEA0A041: assemble (compile.c:4259)
+==1362==    by 0xEA0D885: compiler_function (compile.c:1692)
+==1362==    by 0xEA0F6BD: compiler_class (compile.c:1348)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xEA0739D: compiler_unit_free (compile.c:505)
+==1362==    by 0xEA08045: compiler_exit_scope (compile.c:642)
+==1362==    by 0xEA0F858: compiler_class (compile.c:1807)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==  Address 0x1ae67020 is 16 bytes after a block of size 2,048 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xEA2441A: PyCode_Optimize (peephole.c:712)
+==1362==    by 0xEA0A041: assemble (compile.c:4259)
+==1362==    by 0xEA0D885: compiler_function (compile.c:1692)
+==1362==    by 0xEA0F6BD: compiler_class (compile.c:1348)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988C1A: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xEA44AE4: _PyObject_GC_Resize (gcmodule.c:1778)
+==1362==    by 0xE964A14: PyFrame_New (frameobject.c:684)
+==1362==    by 0xEA06074: PyEval_EvalFrameEx (ceval.c:4320)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE988C69: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xEA44AE4: _PyObject_GC_Resize (gcmodule.c:1778)
+==1362==    by 0xE964A14: PyFrame_New (frameobject.c:684)
+==1362==    by 0xEA06074: PyEval_EvalFrameEx (ceval.c:4320)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988C1A: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xE92C6A9: PyNode_AddChild (node.c:98)
+==1362==    by 0xE92D4EA: PyParser_AddToken (parser.c:126)
+==1362==    by 0xE93028D: parsetok (parsetok.c:263)
+==1362==    by 0xEA28CD1: PyParser_ASTFromStringObject (pythonrun.c:2311)
+==1362==    by 0xEA2B9B2: PyRun_StringFlags (pythonrun.c:2102)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE988C69: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xE92C6A9: PyNode_AddChild (node.c:98)
+==1362==    by 0xE92D4EA: PyParser_AddToken (parser.c:126)
+==1362==    by 0xE93028D: parsetok (parsetok.c:263)
+==1362==    by 0xEA28CD1: PyParser_ASTFromStringObject (pythonrun.c:2311)
+==1362==    by 0xEA2B9B2: PyRun_StringFlags (pythonrun.c:2102)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE988C11: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xEA07908: compiler_next_instr (compile.c:821)
+==1362==    by 0xEA0A536: compiler_make_closure (compile.c:1187)
+==1362==    by 0xEA0D8DA: compiler_function (compile.c:1705)
+==1362==    by 0xEA0F6BD: compiler_class (compile.c:1348)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==  Address 0x1b965020 is 1,488 bytes inside a block of size 2,048 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xEA2441A: PyCode_Optimize (peephole.c:712)
+==1362==    by 0xEA0A041: assemble (compile.c:4259)
+==1362==    by 0xEA0D885: compiler_function (compile.c:1692)
+==1362==    by 0xEA0F6BD: compiler_class (compile.c:1348)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE988C11: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xEA07908: compiler_next_instr (compile.c:821)
+==1362==    by 0xEA08E8C: compiler_addop_o (compile.c:1187)
+==1362==    by 0xEA0B0E4: compiler_visit_expr (compile.c:3486)
+==1362==    by 0xEA0C66F: compiler_call_helper (compile.c:3005)
+==1362==    by 0xEA0C66F: compiler_call_helper (compile.c:3005)
+==1362==    by 0xEA0DDD1: compiler_visit_stmt (compile.c:2534)
+==1362==    by 0xEA0F6BD: compiler_class (compile.c:1348)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==  Address 0x1b96b020 is 1,040 bytes inside a block of size 2,048 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xEA2441A: PyCode_Optimize (peephole.c:712)
+==1362==    by 0xEA0A041: assemble (compile.c:4259)
+==1362==    by 0xEA0D885: compiler_function (compile.c:1692)
+==1362==    by 0xEA0F6BD: compiler_class (compile.c:1348)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE950726: code_dealloc (codeobject.c:376)
+==1362==    by 0xEA2BA06: PyRun_StringFlags (pythonrun.c:2181)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362==    by 0xEA04D14: PyEval_EvalFrameEx (ceval.c:4555)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==  Address 0x1b946020 is 128 bytes inside a block of size 416 free'd
+==1362==    at 0xE0A8C9C: realloc (vg_replace_malloc.c:687)
+==1362==    by 0xE96A807: listappend (listobject.c:63)
+==1362==    by 0xEA0527D: PyEval_EvalFrameEx (ceval.c:4221)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xEA00F01: PyEval_EvalFrameEx (ceval.c:1556)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362==    by 0xEA04D14: PyEval_EvalFrameEx (ceval.c:4555)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==  Address 0x1b979020 is 16 bytes inside a block of size 48 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE967F76: list_dealloc (listobject.c:328)
+==1362==    by 0xE967F64: list_dealloc (listobject.c:326)
+==1362==    by 0xE9A240C: mro_implementation (typeobject.c:1711)
+==1362==    by 0xE99FE3A: mro_internal (typeobject.c:1735)
+==1362==    by 0xE9A04F7: PyType_Ready (typeobject.c:4659)
+==1362==    by 0xE9A2E5E: type_new (typeobject.c:2518)
+==1362==    by 0xE996932: type_call (typeobject.c:854)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE9FCC52: PyEval_CallObjectWithKeywords (ceval.c:4111)
+==1362==    by 0xE9FC447: builtin___build_class__ (bltinmodule.c:180)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE988C11: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xE9B0353: resize_compact (unicodeobject.c:730)
+==1362==    by 0xE9B0869: unicode_resize (unicodeobject.c:1676)
+==1362==    by 0xE9B0C77: PyUnicode_Append (unicodeobject.c:11069)
+==1362==    by 0xE9FD795: unicode_concatenate (ceval.c:4811)
+==1362==    by 0xEA0426F: PyEval_EvalFrameEx (ceval.c:1549)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362==    by 0xEA04D14: PyEval_EvalFrameEx (ceval.c:4555)
+==1362==  Address 0x1b979020 is 16 bytes inside a block of size 48 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE967F76: list_dealloc (listobject.c:328)
+==1362==    by 0xE967F64: list_dealloc (listobject.c:326)
+==1362==    by 0xE9A240C: mro_implementation (typeobject.c:1711)
+==1362==    by 0xE99FE3A: mro_internal (typeobject.c:1735)
+==1362==    by 0xE9A04F7: PyType_Ready (typeobject.c:4659)
+==1362==    by 0xE9A2E5E: type_new (typeobject.c:2518)
+==1362==    by 0xE996932: type_call (typeobject.c:854)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE9FCC52: PyEval_CallObjectWithKeywords (ceval.c:4111)
+==1362==    by 0xE9FC447: builtin___build_class__ (bltinmodule.c:180)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xEA00F01: PyEval_EvalFrameEx (ceval.c:1556)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362==    by 0xEA04D14: PyEval_EvalFrameEx (ceval.c:4555)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==  Address 0x1b979020 is 16 bytes inside a block of size 48 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE967F76: list_dealloc (listobject.c:328)
+==1362==    by 0xE967F64: list_dealloc (listobject.c:326)
+==1362==    by 0xE9A240C: mro_implementation (typeobject.c:1711)
+==1362==    by 0xE99FE3A: mro_internal (typeobject.c:1735)
+==1362==    by 0xE9A04F7: PyType_Ready (typeobject.c:4659)
+==1362==    by 0xE9A2E5E: type_new (typeobject.c:2518)
+==1362==    by 0xE996932: type_call (typeobject.c:854)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE9FCC52: PyEval_CallObjectWithKeywords (ceval.c:4111)
+==1362==    by 0xE9FC447: builtin___build_class__ (bltinmodule.c:180)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE988C11: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xE9B0353: resize_compact (unicodeobject.c:730)
+==1362==    by 0xE9B2F6A: _PyUnicodeWriter_PrepareInternal (unicodeobject.c:13308)
+==1362==    by 0xE9B54AA: _PyUnicodeWriter_WriteStr (unicodeobject.c:13367)
+==1362==    by 0xEA3E2DA: _PyUnicode_FormatAdvancedWriter (formatter_unicode.c:765)
+==1362==    by 0xE9C3461: render_field (unicode_format.h:513)
+==1362==    by 0xE9C461B: build_string (unicode_format.h:840)
+==1362==    by 0xE9C48B8: do_string_format (unicode_format.h:950)
+==1362==    by 0xEA05168: PyEval_EvalFrameEx (ceval.c:4460)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==  Address 0x1b986020 is 0 bytes after a block of size 224 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE97A88B: dict_dealloc (dictobject.c:1391)
+==1362==    by 0xEA03F26: PyEval_EvalFrameEx (ceval.c:4466)
+==1362==    by 0xE95DC65: gen_send_ex (genobject.c:104)
+==1362==    by 0xE96B82D: listextend (listobject.c:855)
+==1362==    by 0xE9394B1: PySequence_List (abstract.c:1741)
+==1362==    by 0xE93955B: PySequence_Fast (abstract.c:1770)
+==1362==    by 0xE9BA52F: PyUnicode_Join (unicodeobject.c:9671)
+==1362==    by 0xEA0527D: PyEval_EvalFrameEx (ceval.c:4221)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988C1A: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xE92C6A9: PyNode_AddChild (node.c:98)
+==1362==    by 0xE92D681: PyParser_AddToken (parser.c:112)
+==1362==    by 0xE93028D: parsetok (parsetok.c:263)
+==1362==    by 0xEA28CD1: PyParser_ASTFromStringObject (pythonrun.c:2311)
+==1362==    by 0xEA2B9B2: PyRun_StringFlags (pythonrun.c:2102)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE988C69: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xE92C6A9: PyNode_AddChild (node.c:98)
+==1362==    by 0xE92D681: PyParser_AddToken (parser.c:112)
+==1362==    by 0xE93028D: parsetok (parsetok.c:263)
+==1362==    by 0xEA28CD1: PyParser_ASTFromStringObject (pythonrun.c:2311)
+==1362==    by 0xEA2B9B2: PyRun_StringFlags (pythonrun.c:2102)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE988C11: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xEA07908: compiler_next_instr (compile.c:821)
+==1362==    by 0xEA079A7: compiler_addop_i (compile.c:1187)
+==1362==    by 0xEA0A625: compiler_make_closure (compile.c:1452)
+==1362==    by 0xEA0D8DA: compiler_function (compile.c:1705)
+==1362==    by 0xEA0F6BD: compiler_class (compile.c:1348)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==  Address 0x1b99e020 is 1,616 bytes inside a block of size 2,048 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xEA24412: PyCode_Optimize (peephole.c:712)
+==1362==    by 0xEA0A041: assemble (compile.c:4259)
+==1362==    by 0xEA0D885: compiler_function (compile.c:1692)
+==1362==    by 0xEA0F6BD: compiler_class (compile.c:1348)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE988C11: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xEA07908: compiler_next_instr (compile.c:821)
+==1362==    by 0xEA0C6E4: compiler_call_helper (compile.c:1187)
+==1362==    by 0xEA0DDD1: compiler_visit_stmt (compile.c:2534)
+==1362==    by 0xEA0F6BD: compiler_class (compile.c:1348)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==  Address 0x1b9a4020 is not stack'd, malloc'd or (recently) free'd
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988364: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE92CA24: freechildren (node.c:146)
+==1362==    by 0xE92CB4D: PyNode_Free (node.c:124)
+==1362==    by 0xEA28D04: PyParser_ASTFromStringObject (pythonrun.c:2321)
+==1362==    by 0xEA2B9B2: PyRun_StringFlags (pythonrun.c:2102)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE98837E: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE92CA24: freechildren (node.c:146)
+==1362==    by 0xE92CB4D: PyNode_Free (node.c:124)
+==1362==    by 0xEA28D04: PyParser_ASTFromStringObject (pythonrun.c:2321)
+==1362==    by 0xEA2B9B2: PyRun_StringFlags (pythonrun.c:2102)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE988C11: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xEA07908: compiler_next_instr (compile.c:821)
+==1362==    by 0xEA091C9: compiler_nameop (compile.c:1187)
+==1362==    by 0xEA0F6BD: compiler_class (compile.c:1348)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==  Address 0x1bb06020 is 16 bytes before a block of size 2,048 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xEA24412: PyCode_Optimize (peephole.c:712)
+==1362==    by 0xEA0A041: assemble (compile.c:4259)
+==1362==    by 0xEA0D885: compiler_function (compile.c:1692)
+==1362==    by 0xEA0F6BD: compiler_class (compile.c:1348)
+==1362==    by 0xEA10C74: PyAST_CompileObject (compile.c:1348)
+==1362==    by 0xEA2B9D1: PyRun_StringFlags (pythonrun.c:2177)
+==1362==    by 0xE9FBAE8: builtin_exec (bltinmodule.c:890)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988364: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE9382A7: _PyObject_CallMethodIdObjArgs (abstract.c:2337)
+==1362==    by 0xEA1C226: PyImport_ImportModuleLevelObject (import.c:1636)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE98837E: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE9382A7: _PyObject_CallMethodIdObjArgs (abstract.c:2337)
+==1362==    by 0xEA1C226: PyImport_ImportModuleLevelObject (import.c:1636)
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988364: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE950726: code_dealloc (codeobject.c:376)
+==1362==    by 0xE994C0D: tupledealloc (tupleobject.c:236)
+==1362==    by 0xE9507CE: code_dealloc (codeobject.c:365)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE98837E: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE950726: code_dealloc (codeobject.c:376)
+==1362==    by 0xE994C0D: tupledealloc (tupleobject.c:236)
+==1362==    by 0xE9507CE: code_dealloc (codeobject.c:365)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE994C0D: tupledealloc (tupleobject.c:236)
+==1362==    by 0xE9507CE: code_dealloc (codeobject.c:365)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE9382A7: _PyObject_CallMethodIdObjArgs (abstract.c:2337)
+==1362==  Address 0x18b39020 is 752 bytes inside a block of size 2,559 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE9382A7: _PyObject_CallMethodIdObjArgs (abstract.c:2337)
+==1362==    by 0xEA1C226: PyImport_ImportModuleLevelObject (import.c:1636)
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988C1A: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xEA44AE4: _PyObject_GC_Resize (gcmodule.c:1778)
+==1362==    by 0xE964A14: PyFrame_New (frameobject.c:684)
+==1362==    by 0xEA0640E: PyEval_EvalCodeEx (ceval.c:3411)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362==    by 0xEA04D14: PyEval_EvalFrameEx (ceval.c:4555)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE988C69: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xEA44AE4: _PyObject_GC_Resize (gcmodule.c:1778)
+==1362==    by 0xE964A14: PyFrame_New (frameobject.c:684)
+==1362==    by 0xEA0640E: PyEval_EvalCodeEx (ceval.c:3411)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362==    by 0xEA04D14: PyEval_EvalFrameEx (ceval.c:4555)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE9D2B6D: unicode_fromformat_write_cstr (unicodeobject.c:2407)
+==1362==    by 0xE9D2FB6: PyUnicode_FromFormatV (unicodeobject.c:2620)
+==1362==    by 0xE9D38FC: PyUnicode_FromFormat (unicodeobject.c:2788)
+==1362==    by 0x1A8AD2F9: ufunc_get_doc (ufunc_object.c:5504)
+==1362==    by 0xE986842: _PyObject_GenericGetAttrWithDict (object.c:1043)
+==1362==    by 0xE9FB74D: builtin_getattr (bltinmodule.c:921)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE94FD3B: method_call (classobject.c:347)
+==1362==  Address 0x16395020 is not stack'd, malloc'd or (recently) free'd
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988364: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE9D2B6D: unicode_fromformat_write_cstr (unicodeobject.c:2407)
+==1362==    by 0xE9D2FB6: PyUnicode_FromFormatV (unicodeobject.c:2620)
+==1362==    by 0xE9D38FC: PyUnicode_FromFormat (unicodeobject.c:2788)
+==1362==    by 0x1A8AD2F9: ufunc_get_doc (ufunc_object.c:5504)
+==1362==    by 0xE986842: _PyObject_GenericGetAttrWithDict (object.c:1043)
+==1362==    by 0xE9FB74D: builtin_getattr (bltinmodule.c:921)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE94FD3B: method_call (classobject.c:347)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE98837E: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE9D2B6D: unicode_fromformat_write_cstr (unicodeobject.c:2407)
+==1362==    by 0xE9D2FB6: PyUnicode_FromFormatV (unicodeobject.c:2620)
+==1362==    by 0xE9D38FC: PyUnicode_FromFormat (unicodeobject.c:2788)
+==1362==    by 0x1A8AD2F9: ufunc_get_doc (ufunc_object.c:5504)
+==1362==    by 0xE986842: _PyObject_GenericGetAttrWithDict (object.c:1043)
+==1362==    by 0xE9FB74D: builtin_getattr (bltinmodule.c:921)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE94FD3B: method_call (classobject.c:347)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE97A71C: dict_dealloc (dictobject.c:1383)
+==1362==    by 0xE998D91: subtype_dealloc (typeobject.c:1157)
+==1362==    by 0xE97AD35: insertdict (dictobject.c:823)
+==1362==    by 0xEA04F14: PyEval_EvalFrameEx (ceval.c:2041)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362==    by 0xEA04D14: PyEval_EvalFrameEx (ceval.c:4555)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==  Address 0x1619c020 is 2,304 bytes inside a block of size 3,104 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE97AB61: dictresize (dictobject.c:982)
+==1362==    by 0xE97AEB4: insertdict (dictobject.c:792)
+==1362==    by 0xEA04F14: PyEval_EvalFrameEx (ceval.c:2041)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362==    by 0xEA04D14: PyEval_EvalFrameEx (ceval.c:4555)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xEA037D2: PyEval_EvalFrameEx (ceval.c:4274)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362==    by 0xEA04D14: PyEval_EvalFrameEx (ceval.c:4555)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==  Address 0x163a1020 is 1,280 bytes inside a block of size 1,371 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE9D2B6D: unicode_fromformat_write_cstr (unicodeobject.c:2407)
+==1362==    by 0xE9D2FB6: PyUnicode_FromFormatV (unicodeobject.c:2620)
+==1362==    by 0xE9D38FC: PyUnicode_FromFormat (unicodeobject.c:2788)
+==1362==    by 0x1A8AD2F9: ufunc_get_doc (ufunc_object.c:5504)
+==1362==    by 0xE986842: _PyObject_GenericGetAttrWithDict (object.c:1043)
+==1362==    by 0xE9FB74D: builtin_getattr (bltinmodule.c:921)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE94FD3B: method_call (classobject.c:347)
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988C1A: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xE9B0353: resize_compact (unicodeobject.c:730)
+==1362==    by 0xE9C2143: _PyUnicodeWriter_Finish (unicodeobject.c:13501)
+==1362==    by 0xE9CDC17: PyUnicode_Format (unicodeobject.c:14728)
+==1362==    by 0xEA04A76: PyEval_EvalFrameEx (ceval.c:1533)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362==    by 0xEA04D14: PyEval_EvalFrameEx (ceval.c:4555)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE988C69: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xE9B0353: resize_compact (unicodeobject.c:730)
+==1362==    by 0xE9C2143: _PyUnicodeWriter_Finish (unicodeobject.c:13501)
+==1362==    by 0xE9CDC17: PyUnicode_Format (unicodeobject.c:14728)
+==1362==    by 0xEA04A76: PyEval_EvalFrameEx (ceval.c:1533)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362==    by 0xEA04D14: PyEval_EvalFrameEx (ceval.c:4555)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988364: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE95074E: code_dealloc (codeobject.c:364)
+==1362==    by 0xE994C0D: tupledealloc (tupleobject.c:236)
+==1362==    by 0xE9507CE: code_dealloc (codeobject.c:365)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE98837E: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE95074E: code_dealloc (codeobject.c:364)
+==1362==    by 0xE994C0D: tupledealloc (tupleobject.c:236)
+==1362==    by 0xE9507CE: code_dealloc (codeobject.c:365)
+==1362==    by 0xE963C81: frame_dealloc (frameobject.c:429)
+==1362==    by 0xEA061F2: PyEval_EvalFrameEx (ceval.c:4333)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE950726: code_dealloc (codeobject.c:376)
+==1362==    by 0xEA2BA06: PyRun_StringFlags (pythonrun.c:2181)
+==1362==    by 0xEA2BA7F: PyRun_SimpleStringFlags (pythonrun.c:1631)
+==1362==    by 0x4F41F5: init_genmag_BYOSED (genmag_BYOSED.c:94)
+==1362==    by 0x4467B2: init_genmodel (snlc_sim.c:20264)
+==1362==    by 0x40B00B: main (snlc_sim.c:221)
+==1362==  Address 0x18c02020 is 16 bytes before a block of size 224 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE97A88B: dict_dealloc (dictobject.c:1391)
+==1362==    by 0xEA03F26: PyEval_EvalFrameEx (ceval.c:4466)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xE9FCC52: PyEval_CallObjectWithKeywords (ceval.c:4111)
+==1362==    by 0xEA11D98: _PyCodec_Lookup (codecs.c:153)
+==1362==    by 0xEA11F02: _PyCodec_LookupTextEncoding (codecs.c:532)
+==1362==    by 0xEA1267F: _PyCodec_DecodeText (codecs.c:576)
+==1362==    by 0xE9CAA9A: PyUnicode_Decode (unicodeobject.c:3038)
+==1362==    by 0xEA89B71: read_directory (zipimport.c:978)
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988C1A: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xE9B0353: resize_compact (unicodeobject.c:730)
+==1362==    by 0xE9C2143: _PyUnicodeWriter_Finish (unicodeobject.c:13501)
+==1362==    by 0xE9C4699: build_string (unicode_format.h:924)
+==1362==    by 0xE9C48B8: do_string_format (unicode_format.h:950)
+==1362==    by 0xEA05168: PyEval_EvalFrameEx (ceval.c:4460)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9FC40A: builtin___build_class__ (bltinmodule.c:173)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE988C69: _PyObject_Realloc (obmalloc.c:1573)
+==1362==    by 0xE9B0353: resize_compact (unicodeobject.c:730)
+==1362==    by 0xE9C2143: _PyUnicodeWriter_Finish (unicodeobject.c:13501)
+==1362==    by 0xE9C4699: build_string (unicode_format.h:924)
+==1362==    by 0xE9C48B8: do_string_format (unicode_format.h:950)
+==1362==    by 0xEA05168: PyEval_EvalFrameEx (ceval.c:4460)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9FC40A: builtin___build_class__ (bltinmodule.c:173)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xEA8522A: _textiowrapper_readline (textio.c:1396)
+==1362==    by 0xEA857E3: textiowrapper_iternext (textio.c:2640)
+==1362==    by 0xE93408A: PyIter_Next (abstract.c:2677)
+==1362==    by 0xEA720D4: chain_next (itertoolsmodule.c:1866)
+==1362==    by 0xE95651C: enum_next (enumobject.c:130)
+==1362==    by 0xEA01A78: PyEval_EvalFrameEx (ceval.c:2660)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==  Address 0x1643c020 is 4,592 bytes inside a block of size 6,176 free'd
+==1362==    at 0xE0A8484: free (vg_replace_malloc.c:468)
+==1362==    by 0xE97A88B: dict_dealloc (dictobject.c:1391)
+==1362==    by 0xE9FC649: builtin___build_class__ (bltinmodule.c:187)
+==1362==    by 0xEA05366: PyEval_EvalFrameEx (ceval.c:4234)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA06CFA: PyEval_EvalCode (ceval.c:773)
+==1362==    by 0xE9FBA3E: builtin_exec (bltinmodule.c:876)
+==1362==    by 0xEA04D14: PyEval_EvalFrameEx (ceval.c:4555)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362==    by 0xEA061C8: PyEval_EvalFrameEx (ceval.c:4331)
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988364: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xEA8522A: _textiowrapper_readline (textio.c:1396)
+==1362==    by 0xEA857E3: textiowrapper_iternext (textio.c:2640)
+==1362==    by 0xE93408A: PyIter_Next (abstract.c:2677)
+==1362==    by 0xEA720D4: chain_next (itertoolsmodule.c:1866)
+==1362==    by 0xE95651C: enum_next (enumobject.c:130)
+==1362==    by 0xEA01A78: PyEval_EvalFrameEx (ceval.c:2660)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE98837E: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xEA8522A: _textiowrapper_readline (textio.c:1396)
+==1362==    by 0xEA857E3: textiowrapper_iternext (textio.c:2640)
+==1362==    by 0xE93408A: PyIter_Next (abstract.c:2677)
+==1362==    by 0xEA720D4: chain_next (itertoolsmodule.c:1866)
+==1362==    by 0xE95651C: enum_next (enumobject.c:130)
+==1362==    by 0xEA01A78: PyEval_EvalFrameEx (ceval.c:2660)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xEA05FEB: PyEval_EvalFrameEx (ceval.c:4341)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==    by 0xE9656A1: function_call (funcobject.c:632)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362== 
+==1362== Invalid read of size 4
+==1362==    at 0xE98835B: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE963BD7: PyFrame_ClearFreeList (frameobject.c:985)
+==1362==    by 0xEA46275: collect (gcmodule.c:887)
+==1362==    by 0xEA46517: _PyObject_GC_Malloc (gcmodule.c:1140)
+==1362==    by 0xEA465FC: _PyObject_GC_New (gcmodule.c:1748)
+==1362==    by 0xE967A9B: list_iter (listobject.c:2738)
+==1362==    by 0xE934145: PyObject_GetIter (abstract.c:2653)
+==1362==    by 0xE9F89DF: zip_new (bltinmodule.c:2228)
+==1362==    by 0xE996932: type_call (typeobject.c:854)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xEA04FD3: PyEval_EvalFrameEx (ceval.c:4463)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362==  Address 0x16cbb020 is 16 bytes before a block of size 32 alloc'd
+==1362==    at 0xE0A96A5: operator new(unsigned long) (vg_replace_malloc.c:319)
+==1362==    by 0xF16E109: TStorage::ObjectAlloc(unsigned long) (in /software/ROOT-5.34-el6-x86_64/lib/libCore.so)
+==1362==    by 0xF1B0F77: TMap::Add(TObject*, TObject*) (in /software/ROOT-5.34-el6-x86_64/lib/libCore.so)
+==1362==    by 0xF1A74E9: TClassTable::Add(char const*, short, std::type_info const&, void (*)(), int) (in /software/ROOT-5.34-el6-x86_64/lib/libCore.so)
+==1362==    by 0xF1DDADB: ROOT::TGenericClassInfo::TGenericClassInfo(char const*, int, char const*, int, std::type_info const&, ROOT::TInitBehavior const*, void (*)(), TVirtualIsAProxy*, int, int) (in /software/ROOT-5.34-el6-x86_64/lib/libCore.so)
+==1362==    by 0x10CC3248: ROOT::GenerateInitInstanceLocal(THnSparse const*) (in /software/ROOT-5.34-el6-x86_64/lib/libHist.so)
+==1362==    by 0x10E848AF: global constructors keyed to G__Hist.cxx (in /software/ROOT-5.34-el6-x86_64/lib/libHist.so)
+==1362==    by 0x10EAEFE5: ??? (in /software/ROOT-5.34-el6-x86_64/lib/libHist.so)
+==1362==    by 0x10B814A2: ??? (in /software/ROOT-5.34-el6-x86_64/lib/libHist.so)
+==1362==    by 0xFFEFFAE5F: ???
+==1362==    by 0x4D4953006578652D: ???
+==1362==    by 0x534F59425F4E4546: ???
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE988364: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE963BD7: PyFrame_ClearFreeList (frameobject.c:985)
+==1362==    by 0xEA46275: collect (gcmodule.c:887)
+==1362==    by 0xEA46517: _PyObject_GC_Malloc (gcmodule.c:1140)
+==1362==    by 0xEA465FC: _PyObject_GC_New (gcmodule.c:1748)
+==1362==    by 0xE967A9B: list_iter (listobject.c:2738)
+==1362==    by 0xE934145: PyObject_GetIter (abstract.c:2653)
+==1362==    by 0xE9F89DF: zip_new (bltinmodule.c:2228)
+==1362==    by 0xE996932: type_call (typeobject.c:854)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xEA04FD3: PyEval_EvalFrameEx (ceval.c:4463)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+==1362== Use of uninitialised value of size 8
+==1362==    at 0xE98837E: _PyObject_Free (obmalloc.c:1346)
+==1362==    by 0xE963BD7: PyFrame_ClearFreeList (frameobject.c:985)
+==1362==    by 0xEA46275: collect (gcmodule.c:887)
+==1362==    by 0xEA46517: _PyObject_GC_Malloc (gcmodule.c:1140)
+==1362==    by 0xEA465FC: _PyObject_GC_New (gcmodule.c:1748)
+==1362==    by 0xE967A9B: list_iter (listobject.c:2738)
+==1362==    by 0xE934145: PyObject_GetIter (abstract.c:2653)
+==1362==    by 0xE9F89DF: zip_new (bltinmodule.c:2228)
+==1362==    by 0xE996932: type_call (typeobject.c:854)
+==1362==    by 0xE935688: PyObject_Call (abstract.c:2067)
+==1362==    by 0xEA04FD3: PyEval_EvalFrameEx (ceval.c:4463)
+==1362==    by 0xEA06C30: PyEval_EvalCodeEx (ceval.c:3585)
+==1362== 
+	 Begin python-init from C code ... 
+	 Finished python-init from C code 
+	 BYOSED parameters to store in data files:
+		 DUMMY_PAR0 
+		 DUMMY_PAR1 
+		 DUMMY_PAR2 
+
+	 Done with init_genmag_BYOSED 
+
+ ****************************************************************** 
+   init_modelSmear: init intrinsic SN smearing with model=NONE  
+	 Smear-mode: interpolate from central filter wavelengths.
+
+ ****************************************************************** 
+   Initialize SEARCH EFFICIENCY for 'PS1_LOWZ_COMBINED' 
+  
+
+  Optional SEARCHEFF_PIPELINE_FILE not found -> skip. 
+
+  Optional SEARCHEFF_SPEC_FILE not specified -> skip. 
+
+  Optional SEARCHEFF_zHOST_FILE not found -> Eff=100% 
+
+ ****************************************************************** 
+    Fill comments for README doc-file  
+
+ ****************************************************************** 
+   clr_VERSION  
+	 LCMERGE Version BYOSEDTEST does not exist. 
+	 SIM Version BYOSEDTEST exists. 
+	 PHOTOMETRY Version BYOSEDTEST does not exist. 
+	 Removing version BYOSEDTEST files ... 
+ execute command: rm -rf  /project/rkessler/PRODUCTS/SNDATA_ROOT/SIM/BYOSEDTEST/  
+ Done. 
+
+ ****************************************************************** 
+   Init SIMGEN_DUMP file   
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE0AA09F: strcpy (mc_replace_strmem.c:443)
+==1362==    by 0x42E9F0: PREP_SIMGEN_DUMP (snlc_sim.c:11093)
+==1362==    by 0x42C7F6: wr_SIMGEN_DUMP (snlc_sim.c:10489)
+==1362==    by 0x452BFF: init_simFiles (snlc_sim.c:24485)
+==1362==    by 0x40B041: main (snlc_sim.c:233)
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE0AA0B7: strcpy (mc_replace_strmem.c:443)
+==1362==    by 0x42E9F0: PREP_SIMGEN_DUMP (snlc_sim.c:11093)
+==1362==    by 0x42C7F6: wr_SIMGEN_DUMP (snlc_sim.c:10489)
+==1362==    by 0x452BFF: init_simFiles (snlc_sim.c:24485)
+==1362==    by 0x40B041: main (snlc_sim.c:233)
+==1362== 
+	 open /project/rkessler/PRODUCTS/SNDATA_ROOT/SIM/BYOSEDTEST/BYOSEDTEST.DUMP
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE0AA59C: strcmp (mc_replace_strmem.c:730)
+==1362==    by 0x42D151: MATCH_INDEX_SIMGEN_DUMP (snlc_sim.c:10669)
+==1362==    by 0x42C92E: wr_SIMGEN_DUMP (snlc_sim.c:10512)
+==1362==    by 0x452BFF: init_simFiles (snlc_sim.c:24485)
+==1362==    by 0x40B041: main (snlc_sim.c:233)
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xE0AA5C7: strcmp (mc_replace_strmem.c:730)
+==1362==    by 0x42D151: MATCH_INDEX_SIMGEN_DUMP (snlc_sim.c:10669)
+==1362==    by 0x42C92E: wr_SIMGEN_DUMP (snlc_sim.c:10512)
+==1362==    by 0x452BFF: init_simFiles (snlc_sim.c:24485)
+==1362==    by 0x40B041: main (snlc_sim.c:233)
+==1362== 
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0x42D159: MATCH_INDEX_SIMGEN_DUMP (snlc_sim.c:10670)
+==1362==    by 0x42C92E: wr_SIMGEN_DUMP (snlc_sim.c:10512)
+==1362==    by 0x452BFF: init_simFiles (snlc_sim.c:24485)
+==1362==    by 0x40B041: main (snlc_sim.c:233)
+==1362== 
+
+ ****************************************************************** 
+    Begin Generating Lightcurves.   
+  Found Max dN/dz * wgt = 1.915362e+64 at z =    0.583 
+==1362== Invalid read of size 8
+==1362==    at 0xE967994: PyList_GetItem (listobject.c:198)
+==1362==    by 0x4F4C61: fetchSED_BYOSED (genmag_BYOSED.c:350)
+==1362==    by 0x4F4726: genmag_BYOSED (genmag_BYOSED.c:216)
+==1362==    by 0x448D7C: genmodel (snlc_sim.c:21340)
+==1362==    by 0x447D83: GENMAG_DRIVER (snlc_sim.c:20892)
+==1362==    by 0x40B25A: main (snlc_sim.c:318)
+==1362==  Address 0x8 is not stack'd, malloc'd or (recently) free'd
+==1362== 
+
+ *** Break *** segmentation violation
+#0  vgModuleLocal_do_syscall_for_client_WRK () at m_syswrap/syscall-amd64-linux.S:147
+#1  0x0000000000000008 in ?? ()
+#2  0x0000000803b08e20 in ?? ()
+#3  0x0000000803b08e90 in ?? ()
+#4  0x0000000039be6d70 in vgPlain_threads ()
+#5  0x000000000000003d in ?? ()
+#6  0x0000000803b08e90 in ?? ()
+#7  0x0000000039fd08c8 in syscallInfo ()
+#8  0x000000000000003d in ?? ()
+#9  0x0000000000000001 in ?? ()
+#10 0x0000000039be6d60 in vgPlain_threads ()
+#11 0x0000000039fd0838 in syscallInfo ()
+#12 0x0000000038085dee in do_syscall_for_client (tid=1, trc=<value optimized out>) at m_syswrap/syswrap-main.c:311
+#13 vgPlain_client_syscall (tid=1, trc=<value optimized out>) at m_syswrap/syswrap-main.c:1618
+#14 0x0000000038083f31 in handle_syscall (tid=1) at m_scheduler/scheduler.c:1070
+#15 vgPlain_scheduler (tid=1) at m_scheduler/scheduler.c:1348
+#16 0x00000000380b1de6 in thread_wrapper (tidW=1) at m_syswrap/syswrap-linux.c:103
+#17 run_a_thread_NORETURN (tidW=1) at m_syswrap/syswrap-linux.c:156
+#18 0x0000000000000000 in ?? ()
+==1362== Conditional jump or move depends on uninitialised value(s)
+==1362==    at 0xFAC5C58: G__destroy_upto (in /software/ROOT-5.34-el6-x86_64/lib/libCint.so)
+==1362==    by 0xFAC645B: G__scratch_globals_upto (in /software/ROOT-5.34-el6-x86_64/lib/libCint.so)
+==1362==    by 0xF1BD3F0: TCint::ResetGlobals() (in /software/ROOT-5.34-el6-x86_64/lib/libCore.so)
+==1362==    by 0xF1F3FE9: TUnixSystem::Exit(int, bool) (in /software/ROOT-5.34-el6-x86_64/lib/libCore.so)
+==1362==    by 0xF1F8DCA: TUnixSystem::DispatchSignals(ESignals) (in /software/ROOT-5.34-el6-x86_64/lib/libCore.so)
+==1362==    by 0xE2BF7DF: ??? (in /lib64/libpthread-2.12.so)
+==1362==    by 0xE967993: PyList_GetItem (listobject.c:197)
+==1362==    by 0xFFEFD2CDF: ???
+==1362==    by 0x4F4726: genmag_BYOSED (genmag_BYOSED.c:216)
+==1362==    by 0x448D7C: genmodel (snlc_sim.c:21340)
+==1362==    by 0x447D83: GENMAG_DRIVER (snlc_sim.c:20892)
+==1362==    by 0x40B25A: main (snlc_sim.c:318)
+==1362== 
+==1362== 
+==1362== HEAP SUMMARY:
+==1362==     in use at exit: 28,712,767 bytes in 34,908 blocks
+==1362==   total heap usage: 1,608,903 allocs, 1,573,995 frees, 219,533,090 bytes allocated
+==1362== 
+==1362== LEAK SUMMARY:
+==1362==    definitely lost: 160,000 bytes in 83 blocks
+==1362==    indirectly lost: 0 bytes in 0 blocks
+==1362==      possibly lost: 221,804 bytes in 197 blocks
+==1362==    still reachable: 28,330,963 bytes in 34,628 blocks
+==1362==         suppressed: 0 bytes in 0 blocks
+==1362== Rerun with --leak-check=full to see details of leaked memory
+==1362== 
+==1362== For counts of detected and suppressed errors, rerun with: -v
+==1362== Use --track-origins=yes to see where uninitialised values come from
+==1362== ERROR SUMMARY: 3319 errors from 93 contexts (suppressed: 128 from 10)

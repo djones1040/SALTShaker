@@ -1,0 +1,15 @@
+# Reference cosmology params for MUDIF: 
+#   Omega_DE(ref):  0.700 
+#   w_DE(ref):      -1.000 
+#   alpha(fit):   0.1400 +- 0.0000 
+#   beta(fit):    3.1000 +- 0.0000 
+# 
+
+MUERR_INCLUDE: zERR 
+
+VARNAMES: ROW  zMIN     zMAX     z        MUDIF  MUDIFERR   MUREF  NFIT 
+ROW:      1   0.0200  0.2200  0.1200     0.0000    0.0544  38.7398    7
+ROW:      2   0.2200  0.4200  0.3200     0.0000  999.0000  41.1175    0
+ROW:      3   0.4200  0.6200  0.5200     0.0000  999.0000  42.3635    0
+ROW:      4   0.6200  0.8200  0.7200     0.0000  999.0000  43.2218    0
+ROW:      5   0.8200  1.0200  0.9200     0.0000  999.0000  43.8766    0
