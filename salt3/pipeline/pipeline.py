@@ -8,6 +8,22 @@ import os
 import numpy as np
 import time
 import glob
+cwd = os.getcwd()
+
+def config_error():
+    raise RuntimeError("'configure' stage has not been run yet")
+def build_error():
+    raise RuntimeError("'build' stage has not been run yet")
+
+def finput_abspath(finput):
+    if not finput.startswith('/') and not finput.startswith('$') and \
+       '/' in finput: finput = '%s/%s'%(cwd,finput)
+    return finput
+
+def nmlval_to_abspath(key,value):
+    if key.lower() in ['kcor_file','vpec_file'] and not value.startswith('/') and not value.startswith('$') and '/' in value:
+        value = '%s/%s'%(cwd,value)
+    return value
 
 class SALT3pipe():
     def __init__(self,finput=None):
@@ -20,10 +36,16 @@ class SALT3pipe():
         self.CosmoFit = CosmoFit()
         self.Data = Data()
 
+        self.build_flag = False
+        self.config_flag = False
+        self.glue_flag = False
+
     def gen_input(self):
         pass
 
     def build(self,mode='default',data=True,skip=None,onlyrun=None):
+        self.build_flag = True
+
         if data:
             pipe_default = ['data','train','lcfit','getmu','cosmofit']
         else:
@@ -45,6 +67,9 @@ class SALT3pipe():
         print("Current procedures: ", self.pipepros)
 
     def configure(self):
+        if not self.build_flag: build_error()
+        self.config_flag = True
+
         config = configparser.ConfigParser()
         config.read(self.finput)
         m2df = self._multivalues_to_df
@@ -116,9 +141,12 @@ class SALT3pipe():
 
 
     def run(self):
+        if not self.build_flag: build_error()
+        if not self.config_flag: config_error()
+
         for prostr in self.pipepros:
             pipepro = self._get_pipepro_from_string(prostr)
-            pipepro.run()
+            pipepro.run(pipepro.batch)
         # self.Simulation.run()
         # self.Training.run()
         # self.LCFitting.run()
@@ -127,6 +155,9 @@ class SALT3pipe():
         
 
     def glue(self,pipepros=None,on='phot'):
+        if not self.build_flag: build_error()
+        if not self.config_flag: config_error()
+
         if pipepros is None:
             return
         elif not isinstance(pipepros,list) or len(pipepros) !=2:
@@ -148,11 +179,14 @@ class SALT3pipe():
                            proargs=pro2.proargs,
                            baseinput=pro2.outname,
                            prooptions=pro2.prooptions,
-                           outname=pro2.outname)
+                           outname=pro2.outname,
+                           batch=pro2.batch)
         else:
             pro2.configure(pro=pro2.pro,
                            prooptions=pro2.prooptions,
-                           outname=setkeys['value'].values[0])            
+                           outname=setkeys['value'].values[0],
+                           batch=pro2.batch)
+
 
     def _get_config_option(self,config,prostr,option,dtype=None):
         if config.has_option(prostr, option):
@@ -233,15 +267,16 @@ class PipeProcedure():
     def gen_input(self,outname=None):
         pass
 
-    def run(self):
-        arglist = [self.proargs] + [self.finput] +[self.prooptions]
+    def run(self,batch):
+        arglist = [self.proargs] + [finput_abspath(self.finput)] +[self.prooptions]
         arglist = list(filter(None,arglist))
         args = []
         for arg in arglist:
             if arg is not None:
                 for argitem in arg.split(' '):
                     args.append(argitem)
-        if self.batch: _run_batch_pro(self.pro, args)
+
+        if batch: _run_batch_pro(self.pro, args)
         else: _run_external_pro(self.pro, args)
 
     def _get_input_info(self):
@@ -521,6 +556,13 @@ class LCFitting(PipeProcedure):
 
     def _get_input_info(self):
         df = {}
+        section = 'HEADER'
+        key = 'VERSION'
+        df[section] = section
+        df['key'] = key
+        df['value'] = self.keys[section][key]
+        df['type'] = 'phot'
+
         section = 'SNLCINP'
         key = 'VERSION_PHOTOMETRY'
         df['section'] = section
@@ -550,7 +592,8 @@ class GetMu(PipeProcedure):
                   outname="pipeline_getmu_input.input",**kwargs):
         self.outname = outname
         self.prooptions = prooptions
-        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,prooptions=prooptions)
+        self.batch = batch
+        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,prooptions=prooptions,batch=batch)
 
     def gen_input(self,outname="pipeline_getmu_input.input"):
         self.outname = outname
@@ -584,8 +627,8 @@ class CosmoFit(PipeProcedure):
             outname = setkeys.value.values[0]
         self.prooptions = prooptions
         self.finput = outname
-
-        super().configure(pro=pro,outname=outname,prooptions=prooptions)
+        self.batch = batch
+        super().configure(pro=pro,outname=outname,prooptions=prooptions,batch=batch)
 
     def _get_input_info(self):
         df = {}
@@ -617,10 +660,13 @@ def _run_batch_pro(pro,args):
 
     done_file = ''
     for line in res.stdout.decode('utf-8').split('\n'):
-        if 'set DONE_STAMP' in line:
+        if 'DONE_STAMP' in line:
             done_file = line.split()[-1]
+
     if not done_file:
         raise RuntimeError('could not find DONE file name in %s output'%pro)
+    # SNANA doesn't remove old done files
+    if os.path.exists(done_file): os.system('rm %s'%done_file)
 
     job_complete=False
     while not job_complete:
@@ -733,6 +779,7 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
                          outname=None):
 
     import f90nml
+    from f90nml.namelist import Namelist
     nml = f90nml.read(basefilename)
 
     # first write the header info
@@ -746,21 +793,19 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
     if setkeys is None:
         print("No modification on the input file, keeping {} as input".format(basefilename))
     else:
-    
+        nml.__setitem__('header',Namelist())
         snlcinp,fitinp = False,False
-        config = {}
-        headerlines = []
         for i,line in enumerate(lines):
             if '&snlcinp' in line.lower(): snlcinp = True
             elif '&fitinp' in line.lower(): fitinp = True
-            elif '#end' in line.lower(): snlcinp,fitinp = False,False
+            elif '&end' in line.lower(): snlcinp,fitinp = False,False
             if snlcinp or fitinp: continue
-
-            headerlines += [line]
-
-        with open(outname,"w") as outfile:
-            for line in headerlines:
-                outfile.write(line)
+            if line.startswith('#'): continue
+            if not ':' in line: continue
+            key = line.split(':')[0].replace(' ','')
+            value = line.split(':')[1].replace('\n','')
+            nml['header'].__setitem__(key,value)
+        nml['header'].__setitem__('done_stamp','ALL.DONE')
 
         for index, row in setkeys.iterrows():
             sec = row['section']
@@ -770,6 +815,9 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
                 raise ValueError("No section named",sec)
             print("Adding/modifying key {}={} in &{}".format(key,v,sec))
             nml[sec][key] = v
+
+        # a bit clumsy, but need to make sure these are the same for now:
+        nml['header'].__setitem__('version',nml['snlcinp']['version_photometry'])
 
         print("Write fit input to file:",outname)
         _write_nml_to_file(nml,outname,append=True)
@@ -808,21 +856,30 @@ def _write_simple_config_file(config,filename,sep='='):
         outfile.write("{}={}\n".format(key,value))
     return
 
-def _write_nml_to_file(nml,filename,append=False):
-    if append: outfile = open(filename,"a")
-    else: outfile = open(filename,"w")
-    outfile.write('DONE_STAMP:  ALL.DONE\n')
+def _write_nml_to_file(nml,filename,headerlines=[],append=False):
+    outfile = open(filename,"w")
 
     for key in nml.keys():
-        outfile.write('&'+key.upper())
-        outfile.write('\n')
-        for key2 in nml[key].keys():
-            value = nml[key][key2]
-            if isinstance(value,str):
-                value = "'{}'".format(value)
-            elif isinstance(value,list):
-                value = ','.join([str(x) for x in value if not isinstance(x,str)])
-            outfile.write("  {} = {}".format(key2.upper(),value))
-            outfile.write("\n")
-        outfile.write('&END\n\n')
+        if key.lower() == 'header':
+            for key2 in nml[key].keys():
+                value = nml[key][key2]
+                if isinstance(value,str):
+                    value = "{}".format(value)
+                elif isinstance(value,list):
+                    value = ','.join([str(x) for x in value if not isinstance(x,str)])
+                outfile.write("{}: {}".format(key2.upper(),value))
+                outfile.write("\n")
+
+        else:
+            outfile.write('&'+key.upper())
+            outfile.write('\n')
+            for key2 in nml[key].keys():
+                value = nmlval_to_abspath(key2,nml[key][key2])
+                if isinstance(value,str):
+                    value = "'{}'".format(value)
+                elif isinstance(value,list):
+                    value = ','.join([str(x) for x in value if not isinstance(x,str)])
+                outfile.write("  {} = {}".format(key2.upper(),value))
+                outfile.write("\n")
+            outfile.write('&END\n\n')
     return
