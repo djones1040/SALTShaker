@@ -282,7 +282,7 @@ class mcmc(saltresids.SALTResids):
 			for i,par in zip(range(self.npar),self.parlist):
 				if par == 'm0':
 					C_0[i,i] = self.stepsize_magscale_M0**2.
-				elif par.startswith('modelerr':
+				elif par.startswith('modelerr'):
 					C_0[i,i] = (self.stepsize_magscale_err)**2.
 				elif par == 'm1':
 					C_0[i,i] = (self.stepsize_magadd_M1)**2.
