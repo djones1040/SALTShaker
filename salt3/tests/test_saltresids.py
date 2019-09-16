@@ -178,7 +178,6 @@ class TRAINING_Test(unittest.TestCase):
 		
 		def incrementOneParam(i):
 			guess=self.guess.copy()
-			#if i==0: import pdb;pdb.set_trace()
 			guess[i]+=dx
 			M0,M1=self.resids.SALTModel(guess)
 			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
@@ -208,7 +207,7 @@ class TRAINING_Test(unittest.TestCase):
 			valsdict,uncertaintydict=incrementOneParam(i)
 			dValdX[:,i]=(valsdict['modelflux']-vals)/dx
 			dUncertaintydX[:,i]=(uncertaintydict['modeluncertainty']-uncertainty)/dx
-		import pdb;pdb.set_trace()
+
 		if not np.allclose(dValdX,jacobian,rtol,atol): print('Problems with model value derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dValdX,jacobian,rtol,atol))[1]]))
 		if not np.allclose(dUncertaintydX,uncJac,rtol,atol): print('Problems with model value derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dUncertaintydX,uncJac,rtol,atol))[1]]))
 
