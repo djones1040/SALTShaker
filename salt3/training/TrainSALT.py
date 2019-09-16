@@ -83,7 +83,7 @@ class TrainSALT(TrainSALTBase):
 		if self.options.n_colorpars:
 			parlist = np.append(parlist,['cl']*self.options.n_colorpars)
 		if self.options.error_snake_phase_binsize and self.options.error_snake_wave_binsize:
-			parlist = np.append(parlist,['modelerr']*n_errphaseknots*n_errwaveknots)
+			for i in range(3): parlist = np.append(parlist,['modelerr_{}'.format(i)]*n_errphaseknots*n_errwaveknots)
 		if self.options.n_colorscatpars:
 			# four knots for the end points
 			parlist = np.append(parlist,['clscat']*(self.options.n_colorscatpars+8))
@@ -109,7 +109,7 @@ class TrainSALT(TrainSALTBase):
 		guess = np.zeros(parlist.size)
 		m0knots[m0knots == 0] = 1e-4
 		guess[parlist == 'm0'] = m0knots
-		guess[parlist == 'modelerr'] = 1e-6 #*np.mean(m0knots)*HC_ERG_AA
+		for i in range(3): guess[parlist == 'modelerr_{}'.format(i)] = 1e-6 
 		if self.options.n_components == 2:
 			guess[parlist == 'm1'] = m1knots
 		if self.options.n_colorpars:
@@ -129,7 +129,7 @@ class TrainSALT(TrainSALTBase):
 				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.resume_from_outputdir,unpack=True,skiprows=1,dtype="U20,f8")
 			except:
 				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.outputdir,unpack=True,skiprows=1,dtype="U20,f8")
-			for key in np.unique(names):
+			for key in np.unique(parlist):
 				guess[parlist == key] = pars[names == key]
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
@@ -169,7 +169,7 @@ class TrainSALT(TrainSALTBase):
 		print('MCMC message: %s'%message)
 		#print('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
 		#	  saltfitter.regularizationChi2(x_modelpars,0,1,0),saltfitter.regularizationChi2(x_modelpars,0,0,1))
-		print('Final loglike'); saltfitter.maxlikefit(x_modelpars,None,False)
+		print('Final loglike'); saltfitter.maxlikefit(x_modelpars)
 
 		print(x_modelpars.size)
 
