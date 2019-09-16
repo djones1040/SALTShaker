@@ -107,7 +107,7 @@ class mcmc(saltresids.SALTResids):
 			elif self.adjust_modelpars and par != 'm0' and par != 'm1' and par != 'modelerr':
 				candidate[i] = current[i]
 			else:
-				if not steps_from_gn and (par == 'modelerr' or par.startswith('x0') or par == 'm0' or par == 'clscat'):
+				if not steps_from_gn and (par.startswith('modelerr') or par.startswith('x0') or par == 'm0' or par == 'clscat'):
 					candidate[i] = current[i]*10**(0.4*np.random.normal(scale=prop_std[i,i]))
 				else:
 					pass
@@ -275,7 +275,6 @@ class mcmc(saltresids.SALTResids):
 
 	def get_propcov_init(self,x,stepsizes=None):
 		C_0 = np.zeros([len(x),len(x)])
-
 		if stepsizes is not None:
 			for i,par in zip(range(self.npar),self.parlist):
 				C_0[i,i] = stepsizes[i]**2.
@@ -283,7 +282,7 @@ class mcmc(saltresids.SALTResids):
 			for i,par in zip(range(self.npar),self.parlist):
 				if par == 'm0':
 					C_0[i,i] = self.stepsize_magscale_M0**2.
-				elif par == 'modelerr':
+				elif par.startswith('modelerr':
 					C_0[i,i] = (self.stepsize_magscale_err)**2.
 				elif par == 'm1':
 					C_0[i,i] = (self.stepsize_magadd_M1)**2.
@@ -432,11 +431,6 @@ class mcmc(saltresids.SALTResids):
 
 
 
-
-	
-	
-
-
 class GaussNewton(saltresids.SALTResids):
 	def __init__(self,guess,datadict,parlist,**kwargs):
 		self.warnings = []
@@ -573,8 +567,8 @@ class GaussNewton(saltresids.SALTResids):
 		X[includePars]=np.array([x.value for x  in paramResults])
 		if np.allclose(X[includePars],initVals):
 			import pdb;pdb.set_trace()
-		print('Final log likelihood: ', result.fval)
-		return X,result.fval
+		print('Final log likelihood: ', -result.fval)
+		return X,-result.fval
 
 
 	def getstepsizes(self,X,Xlast):
@@ -654,7 +648,7 @@ class GaussNewton(saltresids.SALTResids):
 		X,chi2=X_init,chi2_init
 		
 		for fit in  self.fitOptions:
-			if fit=='all':continue
+			if 'all-grouped' in fit :continue
 			print('fitting '+self.fitOptions[fit][0])
 			Xprop,chi2prop = self.process_fit(X,fit=fit,computePCDerivs= (fit=='component0') or ('all' in fit))
 			if chi2prop<chi2:
@@ -719,6 +713,6 @@ class GaussNewton(saltresids.SALTResids):
 		print((residuals**2).sum(),chi2,(residuals**2).sum()-chi2)
 		#if chi2 != chi2:
 		#	import pdb; pdb.set_trace()
-		if ((residuals**2).sum()-chi2) < -1e16 : import pdb;pdb.set_trace()
+		#if ((residuals**2).sum()-chi2) < -1e16 : import pdb;pdb.set_trace()
 		return X,chi2
 	
