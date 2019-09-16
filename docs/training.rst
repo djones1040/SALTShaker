@@ -4,12 +4,12 @@ Training the SALT3 Model
 
 usage::
 
-  TrainSALT.py -c <configfile> <options>
+  trainsalt -c <configfile> <options>
   
 To run an example, change to the "examples" directory
 in the main package and run::
 
-  TrainSALT.py -c SALT.conf
+  trainsalt -c SALT.conf
 
 This will use the lightcurves and spectra in the :code:`examples/exampledata/`
 directory and the kcor files in the :code:`examples/kcor/` directory to
@@ -26,7 +26,7 @@ and :code:`exampledata/snana/photdata_nox1` for a simple model where
 the training only attempts to find the first principal component.
 For this simplified model, run::
 
-  TrainSALT.py -c SALT_SNANA.conf --n_components 1
+  trainsalt -c SALT_SNANA.conf --n_components 1
 
 Additional examples will be added as the code matures.
 
@@ -99,5 +99,46 @@ error_snake_phase_binsize      5                 Spacing in days for the SALT er
 error_snake_wave_binsize       600               Spacing in Angstroms for the SALT error model B-spline interpolation
 n_components                   2                 Number of principal components
 n_processes                    1                 Number of worker processes to spawn to calculate the chi2
+n_specrecal                    0
+estimate_tpk
+fix_t0
+regulargradientphase           0
+regulargradientwave            100
+regulardyad                    10
+n_min_specrecal                1
+specrange_wavescale_specrecal  2500
+n_specrecal_per_lightcurve     0.34
+filter_mass_tolerance          0.01
+error_snake_phase_binsize      4
+error_snake_wave_binsize       400
+do_mcmc                        1
+do_gaussnewton=
+gaussnewton_maxiter            2
+regularize                     False
+specrecal                      1
+n_repeat                       1
+usePriors                      m0prior,x1mean
+priorWidths                    0.1,0.1
 
+[mcmcparams]
+n_steps_mcmc                   5000
+n_burnin_mcmc                  4800
+stepsize_magscale_M0           0.02
+stepsize_magadd_M0             0.005
+stepsize_magscale_M1           0.01
+stepsize_magadd_M1             0.001
+stepsize_magscale_err          0.001
+stepsize_cl                    0.01
+stepsize_magscale_clscat       0.0001
+stepsize_specrecal             0.01
+stepsize_x0                    0.01
+stepsize_x1                    0.01
+stepsize_c                     0.01
+stepsize_tpk                   0.01
+nsteps_before_adaptive         200
+nsteps_adaptive_memory         200
+modelpar_snpar_tradeoff_nstep  200
+adaptive_sigma_opt_scale       1
+nsteps_between_lsqfit          100
+use_lsqfit
 =============================  ================  ======================================================================================================================================
