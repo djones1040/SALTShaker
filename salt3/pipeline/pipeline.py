@@ -15,6 +15,11 @@ def config_error():
 def build_error():
     raise RuntimeError("'build' stage has not been run yet")
 
+def boolean_string(s):
+    if s not in {'False', 'True', '1', '0', None}:
+        raise ValueError('Not a valid boolean string')
+    return (s == 'True') | (s == '1')
+
 def finput_abspath(finput):
     if not finput.startswith('/') and not finput.startswith('$') and \
        '/' in finput: finput = '%s/%s'%(cwd,finput)
@@ -22,7 +27,10 @@ def finput_abspath(finput):
 
 def nmlval_to_abspath(key,value):
     if key.lower() in ['kcor_file','vpec_file'] and not value.startswith('/') and not value.startswith('$') and '/' in value:
-        value = '%s/%s'%(cwd,value)
+        if key.lower() == 'kcor_file' and os.path.exists(os.path.expandvars('$SNDATA_ROOT/kcor/%s'%value)):
+            return value
+        else:
+            value = '%s/%s'%(cwd,value)
     return value
 
 class SALT3pipe():
@@ -87,7 +95,8 @@ class SALT3pipe():
             baseinput = self._get_config_option(config,prostr,'baseinput')
             outname = self._get_config_option(config,prostr,'outinput')
             pro = self._get_config_option(config,prostr,'pro')
-            batch = self._get_config_option(config,prostr,'batch',dtype=bool)
+            batch = self._get_config_option(config,prostr,'batch',dtype=boolean_string)
+            validplots = self._get_config_option(config,prostr,'validplots',dtype=boolean_string)
             proargs = self._get_config_option(config,prostr,'proargs')
             prooptions = self._get_config_option(config,prostr,'prooptions')
             snlist = self._get_config_option(config,prostr,'snlist')
@@ -98,7 +107,8 @@ class SALT3pipe():
                               proargs=proargs,
                               prooptions=prooptions,
                               snlist=snlist,
-                              batch=batch)
+                              batch=batch,
+                              validplots=validplots)
 
         # self.Data.configure(snlist=config.get('data','snlist'))
 
@@ -140,19 +150,20 @@ class SALT3pipe():
         #                         prooptions=config.get('getmu','prooptions'))
 
 
-    def run(self):
+    def run(self,onlyrun=None):
         if not self.build_flag: build_error()
         if not self.config_flag: config_error()
 
+        if onlyrun is not None:
+            if isinstance(onlyrun,str):
+                onlyrun = [onlyrun]
+        
         for prostr in self.pipepros:
+            if onlyrun is not None and prostr not in onlyrun:
+                continue
+            
             pipepro = self._get_pipepro_from_string(prostr)
             pipepro.run(pipepro.batch)
-        # self.Simulation.run()
-        # self.Training.run()
-        # self.LCFitting.run()
-        # self.GetMu.run()
-        # self.CosmoFit.run()
-        
 
     def glue(self,pipepros=None,on='phot'):
         if not self.build_flag: build_error()
@@ -173,6 +184,18 @@ class SALT3pipe():
             pro2_in = pro2._get_input_info().loc[0]
         pro2_in['value'] = pro1_out
         setkeys = pd.DataFrame([pro2_in])
+
+        if isinstance(pro1,Training):
+            # need to define the output directory *before* running training
+            pro1.configure(setkeys = pd.DataFrame([pro1._get_output_info().loc[0]]),
+                           pro=pro1.pro,
+                           proargs=pro1.proargs,
+                           baseinput=pro1.outname,
+                           prooptions=pro1.prooptions,
+                           outname=pro1.outname,
+                           batch=pro1.batch,
+                           validplots=pro1.validplots)
+        
         if not pipepros[1].lower().startswith('cosmofit'):
             pro2.configure(setkeys = setkeys,
                            pro=pro2.pro,
@@ -180,12 +203,14 @@ class SALT3pipe():
                            baseinput=pro2.outname,
                            prooptions=pro2.prooptions,
                            outname=pro2.outname,
-                           batch=pro2.batch)
+                           batch=pro2.batch,
+                           validplots=pro2.validplots)
         else:
             pro2.configure(pro=pro2.pro,
                            prooptions=pro2.prooptions,
                            outname=setkeys['value'].values[0],
-                           batch=pro2.batch)
+                           batch=pro2.batch,
+                           validplots=pro2.validplots)
 
 
     def _get_config_option(self,config,prostr,option,dtype=None):
@@ -251,7 +276,8 @@ class PipeProcedure():
         self.outname = None
 
     def configure(self,pro=None,baseinput=None,setkeys=None,
-                  proargs=None,prooptions=None,batch=False,**kwargs):  
+                  proargs=None,prooptions=None,batch=False,
+                  validplots=False,**kwargs):  
         if pro is not None and "$" in pro:
             self.pro = os.path.expandvars(pro)
         else:
@@ -261,6 +287,7 @@ class PipeProcedure():
         self.proargs = proargs
         self.prooptions = prooptions
         self.batch = batch
+        self.validplots = validplots
 
         self.gen_input(outname=self.outname)
 
@@ -365,12 +392,14 @@ class BYOSED(PyPipeProcedure):
 class Simulation(PipeProcedure):
 
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
-                  batch=False,
+                  batch=False,validplots=False,
                   outname="pipeline_byosed_input.input",**kwargs):
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
-        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,prooptions=prooptions,batch=batch)
+        self.validplots = validplots
+        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
+                          prooptions=prooptions,batch=batch,validplots=validplots)
 
     def gen_input(self,outname="pipeline_sim_input.input"):
         self.outname = outname
@@ -427,7 +456,8 @@ class Training(PyPipeProcedure):
             outdir = self._get_output_info().value.values[0]
             ##copy necessary files to a model folder in SNDATA_ROOT
             modeldir = 'lcfitting/SALT3.test'
-            self.__transfer_model_files(outdir,modeldir,rename=False)
+            #self.__transfer_model_files(outdir,modeldir,rename=False)
+            self._set_output_info(modeldir)
             return modeldir
         else:
             raise ValueError("training can only glue to lcfit")
@@ -450,10 +480,20 @@ class Training(PyPipeProcedure):
         df['value'] = self.keys[section][key]
         return pd.DataFrame([df])
 
+    def _set_output_info(self,value):
+        df = {}
+        section = 'iodata'
+        key = 'outputdir'
+        df['section'] = section
+        df['key'] = key
+        df['value'] = value
+        self.keys[section][key] = value
+        return pd.DataFrame([df])
+    
     def __transfer_model_files(self,outdir,modeldir,write_info=True,rename=True):
         modelfiles = glob.glob('{}/*.dat'.format(outdir))
         if not modelfiles:
-            raise ValueError("[glueto lcfitting] File does not exists. Run training first")
+            raise ValueError("[glueto lcfitting] File does not exist. Run training first")
         shellcommand = "cp -p {} {}".format(' '.join(modelfiles),modeldir) 
         shellrun = subprocess.run(list(shellcommand.split()))
         if shellrun.returncode != 0:
@@ -533,11 +573,13 @@ class Training(PyPipeProcedure):
 class LCFitting(PipeProcedure):
 
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
-                  batch=False,outname="pipeline_lcfit_input.input",**kwargs):
+                  batch=False,validplots=False,outname="pipeline_lcfit_input.input",**kwargs):
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
-        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,prooptions=prooptions,batch=batch)
+        self.validplots = validplots
+        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
+                          prooptions=prooptions,batch=batch,validplots=validplots)
 
     def gen_input(self,outname="pipeline_lcfit_input.input"):
         self.outname = outname
@@ -589,11 +631,13 @@ class LCFitting(PipeProcedure):
  
 class GetMu(PipeProcedure):
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
-                  outname="pipeline_getmu_input.input",**kwargs):
+                  batch=False,validplots=False,outname="pipeline_getmu_input.input",**kwargs):
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
-        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,prooptions=prooptions,batch=batch)
+        self.validplots = validplots
+        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
+                          prooptions=prooptions,batch=batch,validplots=validplots)
 
     def gen_input(self,outname="pipeline_getmu_input.input"):
         self.outname = outname
@@ -628,7 +672,8 @@ class CosmoFit(PipeProcedure):
         self.prooptions = prooptions
         self.finput = outname
         self.batch = batch
-        super().configure(pro=pro,outname=outname,prooptions=prooptions,batch=batch)
+        self.validplots = validplots
+        super().configure(pro=pro,outname=outname,prooptions=prooptions,batch=batch,validplots=validplots)
 
     def _get_input_info(self):
         df = {}

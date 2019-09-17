@@ -220,16 +220,16 @@ class TrainSALT(TrainSALTBase):
 
 		for p,i in zip(phase,range(len(phase))):
 			for w,j in zip(wave,range(len(wave))):
-				print('%.1f %.2f %8.5e'%(p,w,M0[i,j]),file=foutm0)
-				print('%.1f %.2f %8.5e'%(p,w,M1[i,j]),file=foutm1)
-				print('%.1f %.2f %8.5e'%(p,w,M0err[i,j]),file=foutm0err)
-				print('%.1f %.2f %8.5e'%(p,w,M1err[i,j]),file=foutm1err)
-				print('%.1f %.2f %8.5e'%(p,w,cov_M0_M1[i,j]),file=foutcov)
-				print('%.1f %.2f %8.5e'%(p,w,modelerr[i,j]),file=fouterrmod)
+				print('%.1f %.2f %8.15e'%(p,w,M0[i,j]),file=foutm0)
+				print('%.1f %.2f %8.15e'%(p,w,M1[i,j]),file=foutm1)
+				print('%.1f %.2f %8.15e'%(p,w,M0err[i,j]),file=foutm0err)
+				print('%.1f %.2f %8.15e'%(p,w,M1err[i,j]),file=foutm1err)
+				print('%.1f %.2f %8.15e'%(p,w,cov_M0_M1[i,j]),file=foutcov)
+				print('%.1f %.2f %8.15e'%(p,w,modelerr[i,j]),file=fouterrmod)
 
 		foutclscat = open('%s/salt3_color_dispersion.dat'%outdir,'w')
 		for w,j in zip(wave,range(len(wave))):
-			print('%.2f %8.5e'%(w,clscat[j]),file=foutclscat)
+			print('%.2f %8.10e'%(w,clscat[j]),file=foutclscat)
 		foutclscat.close()
 				
 		foutm0.close()
@@ -241,7 +241,7 @@ class TrainSALT(TrainSALTBase):
 		
 		print('%i'%len(clpars),file=foutcl)
 		for c in clpars:
-			print('%8.5e'%c,file=foutcl)
+			print('%8.10e'%c,file=foutcl)
 		print("""Salt2ExtinctionLaw.version 1
 Salt2ExtinctionLaw.min_lambda %i
 Salt2ExtinctionLaw.max_lambda %i"""%(
@@ -287,7 +287,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 			if 't0' not in SNParams[k].keys():
 				SNParams[k]['t0'] = 0.0
-			print('%s %8.5e %.4f %.4f %.2f %.2f %8.5e %.4f %.4f %.2f'%(
+			print('%s %8.10e %.10f %.10f %.10f %.10f %8.10e %.10f %.10f %.2f'%(
 				k,SNParams[k]['x0'],SNParams[k]['x1'],SNParams[k]['c'],SNParams[k]['t0'],
 				SNParams[k]['tpkoff'],SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD),file=foutsn)
 		foutsn.close()
