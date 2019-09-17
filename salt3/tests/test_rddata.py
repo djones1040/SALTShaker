@@ -9,7 +9,7 @@ class RdTest(unittest.TestCase):
 
 	def test_t0_measure(self):
 
-		sn = snana.SuperNova('testdata/SALT3TEST_SIMPLE_SN5999390.DAT')
+		sn = snana.SuperNova('testdata/TEST.DAT')
 		t0,msg = estimate_tpk_bazin(sn.MJD,sn.FLUXCAL,sn.FLUXCALERR)
 
 		self.assertTrue('termination condition is satisfied' in msg)
