@@ -123,6 +123,8 @@ class TrainSALTBase:
 							help='turn on regularization if set (default=%default)')
 		parser.add_argument('--n_repeat', default=config.get('trainparams','n_repeat'), type=int,
 							help='repeat mcmc and/or gauss newton n times (default=%default)')
+		parser.add_argument('--fit_model_err', default=config.get('trainparams','fit_model_err'), type=boolean_string,
+							help='fit for model error if set (default=%default)')
 		
 		# mcmc parameters
 		parser.add_argument('--n_steps_mcmc', default=config.get('mcmcparams','n_steps_mcmc'), type=int,
@@ -186,8 +188,8 @@ class TrainSALTBase:
 
 	def get_saltkw(self,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc):
 		saltfitkwargs = {'specrecal':self.options.specrecal,
-						'usePriors':self.options.usePriors,'priorWidths':self.options.priorWidths,
-						'phaseknotloc':phaseknotloc,'waveknotloc':waveknotloc,
+						 'usePriors':self.options.usePriors,'priorWidths':self.options.priorWidths,
+						 'phaseknotloc':phaseknotloc,'waveknotloc':waveknotloc,
 						 'errphaseknotloc':errphaseknotloc,'errwaveknotloc':errwaveknotloc,
 						 'phaserange':self.options.phaserange,
 						 'waverange':self.options.waverange,'phaseres':self.options.phasesplineres,
@@ -221,7 +223,9 @@ class TrainSALTBase:
 						 'modelpar_snpar_tradeoff_nstep':self.options.modelpar_snpar_tradeoff_nstep,
 						 'nsteps_between_lsqfit':self.options.nsteps_between_lsqfit,
 						 'use_lsqfit':self.options.use_lsqfit,
-						 'regularize':self.options.regularize}
+						 'regularize':self.options.regularize,
+						 'outputdir':self.options.outputdir,
+						 'fit_model_err':self.options.fit_model_err}
 
 		return saltfitkwargs
 
