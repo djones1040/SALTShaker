@@ -150,19 +150,20 @@ class SALT3pipe():
         #                         prooptions=config.get('getmu','prooptions'))
 
 
-    def run(self):
+    def run(self,onlyrun=None):
         if not self.build_flag: build_error()
         if not self.config_flag: config_error()
 
+        if onlyrun is not None:
+            if isinstance(onlyrun,str):
+                onlyrun = [onlyrun]
+        
         for prostr in self.pipepros:
+            if onlyrun is not None and prostr not in onlyrun:
+                continue
+            
             pipepro = self._get_pipepro_from_string(prostr)
             pipepro.run(pipepro.batch)
-        # self.Simulation.run()
-        # self.Training.run()
-        # self.LCFitting.run()
-        # self.GetMu.run()
-        # self.CosmoFit.run()
-        
 
     def glue(self,pipepros=None,on='phot'):
         if not self.build_flag: build_error()
@@ -183,6 +184,18 @@ class SALT3pipe():
             pro2_in = pro2._get_input_info().loc[0]
         pro2_in['value'] = pro1_out
         setkeys = pd.DataFrame([pro2_in])
+
+        if isinstance(pro1,Training):
+            # need to define the output directory *before* running training
+            pro1.configure(setkeys = pd.DataFrame([pro1._get_output_info().loc[0]]),
+                           pro=pro1.pro,
+                           proargs=pro1.proargs,
+                           baseinput=pro1.outname,
+                           prooptions=pro1.prooptions,
+                           outname=pro1.outname,
+                           batch=pro1.batch,
+                           validplots=pro1.validplots)
+        
         if not pipepros[1].lower().startswith('cosmofit'):
             pro2.configure(setkeys = setkeys,
                            pro=pro2.pro,
@@ -443,7 +456,8 @@ class Training(PyPipeProcedure):
             outdir = self._get_output_info().value.values[0]
             ##copy necessary files to a model folder in SNDATA_ROOT
             modeldir = 'lcfitting/SALT3.test'
-            self.__transfer_model_files(outdir,modeldir,rename=False)
+            #self.__transfer_model_files(outdir,modeldir,rename=False)
+            self._set_output_info(modeldir)
             return modeldir
         else:
             raise ValueError("training can only glue to lcfit")
@@ -466,10 +480,20 @@ class Training(PyPipeProcedure):
         df['value'] = self.keys[section][key]
         return pd.DataFrame([df])
 
+    def _set_output_info(self,value):
+        df = {}
+        section = 'iodata'
+        key = 'outputdir'
+        df['section'] = section
+        df['key'] = key
+        df['value'] = value
+        self.keys[section][key] = value
+        return pd.DataFrame([df])
+    
     def __transfer_model_files(self,outdir,modeldir,write_info=True,rename=True):
         modelfiles = glob.glob('{}/*.dat'.format(outdir))
         if not modelfiles:
-            raise ValueError("[glueto lcfitting] File does not exists. Run training first")
+            raise ValueError("[glueto lcfitting] File does not exist. Run training first")
         shellcommand = "cp -p {} {}".format(' '.join(modelfiles),modeldir) 
         shellrun = subprocess.run(list(shellcommand.split()))
         if shellrun.returncode != 0:
