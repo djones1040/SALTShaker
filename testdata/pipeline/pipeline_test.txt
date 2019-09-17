@@ -1,0 +1,22 @@
+##SALT3 INPUT
+    
+[simulation]
+pro=snlc_sim.exe
+baseinput=testdata/pipeline/simulation/SIMGEN_BYOSEDTEST.INPUT
+outinput=testdata/pipeline/pipelinetest/TEST_SIMGEN_BYOSEDTEST.INPUT
+#baseinput=simulation/SIMGEN_SALT3TEST.INPUT
+#outinput=pipelinetest/TEST_SIMGEN_SALT3TEST.INPUT
+prooptions=
+set_key= NGEN_LC 20
+    GENSOURCE RANDOM
+    GENRANGE_REDSHIFT 0.01 0.1
+    GENVERSION MD_BYOSEDTEST
+
+[lcfitting]
+pro=snlc_fit.exe
+baseinput=testdata/pipeline/lcfitting/snfit_base.nml
+outinput=testdata/pipeline/pipelinetest/snfit_TEST.nml
+prooptions=
+set_key=SNLCINP VERSION_PHOTOMETRY SALT3TEST_SIMPLE
+    SNLCINP KCOR_FILE testdata/pipeline/lcfitting/kcor_PS1_LOWZ_COMBINED.fits
+    FITINP FILTLIST_FIT bcdeghi

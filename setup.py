@@ -54,5 +54,6 @@ setup(
 					  'ipython',
 					  'pandas',
 					  'f90nml',
-					  'iminuit'],
+					  'iminuit',
+					  'tqdm'],
 	)
