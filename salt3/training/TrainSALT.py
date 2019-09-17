@@ -147,6 +147,7 @@ class TrainSALT(TrainSALTBase):
 			if i == 0: laststepsize = None
 			
 			if self.options.do_mcmc:
+				saltfitkwargs['regularize'] = False
 				saltfitter = saltfit.mcmc(x_modelpars,datadict,parlist,**saltfitkwargs)
 				print('initial loglike: %.1f'%saltfitter.maxlikefit(x_modelpars,None,False))
 				# do the fitting
@@ -157,6 +158,7 @@ class TrainSALT(TrainSALTBase):
 						#stepsizes=laststepsize)
 
 			if self.options.do_gaussnewton:
+				saltfitkwargs['regularize'] = self.options.regularize
 				saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)			
 				# do the fitting
 				x_modelpars,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\

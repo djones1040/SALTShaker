@@ -1052,7 +1052,7 @@ class SALTResids:
 
 		axcount = 0; parcount = 0
 		from matplotlib.backends.backend_pdf import PdfPages
-		pdf_pages = PdfPages('output/MCMC_hist.pdf')
+		pdf_pages = PdfPages('%s/MCMC_hist.pdf'%self.outputdir)
 		fig = plt.figure()
 		
 		m0pars = np.array([])
