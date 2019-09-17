@@ -1,12 +1,18 @@
 import unittest
 from salt3.training import saltresids
+from salt3.training.saltresids import _SCALE_FACTOR
+
 from salt3.training.TrainSALT import TrainSALT
 import numpy as np
 import pickle, argparse, configparser,warnings
 from salt3.util import snana,readutils
 from sncosmo.salt2utils import SALT2ColorLaw
+from scipy.interpolate import interp1d
+
 
 class TRAINING_Test(unittest.TestCase):
+	
+	
 	
 	def setUp(self):
 		ts=TrainSALT()
@@ -23,7 +29,6 @@ class TRAINING_Test(unittest.TestCase):
 		# read the data
 		datadict = readutils.rdAllData(options.snlist,options.estimate_tpk,kcordict,
 									   ts.addwarning,dospec=options.dospec)
-		datadict = ts.mkcuts(datadict)
 		self.parlist,self.guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc = ts.initialParameters(datadict)
 		saltfitkwargs = ts.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
 
@@ -68,16 +73,11 @@ class TRAINING_Test(unittest.TestCase):
 		if self.resids.n_colorscatpars:
 			colorScat = True
 		else: colorScat = None
-		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,True,True)
+		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,salterr,True,True)
 		
-		residuals = photresidsdict['photresid']
+		residuals = photresidsdict['resid']
 		
-		jacobian=np.zeros((residuals.size,self.parlist.size))
-		jacobian[:,self.parlist=='cl'] = photresidsdict['dphotresid_dcl']
-		jacobian[:,self.parlist=='m0'] = photresidsdict['dphotresid_dM0']
-		jacobian[:,self.parlist=='m1'] = photresidsdict['dphotresid_dM1']
-		for snparam in ('x0','x1','c'): #tpkoff should go here
-			jacobian[:,self.parlist == '{}_{}'.format(snparam,sn)] = photresidsdict['dphotresid_d{}'.format(snparam)]
+		jacobian=photresidsdict['resid_jacobian']
 		def incrementOneParam(i):
 			guess=self.guess.copy()
 			guess[i]+=dx
@@ -85,13 +85,174 @@ class TRAINING_Test(unittest.TestCase):
 			if self.resids.n_colorpars:
 				colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
 			else: colorLaw = None
-			return self.resids.ResidsForSN(guess,sn,components,colorLaw,False)[0]['photresid']
+			return self.resids.ResidsForSN(guess,sn,components,colorLaw,salterr,False)[0]['resid']
 		dResiddX=np.zeros((residuals.size,self.parlist.size))
 		for i in range(self.guess.size):
 			dResiddX[:,i]=(incrementOneParam(i)-residuals)/dx
+
 		if not np.allclose(dResiddX,jacobian,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol))[1]]))
 		self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
 
+	def test_photresid_jacobian_vary_uncertainty(self):
+		"""Check that lognorm gradient and residuals' jacobian are correctly calculated with fixUncertainty=False"""
+		print("Checking photometric derivatives including uncertainties")
+		dx=1e-8
+		rtol=1e-2
+		atol=1e-2
+		sn=self.resids.datadict.keys().__iter__().__next__()
+		components = self.resids.SALTModel(self.resids.guess)
+		salterr = self.resids.ErrModel(self.resids.guess)
+		colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.resids.guess[self.resids.parlist == 'cl'])
+		
+		residsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,salterr,True,True,fixUncertainty=False)[0]
+		grad=residsdict['lognorm_grad']
+		jacobian=residsdict['resid_jacobian']
+
+		residsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,salterr,False,False,fixUncertainty=False)[0]
+		residuals = residsdict['resid']
+		lognorm= residsdict['lognorm']
+
+		def incrementOneParam(i):
+			guess=self.guess.copy()
+			guess[i]+=dx
+			components=self.resids.SALTModel(guess)
+			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
+			salterr=self.resids.ErrModel(guess)
+			
+			return self.resids.ResidsForSN(guess,sn,components,colorLaw,salterr,False,fixUncertainty=False)[0]
+		dResiddX=np.zeros((residuals.size,self.parlist.size))
+		dLognormdX=np.zeros(self.parlist.size)
+		for i in range(self.guess.size):
+			residsdict=incrementOneParam(i)
+			dResiddX[:,i]=(residsdict['resid']-residuals)/dx
+			dLognormdX[i]=(residsdict['lognorm']-lognorm)/dx
+		if not np.allclose(dResiddX,jacobian,rtol): print('Problems with residual derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol,atol))[1]]))
+		if not np.allclose(dLognormdX,grad,rtol): print('Problems with lognorm derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dLognormdX,grad,rtol,atol))[0]]))
+		self.assertTrue(np.allclose(dResiddX,jacobian,rtol,atol))
+		self.assertTrue(np.allclose(dLognormdX,grad,rtol,atol))
+
+	def test_specvals(self):
+		"""Check that lognorm gradient and residuals' jacobian are correctly calculated with fixUncertainty=False"""
+		print("Checking spectral derivatives")
+		dx=1e-8
+		rtol=1e-2
+		atol=1e-20
+		sn=self.resids.datadict.keys().__iter__().__next__()
+		components = self.resids.SALTModel(self.resids.guess)
+		salterr = self.resids.ErrModel(self.resids.guess)
+		colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.guess[self.resids.parlist == 'cl'])
+
+		M0,M1=self.resids.SALTModel(self.guess)
+		colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.guess[self.parlist == 'cl'])
+		saltErr=self.resids.ErrModel(self.guess)
+		z = self.resids.datadict[sn]['zHelio']
+		obsphase = self.resids.datadict[sn]['obsphase'] #self.phase*(1+z)
+		x0,x1,c,tpkoff = self.guess[self.parlist == 'x0_%s'%sn],self.guess[self.parlist == 'x1_%s'%sn],\
+						 self.guess[self.parlist == 'c_%s'%sn],self.guess[self.parlist == 'tpkoff_%s'%sn]
+
+		#Apply MW extinction
+		M0 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
+		M1 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
+	
+		colorlaw = -0.4 * colorLaw(self.resids.wave)
+		colorexp = 10. ** (colorlaw * c)
+		M0 *= colorexp; M1 *= colorexp
+		M0 *= _SCALE_FACTOR/(1+z); M1 *= _SCALE_FACTOR/(1+z)
+		int1dM0 = interp1d(obsphase,M0,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
+		int1dM1 = interp1d(obsphase,M1,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
+
+		interr1d = [interp1d(obsphase,err * (self.resids.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z))**2 ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
+
+		mod = x0*(M0 + x1*M1)
+		int1d = interp1d(obsphase,mod,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
+
+		valsdict=self.resids.specValsForSN(self.resids.guess,sn, (int1dM0,int1dM1),colorlaw,colorexp,True,True)
+		uncertaintydict=self.resids.specUncertaintyForSN(self.guess,sn,(int1dM0,int1dM1),colorlaw,colorexp,interr1d,True)
+		jacobian=valsdict['modelflux_jacobian']
+		uncJac=	uncertaintydict['modeluncertainty_jacobian']
+
+		valsdict=self.resids.specValsForSN(self.resids.guess,sn, int1d,colorlaw,colorexp,False,False)
+		uncertaintydict=self.resids.specUncertaintyForSN(self.guess,sn,int1d,colorlaw,colorexp,interr1d,False)
+		vals = valsdict['modelflux']
+		uncertainty = uncertaintydict['modeluncertainty']
+		
+		def incrementOneParam(i):
+			guess=self.guess.copy()
+			guess[i]+=dx
+			M0,M1=self.resids.SALTModel(guess)
+			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
+			saltErr=self.resids.ErrModel(guess)
+			z = self.resids.datadict[sn]['zHelio']
+			obsphase = self.resids.datadict[sn]['obsphase'] #self.phase*(1+z)
+			x0,x1,c,tpkoff = guess[self.parlist == 'x0_%s'%sn],guess[self.parlist == 'x1_%s'%sn],\
+							 guess[self.parlist == 'c_%s'%sn],guess[self.parlist == 'tpkoff_%s'%sn]
+
+			#Apply MW extinction
+			M0 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
+			M1 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
+	
+			colorlaw = -0.4 * colorLaw(self.resids.wave)
+			colorexp = 10. ** (colorlaw * c)
+	
+			interr1d = [interp1d(obsphase,err * (self.resids.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z))**2 ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
+
+			mod = x0*(M0 + x1*M1)*colorexp
+			mod *= _SCALE_FACTOR/(1+z)
+			int1d = interp1d(obsphase,mod,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
+
+			return self.resids.specValsForSN(guess,sn, int1d,colorlaw,colorexp,False,False),self.resids.specUncertaintyForSN(guess,sn,int1d,colorlaw,colorexp,interr1d,False)
+		dValdX=np.zeros((vals.size,self.parlist.size))
+		dUncertaintydX=np.zeros((vals.size,self.parlist.size))
+		for i in range(self.guess.size):
+			valsdict,uncertaintydict=incrementOneParam(i)
+			dValdX[:,i]=(valsdict['modelflux']-vals)/dx
+			dUncertaintydX[:,i]=(uncertaintydict['modeluncertainty']-uncertainty)/dx
+
+		if not np.allclose(dValdX,jacobian,rtol,atol): print('Problems with model value derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dValdX,jacobian,rtol,atol))[1]]))
+		if not np.allclose(dUncertaintydX,uncJac,rtol,atol): print('Problems with model value derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dUncertaintydX,uncJac,rtol,atol))[1]]))
+
+		self.assertTrue(np.allclose(dValdX,jacobian,rtol,atol))
+		self.assertTrue(np.allclose(dUncertaintydX,uncJac,rtol,atol))
+
+
+	def test_specresid_jacobian_vary_uncertainty(self):
+		"""Check that lognorm gradient and residuals' jacobian are correctly calculated with fixUncertainty=False"""
+		print("Checking spectral resid derivatives")
+		dx=1e-8
+		rtol=1e-2
+		atol=1e-2
+		sn=self.resids.datadict.keys().__iter__().__next__()
+		components = self.resids.SALTModel(self.resids.guess)
+		salterr = self.resids.ErrModel(self.resids.guess)
+		colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.resids.guess[self.resids.parlist == 'cl'])
+		
+		specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,salterr,True,True,fixUncertainty=False)[1]
+		grad=specresidsdict['lognorm_grad']
+		jacobian=specresidsdict['resid_jacobian']
+
+		specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,salterr,False,False,fixUncertainty=False)[1]
+		residuals = specresidsdict['resid']
+		lognorm= specresidsdict['lognorm']
+
+		def incrementOneParam(i,dx):
+			guess=self.guess.copy()
+			guess[i]+=dx
+			components=self.resids.SALTModel(guess)
+			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
+			salterr=self.resids.ErrModel(guess)
+			return self.resids.ResidsForSN(guess,sn,components,colorLaw,salterr,False,fixUncertainty=False)[1]
+		dResiddX=np.zeros((residuals.size,self.parlist.size))
+		dLognormdX=np.zeros(self.parlist.size)
+		for i in range(self.guess.size):
+			residsdict=incrementOneParam(i,dx)
+			dResiddX[:,i]=(residsdict['resid']-residuals)/dx
+			dLognormdX[i]=(residsdict['lognorm']-lognorm)/dx
+		if not np.allclose(dResiddX,jacobian,rtol,atol): print('Problems with residual derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol,atol))[1]]))
+		if not np.allclose(dLognormdX,grad,rtol,atol): print('Problems with lognorm derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dLognormdX,grad,rtol,atol))[0]]))
+		self.assertTrue(np.allclose(dResiddX,jacobian,rtol,atol))
+		self.assertTrue(np.allclose(dLognormdX,grad,rtol,atol))
+
+	
 	def test_computeDerivatives(self):
 		"""Checks that the computeDerivatives parameter of the ResidsForSN function is not affecting the residuals"""
 		sn=self.resids.datadict.keys().__iter__().__next__()
@@ -104,15 +265,15 @@ class TRAINING_Test(unittest.TestCase):
 			colorScat = True
 		else: colorScat = None
 		combinations= [(True,True),(True,False),(False,False)]
-		results=[self.resids.ResidsForSN(self.guess,sn,components,colorLaw,*x) for x in combinations]
+		results=[self.resids.ResidsForSN(self.guess,sn,components,colorLaw,salterr,*x) for x in combinations]
 		first=results[0]
-		self.assertTrue([np.allclose(first[0]['photresid'],result[0]['photresid']) for result in results[1:]])
-		self.assertTrue([np.allclose(first[1]['specresid'],result[1]['specresid']) for result in results[1:]])
+		self.assertTrue([np.allclose(first[0]['resid'],result[0]['resid']) for result in results[1:]])
+		self.assertTrue([np.allclose(first[1]['resid'],result[1]['resid']) for result in results[1:]])
 
 	def test_specresid_jacobian(self):
 		"""Checks that the the jacobian of the spectroscopic residuals is being correctly calculated to within 1%"""
 		print("Checking spectral derivatives")
-		dx=1e-3
+		dx=1e-8
 		rtol=1e-2
 		sn=self.resids.datadict.keys().__iter__().__next__()
 		components = self.resids.SALTModel(self.resids.guess)
@@ -123,28 +284,21 @@ class TRAINING_Test(unittest.TestCase):
 		if self.resids.n_colorscatpars:
 			colorScat = True
 		else: colorScat = None
-		specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,True,True)[1]
 		
-		residuals = specresidsdict['specresid']
-		jacobian=np.zeros((residuals.size,self.parlist.size))
-		jacobian[:,self.parlist=='cl'] = specresidsdict['dspecresid_dcl']
-		jacobian[:,self.parlist=='m0'] = specresidsdict['dspecresid_dM0']
-		jacobian[:,self.parlist=='m1'] = specresidsdict['dspecresid_dM1']
-		for k in self.resids.datadict[sn]['specdata']:
-			jacobian[:,self.parlist=='specrecal_{}_{}'.format(sn,k)] = specresidsdict['dspecresid_dspecrecal_{}'.format(k)]
-		for snparam in ('x0','x1','c'): #tpkoff should go here
-			jacobian[:,self.parlist == '{}_{}'.format(snparam,sn)] = specresidsdict['dspecresid_d{}'.format(snparam)]
-		def incrementOneParam(i):
+		specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,colorLaw,salterr,True,True)[1]
+		
+		residuals = specresidsdict['resid']
+		jacobian=specresidsdict['resid_jacobian']
+		def incrementOneParam(i,dx):
 			guess=self.guess.copy()
 			guess[i]+=dx
 			components=self.resids.SALTModel(guess)
-			if self.resids.n_colorpars:
-				colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
-			else: colorLaw = None
-			return self.resids.ResidsForSN(guess,sn,components,colorLaw,False)[1]['specresid']
+			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
+			return self.resids.ResidsForSN(guess,sn,components,colorLaw,salterr,False)[1]['resid']
 		dResiddX=np.zeros((residuals.size,self.parlist.size))
 		for i in range(self.guess.size):
-			dResiddX[:,i]=(incrementOneParam(i)-residuals)/dx
+			dResiddX[:,i]=(incrementOneParam(i,dx)-residuals)/dx
+		import pdb;pdb.set_trace()
 		if not np.allclose(dResiddX,jacobian,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol))[1]]))
 		self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
 
@@ -167,128 +321,5 @@ class TRAINING_Test(unittest.TestCase):
 				dResiddX[:,i]=(incrementOneParam(j)-residuals)/dx
 			self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
 	
-# 	def test_init_chi2func(self):
-# 		self.assertTrue(True)
-# 		waverange = [2000,9200]
-# 		colorwaverange = [2800,7000]
-# 		phaserange = [-14,50]
-# 		phasesplineres = 3.2
-# 		wavesplineres = 72
-# 		phaseoutres = 2
-# 		waveoutres = 2
-# 		
-# 		n_phaseknots = int((phaserange[1]-phaserange[0])/phasesplineres)-4
-# 		n_waveknots = int((waverange[1]-waverange[0])/wavesplineres)-4
-# 
-# 		snlist = 'examples/exampledata/photdata/PHOTFILES.LIST'
-# 		ts = TrainSALT()
-# 		datadict = ts.rdAllData(snlist)
-# 
-# 
-# 		parlist = ['m0']*(n_phaseknots*n_waveknots)
-# 		for k in datadict.keys():
-# 			parlist += ['x0_%s'%k,'x1_%s'%k,'c_%s'%k]*len(datadict.keys())
-# 		parlist = np.array(parlist)
-# 		
-# 		guess = np.ones(len(parlist))*1e-10
-# 		
-# 		kcorfile = 'examples/kcor/kcor_PS1_PS1MD.fits'
-# 		survey = 'PS1MD'
-# 		kcorpath = ('%s,%s'%(survey,kcorfile),)
-# 		ts = TrainSALT()
-# 		ts.rdkcor(kcorpath)
-# 
-# 		saltfitter = saltfit.chi2(guess,datadict,parlist,phaserange,
-# 								  waverange,phasesplineres,wavesplineres,phaseoutres,waveoutres,
-# 								  colorwaverange,ts.kcordict)
-# 
-# 		#saltfitter.chi2fit(guess)
-# 		self.assertTrue('stdmag' in saltfitter.__dict__.keys())
-# 	def test_chi2forSN(self):
-# 		self.assertTrue(True)
-# 		waverange = [2000,9200]
-# 		colorwaverange = [2800,7000]
-# 		phaserange = [-14,50]
-# 		phasesplineres = 3.2
-# 		wavesplineres = 72
-# 		phaseoutres = 2
-# 		waveoutres = 2
-# 		n_colorpars=4
-# 		n_components=2
-# 		sn='SN2017lc'
-# 		
-# 		n_phaseknots = int((phaserange[1]-phaserange[0])/phasesplineres)-4
-# 		n_waveknots = int((waverange[1]-waverange[0])/wavesplineres)-4
-# 
-# 		snlist = 'examples/exampledata/photdata/PHOTFILES.LIST'
-# 		ts = TrainSALT()
-# 		datadict = ts.rdAllData(snlist)
-# 
-# 		parlist = ['m0']*(n_phaseknots*n_waveknots)
-# 		if n_components == 2:
-# 			parlist += ['m1']*(n_phaseknots*n_waveknots)
-# 		if n_colorpars:
-# 			parlist += ['cl']*n_colorpars
-# 
-# 		parlist += ['x0_%s'%sn,'x1_%s'%sn ,'c_%s'%sn,'tpkoff_%s'%sn]
-# 		parlist = np.array(parlist)		
-# 		#This is a basic example of some SALT model parameters with the SN parameters for 2017
-# 		guess = np.load('examples/testfiles/testparams.npy')
-# 
-# 		kcorfile = 'examples/kcor/kcor_PS1_PS1MD.fits'
-# 		survey = 'PS1MD'
-# 		kcorpath = ('%s,%s'%(survey,kcorfile),)
-# 		ts = TrainSALT()
-# 		ts.rdkcor(kcorpath)
-		
-# 	def test_synphot(self):
-# 		self.assertTrue(True)
-# 		waverange = [2000,9200]
-# 		colorwaverange = [2800,7000]
-# 		phaserange = [-19,55]
-# 		phasesplineres = 3.2
-# 		wavesplineres = 72
-# 		phaseoutres = 2
-# 		waveoutres = 2
-# 		
-# 		n_phaseknots = int((phaserange[1]-phaserange[0])/phasesplineres)-4
-# 		n_waveknots = int((waverange[1]-waverange[0])/wavesplineres)-4
-# 
-# 		snlist = 'examples/exampledata/photdata/PHOTFILES.LIST'
-# 		ts = TrainSALT()
-# 		datadict = ts.rdAllData(snlist)
-# 
-# 		parlist = ['m0']*(n_phaseknots*n_waveknots)
-# 		for k in datadict.keys():
-# 			parlist += ['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k]*len(datadict.keys())
-# 		parlist = np.array(parlist)
-# 		guess = np.ones(len(parlist))
-# 		
-# 		kcorfile = 'examples/kcor/kcor_PS1_PS1MD.fits'
-# 		survey = 'PS1MD'
-# 		kcorpath = ('%s,%s'%(survey,kcorfile),)
-# 		ts = TrainSALT()
-# 		ts.rdkcor(kcorpath)
-# 		
-# 		saltfitter = saltfit.chi2(guess,datadict,parlist,phaserange,
-# 								  waverange,phasesplineres,wavesplineres,phaseoutres,waveoutres,
-# 								  colorwaverange,ts.kcordict)
-# 
-# 		flatnuwave,flatnuflux = np.loadtxt('salt3/initfiles/flatnu.dat',unpack=True)
-# 		vegawave,vegaflux = np.loadtxt('salt3/initfiles/vegased_2004_stis.txt',unpack=True)
-# 		flatnufluxinterp = np.interp(saltfitter.wave,flatnuwave,flatnuflux)
-# 		vegafluxinterp = np.interp(saltfitter.wave,vegawave,vegaflux)
-# 
-# 		ab_offsets = [-0.08,0.16,0.37,0.54]
-# 		for flt,abo in zip('gri',ab_offsets):
-# 			abmag = saltfitter.synflux(flatnufluxinterp,ts.kcordict['PS1MD'][flt]['zpoff'],survey='PS1MD',flt=flt)
-# 			vegamag = saltfitter.synflux(vegafluxinterp,ts.kcordict['PS1MD'][flt]['zpoff'],survey='PS1MD',flt=flt)
-# 
-# 			# make sure my two synthetic phot methods agree
-# 			# both self-consistent and agree better than 3% (?!?!) with griz AB offsets from
-# 			# possibly reliable source (http://www.astronomy.ohio-state.edu/~martini/usefuldata.html)
-# 			self.assertTrue(np.abs(abmag-ts.kcordict['PS1MD'][flt]['zpoff']-saltfitter.stdmag['PS1MD'][flt]) < 0.001)
-# 			self.assertTrue(np.abs(vegamag-abmag-abo) < 0.015)
-# 
 if __name__ == "__main__":
     unittest.main()
