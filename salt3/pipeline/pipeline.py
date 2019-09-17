@@ -27,7 +27,10 @@ def finput_abspath(finput):
 
 def nmlval_to_abspath(key,value):
     if key.lower() in ['kcor_file','vpec_file'] and not value.startswith('/') and not value.startswith('$') and '/' in value:
-        value = '%s/%s'%(cwd,value)
+        if key.lower() == 'kcor_file' and os.path.exists(os.path.expandvars('$SNDATA_ROOT/kcor/%s'%value)):
+            return value
+        else:
+            value = '%s/%s'%(cwd,value)
     return value
 
 class SALT3pipe():

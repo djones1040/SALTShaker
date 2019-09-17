@@ -70,8 +70,8 @@ class RdTest(unittest.TestCase):
 		phaseoutres = 2
 		waveoutres = 2
 
-		n_phaseknots = int((phaserange[1]-phaserange[0])/phasesplineres)-4
-		n_waveknots = int((waverange[1]-waverange[0])/wavesplineres)-4
+		n_phaseknots = int((phaserange[1]-phaserange[0])/phasesplineres)-3
+		n_waveknots = int((waverange[1]-waverange[0])/wavesplineres)-3
 		
 		phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(initmodelfile,
 			 Bfilt='salt3/initfiles/Bessell90_B.dat',
