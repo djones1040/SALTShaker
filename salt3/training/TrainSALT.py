@@ -8,23 +8,25 @@ import configparser
 import numpy as np
 import sys
 import multiprocessing
+
 from scipy.linalg import lstsq
-
-from salt3.util import snana,readutils
-from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
 from scipy.optimize import minimize, least_squares, differential_evolution
-
-from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs, init_errs_fromfile
-from salt3.training.base import TrainSALTBase
-from salt3.initfiles import init_rootdir
-from salt3.util.txtobj import txtobj
 from astropy.io import fits
 from astropy.cosmology import Planck15 as cosmo
 from sncosmo.constants import HC_ERG_AA
 
+from salt3.util import snana,readutils
+from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
+from salt3.util.txtobj import txtobj
+
+from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs, init_errs_fromfile
+from salt3.training.base import TrainSALTBase
 from salt3.training.saltfit import fitting
 from salt3.training import saltfit as saltfit
+
 from salt3.data import data_rootdir
+from salt3.initfiles import init_rootdir
+
 
 class TrainSALT(TrainSALTBase):
 	def __init__(self):
@@ -81,7 +83,7 @@ class TrainSALT(TrainSALTBase):
 		if self.options.n_colorpars:
 			parlist = np.append(parlist,['cl']*self.options.n_colorpars)
 		if self.options.error_snake_phase_binsize and self.options.error_snake_wave_binsize:
-			parlist = np.append(parlist,['modelerr']*n_errphaseknots*n_errwaveknots)
+			for i in range(3): parlist = np.append(parlist,['modelerr_{}'.format(i)]*n_errphaseknots*n_errwaveknots)
 		if self.options.n_colorscatpars:
 			# four knots for the end points
 			parlist = np.append(parlist,['clscat']*(self.options.n_colorscatpars+8))
@@ -107,7 +109,7 @@ class TrainSALT(TrainSALTBase):
 		guess = np.zeros(parlist.size)
 		m0knots[m0knots == 0] = 1e-4
 		guess[parlist == 'm0'] = m0knots
-		guess[parlist == 'modelerr'] = 1e-6 #*np.mean(m0knots)*HC_ERG_AA
+		for i in range(3): guess[parlist == 'modelerr_{}'.format(i)] = 1e-6 
 		if self.options.n_components == 2:
 			guess[parlist == 'm1'] = m1knots
 		if self.options.n_colorpars:
@@ -127,7 +129,7 @@ class TrainSALT(TrainSALTBase):
 				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.resume_from_outputdir,unpack=True,skiprows=1,dtype="U20,f8")
 			except:
 				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.outputdir,unpack=True,skiprows=1,dtype="U20,f8")
-			for key in np.unique(names):
+			for key in np.unique(parlist):
 				guess[parlist == key] = pars[names == key]
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
@@ -170,7 +172,7 @@ class TrainSALT(TrainSALTBase):
 		print('MCMC message: %s'%message)
 		#print('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
 		#	  saltfitter.regularizationChi2(x_modelpars,0,1,0),saltfitter.regularizationChi2(x_modelpars,0,0,1))
-		print('Final loglike'); saltfitter.maxlikefit(x_modelpars,None,False)
+		print('Final loglike'); saltfitter.maxlikefit(x_modelpars)
 
 		print(x_modelpars.size)
 
@@ -218,16 +220,16 @@ class TrainSALT(TrainSALTBase):
 
 		for p,i in zip(phase,range(len(phase))):
 			for w,j in zip(wave,range(len(wave))):
-				print('%.1f %.2f %8.5e'%(p,w,M0[i,j]),file=foutm0)
-				print('%.1f %.2f %8.5e'%(p,w,M1[i,j]),file=foutm1)
-				print('%.1f %.2f %8.5e'%(p,w,M0err[i,j]),file=foutm0err)
-				print('%.1f %.2f %8.5e'%(p,w,M1err[i,j]),file=foutm1err)
-				print('%.1f %.2f %8.5e'%(p,w,cov_M0_M1[i,j]),file=foutcov)
-				print('%.1f %.2f %8.5e'%(p,w,modelerr[i,j]),file=fouterrmod)
+				print('%.1f %.2f %8.15e'%(p,w,M0[i,j]),file=foutm0)
+				print('%.1f %.2f %8.15e'%(p,w,M1[i,j]),file=foutm1)
+				print('%.1f %.2f %8.15e'%(p,w,M0err[i,j]),file=foutm0err)
+				print('%.1f %.2f %8.15e'%(p,w,M1err[i,j]),file=foutm1err)
+				print('%.1f %.2f %8.15e'%(p,w,cov_M0_M1[i,j]),file=foutcov)
+				print('%.1f %.2f %8.15e'%(p,w,modelerr[i,j]),file=fouterrmod)
 
 		foutclscat = open('%s/salt3_color_dispersion.dat'%outdir,'w')
 		for w,j in zip(wave,range(len(wave))):
-			print('%.2f %8.5e'%(w,clscat[j]),file=foutclscat)
+			print('%.2f %8.10e'%(w,clscat[j]),file=foutclscat)
 		foutclscat.close()
 				
 		foutm0.close()
@@ -239,7 +241,7 @@ class TrainSALT(TrainSALTBase):
 		
 		print('%i'%len(clpars),file=foutcl)
 		for c in clpars:
-			print('%8.5e'%c,file=foutcl)
+			print('%8.10e'%c,file=foutcl)
 		print("""Salt2ExtinctionLaw.version 1
 Salt2ExtinctionLaw.min_lambda %i
 Salt2ExtinctionLaw.max_lambda %i"""%(
@@ -285,7 +287,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 			if 't0' not in SNParams[k].keys():
 				SNParams[k]['t0'] = 0.0
-			print('%s %8.5e %.4f %.4f %.2f %.2f %8.5e %.4f %.4f %.2f'%(
+			print('%s %8.10e %.10f %.10f %.10f %.10f %8.10e %.10f %.10f %.2f'%(
 				k,SNParams[k]['x0'],SNParams[k]['x1'],SNParams[k]['c'],SNParams[k]['t0'],
 				SNParams[k]['tpkoff'],SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD),file=foutsn)
 		foutsn.close()

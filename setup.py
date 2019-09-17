@@ -53,5 +53,7 @@ setup(
 					  'emcee',
 					  'ipython',
 					  'pandas',
-					  'f90nml'],
+					  'f90nml',
+					  'iminuit',
+					  'tqdm'],
 	)

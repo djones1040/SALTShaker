@@ -1,0 +1,9 @@
+ MERGED   MD_BYOSEDTEST  FITOPT000  (N=0)    
+
+	    0 of   10 jobs finished with success.
+	   10 of   10 jobs ABORTED. 
+ WARNING: some jobs did not finish properly.
+	 (NGRACE=0  NEXPECT=10) 
+
+ Total elapsed wall time: 0.011 hr. 
+ Done. 

@@ -8,6 +8,30 @@ import os
 import numpy as np
 import time
 import glob
+cwd = os.getcwd()
+
+def config_error():
+    raise RuntimeError("'configure' stage has not been run yet")
+def build_error():
+    raise RuntimeError("'build' stage has not been run yet")
+
+def boolean_string(s):
+    if s not in {'False', 'True', '1', '0', None}:
+        raise ValueError('Not a valid boolean string')
+    return (s == 'True') | (s == '1')
+
+def finput_abspath(finput):
+    if not finput.startswith('/') and not finput.startswith('$') and \
+       '/' in finput: finput = '%s/%s'%(cwd,finput)
+    return finput
+
+def nmlval_to_abspath(key,value):
+    if key.lower() in ['kcor_file','vpec_file'] and not value.startswith('/') and not value.startswith('$') and '/' in value:
+        if key.lower() == 'kcor_file' and os.path.exists(os.path.expandvars('$SNDATA_ROOT/kcor/%s'%value)):
+            return value
+        else:
+            value = '%s/%s'%(cwd,value)
+    return value
 
 class SALT3pipe():
     def __init__(self,finput=None):
@@ -20,10 +44,16 @@ class SALT3pipe():
         self.CosmoFit = CosmoFit()
         self.Data = Data()
 
+        self.build_flag = False
+        self.config_flag = False
+        self.glue_flag = False
+
     def gen_input(self):
         pass
 
     def build(self,mode='default',data=True,skip=None,onlyrun=None):
+        self.build_flag = True
+
         if data:
             pipe_default = ['data','train','lcfit','getmu','cosmofit']
         else:
@@ -45,6 +75,9 @@ class SALT3pipe():
         print("Current procedures: ", self.pipepros)
 
     def configure(self):
+        if not self.build_flag: build_error()
+        self.config_flag = True
+
         config = configparser.ConfigParser()
         config.read(self.finput)
         m2df = self._multivalues_to_df
@@ -65,6 +98,8 @@ class SALT3pipe():
             baseinput = self._get_config_option(config,prostr,'baseinput')
             outname = self._get_config_option(config,prostr,'outinput')
             pro = self._get_config_option(config,prostr,'pro')
+            batch = self._get_config_option(config,prostr,'batch',dtype=boolean_string)
+            validplots = self._get_config_option(config,prostr,'validplots',dtype=boolean_string)
             proargs = self._get_config_option(config,prostr,'proargs')
             prooptions = self._get_config_option(config,prostr,'prooptions')
             snlist = self._get_config_option(config,prostr,'snlist')
@@ -74,7 +109,9 @@ class SALT3pipe():
                               pro=pro,
                               proargs=proargs,
                               prooptions=prooptions,
-                              snlist=snlist)
+                              snlist=snlist,
+                              batch=batch,
+                              validplots=validplots)
 
         # self.Data.configure(snlist=config.get('data','snlist'))
 
@@ -116,18 +153,25 @@ class SALT3pipe():
         #                         prooptions=config.get('getmu','prooptions'))
 
 
-    def run(self):
-        for prostr in self.pipepros:
-            pipepro = self._get_pipepro_from_string(prostr)
-            pipepro.run()
-        # self.Simulation.run()
-        # self.Training.run()
-        # self.LCFitting.run()
-        # self.GetMu.run()
-        # self.CosmoFit.run()
+    def run(self,onlyrun=None):
+        if not self.build_flag: build_error()
+        if not self.config_flag: config_error()
+
+        if onlyrun is not None:
+            if isinstance(onlyrun,str):
+                onlyrun = [onlyrun]
         
+        for prostr in self.pipepros:
+            if onlyrun is not None and prostr not in onlyrun:
+                continue
+            
+            pipepro = self._get_pipepro_from_string(prostr)
+            pipepro.run(pipepro.batch)
 
     def glue(self,pipepros=None,on='phot'):
+        if not self.build_flag: build_error()
+        if not self.config_flag: config_error()
+
         if pipepros is None:
             return
         elif not isinstance(pipepros,list) or len(pipepros) !=2:
@@ -147,23 +191,44 @@ class SALT3pipe():
             pro2_in = pro2._get_input_info().loc[0]
         pro2_in['value'] = pro1_out
         setkeys = pd.DataFrame([pro2_in])
+
+        if isinstance(pro1,Training):
+            # need to define the output directory *before* running training
+            pro1.configure(setkeys = pd.DataFrame([pro1._get_output_info().loc[0]]),
+                           pro=pro1.pro,
+                           proargs=pro1.proargs,
+                           baseinput=pro1.outname,
+                           prooptions=pro1.prooptions,
+                           outname=pro1.outname,
+                           batch=pro1.batch,
+                           validplots=pro1.validplots)
+        
         if not pipepros[1].lower().startswith('cosmofit'):
             pro2.configure(setkeys = setkeys,
                            pro=pro2.pro,
                            proargs=pro2.proargs,
                            baseinput=pro2.outname,
                            prooptions=pro2.prooptions,
-                           outname=pro2.outname)
+                           outname=pro2.outname,
+                           batch=pro2.batch,
+                           validplots=pro2.validplots)
         else:
             pro2.configure(pro=pro2.pro,
                            prooptions=pro2.prooptions,
-                           outname=setkeys['value'].values[0])            
+                           outname=setkeys['value'].values[0],
+                           batch=pro2.batch,
+                           validplots=pro2.validplots)
 
-    def _get_config_option(self,config,prostr,option):
+
+    def _get_config_option(self,config,prostr,option,dtype=None):
         if config.has_option(prostr, option):
             option_value = config.get(prostr,option)
         else:
             option_value = None
+
+        if dtype is not None:
+            option_value = dtype(option_value)
+
         return option_value
 
     def _get_pipepro_from_string(self,pipepro_str):
@@ -218,7 +283,8 @@ class PipeProcedure():
         self.outname = None
 
     def configure(self,pro=None,baseinput=None,setkeys=None,
-                  proargs=None,prooptions=None,**kwargs):  
+                  proargs=None,prooptions=None,batch=False,
+                  validplots=False,**kwargs):  
         if pro is not None and "$" in pro:
             self.pro = os.path.expandvars(pro)
         else:
@@ -227,21 +293,25 @@ class PipeProcedure():
         self.setkeys = setkeys
         self.proargs = proargs
         self.prooptions = prooptions
+        self.batch = batch
+        self.validplots = validplots
 
         self.gen_input(outname=self.outname)
 
     def gen_input(self,outname=None):
         pass
 
-    def run(self):
-        arglist = [self.proargs] + [self.finput] +[self.prooptions]
+    def run(self,batch):
+        arglist = [self.proargs] + [finput_abspath(self.finput)] +[self.prooptions]
         arglist = list(filter(None,arglist))
         args = []
         for arg in arglist:
             if arg is not None:
                 for argitem in arg.split(' '):
                     args.append(argitem)
-        _run_external_pro(self.pro, args)
+
+        if batch: _run_batch_pro(self.pro, args)
+        else: _run_external_pro(self.pro, args)
 
     def _get_input_info(self):
         pass
@@ -329,10 +399,14 @@ class BYOSED(PyPipeProcedure):
 class Simulation(PipeProcedure):
 
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
+                  batch=False,validplots=False,
                   outname="pipeline_byosed_input.input",**kwargs):
         self.outname = outname
         self.prooptions = prooptions
-        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,prooptions=prooptions)
+        self.batch = batch
+        self.validplots = validplots
+        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
+                          prooptions=prooptions,batch=batch,validplots=validplots)
 
     def gen_input(self,outname="pipeline_sim_input.input"):
         self.outname = outname
@@ -351,12 +425,14 @@ class Simulation(PipeProcedure):
             pipepro = type(pipepro).__name__
         outdir = self._get_output_info().value.values[0]
         outpath = os.path.join(os.environ['SNDATA_ROOT'],'SIM/',outdir)
-        if os.path.isdir(outdir):
-            res = outdir
-        elif os.path.exists(outpath):
-            res = outpath
-        else:
-            raise ValueError("Path does not exists",outdir,outpath)             
+        # HACK - needs to check SCRATCH_SIMDIR or something else
+        res = outpath
+        #if os.path.isdir(outdir):
+        #    res = outdir
+        #elif os.path.exists(outpath):
+        #    res = outpath
+        #else:
+        #    raise ValueError("Path does not exists",outdir,outpath)             
         if pipepro.lower().startswith('train'):
             return glob.glob(os.path.join(res,'*.LIST'))[0]
         elif pipepro.lower().startswith('lcfit'):
@@ -387,7 +463,8 @@ class Training(PyPipeProcedure):
             outdir = self._get_output_info().value.values[0]
             ##copy necessary files to a model folder in SNDATA_ROOT
             modeldir = 'lcfitting/SALT3.test'
-            self.__transfer_model_files(outdir,modeldir,rename=False)
+            #self.__transfer_model_files(outdir,modeldir,rename=False)
+            self._set_output_info(modeldir)
             return modeldir
         else:
             raise ValueError("training can only glue to lcfit")
@@ -410,10 +487,20 @@ class Training(PyPipeProcedure):
         df['value'] = self.keys[section][key]
         return pd.DataFrame([df])
 
+    def _set_output_info(self,value):
+        df = {}
+        section = 'iodata'
+        key = 'outputdir'
+        df['section'] = section
+        df['key'] = key
+        df['value'] = value
+        self.keys[section][key] = value
+        return pd.DataFrame([df])
+    
     def __transfer_model_files(self,outdir,modeldir,write_info=True,rename=True):
         modelfiles = glob.glob('{}/*.dat'.format(outdir))
         if not modelfiles:
-            raise ValueError("[glueto lcfitting] File does not exists. Run training first")
+            raise ValueError("[glueto lcfitting] File does not exist. Run training first")
         shellcommand = "cp -p {} {}".format(' '.join(modelfiles),modeldir) 
         shellrun = subprocess.run(list(shellcommand.split()))
         if shellrun.returncode != 0:
@@ -493,10 +580,13 @@ class Training(PyPipeProcedure):
 class LCFitting(PipeProcedure):
 
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
-                  outname="pipeline_lcfit_input.input",**kwargs):
+                  batch=False,validplots=False,outname="pipeline_lcfit_input.input",**kwargs):
         self.outname = outname
         self.prooptions = prooptions
-        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,prooptions=prooptions)
+        self.batch = batch
+        self.validplots = validplots
+        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
+                          prooptions=prooptions,batch=batch,validplots=validplots)
 
     def gen_input(self,outname="pipeline_lcfit_input.input"):
         self.outname = outname
@@ -515,6 +605,13 @@ class LCFitting(PipeProcedure):
 
     def _get_input_info(self):
         df = {}
+        section = 'HEADER'
+        key = 'VERSION'
+        df[section] = section
+        df['key'] = key
+        df['value'] = self.keys[section][key]
+        df['type'] = 'phot'
+
         section = 'SNLCINP'
         key = 'VERSION_PHOTOMETRY'
         df['section'] = section
@@ -541,10 +638,13 @@ class LCFitting(PipeProcedure):
  
 class GetMu(PipeProcedure):
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
-                  outname="pipeline_getmu_input.input",**kwargs):
+                  batch=False,validplots=False,outname="pipeline_getmu_input.input",**kwargs):
         self.outname = outname
         self.prooptions = prooptions
-        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,prooptions=prooptions)
+        self.batch = batch
+        self.validplots = validplots
+        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
+                          prooptions=prooptions,batch=batch,validplots=validplots)
 
     def gen_input(self,outname="pipeline_getmu_input.input"):
         self.outname = outname
@@ -578,8 +678,9 @@ class CosmoFit(PipeProcedure):
             outname = setkeys.value.values[0]
         self.prooptions = prooptions
         self.finput = outname
-
-        super().configure(pro=pro,outname=outname,prooptions=prooptions)
+        self.batch = batch
+        self.validplots = validplots
+        super().configure(pro=pro,outname=outname,prooptions=prooptions,batch=batch,validplots=validplots)
 
     def _get_input_info(self):
         df = {}
@@ -600,6 +701,44 @@ def _run_external_pro(pro,args):
         raise ValueError("Something went wrong..") ##possible to pass the error msg from the program?
 
     return
+
+def _run_batch_pro(pro,args):
+
+    if isinstance(args, str):
+        args = [args]
+
+    print("Running",' '.join([pro] + args))
+    res = subprocess.run(args = list([pro] + args),capture_output=True)
+
+    done_file = ''
+    for line in res.stdout.decode('utf-8').split('\n'):
+        if 'DONE_STAMP' in line:
+            done_file = line.split()[-1]
+
+    if not done_file:
+        raise RuntimeError('could not find DONE file name in %s output'%pro)
+    # SNANA doesn't remove old done files
+    if os.path.exists(done_file): os.system('rm %s'%done_file)
+
+    job_complete=False
+    while not job_complete:
+        time.sleep(15)
+    
+        if os.path.exists(done_file): job_complete = True
+
+    success = False
+    with open(done_file,'r') as fin:
+        for line in fin:
+            if 'SUCCESS' in line:
+                success = True
+
+    if success:
+        print("{} finished successfully.".format(pro.strip()))
+    else:
+        raise ValueError("Something went wrong..") ##possible to pass the error msg from the program?
+
+    return
+
 
 def _gen_general_python_input(basefilename=None,setkeys=None,
                               outname=None):
@@ -689,13 +828,37 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
 
 
 def _gen_snana_fit_input(basefilename=None,setkeys=None,
-                              outname=None):
+                         outname=None):
+
     import f90nml
+    from f90nml.namelist import Namelist
     nml = f90nml.read(basefilename)
+
+    # first write the header info
+    if not os.path.isfile(basefilename):
+        raise ValueError("basefilename cannot be None")
+    print("Load base fit input file..",basefilename)
+    basefile = open(basefilename,"r")
+    lines = basefile.readlines()
+    basekws = []
 
     if setkeys is None:
         print("No modification on the input file, keeping {} as input".format(basefilename))
     else:
+        nml.__setitem__('header',Namelist())
+        snlcinp,fitinp = False,False
+        for i,line in enumerate(lines):
+            if '&snlcinp' in line.lower(): snlcinp = True
+            elif '&fitinp' in line.lower(): fitinp = True
+            elif '&end' in line.lower(): snlcinp,fitinp = False,False
+            if snlcinp or fitinp: continue
+            if line.startswith('#'): continue
+            if not ':' in line: continue
+            key = line.split(':')[0].replace(' ','')
+            value = line.split(':')[1].replace('\n','')
+            nml['header'].__setitem__(key,value)
+        nml['header'].__setitem__('done_stamp','ALL.DONE')
+
         for index, row in setkeys.iterrows():
             sec = row['section']
             key = row['key']
@@ -705,8 +868,11 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
             print("Adding/modifying key {}={} in &{}".format(key,v,sec))
             nml[sec][key] = v
 
+        # a bit clumsy, but need to make sure these are the same for now:
+        nml['header'].__setitem__('version',nml['snlcinp']['version_photometry'])
+
         print("Write fit input to file:",outname)
-        _write_nml_to_file(nml,outname)
+        _write_nml_to_file(nml,outname,append=True)
     return outname,nml
 
 def _gen_general_input(basefilename=None,setkeys=None,outname=None):
@@ -742,18 +908,30 @@ def _write_simple_config_file(config,filename,sep='='):
         outfile.write("{}={}\n".format(key,value))
     return
 
-def _write_nml_to_file(nml,filename):
+def _write_nml_to_file(nml,filename,headerlines=[],append=False):
     outfile = open(filename,"w")
+
     for key in nml.keys():
-        outfile.write('&'+key.upper())
-        outfile.write('\n')
-        for key2 in nml[key].keys():
-            value = nml[key][key2]
-            if isinstance(value,str):
-                value = "'{}'".format(value)
-            elif isinstance(value,list):
-                value = ','.join([str(x) for x in value if not isinstance(x,str)])
-            outfile.write("  {} = {}".format(key2.upper(),value))
-            outfile.write("\n")
-        outfile.write('&END\n\n')
+        if key.lower() == 'header':
+            for key2 in nml[key].keys():
+                value = nml[key][key2]
+                if isinstance(value,str):
+                    value = "{}".format(value)
+                elif isinstance(value,list):
+                    value = ','.join([str(x) for x in value if not isinstance(x,str)])
+                outfile.write("{}: {}".format(key2.upper(),value))
+                outfile.write("\n")
+
+        else:
+            outfile.write('&'+key.upper())
+            outfile.write('\n')
+            for key2 in nml[key].keys():
+                value = nmlval_to_abspath(key2,nml[key][key2])
+                if isinstance(value,str):
+                    value = "'{}'".format(value)
+                elif isinstance(value,list):
+                    value = ','.join([str(x) for x in value if not isinstance(x,str)])
+                outfile.write("  {} = {}".format(key2.upper(),value))
+                outfile.write("\n")
+            outfile.write('&END\n\n')
     return
