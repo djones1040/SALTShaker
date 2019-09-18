@@ -477,6 +477,7 @@ class TRAINING_Test(unittest.TestCase):
 		print("Checking spectral derivatives")
 		dx=1e-8
 		rtol=1e-2
+		atol=1e-4
 		sn=self.resids.datadict.keys().__iter__().__next__()
 		components = self.resids.SALTModel(self.resids.guess)
 		salterr = self.resids.ErrModel(self.resids.guess)
@@ -501,8 +502,8 @@ class TRAINING_Test(unittest.TestCase):
 		for i in range(self.guess.size):
 			dResiddX[:,i]=(incrementOneParam(i,dx)-residuals)/dx
 
-		if not np.allclose(dResiddX,jacobian,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol))[1]]))
-		self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
+		if not np.allclose(dResiddX,jacobian,rtol,atol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol,atol))[1]]))
+		self.assertTrue(np.allclose(dResiddX,jacobian,rtol,atol))
 
 	def test_regularization_jacobian(self):
 		"""Checks that the the jacobian of the spectroscopic residuals is being correctly calculated to within 1%"""

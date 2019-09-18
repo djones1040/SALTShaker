@@ -532,7 +532,7 @@ class SALTResids:
 			
 				# color law
 				for i in range(self.n_colorpars):
-					dcolorlaw_dcli = SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(specdata[k]['wavelength']/(1+z))-SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(specdata[k]['wavelength']/(1+z))
+					dcolorlaw_dcli = interp1d(obswave,SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(self.wave)-SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(self.wave),kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(specdata[k]['wavelength'])
 					specresultsdict['modeluncertainty_jacobian'][iSpecStart:iSpecStart+SpecLen,self.iCL[i]] = (-0.4*x0*np.log(10)*c)*modelUncertainty*dcolorlaw_dcli
 			
 				interpresult= self.errorspline_deriv_interp((clippedPhase[0]/(1+z),specdata[k]['wavelength']/(1+z)),method=self.interpMethod) * (intmultnox**2 * x0/2  / modelUncertainty)[:,np.newaxis]
