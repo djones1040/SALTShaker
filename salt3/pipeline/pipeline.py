@@ -21,8 +21,12 @@ def boolean_string(s):
     return (s == 'True') | (s == '1')
 
 def finput_abspath(finput):
-    if not finput.startswith('/') and not finput.startswith('$') and \
+    if not finput.replace(' ','').startswith('/') and not finput.startswith('$') and \
        '/' in finput: finput = '%s/%s'%(cwd,finput)
+    return finput
+
+def abspath_for_getmu(finput):
+    if not finput.replace(' ','').startswith('/') and not finput.startswith('$'): finput = '%s/%s'%(cwd,finput.replace(' ',''))
     return finput
 
 def nmlval_to_abspath(key,value):
@@ -318,7 +322,7 @@ class PyPipeProcedure(PipeProcedure):
     def gen_input(self,outname="pipeline_generalpy_input.input"):
         self.outname = outname
         self.finput,self.keys = _gen_general_python_input(basefilename=self.baseinput,setkeys=self.setkeys,
-                                                outname=outname)
+                                                          outname=outname)
 
 class Data(PipeProcedure):
 
@@ -591,8 +595,9 @@ class LCFitting(PipeProcedure):
         if not isinstance(pipepro,str):
             pipepro = type(pipepro).__name__
         if pipepro.lower().startswith('getmu'):
-            outprefix = self._get_output_info().value.values[0]
-            return str(outprefix)+'.FITRES.TEXT'
+            outprefix = abspath_for_getmu(self._get_output_info().value.values[0])
+            if self.batch: return str(outprefix)
+            else: return str(outprefix)+'.FITRES.TEXT'
         else:
             raise ValueError("lcfitting can only glue to getmu")
 
@@ -622,8 +627,12 @@ class LCFitting(PipeProcedure):
 
     def _get_output_info(self):
         df = {}
-        section = 'SNLCINP'
-        key = 'TEXTFILE_PREFIX'
+        if self.batch:
+            section = 'HEADER'
+            key = 'OUTDIR'
+        else:
+            section = 'SNLCINP'
+            key = 'TEXTFILE_PREFIX'
         df['section'] = section
         df['key'] = key
         df['value'] = self.keys[section][key]
@@ -641,8 +650,8 @@ class GetMu(PipeProcedure):
 
     def gen_input(self,outname="pipeline_getmu_input.input"):
         self.outname = outname
-        self.finput,self.keys = _gen_general_input(basefilename=self.baseinput,setkeys=self.setkeys,
-                                                          outname=outname)        
+        self.finput,self.keys,self.delimiter = _gen_general_input(basefilename=self.baseinput,setkeys=self.setkeys,
+                                                                  outname=outname,sep=['=',': '],done_stamp=True)
     def glueto(self,pipepro):
         if not isinstance(pipepro,str):
             pipepro = type(pipepro).__name__
@@ -653,9 +662,16 @@ class GetMu(PipeProcedure):
    
     def _get_input_info(self):
         df = {}
-        key = 'file'
-        df['key'] = key
-        df['value'] = self.keys[key]
+        if not self.batch:
+            key = 'file'
+            df['key'] = key
+            df['value'] = self.keys[key]
+        else:
+            key = 'INPDIR'
+            df['key'] = key
+            df['value'] = finput_abspath(self.keys[key])
+            df['delimiter'] = self.delimiter[key]
+
         return pd.DataFrame([df])
 
     def _get_output_info(self):
@@ -868,37 +884,63 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
         _write_nml_to_file(nml,outname,append=True)
     return outname,nml
 
-def _gen_general_input(basefilename=None,setkeys=None,outname=None):
-    config = _read_simple_config_file(basefilename)
-    if setkeys is None:
-        print("No modification on the input file, keeping {} as input".format(basefilename))
-    else:
+def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_stamp=False):
+
+    config,delimiter = _read_simple_config_file(basefilename,sep=sep)
+    #if setkeys is None:
+    #    print("No modification on the input file, keeping {} as input".format(basefilename))
+    if setkeys is not None: #else:
         for index, row in setkeys.iterrows():
             key = row['key']
             v = row['value']
             print("Adding/modifying key {}={}".format(key,v))
             config[key] = v
+    if done_stamp:
+        key = 'DONE_STAMP'
+        v = 'ALL.DONE'
+        config[key] = v
 
-        print("input file saved as:",outname)
-        _write_simple_config_file(config,outname)
+    print("input file saved as:",outname)
+    _write_simple_config_file(config,outname,delimiter)
 
-    return outname,config
+    if len(sep) == 1: return outname,config
+    else: return outname,config,delimiter
 
 def _read_simple_config_file(filename,sep='='):
-    config = {}
+    config,delimiter = {},{}
     f = open(filename,"r")
     lines = f.readlines()
-    for line in lines:    
-        if sep in line and not line.strip().startswith("#"):
-            key,value = line.split(sep)
-            config[key] = value.rstrip()
-    return config
 
-def _write_simple_config_file(config,filename,sep='='):
+    # sighhhh so many SNANA inputs with multiple key/value separators
+    if isinstance(sep,str):
+        sep = np.array([sep])
+    else: sep = np.array(sep)
+
+    for line in lines:
+        sep_in_line = []
+        for s in sep:
+            if s in line and not line.strip().startswith("#"):
+                key,value = line.split(s,1)
+                config[key] = value.rstrip()
+                sep_in_line += [line.find(s)]
+            else:
+                sep_in_line += [None]
+        sep_in_line = np.array(sep_in_line)
+        iSepExists = sep_in_line != None
+        if len(sep[iSepExists]) == 1: delimiter[key] = sep[iSepExists][0]
+        elif len(sep[iSepExists]) > 1: delimiter[key] = sep[iSepExists][sep_in_line[iSepExists] == min(sep_in_line[iSepExists])][0]
+        else: continue
+
+    return config,delimiter
+
+def _write_simple_config_file(config,filename,delimiter,sep='='):
     outfile = open(filename,"w")
     for key in config.keys():
         value = config[key]
-        outfile.write("{}={}\n".format(key,value))
+        if not key in delimiter.keys(): outfile.write("{}={}\n".format(key,value))
+        else: outfile.write("{}{}{}\n".format(key,delimiter[key],value))
+    outfile.close()
+
     return
 
 def _write_nml_to_file(nml,filename,headerlines=[],append=False):
