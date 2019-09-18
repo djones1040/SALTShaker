@@ -582,13 +582,23 @@ class SALTResids:
 			if computeDerivatives:					
 				intmult=self.fluxfactor[survey][flt]*np.sqrt(pbspl[flt].sum()) * dwave
 				photresultsdict['modeluncertainty_jacobian'][selectFilter,self.parlist == 'x0_{}'.format(sn)] = intmult    * modelErrNoNorm
-				photresultsdict['modeluncertainty_jacobian'][selectFilter,self.parlist == 'x1_{}'.format(sn)] = intmult* x0* sum([ i*modelerr * x1**(i-1) if i>0 else 0 for i,modelerr in enumerate(modelErrnox)]) / modelErrNoNorm
+				photresultsdict['modeluncertainty_jacobian'][selectFilter,self.parlist == 'x1_{}'.format(sn)] = intmult* x0 / 2* sum([ i*modelerr * x1**(i-1) if i>0 else 0 for i,modelerr in enumerate(modelErrnox)]) / modelErrNoNorm
 
-				photresultsdict['modeluncertainty_jacobian'][selectFilter,self.parlist == 'c_{}'.format(sn)]  = intmult* x0* -0.4*np.log(10)*sum([ np.sum(colorlaw[np.newaxis,idx[flt]] * modelerr,axis=1) * x1**i for i,modelerr in enumerate(modulatedModelErr)])/modelErrNoNorm
+				photresultsdict['modeluncertainty_jacobian'][selectFilter,self.parlist == 'c_{}'.format(sn)]  = intmult* x0* np.log(10)*sum([ np.sum(colorlaw[np.newaxis,idx[flt]] * modelerr,axis=1) * x1**i for i,modelerr in enumerate(modulatedModelErr)])/modelErrNoNorm
+				
+				for i in range(self.n_colorpars):
+					#Color law is linear wrt to the color law parameters; therefore derivative of the color law
+					# with respect to color law parameter i is the color law with all other values zeroed minus the color law with all values zeroed
+					dcolorlaw_dcli = SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(self.wave[idx[flt]])-SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(self.wave[idx[flt]])
+					#Multiply M0 and M1 components (already modulated with passband) by c* d colorlaw / d cl_i, with associated normalizations
+#					import pdb;pdb.set_trace()
+					photresultsdict['modeluncertainty_jacobian'][selectFilter,self.iCL[i]] =  intmult* x0 *c* -0.4*np.log(10)*sum([ np.sum(dcolorlaw_dcli[np.newaxis,:] * modelerr,axis=1) * x1**i for i,modelerr in enumerate(modulatedModelErr)])/modelErrNoNorm
+
 				
 				passbandColorExp=(pbspl[flt]*(colorexp[idx[flt]]*self.datadict[sn]['mwextcurve'][idx[flt]])**2)
-				intmult = dwave*self.fluxfactor[survey][flt]*_SCALE_FACTOR/(1+z)*x0*np.sqrt(pbspl[flt].sum())
-
+				
+				intmult = dwave*self.fluxfactor[survey][flt]*x0*np.sqrt(pbspl[flt].sum())*(_SCALE_FACTOR/(1+z))**2
+				
 				for pdx,p in enumerate(np.where(selectFilter)[0]):
 					derivInterp = self.errorspline_deriv_interp(
 								(clippedPhase[pdx]/(1+z),self.wave[idx[flt]]),method=self.interpMethod)
@@ -597,13 +607,6 @@ class SALTResids:
 						mErrIdx=np.where(self.parlist=='modelerr_{}'.format(i))[0] 
 						photresultsdict['modeluncertainty_jacobian'][p,mErrIdx]=  x1**i * summation
 						
-				for i in range(self.n_colorpars):
-					#Color law is linear wrt to the color law parameters; therefore derivative of the color law
-					# with respect to color law parameter i is the color law with all other values zeroed minus the color law with all values zeroed
-					dcolorlaw_dcli = SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(self.wave[idx[flt]])-SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(self.wave[idx[flt]])
-					#Multiply M0 and M1 components (already modulated with passband) by c* d colorlaw / d cl_i, with associated normalizations
-#					import pdb;pdb.set_trace()
-					photresultsdict['modeluncertainty_jacobian'][selectFilter,self.iCL[i]] =  intmult* x0*c* -0.4*np.log(10)*sum([ np.sum(dcolorlaw_dcli[np.newaxis,:] * modelerr,axis=1) * x1**i for i,modelerr in enumerate(modulatedModelErr)])/modelErrNoNorm
 					
 		return photresultsdict
 		
@@ -619,7 +622,6 @@ class SALTResids:
 		idx = self.datadict[sn]['idx']
 		x0,x1,c,tpkoff = x[self.parlist == 'x0_%s'%sn],x[self.parlist == 'x1_%s'%sn],\
 						 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
-
 		if computeDerivatives:
 			int1dM0,int1dM1=componentsModInterp
 		else:
