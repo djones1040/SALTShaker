@@ -1,4 +1,3 @@
-
 BATCH_INFO:      sbatch  $SBATCH_TEMPLATES/SBATCH_Midway2_short.TEMPLATE 20
 
 # nominal generation

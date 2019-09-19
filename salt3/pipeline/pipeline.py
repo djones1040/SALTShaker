@@ -86,6 +86,9 @@ class SALT3pipe():
         config.read(self.finput)
         m2df = self._multivalues_to_df
 
+        if not hasattr(self, 'pipepros'):
+            raise ValueError("Pipeline stages are not specified, call self.build() first.")
+        
         for prostr in self.pipepros:
             sectionname = [x for x in config.sections() if x.startswith(prostr)]
             if len(sectionname) == 1:
@@ -167,7 +170,7 @@ class SALT3pipe():
                 continue
             
             pipepro = self._get_pipepro_from_string(prostr)
-            pipepro.run(pipepro.batch)
+            pipepro.run(batch=pipepro.batch)
 
     def glue(self,pipepros=None,on='phot'):
         if not self.build_flag: build_error()
@@ -176,7 +179,11 @@ class SALT3pipe():
         if pipepros is None:
             return
         elif not isinstance(pipepros,list) or len(pipepros) !=2:
-            raise ValueError("pipepros must be list of length 2, {} of {} was given".format(type(pipepros),len(pipepros)))       
+            raise ValueError("pipepros must be list of length 2, {} of {} was given".format(type(pipepros),len(pipepros))) 
+        elif not set(pipepros).issubset(self.pipepros):
+            raise ValueError("one or more stages are not configured, check options in self.build()")
+            
+        
         print("Connecting ",pipepros)
         
         pro1 = self._get_pipepro_from_string(pipepros[0])
@@ -298,7 +305,7 @@ class PipeProcedure():
     def gen_input(self,outname=None):
         pass
 
-    def run(self,batch):
+    def run(self,batch=None):
         arglist = [self.proargs] + [finput_abspath(self.finput)] +[self.prooptions]
         arglist = list(filter(None,arglist))
         args = []
@@ -354,7 +361,7 @@ class Data(PipeProcedure):
         else:
             raise ValueError("data can only glue to training or lcfitting")
     
-    def run(self):
+    def run(self,**kwargs):
         pass
 
 
@@ -391,7 +398,7 @@ class BYOSED(PyPipeProcedure):
         else:
             print("{} is copied to {}".format(outname,byosed_default))
 
-    def run(self):
+    def run(self,**kwargs):
         pass
 
 class Simulation(PipeProcedure):
@@ -417,7 +424,13 @@ class Simulation(PipeProcedure):
         key = 'GENVERSION'
         df['key'] = key
         df['value'] = self.keys[key]
-        return pd.DataFrame([df])
+        if not self.batch:
+            return pd.DataFrame([df])
+        key2 = 'GENPREFIX'
+        df2 = {}
+        df2['key'] = key2
+        df2['value'] = self.keys[key]
+        return pd.DataFrame([df,df2])
 
     def glueto(self,pipepro):
         if not isinstance(pipepro,str):
@@ -431,9 +444,14 @@ class Simulation(PipeProcedure):
         #elif os.path.exists(outpath):
         #    res = outpath
         #else:
-        #    raise ValueError("Path does not exists",outdir,outpath)             
+        #    raise ValueError("Path does not exists",outdir,outpath)            
         if pipepro.lower().startswith('train'):
-            return glob.glob(os.path.join(res,'*.LIST'))[0]
+            if self.batch:
+                prefix = self._get_output_info().value.values[1]
+                return "{}/{}.LIST".format(res,prefix)
+            else:
+                return "{}/{}.LIST".format(res,res)
+            # return glob.glob(os.path.join(res,'*.LIST'))[0]
         elif pipepro.lower().startswith('lcfit'):
             simpath = os.path.join(os.environ['SNDATA_ROOT'],'SIM/')
             idx = res.find(simpath)
@@ -728,6 +746,15 @@ def _run_batch_pro(pro,args,done_file=None):
 
     print("Running",' '.join([pro] + args))
     res = subprocess.run(args = list([pro] + args),capture_output=True)
+    stdout = res.stdout.decode('utf-8')
+    if 'ERROR MESSAGE' in stdout:
+        for line in stdout[stdout.find('ERROR MESSAGE'):].split('\n'):
+            print(line)
+        raise RuntimeError("Something went wrong...")
+    if 'WARNING' in stdout:
+        for line in stdout[stdout.find('WARNING'):].split('\n'):
+            print(line)
+        raise RuntimeError("Something went wrong...")
 
     if not done_file:
         for line in res.stdout.decode('utf-8').split('\n'):
@@ -840,8 +867,9 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
 
         for key,value in zip(setkeys.key,setkeys.value):
             if not key in basekws:
-                print("Adding key {}={}".format(key,value))
-                newline = key+": "+' '.join(list(filter(None,value)))
+                valuestr = ' '.join(list(filter(None,value)))
+                newline = key+": "+' '.join(list(filter(None,value)))+'\n'
+                print("Adding key {} = {}".format(key,valuestr))
                 outfile.write(newline)
                 config[key] = value
 
