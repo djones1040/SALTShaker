@@ -307,7 +307,7 @@ class PipeProcedure():
                 for argitem in arg.split(' '):
                     args.append(argitem)
 
-        if batch: _run_batch_pro(self.pro, args)
+        if batch: _run_batch_pro(self.pro, args, done_file=self.done_file)
         else: _run_external_pro(self.pro, args)
 
     def _get_input_info(self):
@@ -363,6 +363,7 @@ class BYOSED(PyPipeProcedure):
     def configure(self,baseinput=None,setkeys=None,
                   outname="pipeline_byosed_input.input",byosed_default="BYOSED/BYOSED.params",
                   bkp_orig_param=False,**kwargs):   
+        self.done_file = None
         self.outname = outname
         super().configure(pro=None,baseinput=baseinput,setkeys=setkeys)
         #rename current byosed param
@@ -398,6 +399,7 @@ class Simulation(PipeProcedure):
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
                   batch=False,validplots=False,
                   outname="pipeline_byosed_input.input",**kwargs):
+        self.done_file = None
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
@@ -447,6 +449,7 @@ class Training(PyPipeProcedure):
 
     def configure(self,pro=None,baseinput=None,setkeys=None,proargs=None,
                   prooptions=None,outname="pipeline_train_input.input",**kwargs):
+        self.done_file = None
         self.outname = outname
         self.proargs = proargs
         self.prooptions = prooptions
@@ -578,6 +581,7 @@ class LCFitting(PipeProcedure):
 
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
                   batch=False,validplots=False,outname="pipeline_lcfit_input.input",**kwargs):
+        self.done_file = None
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
@@ -641,17 +645,18 @@ class LCFitting(PipeProcedure):
 class GetMu(PipeProcedure):
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
                   batch=False,validplots=False,outname="pipeline_getmu_input.input",**kwargs):
+        self.done_file = finput_abspath('%s/GetMu.DONE'%os.path.dirname(baseinput))
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
         self.validplots = validplots
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
-                          prooptions=prooptions,batch=batch,validplots=validplots)
+                          prooptions=prooptions,batch=batch,validplots=validplots,done_file=self.done_file)
 
     def gen_input(self,outname="pipeline_getmu_input.input"):
         self.outname = outname
         self.finput,self.keys,self.delimiter = _gen_general_input(basefilename=self.baseinput,setkeys=self.setkeys,
-                                                                  outname=outname,sep=['=',': '],done_stamp=True)
+                                                                  outname=outname,sep=['=',': '],done_file=self.done_file)
     def glueto(self,pipepro):
         if not isinstance(pipepro,str):
             pipepro = type(pipepro).__name__
@@ -683,6 +688,7 @@ class GetMu(PipeProcedure):
 
 class CosmoFit(PipeProcedure):
     def configure(self,setkeys=None,pro=None,outname=None,prooptions=None,**kwargs):
+        self.done_file = None
         if setkeys is not None:
             outname = setkeys.value.values[0]
         self.prooptions = prooptions
@@ -711,35 +717,43 @@ def _run_external_pro(pro,args):
 
     return
 
-def _run_batch_pro(pro,args):
+def _run_batch_pro(pro,args,done_file=None):
 
     if isinstance(args, str):
         args = [args]
 
+    if done_file:
+        # SNANA doesn't remove old done files
+        if os.path.exists(done_file): os.system('rm %s'%done_file)
+
     print("Running",' '.join([pro] + args))
     res = subprocess.run(args = list([pro] + args),capture_output=True)
 
-    done_file = ''
-    for line in res.stdout.decode('utf-8').split('\n'):
-        if 'DONE_STAMP' in line:
-            done_file = line.split()[-1]
+    if not done_file:
+        for line in res.stdout.decode('utf-8').split('\n'):
+            if 'DONE_STAMP' in line:
+                done_file = line.split()[-1]
+        # SNANA doesn't remove old done files
+        if os.path.exists(done_file): os.system('rm %s'%done_file)
 
     if not done_file:
         raise RuntimeError('could not find DONE file name in %s output'%pro)
-    # SNANA doesn't remove old done files
-    if os.path.exists(done_file): os.system('rm %s'%done_file)
 
     job_complete=False
     while not job_complete:
         time.sleep(15)
     
-        if os.path.exists(done_file): job_complete = True
+        if os.path.exists(done_file): 
+            job_complete = True
+            # apparently there's a lag between creating the file and writing to it
+            time.sleep(15)
 
     success = False
     with open(done_file,'r') as fin:
         for line in fin:
             if 'SUCCESS' in line:
                 success = True
+
 
     if success:
         print("{} finished successfully.".format(pro.strip()))
@@ -884,7 +898,7 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
         _write_nml_to_file(nml,outname,append=True)
     return outname,nml
 
-def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_stamp=False):
+def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_file=None):
 
     config,delimiter = _read_simple_config_file(basefilename,sep=sep)
     #if setkeys is None:
@@ -895,9 +909,9 @@ def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_
             v = row['value']
             print("Adding/modifying key {}={}".format(key,v))
             config[key] = v
-    if done_stamp:
+    if done_file:
         key = 'DONE_STAMP'
-        v = 'ALL.DONE'
+        v = done_file
         config[key] = v
 
     print("input file saved as:",outname)
