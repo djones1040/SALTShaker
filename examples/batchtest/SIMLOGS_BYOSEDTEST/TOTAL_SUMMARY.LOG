@@ -1,0 +1,12 @@
+                                                SUM-SNIa  : 
+  GENVERSION                                  NGEN     NWRITE  NSPEC   
+# ----------------------------------------------------------------- 
+MD_BYOSEDTEST                                   20      20     20
+
+
+                                                SUM-NONIa : 
+  GENVERSION                                  NGEN     NWRITE  NSPEC   
+# ----------------------------------------------------------------- 
+MD_BYOSEDTEST                                    0       0      0
+
+

@@ -5,7 +5,7 @@ magoff = 0.0
 
 [FLAGS]
 color = False
-stretch = True
+stretch = False
 velocity = True
 sfr = False
 metallicity = False
