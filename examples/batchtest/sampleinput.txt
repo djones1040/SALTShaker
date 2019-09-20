@@ -20,8 +20,8 @@ prooptions=
 set_key= NGEN_LC 20
     GENSOURCE RANDOM
     GENRANGE_REDSHIFT 0.01 0.1
-    GENVERSION MD_BYOSEDTEST
-
+    GENVERSION MD_BYOSEDTEST_TEST
+    
 [training]
 pro=trainsalt
 proargs = -c 
@@ -44,21 +44,37 @@ prooptions=
 batch=True
 set_key=SNLCINP VERSION_PHOTOMETRY SALT3TEST_SIMPLE
     SNLCINP KCOR_FILE lcfitting/kcor_PS1_LOWZ_COMBINED.fits
-
-#FITINP FILTLIST_FIT bcdeghi
+    FITINP FILTLIST_FIT bcdeghi
 
 [getmu]
-pro=SALT2mu_fit.pl
-baseinput=getmu/BBC_test.input
+pro=SALT2mu.exe
+baseinput=getmu/SALT2mu.default
 outinput=pipelinetest/test_salt2mu.input
-batch=True
 prooptions=
-set_key=FITOPT000_ONLY 1
-
-#file ps1sim_default.fitres
-#    prefix test_salt2mu
+set_key=file ps1sim_default.fitres
+    prefix test_salt2mu
 
 [cosmofit]
 pro=wfit.exe
 outinput=cosmofit/test.M0DIF
 prooptions= -ompri 0.3 -dompri 0.01
+
+[biascorsim]
+pro=sim_SNmix.pl
+baseinput=simulation_biascor/SIMGEN_BIASCOR_MASTER.INPUT
+outinput=pipelinetest/TEST_SIMGEN_BIASCOR.INPUT
+batch=True
+#baseinput=simulation/SIMGEN_SALT3TEST.INPUT
+#outinput=pipelinetest/TEST_SIMGEN_SALT3TEST.INPUT
+prooptions=
+set_key=GENVERSION MD_BIASCOR
+
+[biascorlcfit]
+pro=split_and_fit.pl
+baseinput=lcfitting_biascor/snfit_biascor.nml
+outinput=pipelinetest/snfit_biascor_TEST.nml
+prooptions=
+batch=True
+set_key=SNLCINP VERSION_PHOTOMETRY MD_BIASCOR
+    SNLCINP KCOR_FILE lcfitting_biascor/kcor_PS1_LOWZ_COMBINED.fits
+    FITINP FILTLIST_FIT bcdeghi
