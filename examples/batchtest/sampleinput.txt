@@ -20,7 +20,8 @@ prooptions=
 set_key= NGEN_LC 20
     GENSOURCE RANDOM
     GENRANGE_REDSHIFT 0.01 0.1
-    GENVERSION MD_BYOSEDTEST
+    GENVERSION MD_BYOSEDTEST_TEST
+    FORMAT_MASK 2
 
 [training]
 pro=trainsalt
