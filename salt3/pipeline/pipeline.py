@@ -728,13 +728,9 @@ class GetMu(PipeProcedure):
         return pd.DataFrame([df])
 
 class CosmoFit(PipeProcedure):
-<<<<<<< HEAD
     def configure(self,setkeys=None,pro=None,outname=None,prooptions=None,batch=False,
                   validplots=False,**kwargs):
-=======
-    def configure(self,setkeys=None,pro=None,outname=None,prooptions=None,**kwargs):
         self.done_file = None
->>>>>>> b07ccd3ce5c0bb2b0bbeb8b88d20be5dac26132d
         if setkeys is not None:
             outname = setkeys.value.values[0]
         self.prooptions = prooptions

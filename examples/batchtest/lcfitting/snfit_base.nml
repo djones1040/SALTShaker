@@ -1,9 +1,4 @@
-<<<<<<< HEAD
 BATCH_INFO:      sbatch $SBATCH_TEMPLATES/SBATCH_Midway2_short.TEMPLATE 20
-#BATCH_INFO:  sbatch  /home/djones1741/djones/SBATCH_sandyb.TEMPLATE 10
-=======
-BATCH_INFO:  sbatch  $SBATCH_TEMPLATES/SBATCH_Midway2_short.TEMPLATE 10
->>>>>>> b07ccd3ce5c0bb2b0bbeb8b88d20be5dac26132d
 OUTDIR: SNFIT_BYOSED
 VERSION: MD_BYOSEDTEST
 
