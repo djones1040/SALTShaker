@@ -8,6 +8,7 @@ import os
 import numpy as np
 import time
 import glob
+import warnings
 cwd = os.getcwd()
 
 def config_error():
@@ -47,6 +48,8 @@ class SALT3pipe():
         self.GetMu = GetMu()
         self.CosmoFit = CosmoFit()
         self.Data = Data()
+        self.BiascorSim = Simulation()
+        self.BiascorLCFit = LCFitting()
 
         self.build_flag = False
         self.config_flag = False
@@ -117,46 +120,6 @@ class SALT3pipe():
                               batch=batch,
                               validplots=validplots)
 
-        # self.Data.configure(snlist=config.get('data','snlist'))
-
-        # self.BYOSED.setkeys = m2df(config.get('byosed','set_key'),
-        #                            colnames=['section','key','value'])
-        # self.BYOSED.configure(baseinput=config.get('byosed','baseinput'),
-        #                       setkeys=self.BYOSED.setkeys,
-        #                       outname=config.get('byosed','outinput'))
-        # self.Simulation.setkeys = m2df(config.get('simulation','set_key'),
-        #                                colnames=['key','value'],
-        #                                stackvalues=True)
-        # self.Simulation.configure(baseinput=config.get('simulation','baseinput'),
-        #                           setkeys=self.Simulation.setkeys,
-        #                           outname=config.get('simulation','outinput'),
-        #                           pro=config.get('simulation','pro'),
-        #                           prooptions=config.get('simulation','prooptions'))
-        # self.Training.setkeys = m2df(config.get('training','set_key'),
-        #                              colnames=['section','key','value'])
-        # self.Training.configure(baseinput=config.get('training','baseinput'),
-        #                         setkeys=self.Training.setkeys,
-        #                         outname=config.get('training','outinput'),
-        #                         pro=config.get('training','pro'),
-        #                         proargs=config.get('training','proargs'),
-        #                         prooptions=config.get('training','prooptions'))
-        # self.LCFitting.setkeys = m2df(config.get('lcfitting','set_key'),colnames=['section','key','value'])
-        # self.LCFitting.configure(baseinput=config.get('lcfitting','baseinput'),
-        #                          setkeys=self.LCFitting.setkeys,
-        #                          outname=config.get('lcfitting','outinput'),
-        #                          pro=config.get('lcfitting','pro'))
-        # self.GetMu.setkeys = m2df(config.get('getmu','set_key'),colnames=['key','value'])
-        # self.GetMu.configure(baseinput=config.get('getmu','baseinput'),
-        #                      setkeys=self.GetMu.setkeys,
-        #                      outname=config.get('getmu','outinput'),
-        #                      pro=config.get('getmu','pro'),
-        #                      prooptions=config.get('getmu','prooptions'))
-
-        # self.CosmoFit.configure(outname=config.get('cosmofit','outinput'),
-        #                         pro=config.get('cosmofit','pro'),
-        #                         prooptions=config.get('getmu','prooptions'))
-
-
     def run(self,onlyrun=None):
         if not self.build_flag: build_error()
         if not self.config_flag: config_error()
@@ -189,12 +152,15 @@ class SALT3pipe():
         pro1 = self._get_pipepro_from_string(pipepros[0])
         pro2 = self._get_pipepro_from_string(pipepros[1])
         pro1_out = pro1.glueto(pro2)
-        if pipepros[1].lower().startswith('lcfit'):
+        if 'lcfit' in pipepros[1].lower():
             pro2_in = pro2._get_input_info().loc[on]
         else:
             pro2_in = pro2._get_input_info().loc[0]
         pro2_in['value'] = pro1_out
-        setkeys = pd.DataFrame([pro2_in])
+        if isinstance(pro2_in,pd.DataFrame):
+            setkeys = pro2_in
+        else:
+            setkeys = pd.DataFrame([pro2_in])
 
         if isinstance(pro1,Training):
             # need to define the output directory *before* running training
@@ -250,6 +216,10 @@ class SALT3pipe():
             pipepro = self.Data
         elif pipepro_str.lower().startswith("byosed"):
             pipepro = self.BYOSED
+        elif pipepro_str.lower().startswith("biascorsim"):
+            pipepro = self.BiascorSim
+        elif pipepro_str.lower().startswith("biascorlcfit"):
+            pipepro = self.BiascorLCFit
         else:
             raise ValueError("Unknow pipeline procedure:",pipepro.strip())
         return pipepro
@@ -420,49 +390,61 @@ class Simulation(PipeProcedure):
                                            outname=outname)
     
     def _get_output_info(self):
-        df = {}
-        key = 'GENVERSION'
-        df['key'] = key
-        df['value'] = self.keys[key]
-        if not self.batch:
-            return pd.DataFrame([df])
-        key2 = 'GENPREFIX'
-        df2 = {}
-        df2['key'] = key2
-        df2['value'] = self.keys[key]
-        return pd.DataFrame([df,df2])
+        if self.batch:
+            keys = ['PATH_SNDATA_SIM','GENVERSION','GENPREFIX']
+        else:
+            keys = ['PATH_SNDATA_SIM','GENVERSION']
+        df = pd.DataFrame()
+        for key in keys:
+            df0 = {}     
+            df0['key'] = key
+            if key in self.keys.keys():
+                df0['value'] = self.keys[key]
+            else:
+                df0['value'] = ''
+            df = df.append(df0, ignore_index=True)
+        return df
 
     def glueto(self,pipepro):
         if not isinstance(pipepro,str):
             pipepro = type(pipepro).__name__
-        outdir = self._get_output_info().value.values[0]
-        outpath = os.path.join(os.environ['SNDATA_ROOT'],'SIM/',outdir)
+        df = self._get_output_info()
+        outdir = os.sep.join(df.set_index('key').loc[['PATH_SNDATA_SIM','GENVERSION'],'value'].values.tolist())
+        res = os.path.expandvars(outdir) 
+
         # HACK - needs to check SCRATCH_SIMDIR or something else
-        res = outpath
-        #if os.path.isdir(outdir):
-        #    res = outdir
-        #elif os.path.exists(outpath):
-        #    res = outpath
-        #else:
-        #    raise ValueError("Path does not exists",outdir,outpath)            
+
+        # ****This still requires sim to run before glueto***
+        # path_to_check = [os.path.join(os.environ['SNDATA_ROOT'],'SIM/'),os.environ['SCRATCH_SIMDIR']]
+        # outpath_list = [os.path.join(x,outdir) for x in path_to_check]
+        # res = []
+        # for outpath in outpath_list:
+        #     if os.path.isdir(outpath):
+        #         res.append(outpath)
+        # if len(res) == 0:
+        #     raise ValueError("No sim directory was found in {}".format(('\n').join(outpath_list)))            
+        # elif len(res)>1:
+        #     raise RuntimeError("More than one directories were found: \n{}".format(('\n').join(res)))
+        # else:
+        #     res = res[0]
+
         if pipepro.lower().startswith('train'):
-            if self.batch:
-                prefix = self._get_output_info().value.values[1]
-                return "{}/{}.LIST".format(res,prefix)
-            else:
-                return "{}/{}.LIST".format(res,res)
-            # return glob.glob(os.path.join(res,'*.LIST'))[0]
+            # if self.batch:
+            #     prefix = df.loc[df.key=='GENPREFIX','value'].values[0]
+            # else:
+            #     prefix = df.loc[df.key=='GENVERSION','value'].values[0]
+            prefix = df.loc[df.key=='GENVERSION','value'].values[0]
+            return "{}/{}.LIST".format(res,prefix)
         elif pipepro.lower().startswith('lcfit'):
-            simpath = os.path.join(os.environ['SNDATA_ROOT'],'SIM/')
-            idx = res.find(simpath)
-            if idx !=0:
-                raise ValueError("photometry must be in $SNDATA_ROOT/SIM")
-            else:
-                return res[len(simpath):] 
+            return df.loc[df.key=='GENVERSION','value'].values[0]
+            # idx = res.find(simpath)
+            # if idx !=0:
+            #     raise ValueError("photometry must be in $SNDATA_ROOT/SIM")
+            # else:
+            #     return res[len(simpath):] 
         else:
             raise ValueError("sim can only glue to training or lcfitting")
         
-
 class Training(PyPipeProcedure):
 
     def configure(self,pro=None,baseinput=None,setkeys=None,proargs=None,
@@ -624,20 +606,14 @@ class LCFitting(PipeProcedure):
             raise ValueError("lcfitting can only glue to getmu")
 
     def _get_input_info(self):
-        df = {}
-        section = 'HEADER'
-        key = 'VERSION'
-        df[section] = section
-        df['key'] = key
-        df['value'] = self.keys[section][key]
-        df['type'] = 'phot'
-
+        df = {}       
         section = 'SNLCINP'
         key = 'VERSION_PHOTOMETRY'
         df['section'] = section
         df['key'] = key
         df['value'] = self.keys[section][key]
         df['type'] = 'phot'
+        
         df2 = {}
         section2 = 'FITINP'
         key2 = 'FITMODEL_NAME'
@@ -645,7 +621,19 @@ class LCFitting(PipeProcedure):
         df2['key'] = key2
         df2['value'] = self.keys[section2][key2]
         df2['type'] = 'model'
-        return pd.DataFrame([df,df2]).set_index('type')
+        df2 = pd.DataFrame([df,df2])
+
+        if not self.batch:
+            return df2.set_index('type')
+        else:
+            section = 'HEADER'
+            key = 'VERSION'
+            df['section'] = section
+            df['key'] = key
+            df['value'] = self.keys[section][key]
+            df['type'] = 'phot'
+            df2 = df2.append(df,ignore_index=True)
+            return df2.set_index('type')
 
     def _get_output_info(self):
         df = {}
@@ -705,7 +693,8 @@ class GetMu(PipeProcedure):
         return pd.DataFrame([df])
 
 class CosmoFit(PipeProcedure):
-    def configure(self,setkeys=None,pro=None,outname=None,prooptions=None,**kwargs):
+    def configure(self,setkeys=None,pro=None,outname=None,prooptions=None,batch=False,
+                  validplots=False,**kwargs):
         self.done_file = None
         if setkeys is not None:
             outname = setkeys.value.values[0]
@@ -853,10 +842,15 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
             if ":" in line and not line.strip().startswith("#"):
                 kwline = line.split(":",maxsplit=1)
                 kw = kwline[0]
+                if "#" in kwline[1]:
+                    kwline[1] = kwline[1].split("#")[0].strip()+'\n'
                 basekws.append(kw)
                 if kw in setkeys.key.values:
                     keyvalue = setkeys[setkeys.key==kw].value.values[0]
-                    kwline[1] = ' '.join(list(filter(None,keyvalue)))+'\n'
+                    if isinstance(keyvalue,list):
+                        kwline[1] = ' '.join(list(filter(None,keyvalue)))+'\n'
+                    else:
+                        kwline[1] = str(keyvalue)+'\n'
                     print("Setting {} = {}".format(kw,kwline[1].strip()))
                 lines[i] = ": ".join(kwline)
                 config[kw] = kwline[1].strip()
@@ -867,11 +861,14 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
 
         for key,value in zip(setkeys.key,setkeys.value):
             if not key in basekws:
-                valuestr = ' '.join(list(filter(None,value)))
-                newline = key+": "+' '.join(list(filter(None,value)))+'\n'
+                if isinstance(value,list):
+                    valuestr = ' '.join(list(filter(None,value)))
+                else:
+                    valuestr = str(value)
+                newline = key+": "+valuestr+'\n'
                 print("Adding key {} = {}".format(key,valuestr))
                 outfile.write(newline)
-                config[key] = value
+                config[key] = valuestr.strip()
 
         print("Write sim input to file:",outname)
 
