@@ -85,18 +85,18 @@ class mcmc(saltresids.SALTResids):
 		super().__init__(guess,datadict,parlist,**kwargs)
 		
 		
-	def get_proposal_cov(self, M2, n, beta=0.25):
-		d, _ = M2.shape
+	def get_proposal_cov(self, n, beta=0.25):
+		d, _ = self.M2_recent.shape
 		init_period = self.nsteps_before_adaptive
 		s_0, s_opt, C_0 = self.AMpars['sigma_0'], self.AMpars['sigma_opt'], self.AMpars['C_0']
 		if n<= init_period or np.random.rand()<=beta:
 			return np.sqrt(C_0), False
 		else:
 			# We can always divide M2 by n-1 since n > init_period
-			return np.sqrt((s_opt/(self.nsteps_adaptive_memory - 1))*M2), True
+			return np.sqrt((s_opt/(self.nsteps_adaptive_memory - 1))*self.M2_recent), True
 	
-	def generate_AM_candidate(self, current, M2, n, steps_from_gn=False):
-		prop_std,adjust_flag = self.get_proposal_cov(M2, n)
+	def generate_AM_candidate(self, current, n, steps_from_gn=False):
+		prop_std,adjust_flag = self.get_proposal_cov(n)
 		
 		#tstart = time.time()
 		candidate = np.zeros(self.npar)
@@ -301,14 +301,15 @@ class mcmc(saltresids.SALTResids):
 					   'sigma_0':0.1/np.sqrt(self.npar),
 					   'sigma_opt':2.38*self.adaptive_sigma_opt_scale/np.sqrt(self.npar)}
 	
-	def update_moments(self,mean, M2, sample, n):
+	def update_moments(self, sample, n):
 		next_n = (n + 1)
 		w = 1/next_n
-		new_mean = mean + w*(sample - mean)
-		delta_bf, delta_af = sample - mean, sample - new_mean
-		new_M2 = M2 + np.outer(delta_bf, delta_af)
-		
-		return new_mean, new_M2
+		new_mean = self.mean + w*(sample - self.mean)
+		delta_bf, delta_af = sample - self.mean, sample - new_mean
+		self.M2 += np.outer(delta_bf, delta_af)
+		self.mean = new_mean
+
+		return
 	
 	def mcmcfit(self,x,nsteps,nburn,pool=None,debug=False,thin=1,stepsizes=None):
 		npar = len(x)
@@ -322,17 +323,16 @@ class mcmc(saltresids.SALTResids):
 		self.M0stddev = np.std(x[self.parlist == 'm0'])
 		self.M1stddev = np.std(x[self.parlist == 'm1'])
 		self.errstddev = self.stepsize_magscale_err
-		mean, M2 = x[:], np.zeros([len(x),len(x)])
-		mean_recent, M2_recent = x[:], np.zeros([len(x),len(x)])
+		self.M2 = np.zeros([len(x),len(x)])
+		self.M2_recent = np.empty_like(self.M2)
+		self.mean = x[:], 
 
 		if stepsizes is not None:
 			steps_from_gn = True
 			stepsizes[stepsizes > 0.1] = 0.1
 			stepsizes *= 1e-14
-			#import pdb; pdb.set_trace()
 		else: steps_from_gn = False
 		self.get_propcov_init(x,stepsizes=stepsizes)
-		#import pdb; pdb.set_trace()
 		accept = 0
 		nstep = 0
 		accept_frac = 0.5
@@ -351,24 +351,18 @@ class mcmc(saltresids.SALTResids):
 					if self.adjust_snpars: self.adjust_modelpars = True; self.adjust_snpars = False
 					else: self.adjust_modelpars = False; self.adjust_snpars = True
 
-			#X = self.lsqguess(current=self.chain[-1],doMangle=True)
 			if self.use_lsqfit:
 				if not (nstep+1) % self.nsteps_between_lsqfit:
 					X = self.lsqguess(current=self.chain[-1],snpars=True)
 				if not (nstep) % self.nsteps_between_lsqfit:
 					X = self.lsqguess(current=self.chain[-1],doMangle=True)
 				else:
-					X = self.generate_AM_candidate(current=self.chain[-1], M2=M2_recent, n=nstep, steps_from_gn=steps_from_gn)
-				#elif not (nstep-3) % self.nsteps_between_lsqfit:
-				#	X = self.lsqguess(current=Xlast,M1=True)
+					X = self.generate_AM_candidate(current=self.chain[-1], n=nstep, steps_from_gn=steps_from_gn)
 			else:
-				X = self.generate_AM_candidate(current=self.chain[-1], M2=M2_recent, n=nstep, steps_from_gn=steps_from_gn)
+				X = self.generate_AM_candidate(current=self.chain[-1], n=nstep, steps_from_gn=steps_from_gn)
 
 			# loglike
 			this_loglike = self.maxlikefit(X,pool=pool,debug=debug)
-			#if this_loglike < -1e10:
-			#	import pdb; pdb.set_trace()
-			# accepted?
 			accept_bool = self.accept(self.loglikes[-1],this_loglike)
 			if accept_bool:
 				if not nstep % thin:
@@ -388,26 +382,25 @@ class mcmc(saltresids.SALTResids):
 			accepted_history = np.append(accepted_history,accept_bool)
 			if not (nstep) % self.nsteps_between_lsqfit:
 				self.updateEffectivePoints(self.chain[-1])
-			mean, M2 = self.update_moments(mean, M2, self.chain[-1], n_adaptive)
+			self.update_moments(self.chain[-1], n_adaptive)
 			if not n_adaptive % self.nsteps_adaptive_memory:
 				n_adaptive = 0
-				ix,iy = np.where(M2 < 1e-5)
-				iLow = np.where(ix == iy)[0]
-				M2[ix[iLow],iy[iLow]] = 1e-5
-				# maybe too hacky
+				#ix,iy = np.where(self.M2 < 1e-5)
+				#iLow = np.where(ix == iy)[0]
+				#self.M2[ix[iLow],iy[iLow]] = 1e-5
+				#if self.adjust_snpars and 'M2_snpars' in self.__dict__.keys(): M2_recent = copy.deepcopy(self.M2_snpars)
+				#elif self.adjust_snpars and 'M2_snpars' not in self.__dict__.keys(): M2_recent = copy.deepcopy(self.M2_allpars)
+				#elif self.adjust_modelpars and 'M2_modelpars' in self.__dict__.keys(): M2_recent = copy.deepcopy(self.M2_modelpars)
+				#elif self.adjust_modelpars and 'M2_modelpars' not in self.__dict__.keys(): M2_recent = copy.deepcopy(self.M2_allpars)
+				#else:
+					#import pdb; pdb.set_trace()
 				
-				if self.adjust_snpars and 'M2_snpars' in self.__dict__.keys(): M2_recent = copy.deepcopy(self.M2_snpars)
-				elif self.adjust_snpars and 'M2_snpars' not in self.__dict__.keys(): M2_recent = copy.deepcopy(self.M2_allpars)
-				elif self.adjust_modelpars and 'M2_modelpars' in self.__dict__.keys(): M2_recent = copy.deepcopy(self.M2_modelpars)
-				elif self.adjust_modelpars and 'M2_modelpars' not in self.__dict__.keys(): M2_recent = copy.deepcopy(self.M2_allpars)
-				else:
-					M2_recent = copy.deepcopy(M2)
-					self.M2_allpars = copy.deepcopy(M2)
-					
-				mean_recent = mean[:]
-				mean, M2 = self.chain[-1][:], np.zeros([len(x),len(x)])
-				if self.adjust_snpars: self.M2_snpars = copy.deepcopy(M2_recent)
-				elif self.adjust_modelpars: self.M2_modelpars = copy.deepcopy(M2_recent)
+				self.M2_recent = np.empty_like(self.M2)
+				self.M2_recent[:] = self.M2
+				self.mean = self.chain[-1][:]
+				self.M2 = np.empty_like(self.M2)
+				#if self.adjust_snpars: self.M2_snpars = copy.deepcopy(M2_recent)
+				#elif self.adjust_modelpars: self.M2_modelpars = copy.deepcopy(M2_recent)
 
 		print('acceptance = %.3f'%(accept/float(nstep)))
 		if nstep < nburn:
