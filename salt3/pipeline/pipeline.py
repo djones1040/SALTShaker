@@ -409,7 +409,10 @@ class Simulation(PipeProcedure):
         if not isinstance(pipepro,str):
             pipepro = type(pipepro).__name__
         df = self._get_output_info()
-        outdir = os.sep.join(df.set_index('key').loc[['PATH_SNDATA_SIM','GENVERSION'],'value'].values.tolist())
+        if df.set_index('key').loc['PATH_SNDATA_SIM'].value:
+            outdir = os.sep.join(df.set_index('key').loc[['PATH_SNDATA_SIM','GENVERSION'],'value'].values.tolist())
+        else:
+            outdir = os.sep.join(['$SNDATA_ROOT/SIM',df.set_index('key').loc['GENVERSION'].value])
         res = os.path.expandvars(outdir) 
 
         # HACK - needs to check SCRATCH_SIMDIR or something else
