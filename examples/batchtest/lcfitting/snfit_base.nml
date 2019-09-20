@@ -1,4 +1,5 @@
-BATCH_INFO:  sbatch  /home/djones1741/djones/SBATCH_sandyb.TEMPLATE 10
+BATCH_INFO:      sbatch $SBATCH_TEMPLATES/SBATCH_Midway2_short.TEMPLATE 20
+#BATCH_INFO:  sbatch  /home/djones1741/djones/SBATCH_sandyb.TEMPLATE 10
 OUTDIR: SNFIT_BYOSED
 
   &SNLCINP
