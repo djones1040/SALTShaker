@@ -1,8 +1,7 @@
-BATCH_INFO:      sbatch $SBATCH_TEMPLATES/SBATCH_Midway2_short.TEMPLATE 20
-#BATCH_INFO:      sbatch  /home/djones1741/djones/SBATCH_sandyb.TEMPLATE 20
+BATCH_INFO:      sbatch  $SBATCH_TEMPLATES/SBATCH_Midway2_short.TEMPLATE 20
 
 # nominal generation
-GENVERSION: BYOSEDTEST
+GENVERSION: MD_BYOSEDTEST
 
 ENDLIST_GENVERSION:
 
@@ -11,10 +10,13 @@ SIMGEN_INFILE_Ia: simulation/SIMGEN_BYOSEDTEST.INPUT
 
 # define required global items to ensure uniformity among all jobs
 H0: 70
-ZRANGE:	         0.03   0.1
+ZRANGE:	         0.01   0.1
 GENPREFIX:       BYOSEDTEST                        # prefix of all data filenames
-FORMAT_MASK: 32	   # 2=TERSE        16=RanCID  32=FITS-FORMAT
-RESET_CIDOFF: 2
+FORMAT_MASK: 48	   # 2=TERSE        16=RanCID  32=FITS-FORMAT
 PATH_SNDATA_SIM: $SCRATCH_SIMDIR
 
+RANSEED: 12349
+RANSEED: 12349
+RANSEED: 12349
+RANSEED: 12349
 RANSEED: 12349
