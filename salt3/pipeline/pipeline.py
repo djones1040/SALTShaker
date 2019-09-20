@@ -48,6 +48,8 @@ class SALT3pipe():
         self.GetMu = GetMu()
         self.CosmoFit = CosmoFit()
         self.Data = Data()
+        self.BiascorSim = Simulation()
+        self.BiascorLCFit = LCFitting()
 
         self.build_flag = False
         self.config_flag = False
@@ -118,46 +120,6 @@ class SALT3pipe():
                               batch=batch,
                               validplots=validplots)
 
-        # self.Data.configure(snlist=config.get('data','snlist'))
-
-        # self.BYOSED.setkeys = m2df(config.get('byosed','set_key'),
-        #                            colnames=['section','key','value'])
-        # self.BYOSED.configure(baseinput=config.get('byosed','baseinput'),
-        #                       setkeys=self.BYOSED.setkeys,
-        #                       outname=config.get('byosed','outinput'))
-        # self.Simulation.setkeys = m2df(config.get('simulation','set_key'),
-        #                                colnames=['key','value'],
-        #                                stackvalues=True)
-        # self.Simulation.configure(baseinput=config.get('simulation','baseinput'),
-        #                           setkeys=self.Simulation.setkeys,
-        #                           outname=config.get('simulation','outinput'),
-        #                           pro=config.get('simulation','pro'),
-        #                           prooptions=config.get('simulation','prooptions'))
-        # self.Training.setkeys = m2df(config.get('training','set_key'),
-        #                              colnames=['section','key','value'])
-        # self.Training.configure(baseinput=config.get('training','baseinput'),
-        #                         setkeys=self.Training.setkeys,
-        #                         outname=config.get('training','outinput'),
-        #                         pro=config.get('training','pro'),
-        #                         proargs=config.get('training','proargs'),
-        #                         prooptions=config.get('training','prooptions'))
-        # self.LCFitting.setkeys = m2df(config.get('lcfitting','set_key'),colnames=['section','key','value'])
-        # self.LCFitting.configure(baseinput=config.get('lcfitting','baseinput'),
-        #                          setkeys=self.LCFitting.setkeys,
-        #                          outname=config.get('lcfitting','outinput'),
-        #                          pro=config.get('lcfitting','pro'))
-        # self.GetMu.setkeys = m2df(config.get('getmu','set_key'),colnames=['key','value'])
-        # self.GetMu.configure(baseinput=config.get('getmu','baseinput'),
-        #                      setkeys=self.GetMu.setkeys,
-        #                      outname=config.get('getmu','outinput'),
-        #                      pro=config.get('getmu','pro'),
-        #                      prooptions=config.get('getmu','prooptions'))
-
-        # self.CosmoFit.configure(outname=config.get('cosmofit','outinput'),
-        #                         pro=config.get('cosmofit','pro'),
-        #                         prooptions=config.get('getmu','prooptions'))
-
-
     def run(self,onlyrun=None):
         if not self.build_flag: build_error()
         if not self.config_flag: config_error()
@@ -190,7 +152,7 @@ class SALT3pipe():
         pro1 = self._get_pipepro_from_string(pipepros[0])
         pro2 = self._get_pipepro_from_string(pipepros[1])
         pro1_out = pro1.glueto(pro2)
-        if pipepros[1].lower().startswith('lcfit'):
+        if 'lcfit' in pipepros[1].lower():
             pro2_in = pro2._get_input_info().loc[on]
         else:
             pro2_in = pro2._get_input_info().loc[0]
@@ -254,6 +216,10 @@ class SALT3pipe():
             pipepro = self.Data
         elif pipepro_str.lower().startswith("byosed"):
             pipepro = self.BYOSED
+        elif pipepro_str.lower().startswith("biascorsim"):
+            pipepro = self.BiascorSim
+        elif pipepro_str.lower().startswith("biascorlcfit"):
+            pipepro = self.BiascorLCFit
         else:
             raise ValueError("Unknow pipeline procedure:",pipepro.strip())
         return pipepro
@@ -479,7 +445,6 @@ class Simulation(PipeProcedure):
         else:
             raise ValueError("sim can only glue to training or lcfitting")
         
-
 class Training(PyPipeProcedure):
 
     def configure(self,pro=None,baseinput=None,setkeys=None,proargs=None,
@@ -882,7 +847,10 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
                 basekws.append(kw)
                 if kw in setkeys.key.values:
                     keyvalue = setkeys[setkeys.key==kw].value.values[0]
-                    kwline[1] = ' '.join(list(filter(None,keyvalue)))+'\n'
+                    if isinstance(keyvalue,list):
+                        kwline[1] = ' '.join(list(filter(None,keyvalue)))+'\n'
+                    else:
+                        kwline[1] = str(keyvalue)+'\n'
                     print("Setting {} = {}".format(kw,kwline[1].strip()))
                 lines[i] = ": ".join(kwline)
                 config[kw] = kwline[1].strip()
@@ -893,7 +861,10 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
 
         for key,value in zip(setkeys.key,setkeys.value):
             if not key in basekws:
-                valuestr = ' '.join(list(filter(None,value)))
+                if isinstance(value,list):
+                    valuestr = ' '.join(list(filter(None,value)))
+                else:
+                    valuestr = str(value)
                 newline = key+": "+valuestr+'\n'
                 print("Adding key {} = {}".format(key,valuestr))
                 outfile.write(newline)
