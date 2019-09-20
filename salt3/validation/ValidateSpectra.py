@@ -97,9 +97,10 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 				coeffs/=factorial(np.arange(len(coeffs)))
 				wave=specdata[k]['wavelength']
 				#print(coeffs)
-				modelFlux = model.flux(specdata[k]['tobs'],wave)*np.exp(np.poly1d(coeffs)((wave-np.mean(wave))/2500))
+				#modelFlux = model.flux(specdata[k]['tobs'],wave)*np.exp(np.poly1d(coeffs)((wave-np.mean(wave))/2500))
 				unncalledModel=model.flux(specdata[k]['tobs']+snPars['t0'],wave)
 				unncalledModel = flux(salt3dir,specdata[k]['tobs']+snPars['t0'],specdata[k]['wavelength'],snPars['z'],snPars['x0'],snPars['x1'],snPars['c'])
+				modelflux = unncalledModel*np.exp(np.poly1d(coeffs)((wave-np.mean(wave))/2500))
 
 				if not axcount % 3:
 					fig = plt.figure()
