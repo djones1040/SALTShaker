@@ -45,15 +45,19 @@ prooptions=
 batch=True
 set_key=SNLCINP VERSION_PHOTOMETRY SALT3TEST_SIMPLE
     SNLCINP KCOR_FILE lcfitting/kcor_PS1_LOWZ_COMBINED.fits
-    FITINP FILTLIST_FIT bcdeghi
+
+#FITINP FILTLIST_FIT bcdeghi
 
 [getmu]
-pro=SALT2mu.exe
-baseinput=getmu/SALT2mu.default
+pro=SALT2mu_fit.pl
+baseinput=getmu/BBC_test.input
 outinput=pipelinetest/test_salt2mu.input
+batch=True
 prooptions=
-set_key=file ps1sim_default.fitres
-    prefix test_salt2mu
+set_key=FITOPT000_ONLY 1
+
+#file ps1sim_default.fitres
+#    prefix test_salt2mu
 
 [cosmofit]
 pro=wfit.exe
