@@ -388,8 +388,8 @@ class Simulation(PipeProcedure):
 
     def gen_input(self,outname="pipeline_sim_input.input"):
         self.outname = outname
-        self.finput,self.keys = _gen_snana_sim_input(basefilename=self.baseinput,setkeys=self.setkeys,
-                                           outname=outname)
+        self.finput,self.keys,self.done_file = _gen_snana_sim_input(basefilename=self.baseinput,setkeys=self.setkeys,
+                                                                    outname=outname,done_file=self.done_file)
     
     def _get_output_info(self):
         if self.batch:
@@ -835,7 +835,7 @@ def _gen_general_python_input(basefilename=None,setkeys=None,
     return outname,config
 
 def _gen_snana_sim_input(basefilename=None,setkeys=None,
-                         outname=None):
+                         outname=None,done_file=None):
 
     #TODO:
     #read in kwlist from standard snana kw list
@@ -903,7 +903,14 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
 
         print("Write sim input to file:",outname)
 
-    return outname,config
+    with open(outname,'a') as fout:
+        if 'GENPREFIX' in config.keys():
+            done_file = finput_abspath('%s/%s'%(config['GENPREFIX'],done_file.split('/')[-1]))
+            print('DONE_STAMP: %s'%done_file,file=fout)
+        else:
+            print('DONE_STAMP: %s'%done_file,file=fout)
+
+    return outname,config,done_file
 
 
 def _gen_snana_fit_input(basefilename=None,setkeys=None,
