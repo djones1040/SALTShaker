@@ -601,7 +601,7 @@ class LCFitting(PipeProcedure):
 
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
                   batch=False,validplots=False,outname="pipeline_lcfit_input.input",**kwargs):
-        self.done_file = None
+        self.done_file = 'ALL.DONE'
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
@@ -612,7 +612,7 @@ class LCFitting(PipeProcedure):
     def gen_input(self,outname="pipeline_lcfit_input.input"):
         self.outname = outname
         self.finput,self.keys = _gen_snana_fit_input(basefilename=self.baseinput,setkeys=self.setkeys,
-                                                     outname=outname)
+                                                     outname=outname,done_file=self.done_file)
 
 
     def glueto(self,pipepro):
@@ -751,7 +751,8 @@ def _run_external_pro(pro,args):
     return
 
 def _run_batch_pro(pro,args,done_file=None):
-
+    
+    print('looking for DONE_STAMP in %s'%done_file)
     if isinstance(args, str):
         args = [args]
 
@@ -762,6 +763,7 @@ def _run_batch_pro(pro,args,done_file=None):
     print("Running",' '.join([pro] + args))
     res = subprocess.run(args = list([pro] + args),capture_output=True)
     stdout = res.stdout.decode('utf-8')
+
     if 'ERROR MESSAGE' in stdout:
         for line in stdout[stdout.find('ERROR MESSAGE'):].split('\n'):
             print(line)
@@ -795,7 +797,6 @@ def _run_batch_pro(pro,args,done_file=None):
         for line in fin:
             if 'SUCCESS' in line:
                 success = True
-
 
     if success:
         print("{} finished successfully.".format(pro.strip()))
@@ -914,7 +915,7 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
 
 
 def _gen_snana_fit_input(basefilename=None,setkeys=None,
-                         outname=None):
+                         outname=None,done_file=None):
 
     import f90nml
     from f90nml.namelist import Namelist
@@ -948,7 +949,8 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
         else:
             value = line.split(':')[1].replace('\n','')
             nml['header'].__setitem__(key,value)
-    nml['header'].__setitem__('done_stamp','ALL.DONE')
+    if not done_file: nml['header'].__setitem__('done_stamp','ALL.DONE')
+    else: nml['header'].__setitem__('done_stamp',done_file)
 
     if setkeys is not None:
         for index, row in setkeys.iterrows():
