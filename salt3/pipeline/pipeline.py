@@ -905,7 +905,7 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
 
     with open(outname,'a') as fout:
         if 'GENPREFIX' in config.keys():
-            done_file = finput_abspath('%s/%s'%(config['GENPREFIX'],done_file.split('/')[-1]))
+            done_file = finput_abspath('%s/%s'%('SIMLOGS_%s'%config['GENPREFIX'],done_file.split('/')[-1]))
             print('DONE_STAMP: %s'%done_file,file=fout)
         else:
             print('DONE_STAMP: %s'%done_file,file=fout)
