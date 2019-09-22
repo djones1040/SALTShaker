@@ -986,6 +986,7 @@ def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_
         key = 'DONE_STAMP'
         v = done_file
         config[key] = v
+        if len(delimiter.keys()): delimiter[key] = ': '
 
     print("input file saved as:",outname)
     _write_simple_config_file(config,outname,delimiter)
