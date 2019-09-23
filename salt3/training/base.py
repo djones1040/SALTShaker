@@ -135,6 +135,10 @@ class TrainSALTBase:
 							help='initial MCMC step size for M0, in mag  (default=%default)')
 		parser.add_argument('--stepsize_magscale_err', default=config.get('mcmcparams','stepsize_magscale_err'), type=float,
 							help='initial MCMC step size for the model err spline knots, in mag  (default=%default)')
+		parser.add_argument('--stepsize_errcorr', default=config.get('mcmcparams','stepsize_errcorr'), type=float,
+							help='initial MCMC step size for the correlation between model error terms, in mag  (default=%default)')
+
+							
 		parser.add_argument('--stepsize_magscale_M1', default=config.get('mcmcparams','stepsize_magscale_M1'), type=float,
 							help='initial MCMC step size for M1, in mag - need both mag and flux steps because M1 can be negative (default=%default)')
 		parser.add_argument('--stepsize_magadd_M1', default=config.get('mcmcparams','stepsize_magadd_M1'), type=float,
@@ -207,6 +211,7 @@ class TrainSALTBase:
 						 'stepsize_magscale_M0':self.options.stepsize_magscale_M0,
 						 'stepsize_magadd_M0':self.options.stepsize_magadd_M0,
 						 'stepsize_magscale_err':self.options.stepsize_magscale_err,
+						 'stepsize_errcorr':self.options.stepsize_errcorr,
 						 'stepsize_magscale_M1':self.options.stepsize_magscale_M1,
 						 'stepsize_magadd_M1':self.options.stepsize_magadd_M1,
 						 'stepsize_cl':self.options.stepsize_cl,

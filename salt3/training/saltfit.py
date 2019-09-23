@@ -296,7 +296,8 @@ class mcmc(saltresids.SALTResids):
 				elif par.startswith('specrecal'): C_0[i,i] = self.stepsize_specrecal**2.
 				elif par.startswith('tpkoff'):
 					C_0[i,i] = self.stepsize_tpk**2.
-
+				elif par.startswith('modelcorr'):
+					C_0[i,i]= self.stepsize_errcorr**2
 		self.AMpars = {'C_0':C_0,
 					   'sigma_0':0.1/np.sqrt(self.npar),
 					   'sigma_opt':2.38*self.adaptive_sigma_opt_scale/np.sqrt(self.npar)}
@@ -453,8 +454,11 @@ class GaussNewton(saltresids.SALTResids):
 		maxes[self.iCL]=10
 		mins[self.ispcrcl]=-1
 		maxes[self.ispcrcl]=1
-		mins[self.imodelerr]=0
+		mins[self.imodelerr]=-1
 		maxes[self.imodelerr]=1
+		mins[self.imodelcorr]=0
+		maxes[self.imodelcorr]=1
+
 		self.bounds=list(zip(mins,maxes))
 
 
@@ -489,6 +493,7 @@ class GaussNewton(saltresids.SALTResids):
 					includePars[self.ispcrcl]=True
 				elif fit=='modelerr':
 					includePars[self.imodelerr]=True
+					includePars[self.imodelcorr]=True
 				else:
 					raise NotImplementedError("""This option for a Gaussian Process fit with a 
 	restricted parameter set has not been implemented: {}""".format(fit))
@@ -594,7 +599,8 @@ class GaussNewton(saltresids.SALTResids):
 		else: colorLaw = None
 		salterr=self.ErrModel(guess)
 		components = self.SALTModel(guess)
-
+		saltCorr=self.CorrelationModel(guess)
+		
 		numResids=self.num_phot+self.num_spec + (self.numPriorResids if doPriors else 0)
 		if self.regularize:
 			numRegResids=sum([ self.n_components*(self.im0.size) for weight in [self.regulargradientphase,self.regulargradientwave ,self.regulardyad] if not weight == 0])
