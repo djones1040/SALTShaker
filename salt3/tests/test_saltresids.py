@@ -55,7 +55,7 @@ class TRAINING_Test(unittest.TestCase):
 		
 			#import pdb;pdb.set_trace()
 			#Check that all derivatives that should be 0 are zero
-			if  not np.allclose(dPriordX,jacobian,rtol): print('Problems with derivatives for prior {} : '.format(prior),np.unique(self.parlist[np.where(~np.isclose(dPriordX,jacobian,rtol))]))
+			if  not np.allclose(jacobian,dPriordX,rtol): print('Problems with derivatives for prior {} : '.format(prior),np.unique(self.parlist[np.where(~np.isclose(jacobian,dPriordX,rtol))]))
 			self.assertTrue(np.all((dPriordX==0)==(jacobian==0)))
 			self.assertTrue(np.allclose(jacobian,dPriordX,rtol))
 
@@ -90,8 +90,8 @@ class TRAINING_Test(unittest.TestCase):
 		for i in range(self.guess.size):
 			dResiddX[:,i]=(incrementOneParam(i)-residuals)/dx
 
-		if not np.allclose(dResiddX,jacobian,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol))[1]]))
-		self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
+		if not np.allclose(jacobian,dResiddX,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(jacobian,dResiddX,rtol))[1]]))
+		self.assertTrue(np.allclose(jacobian,dResiddX,rtol))
 
 	def test_photresid_jacobian_vary_uncertainty(self):
 		"""Check that lognorm gradient and residuals' jacobian are correctly calculated with fixUncertainty=False"""
@@ -126,10 +126,10 @@ class TRAINING_Test(unittest.TestCase):
 			residsdict=incrementOneParam(i)
 			dResiddX[:,i]=(residsdict['resid']-residuals)/dx
 			dLognormdX[i]=(residsdict['lognorm']-lognorm)/dx
-		if not np.allclose(dResiddX,jacobian,rtol): print('Problems with residual derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol,atol))[1]]))
-		if not np.allclose(dLognormdX,grad,rtol): print('Problems with lognorm derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dLognormdX,grad,rtol,atol))[0]]))
-		self.assertTrue(np.allclose(dResiddX,jacobian,rtol,atol))
-		self.assertTrue(np.allclose(dLognormdX,grad,rtol,atol))
+		if not np.allclose(jacobian,dResiddX,rtol): print('Problems with residual derivatives: ',np.unique(self.parlist[np.where(~np.isclose(jacobian,dResiddX,rtol,atol))[1]]))
+		if not np.allclose(grad,dLognormdX,rtol): print('Problems with lognorm derivatives: ',np.unique(self.parlist[np.where(~np.isclose(grad,dLognormdX,rtol,atol))[0]]))
+		self.assertTrue(np.allclose(jacobian,dResiddX,rtol,atol))
+		self.assertTrue(np.allclose(grad,dLognormdX,rtol,atol))
 
 	def test_photvals_jacobian(self):
 		"""Check that the model is correctly calculating the jacobian of the photometry"""
@@ -218,6 +218,8 @@ class TRAINING_Test(unittest.TestCase):
 		M0,M1=self.resids.SALTModel(self.guess)
 		colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.guess[self.parlist == 'cl'])
 		saltErr=self.resids.ErrModel(self.guess)
+		saltCorr=self.resids.CorrelationModel(self.guess)
+
 		z = self.resids.datadict[sn]['zHelio']
 		obsphase = self.resids.datadict[sn]['obsphase'] #self.phase*(1+z)
 		x0,x1,c,tpkoff = self.guess[self.parlist == 'x0_%s'%sn],self.guess[self.parlist == 'x1_%s'%sn],\
@@ -233,17 +235,18 @@ class TRAINING_Test(unittest.TestCase):
 		M0 *= _SCALE_FACTOR/(1+z); M1 *= _SCALE_FACTOR/(1+z)
 		int1dM0 = interp1d(obsphase,M0,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
 		int1dM1 = interp1d(obsphase,M1,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
+		intcorr1d= [interp1d(obsphase,corr ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for corr in saltCorr]
 
-		interr1d = [interp1d(obsphase,err * (self.resids.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z))**2 ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
+		interr1d = [interp1d(obsphase,err * (self.resids.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z)) ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
 
 		mod = x0*(M0 + x1*M1)
 		int1d = interp1d(obsphase,mod,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
 
-		uncertaintydict=self.resids.photUncertaintyForSN(self.guess,sn,(int1dM0,int1dM1),colorlaw,colorexp,interr1d,True)
-		uncJac=	uncertaintydict['modeluncertainty_jacobian']
+		uncertaintydict=self.resids.photVarianceForSN(self.guess,sn,interr1d,intcorr1d,colorlaw,colorexp,True)
+		uncJac=	uncertaintydict['modelvariance_jacobian']
 
-		uncertaintydict=self.resids.photUncertaintyForSN(self.guess,sn,int1d,colorlaw,colorexp,interr1d,False)
-		uncertainty = uncertaintydict['modeluncertainty']
+		uncertaintydict=self.resids.photVarianceForSN(self.guess,sn,interr1d,intcorr1d,colorlaw,colorexp,False)
+		uncertainty = uncertaintydict['modelvariance']
 		
 		def incrementOneParam(i):
 			guess=self.guess.copy()
@@ -251,47 +254,46 @@ class TRAINING_Test(unittest.TestCase):
 
 			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
 			saltErr=self.resids.ErrModel(guess)
+			saltCorr=self.resids.CorrelationModel(guess)
+
 			z = self.resids.datadict[sn]['zHelio']
 			obsphase = self.resids.datadict[sn]['obsphase'] #self.phase*(1+z)
 			x0,x1,c,tpkoff = guess[self.parlist == 'x0_%s'%sn],guess[self.parlist == 'x1_%s'%sn],\
 							 guess[self.parlist == 'c_%s'%sn],guess[self.parlist == 'tpkoff_%s'%sn]
-
 	
 			colorlaw = -0.4 * colorLaw(self.resids.wave)
 			colorexp = 10. ** (colorlaw * c)
-	
-			interr1d = [interp1d(obsphase,err * (self.resids.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z))**2 ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
+			intcorr1d= [interp1d(obsphase,corr ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for corr in saltCorr]
+			interr1d = [interp1d(obsphase,err * (self.resids.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z)) ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
 
-
-			return self.resids.photUncertaintyForSN(guess,sn,int1d,colorlaw,colorexp,interr1d,False)
+			return self.resids.photVarianceForSN(guess,sn,interr1d,intcorr1d,colorlaw,colorexp,False)
 		dUncertaintydX=np.zeros((uncertainty.size,self.parlist.size))
 		for i in range(self.guess.size):
 			uncertaintydict=incrementOneParam(i)
-			dUncertaintydX[:,i]=(uncertaintydict['modeluncertainty']-uncertainty)/dx
-
-		if not np.allclose(dUncertaintydX,uncJac,rtol,atol): print('Problems with model uncertainty derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dUncertaintydX,uncJac,rtol,atol))[1]]))
-
-		self.assertTrue(np.allclose(dUncertaintydX,uncJac,rtol,atol))
+			dUncertaintydX[:,i]=(uncertaintydict['modelvariance']-uncertainty)/dx
+		
+		if not np.allclose(uncJac,dUncertaintydX,rtol,atol): print('Problems with model uncertainty derivatives: ',np.unique(self.parlist[np.where(~np.isclose(uncJac,dUncertaintydX,rtol,atol))[1]]))
+		import pdb;pdb.set_trace()
+		self.assertTrue(np.allclose(uncJac,dUncertaintydX,rtol,atol))
 
 	def test_specuncertainty_jacobian(self):
-		"""Check that lognorm gradient and residuals' jacobian are correctly calculated with fixUncertainty=False"""
-		print("Checking spectral derivatives")
+		"""Check that jacobian of spectral variance is correct"""
+		print("Checking spectral variance derivatives")
 		dx=1e-8
 		rtol=1e-2
-		atol=1e-20
+		atol=1e-48
 		sn=self.resids.datadict.keys().__iter__().__next__()
 		components = self.resids.SALTModel(self.resids.guess)
-		salterr = self.resids.ErrModel(self.resids.guess)
+		saltErr = self.resids.ErrModel(self.resids.guess)
 		colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.guess[self.resids.parlist == 'cl'])
-
-		M0,M1=self.resids.SALTModel(self.guess)
-		colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.guess[self.parlist == 'cl'])
-		saltErr=self.resids.ErrModel(self.guess)
+		saltCorr=self.resids.CorrelationModel(self.guess)
+		
+		M0,M1=components
 		z = self.resids.datadict[sn]['zHelio']
 		obsphase = self.resids.datadict[sn]['obsphase'] #self.phase*(1+z)
 		x0,x1,c,tpkoff = self.guess[self.parlist == 'x0_%s'%sn],self.guess[self.parlist == 'x1_%s'%sn],\
 						 self.guess[self.parlist == 'c_%s'%sn],self.guess[self.parlist == 'tpkoff_%s'%sn]
-
+		
 		#Apply MW extinction
 		M0 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
 		M1 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
@@ -302,17 +304,20 @@ class TRAINING_Test(unittest.TestCase):
 		M0 *= _SCALE_FACTOR/(1+z); M1 *= _SCALE_FACTOR/(1+z)
 		int1dM0 = interp1d(obsphase,M0,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
 		int1dM1 = interp1d(obsphase,M1,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-
-		interr1d = [interp1d(obsphase,err * (self.resids.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z))**2 ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
+		
+		intcorr1d= [interp1d(obsphase,corr ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for corr in saltCorr]
+		interr1d = [interp1d(obsphase,err * (self.resids.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z)) ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
 
 		mod = x0*(M0 + x1*M1)
 		int1d = interp1d(obsphase,mod,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
 
-		uncertaintydict=self.resids.specUncertaintyForSN(self.guess,sn,(int1dM0,int1dM1),colorlaw,colorexp,interr1d,True)
-		uncJac=	uncertaintydict['modeluncertainty_jacobian']
+		uncertaintydict=self.resids.specVarianceForSN(self.guess,sn,interr1d,intcorr1d,colorlaw,colorexp,True)
+		uncJac=	uncertaintydict['modelvariance_jacobian']
 
-		uncertaintydict=self.resids.specUncertaintyForSN(self.guess,sn,int1d,colorlaw,colorexp,interr1d,False)
-		uncertainty = uncertaintydict['modeluncertainty']
+		uncertaintydict=self.resids.specVarianceForSN(self.guess,sn,interr1d,intcorr1d,colorlaw,colorexp,False)
+		uncertainty = uncertaintydict['modelvariance']
+		
+		
 		
 		def incrementOneParam(i):
 			guess=self.guess.copy()
@@ -320,6 +325,8 @@ class TRAINING_Test(unittest.TestCase):
 			M0,M1=self.resids.SALTModel(guess)
 			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
 			saltErr=self.resids.ErrModel(guess)
+			saltCorr=self.resids.CorrelationModel(guess)
+
 			z = self.resids.datadict[sn]['zHelio']
 			obsphase = self.resids.datadict[sn]['obsphase'] #self.phase*(1+z)
 			x0,x1,c,tpkoff = guess[self.parlist == 'x0_%s'%sn],guess[self.parlist == 'x1_%s'%sn],\
@@ -327,19 +334,19 @@ class TRAINING_Test(unittest.TestCase):
 	
 			colorlaw = -0.4 * colorLaw(self.resids.wave)
 			colorexp = 10. ** (colorlaw * c)
-	
-			interr1d = [interp1d(obsphase,err * (self.resids.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z))**2 ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
-
-			return self.resids.specUncertaintyForSN(guess,sn,int1d,colorlaw,colorexp,interr1d,False)
+			intcorr1d= [interp1d(obsphase,corr ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for corr in saltCorr]
+			interr1d = [interp1d(obsphase,err * (self.resids.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z)) ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
+			
+			return self.resids.specVarianceForSN(guess,sn,interr1d,intcorr1d,colorlaw,colorexp,False)
 
 		dUncertaintydX=np.zeros((uncertainty.size,self.parlist.size))
 		for i in range(self.guess.size):
 			uncertaintydict=incrementOneParam(i)
-			dUncertaintydX[:,i]=(uncertaintydict['modeluncertainty']-uncertainty)/dx
+			dUncertaintydX[:,i]=(uncertaintydict['modelvariance']-uncertainty)/dx
+		import pdb;pdb.set_trace()
+		if not np.allclose(uncJac,dUncertaintydX,rtol,atol): print('Problems with model variance derivatives: ',np.unique(self.parlist[np.where(~np.isclose(uncJac,dUncertaintydX,rtol,atol))[1]]))
 
-		if not np.allclose(dUncertaintydX,uncJac,rtol,atol): print('Problems with model value derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dUncertaintydX,uncJac,rtol,atol))[1]]))
-
-		self.assertTrue(np.allclose(dUncertaintydX,uncJac,rtol,atol))
+		self.assertTrue(np.allclose(uncJac,dUncertaintydX,rtol,atol))
 
 
 	def test_specvals_jacobian(self):
@@ -412,9 +419,9 @@ class TRAINING_Test(unittest.TestCase):
 			valsdict=incrementOneParam(i)
 			dValdX[:,i]=(valsdict['modelflux']-vals)/dx
 
-		if not np.allclose(dValdX,jacobian,rtol,atol): print('Problems with model value derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dValdX,jacobian,rtol,atol))[1]]))
+		if not np.allclose(jacobian,dValdX,rtol,atol): print('Problems with model value derivatives: ',np.unique(self.parlist[np.where(~np.isclose(jacobian,dValdX,rtol,atol))[1]]))
 
-		self.assertTrue(np.allclose(dValdX,jacobian,rtol,atol))
+		self.assertTrue(np.allclose(jacobian,dValdX,rtol,atol))
 
 
 	def test_specresid_jacobian_vary_uncertainty(self):
@@ -449,10 +456,10 @@ class TRAINING_Test(unittest.TestCase):
 			residsdict=incrementOneParam(i,dx)
 			dResiddX[:,i]=(residsdict['resid']-residuals)/dx
 			dLognormdX[i]=(residsdict['lognorm']-lognorm)/dx
-		if not np.allclose(dResiddX,jacobian,rtol,atol): print('Problems with residual derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol,atol))[1]]))
-		if not np.allclose(dLognormdX,grad,rtol,atol): print('Problems with lognorm derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dLognormdX,grad,rtol,atol))[0]]))
-		self.assertTrue(np.allclose(dResiddX,jacobian,rtol,atol))
-		self.assertTrue(np.allclose(dLognormdX,grad,rtol,atol))
+		if not np.allclose(jacobian,dResiddX,rtol,atol): print('Problems with residual derivatives: ',np.unique(self.parlist[np.where(~np.isclose(jacobian,dResiddX,rtol,atol))[1]]))
+		if not np.allclose(grad,dLognormdX,rtol,atol): print('Problems with lognorm derivatives: ',np.unique(self.parlist[np.where(~np.isclose(grad,dLognormdX,rtol,atol))[0]]))
+		self.assertTrue(np.allclose(jacobian,dResiddX,rtol,atol))
+		self.assertTrue(np.allclose(grad,dLognormdX,rtol,atol))
 
 	
 	def test_computeDerivatives(self):
@@ -502,8 +509,8 @@ class TRAINING_Test(unittest.TestCase):
 		for i in range(self.guess.size):
 			dResiddX[:,i]=(incrementOneParam(i,dx)-residuals)/dx
 
-		if not np.allclose(dResiddX,jacobian,rtol,atol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol,atol))[1]]))
-		self.assertTrue(np.allclose(dResiddX,jacobian,rtol,atol))
+		if not np.allclose(jacobian,dResiddX,rtol,atol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(jacobian,dResiddX,rtol,atol))[1]]))
+		self.assertTrue(np.allclose(jacobian,dResiddX,rtol,atol))
 
 	def test_regularization_jacobian(self):
 		"""Checks that the the jacobian of the spectroscopic residuals is being correctly calculated to within 1%"""
