@@ -154,7 +154,8 @@ class SALT3pipe():
         pro1_out = pro1.glueto(pro2)
         if 'lcfit' in pipepros[1].lower():
             pro2_in = pro2._get_input_info().loc[on]
-            pro2_in['value'] = ', '.join(pro1_out)
+            if isinstance(pro1_out,list): pro2_in['value'] = ', '.join(pro1_out)
+            else: pro2_in['value'] = pro1_out
         else:
             pro2_in = pro2._get_input_info().loc[0]
             pro2_in['value'] = pro1_out
