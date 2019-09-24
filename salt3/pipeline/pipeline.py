@@ -159,7 +159,6 @@ class SALT3pipe():
         else:
             pro2_in = pro2._get_input_info().loc[0]
             pro2_in['value'] = pro1_out
-
         if isinstance(pro2_in,pd.DataFrame):
             setkeys = pro2_in
         else:
@@ -423,7 +422,7 @@ class Simulation(PipeProcedure):
                                              genversion])]
         else:
             if isinstance(df.set_index('key').loc['GENVERSION'].value,str):
-                outdir = os.sep.join(['$SNDATA_ROOT/SIM',df.set_index('key').loc['GENVERSION'].value])
+                outdirs = [os.sep.join(['$SNDATA_ROOT/SIM',df.set_index('key').loc['GENVERSION'].value])]
             else:
                 outdirs = []
                 for genversion in df.set_index('key').loc['GENVERSION'].value:
@@ -455,7 +454,7 @@ class Simulation(PipeProcedure):
             # else:
             #     prefix = df.loc[df.key=='GENVERSION','value'].values[0]
             prefix = df.loc[df.key=='GENVERSION','value'].values[0]
-            return "{}/{}.LIST".format(res,prefix)
+            return ["{}/{}.LIST".format(res,prefix) for res in outdirs]
         elif pipepro.lower().startswith('lcfit'):
             return df.loc[df.key=='GENVERSION','value'].values[0]
             # idx = res.find(simpath)
@@ -825,11 +824,15 @@ def _gen_general_python_input(basefilename=None,setkeys=None,
         for index, row in setkeys.iterrows():
             sec = row['section']
             key = row['key']
-            v = row['value']
+            values = row['value']
             if not sec in config.sections():
                 config.add_section(sec)
-            print("Adding/modifying key {}={} in [{}]".format(key,v,sec))
-            config[sec][key] = v
+            if not isinstance(values,list): values = [values]
+            config[sec][key] = ''
+            for value in values:
+                print("Adding/modifying key {}={} in [{}]".format(key,value,sec))
+                config[sec][key] = config[sec][key] + '%s,'%value
+            config[sec][key] = config[sec][key][:-1]
         with open(outname, 'w') as f:
             config.write(f)
 
