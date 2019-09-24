@@ -13,11 +13,11 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.special import factorial
 from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
 from scipy.integrate import trapz
-from scipy.linalg import cholesky
+from scipy import linalg 
 
 import numpy as np
 from numpy.random import standard_normal
-from numpy.linalg import inv,pinv
+from numpy.linalg import slogdet
 
 from astropy.cosmology import Planck15 as cosmo
 from multiprocessing import Pool, get_context
@@ -284,6 +284,7 @@ class SALTResids:
 		components = self.SALTModel(x)
 		
 		salterr = self.ErrModel(x)
+		saltcorr= self.CorrelationModel(x)
 		if self.n_colorpars:
 			colorLaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
 		else: colorLaw = None
@@ -299,7 +300,7 @@ class SALTResids:
 		chi2 = 0
 		#Construct arguments for maxlikeforSN method
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
-		args=[(None,sn,x,components,salterr,colorLaw,colorScat,debug,timeit,computeDerivatives,computePCDerivs) for sn in self.datadict.keys()]
+		args=[(None,sn,x,components,salterr,saltcorr,colorLaw,colorScat,debug,timeit,computeDerivatives,computePCDerivs) for sn in self.datadict.keys()]
 		mapFun=pool.map if pool else starmap
 		if computeDerivatives:
 			result=list(mapFun(self.loglikeforSN,args))
@@ -335,31 +336,65 @@ class SALTResids:
 			return logp
 				
 	def ResidsForSN(self,x,sn,components,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs=False,fixUncertainty=True):
-		
-		modeldicts=self.modelvalsforSN(x,sn,components,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs,fixUncertainty)
-		
-		residslist=[]
-		for modeldict,name in zip(modeldicts,['phot','spec']):
-			uncertainty=np.hypot(modeldict['fluxvariance'],modeldict['modelvariance'])
-			#Suppress the effect of the spectra by multiplying chi^2 by number of photometric points over number of spectral points
-			if name =='spec': spectralSuppression=np.sqrt(self.num_phot/self.num_spec)
-			else: spectralSuppression=1
-			#If fixing the error, retrieve from storage
-				
-			
-			residsdict={'resid': spectralSuppression * (modeldict['modelflux']-modeldict['dataflux'])/uncertainty}
-			if not fixUncertainty:
-				residsdict['lognorm']=-np.log((np.sqrt(2*np.pi)*uncertainty)).sum()
-			
-			if computeDerivatives:
-				residsdict['resid_jacobian']=spectralSuppression * modeldict['modelflux_jacobian']/(uncertainty[:,np.newaxis])
-				if not fixUncertainty:
-					uncertainty_jac=  modeldict['modelvariance_jacobian'] *(modeldict['modelvariance'] / uncertainty)[:,np.newaxis] 
-					residsdict['lognorm_grad']= - (uncertainty_jac/uncertainty[:,np.newaxis]).sum(axis=0)
-					residsdict['resid_jacobian']-=   uncertainty_jac*(residsdict['resid'] /uncertainty)[:,np.newaxis]
+		""" This method should be the only one required for any fitter to process the supernova data. 
+		Find the residuals of a set of parameters to the photometric and spectroscopic data of a given supernova. 
+		Photometric residuals are run through a cholesky transformation to decorrelate color scatter"""
 
-			residslist+=[residsdict]
-		return tuple(residslist)
+		photmodel,specmodel=self.modelvalsforSN(x,sn,components,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs,fixUncertainty)
+		
+		#Separate code for photometry and spectra now, since photometry has to handle a covariance matrix with off-diagonal elements
+		covariance=np.diag(photmodel['fluxvariance']+photmodel['modelvariance'])
+		
+		#Cholesky transformation decomposes the covariance matrix into a lower triangular matrix s.t. Sigma= L L^T
+		L=linalg.cholesky(covariance).T
+		fluxdiff=photmodel['modelflux']-photmodel['dataflux']
+		
+		#More stable to solve by backsubstitution than to invert and multiply
+		photresids={'resid':linalg.solve_triangular(L, fluxdiff ,lower=True)}
+		if not fixUncertainty:
+			#slogdet function  doesn't encounter numerical underflow like log(det(covariance)) would
+			photresids['lognorm']= - 0.5 * (fluxdiff.size * np.log(2*np.pi) + slogdet(covariance)[1])
+		
+		if computeDerivatives:
+			photresids['resid_jacobian']=linalg.solve_triangular(L,photmodel['modelflux_jacobian'],lower=True)
+			if not fixUncertainty:
+				#Cut out zeroed jacobian entries to save time
+				nonzero=~(photmodel['modelvariance_jacobian']==0).all(axis=0)
+				reducedJac=photmodel['modelvariance_jacobian'][:,nonzero]
+				#Calculate L^-1
+				invL=linalg.solve_triangular(L,np.diag(np.ones(fluxdiff.size)),lower=True)
+				# Calculate the fractional derivative of L w.r.t model parameters
+				# L^-1 dL/dx = {L^-1 x d Sigma / dx x L^-T, with the upper triangular part zeroed and the diagonal halved}
+				fractionalLDeriv=np.dot(invL,np.swapaxes(reducedJac[:,np.newaxis,:]* invL.T[:,:,np.newaxis],0,1))
+				fractionalLDeriv[np.triu(np.ones((fluxdiff.size,fluxdiff.size),dtype=bool),1),:]=0
+				fractionalLDeriv[np.diag(np.ones((fluxdiff.size),dtype=bool)),:]/=2
+				
+				#Multiply by size of transformed residuals and apply to resiudal jacobian
+				photresids['resid_jacobian'][:,nonzero]-=np.dot(np.swapaxes(fractionalLDeriv,1,2),photresids['resid'])
+				
+				#Trace gives the gradient of the lognorm term, since determinant is product of diagonal
+				photresids['lognorm_grad']=np.zeros(self.npar)
+				photresids['lognorm_grad'][nonzero]-= np.trace(fractionalLDeriv)
+				
+		#Handle spectra
+		variance=specmodel['fluxvariance'] + specmodel['modelvariance']
+		uncertainty=np.sqrt(variance)
+		#Suppress the effect of the spectra by multiplying chi^2 by number of photometric points over number of spectral points
+		spectralSuppression=np.sqrt(self.num_phot/self.num_spec	)			
+		
+		specresids={'resid': spectralSuppression * (specmodel['modelflux']-specmodel['dataflux'])/uncertainty}
+		if not fixUncertainty:
+			specresids['lognorm']=-np.log((np.sqrt(2*np.pi)*uncertainty)).sum()
+		
+		if computeDerivatives:
+			specresids['resid_jacobian']=spectralSuppression * specmodel['modelflux_jacobian']/(uncertainty[:,np.newaxis])
+			if not fixUncertainty:
+				#Calculate jacobian of total spectral uncertainty including reported uncertainties
+				uncertainty_jac=  specmodel['modelvariance_jacobian'] / (2*uncertainty[:,np.newaxis])
+				specresids['lognorm_grad']= - (uncertainty_jac/uncertainty[:,np.newaxis]).sum(axis=0)
+				specresids['resid_jacobian']-=   uncertainty_jac*(specresids['resid'] /uncertainty)[:,np.newaxis]
+
+		return photresids,specresids
 			
 	def specValsForSN(self,x,sn,componentsModInterp,colorlaw,colorexp,computeDerivatives,computePCDerivs):
 		z = self.datadict[sn]['zHelio']
@@ -487,7 +522,7 @@ class SALTResids:
 		idx = self.datadict[sn]['idx']
 		x0,x1,c,tpkoff = x[self.parlist == 'x0_%s'%sn],x[self.parlist == 'x1_%s'%sn],\
 						 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
-		import pdb;pdb.set_trace()
+
 		nspecdata = sum([specdata[key]['flux'].size for key in specdata])
 		specresultsdict={}
 		specresultsdict['fluxvariance'] =  np.zeros(nspecdata)
@@ -579,6 +614,13 @@ class SALTResids:
 			clippedPhase=np.clip(phase,obsphase.min(),obsphase.max())
 			nphase = len(phase)
 			#import pdb;pdb.set_trace()
+			#Calculate color scatter relative to flux
+			#photresultsdict['colorvariancerelative']=
+			
+			
+			
+			
+			#Calculate model uncertainty
 			modelErrInt = [ interp1d( obswave, interr(clippedPhase),axis=1,kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True) for interr in interr1d]
 			modelCorrInt= [ interp1d( obswave, intcorr(clippedPhase),axis=1,kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True) for intcorr in intcorr1d]
 			
@@ -588,12 +630,13 @@ class SALTResids:
 			modelUncertainty=  modelerrnox[0]**2  + 2*x1* corr[0]*modelerrnox[0]*modelerrnox[1] + x1**2 *modelerrnox[1]**2
 			
 			photresultsdict['fluxvariance'][selectFilter] = photdata['fluxcalerr'][selectFilter]**2
-			fluxfactor=(self.fluxfactor[survey][flt]*(pbspl[flt].sum())*dwave)
+			fluxfactor=(self.fluxfactor[survey][flt]*(pbspl[flt].sum())*dwave)**2
 			photresultsdict['modelvariance'][selectFilter]= x0**2 *fluxfactor  * modelUncertainty
 
 		
 			# derivatives....
 			if computeDerivatives:
+
 				colorexpint = interp1d(obswave,colorexp,kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
 				colorexpinterp = colorexpint(lameff)
 				colorlawint = interp1d(obswave,colorlaw,kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
@@ -760,7 +803,7 @@ class SALTResids:
 		interr1d = [interp1d(obsphase,err * (self.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z)) ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
 		intcorr1d= [interp1d(obsphase,corr ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True) for corr in saltCorr ]
 		returndicts=[]
-		for valfun,uncertaintyfun,name in [(self.photValsForSN,self.photUncertaintyForSN,'phot'),(self.specValsForSN,self.specUncertaintyForSN, 'spec')]:
+		for valfun,uncertaintyfun,name in [(self.photValsForSN,self.photVarianceForSN,'phot'),(self.specValsForSN,self.specVarianceForSN, 'spec')]:
 			valdict=valfun(x,sn,(int1dM0,int1dM1) if computeDerivatives else int1d,colorlaw,colorexp,computeDerivatives,computePCDerivs)
 			key='__{}_{}_fixed_uncertainty__'.format(name,sn)
 			if fixUncertainty: 
@@ -887,7 +930,7 @@ class SALTResids:
 			idx+=priorFunction.numResids
 		return residuals,values,jacobian
 
-	def loglikeforSN(self,args,sn=None,x=None,components=None,salterr=None,
+	def loglikeforSN(self,args,sn=None,x=None,components=None,salterr=None,saltcorr=None,
 					 colorLaw=None,colorScat=None,
 					 debug=False,timeit=False,computeDerivatives=False,computePCDerivs=False):
 		"""
@@ -930,7 +973,7 @@ class SALTResids:
 		if salterr is None:
 			salterr = self.ErrModel(x)
 
-		photResidsDict,specResidsDict = self.ResidsForSN(x,sn,components,colorLaw,salterr,computeDerivatives,computePCDerivs,fixUncertainty=False)
+		photResidsDict,specResidsDict = self.ResidsForSN(x,sn,components,colorLaw,salterr,saltcorr,computeDerivatives,computePCDerivs,fixUncertainty=False)
 		
 		loglike= - (photResidsDict['resid']**2).sum() / 2.   -(specResidsDict['resid']**2).sum()/2.+photResidsDict['lognorm']+specResidsDict['lognorm']
 		if computeDerivatives: 
