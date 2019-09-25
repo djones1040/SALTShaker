@@ -338,7 +338,7 @@ class SALTResids:
 	def ResidsForSN(self,x,sn,components,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs=False,fixUncertainty=True):
 		""" This method should be the only one required for any fitter to process the supernova data. 
 		Find the residuals of a set of parameters to the photometric and spectroscopic data of a given supernova. 
-		Photometric residuals are run through a cholesky transformation to decorrelate color scatter"""
+		Photometric residuals are first decorrelated to diagonalize color scatter"""
 
 		photmodel,specmodel=self.modelvalsforSN(x,sn,components,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs,fixUncertainty)
 		
@@ -358,6 +358,7 @@ class SALTResids:
 		if computeDerivatives:
 			photresids['resid_jacobian']=linalg.solve_triangular(L,photmodel['modelflux_jacobian'],lower=True)
 			if not fixUncertainty:
+				#import pdb;pdb.set_trace()
 				#Cut out zeroed jacobian entries to save time
 				nonzero=~(photmodel['modelvariance_jacobian']==0).all(axis=0)
 				reducedJac=photmodel['modelvariance_jacobian'][:,nonzero]
@@ -372,7 +373,7 @@ class SALTResids:
 				#Multiply by size of transformed residuals and apply to resiudal jacobian
 				photresids['resid_jacobian'][:,nonzero]-=np.dot(np.swapaxes(fractionalLDeriv,1,2),photresids['resid'])
 				
-				#Trace gives the gradient of the lognorm term, since determinant is product of diagonal
+				#Trace of fractional derivative gives the gradient of the lognorm term, since determinant is product of diagonal
 				photresids['lognorm_grad']=np.zeros(self.npar)
 				photresids['lognorm_grad'][nonzero]-= np.trace(fractionalLDeriv)
 				
@@ -650,8 +651,8 @@ class SALTResids:
 				for i in range(self.n_colorpars):
 					dcolorlaw_dcli = interp1d(obswave,SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(self.wave)-SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(self.wave),kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(lameff)
 					photresultsdict['modelvariance_jacobian'][selectFilter,self.iCL[i]] =fluxfactor* x0**2 *2* (-0.4 *np.log(10)*c)*modelUncertainty*dcolorlaw_dcli
-				
-				interpresult=  self.errorspline_deriv_interp((clippedPhase/(1+z),lameff),method=self.interpMethod) 
+
+				interpresult=  self.errorspline_deriv_interp((clippedPhase/(1+z),lameff/(1+z)),method=self.interpMethod) 
 				extinctionexp=(colorexpinterp* _SCALE_FACTOR/(1+z)*self.datadict[sn]['mwextcurveint'](lameff))
 
 				photresultsdict['modelvariance_jacobian'][selectFilter[:,np.newaxis] & (self.parlist=='modelerr_0')[np.newaxis,:]]   = (fluxfactor* 2* x0**2  * extinctionexp * (( modelerrnox[0] + corr[0]*modelerrnox[1]*x1))[:,np.newaxis] * interpresult).flatten()
@@ -713,7 +714,6 @@ class SALTResids:
 				
 				modulatedFlux= x0*(modulatedM0 +modulatedM1*x1)
 				modelflux = x0* (modelsynM0flux+ x1*modelsynM1flux)
-			
 				#Need to figure out how to handle derivatives wrt time when dealing with nearest neighbor interpolation; maybe require linear?
 				for p in np.where(phase>obsphase.max())[0]:
 				
@@ -735,13 +735,12 @@ class SALTResids:
 					passbandColorExp=pbspl[flt]*colorexp[idx[flt]]*self.datadict[sn]['mwextcurve'][idx[flt]]
 					intmult = dwave*self.fluxfactor[survey][flt]*_SCALE_FACTOR/(1+z)*x0
 					intmultnox = dwave*self.fluxfactor[survey][flt]*_SCALE_FACTOR/(1+z)
-
 					for pdx,p in enumerate(np.where(selectFilter)[0]):
 						derivInterp = self.spline_deriv_interp(
 							(clippedPhase[pdx]/(1+z),self.wave[idx[flt]]),
 							method=self.interpMethod)
 					
-						summation = np.sum( passbandColorExp[:,:,np.newaxis] * derivInterp, axis=1)
+						summation = np.sum( passbandColorExp.T * derivInterp, axis=0)
 						photresultsdict['modelflux_jacobian'][p,self.im0]=  summation*intmult
 						photresultsdict['modelflux_jacobian'][p,self.im1] = summation*intmult*x1
 						self.__dict__['dmodelflux_dM0_phot_%s'%sn][p,:] = summation*intmultnox
@@ -751,7 +750,7 @@ class SALTResids:
 				modelflux = np.sum(pbspl[flt]*modinterp[:,idx[flt]], axis=1)*dwave*self.fluxfactor[survey][flt]
 				if ( (phase>obsphase.max())).any():
 					modelflux[(phase>obsphase.max())]*= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))[(phase>obsphase.max())]
-				photresultsdict['modelflux'][selectFilter]=modelflux
+			photresultsdict['modelflux'][selectFilter]=modelflux
 			
 		phase=photdata['tobs']+tpkoff
 		if computeDerivatives:

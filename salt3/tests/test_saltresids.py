@@ -100,9 +100,9 @@ class TRAINING_Test(unittest.TestCase):
 	def test_photresid_jacobian_vary_uncertainty(self):
 		"""Check that lognorm gradient and residuals' jacobian are correctly calculated with fixUncertainty=False"""
 		print("Checking photometric derivatives including uncertainties")
-		dx=1e-8
+		dx=3e-8
 		rtol=1e-2
-		atol=1e-2
+		atol=1e-4
 		sn=self.resids.datadict.keys().__iter__().__next__()
 		components = self.resids.SALTModel(self.resids.guess)
 		salterr = self.resids.ErrModel(self.resids.guess)
@@ -131,8 +131,9 @@ class TRAINING_Test(unittest.TestCase):
 			residsdict=incrementOneParam(i)
 			dResiddX[:,i]=(residsdict['resid']-residuals)/dx
 			dLognormdX[i]=(residsdict['lognorm']-lognorm)/dx
-		if not np.allclose(jacobian,dResiddX,rtol): print('Problems with residual derivatives: ',np.unique(self.parlist[np.where(~np.isclose(jacobian,dResiddX,rtol,atol))[1]]))
-		if not np.allclose(grad,dLognormdX,rtol): print('Problems with lognorm derivatives: ',np.unique(self.parlist[np.where(~np.isclose(grad,dLognormdX,rtol,atol))[0]]))
+		#import pdb;pdb.set_trace()
+		if not np.allclose(jacobian,dResiddX,rtol,atol): print('Problems with residual derivatives: ',np.unique(self.parlist[np.where(~np.isclose(jacobian,dResiddX,rtol,atol))[1]]))
+		if not np.allclose(grad,dLognormdX,rtol,atol): print('Problems with lognorm derivatives: ',np.unique(self.parlist[np.where(~np.isclose(grad,dLognormdX,rtol,atol))[0]]))
 		self.assertTrue(np.allclose(jacobian,dResiddX,rtol,atol))
 		self.assertTrue(np.allclose(grad,dLognormdX,rtol,atol))
 
@@ -276,7 +277,6 @@ class TRAINING_Test(unittest.TestCase):
 			dUncertaintydX[:,i]=(uncertaintydict['modelvariance']-uncertainty)/dx
 		
 		if not np.allclose(uncJac,dUncertaintydX,rtol,atol): print('Problems with model uncertainty derivatives: ',np.unique(self.parlist[np.where(~np.isclose(uncJac,dUncertaintydX,rtol,atol))[1]]))
-		import pdb;pdb.set_trace()
 		self.assertTrue(np.allclose(uncJac,dUncertaintydX,rtol,atol))
 
 	def test_specuncertainty_jacobian(self):
@@ -459,7 +459,6 @@ class TRAINING_Test(unittest.TestCase):
 		dResiddX=np.zeros((residuals.size,self.parlist.size))
 		for i in range(self.guess.size):
 			dResiddX[:,i]=(incrementOneParam(i,dx)-residuals)/dx
-		import pdb;pdb.set_trace()
 		if not np.allclose(jacobian,dResiddX,rtol,atol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(jacobian,dResiddX,rtol,atol))[1]]))
 		self.assertTrue(np.allclose(jacobian,dResiddX,rtol,atol))
 
@@ -518,10 +517,11 @@ class TRAINING_Test(unittest.TestCase):
 		combinations= [(True,True),(True,False),(False,False)]
 		results=[self.resids.ResidsForSN(self.guess,sn,components,colorLaw,salterr,saltcorr,*x) for x in combinations]
 		first=results[0]
+		
 		#Check photometric residuals are not affected by computeDerivatives
-		self.assertTrue([np.allclose(first[0]['resid'],result[0]['resid']) for result in results[1:]])
+		self.assertTrue(all([np.allclose(first[0]['resid'],result[0]['resid']) for result in results[1:]]))
 		#Check spectroscopic residuals are not affected by computeDerivatives
-		self.assertTrue([np.allclose(first[1]['resid'],result[1]['resid']) for result in results[1:]])
+		self.assertTrue(all([np.allclose(first[1]['resid'],result[1]['resid']) for result in results[1:]]))
 
 
 	def test_regularization_jacobian(self):
