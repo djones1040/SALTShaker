@@ -1,0 +1,12 @@
+                                                SUM-SNIa  : 
+  GENVERSION                                  NGEN     NWRITE  NSPEC   
+# ----------------------------------------------------------------- 
+BYOSED_BATCH_TEST                             6000     385    385
+
+
+                                                SUM-NONIa : 
+  GENVERSION                                  NGEN     NWRITE  NSPEC   
+# ----------------------------------------------------------------- 
+BYOSED_BATCH_TEST                                0       0      0
+
+
