@@ -103,7 +103,6 @@ class TrainSALT(TrainSALTBase):
 				if self.options.specrecal:
 					parlist=np.append(parlist,['specrecal_{}_{}'.format(sn,k)]*order)
 
-
 		# initial guesses
 		n_params=parlist.size
 		guess = np.zeros(parlist.size)
@@ -121,7 +120,6 @@ class TrainSALT(TrainSALTBase):
 		i=0
 		for k in datadict.keys():
 			guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36-10.635))
-			#guess[parlist == 'x1_%s'%k] = 1 if i%2==0 else -1
 			i+=1
 
 		if self.options.resume_from_outputdir:

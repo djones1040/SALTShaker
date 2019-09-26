@@ -456,7 +456,8 @@ class GaussNewton(saltresids.SALTResids):
 		self.chi2_diff_cutoff = 1
 		self.fitOptions={}
 		for message,fit in [('all parameters','all'),('all parameters grouped','all-grouped'),(" x0",'x0'),('x1','x1'),('principal component 0','component0'),
-			('principal component 1','component1'),('color','color'),('color law','colorlaw'),('spectral recalibration','spectralrecalibration')]: #,('error model','modelerr')]:
+							('principal component 1','component1'),('color','color'),('color law','colorlaw'),('spectral recalibration const.','spectralrecalibration_norm'),
+							('time of max','tpk')]: #,('error model','modelerr')]:
 			if 'all' in fit: includePars=np.ones(self.npar,dtype=bool)
 			else:
 				includePars=np.zeros(self.npar,dtype=bool)
@@ -478,8 +479,12 @@ class GaussNewton(saltresids.SALTResids):
 					includePars[self.ic]=True
 				elif fit=='colorlaw':
 					includePars[self.iCL]=True
+				elif fit=='tpk':
+					includePars[self.itpk]=True
 				elif fit=='spectralrecalibration':
 					includePars[self.ispcrcl]=True
+				elif fit=='spectralrecalibration_norm':
+					includePars[self.ispcrcl_norm]=True
 				elif fit=='modelerr':
 					includePars[self.imodelerr]=True
 				else:
@@ -508,10 +513,10 @@ class GaussNewton(saltresids.SALTResids):
 			if superloop % 3 ==0 and self.fit_model_err:
 				print('Optimizing model error')
 				X,loglike=self.minuitOptimize(X,'modelerr')
-			elif superloop == 0:
-				print('Optimizing model error')
-				X,loglike=self.minuitOptimize(X,'modelerr')
-				
+			#elif superloop == 0:
+			#	print('Optimizing model error')
+			#	X,loglike=self.minuitOptimize(X,'modelerr')
+
 			X,chi2,converged = self.robust_process_fit(X,chi2_init,superloop)
 			
 			if chi2_init-chi2 < -1.e-6:
@@ -591,7 +596,8 @@ class GaussNewton(saltresids.SALTResids):
 		else: colorLaw = None
 		salterr=self.ErrModel(guess)
 		components = self.SALTModel(guess)
-
+		
+		componentderivs = self.SALTModelDeriv(guess,1,0,self.phase,self.wave)
 		numResids=self.num_phot+self.num_spec + (self.numPriorResids if doPriors else 0)
 		if self.regularize:
 			numRegResids=sum([ self.n_components*(self.im0.size) for weight in [self.regulargradientphase,self.regulargradientwave ,self.regulardyad] if not weight == 0])
@@ -602,7 +608,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 		idx = 0
 		for sn in self.datadict.keys():
-			photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,components,colorLaw,salterr,computeDerivatives,computePCDerivs)
+			photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,components,componentderivs,colorLaw,salterr,computeDerivatives,computePCDerivs)
 			
 			idxp = photresidsdict['resid'].size
 
