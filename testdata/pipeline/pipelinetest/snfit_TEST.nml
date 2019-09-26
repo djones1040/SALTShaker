@@ -1,10 +1,10 @@
 &SNLCINP
   USE_MINOS = True
-  VERSION_PHOTOMETRY = 'MD_BYOSEDTEST'
+  VERSION_PHOTOMETRY = 'SALT3TEST_SIMPLE'
   PHOTFLAG_MSKREJ = 0,0
   SNTABLE_LIST = 'FITRES LCPLOT(text:key)'
   TEXTFILE_PREFIX = 'snfit_test'
-  KCOR_FILE = '/Users/David/Dropbox/research/SALT3/testdata/pipeline/lcfitting/kcor_PS1_LOWZ_COMBINED.fits'
+  KCOR_FILE = '/Users/david/Dropbox/research/SALT3/testdata/pipeline/lcfitting/kcor_PS1_LOWZ_COMBINED.fits'
   NFIT_ITERATION = 3
   INTERP_OPT = 1
   H0_REF = 70.0
@@ -46,4 +46,3 @@
 &END
 
 DONE_STAMP: ALL.DONE
-VERSION: MD_BYOSEDTEST
