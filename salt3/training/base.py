@@ -4,9 +4,14 @@ import configparser
 import numpy as np
 
 def boolean_string(s):
-    if s not in {'False', 'True', '1', '0'}:
-        raise ValueError('Not a valid boolean string')
-    return (s == 'True') | (s == '1')
+	if s not in {'False', 'True', '1', '0'}:
+		raise ValueError('Not a valid boolean string')
+	return (s == 'True') | (s == '1')
+
+def nonetype_or_int(s):
+	if s == 'None': return None
+	else: return int(s)
+
 
 class TrainSALTBase:
 	def __init__(self):
@@ -37,10 +42,8 @@ class TrainSALTBase:
 							help="""list of SNANA-formatted SN data files, including both photometry and spectroscopy. (default=%default)""")
 		parser.add_argument('--dospec', default=config.get('iodata','dospec'), type=bool,
 							help="""if set, look for spectra in the snlist files (default=%default)""")
-		#parser.add_argument('--speclist', default=config.get('iodata','speclist'), type=str,
-		#					help="""optional list of ascii spectra, which will be written to the 
-		#					SNANA-formatted SN light curve files provided by the snlist argument.
-		#					List format should be space-delimited SNID, MJD-OBS (or DATE-OBS), spectrum filename (default=%default)""")
+		parser.add_argument('--maxsn', default=config.get('iodata','maxsn'), type=nonetype_or_int,
+							help="""sets maximum number of SNe to fit for debugging (default=%default)""")
 		parser.add_argument('--outputdir', default=config.get('iodata','outputdir'), type=str,
 							help="""data directory for spectroscopy, format should be ASCII 
 							with columns wavelength, flux, fluxerr (optional) (default=%default)""")
@@ -130,29 +133,29 @@ class TrainSALTBase:
 		parser.add_argument('--n_steps_mcmc', default=config.get('mcmcparams','n_steps_mcmc'), type=int,
 							help='number of accepted MCMC steps (default=%default)')
 		parser.add_argument('--n_burnin_mcmc', default=config.get('mcmcparams','n_burnin_mcmc'), type=int,
-							help='number of burn-in MCMC steps  (default=%default)')
+							help='number of burn-in MCMC steps	(default=%default)')
 		parser.add_argument('--stepsize_magscale_M0', default=config.get('mcmcparams','stepsize_magscale_M0'), type=float,
-							help='initial MCMC step size for M0, in mag  (default=%default)')
+							help='initial MCMC step size for M0, in mag	 (default=%default)')
 		parser.add_argument('--stepsize_magadd_M0', default=config.get('mcmcparams','stepsize_magadd_M0'), type=float,
-							help='initial MCMC step size for M0, in mag  (default=%default)')
+							help='initial MCMC step size for M0, in mag	 (default=%default)')
 		parser.add_argument('--stepsize_magscale_err', default=config.get('mcmcparams','stepsize_magscale_err'), type=float,
-							help='initial MCMC step size for the model err spline knots, in mag  (default=%default)')
+							help='initial MCMC step size for the model err spline knots, in mag	 (default=%default)')
 		parser.add_argument('--stepsize_magscale_M1', default=config.get('mcmcparams','stepsize_magscale_M1'), type=float,
 							help='initial MCMC step size for M1, in mag - need both mag and flux steps because M1 can be negative (default=%default)')
 		parser.add_argument('--stepsize_magadd_M1', default=config.get('mcmcparams','stepsize_magadd_M1'), type=float,
 							help='initial MCMC step size for M1, in flux - need both mag and flux steps because M1 can be negative (default=%default)')
 		parser.add_argument('--stepsize_cl', default=config.get('mcmcparams','stepsize_cl'), type=float,
-							help='initial MCMC step size for color law  (default=%default)')
+							help='initial MCMC step size for color law	(default=%default)')
 		parser.add_argument('--stepsize_magscale_clscat', default=config.get('mcmcparams','stepsize_magscale_clscat'), type=float,
-							help='initial MCMC step size for color law  (default=%default)')
+							help='initial MCMC step size for color law	(default=%default)')
 		parser.add_argument('--stepsize_specrecal', default=config.get('mcmcparams','stepsize_specrecal'), type=float,
-							help='initial MCMC step size for spec recal. params  (default=%default)')
+							help='initial MCMC step size for spec recal. params	 (default=%default)')
 		parser.add_argument('--stepsize_x0', default=config.get('mcmcparams','stepsize_x0'), type=float,
-							help='initial MCMC step size for x0, in mag  (default=%default)')
+							help='initial MCMC step size for x0, in mag	 (default=%default)')
 		parser.add_argument('--stepsize_x1', default=config.get('mcmcparams','stepsize_x1'), type=float,
-							help='initial MCMC step size for x1  (default=%default)')
+							help='initial MCMC step size for x1	 (default=%default)')
 		parser.add_argument('--stepsize_c', default=config.get('mcmcparams','stepsize_c'), type=float,
-							help='initial MCMC step size for c  (default=%default)')
+							help='initial MCMC step size for c	(default=%default)')
 		parser.add_argument('--stepsize_tpk', default=config.get('mcmcparams','stepsize_tpk'), type=float,
 							help='initial MCMC step size for tpk  (default=%default)')
 
@@ -258,7 +261,7 @@ class TrainSALTBase:
 					print('%i epochs, %i epochs near peak, %i epochs post-peak, %i filters near peak'%(
 						len(iEpochsCut),len(iPkCut),len(iShapeCut),NFiltColorCut))
 				continue
-			
+
 			#Remove spectra outside phase range
 			for k in list(specdata.keys()):
 				if ((specdata[k]['tobs'])/(1+z)<self.options.phaserange[0]) or \
@@ -291,6 +294,11 @@ class TrainSALTBase:
 			numPhotElimmed+=(~keepPhot).sum()
 			numPhot+=keepPhot.sum()
 			datadict[sn]['photdata'] ={key:photdata[key][keepPhot] for key in photdata}
+
+		if self.options.maxsn is not None:
+			for i,sn in enumerate(list(datadict.keys())):
+				if i >= self.options.maxsn:
+					datadict.pop(sn)
 			
 		print('{} spectra and {} photometric observations removed for being outside phase range'.format(numSpecElimmed,numPhotElimmed))
 		print('{} spectra and {} photometric observations remaining'.format(numSpec,numPhot))
