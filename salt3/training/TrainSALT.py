@@ -86,10 +86,9 @@ class TrainSALT(TrainSALTBase):
 			for i in range(self.options.n_components): parlist = np.append(parlist,['modelerr_{}'.format(i)]*n_errphaseknots*n_errwaveknots)
 			if self.options.n_components == 2:
 				parlist = np.append(parlist,['modelcorr_01']*n_errphaseknots*n_errwaveknots)
-
+		
 		if self.options.n_colorscatpars:
-			# four knots for the end points
-			parlist = np.append(parlist,['clscat']*(self.options.n_colorscatpars+8))
+			parlist = np.append(parlist,['clscat']*(self.options.n_colorscatpars))
 
 		# SN parameters
 		for k in datadict.keys():
