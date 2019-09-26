@@ -570,8 +570,8 @@ class GaussNewton(saltresids.SALTResids):
 		result,paramResults=m.migrad(10)
 		X=X.copy()
 		X[includePars]=np.array([x.value for x  in paramResults])
-		if np.allclose(X[includePars],initVals):
-			import pdb;pdb.set_trace()
+# 		if np.allclose(X[includePars],initVals):
+# 			import pdb;pdb.set_trace()
 		print('Final log likelihood: ', -result.fval)
 		return X,-result.fval
 
@@ -611,7 +611,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 		idx = 0
 		for sn in self.datadict.keys():
-			photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,components,colorLaw,salterr,computeDerivatives,computePCDerivs)
+			photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,components,colorLaw,salterr,saltCorr,computeDerivatives,computePCDerivs)
 			
 			idxp = photresidsdict['resid'].size
 
