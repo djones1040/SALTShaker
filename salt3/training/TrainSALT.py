@@ -83,10 +83,12 @@ class TrainSALT(TrainSALTBase):
 		if self.options.n_colorpars:
 			parlist = np.append(parlist,['cl']*self.options.n_colorpars)
 		if self.options.error_snake_phase_binsize and self.options.error_snake_wave_binsize:
-			for i in range(3): parlist = np.append(parlist,['modelerr_{}'.format(i)]*n_errphaseknots*n_errwaveknots)
+			for i in range(self.options.n_components): parlist = np.append(parlist,['modelerr_{}'.format(i)]*n_errphaseknots*n_errwaveknots)
+			if self.options.n_components == 2:
+				parlist = np.append(parlist,['modelcorr_01']*n_errphaseknots*n_errwaveknots)
+		
 		if self.options.n_colorscatpars:
-			# four knots for the end points
-			parlist = np.append(parlist,['clscat']*(self.options.n_colorscatpars+8))
+			parlist = np.append(parlist,['clscat']*(self.options.n_colorscatpars))
 
 		# SN parameters
 		for k in datadict.keys():
