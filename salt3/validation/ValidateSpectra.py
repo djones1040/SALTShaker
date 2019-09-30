@@ -63,7 +63,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 				   ax=None,maxspec=None):
 
 	plt.close('all')
-	datadict=readutils.rdAllData(speclist,False,None,lambda x: None,speclist)
+	datadict=readutils.rdAllData(speclist,False,None,lambda x: None,speclist,KeepOnlySpec=True)
 	salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,
 							m1file=m1file,
 							clfile=clfile,cdfile=cdfile,
@@ -72,7 +72,8 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 							lcrv11file=lcrv11file,
 							lcrv01file=lcrv01file)
 	model=sncosmo.Model(source=salt3)
-	parlist,pars=np.loadtxt(os.path.join(salt3dir,parfile),skiprows=1,unpack=True,dtype=[('a','U40'),('b',float)])
+	parlist,pars=np.loadtxt(os.path.join(salt3dir,parfile),
+							skiprows=1,unpack=True,dtype=[('a','U40'),('b',float)])
 	if outdir is None: outdir=salt3dir	
 	pdf_pages = PdfPages('%s/speccomp.pdf'%outdir)
 
@@ -90,7 +91,6 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 			print('SN {} is not in parameters, skipping'.format(sn))
 			continue
 		model.update(snPars)
-		#import pdb; pdb.set_trace()
 		for k in specdata.keys():
 			try:
 				coeffs=pars[parlist=='specrecal_{}_{}'.format(sn,k)]
@@ -107,7 +107,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 				ax = plt.subplot(3,1,axcount % 3 + 1)
 			
 				#ax.clf()
-				if len(coeffs): ax.plot(wave,modelFlux,'r-',label='Model spectrum')
+				if len(coeffs): ax.plot(wave,modelflux,'r-',label='Model spectrum')
 				ax.plot(wave,specdata[k]['flux'],'b-',label='Spectral data, phase = %.1f'%(specdata[k]['tobs']-snPars['t0']))
 				ax.plot(wave,unncalledModel,'g-',label='SALT3 Model spectrum\n(no calibration)')
 				ax.set_xlim(wave.min(),wave.max())
@@ -123,7 +123,8 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 					pdf_pages.savefig()
 				if maxspec and axcount >= maxspec:
 					break
-			except:
+			except Exception as e:
+				print(e)
 				continue
 	pdf_pages.savefig()
 	pdf_pages.close()
