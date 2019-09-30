@@ -349,19 +349,23 @@ class SALTResids:
 		Find the residuals of a set of parameters to the photometric and spectroscopic data of a given supernova. 
 		Photometric residuals are first decorrelated to diagonalize color scatter"""
 		fixUncertainty= saltErr is None and saltCorr is None
-		photmodel,specmodel=self.modelvalsforSN(x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs,fixedUncertainties)
+		photmodel,specmodel=self.modelvalsforSN(x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs)
 		
 		#Separate code for photometry and spectra now, since photometry has to handle a covariance matrix with off-diagonal elements
-		covariance=np.diag(photmodel['fluxvariance']+photmodel['modelvariance'])
-		
-		#Add color scatter
-		for selectFilter,clscat,dclscat in photmodel['colorvariance']:
-			flux=photmodel['modelflux']*selectFilter
-			#Color scatter is k(lambda)^2 times the outer product of 
-			covariance+=clscat* flux[:,np.newaxis]*flux[np.newaxis,:]
+		if fixUncertainty:
+			L=fixedUncertainties['phot_{}'.format(sn)]
 			
-		#Cholesky transformation decomposes the covariance matrix into a lower triangular matrix s.t. Sigma= L L^T
-		L=linalg.cholesky(covariance).T
+		else:
+			covariance=np.diag(photmodel['fluxvariance']+photmodel['modelvariance'])
+		
+			#Add color scatter
+			for selectFilter,clscat,dclscat in photmodel['colorvariance']:
+				flux=photmodel['modelflux']*selectFilter
+				#Color scatter is k(lambda)^2 times the outer product of 
+				covariance+=clscat* flux[:,np.newaxis]*flux[np.newaxis,:]
+			
+			#Cholesky transformation decomposes the covariance matrix into a lower triangular matrix s.t. Sigma= L L^T
+			L=linalg.cholesky(covariance).T
 		fluxdiff=photmodel['modelflux']-photmodel['dataflux']
 		
 		#More stable to solve by backsubstitution than to invert and multiply
@@ -407,7 +411,11 @@ class SALTResids:
 				photresids['lognorm_grad'][nonzero]-= np.trace(fractionalLDeriv)
 				
 		#Handle spectra
-		variance=specmodel['fluxvariance'] + specmodel['modelvariance']
+		
+		if fixUncertainty:
+			variance=fixedUncertainties['spec_{}'.format(sn)]
+		else:
+			variance=specmodel['fluxvariance'] + specmodel['modelvariance']
 		uncertainty=np.sqrt(variance)*SpecErrScale
 		# HACK
 		#uncertainty *= 0.01
@@ -825,7 +833,7 @@ class SALTResids:
 		return photresultsdict
 	
 	
-	def modelvalsforSN(self,x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs,fixedUncertainties=None):
+	def modelvalsforSN(self,x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs):
 
 		# model pars, initialization
 		M0,M1 = copy.deepcopy(components)
@@ -876,36 +884,35 @@ class SALTResids:
                      (int1dM0phasederiv,int1dM1phasederiv) if computeDerivatives else None,
                      colorlaw,colorexp,computeDerivatives,computePCDerivs)
 
-			if ( saltErr is None and saltCorr is None): 
-				uncertaintydict=fixedUncertainties['{}_{}'.format(name,sn)]
-			else:
+			if not ( saltErr is None and saltCorr is None): 
 				uncertaintydict=uncertaintyfun(x,sn,interr1d,intcorr1d,colorlaw,colorexp,computeDerivatives)
-			valdict.update(uncertaintydict)
+				valdict.update(uncertaintydict)
 			returndicts+=[valdict]
 
 		return returndicts
 		
 	def getFixedUncertainties(self,x):		
 		colorLaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
+		components=self.SALTModel(x)
+		componentderivs=self.SALTModelDeriv(x,1,0,self.phase,self.wave)
 		saltErr=self.ErrModel(x)
 		saltCorr=self.CorrelationModel(x)
 
 		fixedUncertainties={}
 		for sn in self.datadict:
-			z = self.datadict[sn]['zHelio']
-			obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
-			x0,x1,c,tpkoff = x[self.parlist == 'x0_%s'%sn],x[self.parlist == 'x1_%s'%sn],\
-							 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
 
-			colorlaw = -0.4 * colorLaw(self.wave)
-			colorexp = 10. ** (colorlaw * c)
-
-			intcorr1d= [interp1d(obsphase,corr ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True) for corr in saltCorr]
-
-			interr1d = [interp1d(obsphase,err * (self.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z)) ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
-
-			fixedUncertainties['phot_{}'.format(sn)]=self.photVarianceForSN(x,sn,interr1d,intcorr1d,colorlaw,colorexp,False)
-			fixedUncertainties['spec_{}'.format(sn)]=self.specVarianceForSN(x,sn,interr1d,intcorr1d,colorlaw,colorexp,False)
+			photmodel,specmodel=self.modelvalsforSN(x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,False,False)
+			covariance=np.diag(photmodel['fluxvariance']+photmodel['modelvariance'])
+			#Add color scatter
+			for selectFilter,clscat,dclscat in photmodel['colorvariance']:
+				flux=photmodel['modelflux']*selectFilter
+				#Color scatter is k(lambda)^2 times the outer product of 
+				covariance+=clscat* flux[:,np.newaxis]*flux[np.newaxis,:]
+			
+			#Cholesky transformation decomposes the covariance matrix into a lower triangular matrix s.t. Sigma= L L^T
+			L=linalg.cholesky(covariance).T
+			fixedUncertainties['phot_{}'.format(sn)]=L
+			fixedUncertainties['spec_{}'.format(sn)]=specmodel['fluxvariance'] + specmodel['modelvariance']
 		return fixedUncertainties
 
 	#@prior
