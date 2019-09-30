@@ -62,7 +62,6 @@ class fitting:
 		saltfitter.debug = False
 		if n_processes > 1:
 			with InterruptiblePool(n_processes) as pool:
-		#	with multiprocessing.Pool(n_processes) as pool:
 				x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 					modelerr,clpars,clerr,clscat,SNParams = \
 					saltfitter.mcmcfit(
@@ -312,7 +311,7 @@ class mcmc(saltresids.SALTResids):
 
 		return
 	
-	def mcmcfit(self,x,nsteps,nburn,pool=None,debug=False,thin=1,stepsizes=None):
+	def mcmcfit(self,x,nsteps,nburn,pool=None,debug=False,thin=1,stepsizes=None,SpecErrScale=0.01):
 		npar = len(x)
 		self.npar = npar
 		self.chain,self.loglikes = [],[]
@@ -320,7 +319,7 @@ class mcmc(saltresids.SALTResids):
 		if self.chain==[]:
 			self.chain+=[x]
 		if self.loglikes==[]:
-			self.loglikes += [self.maxlikefit(x,pool=pool,debug=debug)]
+			self.loglikes += [self.maxlikefit(x,pool=pool,debug=debug,SpecErrScale=SpecErrScale)]
 		self.M0stddev = np.std(x[self.parlist == 'm0'])
 		self.M1stddev = np.std(x[self.parlist == 'm1'])
 		self.errstddev = self.stepsize_magscale_err
@@ -363,7 +362,7 @@ class mcmc(saltresids.SALTResids):
 				X = self.generate_AM_candidate(current=self.chain[-1], n=nstep, steps_from_gn=steps_from_gn)
 
 			# loglike
-			this_loglike = self.maxlikefit(X,pool=pool,debug=debug)
+			this_loglike = self.maxlikefit(X,pool=pool,debug=debug,SpecErrScale=SpecErrScale)
 			accept_bool = self.accept(self.loglikes[-1],this_loglike)
 			if accept_bool:
 				if not nstep % thin:
@@ -459,9 +458,11 @@ class GaussNewton(saltresids.SALTResids):
 		self._writetmp = False
 		self.chi2_diff_cutoff = 1
 		self.fitOptions={}
-		for message,fit in [('all parameters','all'),('all parameters grouped','all-grouped'),(" x0",'x0'),('x1','x1'),('principal component 0','component0'),
-							('principal component 1','component1'),('color','color'),('color law','colorlaw'),('spectral recalibration const.','spectralrecalibration_norm'),
-							('time of max','tpk')]: #,('error model','modelerr')]:
+		for message,fit in [('spectral recalibration const.','spectralrecalibration_norm'),
+							('all parameters','all'),('all parameters grouped','all-grouped'),(" x0",'x0'),('x1','x1'),('principal component 0','component0'),
+							('principal component 1','component1'),('color','color'),('color law','colorlaw'),
+							('spectral recalibration higher orders','spectralrecalibration_poly'),
+							('time of max','tpk'),('error model','modelerr')]:
 			if 'all' in fit: includePars=np.ones(self.npar,dtype=bool)
 			else:
 				includePars=np.zeros(self.npar,dtype=bool)
@@ -489,6 +490,8 @@ class GaussNewton(saltresids.SALTResids):
 					includePars[self.ispcrcl]=True
 				elif fit=='spectralrecalibration_norm':
 					includePars[self.ispcrcl_norm]=True
+				elif fit=='spectralrecalibration_poly':
+					includePars[self.ispcrcl_poly]=True
 				elif fit=='modelerr':
 					includePars[self.imodelerr]=True
 					includePars[self.imodelcorr]=True
@@ -505,6 +508,9 @@ class GaussNewton(saltresids.SALTResids):
 		lastResid = 1e20
 		print('Initializing')
 
+		if self.fit_model_err: fixUncertainty = False
+		else: fixUncertainty = True
+		
 		if len(self.usePriors) != len(self.priorWidths):
 			raise RuntimeError('length of priors does not equal length of prior widths!')
 
@@ -554,6 +560,7 @@ class GaussNewton(saltresids.SALTResids):
 	
 	def minuitOptimize(self,X,fit='all'):
 		includePars=self.fitOptions[fit][1] & ~ (np.array([ x.startswith('tpkoff') for x in self.parlist]))
+
 		def fn(Y):
 			Xnew=X.copy()
 			Xnew[includePars]=Y
@@ -589,7 +596,7 @@ class GaussNewton(saltresids.SALTResids):
 		#import pdb; pdb.set_trace()
 		return stepsizes
 	
-	def lsqwrap(self,guess,computeDerivatives,computePCDerivs=True,doPriors=True):
+	def lsqwrap(self,guess,computeDerivatives,computePCDerivs=True,doPriors=True,fixUncertainty=True):
 		tstart = time.time()
 
 		if self.n_colorscatpars:
@@ -601,9 +608,9 @@ class GaussNewton(saltresids.SALTResids):
 		else: colorLaw = None
 		salterr=self.ErrModel(guess)
 		components = self.SALTModel(guess)
-
-		saltCorr=self.CorrelationModel(guess)
 		componentderivs = self.SALTModelDeriv(guess,1,0,self.phase,self.wave)
+		
+		saltCorr=self.CorrelationModel(guess)
 
 		numResids=self.num_phot+self.num_spec + (self.numPriorResids if doPriors else 0)
 		if self.regularize:
@@ -616,7 +623,9 @@ class GaussNewton(saltresids.SALTResids):
 		idx = 0
 		for sn in self.datadict.keys():
 
-			photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,components,componentderivs,colorLaw,salterr,saltCorr,computeDerivatives,computePCDerivs)
+			photresidsdict,specresidsdict=self.ResidsForSN(
+				guess,sn,components,componentderivs,colorLaw,salterr,saltCorr,
+				computeDerivatives,computePCDerivs,fixUncertainty=fixUncertainty)
 
 			
 			idxp = photresidsdict['resid'].size
@@ -656,13 +665,13 @@ class GaussNewton(saltresids.SALTResids):
 		else:
 			return residuals
 	
-	def robust_process_fit(self,X_init,chi2_init,niter):
+	def robust_process_fit(self,X_init,chi2_init,niter,fixUncertainty=True):
 		X,chi2=X_init,chi2_init
 		
 		for fit in  self.fitOptions:
 			if 'all-grouped' in fit :continue
 			print('fitting '+self.fitOptions[fit][0])
-			Xprop,chi2prop = self.process_fit(X,fit=fit,computePCDerivs= (fit=='component0') or ('all' in fit))
+			Xprop,chi2prop = self.process_fit(X,fit=fit,computePCDerivs= (fit=='component0') or ('all' in fit),fixUncertainty=fixUncertainty)
 			if chi2prop<chi2:
 				if (fit=='all'):
 					if (chi2prop/chi2 < 0.9):
@@ -679,7 +688,7 @@ class GaussNewton(saltresids.SALTResids):
 			return X,chi2,False
 		 #_init
 	
-	def process_fit(self,X,fit='all',snid=None,doPriors=True,computePCDerivs=False):
+	def process_fit(self,X,fit='all',snid=None,doPriors=True,computePCDerivs=False,fixUncertainty=True):
 		X=X.copy()
 		#if fit == 'all' or fit == 'components': computePCDerivs = 3
 		#elif fit == 'component0': computePCDerivs=1
@@ -687,8 +696,8 @@ class GaussNewton(saltresids.SALTResids):
 		#else: computePCDerivs = 0
 		#computePCDerivs = True
 		#doPriors=False
-		
-		residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors)
+
+		residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors,fixUncertainty=fixUncertainty)
 		
 		
 		if fit=='all-grouped':
@@ -709,9 +718,6 @@ class GaussNewton(saltresids.SALTResids):
 			print('Number of parameters fit this round: {}'.format(includePars.sum()))
 			jacobian=jacobian[:,includePars]
 			stepsize=linalg.lstsq(jacobian,residuals)[0]
-			#if self.i>4 and fit=='all' and not self.debug: 
-			#	import pdb;pdb.set_trace()
-			#	self.debug=True
 			if np.any(np.isnan(stepsize)):
 				print('NaN detected in stepsize; exitting to debugger')
 				import pdb;pdb.set_trace()
@@ -719,12 +725,9 @@ class GaussNewton(saltresids.SALTResids):
 			X[includePars] -= stepsize
 
 		# quick eval
-
 		chi2 = np.sum(self.lsqwrap(X,False,False,doPriors=doPriors)**2.)
 		print("chi2: old, new, diff")
 		print((residuals**2).sum(),chi2,(residuals**2).sum()-chi2)
-		#if chi2 != chi2:
-		#	import pdb; pdb.set_trace()
-		#if ((residuals**2).sum()-chi2) < -1e16 : import pdb;pdb.set_trace()
+
 		return X,chi2
 	
