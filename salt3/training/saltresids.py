@@ -99,11 +99,11 @@ class SALTResids:
 		for i,parname in enumerate(np.unique(self.parlist[self.ispcrcl])):
 			self.ispcrcl_norm = np.append(self.ispcrcl_norm,np.where(self.parlist == parname)[0][-1])
 			self.ispcrcl_poly = np.append(self.ispcrcl_poly,np.where(self.parlist == parname)[0][:-1])
-			
+
 		# set some phase/wavelength arrays
 		self.phase = np.linspace(self.phaserange[0],self.phaserange[1],
 								 int((self.phaserange[1]-self.phaserange[0])/self.phaseoutres)+1,True)
-		
+
 		self.interpMethod='nearest'
 		
 		nwaveout=int((self.waverange[1]-self.waverange[0])/self.waveoutres)
@@ -345,7 +345,8 @@ class SALTResids:
 			return logp
 				
 	def ResidsForSN(self,x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,
-					computeDerivatives,computePCDerivs=False,fixUncertainty=True,SpecErrScale=1.0):
+					computeDerivatives,computePCDerivs=False,fixUncertainty=True,
+					SpecErrScale=1.0,returnSpecModel=False):
 		""" This method should be the only one required for any fitter to process the supernova data. 
 		Find the residuals of a set of parameters to the photometric and spectroscopic data of a given supernova. 
 		Photometric residuals are first decorrelated to diagonalize color scatter"""
@@ -397,6 +398,7 @@ class SALTResids:
 		spectralSuppression=np.sqrt(self.num_phot/self.num_spec	)			
 		
 		specresids={'resid': spectralSuppression * (specmodel['modelflux']-specmodel['dataflux'])/uncertainty}
+		specresids['uncertainty'] = uncertainty
 		if not fixUncertainty:
 			specresids['lognorm']=-np.log((np.sqrt(2*np.pi)*uncertainty)).sum()
 		
@@ -408,8 +410,9 @@ class SALTResids:
 				specresids['lognorm_grad']= - (uncertainty_jac/uncertainty[:,np.newaxis]).sum(axis=0)
 				specresids['resid_jacobian']-=   uncertainty_jac*(specresids['resid'] /uncertainty)[:,np.newaxis]
 
-		return photresids,specresids
-			
+		if returnSpecModel: return photresids,specresids,specmodel
+		else: return photresids,specresids
+		
 	def specValsForSN(self,x,sn,componentsModInterp,componentsDerivInterp,colorlaw,colorexp,computeDerivatives,computePCDerivs):
 		z = self.datadict[sn]['zHelio']
 		survey = self.datadict[sn]['survey']
@@ -461,6 +464,7 @@ class SALTResids:
 			coeffs=x[self.parlist=='specrecal_{}_{}'.format(sn,k)]
 			coeffs/=factorial(np.arange(len(coeffs)))
 			recalexp = np.exp(np.poly1d(coeffs)((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal))
+
 			if computeDerivatives:
 				M0int = interp1d(obswave,M0interp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
 				M0interp = M0int(specdata[k]['wavelength'])*recalexp
@@ -483,7 +487,7 @@ class SALTResids:
 				modint = interp1d(obswave,modinterp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
 				modinterp = modint(specdata[k]['wavelength'])*recalexp
 				specresultsdict['modelflux'][iSpecStart:iSpecStart+SpecLen] = modinterp
-				
+
 			specresultsdict['dataflux'][iSpecStart:iSpecStart+SpecLen] = specdata[k]['flux']
 			# derivatives....
 			if computeDerivatives:
