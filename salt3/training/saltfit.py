@@ -458,10 +458,9 @@ class GaussNewton(saltresids.SALTResids):
 		self._writetmp = False
 		self.chi2_diff_cutoff = 1
 		self.fitOptions={}
-		for message,fit in [('spectral recalibration const.','spectralrecalibration_norm'),
-							('all parameters','all'),('all parameters grouped','all-grouped'),(" x0",'x0'),('x1','x1'),('principal component 0','component0'),
+		for message,fit in [('all parameters','all'),('all parameters grouped','all-grouped'),(" x0",'x0'),('x1','x1'),('principal component 0','component0'),
 							('principal component 1','component1'),('color','color'),('color law','colorlaw'),
-							('spectral recalibration higher orders','spectralrecalibration_poly'),
+							('spectral recalibration const.','spectralrecalibration_norm'),('spectral recalibration','spectralrecalibration'),
 							('time of max','tpk'),('error model','modelerr')]:
 			if 'all' in fit: includePars=np.ones(self.npar,dtype=bool)
 			else:
@@ -503,13 +502,32 @@ class GaussNewton(saltresids.SALTResids):
 	def addwarning(self,warning):
 		print(warning)
 		self.warnings.append(warning)
+
+	def AdjustSpecJac(self,X,specdataflux,specmodelflux,specuncertainty,jacobian):
+
+		iSpecStart = 0
+		count = 0
+		for sn in self.datadict.keys():
+			specdata = self.datadict[sn]['specdata']
+			
+			for k in specdata.keys():
+				SpecLen = specdata[k]['flux'].size
+
+				coeffs=X[self.parlist=='specrecal_{}_{}'.format(sn,k)]
+				irecal = np.where(self.parlist=='specrecal_{}_{}'.format(sn,k))[0][-1]
+				#recalexp = np.exp(np.poly1d(coeffs[-1])((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal))
+				recalexp = np.exp(coeffs[-1])
+				jacobian[iSpecStart:iSpecStart+SpecLen,irecal] /= recalexp
+				iSpecStart += SpecLen
+				count += 1
+		return jacobian
 		
 	def convergence_loop(self,guess,loop_niter=3):
 		lastResid = 1e20
 		print('Initializing')
 
-		if self.fit_model_err: fixUncertainty = False
-		else: fixUncertainty = True
+		#if self.fit_model_err: fixUncertainty = False
+		#else: fixUncertainty = True
 		
 		if len(self.usePriors) != len(self.priorWidths):
 			raise RuntimeError('length of priors does not equal length of prior widths!')
@@ -524,6 +542,7 @@ class GaussNewton(saltresids.SALTResids):
 			if superloop % 3 ==0 and self.fit_model_err:
 				print('Optimizing model error')
 				X,loglike=self.minuitOptimize(X,'modelerr')
+			
 			#elif superloop == 0:
 			#	print('Optimizing model error')
 			#	X,loglike=self.minuitOptimize(X,'modelerr')
@@ -596,9 +615,12 @@ class GaussNewton(saltresids.SALTResids):
 		#import pdb; pdb.set_trace()
 		return stepsizes
 	
-	def lsqwrap(self,guess,computeDerivatives,computePCDerivs=True,doPriors=True,fixUncertainty=True):
+	def lsqwrap(self,guess,computeDerivatives,computePCDerivs=True,doPriors=True,fixUncertainty=True,returnSpecFluxes=False):
 		tstart = time.time()
 
+		if returnSpecFluxes:
+			specdataflux,specmodelflux,specuncertainty = np.array([]),np.array([]),np.array([])
+		
 		if self.n_colorscatpars:
 			colorScat = True
 		else: colorScat = None
@@ -623,10 +645,14 @@ class GaussNewton(saltresids.SALTResids):
 		idx = 0
 		for sn in self.datadict.keys():
 
-			photresidsdict,specresidsdict=self.ResidsForSN(
-				guess,sn,components,componentderivs,colorLaw,salterr,saltCorr,
-				computeDerivatives,computePCDerivs,fixUncertainty=fixUncertainty)
-
+			if returnSpecFluxes:
+				photresidsdict,specresidsdict,specmodeldict=self.ResidsForSN(
+					guess,sn,components,componentderivs,colorLaw,salterr,saltCorr,
+					computeDerivatives,computePCDerivs,fixUncertainty=fixUncertainty,returnSpecModel=True)
+			else:
+				photresidsdict,specresidsdict=self.ResidsForSN(
+					guess,sn,components,componentderivs,colorLaw,salterr,saltCorr,
+					computeDerivatives,computePCDerivs,fixUncertainty=fixUncertainty)
 			
 			idxp = photresidsdict['resid'].size
 
@@ -642,7 +668,11 @@ class GaussNewton(saltresids.SALTResids):
 				jacobian[idx:idx+idxp,:]=specresidsdict['resid_jacobian']
 			idx += idxp
 
-		# priors
+			if returnSpecFluxes:
+				specdataflux = np.append(specdataflux,specmodeldict['dataflux'])
+				specmodelflux = np.append(specmodelflux,specmodeldict['modelflux'])
+				specuncertainty = np.append(specuncertainty,specresidsdict['uncertainty'])
+				# priors
 		if doPriors:
 			priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,guess)
 			residuals[idx:idx+priorResids.size]=priorResids
@@ -661,9 +691,15 @@ class GaussNewton(saltresids.SALTResids):
 
 		if computeDerivatives:
 			print('loop took %i seconds'%(time.time()-tstart))
-			return residuals,jacobian
+			if returnSpecFluxes:
+				return residuals,jacobian,specdataflux,specmodelflux,specuncertainty
+			else:
+				return residuals,jacobian
 		else:
-			return residuals
+			if returnSpecFluxes:
+				return residuals,specdataflux,specmodelflux,specuncertainty
+			else:
+				return residuals
 	
 	def robust_process_fit(self,X_init,chi2_init,niter,fixUncertainty=True):
 		X,chi2=X_init,chi2_init
@@ -690,17 +726,32 @@ class GaussNewton(saltresids.SALTResids):
 	
 	def process_fit(self,X,fit='all',snid=None,doPriors=True,computePCDerivs=False,fixUncertainty=True):
 		X=X.copy()
-		#if fit == 'all' or fit == 'components': computePCDerivs = 3
-		#elif fit == 'component0': computePCDerivs=1
-		#elif fit == 'component1': computePCDerivs=2
-		#else: computePCDerivs = 0
-		#computePCDerivs = True
-		#doPriors=False
 
-		residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors,fixUncertainty=fixUncertainty)
+		if fit == 'spectralrecalibration_norm':
+			residuals,jacobian,specdataflux,specmodelflux,specuncertainty=self.lsqwrap(
+				X,True,computePCDerivs,doPriors,fixUncertainty=fixUncertainty,returnSpecFluxes=True)
+
+			residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors,fixUncertainty=fixUncertainty)
+			jacobian = self.AdjustSpecJac(X,specdataflux,specmodelflux,specuncertainty,jacobian)
+			
+			#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
+			includePars=self.fitOptions[fit][1] & ~(np.all(0==jacobian,axis=0))
 		
-		
-		if fit=='all-grouped':
+			print('Number of parameters fit this round: {}'.format(includePars.sum()))
+			jacobian=jacobian[:,includePars]
+			stepsize=linalg.lstsq(jacobian,residuals)[0]
+			if np.any(np.isnan(stepsize)):
+				print('NaN detected in stepsize; exitting to debugger')
+				import pdb;pdb.set_trace()
+
+			Xtmp = np.log(np.exp(X[includePars])- stepsize)
+			Xtmp[Xtmp != Xtmp] = X[includePars][Xtmp != Xtmp]
+			X[includePars] = Xtmp #np.log(np.exp(X[includePars])- stepsize)
+
+			
+		elif fit=='all-grouped':
+			residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors,fixUncertainty=fixUncertainty)
+			
 			designMatrix=np.zeros((self.parlist.size,len([fit for fit in self.fitOptions if 'all' not in fit])))
 			
 			for i,fit in enumerate([fit for fit in self.fitOptions if 'all' not in fit]):
@@ -712,6 +763,8 @@ class GaussNewton(saltresids.SALTResids):
 			X-=np.dot(designMatrix,stepsize)
 				
 		else:
+			residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors,fixUncertainty=fixUncertainty)
+			
 			#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
 			includePars=self.fitOptions[fit][1] & ~(np.all(0==jacobian,axis=0))
 		
