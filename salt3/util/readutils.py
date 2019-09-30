@@ -75,7 +75,7 @@ def rdkcor(surveylist,options,addwarning=None):
 	kcordict['default']['primarywave']=primarywave
 	return kcordict
 			
-def rdSpecData(datadict,speclist):
+def rdSpecData(datadict,speclist,KeepOnlySpec=False):
 	if not os.path.exists(speclist):
 		raise RuntimeError('speclist %s does not exist')
 	
@@ -102,6 +102,9 @@ def rdSpecData(datadict,speclist):
 					
 				if len(sn.SPECTRA)==0:
 					print('warning: File {} contains no supernova spectra'.format(sf))
+					if KeepOnlySpec: 
+						print('KeepOnlySpec (debug) flag is set, removing SN')
+						datadict.pop(s)
 					continue
 				
 					#raise ValueError('File {} contains no supernova spectra'.format(sf))
@@ -161,7 +164,7 @@ def rdSpecData(datadict,speclist):
 
 	return datadict
 
-def rdAllData(snlist,estimate_tpk,kcordict,addwarning,dospec=False):
+def rdAllData(snlist,estimate_tpk,kcordict,addwarning,dospec=False,KeepOnlySpec=False):
 	datadict = {}
 
 
@@ -253,7 +256,7 @@ def rdAllData(snlist,estimate_tpk,kcordict,addwarning,dospec=False):
 		raise RuntimeError('no light curve data to train on!!')
 		
 	if dospec:
-		datadict = rdSpecData(datadict,snlist)
+		datadict = rdSpecData(datadict,snlist,KeepOnlySpec=KeepOnlySpec)
 		
 	return datadict
 	

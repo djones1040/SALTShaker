@@ -95,11 +95,11 @@ class SALTResids:
 		self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr')])
 		self.imodelcorr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelcorr')])
 
-		self.ispcrcl_norm = []
+		self.ispcrcl_norm,self.ispcrcl_poly = np.array([],dtype='int'),np.array([],dtype='int')
 		for i,parname in enumerate(np.unique(self.parlist[self.ispcrcl])):
-			self.ispcrcl_norm += [np.where(self.parlist == parname)[0][-1]]
-		self.ispcrcl_norm = np.array(self.ispcrcl_norm)
-
+			self.ispcrcl_norm = np.append(self.ispcrcl_norm,np.where(self.parlist == parname)[0][-1])
+			self.ispcrcl_poly = np.append(self.ispcrcl_poly,np.where(self.parlist == parname)[0][:-1])
+			
 		# set some phase/wavelength arrays
 		self.phase = np.linspace(self.phaserange[0],self.phaserange[1],
 								 int((self.phaserange[1]-self.phaserange[0])/self.phaseoutres)+1,True)
@@ -262,7 +262,7 @@ class SALTResids:
 		self.kcordict['default']['Bpbspl'] = pbspl
 		self.kcordict['default']['Bdwave'] = self.wave[1] - self.wave[0]
 				
-	def maxlikefit(self,x,pool=None,debug=False,timeit=False,computeDerivatives=False,computePCDerivs=False):
+	def maxlikefit(self,x,pool=None,debug=False,timeit=False,computeDerivatives=False,computePCDerivs=False,SpecErrScale=1.0):
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic data given during initialization
 		
@@ -287,7 +287,11 @@ class SALTResids:
 		#Set up SALT model
 		# HACK
 		components = self.SALTModel(x)
-		
+		if computeDerivatives:
+			componentderivs = self.SALTModelDeriv(x,1,0,self.phase,self.wave)
+		else:
+			componentderivs = None
+			
 		salterr = self.ErrModel(x)
 		saltcorr= self.CorrelationModel(x)
 		if self.n_colorpars:
@@ -305,7 +309,7 @@ class SALTResids:
 		chi2 = 0
 		#Construct arguments for maxlikeforSN method
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
-		args=[(None,sn,x,components,salterr,saltcorr,colorLaw,colorScat,debug,timeit,computeDerivatives,computePCDerivs) for sn in self.datadict.keys()]
+		args=[(None,sn,x,components,componentderivs,salterr,saltcorr,colorLaw,colorScat,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale) for sn in self.datadict.keys()]
 		mapFun=pool.map if pool else starmap
 		if computeDerivatives:
 			result=list(mapFun(self.loglikeforSN,args))
@@ -340,7 +344,7 @@ class SALTResids:
 		else:
 			return logp
 				
-	def ResidsForSN(self,x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs=False,fixedUncertainties=None):
+	def ResidsForSN(self,x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs=False,fixedUncertainties=None,SpecErrScale=1.):
 		""" This method should be the only one required for any fitter to process the supernova data. 
 		Find the residuals of a set of parameters to the photometric and spectroscopic data of a given supernova. 
 		Photometric residuals are first decorrelated to diagonalize color scatter"""
@@ -369,7 +373,6 @@ class SALTResids:
 		if computeDerivatives:
 			photresids['resid_jacobian']=linalg.solve_triangular(L,photmodel['modelflux_jacobian'],lower=True)
 			if not fixUncertainty:
-				#import pdb;pdb.set_trace()
 				#Cut out zeroed jacobian entries to save time
 				nonzero=(~((photmodel['modelvariance_jacobian']==0) & (photmodel['modelflux_jacobian']==0)).all(axis=0)) | (self.parlist=='clscat')
 				reducedJac=photmodel['modelvariance_jacobian'][:,nonzero]
@@ -405,7 +408,9 @@ class SALTResids:
 				
 		#Handle spectra
 		variance=specmodel['fluxvariance'] + specmodel['modelvariance']
-		uncertainty=np.sqrt(variance)
+		uncertainty=np.sqrt(variance)*SpecErrScale
+		# HACK
+		#uncertainty *= 0.01
 		#Suppress the effect of the spectra by multiplying chi^2 by number of photometric points over number of spectral points
 		spectralSuppression=np.sqrt(self.num_phot/self.num_spec	)			
 		
@@ -570,7 +575,7 @@ class SALTResids:
 			SpecLen = specdata[k]['flux'].size
 			phase=specdata[k]['tobs']+tpkoff
 			clippedPhase=np.clip(phase,obsphase.min(),obsphase.max())
-			#import pdb;pdb.set_trace()
+
 			#Define recalibration factor
 			coeffs=x[self.parlist=='specrecal_{}_{}'.format(sn,k)]
 			coeffs/=factorial(np.arange(len(coeffs)))
@@ -650,7 +655,6 @@ class SALTResids:
 			phase=phase[selectFilter]
 			clippedPhase=np.clip(phase,obsphase.min(),obsphase.max())
 			nphase = len(phase)
-			#import pdb;pdb.set_trace()
 			
 			#Calculate color scatter
 			coeffs=x[self.parlist=='clscat']
@@ -772,7 +776,8 @@ class SALTResids:
 				
 				photresultsdict['modelflux_jacobian'][selectFilter,self.parlist == 'x0_{}'.format(sn)] = modelsynM0flux+ x1*modelsynM1flux
 				photresultsdict['modelflux_jacobian'][selectFilter,self.parlist == 'x1_{}'.format(sn)] = modelsynM1flux*x0
-			
+				photresultsdict['modelflux_jacobian'][selectFilter,self.parlist == 'tpkoff_{}'.format(sn)] = x0*(modelsynphasederivM0flux+ x1*modelsynphasederivM1flux)
+				
 				#d model / dc is total flux (M0 and M1 components (already modulated with passband)) times the color law and a factor of ln(10)
 				photresultsdict['modelflux_jacobian'][selectFilter,self.parlist == 'c_{}'.format(sn)]=np.sum((modulatedFlux)*np.log(10)*colorlaw[np.newaxis,idx[flt]], axis=1)*dwave*self.fluxfactor[survey][flt]
 				for i in range(self.n_colorpars):
@@ -877,6 +882,7 @@ class SALTResids:
 				uncertaintydict=uncertaintyfun(x,sn,interr1d,intcorr1d,colorlaw,colorexp,computeDerivatives)
 			valdict.update(uncertaintydict)
 			returndicts+=[valdict]
+
 		return returndicts
 		
 	def getFixedUncertainties(self,x):		
@@ -1013,9 +1019,9 @@ class SALTResids:
 			idx+=priorFunction.numResids
 		return residuals,values,jacobian
 
-	def loglikeforSN(self,args,sn=None,x=None,components=None,salterr=None,saltcorr=None,
+	def loglikeforSN(self,args,sn=None,x=None,components=None,componentderivs=None,salterr=None,saltcorr=None,
 					 colorLaw=None,colorScat=None,
-					 debug=False,timeit=False,computeDerivatives=False,computePCDerivs=False):
+					 debug=False,timeit=False,computeDerivatives=False,computePCDerivs=False,SpecErrScale=1.0):
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic observations of a single SN 
 
@@ -1053,11 +1059,16 @@ class SALTResids:
 		#Set up SALT model
 		if components is None:
 			components = self.SALTModel(x)
+		if componentderivs is None and computeDerivatives:
+			componentderivs = self.SALTModelDeriv(x,1,0,self.phase,self.wave)			
 		if salterr is None:
 			salterr = self.ErrModel(x)
 
 
-		photResidsDict,specResidsDict = self.ResidsForSN(x,sn,components,None,colorLaw,salterr,saltcorr,computeDerivatives,computePCDerivs)
+		photResidsDict,specResidsDict = self.ResidsForSN(
+			x,sn,components,componentderivs,colorLaw,salterr,
+			saltcorr,computeDerivatives,computePCDerivs,
+			SpecErrScale=SpecErrScale)
 
 		
 		loglike= - (photResidsDict['resid']**2).sum() / 2.   -(specResidsDict['resid']**2).sum()/2.+photResidsDict['lognorm']+specResidsDict['lognorm']
