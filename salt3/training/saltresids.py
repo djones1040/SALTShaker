@@ -172,7 +172,7 @@ class SALTResids:
 			self.datadict[sn]['mwextcurve']   = 10**(-0.4*extinction.fitzpatrick99(self.wave*(1+z),self.datadict[sn]['MWEBV']*3.1))
 			self.datadict[sn]['mwextcurveint'] = interp1d(self.wave*(1+z),self.datadict[sn]['mwextcurve'] ,kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
 
-
+		self.fixedUncertainties={}
 		starttime=time.time()
 		#Store derivatives of a spline with fixed knot locations with respect to each knot value
 		self.spline_derivs = np.zeros([len(self.phase),len(self.wave),self.im0.size])
@@ -340,16 +340,22 @@ class SALTResids:
 		else:
 			return logp
 				
-	def ResidsForSN(self,x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs=False,fixUncertainty=True):
+	def ResidsForSN(self,x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs=False,fixedUncertainties=None):
 		""" This method should be the only one required for any fitter to process the supernova data. 
 		Find the residuals of a set of parameters to the photometric and spectroscopic data of a given supernova. 
 		Photometric residuals are first decorrelated to diagonalize color scatter"""
-
-		photmodel,specmodel=self.modelvalsforSN(x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs,fixUncertainty)
+		fixUncertainty= saltErr is None and saltCorr is None
+		photmodel,specmodel=self.modelvalsforSN(x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs,fixedUncertainties)
 		
 		#Separate code for photometry and spectra now, since photometry has to handle a covariance matrix with off-diagonal elements
 		covariance=np.diag(photmodel['fluxvariance']+photmodel['modelvariance'])
 		
+		#Add color scatter
+		for selectFilter,clscat,dclscat in photmodel['colorvariance']:
+			flux=photmodel['modelflux']*selectFilter
+			#Color scatter is k(lambda)^2 times the outer product of 
+			covariance+=clscat* flux[:,np.newaxis]*flux[np.newaxis,:]
+			
 		#Cholesky transformation decomposes the covariance matrix into a lower triangular matrix s.t. Sigma= L L^T
 		L=linalg.cholesky(covariance).T
 		fluxdiff=photmodel['modelflux']-photmodel['dataflux']
@@ -365,13 +371,28 @@ class SALTResids:
 			if not fixUncertainty:
 				#import pdb;pdb.set_trace()
 				#Cut out zeroed jacobian entries to save time
-				nonzero=~(photmodel['modelvariance_jacobian']==0).all(axis=0)
+				nonzero=(~((photmodel['modelvariance_jacobian']==0) & (photmodel['modelflux_jacobian']==0)).all(axis=0)) | (self.parlist=='clscat')
 				reducedJac=photmodel['modelvariance_jacobian'][:,nonzero]
 				#Calculate L^-1
 				invL=linalg.solve_triangular(L,np.diag(np.ones(fluxdiff.size)),lower=True)
 				# Calculate the fractional derivative of L w.r.t model parameters
 				# L^-1 dL/dx = {L^-1 x d Sigma / dx x L^-T, with the upper triangular part zeroed and the diagonal halved}
+				
+				#First calculating diagonal part
 				fractionalLDeriv=np.dot(invL,np.swapaxes(reducedJac[:,np.newaxis,:]* invL.T[:,:,np.newaxis],0,1))
+				
+				for selectFilter,clscat,dclscat in photmodel['colorvariance']:
+				
+					fluxPrime= linalg.solve_triangular(L,photmodel['modelflux']*selectFilter)
+					jacPrime = linalg.solve_triangular(L,photmodel['modelflux_jacobian'][:,nonzero]*selectFilter[:,np.newaxis])
+					#Derivative w.r.t  color scatter 
+					fractionalLDeriv[:,:,self.parlist[nonzero]=='clscat']+= dclscat[np.newaxis,np.newaxis,:]* fluxPrime[:,np.newaxis,np.newaxis]*fluxPrime[np.newaxis,:,np.newaxis]
+					#Derivative w.r.t model flux
+					dfluxSquared = jacPrime[:,np.newaxis,:]*fluxPrime[np.newaxis,:,np.newaxis]
+					#Symmetrize
+					dfluxSquared = np.swapaxes(dfluxSquared,0,1)+dfluxSquared
+					fractionalLDeriv +=clscat* dfluxSquared
+					
 				fractionalLDeriv[np.triu(np.ones((fluxdiff.size,fluxdiff.size),dtype=bool),1),:]=0
 				fractionalLDeriv[np.diag(np.ones((fluxdiff.size),dtype=bool)),:]/=2
 				
@@ -618,6 +639,7 @@ class SALTResids:
 		photresultsdict={}
 		photresultsdict['fluxvariance'] =  np.zeros(len(photdata['filt']))
 		photresultsdict['modelvariance'] =  np.zeros(len(photdata['filt']))
+		photresultsdict['colorvariance'] = []
 		if computeDerivatives:
 			photresultsdict['modelvariance_jacobian']=np.zeros([photdata['filt'].size,self.npar])
 		for flt in np.unique(photdata['filt']):
@@ -629,11 +651,18 @@ class SALTResids:
 			clippedPhase=np.clip(phase,obsphase.min(),obsphase.max())
 			nphase = len(phase)
 			#import pdb;pdb.set_trace()
-			#Calculate color scatter relative to flux
-			#photresultsdict['colorvariancerelative']=
 			
+			#Calculate color scatter
+			coeffs=x[self.parlist=='clscat']
+			coeffs/=factorial(np.arange(len(coeffs)))
+			lameffPrime=lameff/(1+z)/1000
+			colorscat=np.exp(2*np.poly1d(coeffs)(lameffPrime))
 			
-			
+			if computeDerivatives:
+				dcolorscatdx= 2*colorscat*((lameffPrime) ** (coeffs.size-1-np.arange(coeffs.size))) / factorial(np.arange(coeffs.size))
+			else :
+				dcolorscatdx=0
+			photresultsdict['colorvariance']+= [(selectFilter,colorscat,dcolorscatdx)]
 			
 			#Calculate model uncertainty
 			modelErrInt = [ interp1d( obswave, interr(clippedPhase),axis=1,kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True) for interr in interr1d]
@@ -791,7 +820,7 @@ class SALTResids:
 		return photresultsdict
 	
 	
-	def modelvalsforSN(self,x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs,fixUncertainty):
+	def modelvalsforSN(self,x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs,fixedUncertainties=None):
 
 		# model pars, initialization
 		M0,M1 = copy.deepcopy(components)
@@ -833,29 +862,46 @@ class SALTResids:
 			mod *= _SCALE_FACTOR/(1+z)
 			int1d = interp1d(obsphase,mod,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
 
-		
-		interr1d = [interp1d(obsphase,err * (self.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z)) ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
-		intcorr1d= [interp1d(obsphase,corr ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True) for corr in saltCorr ]
+		if not ( saltErr is None and saltCorr is None):
+			interr1d = [interp1d(obsphase,err * (self.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z)) ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
+			intcorr1d= [interp1d(obsphase,corr ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True) for corr in saltCorr ]
 		returndicts=[]
 		for valfun,uncertaintyfun,name in [(self.photValsForSN,self.photVarianceForSN,'phot'),(self.specValsForSN,self.specVarianceForSN, 'spec')]:
 			valdict=valfun(x,sn,(int1dM0,int1dM1) if computeDerivatives else int1d,
                      (int1dM0phasederiv,int1dM1phasederiv) if computeDerivatives else None,
                      colorlaw,colorexp,computeDerivatives,computePCDerivs)
 
-			key='__{}_{}_fixed_uncertainty__'.format(name,sn)
-			if fixUncertainty: 
-				try:
-					uncertaintydict=self.__dict__[key]
-				except KeyError:
-					fixUncertainty=False
-			if not fixUncertainty:
-				#Otherwise, store current uncertainties 
+			if ( saltErr is None and saltCorr is None): 
+				uncertaintydict=fixedUncertainties['{}_{}'.format(name,sn)]
+			else:
 				uncertaintydict=uncertaintyfun(x,sn,interr1d,intcorr1d,colorlaw,colorexp,computeDerivatives)
-				self.__dict__[key]=uncertaintydict
 			valdict.update(uncertaintydict)
 			returndicts+=[valdict]
 		return returndicts
-			
+		
+	def getFixedUncertainties(self,x):		
+		colorLaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
+		saltErr=self.ErrModel(x)
+		saltCorr=self.CorrelationModel(x)
+
+		fixedUncertainties={}
+		for sn in self.datadict:
+			z = self.datadict[sn]['zHelio']
+			obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
+			x0,x1,c,tpkoff = x[self.parlist == 'x0_%s'%sn],x[self.parlist == 'x1_%s'%sn],\
+							 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
+
+			colorlaw = -0.4 * colorLaw(self.wave)
+			colorexp = 10. ** (colorlaw * c)
+
+			intcorr1d= [interp1d(obsphase,corr ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True) for corr in saltCorr]
+
+			interr1d = [interp1d(obsphase,err * (self.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z)) ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
+
+			fixedUncertainties['phot_{}'.format(sn)]=self.photVarianceForSN(x,sn,interr1d,intcorr1d,colorlaw,colorexp,False)
+			fixedUncertainties['spec_{}'.format(sn)]=self.specVarianceForSN(x,sn,interr1d,intcorr1d,colorlaw,colorexp,False)
+		return fixedUncertainties
+
 	#@prior
 	def peakprior(self,width,x,components):
 		wave=self.wave[self.bbandoverlap]
@@ -1011,7 +1057,7 @@ class SALTResids:
 			salterr = self.ErrModel(x)
 
 
-		photResidsDict,specResidsDict = self.ResidsForSN(x,sn,components,None,colorLaw,salterr,saltcorr,computeDerivatives,computePCDerivs,fixUncertainty=False)
+		photResidsDict,specResidsDict = self.ResidsForSN(x,sn,components,None,colorLaw,salterr,saltcorr,computeDerivatives,computePCDerivs)
 
 		
 		loglike= - (photResidsDict['resid']**2).sum() / 2.   -(specResidsDict['resid']**2).sum()/2.+photResidsDict['lognorm']+specResidsDict['lognorm']
