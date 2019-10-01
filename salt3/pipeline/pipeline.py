@@ -154,8 +154,9 @@ class SALT3pipe():
         pro1_out = pro1.glueto(pro2)
         if 'lcfit' in pipepros[1].lower():
             pro2_in = pro2._get_input_info().loc[on]
-            if isinstance(pro1_out,list): pro2_in['value'] = ', '.join(pro1_out)
-            else: pro2_in['value'] = pro1_out
+            if isinstance(pro1_out,list) or isinstance(pro1_out,np.ndarray): pro2_in['value'] = ', '.join(pro1_out)
+            else:
+                pro2_in['value'] = pro1_out
         else:
             pro2_in = pro2._get_input_info().loc[0]
             pro2_in['value'] = pro1_out
@@ -912,6 +913,10 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
         if 'GENPREFIX' in config.keys():
             done_file = finput_abspath('%s/%s'%('SIMLOGS_%s'%config['GENPREFIX'],done_file.split('/')[-1]))
             print('DONE_STAMP: %s'%done_file,file=fout)
+
+            if os.path.exists('SIMLOGS_%s'%config['GENPREFIX']):
+                print('warning : clobbering old sim dir SIMLOGS_%s so SNANA doesn\'t hang'%config['GENPREFIX'])
+                os.system('rm -r SIMLOGS_%s'%config['GENPREFIX'])
         else:
             print('DONE_STAMP: %s'%done_file,file=fout)
 
