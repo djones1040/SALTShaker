@@ -204,7 +204,7 @@ class TrainSALT(TrainSALTBase):
 			foutpars.write('{: <30} {}\n'.format('Parameter Name','Value'))
 			for name,par in zip(parlist,pars):
 
-				foutpars.write('{: <30} {:.6e}\n'.format(name,par))
+				foutpars.write('{: <30} {:.15e}\n'.format(name,par))
 		
 		#Save mcmc chain and log_likelihoods
 		
