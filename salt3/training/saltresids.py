@@ -684,15 +684,19 @@ class SALTResids:
 			nphase = len(phase)
 			
 			#Calculate color scatter
-			coeffs=x[self.parlist=='clscat']
-			coeffs/=factorial(np.arange(len(coeffs)))
-			lameffPrime=lameff/(1+z)/1000
-			colorscat=np.exp(np.poly1d(coeffs)(lameffPrime))
+			if (self.parlist=='clscat').any():
+				coeffs=x[self.parlist=='clscat']
+				coeffs/=factorial(np.arange(len(coeffs)))
+				lameffPrime=lameff/(1+z)/1000
+				colorscat=np.exp(np.poly1d(coeffs)(lameffPrime))
 			
-			if computeDerivatives:
-				dcolorscatdx= colorscat*((lameffPrime) ** (coeffs.size-1-np.arange(coeffs.size))) / factorial(np.arange(coeffs.size))
-			else :
-				dcolorscatdx=0
+				if computeDerivatives:
+					dcolorscatdx= colorscat*((lameffPrime) ** (coeffs.size-1-np.arange(coeffs.size))) / factorial(np.arange(coeffs.size))
+				else :
+					dcolorscatdx=0
+			else:
+				colorscat=0
+				dcolorscatdx=np.array([])
 			photresultsdict['colorvariance']+= [(selectFilter,colorscat,dcolorscatdx)]
 			
 			#Calculate model uncertainty

@@ -663,11 +663,11 @@ class GaussNewton(saltresids.SALTResids):
 			if returnSpecFluxes:
 				photresidsdict,specresidsdict,specmodeldict=self.ResidsForSN(
 					guess,sn,components,componentderivs,colorLaw,None,None, #salterr,saltCorr,
-					computeDerivatives,computePCDerivs,fixUncertainty=uncertainties,returnSpecModel=True)
+					computeDerivatives,computePCDerivs,fixedUncertainties=uncertainties,returnSpecModel=True)
 			else:
 				photresidsdict,specresidsdict=self.ResidsForSN(
 					guess,sn,components,componentderivs,colorLaw,None,None, #salterr,saltCorr,
-					computeDerivatives,computePCDerivs,fixUncertainty=uncertainties)
+					computeDerivatives,computePCDerivs,fixedUncertainties=uncertainties)
 
 			
 			idxp = photresidsdict['resid'].size
