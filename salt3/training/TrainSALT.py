@@ -224,8 +224,8 @@ class TrainSALT(TrainSALTBase):
 			for w,j in zip(wave,range(len(wave))):
 				print('%.1f %.2f %8.15e'%(p,w,M0[i,j]),file=foutm0)
 				print('%.1f %.2f %8.15e'%(p,w,M1[i,j]),file=foutm1)
-				print('%.1f %.2f %8.15e'%(p,w,M0err[i,j]),file=foutm0err)
-				print('%.1f %.2f %8.15e'%(p,w,M1err[i,j]),file=foutm1err)
+				print('%.1f %.2f %8.15e'%(p,w,M0err[i,j]**2.),file=foutm0err)
+				print('%.1f %.2f %8.15e'%(p,w,M1err[i,j]**2.),file=foutm1err)
 				print('%.1f %.2f %8.15e'%(p,w,cov_M0_M1[i,j]),file=foutcov)
 				print('%.1f %.2f %8.15e'%(p,w,modelerr[i,j]),file=fouterrmod)
 

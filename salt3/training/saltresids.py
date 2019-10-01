@@ -100,11 +100,11 @@ class SALTResids:
 		for i,parname in enumerate(np.unique(self.parlist[self.ispcrcl])):
 			self.ispcrcl_norm = np.append(self.ispcrcl_norm,np.where(self.parlist == parname)[0][-1])
 			self.ispcrcl_poly = np.append(self.ispcrcl_poly,np.where(self.parlist == parname)[0][:-1])
-			
+
 		# set some phase/wavelength arrays
 		self.phase = np.linspace(self.phaserange[0],self.phaserange[1],
 								 int((self.phaserange[1]-self.phaserange[0])/self.phaseoutres)+1,True)
-		
+
 		self.interpMethod='nearest'
 		
 		nwaveout=int((self.waverange[1]-self.waverange[0])/self.waveoutres)
@@ -377,7 +377,11 @@ class SALTResids:
 			fixedUncertainties['spec_{}'.format(sn)]=specmodel['fluxvariance'] + specmodel['modelvariance']
 		return fixedUncertainties
 
-	def ResidsForSN(self,x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs=False,fixedUncertainties=None,SpecErrScale=1.):
+
+				
+	def ResidsForSN(self,x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,
+					computeDerivatives,computePCDerivs=False,fixedUncertainties=None,
+					SpecErrScale=1.0,returnSpecModel=False):
 		""" This method should be the only one required for any fitter to process the supernova data. 
 		Find the residuals of a set of parameters to the photometric and spectroscopic data of a given supernova. 
 		Photometric residuals are first decorrelated to diagonalize color scatter"""
@@ -469,6 +473,7 @@ class SALTResids:
 		spectralSuppression=np.sqrt(self.num_phot/self.num_spec	)			
 		
 		specresids={'resid': spectralSuppression * (specmodel['modelflux']-specmodel['dataflux'])/uncertainty}
+		specresids['uncertainty'] = uncertainty
 		if not fixUncertainty:
 			specresids['lognorm']=-np.log((np.sqrt(2*np.pi)*uncertainty)).sum()
 		
@@ -480,8 +485,9 @@ class SALTResids:
 				specresids['lognorm_grad']= - (uncertainty_jac/uncertainty[:,np.newaxis]).sum(axis=0)
 				specresids['resid_jacobian']-=   uncertainty_jac*(specresids['resid'] /uncertainty)[:,np.newaxis]
 
-		return photresids,specresids
-			
+		if returnSpecModel: return photresids,specresids,specmodel
+		else: return photresids,specresids
+		
 	def specValsForSN(self,x,sn,componentsModInterp,componentsDerivInterp,colorlaw,colorexp,computeDerivatives,computePCDerivs):
 		z = self.datadict[sn]['zHelio']
 		survey = self.datadict[sn]['survey']
@@ -534,6 +540,7 @@ class SALTResids:
 			pow=coeffs.size-1-np.arange(coeffs.size)
 			coeffs/=factorial(pow)
 			recalexp = np.exp(np.poly1d(coeffs)((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal))
+
 			if computeDerivatives:
 				M0int = interp1d(obswave,M0interp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
 				M0interp = M0int(specdata[k]['wavelength'])*recalexp
@@ -556,7 +563,7 @@ class SALTResids:
 				modint = interp1d(obswave,modinterp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
 				modinterp = modint(specdata[k]['wavelength'])*recalexp
 				specresultsdict['modelflux'][iSpecStart:iSpecStart+SpecLen] = modinterp
-				
+
 			specresultsdict['dataflux'][iSpecStart:iSpecStart+SpecLen] = specdata[k]['flux']
 			# derivatives....
 			if computeDerivatives:
@@ -1196,15 +1203,15 @@ class SALTResids:
 	def getParsGN(self,x):
 
 		m0pars = x[self.parlist == 'm0']
-		m0err = np.zeros(len(x[self.parlist == 'm0']))
+		#m0err = np.zeros(len(x[self.parlist == 'm0']))
 		m1pars = x[self.parlist == 'm1']
-		m1err = np.zeros(len(x[self.parlist == 'm1']))
+		#m1err = np.zeros(len(x[self.parlist == 'm1']))
 		
 		# covmat (diagonals only?)
 		m0_m1_cov = np.zeros(len(m0pars))
 
 		modelerrpars = x[self.parlist == 'modelerr']
-		modelerrerr = np.zeros(len(x[self.parlist == 'modelerr']))
+		#modelerrerr = np.zeros(len(x[self.parlist == 'modelerr']))
 
 		clpars = x[self.parlist == 'cl']
 		clerr = np.zeros(len(x[self.parlist == 'cl']))
@@ -1228,23 +1235,28 @@ class SALTResids:
 
 
 		m0 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars,self.bsorder,self.bsorder))
-		m0errp = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars+m0err,self.bsorder,self.bsorder))
-		m0errm = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars-m0err,self.bsorder,self.bsorder))
-		m0err = (m0errp-m0errm)/2.
+		#m0errp = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars+m0err,self.bsorder,self.bsorder))
+		#m0errm = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars-m0err,self.bsorder,self.bsorder))
+		#m0err = (m0errp-m0errm)/2.
 		if len(m1pars):
 			m1 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars,self.bsorder,self.bsorder))
-			m1errp = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars+m1err,self.bsorder,self.bsorder))
-			m1errm = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars-m1err,self.bsorder,self.bsorder))
-			m1err = (m1errp-m1errm)/2.
+			#m1errp = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars+m1err,self.bsorder,self.bsorder))
+			#m1errm = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars-m1err,self.bsorder,self.bsorder))
+			#m1err = (m1errp-m1errm)/2.
 		else:
 			m1 = np.zeros(np.shape(m0))
-			m1err = np.zeros(np.shape(m0))
+			#m1err = np.zeros(np.shape(m0))
 
-		cov_m0_m1 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0_m1_cov,self.bsorder,self.bsorder))
+		#cov_m0_m1 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0_m1_cov,self.bsorder,self.bsorder))
 		modelerr = bisplev(self.phase,self.wave,(self.errphaseknotloc,self.errwaveknotloc,modelerrpars,self.bsorder,self.bsorder))
+		modelerr[:] = 0.0
 		clscat = splev(self.wave,(self.errwaveknotloc,clscatpars,3))
 		if not len(clpars): clpars = []
 
+		# model errors
+		m0err,m1err = self.ErrModel(x)
+		cov_m0_m1 = self.CorrelationModel(x)[0]*m0err*m1err
+		
 		return(x,self.phase,self.wave,m0,m0err,m1,m1err,cov_m0_m1,modelerr,
 			   clpars,clerr,clscat,resultsdict)
 
