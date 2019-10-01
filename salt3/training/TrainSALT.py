@@ -414,7 +414,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		
 		# read the data
 		datadict = readutils.rdAllData(self.options.snlist,self.options.estimate_tpk,self.kcordict,
-									   self.addwarning,dospec=self.options.dospec,KeepOnlySpec=True)
+									   self.addwarning,dospec=self.options.dospec,KeepOnlySpec=False)
 		
 		if not os.path.exists(self.options.outputdir):
 			os.makedirs(self.options.outputdir)
