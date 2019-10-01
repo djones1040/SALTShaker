@@ -36,6 +36,7 @@ _B_LAMBDA_EFF = np.array([4302.57])	 # B-band-ish wavelength
 _V_LAMBDA_EFF = np.array([5428.55])	 # V-band-ish wavelength
 warnings.simplefilter('ignore',category=FutureWarning)
 
+
 __priors__=dict()
 def prior(prior):
 	"""Decorator to register a given function as a valid prior"""
@@ -172,7 +173,7 @@ class SALTResids:
 			self.datadict[sn]['mwextcurve']   = 10**(-0.4*extinction.fitzpatrick99(self.wave*(1+z),self.datadict[sn]['MWEBV']*3.1))
 			self.datadict[sn]['mwextcurveint'] = interp1d(self.wave*(1+z),self.datadict[sn]['mwextcurve'] ,kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
 
-
+		self.fixedUncertainties={}
 		starttime=time.time()
 		#Store derivatives of a spline with fixed knot locations with respect to each knot value
 		self.spline_derivs = np.zeros([len(self.phase),len(self.wave),self.im0.size])
@@ -343,54 +344,94 @@ class SALTResids:
 			return logp,grad
 		else:
 			return logp
+
 				
 	def ResidsForSN(self,x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,
-					computeDerivatives,computePCDerivs=False,fixUncertainty=True,
+					computeDerivatives,computePCDerivs=False,fixedUncertainties=None,
 					SpecErrScale=1.0,returnSpecModel=False):
+
 		""" This method should be the only one required for any fitter to process the supernova data. 
 		Find the residuals of a set of parameters to the photometric and spectroscopic data of a given supernova. 
 		Photometric residuals are first decorrelated to diagonalize color scatter"""
-
-		photmodel,specmodel=self.modelvalsforSN(
-			x,sn,components,componentderivs,colorLaw,saltErr,
-			saltCorr,computeDerivatives,computePCDerivs,fixUncertainty)
+		fixUncertainty= saltErr is None and saltCorr is None
+		photmodel,specmodel=self.modelvalsforSN(x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs)
 		
 		#Separate code for photometry and spectra now, since photometry has to handle a covariance matrix with off-diagonal elements
-		covariance=np.diag(photmodel['fluxvariance']+photmodel['modelvariance'])
-		
-		#Cholesky transformation decomposes the covariance matrix into a lower triangular matrix s.t. Sigma= L L^T
-		L=linalg.cholesky(covariance).T
-		fluxdiff=photmodel['modelflux']-photmodel['dataflux']
-		
-		#More stable to solve by backsubstitution than to invert and multiply
-		photresids={'resid':linalg.solve_triangular(L, fluxdiff ,lower=True)}
-		if not fixUncertainty:
-			#slogdet function  doesn't encounter numerical underflow like log(det(covariance)) would
-			photresids['lognorm']= - 0.5 * (fluxdiff.size * np.log(2*np.pi) + slogdet(covariance)[1])
-		
+		if fixUncertainty:
+			Ls,colorvar=fixedUncertainties['phot_{}'.format(sn)]
+			
+		else:
+			variance=photmodel['fluxvariance']+photmodel['modelvariance']
+			Ls,colorvar=[],[]
+			#Add color scatter
+			for selectFilter,clscat,dclscat in photmodel['colorvariance']:
+				flux=clscat*photmodel['modelflux'][selectFilter]
+				#Find cholesky matrix as sqrt of diagonal uncertainties, then perform rank one update to incorporate color scatter
+				L= np.diag(np.sqrt(variance[selectFilter]))
+				for k in range(flux.size):
+					r = np.sqrt(L[k,k]**2 + flux[k]**2)
+					c = r/L[k,k]
+					s = flux[k]/L[k,k]
+					L[k,k] = r
+					L[k+1:,k] = (L[k+1:,k] + s*flux[k+1:])/c
+					flux[k+1:]= c*flux[k+1:] - s*L[k+1:,k]
+				Ls+=[L]
+				colorvar+=[(selectFilter,clscat,dclscat)]
+
+		photresids={'resid':np.zeros(photmodel['modelflux'].size)}
 		if computeDerivatives:
-			photresids['resid_jacobian']=linalg.solve_triangular(L,photmodel['modelflux_jacobian'],lower=True)
-			if not fixUncertainty:
-				#Cut out zeroed jacobian entries to save time
-				nonzero=~(photmodel['modelvariance_jacobian']==0).all(axis=0)
-				reducedJac=photmodel['modelvariance_jacobian'][:,nonzero]
-				#Calculate L^-1
-				invL=linalg.solve_triangular(L,np.diag(np.ones(fluxdiff.size)),lower=True)
-				# Calculate the fractional derivative of L w.r.t model parameters
-				# L^-1 dL/dx = {L^-1 x d Sigma / dx x L^-T, with the upper triangular part zeroed and the diagonal halved}
-				fractionalLDeriv=np.dot(invL,np.swapaxes(reducedJac[:,np.newaxis,:]* invL.T[:,:,np.newaxis],0,1))
-				fractionalLDeriv[np.triu(np.ones((fluxdiff.size,fluxdiff.size),dtype=bool),1),:]=0
-				fractionalLDeriv[np.diag(np.ones((fluxdiff.size),dtype=bool)),:]/=2
-				
-				#Multiply by size of transformed residuals and apply to resiudal jacobian
-				photresids['resid_jacobian'][:,nonzero]-=np.dot(np.swapaxes(fractionalLDeriv,1,2),photresids['resid'])
-				
-				#Trace of fractional derivative gives the gradient of the lognorm term, since determinant is product of diagonal
+			photresids['resid_jacobian']=np.zeros((photmodel['modelflux'].size,self.npar))
+		if not fixUncertainty: 
+			photresids['lognorm']=0
+			if computeDerivatives:
 				photresids['lognorm_grad']=np.zeros(self.npar)
-				photresids['lognorm_grad'][nonzero]-= np.trace(fractionalLDeriv)
+		
+		for L,(selectFilter,clscat,dclscat) in zip(Ls,colorvar):
+			#More stable to solve by backsubstitution than to invert and multiply
+			fluxdiff=photmodel['modelflux'][selectFilter]-photmodel['dataflux'][selectFilter]
+			photresids['resid'][selectFilter]=linalg.solve_triangular(L, fluxdiff,lower=True)
+			if not fixUncertainty:
+				photresids['lognorm']-= (np.log(np.diag(L)).sum())
+		
+			if computeDerivatives:
+				photresids['resid_jacobian'][selectFilter]=linalg.solve_triangular(L,photmodel['modelflux_jacobian'][selectFilter],lower=True)
+				if not fixUncertainty:
+					#Cut out zeroed jacobian entries to save time
+					nonzero=(~((photmodel['modelvariance_jacobian'][selectFilter]==0) & (photmodel['modelflux_jacobian'][selectFilter]==0)).all(axis=0)) | (self.parlist=='clscat')
+					reducedJac=photmodel['modelvariance_jacobian'][selectFilter][:,nonzero]
+					#Calculate L^-1 (necessary for the diagonal derivative)
+					invL=linalg.solve_triangular(L,np.diag(np.ones(fluxdiff.size)),lower=True)
+					# Calculate the fractional derivative of L w.r.t model parameters
+					# L^-1 dL/dx = {L^-1 x d Sigma / dx x L^-T, with the upper triangular part zeroed and the diagonal halved}
+					
+					#First calculating diagonal part
+					fractionalLDeriv=np.dot(invL,np.swapaxes(reducedJac[:,np.newaxis,:]* invL.T[:,:,np.newaxis],0,1))
+				
+					fluxPrime= linalg.solve_triangular(L,photmodel['modelflux'][selectFilter])
+					jacPrime = linalg.solve_triangular(L,photmodel['modelflux_jacobian'][selectFilter][:,nonzero])
+					#Derivative w.r.t  color scatter 
+					fractionalLDeriv[:,:,self.parlist[nonzero]=='clscat']+= 2*clscat*dclscat[np.newaxis,np.newaxis,:]* fluxPrime[:,np.newaxis,np.newaxis]*fluxPrime[np.newaxis,:,np.newaxis]
+					#Derivative w.r.t model flux
+					dfluxSquared = jacPrime[:,np.newaxis,:]*fluxPrime[np.newaxis,:,np.newaxis]
+					#Symmetrize
+					dfluxSquared = np.swapaxes(dfluxSquared,0,1)+dfluxSquared
+					fractionalLDeriv +=clscat**2 * dfluxSquared
+					
+					fractionalLDeriv[np.triu(np.ones((fluxdiff.size,fluxdiff.size),dtype=bool),1),:]=0
+					fractionalLDeriv[np.diag(np.ones((fluxdiff.size),dtype=bool)),:]/=2
+				
+					#Multiply by size of transformed residuals and apply to resiudal jacobian
+					photresids['resid_jacobian'][np.outer(selectFilter,nonzero)]-=np.dot(np.swapaxes(fractionalLDeriv,1,2),photresids['resid'][selectFilter]).flatten()
+				
+					#Trace of fractional derivative gives the gradient of the lognorm term, since determinant is product of diagonal
+					photresids['lognorm_grad'][nonzero]-= np.trace(fractionalLDeriv)
 				
 		#Handle spectra
-		variance=specmodel['fluxvariance'] + specmodel['modelvariance']
+		
+		if fixUncertainty:
+			variance=fixedUncertainties['spec_{}'.format(sn)]
+		else:
+			variance=specmodel['fluxvariance'] + specmodel['modelvariance']
 		uncertainty=np.sqrt(variance)*SpecErrScale
 		# HACK
 		#uncertainty *= 0.01
@@ -630,6 +671,7 @@ class SALTResids:
 		photresultsdict={}
 		photresultsdict['fluxvariance'] =  np.zeros(len(photdata['filt']))
 		photresultsdict['modelvariance'] =  np.zeros(len(photdata['filt']))
+		photresultsdict['colorvariance'] = []
 		if computeDerivatives:
 			photresultsdict['modelvariance_jacobian']=np.zeros([photdata['filt'].size,self.npar])
 		for flt in np.unique(photdata['filt']):
@@ -640,11 +682,18 @@ class SALTResids:
 			phase=phase[selectFilter]
 			clippedPhase=np.clip(phase,obsphase.min(),obsphase.max())
 			nphase = len(phase)
-			#Calculate color scatter relative to flux
-			#photresultsdict['colorvariancerelative']=
 			
+			#Calculate color scatter
+			coeffs=x[self.parlist=='clscat']
+			coeffs/=factorial(np.arange(len(coeffs)))
+			lameffPrime=lameff/(1+z)/1000
+			colorscat=np.exp(np.poly1d(coeffs)(lameffPrime))
 			
-			
+			if computeDerivatives:
+				dcolorscatdx= colorscat*((lameffPrime) ** (coeffs.size-1-np.arange(coeffs.size))) / factorial(np.arange(coeffs.size))
+			else :
+				dcolorscatdx=0
+			photresultsdict['colorvariance']+= [(selectFilter,colorscat,dcolorscatdx)]
 			
 			#Calculate model uncertainty
 			modelErrInt = [ interp1d( obswave, interr(clippedPhase),axis=1,kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True) for interr in interr1d]
@@ -803,7 +852,7 @@ class SALTResids:
 		return photresultsdict
 	
 	
-	def modelvalsforSN(self,x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs,fixUncertainty):
+	def modelvalsforSN(self,x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs):
 
 		# model pars, initialization
 		M0,M1 = copy.deepcopy(components)
@@ -845,30 +894,53 @@ class SALTResids:
 			mod *= _SCALE_FACTOR/(1+z)
 			int1d = interp1d(obsphase,mod,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
 
-		
-		interr1d = [interp1d(obsphase,err * (self.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z)) ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
-		intcorr1d= [interp1d(obsphase,corr ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True) for corr in saltCorr ]
+		if not ( saltErr is None and saltCorr is None):
+			interr1d = [interp1d(obsphase,err * (self.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z)) ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
+			intcorr1d= [interp1d(obsphase,corr ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True) for corr in saltCorr ]
 		returndicts=[]
 		for valfun,uncertaintyfun,name in [(self.photValsForSN,self.photVarianceForSN,'phot'),(self.specValsForSN,self.specVarianceForSN, 'spec')]:
 			valdict=valfun(x,sn,(int1dM0,int1dM1) if computeDerivatives else int1d,
                      (int1dM0phasederiv,int1dM1phasederiv) if computeDerivatives else None,
                      colorlaw,colorexp,computeDerivatives,computePCDerivs)
 
-			key='__{}_{}_fixed_uncertainty__'.format(name,sn)
-			if fixUncertainty: 
-				try:
-					uncertaintydict=self.__dict__[key]
-				except KeyError:
-					fixUncertainty=False
-			if not fixUncertainty:
-				#Otherwise, store current uncertainties 
+			if not ( saltErr is None and saltCorr is None): 
 				uncertaintydict=uncertaintyfun(x,sn,interr1d,intcorr1d,colorlaw,colorexp,computeDerivatives)
-				self.__dict__[key]=uncertaintydict
-			valdict.update(uncertaintydict)
+				valdict.update(uncertaintydict)
 			returndicts+=[valdict]
 
 		return returndicts
-			
+		
+	def getFixedUncertainties(self,x):		
+		colorLaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
+		components=self.SALTModel(x)
+		componentderivs=self.SALTModelDeriv(x,1,0,self.phase,self.wave)
+		saltErr=self.ErrModel(x)
+		saltCorr=self.CorrelationModel(x)
+
+		fixedUncertainties={}
+		for sn in self.datadict:
+
+			photmodel,specmodel=self.modelvalsforSN(x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,False,False)
+			variance=photmodel['fluxvariance']+photmodel['modelvariance']
+			Ls,colorvar=[],[]
+			#Add color scatter
+			for selectFilter,clscat,dclscat in photmodel['colorvariance']:
+				flux=clscat*photmodel['modelflux'][selectFilter]
+				#Find cholesky matrix as sqrt of diagonal uncertainties, then perform rank one update to incorporate color scatter
+				L= np.diag(np.sqrt(variance[selectFilter]))
+				for k in range(flux.size):
+					r = np.sqrt(L[k,k]**2 + flux[k]**2)
+					c = r/L[k,k]
+					s = flux[k]/L[k,k]
+					L[k,k] = r
+					L[k,k+1:] = (L[k,k+1:] + s*flux[k+1:])/c
+					flux[k+1:]= c*flux[k+1:] - s*L[k, k+1:]
+				Ls+=[L]
+				colorvar+=[(selectFilter,clscat,dclscat)]
+			fixedUncertainties['phot_{}'.format(sn)]=Ls,colorvar
+			fixedUncertainties['spec_{}'.format(sn)]=specmodel['fluxvariance'] + specmodel['modelvariance']
+		return fixedUncertainties
+
 	#@prior
 	def peakprior(self,width,x,components):
 		wave=self.wave[self.bbandoverlap]
@@ -1028,7 +1100,7 @@ class SALTResids:
 
 		photResidsDict,specResidsDict = self.ResidsForSN(
 			x,sn,components,componentderivs,colorLaw,salterr,
-			saltcorr,computeDerivatives,computePCDerivs,fixUncertainty=False,
+			saltcorr,computeDerivatives,computePCDerivs,
 			SpecErrScale=SpecErrScale)
 
 		
