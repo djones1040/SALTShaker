@@ -627,7 +627,7 @@ class GaussNewton(saltresids.SALTResids):
 		#import pdb; pdb.set_trace()
 		return stepsizes
 	
-	def lsqwrap(self,guess,uncertainties,computeDerivatives,computePCDerivs=True,doPriors=True,fixUncertainty=True,returnSpecFluxes=False):
+	def lsqwrap(self,guess,uncertainties,computeDerivatives,computePCDerivs=True,doPriors=True,returnSpecFluxes=False):
 
 		tstart = time.time()
 
@@ -750,7 +750,7 @@ class GaussNewton(saltresids.SALTResids):
 
 		if fit == 'spectralrecalibration_norm':
 			residuals,jacobian,specdataflux,specmodelflux,specuncertainty=self.lsqwrap(
-				X,True,computePCDerivs,doPriors,fixUncertainty=fixUncertainty,returnSpecFluxes=True)
+				X,uncertainties,True,computePCDerivs,doPriors,returnSpecFluxes=True)
 
 			residuals,jacobian=self.lsqwrap(X,uncertainties,True,computePCDerivs,doPriors)
 			jacobian = self.AdjustSpecJac(X,specdataflux,specmodelflux,specuncertainty,jacobian)
