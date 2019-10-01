@@ -38,7 +38,7 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 	salt2m0fluxerr = salt2m0fluxerr.reshape([len(np.unique(salt2m0errphase)),len(np.unique(salt2m0errwave))])
 	salt2m1flux = salt2m1flux.reshape([len(np.unique(salt2m1phase)),len(np.unique(salt2m1wave))])
 	salt2m1fluxerr = salt2m1fluxerr.reshape([len(np.unique(salt2m1errphase)),len(np.unique(salt2m1errwave))])
-
+	
 	salt3m0flux = salt3m0flux.reshape([len(np.unique(salt3m0phase)),len(np.unique(salt3m0wave))])
 	salt3m0fluxerr = salt3m0fluxerr.reshape([len(np.unique(salt3m0errphase)),len(np.unique(salt3m0errwave))])
 	salt3m1flux = -1*salt3m1flux.reshape([len(np.unique(salt3m1phase)),len(np.unique(salt3m1wave))])
@@ -79,13 +79,13 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 
 		ax1.plot(salt2m0wave,salt2m0flux_0+spacing*i,color='b',label='SALT2')
 		ax1.fill_between(salt2m0wave,
-						 salt2m0flux_0-salt2m0fluxerr_0+spacing*i,
-						 salt2m0flux_0+salt2m0fluxerr_0+spacing*i,
+						 salt2m0flux_0-np.sqrt(salt2m0fluxerr_0)+spacing*i,
+						 salt2m0flux_0+np.sqrt(salt2m0fluxerr_0)+spacing*i,
 						 color='b',alpha=0.5)
 		ax1.plot(salt3m0wave,salt3m0flux_0+spacing*i,color='r',label='SALT3')
 		ax1.fill_between(salt3m0wave,
-						 salt3m0flux_0-salt3m0fluxerr_0+spacing*i,
-						 salt3m0flux_0+salt3m0fluxerr_0+spacing*i,
+						 salt3m0flux_0-np.sqrt(salt3m0fluxerr_0)+spacing*i,
+						 salt3m0flux_0+np.sqrt(salt3m0fluxerr_0)+spacing*i,
 						 color='r',alpha=0.5)
 		ax1.set_xlim(xlimits)
 		ax1.set_ylim([0,1.35])
@@ -103,18 +103,17 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 		int_salt3m1err = interp2d(salt3m1errwave,salt3m1errphase,salt3m1fluxerr)
 		salt3m1flux_0 = int_salt3m1(salt3m1wave,plotphase)
 		salt3m1fluxerr_0 = int_salt3m1err(salt3m1wave,plotphase)
-
 		ax2.plot(salt2m1wave,salt2m1flux_0+spacing*i,color='b',label='SALT2')
 		ax2.fill_between(salt2m1wave,
-						 salt2m1flux_0-salt2m1fluxerr_0+spacing*i,
-						 salt2m1flux_0+salt2m1fluxerr_0+spacing*i,
+						 salt2m1flux_0-np.sqrt(salt2m1fluxerr_0)+spacing*i,
+						 salt2m1flux_0+np.sqrt(salt2m1fluxerr_0)+spacing*i,
 						 color='b',alpha=0.5)
 		m1scale = np.mean(np.abs(salt2m1flux_0[(salt2m1wave > 4000) & (salt2m1wave < 7000)]))/np.mean(np.abs(salt3m1flux_0[(salt3m1wave > 4000) & (salt3m1wave < 7000)]))
-		ax2.plot(salt3m1wave,salt3m1flux_0*m1scale+spacing*i,color='r',label='SALT3')
-		#ax2.fill_between(salt3m1wave,
-		#				 salt3m1flux_0-salt3m1fluxerr_0+spacing*i,
-		#				 salt3m1flux_0+salt3m1fluxerr_0+spacing*i,
-		#				 color='r',alpha=0.5)
+		ax2.plot(salt3m1wave,salt3m1flux_0+spacing*i,color='r',label='SALT3')
+		ax2.fill_between(salt3m1wave,
+						 salt3m1flux_0-np.sqrt(salt3m1fluxerr_0)+spacing*i,
+						 salt3m1flux_0+np.sqrt(salt3m1fluxerr_0)+spacing*i,
+						 color='r',alpha=0.5)
 		ax2.set_xlim(xlimits)
 		ax2.set_ylim([-0.05,0.39])
 

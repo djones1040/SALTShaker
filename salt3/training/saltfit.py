@@ -453,6 +453,10 @@ class GaussNewton(saltresids.SALTResids):
 
 		self.bounds=list(zip(mins,maxes))
 
+		self.GN_iter = {'all':1,'all-grouped':1,'x0':1,'x1':1,'component0':1,
+						'component1':1,'color':3,'colorlaw':3,
+						'spectralrecalibration_norm':3,'spectralrecalibration_poly':3,
+					    'tpk':1,'modelerr':1}
 
 		self._robustify = False
 		self._writetmp = False
@@ -460,9 +464,10 @@ class GaussNewton(saltresids.SALTResids):
 		self.fitOptions={}
 		for message,fit in [('all parameters','all'),('all parameters grouped','all-grouped'),(" x0",'x0'),('x1','x1'),('principal component 0','component0'),
 							('principal component 1','component1'),('color','color'),('color law','colorlaw'),
-							('spectral recalibration const.','spectralrecalibration_norm'),('spectral recalibration','spectralrecalibration'),
+							('spectral recalibration const.','spectralrecalibration_norm'),('spectral recalibration higher orders','spectralrecalibration_poly'),
 							('time of max','tpk'),('error model','modelerr')]:
-			if 'all' in fit: includePars=np.ones(self.npar,dtype=bool)
+			if 'all' in fit:
+				includePars=np.ones(self.npar,dtype=bool)
 			else:
 				includePars=np.zeros(self.npar,dtype=bool)
 				if fit=='components':
@@ -538,14 +543,7 @@ class GaussNewton(saltresids.SALTResids):
 		Xlast = copy.deepcopy(guess[:])
 		
 		print('starting loop')
-		for superloop in range(loop_niter):
-			if superloop % 3 ==0 and self.fit_model_err:
-				print('Optimizing model error')
-				X,loglike=self.minuitOptimize(X,'modelerr')
-			
-			#elif superloop == 0:
-			#	print('Optimizing model error')
-			#	X,loglike=self.minuitOptimize(X,'modelerr')
+		for superloop in range(loop_niter):			
 
 			X,chi2,converged = self.robust_process_fit(X,chi2_init,superloop)
 			
@@ -559,7 +557,11 @@ class GaussNewton(saltresids.SALTResids):
 				return xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 					modelerr,clpars,clerr,clscat,SNParams,stepsizes
 
+			if self.fit_model_err: # and superloop % 3 ==0
+				print('Optimizing model error')
+				X,loglike=self.minuitOptimize(X,'modelerr')
 			
+
 			print('finished iteration %i, chi2 improved by %.1f'%(superloop+1,chi2_init-chi2))
 			if converged:
 				print('Gauss-Newton optimizer could not further improve chi2')
@@ -706,8 +708,11 @@ class GaussNewton(saltresids.SALTResids):
 		
 		for fit in  self.fitOptions:
 			if 'all-grouped' in fit :continue
+			if 'modelerr' in fit: continue
 			print('fitting '+self.fitOptions[fit][0])
-			Xprop,chi2prop = self.process_fit(X,fit=fit,computePCDerivs= (fit=='component0') or ('all' in fit),fixUncertainty=fixUncertainty)
+			Xprop = X.copy()
+			for i in range(self.GN_iter[fit]):
+				Xprop,chi2prop = self.process_fit(Xprop,fit=fit,computePCDerivs= (fit=='component0') or ('all' in fit),fixUncertainty=fixUncertainty)
 			if chi2prop<chi2:
 				if (fit=='all'):
 					if (chi2prop/chi2 < 0.9):
@@ -747,7 +752,6 @@ class GaussNewton(saltresids.SALTResids):
 			Xtmp = np.log(np.exp(X[includePars])- stepsize)
 			Xtmp[Xtmp != Xtmp] = X[includePars][Xtmp != Xtmp]
 			X[includePars] = Xtmp #np.log(np.exp(X[includePars])- stepsize)
-
 			
 		elif fit=='all-grouped':
 			residuals,jacobian=self.lsqwrap(X,True,computePCDerivs,doPriors,fixUncertainty=fixUncertainty)
