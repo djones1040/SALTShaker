@@ -1059,6 +1059,8 @@ class SALTResids:
 	def loglikeforSN(self,args,sn=None,x=None,components=None,componentderivs=None,salterr=None,saltcorr=None,
 					 colorLaw=None,colorScat=None,
 					 debug=False,timeit=False,computeDerivatives=False,computePCDerivs=False,SpecErrScale=1.0):
+		print("HI SPLITTING JOBS")
+		
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic observations of a single SN 
 
