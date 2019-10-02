@@ -192,7 +192,7 @@ def rdAllData(snlist,estimate_tpk,kcordict,addwarning,dospec=False,KeepOnlySpec=
 		if not 'SURVEY' in sn.__dict__.keys():
 			raise RuntimeError('File %s has no SURVEY key, which is needed to find the filter transmission curves'%PhotSNID[0])
 		if not 'REDSHIFT_HELIO' in sn.__dict__.keys():
-			raise RuntimeError('File %s has no heliocentric redshift information in the header'%PhotSNID[0])
+			raise RuntimeError('File %s has no heliocentric redshift information in the header'%sn.SNID)
 
 		if 'PEAKMJD' in sn.__dict__.keys(): sn.SEARCH_PEAKMJD = sn.PEAKMJD
 		zHel = float(sn.REDSHIFT_HELIO.split('+-')[0])
