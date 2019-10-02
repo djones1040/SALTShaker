@@ -30,6 +30,7 @@ import pylab as plt
 import extinction
 import copy
 import warnings
+import pyParz
 
 _SCALE_FACTOR = 1e-12
 _B_LAMBDA_EFF = np.array([4302.57])	 # B-band-ish wavelength
@@ -311,13 +312,18 @@ class SALTResids:
 		#Construct arguments for maxlikeforSN method
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
 		args=[(None,sn,x,components,componentderivs,salterr,saltcorr,colorLaw,colorScat,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale) for sn in self.datadict.keys()]
+		args2 = (x,components,componentderivs,salterr,saltcorr,colorLaw,colorScat,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale)
 		mapFun=pool.map if pool else starmap
 		if computeDerivatives:
+			#result = list(pyParz.foreach(self.datadict.keys(),self.loglikeforSN,args2))
 			result=list(mapFun(self.loglikeforSN,args))
 			loglike=sum([r[0] for r in result])
 			grad=sum([r[1] for r in result])
 		else:
-			loglike=sum(mapFun(self.loglikeforSN,args))
+			import pdb; pdb.set_trace()
+			result = list(pyParz.foreach(list(self.datadict.keys())[:4],self.loglikeforSN_multiprocess,args2))
+			import pdb; pdb.set_trace()
+			#loglike=sum(mapFun(self.loglikeforSN,args))
 
 		logp = loglike
 		if len(self.usePriors):
@@ -1056,6 +1062,66 @@ class SALTResids:
 			idx+=priorFunction.numResids
 		return residuals,values,jacobian
 
+	def loglikeforSN_multiprocess(self,args):
+		print("HI SPLITTING JOBS")
+		
+		"""
+		Calculates the likelihood of given SALT model to photometric and spectroscopic observations of a single SN 
+
+		Parameters
+		----------
+		args : tuple or None
+			Placeholder that contains all the other variables for multiprocessing quirks
+
+		sn : str
+			Name of supernova to compare to model
+			
+		x : array
+			SALT model parameters
+			
+		components: array_like, optional
+			SALT model components, if not provided will be derived from SALT model parameters passed in \'x\'
+		
+		colorLaw: function, optional
+			SALT color law which takes wavelength as an argument
+
+		debug : boolean, optional
+			Debug flag
+		
+		Returns
+		-------
+		chi2: float
+			Model chi2 relative to training data	
+		"""
+
+		#if timeit: tstart = time.time()
+
+		sn,x,components,componentderivs,salterr,saltcorr,colorLaw,colorScat,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale = args[:]
+		x = np.array(x)
+		
+		#Set up SALT model
+		if components is None:
+			components = self.SALTModel(x)
+		if componentderivs is None and computeDerivatives:
+			componentderivs = self.SALTModelDeriv(x,1,0,self.phase,self.wave)			
+		if salterr is None:
+			salterr = self.ErrModel(x)
+
+
+		photResidsDict,specResidsDict = self.ResidsForSN(
+			x,sn,components,componentderivs,colorLaw,salterr,
+			saltcorr,computeDerivatives,computePCDerivs,
+			SpecErrScale=SpecErrScale)
+
+		
+		loglike= - (photResidsDict['resid']**2).sum() / 2.   -(specResidsDict['resid']**2).sum()/2.+photResidsDict['lognorm']+specResidsDict['lognorm']
+		if computeDerivatives: 
+			grad_loglike=  - (photResidsDict['resid'][:,np.newaxis] * photResidsDict['resid_jacobian']).sum(axis=0) - (specResidsDict['resid'][:,np.newaxis] * specResidsDict['resid_jacobian']).sum(axis=0) + photResidsDict['lognorm_grad'] +specResidsDict['lognorm_grad']
+			return loglike,grad_loglike
+		else:
+			return loglike
+
+	
 	def loglikeforSN(self,args,sn=None,x=None,components=None,componentderivs=None,salterr=None,saltcorr=None,
 					 colorLaw=None,colorScat=None,
 					 debug=False,timeit=False,computeDerivatives=False,computePCDerivs=False,SpecErrScale=1.0):
