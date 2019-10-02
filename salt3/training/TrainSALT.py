@@ -231,7 +231,7 @@ class TrainSALT(TrainSALTBase):
 
 		foutclscat = open('%s/salt3_color_dispersion.dat'%outdir,'w')
 		for w,j in zip(wave,range(len(wave))):
-			print('%.2f %8.10e'%(w,clscat[j]),file=foutclscat)
+			print('%.2f %8.15e'%(w,clscat[j]),file=foutclscat)
 		foutclscat.close()
 				
 		foutm0.close()
