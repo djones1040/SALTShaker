@@ -204,7 +204,7 @@ class TrainSALT(TrainSALTBase):
 			foutpars.write('{: <30} {}\n'.format('Parameter Name','Value'))
 			for name,par in zip(parlist,pars):
 
-				foutpars.write('{: <30} {:.6e}\n'.format(name,par))
+				foutpars.write('{: <30} {:.15e}\n'.format(name,par))
 		
 		#Save mcmc chain and log_likelihoods
 		
@@ -414,7 +414,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		
 		# read the data
 		datadict = readutils.rdAllData(self.options.snlist,self.options.estimate_tpk,self.kcordict,
-									   self.addwarning,dospec=self.options.dospec,KeepOnlySpec=True)
+									   self.addwarning,dospec=self.options.dospec,KeepOnlySpec=False)
 		
 		if not os.path.exists(self.options.outputdir):
 			os.makedirs(self.options.outputdir)

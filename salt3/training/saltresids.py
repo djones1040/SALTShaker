@@ -720,6 +720,7 @@ class SALTResids:
 			nphase = len(phase)
 			
 			#Calculate color scatter
+
 			if self.iclscat.size:
 				coeffs=x[self.parlist=='clscat']
 				pow=coeffs.size-1-np.arange(coeffs.size)
@@ -729,6 +730,7 @@ class SALTResids:
 				
 				if computeDerivatives:
 					dcolorscatdx= colorscat*((lameffPrime) ** (pow) )/ factorial(pow)
+
 				else :
 					dcolorscatdx=0
 			else:
@@ -1067,6 +1069,8 @@ class SALTResids:
 	def loglikeforSN(self,args,sn=None,x=None,components=None,componentderivs=None,salterr=None,saltcorr=None,
 					 colorLaw=None,colorScat=None,
 					 debug=False,timeit=False,computeDerivatives=False,computePCDerivs=False,SpecErrScale=1.0):
+		print("HI SPLITTING JOBS")
+		
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic observations of a single SN 
 
