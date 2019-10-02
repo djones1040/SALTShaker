@@ -263,7 +263,7 @@ class SALTResids:
 		pbspl /= denom*HC_ERG_AA
 		self.kcordict['default']['Bpbspl'] = pbspl
 		self.kcordict['default']['Bdwave'] = self.wave[1] - self.wave[0]
-				
+
 	def maxlikefit(self,x,pool=None,debug=False,timeit=False,computeDerivatives=False,computePCDerivs=False,SpecErrScale=1.0):
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic data given during initialization
@@ -320,10 +320,10 @@ class SALTResids:
 			loglike=sum([r[0] for r in result])
 			grad=sum([r[1] for r in result])
 		else:
-			import pdb; pdb.set_trace()
-			result = list(pyParz.foreach(list(self.datadict.keys())[:4],self.loglikeforSN_multiprocess,args2))
-			import pdb; pdb.set_trace()
-			#loglike=sum(mapFun(self.loglikeforSN,args))
+			#import pdb; pdb.set_trace()
+			#result = list(pyParz.foreach(list(self.datadict.keys())[:4],self.loglikeforSN_multiprocess,args2))
+			#import pdb; pdb.set_trace()
+			loglike=sum(mapFun(self.loglikeforSN,args))
 
 		logp = loglike
 		if len(self.usePriors):
@@ -1073,7 +1073,6 @@ class SALTResids:
 		return residuals,values,jacobian
 
 	def loglikeforSN_multiprocess(self,args):
-		print("HI SPLITTING JOBS")
 		
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic observations of a single SN 
@@ -1135,7 +1134,6 @@ class SALTResids:
 	def loglikeforSN(self,args,sn=None,x=None,components=None,componentderivs=None,salterr=None,saltcorr=None,
 					 colorLaw=None,colorScat=None,
 					 debug=False,timeit=False,computeDerivatives=False,computePCDerivs=False,SpecErrScale=1.0):
-		print("HI SPLITTING JOBS")
 		
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic observations of a single SN 
@@ -1287,7 +1285,9 @@ class SALTResids:
 		clerr = np.zeros(len(x[self.parlist == 'cl']))
 		
 		clscatpars = x[self.parlist == 'clscat']
-		clscaterr = np.zeros(x[self.parlist == 'clscat'])
+		clscat=np.exp(np.poly1d(clscatpars)(self.wave/1000))
+
+		#clscaterr = x[self.parlist == 'clscaterr']
 		
 
 		resultsdict = {}
@@ -1320,7 +1320,7 @@ class SALTResids:
 		#cov_m0_m1 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0_m1_cov,self.bsorder,self.bsorder))
 		modelerr = bisplev(self.phase,self.wave,(self.errphaseknotloc,self.errwaveknotloc,modelerrpars,self.bsorder,self.bsorder))
 		modelerr[:] = 0.0
-		clscat = splev(self.wave,(self.errwaveknotloc,clscatpars,3))
+		#clscat = splev(self.wave,(self.errwaveknotloc,clscatpars,3))
 		if not len(clpars): clpars = []
 
 		# model errors
