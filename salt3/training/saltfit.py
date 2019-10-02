@@ -546,13 +546,6 @@ class GaussNewton(saltresids.SALTResids):
 		
 		print('starting loop')
 		for superloop in range(loop_niter):
-			if superloop % 3 ==0 and self.fit_model_err:
-				print('Optimizing model error')
-				X,loglike=self.minuitOptimize(X,'modelerr')
-				uncertainties=self.getFixedUncertainties(X)
-			#elif superloop == 0:
-			#	print('Optimizing model error')
-			#	X,loglike=self.minuitOptimize(X,'modelerr')
 
 			X,chi2,converged = self.robust_process_fit(X,uncertainties,chi2_init,superloop)
 			
@@ -569,7 +562,7 @@ class GaussNewton(saltresids.SALTResids):
 			if self.fit_model_err: # and superloop % 3 ==0
 				print('Optimizing model error')
 				X,loglike=self.minuitOptimize(X,'modelerr')
-			
+				uncertainties=self.getFixedUncertainties(X)
 
 			print('finished iteration %i, chi2 improved by %.1f'%(superloop+1,chi2_init-chi2))
 			if converged:
