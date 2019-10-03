@@ -559,7 +559,7 @@ class GaussNewton(saltresids.SALTResids):
 				return xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 					modelerr,clpars,clerr,clscat,SNParams,stepsizes
 
-			if self.fit_model_err: # and superloop % 3 ==0
+			if self.fit_model_err and (superloop % 3 ==2 or superloop==loop_niter):
 				print('Optimizing model error')
 				X,loglike=self.minuitOptimize(X,'modelerr')
 				uncertainties=self.getFixedUncertainties(X)
@@ -598,7 +598,7 @@ class GaussNewton(saltresids.SALTResids):
 		kwargs.update({params[i]: initVals[i] for i in range(includePars.sum())})
 		kwargs.update({'error_'+params[i]: np.sqrt(np.abs(X[includePars][i])) for i in range(includePars.sum())})
 		m=Minuit(fn,use_array_call=True,forced_parameters=params,grad=grad,errordef=1,**kwargs)
-		result,paramResults=m.migrad(10)
+		result,paramResults=m.migrad(1200)
 		X=X.copy()
 		
 		X[includePars]=np.array([x.value for x  in paramResults])
