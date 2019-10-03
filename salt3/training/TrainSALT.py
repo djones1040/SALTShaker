@@ -314,7 +314,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		from salt3.validation import ValidateLightcurves
 		from salt3.validation import ValidateSpectra
 		from salt3.validation import ValidateModel
-
+		from salt3.validation.figs import plotSALTModel
 		x0,x1,c,t0 = np.loadtxt('%s/salt3train_snparams.txt'%outputdir,unpack=True,usecols=[1,2,3,4])
 		snid = np.genfromtxt('%s/salt3train_snparams.txt'%outputdir,unpack=True,dtype='str',usecols=[0])
 		
@@ -325,7 +325,8 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			'%s/spectralcomp_chi2.png'%outputdir,
 			outputdir)
 
-
+		plotSALTModel.mkModelPlot(outputdir,outfile='%s/SALTmodelcomp.pdf'%outputdir,
+			)
 		if self.options.dospec:
 			ValidateSpectra.compareSpectra(snlist,
 										   self.options.outputdir,maxspec=50)
