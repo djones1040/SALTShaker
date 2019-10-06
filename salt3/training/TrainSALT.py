@@ -112,7 +112,7 @@ class TrainSALT(TrainSALTBase):
 		guess[parlist == 'm0'] = m0knots
 		for i in range(3): guess[parlist == 'modelerr_{}'.format(i)] = 1e-6 
 		if self.options.n_components == 2:
-			guess[parlist == 'm1'] = m1knots
+			guess[parlist == 'm1'] = m1knots*1e3
 		if self.options.n_colorpars:
 			guess[parlist == 'cl'] = [0.]*self.options.n_colorpars
 		if self.options.n_colorscatpars:

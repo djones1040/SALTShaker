@@ -446,11 +446,12 @@ class GaussNewton(saltresids.SALTResids):
 		maxes[self.iCL]=10
 		mins[self.ispcrcl]=-1
 		maxes[self.ispcrcl]=1
-		mins[self.imodelerr]=-1
+		mins[self.imodelerr]=0
 		maxes[self.imodelerr]=1
-		mins[self.imodelcorr]=0
+		mins[self.imodelcorr]=-1
 		maxes[self.imodelcorr]=1
-
+		mins[self.iclscat]=-20
+		mins[self.iclscat]=20
 		self.bounds=list(zip(mins,maxes))
 
 		self.GN_iter = {'all':1,'all-grouped':1,'x0':1,'x1':1,'component0':1,
@@ -692,12 +693,12 @@ class GaussNewton(saltresids.SALTResids):
 			for regularization, weight in [(self.phaseGradientRegularization, self.regulargradientphase),(self.waveGradientRegularization,self.regulargradientwave ),(self.dyadicRegularization,self.regulardyad)]:
 				if weight ==0:
 					continue
-				for regResids,regJac,indices in zip( *regularization(guess,computeDerivatives), [self.im0,self.im1]):
+				for regResids,regJac,indices in zip( *regularization(guess,components,computeDerivatives), [self.im0,self.im1]):
 					residuals[idx:idx+regResids.size]=regResids*np.sqrt(weight)
 					if computeDerivatives:
 						jacobian[idx:idx+regResids.size,indices]=regJac*np.sqrt(weight)
 					idx+=regResids.size
-
+		#import pdb;pdb.set_trace()
 		if computeDerivatives:
 			print('loop took %i seconds'%(time.time()-tstart))
 			if returnSpecFluxes:
@@ -709,7 +710,7 @@ class GaussNewton(saltresids.SALTResids):
 				return residuals,specdataflux,specmodelflux,specuncertainty
 			else:
 				return residuals
-	
+
 	def robust_process_fit(self,X_init,uncertainties,chi2_init,niter):
 		X,chi2=X_init,chi2_init
 		
