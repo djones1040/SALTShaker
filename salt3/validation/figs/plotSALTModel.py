@@ -3,12 +3,15 @@
 
 import numpy as np
 import pylab as plt
+import sys
 from scipy.interpolate import interp1d, interp2d
 from sncosmo.salt2utils import SALT2ColorLaw
-
+from salt3.initfiles import init_rootdir
+from argparse import ArgumentParser
 def mkModelPlot(salt3dir='modelfiles/salt3',
-				xlimits=[2000,9200]):
-	plt.rcParams['figure.figsize'] = (9,3)
+				xlimits=[2000,9200],outfile=None,plotErr=True):
+	
+	plt.figure(figsize=(5,8))
 	plt.subplots_adjust(left=None, bottom=None, right=None, top=None,
 						wspace=0, hspace=0)
 	plt.clf()
@@ -26,19 +29,19 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 		np.loadtxt('%s/salt3_lc_relative_variance_1.dat'%salt3dir,unpack=True)
 
 	salt2m0phase,salt2m0wave,salt2m0flux = \
-		np.loadtxt('modelfiles/salt2/salt2_template_0.dat',unpack=True)
+		np.loadtxt('%s/salt2_template_0.dat'%init_rootdir,unpack=True)
 	salt2m1phase,salt2m1wave,salt2m1flux = \
-		np.loadtxt('modelfiles/salt2/salt2_template_1.dat',unpack=True)
+		np.loadtxt('%s/salt2_template_1.dat'%init_rootdir,unpack=True)
 	salt2m0errphase,salt2m0errwave,salt2m0fluxerr = \
-		np.loadtxt('modelfiles/salt2/salt2_lc_relative_variance_0.dat',unpack=True)
+		np.loadtxt('%s/salt2_lc_relative_variance_0.dat'%init_rootdir,unpack=True)
 	salt2m1errphase,salt2m1errwave,salt2m1fluxerr = \
-		np.loadtxt('modelfiles/salt2/salt2_lc_relative_variance_1.dat',unpack=True)
+		np.loadtxt('%s/salt2_lc_relative_variance_1.dat'%init_rootdir,unpack=True)
 
 	salt2m0flux = salt2m0flux.reshape([len(np.unique(salt2m0phase)),len(np.unique(salt2m0wave))])
 	salt2m0fluxerr = salt2m0fluxerr.reshape([len(np.unique(salt2m0errphase)),len(np.unique(salt2m0errwave))])
 	salt2m1flux = salt2m1flux.reshape([len(np.unique(salt2m1phase)),len(np.unique(salt2m1wave))])
 	salt2m1fluxerr = salt2m1fluxerr.reshape([len(np.unique(salt2m1errphase)),len(np.unique(salt2m1errwave))])
-
+	
 	salt3m0flux = salt3m0flux.reshape([len(np.unique(salt3m0phase)),len(np.unique(salt3m0wave))])
 	salt3m0fluxerr = salt3m0fluxerr.reshape([len(np.unique(salt3m0errphase)),len(np.unique(salt3m0errwave))])
 	salt3m1flux = -1*salt3m1flux.reshape([len(np.unique(salt3m1phase)),len(np.unique(salt3m1wave))])
@@ -79,13 +82,13 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 
 		ax1.plot(salt2m0wave,salt2m0flux_0+spacing*i,color='b',label='SALT2')
 		ax1.fill_between(salt2m0wave,
-						 salt2m0flux_0-salt2m0fluxerr_0+spacing*i,
-						 salt2m0flux_0+salt2m0fluxerr_0+spacing*i,
+						 salt2m0flux_0-np.sqrt(salt2m0fluxerr_0)+spacing*i,
+						 salt2m0flux_0+np.sqrt(salt2m0fluxerr_0)+spacing*i,
 						 color='b',alpha=0.5)
 		ax1.plot(salt3m0wave,salt3m0flux_0+spacing*i,color='r',label='SALT3')
 		ax1.fill_between(salt3m0wave,
-						 salt3m0flux_0-salt3m0fluxerr_0+spacing*i,
-						 salt3m0flux_0+salt3m0fluxerr_0+spacing*i,
+						 salt3m0flux_0-np.sqrt(salt3m0fluxerr_0)+spacing*i,
+						 salt3m0flux_0+np.sqrt(salt3m0fluxerr_0)+spacing*i,
 						 color='r',alpha=0.5)
 		ax1.set_xlim(xlimits)
 		ax1.set_ylim([0,1.35])
@@ -103,18 +106,19 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 		int_salt3m1err = interp2d(salt3m1errwave,salt3m1errphase,salt3m1fluxerr)
 		salt3m1flux_0 = int_salt3m1(salt3m1wave,plotphase)
 		salt3m1fluxerr_0 = int_salt3m1err(salt3m1wave,plotphase)
-
 		ax2.plot(salt2m1wave,salt2m1flux_0+spacing*i,color='b',label='SALT2')
-		ax2.fill_between(salt2m1wave,
-						 salt2m1flux_0-salt2m1fluxerr_0+spacing*i,
-						 salt2m1flux_0+salt2m1fluxerr_0+spacing*i,
-						 color='b',alpha=0.5)
+		if plotErr: 
+			ax2.fill_between(salt2m1wave,
+							 salt2m1flux_0-np.sqrt(salt2m1fluxerr_0)+spacing*i,
+							 salt2m1flux_0+np.sqrt(salt2m1fluxerr_0)+spacing*i,
+							 color='b',alpha=0.5)
 		m1scale = np.mean(np.abs(salt2m1flux_0[(salt2m1wave > 4000) & (salt2m1wave < 7000)]))/np.mean(np.abs(salt3m1flux_0[(salt3m1wave > 4000) & (salt3m1wave < 7000)]))
-		ax2.plot(salt3m1wave,salt3m1flux_0*m1scale+spacing*i,color='r',label='SALT3')
-		#ax2.fill_between(salt3m1wave,
-		#				 salt3m1flux_0-salt3m1fluxerr_0+spacing*i,
-		#				 salt3m1flux_0+salt3m1fluxerr_0+spacing*i,
-		#				 color='r',alpha=0.5)
+		ax2.plot(salt3m1wave,salt3m1flux_0+spacing*i,color='r',label='SALT3')
+		if plotErr:
+			ax2.fill_between(salt3m1wave,
+							 salt3m1flux_0-np.sqrt(salt3m1fluxerr_0)+spacing*i,
+							 salt3m1flux_0+np.sqrt(salt3m1fluxerr_0)+spacing*i,
+							 color='r',alpha=0.5)
 		ax2.set_xlim(xlimits)
 		ax2.set_ylim([-0.05,0.39])
 
@@ -122,7 +126,7 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 		
 		#import pdb; pdb.set_trace()
 		
-	with open('modelfiles/salt2/salt2_color_correction.dat') as fin:
+	with open('%s/salt2_color_correction.dat'%init_rootdir) as fin:
 		lines = fin.readlines()
 	for i in range(len(lines)):
 		lines[i] = lines[i].replace('\n','')
@@ -154,7 +158,9 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 	ax1.xaxis.set_ticklabels([])
 	ax2.xaxis.set_ticklabels([])
 	ax3.set_xlabel('Wavelength ($\AA$)',fontsize=15)
-	
+	plt.tight_layout()
+	if not outfile is None:
+		plt.savefig(outfile)
 def mkModelErrPlot(salt3dir='modelfiles/salt3',xlimits=[2000,9200]):
 	plt.rcParams['figure.figsize'] = (9,3)
 	plt.subplots_adjust(left=None, bottom=None, right=None, top=None,
@@ -220,4 +226,9 @@ def mkModelErrPlot(salt3dir='modelfiles/salt3',xlimits=[2000,9200]):
 		
 	
 if __name__ == "__main__":
-	mkModelPlot()
+	parser=ArgumentParser(description='Plot SALT model components at peak and color law as compared to SALT2')
+	parser.add_argument('modeldir',type=str,help='SALT3 model directory',default='model/salt3',nargs='?')
+	parser.add_argument('outfile',type=str,help='File to save plots to',default=None,nargs='?')
+	parser.add_argument('--noErr',dest='plotErr',help='Flag to choose whether or not to show model uncertainties on plot',action='store_const',const=False,default=True)
+	parser=parser.parse_args()
+	mkModelPlot(parser.modeldir ,outfile= '{}/SALTmodelcomp.pdf'.format(parser.modeldir) if parser.outfile is None else parser.outfile,plotErr=parser.plotErr)
