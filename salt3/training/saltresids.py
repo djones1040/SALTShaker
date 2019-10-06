@@ -62,8 +62,6 @@ class SALTResids:
 		#	for flt in np.unique(photdata['filt']):
 		#		ndata += len(photdata['filt'][photdata['filt'] == flt])
 		#self.n_data = ndata
-
-		self.regularizationScaleMethod='meanabs'
 		
 		self.bsorder=3
 		self.guess = guess
@@ -343,7 +341,7 @@ class SALTResids:
 			for regularization, weight in [(self.phaseGradientRegularization, self.regulargradientphase),(self.waveGradientRegularization,self.regulargradientwave ),(self.dyadicRegularization,self.regulardyad)]:
 				if weight ==0:
 					continue
-				regResids,regJac=regularization(x,computeDerivatives)
+				regResids,regJac=regularization(x,components,computeDerivatives)
 				logp-= sum([(res**2).sum()*weight/2 for res in regResids])
 				if computeDerivatives:
 					for idx,res,jac in zip([self.im0,self.im1],regResids,regJac):
@@ -968,7 +966,7 @@ class SALTResids:
 		return returndicts
 		
 
-	#@prior
+	@prior
 	def peakprior(self,width,x,components):
 		wave=self.wave[self.bbandoverlap]
 		lightcurve=np.sum(self.bbandpbspl[np.newaxis,:]*components[0][:,self.bbandoverlap],axis=1)
@@ -1203,7 +1201,7 @@ class SALTResids:
 		return chi2
 	
 	def SALTModel(self,x,evaluatePhase=None,evaluateWave=None):
-		
+		"""Returns flux surfaces of SALT model"""
 		try: m0pars = x[self.m0min:self.m0max]
 		except: import pdb; pdb.set_trace()
 		try:
@@ -1227,7 +1225,7 @@ class SALTResids:
 		return components
 
 	def SALTModelDeriv(self,x,dx,dy,evaluatePhase=None,evaluateWave=None):
-		
+		"""Returns derivatives of flux surfaces of SALT model"""
 		try: m0pars = x[self.m0min:self.m0max]
 		except: import pdb; pdb.set_trace()
 		try:
@@ -1253,6 +1251,7 @@ class SALTResids:
 		return components
 
 	def CorrelationModel(self,x,evaluatePhase=None,evaluateWave=None):
+		"""Returns correlation between SALT model components as a function of phase and wavelength"""
 		components=[]
 		for min,max in zip(self.corrmin,self.corrmax):
 			try: errpars = x[min:max]
@@ -1265,6 +1264,7 @@ class SALTResids:
 
 	
 	def ErrModel(self,x,evaluatePhase=None,evaluateWave=None):
+		"""Returns modeled variance of SALT model components as a function of phase and wavelength"""
 		components=[]
 		for min,max in zip(self.errmin,self.errmax):
 			try: errpars = x[min:max]
@@ -1584,27 +1584,53 @@ class SALTResids:
 			plt.savefig(output,dpi=288)
 		plt.clf()
 	
-	def regularizationScale(self,fluxes):
+	def regularizationScale(self,components,fluxes):
 		if self.regularizationScaleMethod=='fixed':
 			return self.guessScale,[np.zeros(self.im0.size) for component in fluxes]
+		elif self.regularizationScaleMethod=='bbandmax':
+			maxFlux=[interp1d(self.phase,flux[:,self.bbandoverlap],axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)(0) for flux in components]
+			maxB=[np.sum(self.bbandpbspl*mf) for mf in maxFlux]
+			derivInterp = self.spline_deriv_interp(
+				(0,self.wave[self.bbandoverlap]),
+				method=self.interpMethod)
+			summation=(derivInterp*self.bbandpbspl[:,np.newaxis]).sum(axis=0)
+			return [np.abs(mB) for mB in maxB],[summation*np.sign(mB) for mB in maxB]
 		elif self.regularizationScaleMethod == 'rms':
 			scale= [np.sqrt(np.mean(flux**2)) for flux in fluxes]
 			return scale, [np.mean(flux[:,:,np.newaxis]*self.regularizationDerivs[0],axis=(0,1))/s for s,flux in zip(scale,fluxes)]
 		elif self.regularizationScaleMethod=='meanabs':
 			scale= [np.mean(np.abs(flux)) for flux in fluxes]
 			return scale, [np.mean(np.sign(flux[:,:,np.newaxis])*self.regularizationDerivs[0],axis=(0,1)) for s,flux in zip(scale,fluxes)]
-
+		elif self.regularizationScaleMethod=='mad':
+			scale= [np.mean(np.abs(np.median(flux))) for flux in zip(fluxes)]
+			return scale, [np.zeros(self.im0.size) for component in fluxes]
+		elif self.regularizationScaleMethod=='maxneff':
+			iqr=[ (np.percentile(self.neff,80)<self.neff)  for flux in fluxes]
+			scale= [np.mean(np.abs(flux[select])) for select,flux in zip(iqr,fluxes)]
+			return scale, [np.zeros(self.im0.size) for flux in fluxes]#[np.mean(np.sign(flux[select,np.newaxis])*self.regularizationDerivs[0][select,:],axis=(0)) for s,select,flux in zip(scale,iqr,fluxes)]
+		elif self.regularizationScaleMethod=='mid5abs':
+			iqr=[ (np.percentile(flux,45)<flux) & (np.percentile(flux,55)>flux)  for flux in fluxes]
+			scale= [np.mean(np.abs(flux[select])) for select,flux in zip(iqr,fluxes)]
+			return scale, [np.mean(np.sign(flux[select,np.newaxis])*self.regularizationDerivs[0][select,:],axis=(0)) for s,select,flux in zip(scale,iqr,fluxes)]
+		elif self.regularizationScaleMethod=='midqtabs':
+			iqr=[ (np.percentile(flux,25)<flux) & (np.percentile(flux,75)>flux)  for flux in fluxes]
+			scale= [np.mean(np.abs(flux[select])) for select,flux in zip(iqr,fluxes)]
+			return scale, [np.mean(np.sign(flux[select,np.newaxis])*self.regularizationDerivs[0][select,:],axis=(0)) for s,select,flux in zip(scale,iqr,fluxes)]
+		elif self.regularizationScaleMethod=='midqt':
+			iqr=[ (np.percentile(flux,25)<flux) & (np.percentile(flux,75)>flux)  for flux in fluxes]
+			scale= [np.sqrt(np.mean(flux[select]**2)) for select,flux in zip(iqr,fluxes)]
+			return scale, [np.mean(flux[select,np.newaxis]*self.regularizationDerivs[0][select,:],axis=(0))/s for s,select,flux in zip(scale,iqr,fluxes)]
 		else:
 			raise ValueError('Regularization scale method invalid: ',self.regularizationScaleMethod)
-			
-	def dyadicRegularization(self,x, computeJac=True):
+
+	def dyadicRegularization(self,x, components,computeJac=True):
 		phase=self.phaseBinCenters
 		wave=self.waveBinCenters
 		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
 		dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
 		dfluxdphase=self.SALTModelDeriv(x,1,0,phase,wave)
 		d2fluxdphasedwave=self.SALTModelDeriv(x,1,1,phase,wave)
-		scale,scaleDeriv=self.regularizationScale(fluxes)
+		scale,scaleDeriv=self.regularizationScale(components,fluxes)
 		resids=[]
 		jac=[]
 		for i in range(len(fluxes)):
@@ -1618,12 +1644,12 @@ class SALTResids:
 			else: jac+=[None]
 		return resids,jac 
 	
-	def phaseGradientRegularization(self, x, computeJac=True):
+	def phaseGradientRegularization(self, x, components, computeJac=True):
 		phase=self.phaseBinCenters
 		wave=self.waveBinCenters
 		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
 		dfluxdphase=self.SALTModelDeriv(x,1,0,phase,wave)
-		scale,scaleDeriv=self.regularizationScale(fluxes)
+		scale,scaleDeriv=self.regularizationScale(components,fluxes)
 		resids=[]
 		jac=[]
 		for i in range(len(fluxes)):
@@ -1639,12 +1665,12 @@ class SALTResids:
 			else: jac+=[None]
 		return resids,jac  
 	
-	def waveGradientRegularization(self, x,computeJac=True):
+	def waveGradientRegularization(self, x, components,computeJac=True):
 		phase=self.phaseBinCenters
 		wave=self.waveBinCenters
 		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
 		dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
-		scale,scaleDeriv=self.regularizationScale(fluxes)
+		scale,scaleDeriv=self.regularizationScale(components,fluxes)
 		waveGradResids=[]
 		jac=[]
 		for i in range(len(fluxes)):
