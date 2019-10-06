@@ -112,12 +112,12 @@ class TrainSALT(TrainSALTBase):
 		guess[parlist == 'm0'] = m0knots
 		for i in range(3): guess[parlist == 'modelerr_{}'.format(i)] = 1e-6 
 		if self.options.n_components == 2:
-			guess[parlist == 'm1'] = m1knots
+			guess[parlist == 'm1'] = m1knots*1e3
 		if self.options.n_colorpars:
 			guess[parlist == 'cl'] = [0.]*self.options.n_colorpars
 		if self.options.n_colorscatpars:
-			guess[parlist == 'clscat'] = [0.]*self.options.n_colorscatpars
-
+			guess[parlist == 'clscat'] = [1e-2]*self.options.n_colorscatpars
+			guess[np.where(parlist == 'clscat')[0][-1]]=-10
 		guess[(parlist == 'm0') & (guess < 0)] = 1e-4
 		i=0
 		for k in datadict.keys():
@@ -204,7 +204,7 @@ class TrainSALT(TrainSALTBase):
 			foutpars.write('{: <30} {}\n'.format('Parameter Name','Value'))
 			for name,par in zip(parlist,pars):
 
-				foutpars.write('{: <30} {:.6e}\n'.format(name,par))
+				foutpars.write('{: <30} {:.15e}\n'.format(name,par))
 		
 		#Save mcmc chain and log_likelihoods
 		
@@ -224,14 +224,14 @@ class TrainSALT(TrainSALTBase):
 			for w,j in zip(wave,range(len(wave))):
 				print('%.1f %.2f %8.15e'%(p,w,M0[i,j]),file=foutm0)
 				print('%.1f %.2f %8.15e'%(p,w,M1[i,j]),file=foutm1)
-				print('%.1f %.2f %8.15e'%(p,w,M0err[i,j]),file=foutm0err)
-				print('%.1f %.2f %8.15e'%(p,w,M1err[i,j]),file=foutm1err)
+				print('%.1f %.2f %8.15e'%(p,w,M0err[i,j]**2.),file=foutm0err)
+				print('%.1f %.2f %8.15e'%(p,w,M1err[i,j]**2.),file=foutm1err)
 				print('%.1f %.2f %8.15e'%(p,w,cov_M0_M1[i,j]),file=foutcov)
 				print('%.1f %.2f %8.15e'%(p,w,modelerr[i,j]),file=fouterrmod)
 
 		foutclscat = open('%s/salt3_color_dispersion.dat'%outdir,'w')
 		for w,j in zip(wave,range(len(wave))):
-			print('%.2f %8.10e'%(w,clscat[j]),file=foutclscat)
+			print('%.2f %8.15e'%(w,clscat[j]),file=foutclscat)
 		foutclscat.close()
 				
 		foutm0.close()
@@ -314,7 +314,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		from salt3.validation import ValidateLightcurves
 		from salt3.validation import ValidateSpectra
 		from salt3.validation import ValidateModel
-
+		from salt3.validation.figs import plotSALTModel
 		x0,x1,c,t0 = np.loadtxt('%s/salt3train_snparams.txt'%outputdir,unpack=True,usecols=[1,2,3,4])
 		snid = np.genfromtxt('%s/salt3train_snparams.txt'%outputdir,unpack=True,dtype='str',usecols=[0])
 		
@@ -325,7 +325,8 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			'%s/spectralcomp_chi2.png'%outputdir,
 			outputdir)
 
-
+		plotSALTModel.mkModelPlot(outputdir,outfile='%s/SALTmodelcomp.pdf'%outputdir,
+			)
 		if self.options.dospec:
 			ValidateSpectra.compareSpectra(snlist,
 										   self.options.outputdir,maxspec=50)
@@ -414,7 +415,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		
 		# read the data
 		datadict = readutils.rdAllData(self.options.snlist,self.options.estimate_tpk,self.kcordict,
-									   self.addwarning,dospec=self.options.dospec,KeepOnlySpec=True)
+									   self.addwarning,dospec=self.options.dospec,KeepOnlySpec=False)
 		
 		if not os.path.exists(self.options.outputdir):
 			os.makedirs(self.options.outputdir)
