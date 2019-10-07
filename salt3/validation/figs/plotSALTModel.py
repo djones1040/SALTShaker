@@ -44,7 +44,7 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 	
 	salt3m0flux = salt3m0flux.reshape([len(np.unique(salt3m0phase)),len(np.unique(salt3m0wave))])
 	salt3m0fluxerr = salt3m0fluxerr.reshape([len(np.unique(salt3m0errphase)),len(np.unique(salt3m0errwave))])
-	salt3m1flux = -1*salt3m1flux.reshape([len(np.unique(salt3m1phase)),len(np.unique(salt3m1wave))])
+	salt3m1flux = salt3m1flux.reshape([len(np.unique(salt3m1phase)),len(np.unique(salt3m1wave))])
 	salt3m1fluxerr = salt3m1fluxerr.reshape([len(np.unique(salt3m1errphase)),len(np.unique(salt3m1errwave))])
 
 	salt2m0phase = np.unique(salt2m0phase)
@@ -66,8 +66,19 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 	salt3m0errwave = np.unique(salt3m0errwave)
 	salt3m1errphase = np.unique(salt3m1errphase)
 	salt3m1errwave = np.unique(salt3m1errwave)
-
-
+	
+# 	if salt2m1wave.size > salt3m1wave.size:
+# 		maxSalt3 = interp2d(salt3m1wave,salt3m1phase,salt3m1flux)(salt2m1wave,0)
+# 		maxSalt2 = interp1d(salt2m1phase,salt2m1flux,axis=0)(0)
+# 		sgn=np.sign(
+# 	else:
+# 		maxsalt2 = interp2d(salt2m1wave,salt2m1phase,salt2m1flux)(salt3m1wave,0)
+# 		maxsalt3 = interp1d(salt3m1phase,salt3m1flux,axis=0)(0)
+# 		sgn=np.sign(((np.sign(maxsalt3)==1) & (np.sign(maxsalt2)==1)).sum() - 0.5* salt3m1wave.size)
+	maxSalt2 = interp1d(salt2m1phase,salt2m1flux,axis=0)(15)
+	maxSalt3 = interp1d(salt3m1phase,salt3m1flux,axis=0)(15)
+	sgn=np.sign(maxSalt3.sum())*np.sign(maxSalt2.sum())
+	salt3m1flux*=sgn
 	spacing = 0.5
 	for plotphase,i,plotphasestr in zip([-5,0,10],range(3),['-5','+0','+10']):
 		int_salt2m0 = interp2d(salt2m0wave,salt2m0phase,salt2m0flux)
