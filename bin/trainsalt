@@ -2,6 +2,7 @@
 
 from salt3.training.TrainSALT import TrainSALT
 import sys, argparse, configparser, os
+from salt3.config import config_rootdir
 
 usagestring = """SALT3 Training
 
@@ -21,20 +22,32 @@ parser.add_argument('-c','--configfile', default=None, type=str,
 options, args = parser.parse_known_args()
 
 if options.configfile:
-    config = configparser.ConfigParser()
-    if not os.path.exists(options.configfile):
-        raise RuntimeError('Configfile doesn\'t exist!')
-    config.read(options.configfile)
+	config = configparser.ConfigParser()
+	if not os.path.exists(options.configfile):
+		raise RuntimeError('Configfile doesn\'t exist!')
+	config.read(options.configfile)
 else:
-    parser.print_help()
-    raise RuntimeError('Configuration file must be specified at command line')
+	parser.print_help()
+	raise RuntimeError('Configuration file must be specified at command line')
 
-parser = salt.add_options(usage=usagestring,config=config)
-options = parser.parse_args()
+user_parser = salt.add_user_options(usage=usagestring,config=config)
+user_options = user_parser.parse_known_args()[0]
+
+if not os.path.exists(user_options.trainingconfig):
+	print('warning : training config file %s doesn\'t exist.  Trying package directory'%user_options.trainingconfig)
+	user_options.trainingconfig = '%s/%s'%(config_rootdir,user_options.trainingconfig)
+if not os.path.exists(user_options.trainingconfig):
+	raise RuntimeError('can\'t find training config file!  Checked %s'%user_options.trainingconfig)
 	
-salt.options = options
-salt.verbose = options.verbose
-salt.clobber = options.clobber
+trainingconfig = configparser.ConfigParser()
+trainingconfig.read(user_options.trainingconfig)
+training_parser = salt.add_training_options(
+	usage=usagestring,config=trainingconfig)
+training_options = training_parser.parse_known_args(namespace=user_options)[0]
+
+salt.options = training_options
+salt.verbose = training_options.verbose
+salt.clobber = training_options.clobber
 
 if salt.options.stage not in ['all','validate','train']:
     raise RuntimeError('stage must be one of all, validate, train')

@@ -1,5 +1,6 @@
 from salt3.util.synphot import synphot
 from salt3.training import init_hsiao
+from salt3.training.priors import SALTPriors
 
 from sncosmo.models import StretchSource
 from sncosmo.salt2utils import SALT2ColorLaw
@@ -36,15 +37,6 @@ _SCALE_FACTOR = 1e-12
 _B_LAMBDA_EFF = np.array([4302.57])	 # B-band-ish wavelength
 _V_LAMBDA_EFF = np.array([5428.55])	 # V-band-ish wavelength
 warnings.simplefilter('ignore',category=FutureWarning)
-
-
-__priors__=dict()
-def prior(prior):
-	"""Decorator to register a given function as a valid prior"""
-	#Check that the method accepts 4 inputs: a SALTResids object, a width, parameter vector, model components
-	assert(len(signature(prior).parameters)==4 or len(signature(prior).parameters)==5)
-	__priors__[prior.__name__]=prior
-	return prior
 	
 class SALTResids:
 	def __init__(self,guess,datadict,parlist,**kwargs):
@@ -56,13 +48,6 @@ class SALTResids:
 		self.parlist = parlist
 		self.npar = len(parlist)
 		self.datadict = datadict
-		#ndata = 0
-		#for sn in self.datadict.keys():
-		#	photdata = self.datadict[sn]['photdata']
-		#	for flt in np.unique(photdata['filt']):
-		#		ndata += len(photdata['filt'][photdata['filt'] == flt])
-		#self.n_data = ndata
-
 		
 		self.bsorder=3
 		self.guess = guess
@@ -71,37 +56,25 @@ class SALTResids:
 		for key, value in kwargs.items(): 
 			self.__dict__[key] = value
 
+		self.usePriors = []
+		self.priorWidths = []
+		self.BoundedParams = []
+		self.Bounds = []
 		if self.usePriors:
-			self.usePriors=self.usePriors.split(',')
-			self.priorWidths=[float(x) for x in self.priorWidths.split(',')]
-		else:
-			self.usePriors = []
-			self.priorWidths = []
+			for opt in self.__dict__.keys():
+				if opt.startswith('prior_'):
+					self.usePriors += [opt.replace('prior_','')]
+					self.priorWidths += [self.__dict__[opt]]
+				elif opt.startswith('bound_'):
+					self.BoundedParams += [opt.replace('bound_','')]
+					self.Bounds += [(self.__dict__[opt])]
+				
+			#self.usePriors=[x.split('prior_')[-1] for x in ] #self.usePriors.split(',')
+			#self.priorWidths=[float(x) for x in self.priorWidths.split(',')]
 			
 		# pre-set some indices
-		self.m0min = np.min(np.where(self.parlist == 'm0')[0])
-		self.m0max = np.max(np.where(self.parlist == 'm0')[0])
-		self.errmin = tuple([np.min(np.where(self.parlist == 'modelerr_{}'.format(i))[0]) for i in range(self.n_components)]) 
-		self.errmax = tuple([np.max(np.where(self.parlist == 'modelerr_{}'.format(i))[0]) for i in range(self.n_components)]) 
-		self.corrcombinations=sum([[(i,j) for j in range(i+1,self.n_components)]for i in range(self.n_components)] ,[])
-		self.corrmin = tuple([np.min(np.where(self.parlist == 'modelcorr_{}{}'.format(i,j))[0]) for i,j in self.corrcombinations]) 
-		self.corrmax = tuple([np.max(np.where(self.parlist == 'modelcorr_{}{}'.format(i,j))[0]) for i,j in self.corrcombinations]) 
-		self.ix1 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x1')])
-		self.ix0 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x0')])
-		self.ic	 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('c_')])
-		self.itpk = np.array([i for i, si in enumerate(self.parlist) if si.startswith('tpkoff')])
-		self.im0 = np.where(self.parlist == 'm0')[0]
-		self.im1 = np.where(self.parlist == 'm1')[0]
-		self.iCL = np.where(self.parlist == 'cl')[0]
-		self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specrecal')])
-		self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr')])
-		self.imodelcorr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelcorr')])
-		self.iclscat = np.where(self.parlist=='clscat')[0]
-		self.ispcrcl_norm,self.ispcrcl_poly = np.array([],dtype='int'),np.array([],dtype='int')
-		for i,parname in enumerate(np.unique(self.parlist[self.ispcrcl])):
-			self.ispcrcl_norm = np.append(self.ispcrcl_norm,np.where(self.parlist == parname)[0][-1])
-			self.ispcrcl_poly = np.append(self.ispcrcl_poly,np.where(self.parlist == parname)[0][:-1])
-
+		self.set_param_indices()
+		
 		# set some phase/wavelength arrays
 		self.phase = np.linspace(self.phaserange[0],self.phaserange[1],
 								 int((self.phaserange[1]-self.phaserange[0])/self.phaseoutres)+1,True)
@@ -210,16 +183,46 @@ class SALTResids:
 		if self.regularize:
 			self.updateEffectivePoints(guess)
 
-		self.priors={ key: partial(__priors__[key],self) for key in __priors__}
-		for prior in self.priors: 
-			result=self.priors[prior](1,self.guess,self.SALTModel(self.guess))
-			try:
-				self.priors[prior].numResids=result[0].size
-			except:
-				self.priors[prior].numResids=1
-		self.numPriorResids=sum([self.priors[x].numResids for x in self.priors])		
+		self.Priors = SALTPriors(self)
+		self.numPriorResids=self.Priors.numPriorResids
+		#sum([self.Priors.priors[x].numResids for x in self.Priors.priors])
+		#self.numPriorResids += sum([self.Priors.boundedPriors[x].numResids for x in self.Priors.boundedPriors])
+		
 		self.__specFixedUncertainty__={}
 		self.__photFixedUncertainty__={}
+
+	def set_param_indices(self):
+
+		self.parameters = ['x0','x1','c','m0','m1','spcrcl','spcrcl_norm','spcrcl_poly',
+						   'modelerr','modelcorr','clscat','clscat_0','clscat_poly']
+		self.m0min = np.min(np.where(self.parlist == 'm0')[0])
+		self.m0max = np.max(np.where(self.parlist == 'm0')[0])
+		self.errmin = tuple([np.min(np.where(self.parlist == 'modelerr_{}'.format(i))[0]) for i in range(self.n_components)]) 
+		self.errmax = tuple([np.max(np.where(self.parlist == 'modelerr_{}'.format(i))[0]) for i in range(self.n_components)]) 
+		self.corrcombinations=sum([[(i,j) for j in range(i+1,self.n_components)]for i in range(self.n_components)] ,[])
+		self.corrmin = tuple([np.min(np.where(self.parlist == 'modelcorr_{}{}'.format(i,j))[0]) for i,j in self.corrcombinations]) 
+		self.corrmax = tuple([np.max(np.where(self.parlist == 'modelcorr_{}{}'.format(i,j))[0]) for i,j in self.corrcombinations]) 
+		self.ix1 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x1')])
+		self.ix0 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x0')])
+		self.ic	 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('c_')])
+		self.itpk = np.array([i for i, si in enumerate(self.parlist) if si.startswith('tpkoff')])
+		self.im0 = np.where(self.parlist == 'm0')[0]
+		self.im1 = np.where(self.parlist == 'm1')[0]
+		self.iCL = np.where(self.parlist == 'cl')[0]
+		self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specrecal')])
+		self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr')])
+		self.imodelcorr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelcorr')])
+		self.iclscat = np.where(self.parlist=='clscat')[0]
+		self.ispcrcl_norm,self.ispcrcl_poly = np.array([],dtype='int'),np.array([],dtype='int')
+		for i,parname in enumerate(np.unique(self.parlist[self.ispcrcl])):
+			self.ispcrcl_norm = np.append(self.ispcrcl_norm,np.where(self.parlist == parname)[0][-1])
+			self.ispcrcl_poly = np.append(self.ispcrcl_poly,np.where(self.parlist == parname)[0][:-1])
+		self.iclscat_0,self.iclscat_poly = np.array([],dtype='int'),np.array([],dtype='int')
+		for i,parname in enumerate(np.unique(self.parlist[self.iclscat])):
+			self.iclscat_0 = np.append(self.iclscat_0,np.where(self.parlist == parname)[0][-1])
+			self.iclscat_poly = np.append(self.iclscat_poly,np.where(self.parlist == parname)[0][:-1])
+
+
 		
 	def getobswave(self):
 		"for each filter, setting up some things needed for synthetic photometry"
@@ -327,7 +330,7 @@ class SALTResids:
 
 		logp = loglike
 		if len(self.usePriors):
-			priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,x)	
+			priorResids,priorVals,priorJac=self.Priors.priorResids(self.usePriors,self.priorWidths,x)	
 			logp -=(priorResids**2).sum()/2
 			if computeDerivatives:
 				grad-= (priorResids [:,np.newaxis] * priorJac).sum(axis=0)
@@ -960,118 +963,6 @@ class SALTResids:
 
 		return returndicts
 		
-
-	#@prior
-	def peakprior(self,width,x,components):
-		wave=self.wave[self.bbandoverlap]
-		lightcurve=np.sum(self.bbandpbspl[np.newaxis,:]*components[0][:,self.bbandoverlap],axis=1)
-		# from D'Arcy - disabled for now!!	(barfs if model goes crazy w/o regularization)
-		#maxPhase=np.argmax(lightcurve)
-		#finePhase=np.arange(self.phase[maxPhase-1],self.phase[maxPhase+1],0.1)
-		finePhase=np.arange(self.phase[self.maxPhase-1],self.phase[self.maxPhase+1],0.1)
-		fineGrid=self.SALTModel(x,evaluatePhase=finePhase,evaluateWave=wave)[0]
-		lightcurve=np.sum(self.bbandpbspl[np.newaxis,:]*fineGrid,axis=1)
-
-		value=finePhase[np.argmax(lightcurve)]	
-		#Need to write the derivative with respect to parameters
-		return value/width,value,np.zeros(self.npar)
-	
-	@prior
-	def m0prior(self,width,x,components):
-		"""Prior on the magnitude of the M0 component at t=0"""
-		int1d = interp1d(self.phase,components[0],axis=0,assume_sorted=True)
-		m0Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
-			self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
-		m0B = -2.5*np.log10(m0Bflux) + 27.5
-		residual = (m0B-self.m0guess) / width
-		#This derivative is constant, and never needs to be recalculated, so I store it in a hidden attribute
-		try:
-			fluxDeriv= self.__m0priorfluxderiv__.copy()
-		except:
-			fluxDeriv= np.zeros(self.npar)
-			passbandColorExp = self.kcordict['default']['Bpbspl']
-			intmult = (self.wave[1] - self.wave[0])*self.kcordict['default']['fluxfactor']
-			for i in range(self.im0.size):
-				waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
-				phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
-				#Check if this filter is inside values affected by changes in knot i
-				if waverange[0] > self.kcordict['default']['maxlam'] or waverange[1] < self.kcordict['default']['minlam']:
-					pass
-				if (0>=phaserange[0] ) & (0<=phaserange[1]):
-					#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
-					#Integrate only over wavelengths within the relevant range
-					inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
-					derivInterp = interp1d(self.phase,self.spline_derivs[:,inbounds,i],axis=0,kind=self.interpMethod,bounds_error=False,fill_value="extrapolate",assume_sorted=True)
-					fluxDeriv[self.im0[i]] = np.sum( passbandColorExp[inbounds] * derivInterp(0))*intmult 
-			self.__m0priorfluxderiv__=fluxDeriv.copy()
-		
-		jacobian=-fluxDeriv* (2.5 / (np.log(10) *m0Bflux * width))
-		return residual,m0B,jacobian
-		
-	@prior
-	def x1mean(self,width,x,components):
-		"""Prior such that the mean of the x1 population is 0"""
-		x1mean=np.mean(x[self.ix1])
-		residual = x1mean/width
-		jacobian=np.zeros(self.npar)
-		jacobian[self.ix1] = 1/len(self.datadict.keys())/width
-		return residual,x1mean,jacobian
-		
-	@prior
-	def x1std(self,width,x,components):
-		"""Prior such that the standard deviation of the x1 population is 1"""
-		x1s=x[self.ix1]
-		x1mean=np.mean(x1s)
-		x1std=np.std(x1s)
-		residual = (x1std-1)/width
-		jacobian=np.zeros(self.npar)
-		if x1std!=0:
-			jacobian[self.ix1] = (x1s-x1mean)/(len(self.datadict.keys())*x1std*width)
-		return residual,x1std,jacobian
-
-	@prior
-	def m0endprior_alllam(self,width,x,components):
-		"""Prior such that at early times there is no flux"""
-		upper,lower=components[0].shape[1],0
-		value=components[0][0,lower:upper]
-		residual = value/width
-		jacobian=np.zeros((upper-lower,self.npar))
-		for i in range((self.waveknotloc.size-self.bsorder-1)):
-			jacobian[lower:upper,self.im0[i]] = self.spline_derivs[0,lower:upper,i]
-		jacobian/=width
-		return residual,value,jacobian
-
-	@prior
-	def m1endprior_alllam(self,width,x,components):
-		"""Prior such that at early times there is no flux"""
-		upper,lower=components[0].shape[1],0
-		value=components[1][0,lower:upper]
-		residual = value/width
-		jacobian=np.zeros((upper-lower,self.npar))
-		for i in range((self.waveknotloc.size-self.bsorder-1)):
-			jacobian[lower:upper,self.im1[i]] = self.spline_derivs[0,lower:upper,i]
-		jacobian/=width
-		return residual,value,jacobian	
-		
-	def priorResids(self,priors,widths,x):
-		"""Given a list of names of priors and widths returns a residuals vector, list of prior values, and Jacobian """
-
-		alllam_vals = range(0,self.im0.size)
-		components = self.SALTModel(x)
-		residuals=np.zeros(self.numPriorResids)
-		jacobian=np.zeros((self.numPriorResids,self.npar))
-		values=np.zeros(self.numPriorResids)
-		idx=0
-		for prior,width in zip(priors,widths):
-			try:
-				priorFunction=self.priors[prior]
-			except:
-				raise ValueError('Invalid prior supplied: {}'.format(prior)) 
-			
-			residuals[idx:idx+priorFunction.numResids],values[idx:idx+priorFunction.numResids],jacobian[idx:idx+priorFunction.numResids,:]=priorFunction(width,x,components)
-			idx+=priorFunction.numResids
-		return residuals,values,jacobian
-
 	def loglikeforSN_multiprocess(self,args):
 		
 		"""
