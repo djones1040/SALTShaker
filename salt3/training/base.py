@@ -126,7 +126,9 @@ class TrainSALTBase:
 							help='Wavelength scale (in angstroms) for determining additional orders of spectral recalibration from wavelength range of spectrum (default=%default)')
 		parser.add_argument('--n_specrecal_per_lightcurve', default=config.get('trainingparams','n_specrecal_per_lightcurve'), type=float,
 							help='Number of additional spectral recalibration orders per lightcurve (default=%default)')
-
+		parser.add_argument('--regularizationScaleMethod', default=config.get('trainparams','regularizationScaleMethod'), type=str,
+							help='Choose how scale for regularization is calculated (default=%default)')
+    
 		# training model parameters
 		parser.add_argument('--waverange', default=list(map(int,config.get('modelparams','waverange').split(','))), type=int, nargs=2,
 							help='wavelength range over which the model is defined (default=%default)')
@@ -215,7 +217,8 @@ class TrainSALTBase:
 		return parser
 
 	def get_saltkw(self,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc):
-		saltfitkwargs = {'specrecal':self.options.specrecal,
+
+		saltfitkwargs = {'specrecal':self.options.specrecal, 'regularizationScaleMethod':self.options.regularizationScaleMethod,
 						 'phaseknotloc':phaseknotloc,'waveknotloc':waveknotloc,
 						 'errphaseknotloc':errphaseknotloc,'errwaveknotloc':errwaveknotloc,
 						 'phaserange':self.options.phaserange,
