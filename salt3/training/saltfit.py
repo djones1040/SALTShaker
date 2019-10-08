@@ -684,10 +684,17 @@ class GaussNewton(saltresids.SALTResids):
 				specuncertainty = np.append(specuncertainty,specresidsdict['uncertainty'])
 				# priors
 		if doPriors:
-			priorResids,priorVals,priorJac=self.priorResids(self.usePriors,self.priorWidths,guess)
+			priorResids,priorVals,priorJac=self.Priors.priorResids(self.usePriors,self.priorWidths,guess)
 			residuals[idx:idx+priorResids.size]=priorResids
 			jacobian[idx:idx+priorResids.size,:]=priorJac
 			idx+=priorResids.size
+
+			BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
+				self.Priors.BoundedPriorResids(self.Bounds,self.BoundedParams,guess)
+			residuals[idx:idx+BoundedPriorResids.size]=BoundedPriorResids
+			jacobian[idx:idx+BoundedPriorResids.size,:]=BoundedPriorJac
+			idx+=BoundedPriorResids.size
+
 			
 		if self.regularize:
 			for regularization, weight in [(self.phaseGradientRegularization, self.regulargradientphase),(self.waveGradientRegularization,self.regulargradientwave ),(self.dyadicRegularization,self.regulardyad)]:
@@ -746,7 +753,6 @@ class GaussNewton(saltresids.SALTResids):
 			residuals,jacobian,specdataflux,specmodelflux,specuncertainty=self.lsqwrap(
 				X,uncertainties,True,computePCDerivs,doPriors,returnSpecFluxes=True)
 
-			residuals,jacobian=self.lsqwrap(X,uncertainties,True,computePCDerivs,doPriors)
 			jacobian = self.AdjustSpecJac(X,specdataflux,specmodelflux,specuncertainty,jacobian)
 			
 			#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
