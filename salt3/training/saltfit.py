@@ -643,7 +643,7 @@ class GaussNewton(saltresids.SALTResids):
 
 		numResids=self.num_phot+self.num_spec + (self.numPriorResids if doPriors else 0)
 		if self.regularize:
-			numRegResids=sum([ self.n_components*(self.im0.size) for weight in [self.regulargradientphase,self.regulargradientwave ,self.regulardyad] if not weight == 0])
+			numRegResids=sum([ self.n_components*(self.waveRegularizationPoints.size*self.phaseRegularizationPoints.size) for weight in [self.regulargradientphase,self.regulargradientwave ,self.regulardyad] if not weight == 0])
 			numResids+=numRegResids
 			
 		residuals = np.zeros( numResids)
@@ -784,7 +784,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 			print('Number of parameters fit this round: {}'.format(includePars.sum()))
 			jacobian=jacobian[:,includePars]
-			stepsize=linalg.lstsq(jacobian,residuals)[0]
+			stepsize=linalg.lstsq(jacobian,residuals,cond=1e-6)[0]
 			if np.any(np.isnan(stepsize)):
 				print('NaN detected in stepsize; exitting to debugger')
 				import pdb;pdb.set_trace()
