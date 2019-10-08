@@ -124,6 +124,9 @@ class TrainSALTBase:
 							help='maximum iterations for Gauss-Newton (default=%default)')
 		parser.add_argument('--regularize', default=config.get('trainparams','regularize'), type=boolean_string,
 							help='turn on regularization if set (default=%default)')
+		parser.add_argument('--regularizationScaleMethod', default=config.get('trainparams','regularizationScaleMethod'), type=str,
+							help='Choose how scale for regularization is calculated (default=%default)')
+
 		parser.add_argument('--n_repeat', default=config.get('trainparams','n_repeat'), type=int,
 							help='repeat mcmc and/or gauss newton n times (default=%default)')
 		parser.add_argument('--fit_model_err', default=config.get('trainparams','fit_model_err'), type=boolean_string,
@@ -192,7 +195,7 @@ class TrainSALTBase:
 		return parser
 
 	def get_saltkw(self,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc):
-		saltfitkwargs = {'specrecal':self.options.specrecal,
+		saltfitkwargs = {'specrecal':self.options.specrecal, 'regularizationScaleMethod':self.options.regularizationScaleMethod,
 						 'usePriors':self.options.usePriors,'priorWidths':self.options.priorWidths,
 						 'phaseknotloc':phaseknotloc,'waveknotloc':waveknotloc,
 						 'errphaseknotloc':errphaseknotloc,'errwaveknotloc':errwaveknotloc,
