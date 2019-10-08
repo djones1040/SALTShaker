@@ -126,7 +126,7 @@ class TrainSALTBase:
 							help='Wavelength scale (in angstroms) for determining additional orders of spectral recalibration from wavelength range of spectrum (default=%default)')
 		parser.add_argument('--n_specrecal_per_lightcurve', default=config.get('trainingparams','n_specrecal_per_lightcurve'), type=float,
 							help='Number of additional spectral recalibration orders per lightcurve (default=%default)')
-		parser.add_argument('--regularizationScaleMethod', default=config.get('trainparams','regularizationScaleMethod'), type=str,
+		parser.add_argument('--regularizationScaleMethod', default=config.get('trainingparams','regularizationScaleMethod'), type=str,
 							help='Choose how scale for regularization is calculated (default=%default)')
     
 		# training model parameters
