@@ -2,11 +2,12 @@ import os
 import argparse
 import configparser
 import numpy as np
+from salt3.config import config_rootdir
 
 def boolean_string(s):
-	if s not in {'False', 'True', '1', '0'}:
+	if s not in {'False', 'True', 'false', 'true', '1', '0'}:
 		raise ValueError('Not a valid boolean string')
-	return (s == 'True') | (s == '1')
+	return (s == 'True') | (s == '1') | (s == 'true')
 
 def nonetype_or_int(s):
 	if s == 'None': return None
@@ -20,8 +21,8 @@ class TrainSALTBase:
 	def addwarning(self,warning):
 		print(warning)
 		self.warnings.append(warning)
-		
-	def add_options(self, parser=None, usage=None, config=None):
+
+	def add_user_options(self, parser=None, usage=None, config=None):
 		if parser == None:
 			parser = argparse.ArgumentParser(usage=usage, conflict_handler="resolve")
 
@@ -36,8 +37,11 @@ class TrainSALTBase:
 							help='configuration file')
 		parser.add_argument('-s','--stage', default='all', type=str,
 							help='stage - options are train and validate')
+
 		
 		# input/output files
+		parser.add_argument('--trainingconfig', default=config.get('iodata','trainingconfig'), type=str,
+							help='training config file')
 		parser.add_argument('--snlist', default=config.get('iodata','snlist'), type=str,
 							help="""list of SNANA-formatted SN data files, including both photometry and spectroscopy. (default=%default)""")
 		parser.add_argument('--dospec', default=config.get('iodata','dospec'), type=bool,
@@ -57,68 +61,15 @@ class TrainSALTBase:
 							help="""initial B-filter to get the normalization of the initial model (default=%default)""")
 		parser.add_argument('--resume_from_outputdir', default=config.get('iodata','resume_from_outputdir'), type=str,
 							help='if set, initialize using output parameters from previous run. If directory, initialize using ouptut parameters from specified directory')
-
-
-		# training model parameters
-		parser.add_argument('--waverange', default=list(map(int,config.get('trainparams','waverange').split(','))), type=int, nargs=2,
-							help='wavelength range over which the model is defined (default=%default)')
-		parser.add_argument('--colorwaverange', default=list(map(int,config.get('trainparams','colorwaverange').split(','))), type=int, nargs=2,
-							help='wavelength range over which the color law is fit to data (default=%default)')
-		parser.add_argument('--interpfunc', default=config.get('trainparams','interpfunc'), type=str,
-							help='function to interpolate between control points in the fitting (default=%default)')
-		parser.add_argument('--interporder', default=config.get('trainparams','interporder'), type=int,
-							help='for splines/polynomial funcs, order of the function (default=%default)')
-		parser.add_argument('--wavesplineres', default=config.get('trainparams','wavesplineres'), type=float,
-							help='number of angstroms between each wavelength spline knot (default=%default)')
-		parser.add_argument('--phasesplineres', default=config.get('trainparams','phasesplineres'), type=float,
-							help='number of angstroms between each phase spline knot (default=%default)')
-		parser.add_argument('--waveoutres', default=config.get('trainparams','waveoutres'), type=float,
-							help='wavelength resolution in angstroms of the output file (default=%default)')
-		parser.add_argument('--phaseoutres', default=config.get('trainparams','phaseoutres'), type=float,
-							help='phase resolution in angstroms of the output file (default=%default)')
-		parser.add_argument('--phaserange', default=list(map(int,config.get('trainparams','phaserange').split(','))), type=int, nargs=2,
-							help='phase range over which model is trained (default=%default)')
-		parser.add_argument('--n_components', default=config.get('trainparams','n_components'), type=int,
-							help='number of principal components of the SALT model to fit for (default=%default)')
-		parser.add_argument('--n_colorpars', default=config.get('trainparams','n_colorpars'), type=int,
-							help='number of degrees of the phase-independent color law polynomial (default=%default)')
-		parser.add_argument('--n_colorscatpars', default=config.get('trainparams','n_colorscatpars'), type=int,
-							help='number of parameters in the broadband scatter model (default=%default)')
-		parser.add_argument('--specrecal', default=config.get('trainparams','specrecal'), type=int,
-							help='number of parameters defining the spectral recalibration (default=%default)')
-		parser.add_argument('--n_processes', default=config.get('trainparams','n_processes'), type=int,
-							help='number of processes to use in calculating chi2 (default=%default)')
-		parser.add_argument('--estimate_tpk', default=config.get('trainparams','estimate_tpk'), type=bool,
-							help='if set, estimate time of max with quick least squares fitting (default=%default)')
-		parser.add_argument('--fix_t0', default=config.get('trainparams','fix_t0'), type=bool,
-							help='if set, don\'t allow time of max to float (default=%default)')
-		parser.add_argument('--regulargradientphase', default=config.get('trainparams','regulargradientphase'), type=float,
-							help='Weighting of phase gradient chi^2 regularization during training of model parameters (default=%default)')
-		parser.add_argument('--regulargradientwave', default=config.get('trainparams','regulargradientwave'), type=float,
-							help='Weighting of wave gradient chi^2 regularization during training of model parameters (default=%default)')
-		parser.add_argument('--regulardyad', default=config.get('trainparams','regulardyad'), type=float,
-							help='Weighting of dyadic chi^2 regularization during training of model parameters (default=%default)')
-		parser.add_argument('--n_min_specrecal', default=config.get('trainparams','n_min_specrecal'), type=int,
-							help='Minimum order of spectral recalibration polynomials (default=%default)')
-		parser.add_argument('--specrange_wavescale_specrecal', default=config.get('trainparams','specrange_wavescale_specrecal'), type=float,
-							help='Wavelength scale (in angstroms) for determining additional orders of spectral recalibration from wavelength range of spectrum (default=%default)')
-		parser.add_argument('--n_specrecal_per_lightcurve', default=config.get('trainparams','n_specrecal_per_lightcurve'), type=float,
-							help='Number of additional spectral recalibration orders per lightcurve (default=%default)')
-		parser.add_argument('--filter_mass_tolerance', default=config.get('trainparams','filter_mass_tolerance'), type=float,
+		parser.add_argument('--filter_mass_tolerance', default=config.get('iodata','filter_mass_tolerance'), type=float,
 							help='Mass of filter transmission allowed outside of model wavelength range (default=%default)')
-		parser.add_argument('--error_snake_phase_binsize', default=config.get('trainparams','error_snake_phase_binsize'), type=float,
-							help='number of days over which to compute scaling of error model (default=%default)')
-		parser.add_argument('--error_snake_wave_binsize', default=config.get('trainparams','error_snake_wave_binsize'), type=float,
-							help='number of angstroms over which to compute scaling of error model (default=%default)')
-		parser.add_argument('--usePriors', default=config.get('trainparams','usePriors'), type=str,
-							help='Names of priors to be applied to the dataset (default=%default)')
-		parser.add_argument('--priorWidths', default=config.get('trainparams','priorWidths'), type=str,
-							help='Widths of priors to be applied to the dataset (default=%default)')
+		parser.add_argument('--trainingconfig', default=config.get('iodata','trainingconfig'), type=str,
+							help='config file for the detailed training params')
 
 
-		parser.add_argument('--do_mcmc', default=config.get('trainparams','do_mcmc'), type=bool,
+		parser.add_argument('--do_mcmc', default=config.get('trainparams','do_mcmc'), type=boolean_string,
 							help='do MCMC fitting (default=%default)')
-		parser.add_argument('--do_gaussnewton', default=config.get('trainparams','do_gaussnewton'), type=bool,
+		parser.add_argument('--do_gaussnewton', default=config.get('trainparams','do_gaussnewton'), type=boolean_string,
 							help='do Gauss-Newton least squares (default=%default)')
 		parser.add_argument('--gaussnewton_maxiter', default=config.get('trainparams','gaussnewton_maxiter'), type=int,
 							help='maximum iterations for Gauss-Newton (default=%default)')
@@ -128,12 +79,85 @@ class TrainSALTBase:
 							help='repeat mcmc and/or gauss newton n times (default=%default)')
 		parser.add_argument('--fit_model_err', default=config.get('trainparams','fit_model_err'), type=boolean_string,
 							help='fit for model error if set (default=%default)')
-		
+
 		# mcmc parameters
 		parser.add_argument('--n_steps_mcmc', default=config.get('mcmcparams','n_steps_mcmc'), type=int,
 							help='number of accepted MCMC steps (default=%default)')
 		parser.add_argument('--n_burnin_mcmc', default=config.get('mcmcparams','n_burnin_mcmc'), type=int,
 							help='number of burn-in MCMC steps	(default=%default)')
+
+
+		# survey definitions
+		self.surveylist = []
+		for survey in config.sections():
+			if not survey.startswith('survey_'): continue
+			
+			parser.add_argument("--%s_kcorfile"%survey.replace('survey_',''),default=config.get(survey,'kcorfile'),type=str,
+								help="kcor file for survey %s"%survey)
+			parser.add_argument("--%s_subsurveylist"%survey.replace('survey_',''),default=config.get(survey,'subsurveylist'),type=str,
+								help="comma-separated list of subsurveys for survey %s"%survey)
+			self.surveylist += [survey.replace('survey_','')]
+
+		return parser
+
+
+	def add_training_options(self, parser=None, usage=None, config=None):
+		if parser == None:
+			parser = argparse.ArgumentParser(usage=usage, conflict_handler="resolve")
+
+		# training params
+		parser.add_argument('--specrecal', default=config.get('trainingparams','specrecal'), type=int,
+							help='number of parameters defining the spectral recalibration (default=%default)')
+		parser.add_argument('--n_processes', default=config.get('trainingparams','n_processes'), type=int,
+							help='number of processes to use in calculating chi2 (default=%default)')
+		parser.add_argument('--estimate_tpk', default=config.get('trainingparams','estimate_tpk'), type=boolean_string,
+							help='if set, estimate time of max with quick least squares fitting (default=%default)')
+		parser.add_argument('--fix_t0', default=config.get('trainingparams','fix_t0'), type=boolean_string,
+							help='if set, don\'t allow time of max to float (default=%default)')
+		parser.add_argument('--regulargradientphase', default=config.get('trainingparams','regulargradientphase'), type=float,
+							help='Weighting of phase gradient chi^2 regularization during training of model parameters (default=%default)')
+		parser.add_argument('--regulargradientwave', default=config.get('trainingparams','regulargradientwave'), type=float,
+							help='Weighting of wave gradient chi^2 regularization during training of model parameters (default=%default)')
+		parser.add_argument('--regulardyad', default=config.get('trainingparams','regulardyad'), type=float,
+							help='Weighting of dyadic chi^2 regularization during training of model parameters (default=%default)')
+		parser.add_argument('--n_min_specrecal', default=config.get('trainingparams','n_min_specrecal'), type=int,
+							help='Minimum order of spectral recalibration polynomials (default=%default)')
+		parser.add_argument('--specrange_wavescale_specrecal', default=config.get('trainingparams','specrange_wavescale_specrecal'), type=float,
+							help='Wavelength scale (in angstroms) for determining additional orders of spectral recalibration from wavelength range of spectrum (default=%default)')
+		parser.add_argument('--n_specrecal_per_lightcurve', default=config.get('trainingparams','n_specrecal_per_lightcurve'), type=float,
+							help='Number of additional spectral recalibration orders per lightcurve (default=%default)')
+
+		# training model parameters
+		parser.add_argument('--waverange', default=list(map(int,config.get('modelparams','waverange').split(','))), type=int, nargs=2,
+							help='wavelength range over which the model is defined (default=%default)')
+		parser.add_argument('--colorwaverange', default=list(map(int,config.get('modelparams','colorwaverange').split(','))), type=int, nargs=2,
+							help='wavelength range over which the color law is fit to data (default=%default)')
+		parser.add_argument('--interpfunc', default=config.get('modelparams','interpfunc'), type=str,
+							help='function to interpolate between control points in the fitting (default=%default)')
+		parser.add_argument('--interporder', default=config.get('modelparams','interporder'), type=int,
+							help='for splines/polynomial funcs, order of the function (default=%default)')
+		parser.add_argument('--wavesplineres', default=config.get('modelparams','wavesplineres'), type=float,
+							help='number of angstroms between each wavelength spline knot (default=%default)')
+		parser.add_argument('--phasesplineres', default=config.get('modelparams','phasesplineres'), type=float,
+							help='number of angstroms between each phase spline knot (default=%default)')
+		parser.add_argument('--waveoutres', default=config.get('modelparams','waveoutres'), type=float,
+							help='wavelength resolution in angstroms of the output file (default=%default)')
+		parser.add_argument('--phaseoutres', default=config.get('modelparams','phaseoutres'), type=float,
+							help='phase resolution in angstroms of the output file (default=%default)')
+		parser.add_argument('--phaserange', default=list(map(int,config.get('modelparams','phaserange').split(','))), type=int, nargs=2,
+							help='phase range over which model is trained (default=%default)')
+		parser.add_argument('--n_components', default=config.get('modelparams','n_components'), type=int,
+							help='number of principal components of the SALT model to fit for (default=%default)')
+		parser.add_argument('--n_colorpars', default=config.get('modelparams','n_colorpars'), type=int,
+							help='number of degrees of the phase-independent color law polynomial (default=%default)')
+		parser.add_argument('--n_colorscatpars', default=config.get('modelparams','n_colorscatpars'), type=int,
+							help='number of parameters in the broadband scatter model (default=%default)')
+		parser.add_argument('--error_snake_phase_binsize', default=config.get('modelparams','error_snake_phase_binsize'), type=float,
+							help='number of days over which to compute scaling of error model (default=%default)')
+		parser.add_argument('--error_snake_wave_binsize', default=config.get('modelparams','error_snake_wave_binsize'), type=float,
+							help='number of angstroms over which to compute scaling of error model (default=%default)')
+		
+		# mcmc parameters
 		parser.add_argument('--stepsize_magscale_M0', default=config.get('mcmcparams','stepsize_magscale_M0'), type=float,
 							help='initial MCMC step size for M0, in mag	 (default=%default)')
 		parser.add_argument('--stepsize_magadd_M0', default=config.get('mcmcparams','stepsize_magadd_M0'), type=float,
@@ -172,28 +196,26 @@ class TrainSALTBase:
 							help='number of steps when trading between adjusting model params and SN params (default=%default)')
 		parser.add_argument('--nsteps_between_lsqfit', default=config.get('mcmcparams','nsteps_between_lsqfit'), type=float,
 							help='every x number of steps, adjust the SN params via least squares fitting (default=%default)')
-		parser.add_argument('--use_lsqfit', default=config.get('mcmcparams','use_lsqfit'), type=bool,
+		parser.add_argument('--use_lsqfit', default=config.get('mcmcparams','use_lsqfit'), type=boolean_string,
 							help='if set, periodically adjust the SN params via least squares fitting (default=%default)')
 		parser.add_argument('--adaptive_sigma_opt_scale', default=config.get('mcmcparams','adaptive_sigma_opt_scale'), type=float,
 							help='scaling the adaptive step sizes (default=%default)')
 
-		# survey definitions
-		self.surveylist = []
-		for survey in config.sections():
-			if not survey.startswith('survey_'): continue
-			
-			parser.add_argument("--%s_kcorfile"%survey.replace('survey_',''),default=config.get(survey,'kcorfile'),type=str,
-								help="kcor file for survey %s"%survey)
-			parser.add_argument("--%s_subsurveylist"%survey.replace('survey_',''),default=config.get(survey,'subsurveylist'),type=str,
-								help="comma-separated list of subsurveys for survey %s"%survey)
-			self.surveylist += [survey.replace('survey_','')]
+		# priors
+		for prior,val in config.items('priors'):
+			parser.add_argument("--prior_%s"%prior,default=val,type=float,
+								help="prior on %s"%prior)
 
-			
+		# bounds
+		for bound,val in config.items('bounds'):
+			parser.add_argument("--bound_%s"%bound,default=val.split(','),type=float,nargs=3,
+								help="bound on %s"%bound)
+		#import pdb; pdb.set_trace()
+
 		return parser
 
 	def get_saltkw(self,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc):
 		saltfitkwargs = {'specrecal':self.options.specrecal,
-						 'usePriors':self.options.usePriors,'priorWidths':self.options.priorWidths,
 						 'phaseknotloc':phaseknotloc,'waveknotloc':waveknotloc,
 						 'errphaseknotloc':errphaseknotloc,'errwaveknotloc':errwaveknotloc,
 						 'phaserange':self.options.phaserange,
@@ -233,6 +255,10 @@ class TrainSALTBase:
 						 'outputdir':self.options.outputdir,
 						 'fit_model_err':self.options.fit_model_err}
 
+		for k in self.__dict__.keys():
+			if k.startswith('prior') or k.startswith('bound'):
+				saltfitkwargs[k] = self.__dict__[k]
+		
 		return saltfitkwargs
 
 	def mkcuts(self,datadict):
