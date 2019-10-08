@@ -446,11 +446,12 @@ class GaussNewton(saltresids.SALTResids):
 		maxes[self.iCL]=10
 		mins[self.ispcrcl]=-1
 		maxes[self.ispcrcl]=1
-		mins[self.imodelerr]=-1
+		mins[self.imodelerr]=0
 		maxes[self.imodelerr]=1
-		mins[self.imodelcorr]=0
+		mins[self.imodelcorr]=-1
 		maxes[self.imodelcorr]=1
-
+		mins[self.iclscat]=-20
+		mins[self.iclscat]=20
 		self.bounds=list(zip(mins,maxes))
 
 		self.GN_iter = {'all':1,'all-grouped':1,'x0':1,'x1':1,'component0':1,
@@ -559,7 +560,7 @@ class GaussNewton(saltresids.SALTResids):
 				return xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 					modelerr,clpars,clerr,clscat,SNParams,stepsizes
 
-			if self.fit_model_err: # and superloop % 3 ==0
+			if self.fit_model_err and (superloop % 3 ==2 or superloop==loop_niter):
 				print('Optimizing model error')
 				X,loglike=self.minuitOptimize(X,'modelerr')
 				uncertainties=self.getFixedUncertainties(X)
@@ -598,7 +599,7 @@ class GaussNewton(saltresids.SALTResids):
 		kwargs.update({params[i]: initVals[i] for i in range(includePars.sum())})
 		kwargs.update({'error_'+params[i]: np.sqrt(np.abs(X[includePars][i])) for i in range(includePars.sum())})
 		m=Minuit(fn,use_array_call=True,forced_parameters=params,grad=grad,errordef=1,**kwargs)
-		result,paramResults=m.migrad(10)
+		result,paramResults=m.migrad(1200)
 		X=X.copy()
 		
 		X[includePars]=np.array([x.value for x  in paramResults])
@@ -642,7 +643,7 @@ class GaussNewton(saltresids.SALTResids):
 
 		numResids=self.num_phot+self.num_spec + (self.numPriorResids if doPriors else 0)
 		if self.regularize:
-			numRegResids=sum([ self.n_components*(self.im0.size) for weight in [self.regulargradientphase,self.regulargradientwave ,self.regulardyad] if not weight == 0])
+			numRegResids=sum([ self.n_components*(self.waveRegularizationPoints.size*self.phaseRegularizationPoints.size) for weight in [self.regulargradientphase,self.regulargradientwave ,self.regulardyad] if not weight == 0])
 			numResids+=numRegResids
 			
 		residuals = np.zeros( numResids)
@@ -699,12 +700,12 @@ class GaussNewton(saltresids.SALTResids):
 			for regularization, weight in [(self.phaseGradientRegularization, self.regulargradientphase),(self.waveGradientRegularization,self.regulargradientwave ),(self.dyadicRegularization,self.regulardyad)]:
 				if weight ==0:
 					continue
-				for regResids,regJac,indices in zip( *regularization(guess,computeDerivatives), [self.im0,self.im1]):
+				for regResids,regJac,indices in zip( *regularization(guess,components,computeDerivatives), [self.im0,self.im1]):
 					residuals[idx:idx+regResids.size]=regResids*np.sqrt(weight)
 					if computeDerivatives:
 						jacobian[idx:idx+regResids.size,indices]=regJac*np.sqrt(weight)
 					idx+=regResids.size
-
+		#import pdb;pdb.set_trace()
 		if computeDerivatives:
 			print('loop took %i seconds'%(time.time()-tstart))
 			if returnSpecFluxes:
@@ -716,7 +717,7 @@ class GaussNewton(saltresids.SALTResids):
 				return residuals,specdataflux,specmodelflux,specuncertainty
 			else:
 				return residuals
-	
+
 	def robust_process_fit(self,X_init,uncertainties,chi2_init,niter):
 		X,chi2=X_init,chi2_init
 		
@@ -789,7 +790,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 			print('Number of parameters fit this round: {}'.format(includePars.sum()))
 			jacobian=jacobian[:,includePars]
-			stepsize=linalg.lstsq(jacobian,residuals)[0]
+			stepsize=linalg.lstsq(jacobian,residuals,cond=1e-6)[0]
 			if np.any(np.isnan(stepsize)):
 				print('NaN detected in stepsize; exitting to debugger')
 				import pdb;pdb.set_trace()
