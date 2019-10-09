@@ -1,0 +1,151 @@
+ USER COMMENT: BLANK 
+
+ BRIEF_DESCRIPTION: simulate RANDOM SNe with GENMODEL = SALT2.JLA-B14 
+
+  HOST MACHINE: x86_64-apple-darwin13.4.0 
+  USERNAME:  david 
+  SNDATA_ROOT:  /usr/local/SNDATA_ROOT 
+  SNANA_DIR:     /Users/David/build/SNANA 
+  SNANA_VERSION: v10_73h 
+  Current Dir:  /Users/david/Dropbox/research/SALT3_runpipe/smallsim_perfect 
+
+ PERFECT LIGHTCURVES REQUESTED: 
+	 MWEBV_FLAG                   : 1 -> 0 
+	 OPT_MWEBV                    : 1 -> 0 
+	 OPT_MWCOLORLAW               : 94 -> 0 
+	 SMEARFLAG_ZEROPT             : 1 -> 0 
+	 EXPOSURE_TIME                : 1.00000 -> 100000.00000 
+	 GENEXPTAU_AV                 : 0.00000 -> 0.00000 
+	 GENGAUSIG_AV                 : 0.00000 -> 0.00000 
+	 GENMODEL_ERRSCALE            : 0.00000 -> 0.00000 
+	 GENMAG_SMEAR                 : 0.00000 -> 0.00000 
+	 NFILT_SMEAR                  : 0 -> 0 
+	 GENSIGMA_REDSHIFT            : 0.00000 -> 0.00001 
+	 GENSIGMA_VPEC                : 0.00000 -> 0.00000 
+	 HOSTLIB_USE                  : 0 -> 0 
+	 GENSIGMA_PEAKMJD             : 1.00000 -> 0.10000 
+	 GENSIGMA_RV                  : 0.00000 -> 0.00000 
+
+ FULL_DESCRIPTION: 
+	 SIMLIB filename  : /usr/local/SNDATA_ROOT/simlib/PS1/Pantheon/PS1_LOWZ_COMBINED.SIMLIB (start at LIBID=0) 
+	 SIMLIB SURVEY    : PS1_LOWZ_COMBINED  (TELESCOPE=UNKNOWN, MINOBS=1) 
+	 SIMLIB UNITS     : ARCSEC_FWHM for PSF,  ADU_PER_SQARCSEC for SKYSIG 
+	 NEWMJD_DIF       :  2.88  minutes (defines trigger epoch)
+	 Generation VERSION: MD_BYOSEDTEST 
+	 Generation source : RANDOM 
+	 Generation FILTERS: bcdeghijlmnopqrsuvwxyzACDEFHIJK 
+	 KCOR lookup tables: kcor/kcor_SPEC_PS1_LOWZ_COMBINED.fits 
+	 Flux-smearing is ON 
+	 Reported flux-uncertainty includes SKY+GALAXY+SOURCE
+	 Zeropt-smearing is OFF 
+	 Host-galaxy shot-noise  is OFF 
+	 Host-galaxy image-noise  is OFF 
+	 MilkyWay extinction  is OFF 
+
+ *********************************** 
+   SIMULATED VOLUME, TIME, RATE(POWERLAW)
+	 Survey dOmega  = 1.0418e-11 steradians  ( 0.00000 PI) 
+	 Redshift range =  0.0100 -  0.4000
+	 <redsfhit>     =  0.2934  (volume-weighted) 
+	 Survey Volume  = 1.2971e-02  sr*(MPc/h70)^3 
+	 Survey Time    = 17.2603  years/season 
+	 Co-moving Time = 13.3444  years/season  [ T/(1+<z>) ] 
+	 Co-moving V*T  = 1.7309e-01  sr*(MPc/h70)^3 * yr / season 
+	 POWERLAW MODEL:  2.60e-05*(1+z)^2.20  (0.0 < z < 4.0) 
+	    MODEL-RATE(z=0.01) = 2.658e-05/Mpc^3/yr    
+	    MODEL-RATE(z=0.21) = 3.955e-05/Mpc^3/yr    
+	 Number of EVENTS per season = 7.930213e-06 
+
+
+  GENERATION RANGES: 
+	 ==> Override gen-values with SIMLIB header values.
+	 Generate Redshift :  0.010 to  0.400  using  POWERLAW distribution. 
+	 REDSHIFT_FINAL is ZCMB_GEN smeared by :  0.00001 
+	 Peculiar Velocity Gaussian sigma: 0.0 km/sec
+	 bcdeghijlmnopqrsuvwxyzACDEFHIJK   ZP   offsets :  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0	 bcdeghijlmnopqrsuvwxyzACDEFHIJK  MODEL offsets :  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0	 bcdeghijlmnopqrsuvwxyzACDEFHIJK  exposure times: 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 10000	 bcdeghijlmnopqrsuvwxyzACDEFHIJK  exposure MSKOPT=7 => ZPT  SKYSIG  READNOISE  
+	 bcdeghijlmnopqrsuvwxyzACDEFHIJK  MODEL offsets :  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000  0	 bcdeghijlmnopqrsuvwxyzACDEFHIJK  exposure times: 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 10000	 bcdeghijlmnopqrsuvwxyzACDEFHIJK  exposure MSKOPT=7 => ZPT  SKYSIG  READNOISE  
+	 bcdeghijlmnopqrsuvwxyzACDEFHIJK  exposure times: 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 100000.0 10000	 bcdeghijlmnopqrsuvwxyzACDEFHIJK  exposure MSKOPT=7 => ZPT  SKYSIG  READNOISE  
+	 bcdeghijlmnopqrsuvwxyzACDEFHIJK  exposure MSKOPT=7 => ZPT  SKYSIG  READNOISE  
+	 RA       : -360.00 to 360.00  deg
+	 PEAKMJD  :  49200.0 to  55500.0   
+	 PEAKMJD-estimate  : 100000.0 
+	 Trest    :   -19.00 to    49.00  days 
+	 RISETIME-SHIFT(days) SIGMA(lo,hi) : 0.0 , 0.0  (Mean= 0.0) 
+	 FALLTIME-SHIFT(days) SIGMA(lo,hi) : 0.0 , 0.0  (Mean= 0.0) 
+	 Shape-par(x1): Peak=0.44  SIG-+= 3.120,0.724  SKEW=0.00,0.00  BND=-4.00,4.00
+	 SALT2c: Peak=-0.07  SIG-+= 0.033,0.125  SKEW=0.00,0.00  BND=-0.40,0.40
+	 Alpha : Peak=0.17  SIG-+= 0.000,0.000  SKEW=0.00,0.00  BND=0.00,0.40
+	 Beta  : Peak=3.03  SIG-+= 0.000,0.000  SKEW=0.00,0.00  BND=0.50,9.90
+
+  Z-dependent SN-parameter shifts:  None. 
+
+  Intrinsic MAG-smearing models (sigma clip -3.0 to  3.0) : 
+   Model 1: Coherent MAG-smearing (GENMAG_SMEAR) :  0.000  
+   Model 2: passband MAG-smearing is OFF 
+   Model 3:  model-smear is OFF  
+   Model 4: intrinsic scatter matrix is OFF 
+   Model 5: GENMAG_SMEAR_USRFUN is  OFF 
+
+  AVWARP_OVERFLOWS:  NONE. 
+
+  TAKE_SPECTRUM: 
+    TOBS =  -7.0 to   0.0    SNR-zPOLY:20,0,0  
+    TOBS =   0.0 to   7.0    SNR-zPOLY:20,0,0  
+    TOBS =  15.0 to  20.0    SNR-zPOLY:20,0,0  
+
+  Cosmology Parameters: 
+	 H0 =  70.00 km/s per MPc 
+	 Omega_{M,L} =  0.30,  0.70   w = -1.00  
+
+ --------------------------------------------------- 
+  Software-Pipeline Search Efficiency (MINOBS=2) from 
+
+  Spectroscopic Efficiency : 
+	 No spec-eff option specified ==> 100% efficiency. 
+
+  Unconfirmed zHOST Efficiency : 100% 
+
+  APPLY_SEARCHEFF_OPT:  3 => Apply both PIPELINE+SPEC efficiencies 
+  SNTYPE(Ia) = 1(SPEC)  and 101(PHOT) 
+ --------------------------------------------------- 
+
+  SOFTWARE CUTS: 
+	 EPOCH CUT:  2000 Lambda(rest) < 22000 A 
+	 EPOCH CUT: SNR >= -9999  
+	 TrestMIN <  10.0  &&  TrestMAX >  9.0 days 
+	 Max TGAP(rest) <= 999999.0  days 
+	 Max T0GAP(rest) <= 999999.0  days 
+	 NOBS(MJDDIF > 0.0) >=  0 
+	 NEPOCH(SNR >  3.0) >=  5 
+	 SIMGEN_DUMP file includes SNe passing software cuts. 
+	 PEAKMAG(any filter) < 999.0 
+	 MWEBV <= 0.2 
+
+  HOSTLIB Summary: None. 
+
+  Fudges on SIMLIB Seeing Conditions: NONE. 
+
+ ============ END OF SIMULATION SUMMARY ============== 
+
+  Random Number Sync: 
+	 RANDOM SEED: 28473   (RANLIST_START_GENSMEAR: 1)
+	 FIRST/LAST Random Number (List=1): 0.129730 0.957268  
+	 FIRST/LAST Random Number (List=2): 0.407840 0.341853  
+	 FIRST/LAST Random Number (List=3): 0.221022 0.706042  
+
+  Generation Statistics (total CPU=0.0 minutes): 
+	 Generated   172 simulated light curves (172/sec) 
+	 Wrote       150 simulated light curves to SNDATA files (150/sec). 
+	 Wrote       516 simulated spectra to SNDATA files 
+  Spectroscopic-type: 172 -> 150 (before -> after cuts)
+  Photometric-type:   0 -> 0 (before -> after cuts)
+  Rejection Statistics: 
+	     0 rejected by NEPOCH<5 
+	     0 rejected by GENRANGEs 
+	     0 rejected by SEARCH-TRIGGER 
+	    22 rejected by CUTWIN-SELECTION 
+  SEARCH+CUTS Efficiency:  0.8721 +-  0.0255 
+
+  Number of SNe per season AFTER CUTS :      0 +-     0 
+
+	 ===== END OF README FILE ====== 
