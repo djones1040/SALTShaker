@@ -677,6 +677,7 @@ class GetMu(PipeProcedure):
         self.prooptions = prooptions
         self.batch = batch
         self.validplots = validplots
+        self.outloc = os.path.join(pipe.LCFitting.glueto('getmu'),pipe.Simulation._get_output_info().set_index('key').loc['GENVERSION'].value)
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
                           prooptions=prooptions,batch=batch,validplots=validplots,done_file=self.done_file)
 
