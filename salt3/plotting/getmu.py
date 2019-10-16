@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """very basic utilities for dealing w/ fitres objects"""
 import numpy as np
-import cosmo
+#import cosmo
 
 def getmu(inp,salt2alpha=0.147,salt2beta=3.13,sigint=0.1,deltam=0,peczerr=0.00083):
 
