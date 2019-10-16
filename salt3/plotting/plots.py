@@ -21,7 +21,7 @@ def calcMu(fr,alpha=0.14,beta=3.1,M=-19.36):
 	return(fr)
 
 def plot_hubble(fr):
-	ax=util.plot('errorbar',fr.zCMB,y=fr.MU,yerr=fr.MUERR,ylab=r'$\mu$',fmt='o')
+	ax=plot('errorbar',fr.zCMB,y=fr.MU,yerr=fr.MUERR,ylab=r'$\mu$',fmt='o')
 	zinterp=np.arange(np.min(fr.zCMB),np.max(fr.zCMB),.01)
 	ax.plot(zinterp,cosmo.distmod(zinterp).value,color='k',linewidth=3)
 	ax=util.split_plot(ax,'errorbar',fr.zCMB,y=fr.MU-cosmo.distmod(fr.zCMB).value,yerr=fr.MUERR,xlab=r'$z_{\rm{CMB}}$',ylab='Residual',fmt='o')
