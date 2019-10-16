@@ -12,7 +12,7 @@ def getObj(fitresfile, fitresheader = True, makeCuts = True):
 	fr = txtobj(fitresfile,fitresheader = fitresheader)
 	if makeCuts:
 		fr = mkcuts(fr)
-	fr.filename=os.path.splitext(fitresfile)[0]
+	fr.filename=os.path.splitext(os.path.basename(fitresfile))[0]
 	return(fr)
 
 def calcMu(fr,alpha=0.14,beta=3.1,M=-19.36):
@@ -34,7 +34,7 @@ def plot_hubble(fr):
 		outname=os.path.join('figures',fr.filename+'_hubble_diagram_'+str(ext)+'.pdf')
 	else:
 		outname=os.path.join('figures',fr.filename+'_hubble_diagram.pdf')
-	print(outname)
+
 	plt.savefig(outname,format='pdf')
 	plt.clf()
 
