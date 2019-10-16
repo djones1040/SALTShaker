@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 import os
 
 
-#from .txtobj import txtobj
-#from .getmu import *
-#from .util import *
+from .txtobj import txtobj
+from .getmu import *
+from .util import *
 
 def getObj(fitresfile, fitresheader = True, makeCuts = True):
 	fr = txtobj(fitresfile,fitresheader = fitresheader)
