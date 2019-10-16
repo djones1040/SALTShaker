@@ -23,11 +23,15 @@ def plot(plot_type,x,y=None,yerr=None,xerr=None,x_lab='',y_lab='',fontsize=18,fi
 	ax.set_ylabel(y_lab,fontsize=fontsize)
 	return(ax)
 
-def split_plot(ax,plot_type,x,y=None,yerr=None,xerr=None,x_lab='',y_lab='',fontsize=18,**kwargs):
+def split_plot(ax,plot_type,x,y=None,yerr=None,xerr=None,x_lab='',y_lab='',xticks=False,fontsize=18,**kwargs):
 	ax_divider = make_axes_locatable(ax)
 	ax_ml = ax_divider.append_axes("bottom", size="50%", pad=.2)
+	ticks=[]
 	for tick in ax_ml.xaxis.get_major_ticks():
+		ticks.append('')
 		tick.label.set_fontsize(14)
+	if not xticks:
+		ax.set_xticklabels(ticks)
 	for tick in ax_ml.yaxis.get_major_ticks():
 		tick.label.set_fontsize(14)
 	if plot_type=='scatter':
