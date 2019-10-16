@@ -4,9 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-from .getmu import *
-from .txtobj import txtobj
-from .util import *
+
+#from .txtobj import txtobj
+#from .getmu import *
+#from .util import *
 
 def getObj(fitresfile, fitresheader = True, makeCuts = True):
 	fr = txtobj(fitresfile,fitresheader = fitresheader)
@@ -15,7 +16,7 @@ def getObj(fitresfile, fitresheader = True, makeCuts = True):
 	fr.filename=os.path.splitext(fitresfile)[0]
 	return(fr)
 
-def getMu(fr,alpha=0.14,beta=3.1,M=-19.36)
+def calcMu(fr,alpha=0.14,beta=3.1,M=-19.36):
 	fr.MU = fr.mB + alpha*fr.x1 - beta*fr.c + M
 	fr.MUERR = np.sqrt(fr.mBERR**2 + alpha**2.*fr.x1ERR**2. + beta**2.*fr.cERR**2)
 	return(fr)
@@ -38,3 +39,5 @@ def plot_hubble(fr):
 	plt.savefig(outname,format='pdf')
 	plt.clf()
 
+if __name__=='__main__':
+	getObj('test')
