@@ -24,7 +24,9 @@ def plot_hubble(fr):
 	ax=plot('errorbar',fr.zCMB,y=fr.MU,yerr=fr.MUERR,y_lab=r'$\mu$',fmt='o')
 	zinterp=np.arange(np.min(fr.zCMB),np.max(fr.zCMB),.01)
 	ax.plot(zinterp,cosmo.distmod(zinterp).value,color='k',linewidth=3)
-	ax=split_plot(ax,'errorbar',fr.zCMB,y=fr.MU-cosmo.distmod(fr.zCMB).value,yerr=fr.MUERR,x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o')
+	ax,ax2=split_plot(ax,'errorbar',fr.zCMB,y=fr.MU-cosmo.distmod(fr.zCMB).value,yerr=fr.MUERR,x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o')
+	lims=ax.get_xlim()
+	ax2.plot(lims,[0,0],'k--',linewidth=3)
 	if not os.path.exists('figures'):
 		os.makedirs('figures')
 	if os.path.exists(os.path.join('figures',fr.filename+'_hubble_diagram.pdf')):
