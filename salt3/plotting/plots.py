@@ -16,7 +16,7 @@ def getObj(fitresfile, fitresheader = True, makeCuts = True):
 	return(fr)
 
 def calcMu(fr,alpha=0.14,beta=3.1,M=-19.36):
-	fr.MU = fr.mB + alpha*fr.x1 - beta*fr.c + M
+	fr.MU = fr.mB + alpha*fr.x1 - beta*fr.c - M
 	fr.MUERR = np.sqrt(fr.mBERR**2 + alpha**2.*fr.x1ERR**2. + beta**2.*fr.cERR**2)
 	return(fr)
 
@@ -34,8 +34,9 @@ def plot_hubble(fr):
 		outname=os.path.join('figures',fr.filename+'_hubble_diagram_'+str(ext)+'.pdf')
 	else:
 		outname=os.path.join('figures',fr.filename+'_hubble_diagram.pdf')
-
+	plt.tight_layout()
 	plt.savefig(outname,format='pdf')
+
 	plt.clf()
 
 if __name__=='__main__':
