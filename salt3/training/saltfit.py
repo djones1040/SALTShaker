@@ -431,28 +431,6 @@ class GaussNewton(saltresids.SALTResids):
 		super().__init__(guess,datadict,parlist,**kwargs)
 		self.lsqfit = False
 		
-		mins,maxes=np.zeros(self.parlist.size),np.zeros(self.parlist.size)
-		mins[self.im1]=-1
-		maxes[self.im1]=1
-		mins[self.im0]=0
-		maxes[self.im0]=1
-		maxes[self.ix0]=1
-		mins[self.ix0]=0
-		mins[self.ic]=-10
-		maxes[self.ic]=10
-		mins[self.ix1]=-10
-		maxes[self.ix1]=10
-		mins[self.iCL]=-10
-		maxes[self.iCL]=10
-		mins[self.ispcrcl]=-1
-		maxes[self.ispcrcl]=1
-		mins[self.imodelerr]=0
-		maxes[self.imodelerr]=1
-		mins[self.imodelcorr]=-1
-		maxes[self.imodelcorr]=1
-		mins[self.iclscat]=-20
-		mins[self.iclscat]=20
-		self.bounds=list(zip(mins,maxes))
 
 		self.GN_iter = {'all':1,'all-grouped':1,'x0':1,'x1':1,'component0':1,
 						'component1':1,'color':3,'colorlaw':3,
@@ -559,8 +537,7 @@ class GaussNewton(saltresids.SALTResids):
 				stepsizes = self.getstepsizes(X,Xlast)
 				return xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 					modelerr,clpars,clerr,clscat,SNParams,stepsizes
-
-			if self.fit_model_err and (superloop % 3 ==2 or superloop==loop_niter):
+			if self.fit_model_err and (superloop % 3 ==2 or superloop+1==loop_niter):
 				print('Optimizing model error')
 				X,loglike=self.minuitOptimize(X,'modelerr')
 				uncertainties=self.getFixedUncertainties(X)
@@ -595,9 +572,10 @@ class GaussNewton(saltresids.SALTResids):
 		print('Initialized log likelihood: ' ,self.maxlikefit(X))
 		params=['x'+str(i) for i in range(includePars.sum())]
 		initVals=X[includePars].copy()
-		kwargs={'limit_'+params[i] : self.bounds[np.where(includePars)[0][i]] for i in range(includePars.sum())}
-		kwargs.update({params[i]: initVals[i] for i in range(includePars.sum())})
-		kwargs.update({'error_'+params[i]: np.sqrt(np.abs(X[includePars][i])) for i in range(includePars.sum())})
+		import pdb;pdb.set_trace()
+		#kwargs={'limit_'+params[i] : self.bounds[np.where(includePars)[0][i]] for i in range(includePars.sum()) if }
+		kwargs=({params[i]: initVals[i] for i in range(includePars.sum())})
+		kwargs.update({'error_'+params[i]: np.abs(X[includePars][i])/10 for i in range(includePars.sum())})
 		m=Minuit(fn,use_array_call=True,forced_parameters=params,grad=grad,errordef=1,**kwargs)
 		result,paramResults=m.migrad(1200)
 		X=X.copy()
@@ -641,7 +619,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 		saltCorr=self.CorrelationModel(guess)
 
-		numResids=self.num_phot+self.num_spec + (self.numPriorResids if doPriors else 0)
+		numResids=self.num_phot+self.num_spec + (self.numPriorResids+self.priors.numBoundResids if doPriors else 0)
 		if self.regularize:
 			numRegResids=sum([ self.n_components*(self.waveRegularizationPoints.size*self.phaseRegularizationPoints.size) for weight in [self.regulargradientphase,self.regulargradientwave ,self.regulardyad] if not weight == 0])
 			numResids+=numRegResids
@@ -684,13 +662,13 @@ class GaussNewton(saltresids.SALTResids):
 				specuncertainty = np.append(specuncertainty,specresidsdict['uncertainty'])
 				# priors
 		if doPriors:
-			priorResids,priorVals,priorJac=self.Priors.priorResids(self.usePriors,self.priorWidths,guess)
+			priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,guess)
 			residuals[idx:idx+priorResids.size]=priorResids
 			jacobian[idx:idx+priorResids.size,:]=priorJac
 			idx+=priorResids.size
 
 			BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
-				self.Priors.BoundedPriorResids(self.Bounds,self.BoundedParams,guess)
+				self.priors.BoundedPriorResids(self.bounds,self.boundedParams,guess)
 			residuals[idx:idx+BoundedPriorResids.size]=BoundedPriorResids
 			jacobian[idx:idx+BoundedPriorResids.size,:]=BoundedPriorJac
 			idx+=BoundedPriorResids.size
