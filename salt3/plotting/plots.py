@@ -1,4 +1,3 @@
-from txtobj import txtobj
 from astropy.cosmology import Planck15 as cosmo
 import numpy as np
 import matplotlib.pyplot as plt
