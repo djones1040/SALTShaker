@@ -34,7 +34,7 @@ def plot_hubble(fr):
 		outname=os.path.join('figures',fr.filename+'_hubble_diagram_'+str(ext)+'.pdf')
 	else:
 		outname=os.path.join('figures',fr.filename+'_hubble_diagram.pdf')
-
+	print(outname)
 	plt.savefig(outname,format='pdf')
 	plt.clf()
 
