@@ -79,7 +79,8 @@ def plot_fits(simfile,datafile=None,version=''):
 	ovhist_obj=ovhist()
 	parser = ovhist_obj.add_options(usage=usagestring)
 	options,  args = parser.parse_args()
-	options.histvar = ['x1','c']
+	options.histvar = ['MURES']#['x1','c']
+
 	ovhist_obj.options = options
 	ovhist_obj.version=version
 	if datafile is None:
