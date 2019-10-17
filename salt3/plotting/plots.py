@@ -63,7 +63,7 @@ def plot_hubble(fr,binned=True):
 
 	plt.clf()
 
-def plot_fits(simfile,version=''):
+def plot_fits(simfile,datafile=None,version=''):
 	usagestring="""
 	ovdatamc.py <DataFitresFile> <SimFitresFile>  <varName1:varName2:varName3....>  [--cutwin NN_ITYPE 1 1 --cutwin x1 -3 3]
 
@@ -82,7 +82,8 @@ def plot_fits(simfile,version=''):
 	options.histvar = ['mB']#['x1','c']
 	ovhist_obj.options = options
 	ovhist_obj.version=version
-	datafile=simfile
+	if datafile is None:
+		datafile=simfile
 	
 	data = txtobj_abv(datafile)
 	sim = txtobj_abv(simfile)
@@ -136,7 +137,7 @@ def plot_fits(simfile,version=''):
 		plt.rcParams['figure.figsize'] = (8.5,11)
 		from matplotlib.backends.backend_pdf import PdfPages
 		if not ovhist_obj.options.outfile:
-			ovhist_obj.options.outfile = 'ovplot%s_%s.pdf'%(ovhist_obj.version,"_".join(ovhist_obj.options.histvar))
+			ovhist_obj.options.outfile = os.path.join("figures",'ovplot_%s_%s.pdf'%(ovhist_obj.version,"_".join(ovhist_obj.options.histvar)))
 		if not os.path.exists(ovhist_obj.options.outfile) or ovhist_obj.options.clobber:
 			pdf_pages = PdfPages(ovhist_obj.options.outfile)
 		else:
