@@ -82,9 +82,9 @@ def plot_fits(simfile,version=''):
 	options.histvar = ['mB']#['x1','c']
 	ovhist_obj.options = options
 	datafile=simfile
-	data = txtobj(datafile)
+	data = txtobj_abv(datafile)
 	data.version=version
-	sim = txtobj(simfile)
+	sim = txtobj_abv(simfile)
 	sim.version=version
 
 	# getting distance modulus is slow, so don't do it unless necessary
