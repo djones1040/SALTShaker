@@ -145,7 +145,7 @@ def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None):
 			ovhist_obj.options.outfile = os.path.join("figures",'ovplot_%s_%s.pdf'%(fname,"_".join(ovhist_obj.options.histvar)))
 			if os.path.exists(ovhist_obj.options.outfile):
 				ext=1
-				while os.path.join("figures",'ovplot_%s_%s_%i.pdf'%(fname,"_".join(ovhist_obj.options.histvar),ext)):
+				while os.path.exists(os.path.join("figures",'ovplot_%s_%s_%i.pdf'%(fname,"_".join(ovhist_obj.options.histvar),ext))):
 					ext+=1
 				ovhist_obj.options.outfile=os.path.join("figures",'ovplot_%s_%s_%i.pdf'%(fname,"_".join(ovhist_obj.options.histvar),ext))
 			
