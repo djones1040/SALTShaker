@@ -2,6 +2,7 @@ from astropy.cosmology import Planck15 as cosmo
 import numpy as np
 import matplotlib.pyplot as plt
 import os,scipy
+import scipy.stats
 
 
 from .txtobj import txtobj
