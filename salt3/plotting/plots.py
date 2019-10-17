@@ -23,7 +23,7 @@ def calcMu(fr,alpha=0.14,beta=3.1,M=-19.36):
 
 def plot_hubble(fr,binned=True):
 	if binned:
-		stats,edges,bins = scipy.stats.binned_statistic(fr.zCMB,fr.MU,'mean')
+		stats,edges,bins = scipy.stats.binned_statistic(fr.zCMB,fr.MU,'mean',bins=np.arange(np.min(fr.zCMB),np.max(fr.zCMB)*1.1,.1))
 		stat_err,edges2,bins2 = scipy.stats.binned_statistic(fr.zCMB,fr.MU,'std',bins=edges)
 		bin_data=[]
 		for i in range(1,len(edges)):
