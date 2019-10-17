@@ -10,11 +10,12 @@ from .getmu import *
 from .util import *
 from .ovdatamc import *
 
-def getObj(fitresfile, fitresheader = True, makeCuts = True):
+def getObj(fitresfile, fitresheader = True, makeCuts = True, version=None):
 	fr = txtobj(fitresfile,fitresheader = fitresheader)
 	if makeCuts:
 		fr = mkcuts(fr)
 	fr.filename=os.path.splitext(os.path.basename(fitresfile))[0]
+	fr.version=version
 	return(fr)
 
 def calcMu(fr,alpha=0.14,beta=3.1,M=-19.36):
@@ -46,19 +47,23 @@ def plot_hubble(fr,binned=True):
 		
 	if not os.path.exists('figures'):
 		os.makedirs('figures')
-	if os.path.exists(os.path.join('figures',fr.filename+'_hubble_diagram.pdf')):
-		ext=1
-		while os.path.exists(os.path.join('figures',fr.filename+'_hubble_diagram_'+str(ext)+'.pdf')):
-			ext+=1
-		outname=os.path.join('figures',fr.filename+'_hubble_diagram_'+str(ext)+'.pdf')
+	if fr.version is not None:
+		fname=fr.version
 	else:
-		outname=os.path.join('figures',fr.filename+'_hubble_diagram.pdf')
+		fname=fr.filename
+	if os.path.exists(os.path.join('figures',fname+'_hubble_diagram.pdf')):
+		ext=1
+		while os.path.exists(os.path.join('figures',fname+'_hubble_diagram_'+str(ext)+'.pdf')):
+			ext+=1
+		outname=os.path.join('figures',fname+'_hubble_diagram_'+str(ext)+'.pdf')
+	else:
+		outname=os.path.join('figures',fname+'_hubble_diagram.pdf')
 	plt.tight_layout()
 	plt.savefig(outname,format='pdf')
 
 	plt.clf()
 
-def plot_fits(simfile):
+def plot_fits(simfile,version=''):
 	usagestring="""
 	ovdatamc.py <DataFitresFile> <SimFitresFile>  <varName1:varName2:varName3....>  [--cutwin NN_ITYPE 1 1 --cutwin x1 -3 3]
 
@@ -78,7 +83,9 @@ def plot_fits(simfile):
 	ovhist_obj.options = options
 	datafile=simfile
 	data = txtobj(datafile)
+	data.version=version
 	sim = txtobj(simfile)
+	sim.version=version
 
 	# getting distance modulus is slow, so don't do it unless necessary
 	getMU = False
@@ -128,7 +135,7 @@ def plot_fits(simfile):
 		plt.rcParams['figure.figsize'] = (8.5,11)
 		from matplotlib.backends.backend_pdf import PdfPages
 		if not ovhist_obj.options.outfile:
-			ovhist_obj.options.outfile = 'ovplot_%s.pdf'%("_".join(ovhist_obj.options.histvar))
+			ovhist_obj.options.outfile = 'ovplot%s_%s.pdf'%(ovhist_obj.version,"_".join(ovhist_obj.options.histvar))
 		if not os.path.exists(ovhist_obj.options.outfile) or ovhist_obj.options.clobber:
 			pdf_pages = PdfPages(ovhist_obj.options.outfile)
 		else:
