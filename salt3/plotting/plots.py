@@ -1,7 +1,7 @@
 from astropy.cosmology import Planck15 as cosmo
 import numpy as np
 import matplotlib.pyplot as plt
-import os,scipy
+import os,scipy,optparse
 import scipy.stats
 
 
@@ -59,7 +59,23 @@ def plot_hubble(fr,binned=True):
 	plt.clf()
 
 def plot_fits(simfile):
+	usagestring="""
+	ovdatamc.py <DataFitresFile> <SimFitresFile>  <varName1:varName2:varName3....>  [--cutwin NN_ITYPE 1 1 --cutwin x1 -3 3]
+
+	Given a FITRES file for both data and an SNANA simulation, 
+	ovdatamc.py creates histograms that compare fit parameters or other 
+	variables between the two.  If distance moduli/residuals are not 
+	included in the fitres file, specify MU/MURES as the varName and 
+	they will be computed with standard SALT2 nuisance parameters.  To 
+	specify multiple variable names, use colons to separate them.
+
+	use -h/--help for full options list
+	"""
 	ovhist_obj=ovhist()
+	parser = ovhist_obj.add_options(usage=usagestring)
+    options,  args = parser.parse_args()
+    options.histvar = ['x1','c','mBvzHD']
+    ovhist_obj.options = options
 	data = txtobj(simfile)
 	sim = txtobj(simfile)
 
