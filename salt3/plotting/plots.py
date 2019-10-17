@@ -63,7 +63,7 @@ def plot_hubble(fr,binned=True):
 
 	plt.clf()
 
-def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version=''):
+def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None):
 	usagestring="""
 	ovdatamc.py <DataFitresFile> <SimFitresFile>  <varName1:varName2:varName3....>  [--cutwin NN_ITYPE 1 1 --cutwin x1 -3 3]
 
@@ -260,7 +260,8 @@ def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version=''):
 		else:
 			print('N(CC Sim.)/N(Ia Sim.): inf')
 
-
+		if xlimits is not None:
+			ax.set_xlim(xlimits)
 		if not ovhist_obj.options.journal and i%3 == 1:
 			box = ax.get_position()
 			ax.set_position([box.x0, box.y0,# + box.height * 0.15,
