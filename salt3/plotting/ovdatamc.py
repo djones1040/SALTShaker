@@ -5,8 +5,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from .txtobj import txtobj
-
 histvardict = {'SNRMAX1':'max SNR',
 			   'zHD':'$z_{CMB}$',
 			   'x1':'$X_1$',
@@ -23,25 +21,25 @@ histvardict = {'SNRMAX1':'max SNR',
 			   'mBERRvzHD':'$\sigma_{m_B}$',
 			   'SNRMAX1vmB':'max SNR'}
 
-# class txtobj:
-# 	def __init__(self,filename):
-# 		import numpy as np
-# 		fin = open(filename,'r')
-# 		lines = fin.readlines()
-# 		for l in lines:
-# 			if l.startswith('VARNAMES:'):
-# 				l = l.replace('\n','')
-# 				coldefs = l.split()
-# 				break
-# 		reader = [x.split() for x in lines if x.startswith('SN:')]
+class txtobj_abv:
+	def __init__(self,filename):
+		import numpy as np
+		fin = open(filename,'r')
+		lines = fin.readlines()
+		for l in lines:
+			if l.startswith('VARNAMES:'):
+				l = l.replace('\n','')
+				coldefs = l.split()
+				break
+		reader = [x.split() for x in lines if x.startswith('SN:')]
 
-# 		i = 0
-# 		for column in zip(*reader):
-# 			try:
-# 				self.__dict__[coldefs[i]] = np.array(column[:]).astype(float)
-# 			except:
-# 				self.__dict__[coldefs[i]] = np.array(column[:])
-# 			i += 1
+		i = 0
+		for column in zip(*reader):
+			try:
+				self.__dict__[coldefs[i]] = np.array(column[:]).astype(float)
+			except:
+				self.__dict__[coldefs[i]] = np.array(column[:])
+			i += 1
 
 class ovhist:
 	def __init__(self):
@@ -100,8 +98,8 @@ class ovhist:
 
 	def main(self,datafile,simfile):
 		
-		data = txtobj(datafile)
-		sim = txtobj(simfile)
+		data = txtobj_abv(datafile)
+		sim = txtobj_abv(simfile)
 
 		# getting distance modulus is slow, so don't do it unless necessary
 		getMU = False
