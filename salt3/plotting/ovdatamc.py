@@ -2,7 +2,8 @@
 # D. Jones - 1/7/16
 
 # map FITRES names to plot names
-
+import numpy as np
+import matplotlib.pyplot as plt
 
 histvardict = {'SNRMAX1':'max SNR',
 			   'zHD':'$z_{CMB}$',
@@ -96,8 +97,7 @@ class ovhist:
 		return(parser)
 
 	def main(self,datafile,simfile):
-		import numpy as np
-		import matplotlib.pyplot as plt
+		
 		data = txtobj(datafile)
 		sim = txtobj(simfile)
 
