@@ -73,9 +73,9 @@ def plot_fits(simfile):
 	"""
 	ovhist_obj=ovhist()
 	parser = ovhist_obj.add_options(usage=usagestring)
-    options,  args = parser.parse_args()
-    options.histvar = ['x1','c','mBvzHD']
-    ovhist_obj.options = options
+	options,  args = parser.parse_args()
+	options.histvar = ['x1','c','mBvzHD']
+	ovhist_obj.options = options
 	data = txtobj(simfile)
 	sim = txtobj(simfile)
 
