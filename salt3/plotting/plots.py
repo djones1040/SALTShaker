@@ -76,7 +76,8 @@ def plot_fits(simfile):
 	options,  args = parser.parse_args()
 	options.histvar = ['x1','c','mBvzHD']
 	ovhist_obj.options = options
-	data = txtobj(simfile)
+	datafile=simfile
+	data = txtobj(datafile)
 	sim = txtobj(simfile)
 
 	# getting distance modulus is slow, so don't do it unless necessary
