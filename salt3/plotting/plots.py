@@ -26,13 +26,14 @@ def calcMu(fr,alpha=0.14,beta=3.1,M=-19.36):
 def plot_hubble(fr,binned=True):
 	if binned:
 		stats,edges,bins = scipy.stats.binned_statistic(fr.zCMB,fr.MU,'mean',bins=np.arange(np.min(fr.zCMB),np.max(fr.zCMB)+.001,.1))
-		#stat_err,edges2,bins2 = scipy.stats.binned_statistic(fr.zCMB,fr.MU,'std',bins=edges)
-		stat_err,edges2,bins2 = scipy.stats.binned_statistic(fr.zCMB,fr.MU,lambda y:np.sqrt(np.mean(y**2)),bins=edges)
+		stat_err,edges2,bins2 = scipy.stats.binned_statistic(fr.zCMB,fr.MU,'std',bins=edges)
 		bin_data=[]
 		for i in range(1,len(edges)):
 			inds=np.where(bins==i)
+			stat_err[i-1]/=np.sqrt(len(inds))
 			bin_data.append(np.average(fr.MU[inds],weights=1./fr.MUERR[inds]))
 		bin_data=np.array(bin_data)
+
 		ax=plot('errorbar',[(edges[i]+edges[i+1])/2 for i in range(len(edges)-1)],bin_data,yerr=stat_err,y_lab=r'$\mu$',fmt='o')
 		ax,ax2=split_plot(ax,'errorbar',[(edges[i]+edges[i+1])/2 for i in range(len(edges)-1)],
 			y=bin_data-cosmo.distmod([(edges[i]+edges[i+1])/2 for i in range(len(edges)-1)]).value,yerr=stat_err,x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o')
