@@ -1019,7 +1019,10 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
             v = row['value']
             if not sec.lower() in nml.keys():
                 raise ValueError("No section named",sec)
-            print("Adding/modifying key {}={} in &{}".format(key,v,sec))
+            if key in nml[sec]:
+                print("Setting key {}={} in &{}".format(key,v,sec))
+            else:
+                print("Addding key {}={} in &{}".format(key,v,sec))               
             nml[sec][key] = v
 
     # a bit clumsy, but need to make sure these are the same for now:
@@ -1097,34 +1100,52 @@ def _write_simple_config_file(config,filename,delimiter,sep='='):
     return
 
 def _write_nml_to_file(nml,filename,headerlines=[],append=False):
-    outfile = open(filename,"w")
+    lines = []
 
     for key in nml.keys():
         if key.lower() == 'header':
+            headercount = 0
             for key2 in nml[key].keys():
                 value = nml[key][key2]
                 if isinstance(value,str):
                     value = "{}".format(value)
                 elif isinstance(value,list):
-                    value = ','.join([str(x) for x in value if not isinstance(x,str)])
+                    value = ','.join([str(x) for x in value if x is not None])
                 if key2.lower() == 'version':
-                    for version in value.replace(',','').split():
-                        outfile.write("{}: {}".format(key2.upper(),version))
-                        outfile.write("\n")
+                    # for version in value.replace(',','').split():
+                    for version in value.split(','):
+                        # outfile.write("{}: {}".format(key2.upper(),version))
+                        # outfile.write("\n")
+                        valstr = "{}: {}\n".format(key2.upper(),version)
+                        lines.insert(0,valstr)
+                        headercount += 1
                 else:
-                    outfile.write("{}: {}".format(key2.upper(),value))
-                    outfile.write("\n")
+                    # outfile.write("{}: {}".format(key2.upper(),value))
+                    # outfile.write("\n")
+                    valstr = "{}: {}\n".format(key2.upper(),value)
+                    lines.insert(0,valstr)
+                    headercount += 1
+            lines.insert(headercount,'\n\n')
 
         else:
-            outfile.write('&'+key.upper())
-            outfile.write('\n')
+            # outfile.write('&'+key.upper())
+            # outfile.write('\n')
+            lines.append('&'+key.upper()+'\n')
             for key2 in nml[key].keys():
                 value = nmlval_to_abspath(key2,nml[key][key2])
                 if isinstance(value,str):
                     value = "'{}'".format(value)
                 elif isinstance(value,list):
-                    value = ','.join([str(x) for x in value if not isinstance(x,str)])
-                outfile.write("  {} = {}".format(key2.upper(),value))
-                outfile.write("\n")
-            outfile.write('&END\n\n')
+                    value = ','.join([str(x) for x in value if x is not None])
+                # outfile.write("  {} = {}".format(key2.upper(),value))
+                # outfile.write("\n")
+                valstr = "  {} = {}\n".format(key2.upper(),value)
+                lines.append(valstr)
+            # outfile.write('&END\n\n')
+            lines.append('&END\n\n')
+
+    outfile = open(filename,"w")
+    for line in lines:
+        outfile.write(line)
+
     return
