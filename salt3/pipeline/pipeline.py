@@ -415,7 +415,6 @@ class Simulation(PipeProcedure):
                 for ki in keyarr:
                     df0['key'] = key
                     if '[' in ki:
-                        print(ki)
                         ind = ki.split('[')[1].split(']')[0]
                         df0['value'] = self.keys[ki]
                         df0['ind'] = ind
