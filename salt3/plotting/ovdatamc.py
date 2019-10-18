@@ -40,6 +40,15 @@ class txtobj_abv:
 			except:
 				self.__dict__[coldefs[i]] = np.array(column[:])
 			i += 1
+	def cut_byVar(self,varname,val_or_range):
+		if isinstance(val_or_range,(tuple,list,np.ndarray)):
+			iCut = np.where(np.logical_and(fr.__dict__[varname]>=val_or_range[0],fr.__dict__[varname]<=val_or_range[1]))[0]
+			
+		else:
+			iCut = fr.__dict__[varname]==val_or_range
+
+		for k in fr.__dict__.keys():
+			fr.__dict__[k] = fr.__dict__[k][iCut]
 
 class ovhist:
 	def __init__(self):

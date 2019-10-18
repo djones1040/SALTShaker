@@ -23,29 +23,41 @@ def calcMu(fr,alpha=0.14,beta=3.1,M=-19.36):
 	fr.MUERR = np.sqrt(fr.mBERR**2 + alpha**2.*fr.x1ERR**2. + beta**2.*fr.cERR**2)
 	return(fr)
 
-def plot_hubble(fr,binned=True):
-	if binned:
-		stats,edges,bins = scipy.stats.binned_statistic(fr.zCMB,fr.MU,'mean',bins=np.arange(np.min(fr.zCMB),np.max(fr.zCMB)+.001,.1))
-		stat_err,edges2,bins2 = scipy.stats.binned_statistic(fr.zCMB,fr.MU,'std',bins=edges)
-		bin_data=[]
-		for i in range(1,len(edges)):
-			inds=np.where(bins==i)[0]
-			print(len(inds))
-			stat_err[i-1]/=np.sqrt(len(inds))
-			bin_data.append(np.average(fr.MU[inds],weights=1./fr.MUERR[inds]))
-		bin_data=np.array(bin_data)
-
-		ax=plot('errorbar',[(edges[i]+edges[i+1])/2 for i in range(len(edges)-1)],bin_data,yerr=stat_err,y_lab=r'$\mu$',fmt='o')
-		ax,ax2=split_plot(ax,'errorbar',[(edges[i]+edges[i+1])/2 for i in range(len(edges)-1)],
-			y=bin_data-cosmo.distmod([(edges[i]+edges[i+1])/2 for i in range(len(edges)-1)]).value,yerr=stat_err,x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o')
-		lims=ax.get_xlim()
-		ax2.plot(lims,[0,0],'k--',linewidth=3)
+def plot_hubble(fr,binned=True,multisurvey=False):
+	if multisurvey:
+		surveys=np.unique(fr.FIELD)
 	else:
-		ax=plot('errorbar',fr.zCMB,y=fr.MU,yerr=fr.MUERR,y_lab=r'$\mu$',fmt='o')
-		ax,ax2=split_plot(ax,'errorbar',fr.zCMB,y=fr.MU-cosmo.distmod(fr.zCMB).value,yerr=fr.MUERR,x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o')
-		lims=ax.get_xlim()
-		ax2.plot(lims,[0,0],'k--',linewidth=3)
-	zinterp=np.arange(np.min(fr.zCMB),np.max(fr.zCMB),.01)
+		surveys=[None]
+	for survey in surveys:
+		if is None:
+			zdata=fr.zCMB
+			mudata=fr.MU
+			muerrdata=fr.MUERR
+		else:
+			zdata=fr.zCMB[fr.FIELD==survey]
+			mudata=fr.MU[fr.FIELD==survey]
+			muerrdata=fr.MUERR[fr.FIELD==survey]
+		if binned:
+			stats,edges,bins = scipy.stats.binned_statistic(zdata,mudata,'mean',bins=np.arange(np.min(zdata),np.max(zdata)+.001,.1))
+			stat_err,edges2,bins2 = scipy.stats.binned_statistic(zdata,mudata,'std',bins=edges)
+			bin_data=[]
+			for i in range(1,len(edges)):
+				inds=np.where(bins==i)[0]
+				stat_err[i-1]/=np.sqrt(len(inds))
+				bin_data.append(np.average(mudata[inds],weights=1./muerrdata[inds]))
+			bin_data=np.array(bin_data)
+
+			ax=plot('errorbar',[(edges[i]+edges[i+1])/2 for i in range(len(edges)-1)],bin_data,yerr=stat_err,y_lab=r'$\mu$',fmt='o')
+			ax,ax2=split_plot(ax,'errorbar',[(edges[i]+edges[i+1])/2 for i in range(len(edges)-1)],
+				y=bin_data-cosmo.distmod([(edges[i]+edges[i+1])/2 for i in range(len(edges)-1)]).value,yerr=stat_err,x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o')
+			lims=ax.get_xlim()
+			ax2.plot(lims,[0,0],'k--',linewidth=3)
+		else:
+			ax=plot('errorbar',zdata,y=mudata,yerr=muerrdata,y_lab=r'$\mu$',fmt='o')
+			ax,ax2=split_plot(ax,'errorbar',zdata,y=mudata-cosmo.distmod(zdata).value,yerr=muerrdata,x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o')
+			lims=ax.get_xlim()
+			ax2.plot(lims,[0,0],'k--',linewidth=3)
+	zinterp=np.arange(np.min(zdata),np.max(zdata),.01)
 	ax.plot(zinterp,cosmo.distmod(zinterp).value,color='k',linewidth=3)
 		
 	if not os.path.exists('figures'):
@@ -66,7 +78,7 @@ def plot_hubble(fr,binned=True):
 
 	plt.clf()
 
-def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None):
+def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None,survey=None):
 	usagestring="""
 	ovdatamc.py <DataFitresFile> <SimFitresFile>  <varName1:varName2:varName3....>  [--cutwin NN_ITYPE 1 1 --cutwin x1 -3 3]
 
@@ -91,7 +103,9 @@ def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None):
 	
 	data = txtobj_abv(datafile)
 	sim = txtobj_abv(simfile)
-	
+	if survey is not None:
+		data.cut_byVar('FIELD',survey)
+		sim.cut_byVar('FIELD',survey)
 
 	# getting distance modulus is slow, so don't do it unless necessary
 	getMU = False
