@@ -29,7 +29,8 @@ def plot_hubble(fr,binned=True):
 		stat_err,edges2,bins2 = scipy.stats.binned_statistic(fr.zCMB,fr.MU,'std',bins=edges)
 		bin_data=[]
 		for i in range(1,len(edges)):
-			inds=np.where(bins==i)
+			inds=np.where(bins==i)[0]
+			print(len(inds))
 			stat_err[i-1]/=np.sqrt(len(inds))
 			bin_data.append(np.average(fr.MU[inds],weights=1./fr.MUERR[inds]))
 		bin_data=np.array(bin_data)
