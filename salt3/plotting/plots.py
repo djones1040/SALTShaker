@@ -54,9 +54,9 @@ def plot_hubble(fr,binned=True,multisurvey=False,nbins=6):
 				bin_data.append(np.average(mudata[inds],weights=1./muerrdata[inds]))
 			bin_data=np.array(bin_data)
 
-			ax=plot('errorbar',[(edges[i]+edges[i+1])/2 for i in final_inds],bin_data,yerr=stat_err,y_lab=r'$\mu$',fmt='o',color=col_dict[survey])
+			ax=plot('errorbar',[(edges[i]+edges[i+1])/2 for i in final_inds],bin_data[final_inds],yerr=stat_err[final_inds],y_lab=r'$\mu$',fmt='o',color=col_dict[survey])
 			ax,ax2=split_plot(ax,'errorbar',[(edges[i]+edges[i+1])/2 for i in final_inds],
-				y=bin_data-cosmo.distmod([(edges[i]+edges[i+1])/2 for i in final_inds]).value,yerr=stat_err,x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o',color=col_dict[survey])
+				y=bin_data[final_inds]-cosmo.distmod([(edges[i]+edges[i+1])/2 for i in final_inds]).value,yerr=stat_err[final_inds],x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o',color=col_dict[survey])
 			lims=ax.get_xlim()
 			ax2.plot(lims,[0,0],'k--',linewidth=3)
 		else:
