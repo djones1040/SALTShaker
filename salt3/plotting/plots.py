@@ -159,6 +159,11 @@ def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None,s
 				os.makedirs('figures')
 			if ovhist_obj.version is not None:
 				fname=ovhist_obj.version
+			else:
+				fname=''
+			if survey is not None:
+				fname+='_'+survey
+			
 			ovhist_obj.options.outfile = os.path.join("figures",'ovplot_%s_%s.pdf'%(fname,"_".join(ovhist_obj.options.histvar)))
 			if os.path.exists(ovhist_obj.options.outfile):
 				ext=1
