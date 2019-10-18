@@ -23,7 +23,7 @@ def calcMu(fr,alpha=0.14,beta=3.1,M=-19.36):
 	fr.MUERR = np.sqrt(fr.mBERR**2 + alpha**2.*fr.x1ERR**2. + beta**2.*fr.cERR**2)
 	return(fr)
 
-def plot_hubble(fr,binned=True,multisurvey=False,nbins=10):
+def plot_hubble(fr,binned=True,multisurvey=False,nbins=6):
 	if multisurvey:
 		surveys=np.unique(fr.FIELD)
 	else:
