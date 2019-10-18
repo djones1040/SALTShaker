@@ -228,18 +228,27 @@ class SALT3pipe():
         return pipepro
 
     def _multivalues_to_df(self,values,colnames=None,stackvalues=False):
-        df = pd.DataFrame([s.split() for s in values.split('\n')])
+        df = pd.DataFrame([s.split() for s in values.split('\n')[1:]])
         if df.empty:
             return None
         if colnames is None:
-            if df.shape[1] == 2:
+            ncol = int(values.split('\n')[0])
+            if ncol == 2:
                 colnames = ['key','value']
-            elif df.shape[1] == 3:
-                if np.any(df.isna()):
-                    colnames = ['key','value']
-                    stackvalues = True
-                else:
-                    colnames=['section','key','value']
+            elif ncol == 3:
+                colnames = ['section','key','value']
+            else:
+                raise ValueError("column number for set_key must be 2 or 3")
+            if df.shape[1] > ncol:
+                stackvalues = True
+            # if df.shape[1] == 2:
+            #     colnames = ['key','value']
+            # elif df.shape[1] == 3:
+            #     if np.any(df.isna()):
+            #         colnames = ['key','value']
+            #         stackvalues = True
+            #     else:
+            #         colnames=['section','key','value']
         if stackvalues and df.shape[1] > len(colnames):
             numbercol = [colnames[-1]+'.'+str(i) for i in range(df.shape[1]-len(colnames)+1)]
             df.columns = colnames[0:-1] + numbercol
@@ -840,6 +849,19 @@ def _gen_general_python_input(basefilename=None,setkeys=None,
         print("input file saved as:",outname)
     return outname,config
 
+def _rename_duplicate_keys(keys):
+    df = pd.DataFrame(keys,columns=['value'])
+    df['count'] = 1
+    counts = df.groupby('value').count() 
+    for key in counts.index:
+        ct = counts.loc[key,'count']
+        if ct > 1:
+            df.loc[df['value']==key,'value'] = ['{}[{}]'.format(key,i) for i in range(ct)]
+        else:
+            df.loc[df['value']==key] = key
+    newkeys = df['value'].values
+    return newkeys
+
 def _gen_snana_sim_input(basefilename=None,setkeys=None,
                          outname=None,done_file=None):
 
@@ -856,7 +878,9 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
     basefile = open(basefilename,"r")
     lines = basefile.readlines()
     basekws = []
-    
+    basevals = []
+    linenum = []
+
     if setkeys is None:
         print("No modification on the input file, copying {} to {}".format(basefilename,outname))
         os.system('cp %s %s'%(basefilename,outname))
@@ -879,33 +903,60 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
             if ":" in line and not line.strip().startswith("#"):
                 kwline = line.split(":",maxsplit=1)
                 kw = kwline[0]
+                kv = kwline[1]
                 if "#" in kwline[1]:
-                    kwline[1] = kwline[1].split("#")[0].strip()+'\n'
+                    kv = kwline[1].split("#")[0].strip()+'\n'
+                if "GENOPT" in line:
+                    kw = kwline[1].split()[0]
+                    kv = kwline[1].split()[1:]
                 basekws.append(kw)
-                if kw in setkeys.key.values:
-                    keyvalue = setkeys[setkeys.key==kw].value.values[0]
-                    if isinstance(keyvalue,list):
-                        kwline[1] = ' '.join(list(filter(None,keyvalue)))+'\n'
-                    else:
-                        kwline[1] = str(keyvalue)+'\n'
-                    print("Setting {} = {}".format(kw,kwline[1].strip()))
-                lines[i] = ": ".join(kwline)
-                config[kw] = kwline[1].strip()
+                basevals.append(kv)
+                linenum.append(i)
 
-        outfile = open(outname,"w")
-        for line in lines:
-            outfile.write(line)
+        basekws_renamed = _rename_duplicate_keys(basekws)
+        # print(basekws_renamed)
+
+        for i,kw in enumerate(basekws_renamed): 
+            if kw in setkeys.key.values:
+                keyvalue = setkeys[setkeys.key==kw].value.values[0]
+                if isinstance(keyvalue,list):
+                    val = ' '.join(list(filter(None,keyvalue)))+'\n'
+                else:
+                    val = str(keyvalue)+'\n'
+                basevals[i] = val
+                keystr = kw.split('[')[0]
+                if "[" in kw and 'GENVERSION' not in kw:
+                    lines[linenum[i]] = "GENOPT:{} {}\n".format(keystr,val)
+                else:
+                    lines[linenum[i]] = "{}: {}\n".format(keystr,val)
+                print("Setting {} = {}".format(keystr,val.strip()))
+                config[kw] = val.strip()              
 
         for key,value in zip(setkeys.key,setkeys.value):
-            if not key in basekws:
+            if not key in basekws_renamed:
                 if isinstance(value,list):
                     valuestr = ' '.join(list(filter(None,value)))
                 else:
                     valuestr = str(value)
-                newline = key+": "+valuestr+'\n'
-                print("Adding key {} = {}".format(key,valuestr))
-                outfile.write(newline)
+                if key.startswith('GENVERSION'):
+                    raise ValueError("Can not add new GENVERSION at the moment")
+                if "[" in key and 'GENVERSION' not in key:
+                    keystr = key.split('[')[0]
+                    numstr = key.split('[')[1].split(']')[0]
+                    newline = "GENOPT:{} {}\n".format(keystr,valuestr)
+                    lineloc = [i for i,line in enumerate(lines) if "GENVERSION".format(numstr) in line][int(numstr)]            
+                    print("Adding key {} = {} for GENVERSION[{}]".format(keystr,valuestr,numstr))
+                else:
+                    keystr = key
+                    newline = "{}: {}\n".format(keystr,valuestr)
+                    lineloc = len(lines)-1
+                    print("Adding key {} = {} at the end of file".format(keystr,valuestr))
+                lines.insert(lineloc+1,newline)
                 config[key] = valuestr.strip()
+
+        outfile = open(outname,"w")
+        for line in lines:
+            outfile.write(line)
 
         print("Write sim input to file:",outname)
 
