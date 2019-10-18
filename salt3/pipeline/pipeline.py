@@ -462,7 +462,7 @@ class Simulation(PipeProcedure):
             prefix = df.loc[df.key=='GENVERSION','value'].values[0]
             return ["{}/{}.LIST".format(res,prefix) for res in outdirs]
         elif pipepro.lower().startswith('lcfit'):
-            return df.loc[df.key=='GENVERSION','value'].values[0]
+            return df.loc[df.key=='GENVERSION','value'].values
             # idx = res.find(simpath)
             # if idx !=0:
             #     raise ValueError("photometry must be in $SNDATA_ROOT/SIM")
