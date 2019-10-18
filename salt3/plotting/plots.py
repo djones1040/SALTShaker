@@ -29,9 +29,12 @@ def plot_hubble(fr,binned=True):
 		stat_err,edges2,bins2 = scipy.stats.binned_statistic(fr.zCMB,fr.MU,'std',bins=edges)
 		bin_data=[]
 		for i in range(1,len(edges)):
-			inds=np.where(bins==i)
+			inds=np.where(bins==i)[0]
+			print(len(inds))
+			stat_err[i-1]/=np.sqrt(len(inds))
 			bin_data.append(np.average(fr.MU[inds],weights=1./fr.MUERR[inds]))
 		bin_data=np.array(bin_data)
+
 		ax=plot('errorbar',[(edges[i]+edges[i+1])/2 for i in range(len(edges)-1)],bin_data,yerr=stat_err,y_lab=r'$\mu$',fmt='o')
 		ax,ax2=split_plot(ax,'errorbar',[(edges[i]+edges[i+1])/2 for i in range(len(edges)-1)],
 			y=bin_data-cosmo.distmod([(edges[i]+edges[i+1])/2 for i in range(len(edges)-1)]).value,yerr=stat_err,x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o')
