@@ -30,6 +30,7 @@ def plot_hubble(fr,binned=True,multisurvey=False,nbins=6):
 	else:
 		surveys=[None]
 		col_dict={None:'b'}
+	ax = None
 	for survey in surveys:
 		if survey is None:
 			zdata=fr.zCMB
@@ -41,7 +42,7 @@ def plot_hubble(fr,binned=True,multisurvey=False,nbins=6):
 			muerrdata=fr.MUERR[fr.FIELD==survey]
 
 		if binned:
-			stats,edges,bins = scipy.stats.binned_statistic(zdata,mudata,'mean')#,bins=nbins)
+			stats,edges,bins = scipy.stats.binned_statistic(zdata,mudata,'mean',bins=np.arange(np.min(zdata),np.max(zdata)+.001,.05))
 			stat_err,edges2,bins2 = scipy.stats.binned_statistic(zdata,mudata,'std',bins=edges)
 			bin_data=[]
 			final_inds=[]
@@ -54,16 +55,20 @@ def plot_hubble(fr,binned=True,multisurvey=False,nbins=6):
 				bin_data.append(np.average(mudata[inds],weights=1./muerrdata[inds]))
 			bin_data=np.array(bin_data)
 
-			ax=plot('errorbar',[(edges[i]+edges[i+1])/2 for i in final_inds],bin_data,yerr=stat_err[final_inds],y_lab=r'$\mu$',fmt='o',color=col_dict[survey])
-			ax,ax2=split_plot(ax,'errorbar',[(edges[i]+edges[i+1])/2 for i in final_inds],
-				y=bin_data-cosmo.distmod([(edges[i]+edges[i+1])/2 for i in final_inds]).value,yerr=stat_err[final_inds],x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o',color=col_dict[survey])
-			lims=ax.get_xlim()
-			ax2.plot(lims,[0,0],'k--',linewidth=3)
+			if ax is None:
+				ax=plot('errorbar',[(edges[i]+edges[i+1])/2 for i in final_inds],bin_data,yerr=stat_err[final_inds],y_lab=r'$\mu$',fmt='o',color=col_dict[survey])
+				ax,ax2=split_plot(ax,'errorbar',[(edges[i]+edges[i+1])/2 for i in final_inds],
+					y=bin_data-cosmo.distmod([(edges[i]+edges[i+1])/2 for i in final_inds]).value,yerr=stat_err[final_inds],x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o',color=col_dict[survey])
+			else:
+				ax.errorbar([(edges[i]+edges[i+1])/2 for i in final_inds],bin_data,yerr=stat_err[final_inds],fmt='o',color=col_dict[survey])
+				ax2.errorbar([(edges[i]+edges[i+1])/2 for i in final_inds],bin_data-cosmo.distmod([(edges[i]+edges[i+1])/2 for i in final_inds]).value,yerr=stat_err[final_inds],
+					fmt='o',color=col_dict[survey])
+			
 		else:
 			ax=plot('errorbar',zdata,y=mudata,yerr=muerrdata,y_lab=r'$\mu$',fmt='o',color=col_dict[survey])
 			ax,ax2=split_plot(ax,'errorbar',zdata,y=mudata-cosmo.distmod(zdata).value,yerr=muerrdata,x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o',color=col_dict[survey])
-			lims=ax.get_xlim()
-			ax2.plot(lims,[0,0],'k--',linewidth=3)
+	lims=ax.get_xlim()
+	ax2.plot(lims,[0,0],'k--',linewidth=3)
 	zinterp=np.arange(np.min(zdata),np.max(zdata),.01)
 	ax.plot(zinterp,cosmo.distmod(zinterp).value,color='k',linewidth=3)
 		
