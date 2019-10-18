@@ -409,12 +409,24 @@ class Simulation(PipeProcedure):
         df = pd.DataFrame()
         for key in keys:
             df0 = {}     
-            df0['key'] = key
-            if key in self.keys.keys():
-                df0['value'] = self.keys[key]
+            keystrs = [x.split('[')[0] for x in self.keys.keys()]
+            keyarr = [x for x in self.keys.keys() if x.startswith(key)]
+            if len(keyarr ) > 0:
+                for ki in keyarr:
+                    df0['key'] = key
+                    if '[' in ki:
+                        print(ki)
+                        ind = ki.split('[')[1].split(']')[0]
+                        df0['value'] = self.keys[ki]
+                        df0['ind'] = ind
+                    else:
+                        df0['value'] = self.keys[ki]
+                        df0['ind'] = None
+                    df = df.append(df0, ignore_index=True)
             else:
                 df0['value'] = ''
-            df = df.append(df0, ignore_index=True)
+                df0['ind'] = None
+                df = df.append(df0, ignore_index=True)
 
         return df
 
@@ -422,22 +434,7 @@ class Simulation(PipeProcedure):
         if not isinstance(pipepro,str):
             pipepro = type(pipepro).__name__
         df = self._get_output_info()
-        if df.set_index('key').loc['PATH_SNDATA_SIM'].value:
-            if isinstance(df.set_index('key').loc['GENVERSION'].value,str):
-                outdirs = [os.sep.join(df.set_index('key').loc[['PATH_SNDATA_SIM','GENVERSION'],'value'].values.tolist())]
-            else:
-                outdirs = []
-                for genversion in df.set_index('key').loc['GENVERSION'].value:
-                    outdirs += [os.sep.join([df.set_index('key').loc['PATH_SNDATA_SIM'].value,
-                                             genversion])]
-        else:
-            if isinstance(df.set_index('key').loc['GENVERSION'].value,str):
-                outdirs = [os.sep.join(['$SNDATA_ROOT/SIM',df.set_index('key').loc['GENVERSION'].value])]
-            else:
-                outdirs = []
-                for genversion in df.set_index('key').loc['GENVERSION'].value:
-                    outdirs += [os.sep.join(['$SNDATA_ROOT/SIM',
-                                             genversion])]
+        outdirs = self.get_outdirs(outinfo=df)
         for i,o in enumerate(outdirs):
             outdirs[i] = os.path.expandvars(outdirs[i])
         #res = os.path.expandvars(outdir)
@@ -475,6 +472,30 @@ class Simulation(PipeProcedure):
         else:
             raise ValueError("sim can only glue to training or lcfitting")
         
+    def get_outdirs(self,outinfo=None):
+        if outinfo is None:
+            df = self._get_output_info()
+        else:
+            df = outinfo
+        if df.set_index('key').loc['PATH_SNDATA_SIM'].value:
+            if isinstance(df.set_index('key').loc['GENVERSION'].value,str):
+                outdirs = [os.sep.join(df.set_index('key').loc[['PATH_SNDATA_SIM','GENVERSION'],'value'].values.tolist())]
+            else:
+                outdirs = []
+                for genversion in df.set_index('key').loc['GENVERSION'].value:
+                    outdirs += [os.sep.join([df.set_index('key').loc['PATH_SNDATA_SIM'].value,
+                                             genversion])]
+        else:
+            if isinstance(df.set_index('key').loc['GENVERSION'].value,str):
+                outdirs = [os.sep.join(['$SNDATA_ROOT/SIM',df.set_index('key').loc['GENVERSION'].value])]
+            else:
+                outdirs = []
+                for genversion in df.set_index('key').loc['GENVERSION'].value:
+                    outdirs += [os.sep.join(['$SNDATA_ROOT/SIM',
+                                             genversion])]
+        return [os.path.expandvars(x) for x in outdirs]
+
+
 class Training(PyPipeProcedure):
 
     def configure(self,pro=None,baseinput=None,setkeys=None,proargs=None,
@@ -634,6 +655,10 @@ class LCFitting(PipeProcedure):
             else: return str(outprefix)+'.FITRES.TEXT'
         else:
             raise ValueError("lcfitting can only glue to getmu")
+
+    def get_outdirs(self):
+        return abspath_for_getmu(self._get_output_info().value.values[0])
+
 
     def _get_input_info(self):
         df = {}       
@@ -905,12 +930,12 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
                 kw = kwline[0]
                 kv = kwline[1]
                 if "#" in kwline[1]:
-                    kv = kwline[1].split("#")[0].strip()+'\n'
+                    kv = kwline[1].split("#")[0].strip()
                 if "GENOPT" in line:
                     kw = kwline[1].split()[0]
-                    kv = kwline[1].split()[1:]
-                basekws.append(kw)
-                basevals.append(kv)
+                    kv = kwline[1].split(maxsplit=1)[1]
+                basekws.append(kw.strip())
+                basevals.append(kv.strip())
                 linenum.append(i)
 
         basekws_renamed = _rename_duplicate_keys(basekws)
@@ -920,9 +945,9 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
             if kw in setkeys.key.values:
                 keyvalue = setkeys[setkeys.key==kw].value.values[0]
                 if isinstance(keyvalue,list):
-                    val = ' '.join(list(filter(None,keyvalue)))+'\n'
+                    val = ' '.join(list(filter(None,keyvalue)))
                 else:
-                    val = str(keyvalue)+'\n'
+                    val = str(keyvalue)
                 basevals[i] = val
                 keystr = kw.split('[')[0]
                 if "[" in kw and 'GENVERSION' not in kw:
@@ -930,7 +955,9 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
                 else:
                     lines[linenum[i]] = "{}: {}\n".format(keystr,val)
                 print("Setting {} = {}".format(keystr,val.strip()))
-                config[kw] = val.strip()              
+                config[kw] = val 
+            else:
+                config[kw] = basevals[i]          
 
         for key,value in zip(setkeys.key,setkeys.value):
             if not key in basekws_renamed:
