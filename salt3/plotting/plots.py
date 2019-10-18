@@ -39,7 +39,7 @@ def plot_hubble(fr,binned=True,multisurvey=False,nbins=6):
 			muerrdata=fr.MUERR[fr.FIELD==survey]
 		print(survey,len(zdata),len(mudata),len(muerrdata))
 		if binned:
-			stats,edges,bins = scipy.stats.binned_statistic(zdata,mudata,'mean',bins=nbins)
+			stats,edges,bins = scipy.stats.binned_statistic(zdata,mudata,'mean')#,bins=nbins)
 			stat_err,edges2,bins2 = scipy.stats.binned_statistic(zdata,mudata,'std',bins=edges)
 			bin_data=[]
 			for i in range(1,len(edges)):
