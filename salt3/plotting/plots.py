@@ -29,7 +29,7 @@ def plot_hubble(fr,binned=True,multisurvey=False):
 	else:
 		surveys=[None]
 	for survey in surveys:
-		if is None:
+		if survey is None:
 			zdata=fr.zCMB
 			mudata=fr.MU
 			muerrdata=fr.MUERR
