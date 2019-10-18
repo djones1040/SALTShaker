@@ -26,8 +26,10 @@ def calcMu(fr,alpha=0.14,beta=3.1,M=-19.36):
 def plot_hubble(fr,binned=True,multisurvey=False,nbins=6):
 	if multisurvey:
 		surveys=np.unique(fr.FIELD)
+		col_dict={s:numpy.random.rand(3,) for s in surveys}
 	else:
 		surveys=[None]
+		col_dict={None:'b'}
 	for survey in surveys:
 		if survey is None:
 			zdata=fr.zCMB
@@ -37,26 +39,29 @@ def plot_hubble(fr,binned=True,multisurvey=False,nbins=6):
 			zdata=fr.zCMB[fr.FIELD==survey]
 			mudata=fr.MU[fr.FIELD==survey]
 			muerrdata=fr.MUERR[fr.FIELD==survey]
-		print(survey,len(zdata),len(mudata),len(muerrdata))
+
 		if binned:
 			stats,edges,bins = scipy.stats.binned_statistic(zdata,mudata,'mean')#,bins=nbins)
 			stat_err,edges2,bins2 = scipy.stats.binned_statistic(zdata,mudata,'std',bins=edges)
 			bin_data=[]
+			final_inds=[]
 			for i in range(1,len(edges)):
 				inds=np.where(bins==i)[0]
-				print(len(inds))
+				if len(inds)==0:
+					continue
+				final_inds.append(i-1)
 				stat_err[i-1]/=np.sqrt(len(inds))
 				bin_data.append(np.average(mudata[inds],weights=1./muerrdata[inds]))
 			bin_data=np.array(bin_data)
 
-			ax=plot('errorbar',[(edges[i]+edges[i+1])/2 for i in range(len(edges)-1)],bin_data,yerr=stat_err,y_lab=r'$\mu$',fmt='o')
-			ax,ax2=split_plot(ax,'errorbar',[(edges[i]+edges[i+1])/2 for i in range(len(edges)-1)],
-				y=bin_data-cosmo.distmod([(edges[i]+edges[i+1])/2 for i in range(len(edges)-1)]).value,yerr=stat_err,x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o')
+			ax=plot('errorbar',[(edges[i]+edges[i+1])/2 for i in final_inds],bin_data,yerr=stat_err,y_lab=r'$\mu$',fmt='o',color=col_dict[survey])
+			ax,ax2=split_plot(ax,'errorbar',[(edges[i]+edges[i+1])/2 for i in final_inds],
+				y=bin_data-cosmo.distmod([(edges[i]+edges[i+1])/2 for i in final_inds]).value,yerr=stat_err,x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o',color=col_dict[survey])
 			lims=ax.get_xlim()
 			ax2.plot(lims,[0,0],'k--',linewidth=3)
 		else:
-			ax=plot('errorbar',zdata,y=mudata,yerr=muerrdata,y_lab=r'$\mu$',fmt='o')
-			ax,ax2=split_plot(ax,'errorbar',zdata,y=mudata-cosmo.distmod(zdata).value,yerr=muerrdata,x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o')
+			ax=plot('errorbar',zdata,y=mudata,yerr=muerrdata,y_lab=r'$\mu$',fmt='o',color=col_dict[survey])
+			ax,ax2=split_plot(ax,'errorbar',zdata,y=mudata-cosmo.distmod(zdata).value,yerr=muerrdata,x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o',color=col_dict[survey])
 			lims=ax.get_xlim()
 			ax2.plot(lims,[0,0],'k--',linewidth=3)
 	zinterp=np.arange(np.min(zdata),np.max(zdata),.01)
