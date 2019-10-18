@@ -26,7 +26,7 @@ def calcMu(fr,alpha=0.14,beta=3.1,M=-19.36):
 def plot_hubble(fr,binned=True,multisurvey=False,nbins=6):
 	if multisurvey:
 		surveys=np.unique(fr.FIELD)
-		col_dict={s:numpy.random.rand(3,) for s in surveys}
+		col_dict={s:np.random.rand(3,) for s in surveys}
 	else:
 		surveys=[None]
 		col_dict={None:'b'}
