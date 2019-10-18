@@ -42,13 +42,13 @@ class txtobj_abv:
 			i += 1
 	def cut_byVar(self,varname,val_or_range):
 		if isinstance(val_or_range,(tuple,list,np.ndarray)):
-			iCut = np.where(np.logical_and(fr.__dict__[varname]>=val_or_range[0],fr.__dict__[varname]<=val_or_range[1]))[0]
+			iCut = np.where(np.logical_and(self.__dict__[varname]>=val_or_range[0],self.__dict__[varname]<=val_or_range[1]))[0]
 			
 		else:
-			iCut = fr.__dict__[varname]==val_or_range
+			iCut = self.__dict__[varname]==val_or_range
 
-		for k in fr.__dict__.keys():
-			fr.__dict__[k] = fr.__dict__[k][iCut]
+		for k in self.__dict__.keys():
+			self.__dict__[k] = self.__dict__[k][iCut]
 
 class ovhist:
 	def __init__(self):
