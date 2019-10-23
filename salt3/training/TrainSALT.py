@@ -132,9 +132,12 @@ class TrainSALT(TrainSALTBase):
 			for key in np.unique(parlist):
 				try:
 					guess[parlist == key] = pars[names == key]
+					
 				except:
 					print ('Problem while initializing parameter ',key,' from previous training')
+					import pdb;pdb.set_trace()
 					sys.exit(1)
+					
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
 	def fitSALTModel(self,datadict):
@@ -198,7 +201,6 @@ class TrainSALT(TrainSALTBase):
 				  M0,M0err,M1,M1err,cov_M0_M1,
 				  modelerr,clpars,
 				  clerr,clscat,SNParams,pars,parlist,chain,loglikes):
-
 		if not os.path.exists(outdir):
 			raise RuntimeError('desired output directory %s doesn\'t exist'%outdir)
 

@@ -549,7 +549,14 @@ class GaussNewton(saltresids.SALTResids):
 			chi2_init = chi2
 			stepsizes = self.getstepsizes(X,Xlast)
 			Xlast = copy.deepcopy(X)
-			
+		#Retranslate x1, M1, x0, M0 to obey definitions
+		print(np.sum(self.lsqwrap(X,uncertainties,False,False,doPriors=True)**2.))
+		X[self.im0]+= np.mean(X[self.ix1])*X[self.im1]
+		X[self.ix1]-=np.mean(X[self.ix1])
+		
+		X[self.im1]*=np.std(X[self.ix1])
+		X[self.ix1]/=np.std(X[self.ix1])
+		print(np.sum(self.lsqwrap(X,uncertainties,False,False,doPriors=True)**2.))
 		xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams = \
 			self.getParsGN(X)
@@ -605,10 +612,6 @@ class GaussNewton(saltresids.SALTResids):
 
 		if returnSpecFluxes:
 			specdataflux,specmodelflux,specuncertainty = np.array([]),np.array([]),np.array([])
-		
-		if self.n_colorscatpars:
-			colorScat = True
-		else: colorScat = None
 
 		if self.n_colorpars:
 			colorLaw = SALT2ColorLaw(self.colorwaverange, guess[self.parlist == 'cl'])

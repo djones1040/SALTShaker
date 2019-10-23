@@ -1,4 +1,4 @@
-import unittest
+import unittest,os
 from salt3.training import saltresids
 from salt3.training.saltresids import _SCALE_FACTOR
 
@@ -18,17 +18,25 @@ class TRAINING_Test(unittest.TestCase):
 		ts=TrainSALT()
 		config = configparser.ConfigParser()
 		config.read('testdata/test.conf')
-		parser = argparse.ArgumentParser()
-		parser = ts.add_options(usage='',config=config)
-		options = parser.parse_args([])
-		ts.options=options
-		kcordict=readutils.rdkcor(ts.surveylist,options,addwarning=ts.addwarning)
+
+		user_parser = ts.add_user_options(usage='',config=config)
+		user_options = user_parser.parse_known_args()[0]
+		
+		trainingconfig = configparser.ConfigParser()
+		trainingconfig.read(user_options.trainingconfig)
+
+		training_parser = ts.add_training_options(
+			usage='',config=trainingconfig)
+		training_options = training_parser.parse_known_args(namespace=user_options)[0]
+		
+		ts.options=training_options
+		kcordict=readutils.rdkcor(ts.surveylist,ts.options,addwarning=ts.addwarning)
 		ts.kcordict=kcordict
 
 		# TODO: ASCII filter files
 		# read the data
-		datadict = readutils.rdAllData(options.snlist,options.estimate_tpk,kcordict,
-									   ts.addwarning,dospec=options.dospec)
+		datadict = readutils.rdAllData(ts.options.snlist,ts.options.estimate_tpk,kcordict,
+									   ts.addwarning,dospec=ts.options.dospec)
 		self.parlist,self.guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc = ts.initialParameters(datadict)
 		saltfitkwargs = ts.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
 
@@ -37,18 +45,18 @@ class TRAINING_Test(unittest.TestCase):
 	def test_prior_jacobian(self):
 		"""Checks that all designated priors are properly calculating the jacobian of their residuals to within 1%"""
 				#Define simple models for m0,m1
-		for prior in self.resids.priors:
+		for prior in self.resids.priors.priors:
 			print('Testing prior', prior)
 			components=self.resids.SALTModel(self.guess)
-			resid,val,jacobian=self.resids.priors[prior](0.3145,self.guess,components)
-			self.assertTrue(self.resids.priors[prior].numResids==resid.size)
+			resid,val,jacobian=self.resids.priors.priors[prior](0.3145,self.guess,components)
+			self.assertTrue(self.resids.priors.priors[prior].numResids==resid.size)
 			dx=1e-3
 			rtol=1e-2
 			def incrementOneParam(i):
 				guess=self.guess.copy()
 				guess[i]+=dx
 				components=self.resids.SALTModel(guess)
-				return self.resids.priors[prior](0.3145,guess,components)[0]
+				return self.resids.priors.priors[prior](0.3145,guess,components)[0]
 			dPriordX=np.zeros((resid.size,self.guess.size))
 			for i in range(self.guess.size):
 				dPriordX[:,i]=(incrementOneParam(i)-resid)/dx
@@ -508,7 +516,6 @@ class TRAINING_Test(unittest.TestCase):
 		for i in range(self.guess.size):
 			dResiddX[:,i]=(incrementOneParam(i,dx)-residuals)/dx
 		if not np.allclose(jacobian,dResiddX,rtol,atol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(jacobian,dResiddX,rtol,atol))[1]]))
-		import pdb; pdb.set_trace()
 		self.assertTrue(np.allclose(jacobian,dResiddX,rtol,atol))
 
 	def test_specresid_jacobian_vary_uncertainty(self):
@@ -580,25 +587,41 @@ class TRAINING_Test(unittest.TestCase):
 		#Check spectroscopic residuals are not affected by computeDerivatives
 		self.assertTrue(all([np.allclose(first[1]['resid'],result[1]['resid']) for result in results[1:]]))
 
-
-	def test_regularization_jacobian(self):
-		"""Checks that the the jacobian of the spectroscopic residuals is being correctly calculated to within 1%"""
-		dx=1e-8
+	def test_regularization_scale(self):
+		dx=1e-6
 		rtol=1e-2
-		for regularization, name in [(self.resids.dyadicRegularization,'Dyadic'),(self.resids.phaseGradientRegularization, 'Phase gradient'),(self.resids.waveGradientRegularization,'Wave gradient' )]:
-			
+		for k in range(2):
 			def incrementOneParam(i):
 				guess=self.guess.copy()
 				guess[i]+=dx
-				return regularization(guess,False)[0][0]
+				return self.resids.regularizationScale(self.resids.SALTModel(guess),self.resids.SALTModel(guess,self.resids.phaseRegularizationPoints,self.resids.waveRegularizationPoints))[0][k]
+			scale,jac=self.resids.regularizationScale(self.resids.SALTModel(self.guess),self.resids.SALTModel(self.guess,self.resids.phaseRegularizationPoints,self.resids.waveRegularizationPoints))
+			scale,jac=scale[k],jac[k]
+			dScaledX=np.zeros(self.resids.im0.size) 
+			for i,j in enumerate([self.resids.im0,self.resids.im1][k]):
+				result=incrementOneParam(j)
+				dScaledX[i]=(result-scale)/dx
+			self.assertTrue(np.allclose(jac,dScaledX,rtol))
+		
+	def test_regularization_jacobian(self):
+		"""Checks that the the jacobian of the regularization terms is being correctly calculated to within 1%"""
+		dx=1e-6
+		rtol=1e-2
+		for regularization, name in [(self.resids.dyadicRegularization,'dyadic'),(self.resids.phaseGradientRegularization, 'phase gradient'),(self.resids.waveGradientRegularization,'wave gradient' )]:
+			for component in range(2):
 			
-			print('Checking jacobian of {} regularization'.format(name))
-			#Only checking the first component, since they're calculated using the same code
-			residuals,jacobian=[x[0] for x in regularization(self.guess,True)]
-			dResiddX=np.zeros((residuals.size,self.resids.im0.size))
-			for i,j in enumerate(self.resids.im0):
-				dResiddX[:,i]=(incrementOneParam(j)-residuals)/dx
-			self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
+				def incrementOneParam(i):
+					guess=self.guess.copy()
+					guess[i]+=dx
+					return regularization(guess,False)[0][component]
+			
+				print('Checking jacobian of {} regularization, {} component'.format(name,component))
+				#Only checking the first component, since they're calculated using the same code
+				residuals,jacobian=[x[component] for x in regularization(self.guess,True)]
+				dResiddX=np.zeros((residuals.size,self.resids.im0.size))
+				for i,j in enumerate([self.resids.im0,self.resids.im1][component]):
+					dResiddX[:,i]=(incrementOneParam(j)-residuals)/dx
+				self.assertTrue(np.allclose(dResiddX,jacobian,rtol))
 	
 if __name__ == "__main__":
     unittest.main()
