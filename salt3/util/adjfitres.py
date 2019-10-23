@@ -2,7 +2,10 @@
 import sys,os
 import numpy as np
 
-from .txtobj import txtobj
+try:
+    from .txtobj import txtobj
+except:
+    from txtobj import txtobj
 
 
 def _getDataFormat(filename,):
@@ -71,7 +74,7 @@ def writefitres(fitresobj,outfile,wrtfitresfmt,wrtfitresvars,
 
     fout.close()
 
-def cutFitRes(fitresfile,outfile,cuts=[],field=None):
+def cutFitRes(fitresfile,clobber=False,cuts=[],field=None):
     fitresfmt,fitresvars,fitresheader=_getDataFormat(fitresfile)
     fr=readfitres(fitresfile)
     print(np.min(fr.zCMB[fr.FIELD==field]))
@@ -94,15 +97,15 @@ def cutFitRes(fitresfile,outfile,cuts=[],field=None):
                 continue
             fr.__dict__[c]=fr.__dict__[c][cut_ind]
 
-
-    
-    writefitres(fr,outfile,fitresfmt,fitresvars,fitresheader)
+    if not clobber:
+        os.rename(fitresfile,fitresfile.replace(os.path.basename(fitresfile),'ORIGINAL.FITRES'))
+    writefitres(fr,fitresfile,fitresfmt,fitresvars,fitresheader)
 
 
 def main():
-    cutFitRes('/Users/jpierel/rodney/salt3_testing/FITOPT000.FITRES','test.fitres',cuts=[['zCMB','>0.8']],field='MEDIUM')
-    fr=readfitres('test.fitres')
-    print(np.min(fr.zCMB[fr.FIELD=='MEDIUM']))
+    cutFitRes('/Users/jpierel/rodney/salt3_testing/FITOPT000.FITRES',clobber=False,cuts=[['zCMB','>0.8']],field='MEDIUM')
+    #fr=readfitres('test.fitres')
+    #print(np.min(fr.zCMB[fr.FIELD=='MEDIUM']))
 
 if __name__=='__main__':
     main()
