@@ -71,14 +71,14 @@ def writefitres(fitresobj,outfile,wrtfitresfmt,wrtfitresvars,
         for v in wrtfitresvars:
             outvars += (fitresobj.__dict__[v][c],)
         print(wrtfitresfmt%outvars,file=fout)
-        
+              
 
     fout.close()
 
 def cutFitRes(fitresfile,clobber=False,cuts=[],field=None):
     fitresfmt,fitresvars,fitresheader=_getDataFormat(fitresfile)
     fr=readfitres(fitresfile)
-    print(np.min(fr.zCMB[fr.FIELD==field]))
+
     for cut in cuts:
         if '<' in cut[1]:
             cond=fr.__dict__[cut[0]]<float(cut[1][1:])
