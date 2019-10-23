@@ -14,16 +14,17 @@ def _getDataFormat(filename,):
     header=''
     next_break=False
     for l in lines:
-        if not next_break:
-            header+=l
         if l.startswith('VARNAMES:'):
             l = l.replace('\n','')
             coldefs = l.split()
             next_break=True
+            header+=l
         elif next_break:
             l=l.replace('\n','')
             rowprfx=l.split()[0]
             break
+        else:
+            header+=l
     fin.close()
 
     with open(filename) as f:
