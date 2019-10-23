@@ -1,8 +1,10 @@
 
 import sys,os
-from ast import literal_eval
-from txtobj import txtobj
 import numpy as np
+
+from .txtobj import txtobj
+
+
 def _getDataFormat(filename,):
     fin = open(filename,'r')
     lines = fin.readlines()
