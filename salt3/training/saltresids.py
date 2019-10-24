@@ -58,16 +58,16 @@ class SALTResids:
 
 		self.usePriors = []
 		self.priorWidths = []
-		self.BoundedParams = []
-		self.Bounds = []
-		if self.usePriors:
-			for opt in self.__dict__.keys():
-				if opt.startswith('prior_'):
-					self.usePriors += [opt.replace('prior_','')]
-					self.priorWidths += [self.__dict__[opt]]
-				elif opt.startswith('bound_'):
-					self.BoundedParams += [opt.replace('bound_','')]
-					self.Bounds += [(self.__dict__[opt])]
+		self.boundedParams = []
+		self.bounds = []
+		
+		for opt in self.__dict__.keys():
+			if opt.startswith('prior_'):
+				self.usePriors += [opt[len('prior_'):]]
+				self.priorWidths += [self.__dict__[opt]]
+			elif opt.startswith('bound_'):
+				self.boundedParams += [opt[len('bound_'):]]
+				self.bounds += [tuple([float(x) for x in self.__dict__[opt]])]
 				
 			#self.usePriors=[x.split('prior_')[-1] for x in ] #self.usePriors.split(',')
 			#self.priorWidths=[float(x) for x in self.priorWidths.split(',')]
@@ -200,10 +200,8 @@ class SALTResids:
 		if self.regularize:
 			self.updateEffectivePoints(guess)
 
-		self.Priors = SALTPriors(self)
-		self.numPriorResids=self.Priors.numPriorResids
-		#sum([self.Priors.priors[x].numResids for x in self.Priors.priors])
-		#self.numPriorResids += sum([self.Priors.boundedPriors[x].numResids for x in self.Priors.boundedPriors])
+		self.priors = SALTPriors(self)
+		self.numPriorResids=self.priors.numPriorResids
 		
 		self.__specFixedUncertainty__={}
 		self.__photFixedUncertainty__={}
@@ -212,20 +210,20 @@ class SALTResids:
 
 		self.parameters = ['x0','x1','c','m0','m1','spcrcl','spcrcl_norm','spcrcl_poly',
 						   'modelerr','modelcorr','clscat','clscat_0','clscat_poly']
+		self.corrcombinations=sum([[(i,j) for j in range(i+1,self.n_components)]for i in range(self.n_components)] ,[])
 		self.m0min = np.min(np.where(self.parlist == 'm0')[0])
 		self.m0max = np.max(np.where(self.parlist == 'm0')[0])
 		self.errmin = tuple([np.min(np.where(self.parlist == 'modelerr_{}'.format(i))[0]) for i in range(self.n_components)]) 
 		self.errmax = tuple([np.max(np.where(self.parlist == 'modelerr_{}'.format(i))[0]) for i in range(self.n_components)]) 
-		self.corrcombinations=sum([[(i,j) for j in range(i+1,self.n_components)]for i in range(self.n_components)] ,[])
 		self.corrmin = tuple([np.min(np.where(self.parlist == 'modelcorr_{}{}'.format(i,j))[0]) for i,j in self.corrcombinations]) 
 		self.corrmax = tuple([np.max(np.where(self.parlist == 'modelcorr_{}{}'.format(i,j))[0]) for i,j in self.corrcombinations]) 
+		self.im0 = np.where(self.parlist == 'm0')[0]
+		self.im1 = np.where(self.parlist == 'm1')[0]
+		self.iCL = np.where(self.parlist == 'cl')[0]
 		self.ix1 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x1')])
 		self.ix0 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x0')])
 		self.ic	 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('c_')])
 		self.itpk = np.array([i for i, si in enumerate(self.parlist) if si.startswith('tpkoff')])
-		self.im0 = np.where(self.parlist == 'm0')[0]
-		self.im1 = np.where(self.parlist == 'm1')[0]
-		self.iCL = np.where(self.parlist == 'cl')[0]
 		self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specrecal')])
 		self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr')])
 		self.imodelcorr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelcorr')])
@@ -347,7 +345,7 @@ class SALTResids:
 
 		logp = loglike
 		if len(self.usePriors):
-			priorResids,priorVals,priorJac=self.Priors.priorResids(self.usePriors,self.priorWidths,x)	
+			priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,x)	
 			logp -=(priorResids**2).sum()/2
 			if computeDerivatives:
 				grad-= (priorResids [:,np.newaxis] * priorJac).sum(axis=0)
@@ -420,6 +418,11 @@ class SALTResids:
 			
 		else:
 			#Calculate cholesky matrix for each set of photometric measurements in each filter
+			
+			if (photmodel['modelvariance']<0).any():
+				warnings.warn('Negative variance in photometry',RuntimeWarning)
+				negVals=photmodel['modelvariance']<0
+				photmodel['modelvariance'][negVals]=0
 			variance=photmodel['fluxvariance']+photmodel['modelvariance']
 			Ls,colorvar=[],[]
 			#Add color scatter
@@ -447,8 +450,12 @@ class SALTResids:
 		
 		for L,(selectFilter,clscat,dclscat) in zip(Ls,colorvar):
 			#More stable to solve by backsubstitution than to invert and multiply
-			fluxdiff=photmodel['modelflux'][selectFilter]-photmodel['dataflux'][selectFilter]
-			photresids['resid'][selectFilter]=linalg.solve_triangular(L, fluxdiff,lower=True)
+			try:
+				fluxdiff=photmodel['modelflux'][selectFilter]-photmodel['dataflux'][selectFilter]
+				photresids['resid'][selectFilter]=linalg.solve_triangular(L, fluxdiff,lower=True)
+
+			except:
+				import pdb;pdb.set_trace()
 			if not fixUncertainty:
 				photresids['lognorm']-= (np.log(np.diag(L)).sum())
 		
@@ -492,6 +499,11 @@ class SALTResids:
 			variance=fixedUncertainties['spec_{}'.format(sn)]
 		else:
 			variance=specmodel['fluxvariance'] + specmodel['modelvariance']
+			if (specmodel['modelvariance']<0).any():
+				warnings.warn('Negative variance in spectra',RuntimeWarning)
+				negVals=specmodel['modelvariance']<0
+				specmodel['modelvariance'][negVals]=0
+
 		uncertainty=np.sqrt(variance)*SpecErrScale
 		# HACK
 		#uncertainty *= 0.01
