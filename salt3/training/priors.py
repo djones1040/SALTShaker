@@ -12,15 +12,6 @@ def prior(prior):
 	__priors__[prior.__name__]=prior
 	return prior
 
-__boundedpriors__=dict()
-def boundedprior(boundedprior):
-	"""Decorator to register a given function as a valid prior"""
-	#Check that the method accepts 4 inputs: a SALTResids object, a width, parameter vector, model components
-	assert(len(signature(boundedprior).parameters)==5 or len(signature(boundedprior).parameters)==6)
-	__boundedpriors__[boundedprior.__name__]=boundedprior
-	return boundedprior
-
-
 # TODO
 # x0 > 0, M0 > 0
 # -5 < tpk < 5
@@ -31,10 +22,8 @@ class SALTPriors:
 		for k in SALTResidsObj.__dict__.keys():
 			self.__dict__[k] = SALTResidsObj.__dict__[k]
 		self.SALTModel = SALTResidsObj.SALTModel
-
 		self.priors={ key: partial(__priors__[key],self) for key in __priors__}
-		self.boundedPriors={ key: partial(__boundedpriors__[key],self) for key in __boundedpriors__}
-		for prior in self.priors:
+		for prior in self.usePriors:
 			result=self.priors[prior](1,self.guess,self.SALTModel(self.guess))
 			try:
 				self.priors[prior].numResids=result[0].size
@@ -42,10 +31,9 @@ class SALTPriors:
 				self.priors[prior].numResids=1
 		self.numPriorResids=sum([self.priors[x].numResids for x in self.priors])
 		self.numBoundResids=0
-		for boundedparam in self.BoundedParams:
+		for boundedparam in self.boundedParams:
 			#width,bound,x,par
-			result=self.boundedPriors[boundedprior](0.1,(0,1),self.guess,boundedparam)
-			self.numPriorResids += result[0].size
+			result=self.boundedprior(0.1,(0,1),self.guess,boundedparam)
 			self.numBoundResids += result[0].size
 			
 		#self.numPriorResids += sum([self.boundedpriors[x].numResids for x in self.boundedpriors])
@@ -119,7 +107,7 @@ class SALTPriors:
 		return residual,x1std,jacobian
 
 	@prior
-	def m0endprior_alllam(self,width,x,components):
+	def m0endalllam(self,width,x,components):
 		"""Prior such that at early times there is no flux"""
 		upper,lower=components[0].shape[1],0
 		value=components[0][0,lower:upper]
@@ -131,7 +119,7 @@ class SALTPriors:
 		return residual,value,jacobian
 
 	@prior
-	def m1endprior_alllam(self,width,x,components):
+	def m1endalllam(self,width,x,components):
 		"""Prior such that at early times there is no flux"""
 		upper,lower=components[0].shape[1],0
 		value=components[1][0,lower:upper]
@@ -142,9 +130,9 @@ class SALTPriors:
 		jacobian/=width
 		return residual,value,jacobian	
 
-	@boundedprior
 	def boundedprior(self,width,bound,x,par):
 		"""Flexible prior that sets Gaussian bounds on parameters"""
+		#import pdb;pdb.set_trace()
 
 		lbound,ubound = bound
 		
@@ -157,9 +145,9 @@ class SALTPriors:
 		residual[iLow] = (x[iPar][iLow]-lbound)**2./(2*width**2.)
 		residual[iHigh] = (x[iPar][iHigh]-ubound)**2./(2*width**2.)
 
-		jacobian = np.zeros(len(x[iPar][iOut]),iPar.size)
-		jacobian[iLow,:] = (x[iPar][iLow]-lbound)/(width**2.)
-		jacobian[iHigh,:] = (x[iPar][iHigh]-ubound)/(width**2.)
+		jacobian = np.zeros((x[iPar].size,self.npar))
+		jacobian[iLow,iPar[iLow]] = (x[iPar][iLow]-lbound)/(width**2.)
+		jacobian[iHigh,iPar[iHigh]] = (x[iPar][iHigh]-ubound)/(width**2.)
 		
 		return residual,x[iPar],jacobian	
 
@@ -195,12 +183,9 @@ class SALTPriors:
 		values=np.zeros(self.numBoundResids)
 		idx=0
 		for bound,par in zip(bounds,boundparams):
-			try:
-				boundFunction=self.boundedprior[bound]
-			except:
-				raise ValueError('Invalid bound supplied: {}'.format(bound))
-
-			residuals[idx:idx+priorFunction.numResids],values[idx:idx+boundFunction.numResids],\
-				jacobian[idx:idx+priorFunction.numResids,:]=boundFunction(bound[-1],(bound[0],bound[1]),x,par)
-			idx+=boundFunction.numResids
+			result=self.boundedprior(bound[-1],(bound[0],bound[1]),x,par)
+			numResids=result[0].size
+			residuals[idx:idx+numResids],values[idx:idx+numResids],\
+				jacobian[idx:idx+numResids,:]=result
+			idx+=numResids
 		return residuals,values,jacobian
