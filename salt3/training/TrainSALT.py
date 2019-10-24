@@ -130,7 +130,11 @@ class TrainSALT(TrainSALTBase):
 			except:
 				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.outputdir,unpack=True,skiprows=1,dtype="U20,f8")
 			for key in np.unique(parlist):
-				guess[parlist == key] = pars[names == key]
+				try:
+					guess[parlist == key] = pars[names == key]
+				except:
+					print ('Problem while initializing parameter ',key,' from previous training')
+					sys.exit(1)
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
 	def fitSALTModel(self,datadict):
