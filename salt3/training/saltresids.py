@@ -187,7 +187,7 @@ class SALTResids:
 		for i in range(len(self.im0)):
 			for j,derivs in enumerate([(0,0),(1,0),(0,1),(1,1)]):
 				self.regularizationDerivs[j][:,:,i]=bisplev(self.phaseRegularizationPoints,self.waveRegularizationPoints,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder),dx=derivs[0],dy=derivs[1])
-		
+
 		phase=self.phaseRegularizationPoints
 		wave=self.waveRegularizationPoints
 		fluxes=self.SALTModel(guess,evaluatePhase=self.phaseRegularizationPoints,evaluateWave=self.waveRegularizationPoints)
@@ -226,7 +226,7 @@ class SALTResids:
 		self.im0 = np.where(self.parlist == 'm0')[0]
 		self.im1 = np.where(self.parlist == 'm1')[0]
 		self.iCL = np.where(self.parlist == 'cl')[0]
-		self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specrecal')])
+		self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specrecal')],dtype='int')
 		self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr')])
 		self.imodelcorr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelcorr')])
 		self.iclscat = np.where(self.parlist=='clscat')[0]
@@ -854,10 +854,10 @@ class SALTResids:
 
 				if ( (phase>obsphase.max())).any():
 					decayFactor=10**(-0.4*self.extrapolateDecline*(phase[phase>obsphase.max()]-obsphase.max()))
-					modulatedM0[np.where(phase>obsphase.max())[0]] *= decayFactor
-					modulatedM1[np.where(phase>obsphase.max())[0]] *= decayFactor
-					modulatedphasederivM0[np.where(phase>obsphase.max())[0]] *= decayFactor
-					modulatedphasederivM1[np.where(phase>obsphase.max())[0]] *= decayFactor
+					modulatedM0[np.where(phase>obsphase.max())[0]] *= decayFactor[:,np.newaxis]
+					modulatedM1[np.where(phase>obsphase.max())[0]] *= decayFactor[:,np.newaxis]
+					modulatedphasederivM0[np.where(phase>obsphase.max())[0]] *= decayFactor[:,np.newaxis]
+					modulatedphasederivM1[np.where(phase>obsphase.max())[0]] *= decayFactor[:,np.newaxis]
 						
 				modelsynM0flux=np.sum(modulatedM0, axis=1)*dwave*self.fluxfactor[survey][flt]
 				modelsynM1flux=np.sum(modulatedM1, axis=1)*dwave*self.fluxfactor[survey][flt]
@@ -1203,7 +1203,6 @@ class SALTResids:
 		resultsdict = {}
 		n_sn = len(self.datadict.keys())
 		for k in self.datadict.keys():
-			tpk_init = self.datadict[k]['photdata']['mjd'][0] - self.datadict[k]['photdata']['tobs'][0]
 			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k],
 							  'x1':x[self.parlist == 'x1_%s'%k],# - np.mean(x[self.ix1]),
 							  'c':x[self.parlist == 'c_%s'%k],
@@ -1324,7 +1323,6 @@ class SALTResids:
 		resultsdict = {}
 		n_sn = len(self.datadict.keys())
 		for k in self.datadict.keys():
-			tpk_init = self.datadict[k]['photdata']['mjd'][0] - self.datadict[k]['photdata']['tobs'][0]
 			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k,nburn:].mean(),
 							  'x1':x[self.parlist == 'x1_%s'%k,nburn:].mean(),# - x[self.ix1,nburn:].mean(),
 							  'c':x[self.parlist == 'c_%s'%k,nburn:].mean(),

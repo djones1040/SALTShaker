@@ -44,7 +44,7 @@ class TrainSALTBase:
 							help='training config file')
 		parser.add_argument('--snlist', default=config.get('iodata','snlist'), type=str,
 							help="""list of SNANA-formatted SN data files, including both photometry and spectroscopy. (default=%default)""")
-		parser.add_argument('--dospec', default=config.get('iodata','dospec'), type=bool,
+		parser.add_argument('--dospec', default=config.get('iodata','dospec'), type=boolean_string,
 							help="""if set, look for spectra in the snlist files (default=%default)""")
 		parser.add_argument('--maxsn', default=config.get('iodata','maxsn'), type=nonetype_or_int,
 							help="""sets maximum number of SNe to fit for debugging (default=%default)""")
@@ -310,8 +310,11 @@ class TrainSALTBase:
 			def checkFilterMass(flt):
 				survey = datadict[sn]['survey']
 				filtwave = self.kcordict[survey]['filtwave']
-				filttrans = self.kcordict[survey][flt]['filttrans']
-			
+				try:
+					filttrans = self.kcordict[survey][flt]['filttrans']
+				except:
+					raise RuntimeError('filter %s not found in kcor file'%flt)
+					
 				#Check how much mass of the filter is inside the wavelength range
 				filtRange=(filtwave/(1+z) > self.options.waverange[0]) & \
 						   (filtwave/(1+z) < self.options.waverange[1])
