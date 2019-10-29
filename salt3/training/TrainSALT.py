@@ -130,7 +130,8 @@ class TrainSALT(TrainSALTBase):
 			except:
 				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.outputdir,unpack=True,skiprows=1,dtype="U20,f8")
 			for key in np.unique(parlist):
-				guess[parlist == key] = pars[names == key]
+				try: guess[parlist == key] = pars[names == key]
+				except: import pdb; pdb.set_trace()
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
 	def fitSALTModel(self,datadict):
@@ -167,9 +168,11 @@ class TrainSALT(TrainSALTBase):
 						self.options.n_steps_mcmc,self.options.n_burnin_mcmc,
 						self.options.gaussnewton_maxiter)
 			for k in datadict.keys():
-				tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
-				SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
-
+				try:
+					tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
+					SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
+				except:
+					SNParams[k]['t0'] = -99
 		
 		print('MCMC message: %s'%message)
 		#print('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
@@ -326,7 +329,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			outputdir)
 
 		plotSALTModel.mkModelPlot(outputdir,outfile='%s/SALTmodelcomp.pdf'%outputdir,
-			)
+								  xlimits=[self.options.waverange[0],self.options.waverange[1]])
 		if self.options.dospec:
 			ValidateSpectra.compareSpectra(snlist,
 										   self.options.outputdir,maxspec=50)

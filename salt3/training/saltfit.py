@@ -560,7 +560,7 @@ class GaussNewton(saltresids.SALTResids):
 				return xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 					modelerr,clpars,clerr,clscat,SNParams,stepsizes
 
-			if self.fit_model_err and (superloop % 3 ==2 or superloop==loop_niter):
+			if self.fit_model_err and (superloop % 3 ==2 or superloop==loop_niter-1):
 				print('Optimizing model error')
 				X,loglike=self.minuitOptimize(X,'modelerr')
 				uncertainties=self.getFixedUncertainties(X)
