@@ -257,11 +257,9 @@ class TrainSALTBase:
 						 'regularize':self.options.regularize,
 						 'outputdir':self.options.outputdir,
 						 'fit_model_err':self.options.fit_model_err}
-
-		for k in self.__dict__.keys():
+		for k in self.options.__dict__.keys():
 			if k.startswith('prior') or k.startswith('bound'):
-				saltfitkwargs[k] = self.__dict__[k]
-		
+				saltfitkwargs[k] = self.options.__dict__[k]
 		return saltfitkwargs
 
 	def mkcuts(self,datadict):
