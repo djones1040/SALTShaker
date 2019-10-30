@@ -51,8 +51,8 @@ def plot_hubble_diff(fr1,fr2,multisurvey=False,nbins=6):
 
 		stats1,edges1,bins1 = scipy.stats.binned_statistic(zdata1,mudata1,'mean',bins=np.arange(np.min(zdata1),np.max(zdata1)+.001,.05))
 		stats2,edges2,bins2 = scipy.stats.binned_statistic(zdata2,mudata2,'mean',bins=edges1)
-		stat_err1,edges2,bins2 = scipy.stats.binned_statistic(zdata,mudata,'std',bins=edges1)
-		stat_err2,edges2,bins2 = scipy.stats.binned_statistic(zdata,mudata,'std',bins=edges1)
+		stat_err1,edges2,bins2 = scipy.stats.binned_statistic(zdata1,mudata1,'std',bins=edges1)
+		stat_err2,edges2,bins2 = scipy.stats.binned_statistic(zdata2,mudata2,'std',bins=edges1)
 		bin_data1=[]
 		bin_data2=[]
 
