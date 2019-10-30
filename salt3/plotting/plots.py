@@ -78,8 +78,7 @@ def plot_hubble_diff(fr1,fr2,multisurvey=False,nbins=6):
 				fmt='o',color=col_dict[survey],label=survey)
 				
 		
-		zinterp=np.arange(np.min(zdata1),np.max(zdata1),.01)
-		ax.plot(zinterp,cosmo.distmod(zinterp).value,color='k',linewidth=3)
+		
 	ax.legend(fontsize=16)
 	lims=ax.get_xlim()
 	ax.plot(lims,[0,0],'k--',linewidth=3)
