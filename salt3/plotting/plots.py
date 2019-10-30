@@ -82,7 +82,7 @@ def plot_hubble_diff(fr1,fr2,multisurvey=False,nbins=6):
 		ax.plot(zinterp,cosmo.distmod(zinterp).value,color='k',linewidth=3)
 	ax.legend(fontsize=16)
 	lims=ax.get_xlim()
-	ax2.plot(lims,[0,0],'k--',linewidth=3)
+	ax.plot(lims,[0,0],'k--',linewidth=3)
 	
 		
 	if not os.path.exists('figures'):
