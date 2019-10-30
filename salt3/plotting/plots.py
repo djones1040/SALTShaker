@@ -178,7 +178,7 @@ def plot_hubble(fr,binned=True,multisurvey=False,nbins=6):
 
 	plt.clf()
 
-def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None,survey=None):
+def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None,survey=None,**kwargs):
 	usagestring="""
 	ovdatamc.py <DataFitresFile> <SimFitresFile>  <varName1:varName2:varName3....>  [--cutwin NN_ITYPE 1 1 --cutwin x1 -3 3]
 
@@ -197,6 +197,8 @@ def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None,s
 	options.histvar = fitvars#['x1','c']
 
 	ovhist_obj.options = options
+	for k in kwargs.keys():
+		ovhist_obj.options[k]=kwargs.get(k)
 	ovhist_obj.version=version
 	if datafile is None:
 		datafile=simfile
