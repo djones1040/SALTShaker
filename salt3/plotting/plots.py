@@ -66,8 +66,8 @@ def plot_hubble_diff(fr1,fr2,multisurvey=False,nbins=6):
 			
 			stat_err1[i-1]/=np.sqrt(len(inds1))
 			stat_err2[i-1]/=np.sqrt(len(inds2))
-			bin_data1.append(np.average(mudata1[inds],weights=1./muerrdata1[inds1]))
-			bin_data2.append(np.average(mudata2[inds],weights=1./muerrdata2[inds2]))
+			bin_data1.append(np.average(mudata1[inds1],weights=1./muerrdata1[inds1]))
+			bin_data2.append(np.average(mudata2[inds2],weights=1./muerrdata2[inds2]))
 		bin_data1=np.array(bin_data1)
 		bin_data2=np.array(bin_data2)
 
