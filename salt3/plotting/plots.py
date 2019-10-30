@@ -71,7 +71,7 @@ def plot_hubble_diff(fr1,fr2,multisurvey=False,nbins=6):
 
 		if ax is None:
 			ax=plot('errorbar',[(edges1[i]+edges1[i+1])/2 for i in final_inds],bin_data1-bin_data2,yerr=np.sqrt(stat_err1[final_inds]**2+stat_err2[final_inds]**2),
-				y_lab=r'$\mu$ Residual',fmt='o',color=col_dict[survey],label=survey)
+				x_lab=r'$z_{\rm{CMB}}$',y_lab=r'$\mu$ Residual',fmt='o',color=col_dict[survey],label=survey)
 			
 		else:
 			ax.errorbar([(edges1[i]+edges1[i+1])/2 for i in final_inds],bin_data1-bin_data2,yerr=np.sqrt(stat_err1[final_inds]**2+stat_err2[final_inds]**2),
