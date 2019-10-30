@@ -26,7 +26,7 @@ def calcMu(fr,alpha=0.14,beta=3.1,M=-19.36):
 def plot_hubble_diff(fr1,fr2,multisurvey=False,nbins=6):
 	if multisurvey:
 		surveys=np.unique(fr1.FIELD)
-		col_dict={s:np.random.rand(3,) for s in surveys1}
+		col_dict={s:np.random.rand(3,) for s in surveys}
 		
 	else:
 		surveys1=[None]
