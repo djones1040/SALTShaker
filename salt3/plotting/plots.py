@@ -198,7 +198,7 @@ def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None,s
 
 	ovhist_obj.options = options
 	for k in kwargs.keys():
-		ovhist_obj.options[k]=kwargs.get(k)
+		ovhist_obj.options.__dict__[k]=kwargs.get(k)
 	ovhist_obj.version=version
 	if datafile is None:
 		datafile=simfile
