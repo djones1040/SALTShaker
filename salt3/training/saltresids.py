@@ -60,7 +60,7 @@ class SALTResids:
 		self.priorWidths = []
 		self.boundedParams = []
 		self.bounds = []
-		
+
 		for opt in self.__dict__.keys():
 			if opt.startswith('prior_'):
 				self.usePriors += [opt[len('prior_'):]]
@@ -71,7 +71,7 @@ class SALTResids:
 				
 			#self.usePriors=[x.split('prior_')[-1] for x in ] #self.usePriors.split(',')
 			#self.priorWidths=[float(x) for x in self.priorWidths.split(',')]
-			
+
 		# pre-set some indices
 		self.set_param_indices()
 		
@@ -187,7 +187,7 @@ class SALTResids:
 		for i in range(len(self.im0)):
 			for j,derivs in enumerate([(0,0),(1,0),(0,1),(1,1)]):
 				self.regularizationDerivs[j][:,:,i]=bisplev(self.phaseRegularizationPoints,self.waveRegularizationPoints,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder),dx=derivs[0],dy=derivs[1])
-		
+
 		phase=self.phaseRegularizationPoints
 		wave=self.waveRegularizationPoints
 		fluxes=self.SALTModel(guess,evaluatePhase=self.phaseRegularizationPoints,evaluateWave=self.waveRegularizationPoints)
@@ -522,6 +522,10 @@ class SALTResids:
 				uncertainty_jac=  specmodel['modelvariance_jacobian'] / (2*uncertainty[:,np.newaxis])
 				specresids['lognorm_grad']= - (uncertainty_jac/uncertainty[:,np.newaxis]).sum(axis=0)
 				specresids['resid_jacobian']-=   uncertainty_jac*(specresids['resid'] /uncertainty)[:,np.newaxis]
+		#if len(specresids['resid'][specresids['resid'] != specresids['resid']]):
+		#	import pdb; pdb.set_trace()
+		#if len(photresids['resid'][photresids['resid'] != photresids['resid']]):
+		#	import pdb; pdb.set_trace()
 
 		if returnSpecModel: return photresids,specresids,specmodel
 		else: return photresids,specresids
@@ -866,10 +870,10 @@ class SALTResids:
 
 				if ( (phase>obsphase.max())).any():
 					decayFactor=10**(-0.4*self.extrapolateDecline*(phase[phase>obsphase.max()]-obsphase.max()))
-					modulatedM0[np.where(phase>obsphase.max())[0]] *= decayFactor
-					modulatedM1[np.where(phase>obsphase.max())[0]] *= decayFactor
-					modulatedphasederivM0[np.where(phase>obsphase.max())[0]] *= decayFactor
-					modulatedphasederivM1[np.where(phase>obsphase.max())[0]] *= decayFactor
+					modulatedM0[np.where(phase>obsphase.max())[0]] *= decayFactor[:,np.newaxis]
+					modulatedM1[np.where(phase>obsphase.max())[0]] *= decayFactor[:,np.newaxis]
+					modulatedphasederivM0[np.where(phase>obsphase.max())[0]] *= decayFactor[:,np.newaxis]
+					modulatedphasederivM1[np.where(phase>obsphase.max())[0]] *= decayFactor[:,np.newaxis]
 						
 				modelsynM0flux=np.sum(modulatedM0, axis=1)*dwave*self.fluxfactor[survey][flt]
 				modelsynM1flux=np.sum(modulatedM1, axis=1)*dwave*self.fluxfactor[survey][flt]
@@ -1215,7 +1219,6 @@ class SALTResids:
 		resultsdict = {}
 		n_sn = len(self.datadict.keys())
 		for k in self.datadict.keys():
-			tpk_init = self.datadict[k]['photdata']['mjd'][0] - self.datadict[k]['photdata']['tobs'][0]
 			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k],
 							  'x1':x[self.parlist == 'x1_%s'%k],# - np.mean(x[self.ix1]),
 							  'c':x[self.parlist == 'c_%s'%k],
@@ -1336,7 +1339,6 @@ class SALTResids:
 		resultsdict = {}
 		n_sn = len(self.datadict.keys())
 		for k in self.datadict.keys():
-			tpk_init = self.datadict[k]['photdata']['mjd'][0] - self.datadict[k]['photdata']['tobs'][0]
 			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k,nburn:].mean(),
 							  'x1':x[self.parlist == 'x1_%s'%k,nburn:].mean(),# - x[self.ix1,nburn:].mean(),
 							  'c':x[self.parlist == 'c_%s'%k,nburn:].mean(),
