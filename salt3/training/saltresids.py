@@ -60,7 +60,7 @@ class SALTResids:
 		self.priorWidths = []
 		self.boundedParams = []
 		self.bounds = []
-		
+
 		for opt in self.__dict__.keys():
 			if opt.startswith('prior_'):
 				self.usePriors += [opt[len('prior_'):]]
@@ -71,7 +71,7 @@ class SALTResids:
 				
 			#self.usePriors=[x.split('prior_')[-1] for x in ] #self.usePriors.split(',')
 			#self.priorWidths=[float(x) for x in self.priorWidths.split(',')]
-			
+
 		# pre-set some indices
 		self.set_param_indices()
 		
@@ -522,6 +522,10 @@ class SALTResids:
 				uncertainty_jac=  specmodel['modelvariance_jacobian'] / (2*uncertainty[:,np.newaxis])
 				specresids['lognorm_grad']= - (uncertainty_jac/uncertainty[:,np.newaxis]).sum(axis=0)
 				specresids['resid_jacobian']-=   uncertainty_jac*(specresids['resid'] /uncertainty)[:,np.newaxis]
+		#if len(specresids['resid'][specresids['resid'] != specresids['resid']]):
+		#	import pdb; pdb.set_trace()
+		#if len(photresids['resid'][photresids['resid'] != photresids['resid']]):
+		#	import pdb; pdb.set_trace()
 
 		if returnSpecModel: return photresids,specresids,specmodel
 		else: return photresids,specresids
