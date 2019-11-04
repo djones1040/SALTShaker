@@ -32,6 +32,7 @@ _jlaspecdir = '%s/trainingdata/jla'%(data_rootdir)
 _ps1specdir = '%s/trainingdata/ps1spec_formatted'%(data_rootdir)
 _foundspecdir = '%s/trainingdata/foundationspec_formatted'%(data_rootdir)
 _foundoldspecdir = '%s/trainingdata/FoundModSpec'%(data_rootdir)
+_foundpubspecdir = '%s/trainingdata/FoundationSpeccopy'%(data_rootdir)
 _ps1oldspecdir = '%s/trainingdata/PS1Spec'%(data_rootdir)
 
 
@@ -122,7 +123,35 @@ def formatFoundSpec(outdir='/Users/David/Dropbox/research/SALT3/salt3/data/train
 
 		fout.close()
 
+def formatFoundPubSpec(outdir='/Users/David/Dropbox/research/SALT3/salt3/data/trainingdata/foundationspec_pub_formatted'):
+	from astropy.time import Time
+	
+	fileset = glob.glob('%s/*/*flm'%_foundoldspecdir)
+	lc_name,found_name = np.loadtxt('%s/trainingdata/foundnames.txt'%data_rootdir,unpack=True,dtype=str)
+	
+	for f in fileset:
 
+		snid = f.split('/')[-1].split('_')[0]
+		try: snid = lc_name[found_name == snid][0]
+		except: pass
+		
+		datestr = f.split('_')[1]
+		t = Time('%s-%s-%s 00:00:00'%(datestr[:4],datestr[4:6],datestr[6:8]),format='iso')
+		fout = open('%s/spectrum-%s.list'%(outdir,snid),'w')
+		print('@Date %i'%t.mjd,file=fout)
+
+		try:
+			wave,flux,fluxerr = np.loadtxt(f,unpack=True,skiprows=7)
+			for w,f,fe in zip(wave,flux,fluxerr):
+				print('%.1f %8.5e %8.5e'%(w,f,fe),file=fout)
+		except:
+			wave,flux = np.loadtxt(f,unpack=True)
+			for w,f in zip(wave,flux):
+				print('%.1f %8.5e %8.5e'%(w,f,f*0.01),file=fout)
+
+		fout.close()
+
+		
 def formatPS1Spec(outdir='/Users/David/Dropbox/research/SALT3/salt3/data/trainingdata/ps1spec_formatted'):
 	from astropy.time import Time
 	

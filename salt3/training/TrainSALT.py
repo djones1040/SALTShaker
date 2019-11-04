@@ -18,6 +18,7 @@ from sncosmo.constants import HC_ERG_AA
 from salt3.util import snana,readutils
 from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
 from salt3.util.txtobj import txtobj
+from salt3.util.specSynPhot import getScaleForSN
 
 from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs, init_errs_fromfile
 from salt3.training.base import TrainSALTBase
@@ -119,6 +120,14 @@ class TrainSALT(TrainSALTBase):
 			guess[parlist == 'clscat'] = [1e-2]*self.options.n_colorscatpars
 			guess[np.where(parlist == 'clscat')[0][-1]]=-10
 		guess[(parlist == 'm0') & (guess < 0)] = 1e-4
+
+		if self.options.specrecal:
+			for sn in datadict.keys():
+				specdata=datadict[sn]['specdata']
+				photdata=datadict[sn]['photdata']
+				for k in specdata.keys():
+					init_scale = getScaleForSN(specdata[k],photdata,self.kcordict,datadict[sn]['survey'])
+					guess[np.where(parlist == 'specrecal_{}_{}'.format(sn,k))[0][-1]] = init_scale
 		i=0
 		for k in datadict.keys():
 			guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36-10.635))

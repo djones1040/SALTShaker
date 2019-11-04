@@ -298,6 +298,10 @@ class TrainSALTBase:
 				   ((specdata[k]['tobs'])/(1+z)>self.options.phaserange[1]):
 					specdata.pop(k)
 					numSpecElimmed+=1
+				elif specdata[k]['mjd'] < np.min(photdata['mjd']) or \
+					 specdata[k]['mjd'] > np.max(photdata['mjd']):
+					specdata.pop(k)
+					numSpecElimmed+=1
 				else:
 					numSpec+=1
 					numSpecPoints+=((specdata[k]['wavelength']/(1+z)>self.options.waverange[0]) &
