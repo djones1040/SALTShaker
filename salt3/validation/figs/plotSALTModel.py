@@ -145,7 +145,7 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 	salt2_colormin = float(lines[6].split()[1])
 	salt2_colormax = float(lines[7].split()[1])
 	colorlaw_salt2 = SALT2ColorLaw([salt2_colormin,salt2_colormax],colorlaw_salt2_coeffs)
-	wave = np.arange(2000,9200,1,dtype='float')#salt2_colormin,salt2_colormax,1)
+	wave = np.arange(xlimits[0],xlimits[1],1,dtype='float')#salt2_colormin,salt2_colormax,1)
 	ax3.plot(wave,colorlaw_salt2(wave),color='b',label='SALT2')
 
 	
