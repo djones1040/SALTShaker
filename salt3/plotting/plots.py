@@ -23,30 +23,142 @@ def calcMu(fr,alpha=0.14,beta=3.1,M=-19.36):
 	fr.MUERR = np.sqrt(fr.mBERR**2 + alpha**2.*fr.x1ERR**2. + beta**2.*fr.cERR**2)
 	return(fr)
 
-def plot_hubble(fr,binned=True):
-	if binned:
-		stats,edges,bins = scipy.stats.binned_statistic(fr.zCMB,fr.MU,'mean',bins=np.arange(np.min(fr.zCMB),np.max(fr.zCMB)+.001,.1))
-		stat_err,edges2,bins2 = scipy.stats.binned_statistic(fr.zCMB,fr.MU,'std',bins=edges)
-		bin_data=[]
-		for i in range(1,len(edges)):
-			inds=np.where(bins==i)[0]
-			print(len(inds))
-			stat_err[i-1]/=np.sqrt(len(inds))
-			bin_data.append(np.average(fr.MU[inds],weights=1./fr.MUERR[inds]))
-		bin_data=np.array(bin_data)
-
-		ax=plot('errorbar',[(edges[i]+edges[i+1])/2 for i in range(len(edges)-1)],bin_data,yerr=stat_err,y_lab=r'$\mu$',fmt='o')
-		ax,ax2=split_plot(ax,'errorbar',[(edges[i]+edges[i+1])/2 for i in range(len(edges)-1)],
-			y=bin_data-cosmo.distmod([(edges[i]+edges[i+1])/2 for i in range(len(edges)-1)]).value,yerr=stat_err,x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o')
-		lims=ax.get_xlim()
-		ax2.plot(lims,[0,0],'k--',linewidth=3)
+def plot_hubble_diff(fr1,fr2,multisurvey=False,nbins=6):
+	if multisurvey:
+		surveys=np.unique(fr1.FIELD)
+		col_dict={s:np.random.rand(3,) for s in surveys}
+		
 	else:
-		ax=plot('errorbar',fr.zCMB,y=fr.MU,yerr=fr.MUERR,y_lab=r'$\mu$',fmt='o')
-		ax,ax2=split_plot(ax,'errorbar',fr.zCMB,y=fr.MU-cosmo.distmod(fr.zCMB).value,yerr=fr.MUERR,x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o')
-		lims=ax.get_xlim()
-		ax2.plot(lims,[0,0],'k--',linewidth=3)
-	zinterp=np.arange(np.min(fr.zCMB),np.max(fr.zCMB),.01)
-	ax.plot(zinterp,cosmo.distmod(zinterp).value,color='k',linewidth=3)
+		surveys1=[None]
+		col_dict1={None:'b'}
+	ax = None
+	for survey in surveys:
+		if survey is None:
+			survey='ALL'
+			zdata1=fr1.zCMB
+			mudata1=fr1.MU
+			muerrdata1=fr1.MUERR
+			zdata2=fr2.zCMB
+			mudata2=fr2.MU
+			muerrdata2=fr2.MUERR
+		else:
+			zdata1=fr1.zCMB[fr1.FIELD==survey]
+			mudata1=fr1.MU[fr1.FIELD==survey]
+			muerrdata1=fr1.MUERR[fr1.FIELD==survey]
+			zdata2=fr2.zCMB[fr2.FIELD==survey]
+			mudata2=fr2.MU[fr2.FIELD==survey]
+			muerrdata2=fr2.MUERR[fr2.FIELD==survey]
+
+		stats1,edges1,bins1 = scipy.stats.binned_statistic(zdata1,mudata1,'mean',bins=np.arange(np.min(zdata1),np.max(zdata1)+.001,.05))
+		stats2,edges2,bins2 = scipy.stats.binned_statistic(zdata2,mudata2,'mean',bins=edges1)
+		stat_err1,edges2,bins2 = scipy.stats.binned_statistic(zdata1,mudata1,'std',bins=edges1)
+		stat_err2,edges2,bins2 = scipy.stats.binned_statistic(zdata2,mudata2,'std',bins=edges1)
+		bin_data1=[]
+		bin_data2=[]
+
+		final_inds=[]
+		for i in range(1,len(edges1)):
+			inds1=np.where(bins1==i)[0]
+			inds2=np.where(bins2==i)[0]
+			if len(inds1)==0 or len(inds2)==0:
+				continue
+			final_inds.append(i-1)
+			
+			stat_err1[i-1]/=np.sqrt(len(inds1))
+			stat_err2[i-1]/=np.sqrt(len(inds2))
+			bin_data1.append(np.average(mudata1[inds1],weights=1./muerrdata1[inds1]))
+			bin_data2.append(np.average(mudata2[inds2],weights=1./muerrdata2[inds2]))
+		bin_data1=np.array(bin_data1)
+		bin_data2=np.array(bin_data2)
+
+		if ax is None:
+			ax=plot('errorbar',[(edges1[i]+edges1[i+1])/2 for i in final_inds],bin_data1-bin_data2,yerr=np.sqrt(stat_err1[final_inds]**2+stat_err2[final_inds]**2),
+				x_lab=r'$z_{\rm{CMB}}$',y_lab=r'$\mu$ Residual',fmt='o',color=col_dict[survey],label=survey)
+			
+		else:
+			ax.errorbar([(edges1[i]+edges1[i+1])/2 for i in final_inds],bin_data1-bin_data2,yerr=np.sqrt(stat_err1[final_inds]**2+stat_err2[final_inds]**2),
+				fmt='o',color=col_dict[survey],label=survey)
+				
+		
+		
+	ax.legend(fontsize=16)
+	lims=ax.get_xlim()
+	ax.plot(lims,[0,0],'k--',linewidth=3)
+	
+		
+	if not os.path.exists('figures'):
+		os.makedirs('figures')
+	if fr1.version is not None:
+		fname1=fr1.version
+	else:
+		fname1=fr1.filename
+	if fr2.version is not None:
+		fname2=fr2.version
+	else:
+		fname2=fr2.filename
+	if os.path.exists(os.path.join('figures',fname1+'-'+fname2+'_hubble_diagram.pdf')):
+		ext=1
+		while os.path.exists(os.path.join('figures',fname1+'-'+fname2+'_hubble_diagram_'+str(ext)+'.pdf')):
+			ext+=1
+		outname=os.path.join('figures',fname1+'-'+fname2+'_hubble_diagram_'+str(ext)+'.pdf')
+	else:
+		outname=os.path.join('figures',fname1+'-'+fname2+'_hubble_diagram.pdf')
+	plt.tight_layout()
+	plt.savefig(outname,format='pdf')
+
+	plt.clf()
+
+def plot_hubble(fr,binned=True,multisurvey=False,nbins=6):
+	if multisurvey:
+		surveys=np.unique(fr.FIELD)
+		col_dict={s:np.random.rand(3,) for s in surveys}
+	else:
+		surveys=[None]
+		col_dict={None:'b'}
+	ax = None
+	for survey in surveys:
+		if survey is None:
+			survey='ALL'
+			zdata=fr.zCMB
+			mudata=fr.MU
+			muerrdata=fr.MUERR
+		else:
+			zdata=fr.zCMB[fr.FIELD==survey]
+			mudata=fr.MU[fr.FIELD==survey]
+			muerrdata=fr.MUERR[fr.FIELD==survey]
+
+		if binned:
+			stats,edges,bins = scipy.stats.binned_statistic(zdata,mudata,'mean',bins=np.arange(np.min(zdata),np.max(zdata)+.001,.05))
+			stat_err,edges2,bins2 = scipy.stats.binned_statistic(zdata,mudata,'std',bins=edges)
+			bin_data=[]
+			final_inds=[]
+			for i in range(1,len(edges)):
+				inds=np.where(bins==i)[0]
+				if len(inds)==0:
+					continue
+				final_inds.append(i-1)
+				stat_err[i-1]/=np.sqrt(len(inds))
+				bin_data.append(np.average(mudata[inds],weights=1./muerrdata[inds]))
+			bin_data=np.array(bin_data)
+
+			if ax is None:
+				ax=plot('errorbar',[(edges[i]+edges[i+1])/2 for i in final_inds],bin_data,yerr=stat_err[final_inds],y_lab=r'$\mu$',fmt='o',color=col_dict[survey],label=survey)
+				ax,ax2=split_plot(ax,'errorbar',[(edges[i]+edges[i+1])/2 for i in final_inds],
+					y=bin_data-cosmo.distmod([(edges[i]+edges[i+1])/2 for i in final_inds]).value,yerr=stat_err[final_inds],x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o',color=col_dict[survey])
+			else:
+				ax.errorbar([(edges[i]+edges[i+1])/2 for i in final_inds],bin_data,yerr=stat_err[final_inds],fmt='o',color=col_dict[survey],label=survey)
+				ax2.errorbar([(edges[i]+edges[i+1])/2 for i in final_inds],bin_data-cosmo.distmod([(edges[i]+edges[i+1])/2 for i in final_inds]).value,yerr=stat_err[final_inds],
+					fmt='o',color=col_dict[survey])
+			
+		else:
+			ax=plot('errorbar',zdata,y=mudata,yerr=muerrdata,y_lab=r'$\mu$',fmt='o',color=col_dict[survey],label=survey)
+			ax,ax2=split_plot(ax,'errorbar',zdata,y=mudata-cosmo.distmod(zdata).value,yerr=muerrdata,x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o',color=col_dict[survey])
+		zinterp=np.arange(np.min(zdata),np.max(zdata),.01)
+		ax.plot(zinterp,cosmo.distmod(zinterp).value,color='k',linewidth=3)
+	ax.legend(fontsize=16)
+	lims=ax.get_xlim()
+	ax2.plot(lims,[0,0],'k--',linewidth=3)
+	
 		
 	if not os.path.exists('figures'):
 		os.makedirs('figures')
@@ -66,7 +178,7 @@ def plot_hubble(fr,binned=True):
 
 	plt.clf()
 
-def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None):
+def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None,survey=None,**kwargs):
 	usagestring="""
 	ovdatamc.py <DataFitresFile> <SimFitresFile>  <varName1:varName2:varName3....>  [--cutwin NN_ITYPE 1 1 --cutwin x1 -3 3]
 
@@ -85,13 +197,17 @@ def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None):
 	options.histvar = fitvars#['x1','c']
 
 	ovhist_obj.options = options
+	for k in kwargs.keys():
+		ovhist_obj.options.__dict__[k]=kwargs.get(k)
 	ovhist_obj.version=version
 	if datafile is None:
 		datafile=simfile
 	
 	data = txtobj_abv(datafile)
 	sim = txtobj_abv(simfile)
-	
+	if survey is not None:
+		data.cut_byVar('FIELD',survey)
+		sim.cut_byVar('FIELD',survey)
 
 	# getting distance modulus is slow, so don't do it unless necessary
 	getMU = False
@@ -145,6 +261,11 @@ def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None):
 				os.makedirs('figures')
 			if ovhist_obj.version is not None:
 				fname=ovhist_obj.version
+			else:
+				fname=''
+			if survey is not None:
+				fname+='_'+survey
+			
 			ovhist_obj.options.outfile = os.path.join("figures",'ovplot_%s_%s.pdf'%(fname,"_".join(ovhist_obj.options.histvar)))
 			if os.path.exists(ovhist_obj.options.outfile):
 				ext=1

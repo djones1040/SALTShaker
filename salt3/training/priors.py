@@ -12,15 +12,6 @@ def prior(prior):
 	__priors__[prior.__name__]=prior
 	return prior
 
-__boundedpriors__=dict()
-def boundedprior(boundedprior):
-	"""Decorator to register a given function as a valid prior"""
-	#Check that the method accepts 4 inputs: a SALTResids object, a width, parameter vector, model components
-	assert(len(signature(boundedprior).parameters)==5 or len(signature(boundedprior).parameters)==6)
-	__boundedpriors__[boundedprior.__name__]=boundedprior
-	return boundedprior
-
-
 # TODO
 # x0 > 0, M0 > 0
 # -5 < tpk < 5
@@ -31,21 +22,19 @@ class SALTPriors:
 		for k in SALTResidsObj.__dict__.keys():
 			self.__dict__[k] = SALTResidsObj.__dict__[k]
 		self.SALTModel = SALTResidsObj.SALTModel
-
 		self.priors={ key: partial(__priors__[key],self) for key in __priors__}
-		self.boundedPriors={ key: partial(__boundedpriors__[key],self) for key in __boundedpriors__}
-		for prior in self.priors:
+		for prior in self.usePriors:
 			result=self.priors[prior](1,self.guess,self.SALTModel(self.guess))
 			try:
 				self.priors[prior].numResids=result[0].size
 			except:
 				self.priors[prior].numResids=1
+
 		self.numPriorResids=sum([self.priors[x].numResids for x in self.priors])
 		self.numBoundResids=0
-		for boundedparam in self.BoundedParams:
+		for boundedparam in self.boundedParams:
 			#width,bound,x,par
-			result=self.boundedPriors[boundedprior](0.1,(0,1),self.guess,boundedparam)
-			self.numPriorResids += result[0].size
+			result=self.boundedprior(0.1,(0,1),self.guess,boundedparam)
 			self.numBoundResids += result[0].size
 			
 		#self.numPriorResids += sum([self.boundedpriors[x].numResids for x in self.boundedpriors])
@@ -96,7 +85,38 @@ class SALTPriors:
 		
 		jacobian=-fluxDeriv* (2.5 / (np.log(10) *m0Bflux * width))
 		return residual,m0B,jacobian
-		
+
+	@prior
+	def m1prior(self,width,x,components):
+		"""M1 should have zero flux at t=0 in the B band"""
+		int1d = interp1d(self.phase,components[1],axis=0,assume_sorted=True)
+		m1Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
+			self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
+		residual = m1Bflux / width
+		#This derivative is constant, and never needs to be recalculated, so I store it in a hidden attribute
+		try:
+			fluxDeriv= self.__m1priorfluxderiv__.copy()
+		except:
+			fluxDeriv= np.zeros(self.npar)
+			passbandColorExp = self.kcordict['default']['Bpbspl']
+			intmult = (self.wave[1] - self.wave[0])*self.kcordict['default']['fluxfactor']
+			for i in range(self.im1.size):
+				waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+				phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+				#Check if this filter is inside values affected by changes in knot i
+				if waverange[0] > self.kcordict['default']['maxlam'] or waverange[1] < self.kcordict['default']['minlam']:
+					pass
+				if (0>=phaserange[0] ) & (0<=phaserange[1]):
+					#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
+					#Integrate only over wavelengths within the relevant range
+					inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
+					derivInterp = interp1d(self.phase,self.spline_derivs[:,inbounds,i],axis=0,kind=self.interpMethod,bounds_error=False,fill_value="extrapolate",assume_sorted=True)
+					fluxDeriv[self.im1[i]] = np.sum( passbandColorExp[inbounds] * derivInterp(0))*intmult 
+			self.__m1priorfluxderiv__=fluxDeriv.copy()
+
+		jacobian=fluxDeriv/width 
+		return residual,m1Bflux,jacobian
+	
 	@prior
 	def x1mean(self,width,x,components):
 		"""Prior such that the mean of the x1 population is 0"""
@@ -119,7 +139,7 @@ class SALTPriors:
 		return residual,x1std,jacobian
 
 	@prior
-	def m0endprior_alllam(self,width,x,components):
+	def m0endalllam(self,width,x,components):
 		"""Prior such that at early times there is no flux"""
 		upper,lower=components[0].shape[1],0
 		value=components[0][0,lower:upper]
@@ -131,7 +151,7 @@ class SALTPriors:
 		return residual,value,jacobian
 
 	@prior
-	def m1endprior_alllam(self,width,x,components):
+	def m1endalllam(self,width,x,components):
 		"""Prior such that at early times there is no flux"""
 		upper,lower=components[0].shape[1],0
 		value=components[1][0,lower:upper]
@@ -142,9 +162,9 @@ class SALTPriors:
 		jacobian/=width
 		return residual,value,jacobian	
 
-	@boundedprior
 	def boundedprior(self,width,bound,x,par):
 		"""Flexible prior that sets Gaussian bounds on parameters"""
+		#import pdb;pdb.set_trace()
 
 		lbound,ubound = bound
 		
@@ -157,9 +177,9 @@ class SALTPriors:
 		residual[iLow] = (x[iPar][iLow]-lbound)**2./(2*width**2.)
 		residual[iHigh] = (x[iPar][iHigh]-ubound)**2./(2*width**2.)
 
-		jacobian = np.zeros(len(x[iPar][iOut]),iPar.size)
-		jacobian[iLow,:] = (x[iPar][iLow]-lbound)/(width**2.)
-		jacobian[iHigh,:] = (x[iPar][iHigh]-ubound)/(width**2.)
+		jacobian = np.zeros((x[iPar].size,self.npar))
+		jacobian[iLow,iPar[iLow]] = (x[iPar][iLow]-lbound)/(width**2.)
+		jacobian[iHigh,iPar[iHigh]] = (x[iPar][iHigh]-ubound)/(width**2.)
 		
 		return residual,x[iPar],jacobian	
 
@@ -188,19 +208,15 @@ class SALTPriors:
 	def BoundedPriorResids(self,bounds,boundparams,x):
 		"""Given a list of names of priors and widths returns a residuals vector, list of prior values, and Jacobian """
 
-		alllam_vals = range(0,self.im0.size)
 		components = self.SALTModel(x)
 		residuals=np.zeros(self.numBoundResids)
 		jacobian=np.zeros((self.numBoundResids,self.npar))
 		values=np.zeros(self.numBoundResids)
 		idx=0
 		for bound,par in zip(bounds,boundparams):
-			try:
-				boundFunction=self.boundedprior[bound]
-			except:
-				raise ValueError('Invalid bound supplied: {}'.format(bound))
-
-			residuals[idx:idx+priorFunction.numResids],values[idx:idx+boundFunction.numResids],\
-				jacobian[idx:idx+priorFunction.numResids,:]=boundFunction(bound[-1],(bound[0],bound[1]),x,par)
-			idx+=boundFunction.numResids
+			result=self.boundedprior(bound[-1],(bound[0],bound[1]),x,par)
+			numResids=result[0].size
+			residuals[idx:idx+numResids],values[idx:idx+numResids],\
+				jacobian[idx:idx+numResids,:]=result
+			idx+=numResids
 		return residuals,values,jacobian
