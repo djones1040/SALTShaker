@@ -58,20 +58,20 @@ class SALTResids:
 
 		self.usePriors = []
 		self.priorWidths = []
-		self.BoundedParams = []
-		self.Bounds = []
-		if self.usePriors:
-			for opt in self.__dict__.keys():
-				if opt.startswith('prior_'):
-					self.usePriors += [opt.replace('prior_','')]
-					self.priorWidths += [self.__dict__[opt]]
-				elif opt.startswith('bound_'):
-					self.BoundedParams += [opt.replace('bound_','')]
-					self.Bounds += [(self.__dict__[opt])]
+		self.boundedParams = []
+		self.bounds = []
+
+		for opt in self.__dict__.keys():
+			if opt.startswith('prior_'):
+				self.usePriors += [opt[len('prior_'):]]
+				self.priorWidths += [self.__dict__[opt]]
+			elif opt.startswith('bound_'):
+				self.boundedParams += [opt[len('bound_'):]]
+				self.bounds += [tuple([float(x) for x in self.__dict__[opt]])]
 				
 			#self.usePriors=[x.split('prior_')[-1] for x in ] #self.usePriors.split(',')
 			#self.priorWidths=[float(x) for x in self.priorWidths.split(',')]
-			
+
 		# pre-set some indices
 		self.set_param_indices()
 		
@@ -187,7 +187,7 @@ class SALTResids:
 		for i in range(len(self.im0)):
 			for j,derivs in enumerate([(0,0),(1,0),(0,1),(1,1)]):
 				self.regularizationDerivs[j][:,:,i]=bisplev(self.phaseRegularizationPoints,self.waveRegularizationPoints,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder),dx=derivs[0],dy=derivs[1])
-		
+
 		phase=self.phaseRegularizationPoints
 		wave=self.waveRegularizationPoints
 		fluxes=self.SALTModel(guess,evaluatePhase=self.phaseRegularizationPoints,evaluateWave=self.waveRegularizationPoints)
@@ -200,44 +200,45 @@ class SALTResids:
 		if self.regularize:
 			self.updateEffectivePoints(guess)
 
-		self.Priors = SALTPriors(self)
-		self.numPriorResids=self.Priors.numPriorResids
-		#sum([self.Priors.priors[x].numResids for x in self.Priors.priors])
-		#self.numPriorResids += sum([self.Priors.boundedPriors[x].numResids for x in self.Priors.boundedPriors])
+		self.priors = SALTPriors(self)
+		self.numPriorResids=self.priors.numPriorResids
 		
 		self.__specFixedUncertainty__={}
 		self.__photFixedUncertainty__={}
+		self.__components_time_stamp__ = time.time()
 
 	def set_param_indices(self):
 
 		self.parameters = ['x0','x1','c','m0','m1','spcrcl','spcrcl_norm','spcrcl_poly',
 						   'modelerr','modelcorr','clscat','clscat_0','clscat_poly']
+		self.corrcombinations=sum([[(i,j) for j in range(i+1,self.n_components)]for i in range(self.n_components)] ,[])
 		self.m0min = np.min(np.where(self.parlist == 'm0')[0])
 		self.m0max = np.max(np.where(self.parlist == 'm0')[0])
 		self.errmin = tuple([np.min(np.where(self.parlist == 'modelerr_{}'.format(i))[0]) for i in range(self.n_components)]) 
 		self.errmax = tuple([np.max(np.where(self.parlist == 'modelerr_{}'.format(i))[0]) for i in range(self.n_components)]) 
-		self.corrcombinations=sum([[(i,j) for j in range(i+1,self.n_components)]for i in range(self.n_components)] ,[])
 		self.corrmin = tuple([np.min(np.where(self.parlist == 'modelcorr_{}{}'.format(i,j))[0]) for i,j in self.corrcombinations]) 
 		self.corrmax = tuple([np.max(np.where(self.parlist == 'modelcorr_{}{}'.format(i,j))[0]) for i,j in self.corrcombinations]) 
+		self.im0 = np.where(self.parlist == 'm0')[0]
+		self.im1 = np.where(self.parlist == 'm1')[0]
+		self.iCL = np.where(self.parlist == 'cl')[0]
 		self.ix1 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x1')])
 		self.ix0 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x0')])
 		self.ic	 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('c_')])
 		self.itpk = np.array([i for i, si in enumerate(self.parlist) if si.startswith('tpkoff')])
-		self.im0 = np.where(self.parlist == 'm0')[0]
-		self.im1 = np.where(self.parlist == 'm1')[0]
-		self.iCL = np.where(self.parlist == 'cl')[0]
 		self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specrecal')])
 		self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr')])
 		self.imodelcorr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelcorr')])
 		self.iclscat = np.where(self.parlist=='clscat')[0]
 		self.ispcrcl_norm,self.ispcrcl_poly = np.array([],dtype='int'),np.array([],dtype='int')
-		for i,parname in enumerate(np.unique(self.parlist[self.ispcrcl])):
-			self.ispcrcl_norm = np.append(self.ispcrcl_norm,np.where(self.parlist == parname)[0][-1])
-			self.ispcrcl_poly = np.append(self.ispcrcl_poly,np.where(self.parlist == parname)[0][:-1])
+		if len(self.ispcrcl):
+			for i,parname in enumerate(np.unique(self.parlist[self.ispcrcl])):
+				self.ispcrcl_norm = np.append(self.ispcrcl_norm,np.where(self.parlist == parname)[0][-1])
+				self.ispcrcl_poly = np.append(self.ispcrcl_poly,np.where(self.parlist == parname)[0][:-1])
 		self.iclscat_0,self.iclscat_poly = np.array([],dtype='int'),np.array([],dtype='int')
-		for i,parname in enumerate(np.unique(self.parlist[self.iclscat])):
-			self.iclscat_0 = np.append(self.iclscat_0,np.where(self.parlist == parname)[0][-1])
-			self.iclscat_poly = np.append(self.iclscat_poly,np.where(self.parlist == parname)[0][:-1])
+		if len(self.ispcrcl):
+			for i,parname in enumerate(np.unique(self.parlist[self.iclscat])):
+				self.iclscat_0 = np.append(self.iclscat_0,np.where(self.parlist == parname)[0][-1])
+				self.iclscat_poly = np.append(self.iclscat_poly,np.where(self.parlist == parname)[0][:-1])
 
 
 		
@@ -319,9 +320,7 @@ class SALTResids:
 		if self.n_colorpars:
 			colorLaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
 		else: colorLaw = None
-		if self.n_colorscatpars:
-			colorScat = True
-		else: colorScat = None
+
 
 		
 		# timing stuff
@@ -331,8 +330,8 @@ class SALTResids:
 		chi2 = 0
 		#Construct arguments for maxlikeforSN method
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
-		args=[(None,sn,x,components,componentderivs,salterr,saltcorr,colorLaw,colorScat,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale) for sn in self.datadict.keys()]
-		args2 = (x,components,componentderivs,salterr,saltcorr,colorLaw,colorScat,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale)
+		args=[(None,sn,x,components,componentderivs,salterr,saltcorr,colorLaw,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale) for sn in self.datadict.keys()]
+		args2 = (x,components,componentderivs,salterr,saltcorr,colorLaw,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale)
 		mapFun=pool.map if pool else starmap
 		if computeDerivatives:
 			#result = list(pyParz.foreach(self.datadict.keys(),self.loglikeforSN,args2))
@@ -347,7 +346,7 @@ class SALTResids:
 
 		logp = loglike
 		if len(self.usePriors):
-			priorResids,priorVals,priorJac=self.Priors.priorResids(self.usePriors,self.priorWidths,x)	
+			priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,x)	
 			logp -=(priorResids**2).sum()/2
 			if computeDerivatives:
 				grad-= (priorResids [:,np.newaxis] * priorJac).sum(axis=0)
@@ -413,13 +412,18 @@ class SALTResids:
 		Photometric residuals are first decorrelated to diagonalize color scatter"""
 		fixUncertainty= saltErr is None and saltCorr is None
 		photmodel,specmodel=self.modelvalsforSN(x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,computeDerivatives,computePCDerivs)
-
 		#Separate code for photometry and spectra now, since photometry has to handle a covariance matrix with off-diagonal elements
+
 		if fixUncertainty:
 			Ls,colorvar=fixedUncertainties['phot_{}'.format(sn)]
 			
 		else:
 			#Calculate cholesky matrix for each set of photometric measurements in each filter
+			
+			if (photmodel['modelvariance']<0).any():
+				warnings.warn('Negative variance in photometry',RuntimeWarning)
+				negVals=photmodel['modelvariance']<0
+				photmodel['modelvariance'][negVals]=0
 			variance=photmodel['fluxvariance']+photmodel['modelvariance']
 			Ls,colorvar=[],[]
 			#Add color scatter
@@ -447,8 +451,11 @@ class SALTResids:
 		
 		for L,(selectFilter,clscat,dclscat) in zip(Ls,colorvar):
 			#More stable to solve by backsubstitution than to invert and multiply
-			fluxdiff=photmodel['modelflux'][selectFilter]-photmodel['dataflux'][selectFilter]
-			photresids['resid'][selectFilter]=linalg.solve_triangular(L, fluxdiff,lower=True)
+			try:
+				fluxdiff=photmodel['modelflux'][selectFilter]-photmodel['dataflux'][selectFilter]
+				photresids['resid'][selectFilter]=linalg.solve_triangular(L, fluxdiff,lower=True)
+			except:
+				import pdb;pdb.set_trace()
 			if not fixUncertainty:
 				photresids['lognorm']-= (np.log(np.diag(L)).sum())
 		
@@ -492,6 +499,11 @@ class SALTResids:
 			variance=fixedUncertainties['spec_{}'.format(sn)]
 		else:
 			variance=specmodel['fluxvariance'] + specmodel['modelvariance']
+			if (specmodel['modelvariance']<0).any():
+				warnings.warn('Negative variance in spectra',RuntimeWarning)
+				negVals=specmodel['modelvariance']<0
+				specmodel['modelvariance'][negVals]=0
+
 		uncertainty=np.sqrt(variance)*SpecErrScale
 		# HACK
 		#uncertainty *= 0.01
@@ -510,6 +522,13 @@ class SALTResids:
 				uncertainty_jac=  specmodel['modelvariance_jacobian'] / (2*uncertainty[:,np.newaxis])
 				specresids['lognorm_grad']= - (uncertainty_jac/uncertainty[:,np.newaxis]).sum(axis=0)
 				specresids['resid_jacobian']-=   uncertainty_jac*(specresids['resid'] /uncertainty)[:,np.newaxis]
+
+		#plt.clf()
+		#plt.plot(specmodel['modelflux'],marker='o')
+		#plt.plot(specmodel['dataflux'],marker='o')
+		#plt.ion()
+		#plt.show()
+		#import pdb; pdb.set_trace()
 
 		if returnSpecModel: return photresids,specresids,specmodel
 		else: return photresids,specresids
@@ -566,7 +585,7 @@ class SALTResids:
 			pow=coeffs.size-1-np.arange(coeffs.size)
 			coeffs/=factorial(pow)
 			recalexp = np.exp(np.poly1d(coeffs)((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal))
-
+			#import pdb; pdb.set_trace()
 			if computeDerivatives:
 				M0int = interp1d(obswave,M0interp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
 				M0interp = M0int(specdata[k]['wavelength'])*recalexp
@@ -591,6 +610,7 @@ class SALTResids:
 				specresultsdict['modelflux'][iSpecStart:iSpecStart+SpecLen] = modinterp
 
 			specresultsdict['dataflux'][iSpecStart:iSpecStart+SpecLen] = specdata[k]['flux']
+			#import pdb; pdb.set_trace()
 			# derivatives....
 			if computeDerivatives:
 				
@@ -753,7 +773,6 @@ class SALTResids:
 				coeffs/=factorial(pow)
 				lameffPrime=lameff/(1+z)/1000
 				colorscat=np.exp(np.poly1d(coeffs)(lameffPrime))
-				
 				if computeDerivatives:
 					dcolorscatdx= colorscat*((lameffPrime) ** (pow) )/ factorial(pow)
 
@@ -854,10 +873,10 @@ class SALTResids:
 
 				if ( (phase>obsphase.max())).any():
 					decayFactor=10**(-0.4*self.extrapolateDecline*(phase[phase>obsphase.max()]-obsphase.max()))
-					modulatedM0[np.where(phase>obsphase.max())[0]] *= decayFactor
-					modulatedM1[np.where(phase>obsphase.max())[0]] *= decayFactor
-					modulatedphasederivM0[np.where(phase>obsphase.max())[0]] *= decayFactor
-					modulatedphasederivM1[np.where(phase>obsphase.max())[0]] *= decayFactor
+					modulatedM0[np.where(phase>obsphase.max())[0]] *= decayFactor[:,np.newaxis]
+					modulatedM1[np.where(phase>obsphase.max())[0]] *= decayFactor[:,np.newaxis]
+					modulatedphasederivM0[np.where(phase>obsphase.max())[0]] *= decayFactor[:,np.newaxis]
+					modulatedphasederivM1[np.where(phase>obsphase.max())[0]] *= decayFactor[:,np.newaxis]
 						
 				modelsynM0flux=np.sum(modulatedM0, axis=1)*dwave*self.fluxfactor[survey][flt]
 				modelsynM1flux=np.sum(modulatedM1, axis=1)*dwave*self.fluxfactor[survey][flt]
@@ -1013,7 +1032,7 @@ class SALTResids:
 
 		#if timeit: tstart = time.time()
 
-		sn,x,components,componentderivs,salterr,saltcorr,colorLaw,colorScat,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale = args[:]
+		sn,x,components,componentderivs,salterr,saltcorr,colorLaw,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale = args[:]
 		x = np.array(x)
 		
 		#Set up SALT model
@@ -1040,7 +1059,7 @@ class SALTResids:
 
 	
 	def loglikeforSN(self,args,sn=None,x=None,components=None,componentderivs=None,salterr=None,saltcorr=None,
-					 colorLaw=None,colorScat=None,
+					 colorLaw=None,
 					 debug=False,timeit=False,computeDerivatives=False,computePCDerivs=False,SpecErrScale=1.0):
 		
 		"""
@@ -1074,7 +1093,7 @@ class SALTResids:
 
 		if timeit: tstart = time.time()
 
-		if args: empty,sn,x,components,salterr,colorLaw,colorScat,debug = args[:]
+		if args: empty,sn,x,components,salterr,colorLaw,debug = args[:]
 		x = np.array(x)
 		
 		#Set up SALT model
@@ -1203,7 +1222,6 @@ class SALTResids:
 		resultsdict = {}
 		n_sn = len(self.datadict.keys())
 		for k in self.datadict.keys():
-			tpk_init = self.datadict[k]['photdata']['mjd'][0] - self.datadict[k]['photdata']['tobs'][0]
 			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k],
 							  'x1':x[self.parlist == 'x1_%s'%k],# - np.mean(x[self.ix1]),
 							  'c':x[self.parlist == 'c_%s'%k],
@@ -1324,7 +1342,6 @@ class SALTResids:
 		resultsdict = {}
 		n_sn = len(self.datadict.keys())
 		for k in self.datadict.keys():
-			tpk_init = self.datadict[k]['photdata']['mjd'][0] - self.datadict[k]['photdata']['tobs'][0]
 			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k,nburn:].mean(),
 							  'x1':x[self.parlist == 'x1_%s'%k,nburn:].mean(),# - x[self.ix1,nburn:].mean(),
 							  'c':x[self.parlist == 'c_%s'%k,nburn:].mean(),
@@ -1512,83 +1529,94 @@ class SALTResids:
 			iqr=[ (np.percentile(self.neffRaw,80)<self.neffRaw)  for flux in fluxes]
 			scale= [np.mean(np.abs(flux[select])) for select,flux in zip(iqr,fluxes)]
 			return scale, [np.mean(np.sign(flux[select,np.newaxis])*self.regularizationDerivs[0][select,:],axis=(0)) for s,select,flux in zip(scale,iqr,fluxes)]
-		elif self.regularizationScaleMethod=='mid5abs':
-			iqr=[ (np.percentile(flux,45)<flux) & (np.percentile(flux,55)>flux)  for flux in fluxes]
-			scale= [np.mean(np.abs(flux[select])) for select,flux in zip(iqr,fluxes)]
-			return scale, [np.mean(np.sign(flux[select,np.newaxis])*self.regularizationDerivs[0][select,:],axis=(0)) for s,select,flux in zip(scale,iqr,fluxes)]
-		elif self.regularizationScaleMethod=='midqtabs':
-			iqr=[ (np.percentile(flux,25)<flux) & (np.percentile(flux,75)>flux)  for flux in fluxes]
-			scale= [np.mean(np.abs(flux[select])) for select,flux in zip(iqr,fluxes)]
-			return scale, [np.mean(np.sign(flux[select,np.newaxis])*self.regularizationDerivs[0][select,:],axis=(0)) for s,select,flux in zip(scale,iqr,fluxes)]
-		elif self.regularizationScaleMethod=='midqt':
-			iqr=[ (np.percentile(flux,25)<flux) & (np.percentile(flux,75)>flux)  for flux in fluxes]
-			scale= [np.sqrt(np.mean(flux[select]**2)) for select,flux in zip(iqr,fluxes)]
-			return scale, [np.mean(flux[select,np.newaxis]*self.regularizationDerivs[0][select,:],axis=(0))/s for s,select,flux in zip(scale,iqr,fluxes)]
 		else:
 			raise ValueError('Regularization scale method invalid: ',self.regularizationScaleMethod)
 
 	def dyadicRegularization(self,x, components,computeJac=True):
-		phase=self.phaseRegularizationPoints
-		wave=self.waveRegularizationPoints
-		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
-		dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
-		dfluxdphase=self.SALTModelDeriv(x,1,0,phase,wave)
-		d2fluxdphasedwave=self.SALTModelDeriv(x,1,1,phase,wave)
-		scale,scaleDeriv=self.regularizationScale(components,fluxes)
-		resids=[]
-		jac=[]
-		for i in range(len(fluxes)):
-			#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
-			normalization=np.sqrt(1/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
-			#0 if model is locally separable in phase and wavelength i.e. flux=g(phase)* h(wavelength) for arbitrary functions g and h
-			numerator=(dfluxdphase[i] *dfluxdwave[i] -d2fluxdphasedwave[i] *fluxes[i] )
-			dnumerator=( self.regularizationDerivs[1]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2]* dfluxdphase[i][:,:,np.newaxis] - self.regularizationDerivs[3]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0]* d2fluxdphasedwave[i][:,:,np.newaxis] )			
-			resids += [normalization* (numerator / (scale[i]**2 * np.sqrt( self.neff ))).flatten()]
-			if computeJac: jac += [((dnumerator*(scale[i]**2 )- scaleDeriv[i][np.newaxis,np.newaxis,:]*2*scale[i]*numerator[:,:,np.newaxis])/np.sqrt(self.neff)[:,:,np.newaxis]*normalization / scale[i]**4  ).reshape(-1, self.im0.size)]
-			else: jac+=[None]
-		return resids,jac 
+		if '__dyadic_time_stamp__' not in self.__dict__.keys() or \
+		   self.__components_time_stamp__ > self.__dyadic_time_stamp__:
+			phase=self.phaseRegularizationPoints
+			wave=self.waveRegularizationPoints
+			fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
+			dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
+			dfluxdphase=self.SALTModelDeriv(x,1,0,phase,wave)
+			d2fluxdphasedwave=self.SALTModelDeriv(x,1,1,phase,wave)
+			scale,scaleDeriv=self.regularizationScale(components,fluxes)
+			resids=[]
+			jac=[]
+			for i in range(len(fluxes)):
+				#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
+				normalization=np.sqrt(1/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
+				#0 if model is locally separable in phase and wavelength i.e. flux=g(phase)* h(wavelength) for arbitrary functions g and h
+				numerator=(dfluxdphase[i] *dfluxdwave[i] -d2fluxdphasedwave[i] *fluxes[i] )
+				dnumerator=( self.regularizationDerivs[1]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2]* dfluxdphase[i][:,:,np.newaxis] - self.regularizationDerivs[3]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0]* d2fluxdphasedwave[i][:,:,np.newaxis] )			
+				resids += [normalization* (numerator / (scale[i]**2 * np.sqrt( self.neff ))).flatten()]
+				if computeJac: jac += [((dnumerator*(scale[i]**2 )- scaleDeriv[i][np.newaxis,np.newaxis,:]*2*scale[i]*numerator[:,:,np.newaxis])/np.sqrt(self.neff)[:,:,np.newaxis]*normalization / scale[i]**4  ).reshape(-1, self.im0.size)]
+				else: jac+=[None]
+
+			self.__dyadic_resids__ = resids
+			self.__dyadic_jac__ = jac
+			if computeJac:
+				self.__dyadic_time_stamp__ = time.time()
+
+		return self.__dyadic_resids__,self.__dyadic_jac__
 	
 	def phaseGradientRegularization(self, x, components, computeJac=True):
-		phase=self.phaseRegularizationPoints
-		wave=self.waveRegularizationPoints
-		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
-		dfluxdphase=self.SALTModelDeriv(x,1,0,phase,wave)
-		scale,scaleDeriv=self.regularizationScale(components,fluxes)
-		resids=[]
-		jac=[]
-		for i in range(len(fluxes)):
-			#Normalize gradient by flux scale
-			normedGrad=dfluxdphase[i]/scale[i]
-			#Derivative of normalized gradient with respect to model parameters
-			normedGradDerivs=(self.regularizationDerivs[1] * scale[i] - scaleDeriv[i][np.newaxis,np.newaxis,:]*dfluxdphase[i][:,:,np.newaxis])/ scale[i]**2
-			#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
-			normalization=np.sqrt(1/((self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
-			#Minimize model derivative w.r.t wavelength in unconstrained regions
-			resids+= [normalization* ( normedGrad /	np.sqrt( self.neff )).flatten()]
-			if computeJac: jac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
-			else: jac+=[None]
-		return resids,jac  
+		if '__phasegrad_time_stamp__' not in self.__dict__.keys() or \
+		   self.__components_time_stamp__ > self.__phasegrad_time_stamp__:
+			phase=self.phaseRegularizationPoints
+			wave=self.waveRegularizationPoints
+			fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
+			dfluxdphase=self.SALTModelDeriv(x,1,0,phase,wave)
+			scale,scaleDeriv=self.regularizationScale(components,fluxes)
+			resids=[]
+			jac=[]
+			for i in range(len(fluxes)):
+				#Normalize gradient by flux scale
+				normedGrad=dfluxdphase[i]/scale[i]
+				#Derivative of normalized gradient with respect to model parameters
+				normedGradDerivs=(self.regularizationDerivs[1] * scale[i] - scaleDeriv[i][np.newaxis,np.newaxis,:]*dfluxdphase[i][:,:,np.newaxis])/ scale[i]**2
+				#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
+				normalization=np.sqrt(1/((self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
+				#Minimize model derivative w.r.t wavelength in unconstrained regions
+				resids+= [normalization* ( normedGrad /	np.sqrt( self.neff )).flatten()]
+				if computeJac: jac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
+				else: jac+=[None]
+
+			self.__phasegrad_resids__ = resids
+			self.__phasegrad_jac__ = jac
+			if computeJac:
+				self.__phasegrad_time_stamp__ = time.time()
+				
+		return self.__phasegrad_resids__,self.__phasegrad_jac__
 	
 	def waveGradientRegularization(self, x, components,computeJac=True):
-		phase=self.phaseRegularizationPoints
-		wave=self.waveRegularizationPoints
-		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
-		dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
-		scale,scaleDeriv=self.regularizationScale(components,fluxes)
-		waveGradResids=[]
-		jac=[]
-		for i in range(len(fluxes)):
-			#Normalize gradient by flux scale
-			normedGrad=dfluxdwave[i]/scale[i]
-			#Derivative of normalized gradient with respect to model parameters
-			normedGradDerivs=(self.regularizationDerivs[2] * scale[i] - scaleDeriv[i][np.newaxis,np.newaxis,:]*dfluxdwave[i][:,:,np.newaxis])/ scale[i]**2
-			#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
-			normalization=np.sqrt(1/((self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
-			#Minimize model derivative w.r.t wavelength in unconstrained regions
-			waveGradResids+= [normalization* ( normedGrad /	np.sqrt( self.neff )).flatten()]
-			if computeJac: jac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
-			else: jac+=[None]
-		return waveGradResids,jac 
+		if '__wavegrad_time_stamp__' not in self.__dict__.keys() or \
+		   self.__components_time_stamp__ > self.__wavegrad_time_stamp__:
+			phase=self.phaseRegularizationPoints
+			wave=self.waveRegularizationPoints
+			fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
+			dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
+			scale,scaleDeriv=self.regularizationScale(components,fluxes)
+			waveGradResids=[]
+			jac=[]
+			for i in range(len(fluxes)):
+				#Normalize gradient by flux scale
+				normedGrad=dfluxdwave[i]/scale[i]
+				#Derivative of normalized gradient with respect to model parameters
+				normedGradDerivs=(self.regularizationDerivs[2] * scale[i] - scaleDeriv[i][np.newaxis,np.newaxis,:]*dfluxdwave[i][:,:,np.newaxis])/ scale[i]**2
+				#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
+				normalization=np.sqrt(1/((self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
+				#Minimize model derivative w.r.t wavelength in unconstrained regions
+				waveGradResids+= [normalization* ( normedGrad /	np.sqrt( self.neff )).flatten()]
+				if computeJac: jac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
+				else: jac+=[None]
+				self.__wavegrad_resids__ = waveGradResids
+				self.__wavegrad_jac__ = jac
+				if computeJac:
+					self.__wavegrad_time_stamp__ = time.time()
+
+		return self.__wavegrad_resids__,self.__wavegrad_jac__
 		
 def trapIntegrate(a,b,xs,ys):
 	if (a<xs.min()) or (b>xs.max()):

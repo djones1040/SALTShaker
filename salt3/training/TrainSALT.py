@@ -18,6 +18,7 @@ from sncosmo.constants import HC_ERG_AA
 from salt3.util import snana,readutils
 from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
 from salt3.util.txtobj import txtobj
+from salt3.util.specSynPhot import getScaleForSN
 
 from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs, init_errs_fromfile
 from salt3.training.base import TrainSALTBase
@@ -119,6 +120,15 @@ class TrainSALT(TrainSALTBase):
 			guess[parlist == 'clscat'] = [1e-2]*self.options.n_colorscatpars
 			guess[np.where(parlist == 'clscat')[0][-1]]=-10
 		guess[(parlist == 'm0') & (guess < 0)] = 1e-4
+
+		if self.options.specrecal:
+			for sn in datadict.keys():
+				specdata=datadict[sn]['specdata']
+				photdata=datadict[sn]['photdata']
+				for k in specdata.keys():
+					print(sn)
+					init_scale = getScaleForSN(specdata[k],photdata,self.kcordict,datadict[sn]['survey'])
+					guess[np.where(parlist == 'specrecal_{}_{}'.format(sn,k))[0][-1]] = init_scale
 		i=0
 		for k in datadict.keys():
 			guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36-10.635))
@@ -130,7 +140,14 @@ class TrainSALT(TrainSALTBase):
 			except:
 				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.outputdir,unpack=True,skiprows=1,dtype="U20,f8")
 			for key in np.unique(parlist):
-				guess[parlist == key] = pars[names == key]
+				try:
+					guess[parlist == key] = pars[names == key]
+					
+				except:
+					print ('Problem while initializing parameter ',key,' from previous training')
+					import pdb;pdb.set_trace()
+					sys.exit(1)
+					
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
 	def fitSALTModel(self,datadict):
@@ -167,9 +184,11 @@ class TrainSALT(TrainSALTBase):
 						self.options.n_steps_mcmc,self.options.n_burnin_mcmc,
 						self.options.gaussnewton_maxiter)
 			for k in datadict.keys():
-				tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
-				SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
-
+				try:
+					tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
+					SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
+				except:
+					SNParams[k]['t0'] = -99
 		
 		print('MCMC message: %s'%message)
 		#print('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
@@ -194,7 +213,6 @@ class TrainSALT(TrainSALTBase):
 				  M0,M0err,M1,M1err,cov_M0_M1,
 				  modelerr,clpars,
 				  clerr,clscat,SNParams,pars,parlist,chain,loglikes):
-
 		if not os.path.exists(outdir):
 			raise RuntimeError('desired output directory %s doesn\'t exist'%outdir)
 
@@ -326,10 +344,10 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			outputdir)
 
 		plotSALTModel.mkModelPlot(outputdir,outfile='%s/SALTmodelcomp.pdf'%outputdir,
-			)
+								  xlimits=[self.options.waverange[0],self.options.waverange[1]])
 		if self.options.dospec:
-			ValidateSpectra.compareSpectra(snlist,
-										   self.options.outputdir,maxspec=50)
+			ValidateSpectra.compareSpectra(
+				snlist,self.options.outputdir,maxspec=50,base=self)
 		
 		snfiles = np.genfromtxt(snlist,dtype='str')
 		snfiles = np.atleast_1d(snfiles)
@@ -366,9 +384,9 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		import matplotlib.gridspec as gridspec
 		gs1 = gridspec.GridSpec(3, 3)
 		gs1.update(wspace=0.0)
-		
+		print('debug1')
 		i = 0
-		for l in snfiles[0:50]:
+		for l in snfiles:
 			if not i % 9:
 				fig = plt.figure()
 			try:
@@ -412,18 +430,19 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			raise RuntimeError('surveys are not defined - see documentation')
 		self.kcordict=readutils.rdkcor(self.surveylist,self.options,addwarning=self.addwarning)
 		# TODO: ASCII filter files
-		
-		# read the data
-		datadict = readutils.rdAllData(self.options.snlist,self.options.estimate_tpk,self.kcordict,
-									   self.addwarning,dospec=self.options.dospec,KeepOnlySpec=False)
-		
+				
 		if not os.path.exists(self.options.outputdir):
 			os.makedirs(self.options.outputdir)
 
-		datadict = self.mkcuts(datadict)
 		
 		# fit the model - initial pass
 		if self.options.stage == "all" or self.options.stage == "train":
+			# read the data
+			datadict = readutils.rdAllData(self.options.snlist,self.options.estimate_tpk,self.kcordict,
+										   self.addwarning,dospec=self.options.dospec,KeepOnlySpec=True,
+										   peakmjdlist=self.options.tmaxlist)
+			datadict = self.mkcuts(datadict)
+
 			phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 				modelerr,clpars,clerr,clscat,SNParams,pars,parlist,chain,loglikes = self.fitSALTModel(datadict)
 		
@@ -438,62 +457,3 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		print('successful SALT2 training!  Output files written to %s'%self.options.outputdir)
 		
 	
-if __name__ == "__main__":
-	usagestring = """SALT3 Training
-
-usage: python TrainSALT.py -c <configfile> <options>
-
-config file options can be overwridden at the command line
-
-Dependencies: sncosmo?
-"""
-
-	if sys.version_info < (3,0):
-		sys.exit('Sorry, Python 2 is not supported')
-	
-	salt = TrainSALT()
-
-	parser = argparse.ArgumentParser(usage=usagestring, conflict_handler="resolve")
-	parser.add_argument('-c','--configfile', default=None, type=str,
-					  help='configuration file')
-	options, args = parser.parse_known_args()
-
-	if options.configfile:
-		config = configparser.ConfigParser()
-		if not os.path.exists(options.configfile):
-			raise RuntimeError('Configfile doesn\'t exist!')
-		config.read(options.configfile)
-	else:
-		parser.print_help()
-		raise RuntimeError('Configuration file must be specified at command line')
-
-
-
-	user_parser = salt.add_user_options(usage=usagestring,config=config)
-	user_options = user_parser.parse_known_args()[0]
-
-	if not os.path.exists(user_options.trainingconfig):
-		print('warning : training config file %s doesn\'t exist.  Trying package directory'%user_options.trainingconfig)
-		user_options.trainingconfig = '%s/%s'%(config_rootdir,user_options.trainingconfig)
-	if not os.path.exists(user_options.trainingconfig):
-		raise RuntimeError('can\'t find training config file!  Checked %s'%user_options.trainingconfig)
-	
-	trainingconfig = configparser.ConfigParser()
-	trainingconfig.read(user_options.trainingconfig)
-	training_parser = salt.add_training_options(
-		usage=usagestring,config=trainingconfig)
-	training_options = training_parser.parse_known_args(namespace=user_options)[0]
-
-	salt.options = training_options
-	salt.verbose = training_options.verbose
-	salt.clobber = training_options.clobber
-
-	if salt.options.stage not in ['all','validate','train']:
-		raise RuntimeError('stage must be one of all, validate, train')
-	
-	salt.main()
-	
-	if len(salt.warnings):
-		print('There were warnings!!')
-		print(salt.warnings)
-
