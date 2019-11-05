@@ -338,9 +338,8 @@ class TrainSALTBase:
 			for i,sn in enumerate(list(datadict.keys())):
 				if i >= self.options.maxsn:
 					datadict.pop(sn)
-			
 		print('{} spectra and {} photometric observations removed for being outside phase range'.format(numSpecElimmed,numPhotElimmed))
 		print('{} spectra and {} photometric observations remaining'.format(numSpec,numPhot))
 		print('{} total spectroscopic data points'.format(numSpecPoints))
-
+		print('Total number of supernovae: {}'.format(len(datadict)))
 		return datadict
