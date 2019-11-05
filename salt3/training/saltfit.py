@@ -784,7 +784,7 @@ class GaussNewton(saltresids.SALTResids):
 			
 			#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
 			includePars=self.fitOptions[fit][1] & ~(np.all(0==jacobian,axis=0))
-		
+
 			print('Number of parameters fit this round: {}'.format(includePars.sum()))
 			jacobian=jacobian[:,includePars]
 			stepsize=linalg.lstsq(jacobian,residuals,cond=1e-6)[0]
