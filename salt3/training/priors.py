@@ -113,7 +113,7 @@ class SALTPriors:
 					derivInterp = interp1d(self.phase,self.spline_derivs[:,inbounds,i],axis=0,kind=self.interpMethod,bounds_error=False,fill_value="extrapolate",assume_sorted=True)
 					fluxDeriv[self.im1[i]] = np.sum( passbandColorExp[inbounds] * derivInterp(0))*intmult 
 			self.__m1priorfluxderiv__=fluxDeriv.copy()
-		
+
 		jacobian=fluxDeriv/width 
 		return residual,m1Bflux,jacobian
 	
