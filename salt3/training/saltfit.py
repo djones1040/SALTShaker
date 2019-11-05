@@ -551,11 +551,25 @@ class GaussNewton(saltresids.SALTResids):
 			Xlast = copy.deepcopy(X)
 		#Retranslate x1, M1, x0, M0 to obey definitions
 		print(np.sum(self.lsqwrap(X,uncertainties,False,False,doPriors=True)**2.))
+		components=self.SALTModel(X)
+		int1d = interp1d(self.phase,components[0],axis=0,assume_sorted=True)
+		m0Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
+			self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
+		int1d = interp1d(self.phase,components[1],axis=0,assume_sorted=True)
+		m1Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
+			self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
+		ratio=m1Bflux/m0Bflux
+		
+		X[self.ix0]*=1+ratio*X[self.ix1]
+		X[self.ix1]/=1+ratio*X[self.ix1]
+		X[self.im1]-=ratio*X[self.im0]
+
 		X[self.im0]+= np.mean(X[self.ix1])*X[self.im1]
 		X[self.ix1]-=np.mean(X[self.ix1])
 		
 		X[self.im1]*=np.std(X[self.ix1])
 		X[self.ix1]/=np.std(X[self.ix1])
+		
 		print(np.sum(self.lsqwrap(X,uncertainties,False,False,doPriors=True)**2.))
 		xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams = \
@@ -664,7 +678,9 @@ class GaussNewton(saltresids.SALTResids):
 				specmodelflux = np.append(specmodelflux,specmodeldict['modelflux'])
 				specuncertainty = np.append(specuncertainty,specresidsdict['uncertainty'])
 				# priors
+
 		if doPriors:
+			
 			priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,guess)
 			residuals[idx:idx+priorResids.size]=priorResids
 			jacobian[idx:idx+priorResids.size,:]=priorJac

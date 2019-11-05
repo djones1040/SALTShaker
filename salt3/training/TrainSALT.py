@@ -372,9 +372,9 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		import matplotlib.gridspec as gridspec
 		gs1 = gridspec.GridSpec(3, 3)
 		gs1.update(wspace=0.0)
-		
+		print('debug1')
 		i = 0
-		for l in snfiles[0:50]:
+		for l in snfiles:
 			if not i % 9:
 				fig = plt.figure()
 			try:
@@ -419,17 +419,18 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		self.kcordict=readutils.rdkcor(self.surveylist,self.options,addwarning=self.addwarning)
 		# TODO: ASCII filter files
 		
-		# read the data
-		datadict = readutils.rdAllData(self.options.snlist,self.options.estimate_tpk,self.kcordict,
-									   self.addwarning,dospec=self.options.dospec,KeepOnlySpec=False)
 		
 		if not os.path.exists(self.options.outputdir):
 			os.makedirs(self.options.outputdir)
 
-		datadict = self.mkcuts(datadict)
 		
 		# fit the model - initial pass
 		if self.options.stage == "all" or self.options.stage == "train":
+				# read the data
+			datadict = readutils.rdAllData(self.options.snlist,self.options.estimate_tpk,self.kcordict,
+									   self.addwarning,dospec=self.options.dospec,KeepOnlySpec=False)
+			datadict = self.mkcuts(datadict)
+
 			phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 				modelerr,clpars,clerr,clscat,SNParams,pars,parlist,chain,loglikes = self.fitSALTModel(datadict)
 		
@@ -444,62 +445,3 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		print('successful SALT2 training!  Output files written to %s'%self.options.outputdir)
 		
 	
-if __name__ == "__main__":
-	usagestring = """SALT3 Training
-
-usage: python TrainSALT.py -c <configfile> <options>
-
-config file options can be overwridden at the command line
-
-Dependencies: sncosmo?
-"""
-
-	if sys.version_info < (3,0):
-		sys.exit('Sorry, Python 2 is not supported')
-	
-	salt = TrainSALT()
-
-	parser = argparse.ArgumentParser(usage=usagestring, conflict_handler="resolve")
-	parser.add_argument('-c','--configfile', default=None, type=str,
-					  help='configuration file')
-	options, args = parser.parse_known_args()
-
-	if options.configfile:
-		config = configparser.ConfigParser()
-		if not os.path.exists(options.configfile):
-			raise RuntimeError('Configfile doesn\'t exist!')
-		config.read(options.configfile)
-	else:
-		parser.print_help()
-		raise RuntimeError('Configuration file must be specified at command line')
-
-
-
-	user_parser = salt.add_user_options(usage=usagestring,config=config)
-	user_options = user_parser.parse_known_args()[0]
-
-	if not os.path.exists(user_options.trainingconfig):
-		print('warning : training config file %s doesn\'t exist.  Trying package directory'%user_options.trainingconfig)
-		user_options.trainingconfig = '%s/%s'%(config_rootdir,user_options.trainingconfig)
-	if not os.path.exists(user_options.trainingconfig):
-		raise RuntimeError('can\'t find training config file!  Checked %s'%user_options.trainingconfig)
-	
-	trainingconfig = configparser.ConfigParser()
-	trainingconfig.read(user_options.trainingconfig)
-	training_parser = salt.add_training_options(
-		usage=usagestring,config=trainingconfig)
-	training_options = training_parser.parse_known_args(namespace=user_options)[0]
-
-	salt.options = training_options
-	salt.verbose = training_options.verbose
-	salt.clobber = training_options.clobber
-
-	if salt.options.stage not in ['all','validate','train']:
-		raise RuntimeError('stage must be one of all, validate, train')
-	
-	salt.main()
-	
-	if len(salt.warnings):
-		print('There were warnings!!')
-		print(salt.warnings)
-

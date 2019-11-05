@@ -176,7 +176,6 @@ class SALTPriors:
 	def BoundedPriorResids(self,bounds,boundparams,x):
 		"""Given a list of names of priors and widths returns a residuals vector, list of prior values, and Jacobian """
 
-		alllam_vals = range(0,self.im0.size)
 		components = self.SALTModel(x)
 		residuals=np.zeros(self.numBoundResids)
 		jacobian=np.zeros((self.numBoundResids,self.npar))
