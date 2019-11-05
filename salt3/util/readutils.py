@@ -215,12 +215,12 @@ def rdAllData(snlist,estimate_tpk,kcordict,addwarning,dospec=False,KeepOnlySpec=
 			tpkmsg = 'termination condition is satisfied'
 
 		# at least one epoch 3 days before max
-		try:
-			if not len(sn.MJD[sn.MJD < tpk-3]):
-				addwarning('skipping SN %s; no epochs 3 days pre-max'%sn.SNID)
-				continue
-		except: import pdb; pdb.set_trace()
-			
+		#try:
+		#	if not len(sn.MJD[sn.MJD < tpk-3]):
+		#		addwarning('skipping SN %s; no epochs 3 days pre-max'%sn.SNID)
+		#		continue
+		#except: import pdb; pdb.set_trace()
+
 		if 'termination condition is satisfied' not in tpkmsg:
 			addwarning('skipping SN %s; can\'t estimate t_max'%sn.SNID)
 			continue

@@ -11,6 +11,7 @@ from sncosmo.constants import HC_ERG_AA
 from salt3.initfiles import init_rootdir
 from salt3.training.init_hsiao import synphotB
 from sncosmo.salt2utils import SALT2ColorLaw
+import extinction
 _SCALE_FACTOR = 1e-12
 
 #filtdict = {'b':'cspb','c':'cspv3014','d':'cspr','e':'cspi'}
@@ -305,6 +306,11 @@ def customfilt(outfile,lcfile,salt3dir,
 		#print('HACK')
 		phase=plotmjd-t0 #sn.PEAKMJD
 		salt3fluxnew = int1d(phase)
+		try: mwextcurve = 10**(-0.4*extinction.fitzpatrick99(salt3wave,float(sn.MWEBV.split()[0])*3.1)) #self.datadict[sn]['MWEBV']*3.1))
+		except: mwextcurve = 10**(-0.4*extinction.fitzpatrick99(salt3wave,sn.MWEBV*3.1)) #self.datadict[sn]['MWEBV']*3.1))
+		#10**(-0.4*bandpassdict[flt]['zpoff'])
+		salt3fluxnew *= mwextcurve[np.newaxis,:]
+
 		if 'SIM_SALT2x0' in sn.__dict__.keys():
 			phase_salt2 = plotmjd-float(sn.SIM_PEAKMJD.split()[0])
 			salt2fluxnew = int1d_salt2(phase_salt2)
@@ -319,8 +325,7 @@ def customfilt(outfile,lcfile,salt3dir,
 		denom = np.trapz(pbspl,salt3wave[g])
 		salt3synflux=np.trapz(pbspl[np.newaxis,:]*salt3fluxnew[:,g]/HC_ERG_AA,salt3wave[g],axis=1)/denom
 		salt3synflux *= 10**(0.4*bandpassdict[sn.SURVEY][flt]['stdmag'])*10**(0.4*27.5)/(1+float(sn.REDSHIFT_HELIO[0:5]))
-		#10**(-0.4*bandpassdict[flt]['zpoff'])
-
+		
 		if 'SIM_SALT2x0' in sn.__dict__.keys():
 			g = (salt2wave >= filtwave[0]) & (salt2wave <= filtwave[-1])  # overlap range
 			pbspl = np.interp(salt2wave[g],filtwave,filttrans)
