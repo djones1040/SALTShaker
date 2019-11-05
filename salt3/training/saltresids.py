@@ -320,9 +320,7 @@ class SALTResids:
 		if self.n_colorpars:
 			colorLaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
 		else: colorLaw = None
-		if self.n_colorscatpars:
-			colorScat = True
-		else: colorScat = None
+
 
 		
 		# timing stuff
@@ -332,8 +330,8 @@ class SALTResids:
 		chi2 = 0
 		#Construct arguments for maxlikeforSN method
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
-		args=[(None,sn,x,components,componentderivs,salterr,saltcorr,colorLaw,colorScat,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale) for sn in self.datadict.keys()]
-		args2 = (x,components,componentderivs,salterr,saltcorr,colorLaw,colorScat,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale)
+		args=[(None,sn,x,components,componentderivs,salterr,saltcorr,colorLaw,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale) for sn in self.datadict.keys()]
+		args2 = (x,components,componentderivs,salterr,saltcorr,colorLaw,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale)
 		mapFun=pool.map if pool else starmap
 		if computeDerivatives:
 			#result = list(pyParz.foreach(self.datadict.keys(),self.loglikeforSN,args2))
@@ -775,7 +773,6 @@ class SALTResids:
 				coeffs/=factorial(pow)
 				lameffPrime=lameff/(1+z)/1000
 				colorscat=np.exp(np.poly1d(coeffs)(lameffPrime))
-				
 				if computeDerivatives:
 					dcolorscatdx= colorscat*((lameffPrime) ** (pow) )/ factorial(pow)
 
@@ -1035,7 +1032,7 @@ class SALTResids:
 
 		#if timeit: tstart = time.time()
 
-		sn,x,components,componentderivs,salterr,saltcorr,colorLaw,colorScat,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale = args[:]
+		sn,x,components,componentderivs,salterr,saltcorr,colorLaw,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale = args[:]
 		x = np.array(x)
 		
 		#Set up SALT model
@@ -1062,7 +1059,7 @@ class SALTResids:
 
 	
 	def loglikeforSN(self,args,sn=None,x=None,components=None,componentderivs=None,salterr=None,saltcorr=None,
-					 colorLaw=None,colorScat=None,
+					 colorLaw=None,
 					 debug=False,timeit=False,computeDerivatives=False,computePCDerivs=False,SpecErrScale=1.0):
 		
 		"""
@@ -1096,7 +1093,7 @@ class SALTResids:
 
 		if timeit: tstart = time.time()
 
-		if args: empty,sn,x,components,salterr,colorLaw,colorScat,debug = args[:]
+		if args: empty,sn,x,components,salterr,colorLaw,debug = args[:]
 		x = np.array(x)
 		
 		#Set up SALT model
@@ -1532,18 +1529,6 @@ class SALTResids:
 			iqr=[ (np.percentile(self.neffRaw,80)<self.neffRaw)  for flux in fluxes]
 			scale= [np.mean(np.abs(flux[select])) for select,flux in zip(iqr,fluxes)]
 			return scale, [np.mean(np.sign(flux[select,np.newaxis])*self.regularizationDerivs[0][select,:],axis=(0)) for s,select,flux in zip(scale,iqr,fluxes)]
-		elif self.regularizationScaleMethod=='mid5abs':
-			iqr=[ (np.percentile(flux,45)<flux) & (np.percentile(flux,55)>flux)  for flux in fluxes]
-			scale= [np.mean(np.abs(flux[select])) for select,flux in zip(iqr,fluxes)]
-			return scale, [np.mean(np.sign(flux[select,np.newaxis])*self.regularizationDerivs[0][select,:],axis=(0)) for s,select,flux in zip(scale,iqr,fluxes)]
-		elif self.regularizationScaleMethod=='midqtabs':
-			iqr=[ (np.percentile(flux,25)<flux) & (np.percentile(flux,75)>flux)  for flux in fluxes]
-			scale= [np.mean(np.abs(flux[select])) for select,flux in zip(iqr,fluxes)]
-			return scale, [np.mean(np.sign(flux[select,np.newaxis])*self.regularizationDerivs[0][select,:],axis=(0)) for s,select,flux in zip(scale,iqr,fluxes)]
-		elif self.regularizationScaleMethod=='midqt':
-			iqr=[ (np.percentile(flux,25)<flux) & (np.percentile(flux,75)>flux)  for flux in fluxes]
-			scale= [np.sqrt(np.mean(flux[select]**2)) for select,flux in zip(iqr,fluxes)]
-			return scale, [np.mean(flux[select,np.newaxis]*self.regularizationDerivs[0][select,:],axis=(0))/s for s,select,flux in zip(scale,iqr,fluxes)]
 		else:
 			raise ValueError('Regularization scale method invalid: ',self.regularizationScaleMethod)
 
