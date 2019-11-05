@@ -8,7 +8,8 @@ import pickle, argparse, configparser,warnings
 from salt3.util import snana,readutils
 from sncosmo.salt2utils import SALT2ColorLaw
 from scipy.interpolate import interp1d
-
+import os
+from salt3.config import config_rootdir
 
 class TRAINING_Test(unittest.TestCase):
 	
@@ -16,6 +17,7 @@ class TRAINING_Test(unittest.TestCase):
 	
 	def setUp(self):
 		ts=TrainSALT()
+
 		config = configparser.ConfigParser()
 		config.read('testdata/test.conf')
 
@@ -31,12 +33,20 @@ class TRAINING_Test(unittest.TestCase):
 		
 		ts.options=training_options
 		kcordict=readutils.rdkcor(ts.surveylist,ts.options,addwarning=ts.addwarning)
-		ts.kcordict=kcordict
+
+		#if not os.path.exists(user_options.trainingconfig):
+		#	print('warning : training config file %s doesn\'t exist.  Trying package directory'%user_options.trainingconfig)
+		#	user_options.trainingconfig = '%s/%s'%(config_rootdir,user_options.trainingconfig)
+		#if not os.path.exists(user_options.trainingconfig):
+		#	raise RuntimeError('can\'t find training config file!  Checked %s'%user_options.trainingconfig)
+	
+		#ts.kcordict=kcordict
 
 		# TODO: ASCII filter files
 		# read the data
 		datadict = readutils.rdAllData(ts.options.snlist,ts.options.estimate_tpk,kcordict,
 									   ts.addwarning,dospec=ts.options.dospec)
+
 		self.parlist,self.guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc = ts.initialParameters(datadict)
 		saltfitkwargs = ts.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
 
@@ -45,7 +55,9 @@ class TRAINING_Test(unittest.TestCase):
 	def test_prior_jacobian(self):
 		"""Checks that all designated priors are properly calculating the jacobian of their residuals to within 1%"""
 				#Define simple models for m0,m1
+
 		for prior in self.resids.priors.priors:
+
 			print('Testing prior', prior)
 			components=self.resids.SALTModel(self.guess)
 			resid,val,jacobian=self.resids.priors.priors[prior](0.3145,self.guess,components)
@@ -60,8 +72,7 @@ class TRAINING_Test(unittest.TestCase):
 			dPriordX=np.zeros((resid.size,self.guess.size))
 			for i in range(self.guess.size):
 				dPriordX[:,i]=(incrementOneParam(i)-resid)/dx
-		
-			#import pdb;pdb.set_trace()
+
 			#Check that all derivatives that should be 0 are zero
 			if  not np.allclose(jacobian,dPriordX,rtol): print('Problems with derivatives for prior {} : '.format(prior),np.unique(self.parlist[np.where(~np.isclose(jacobian,dPriordX,rtol))]))
 			self.assertTrue(np.all((dPriordX==0)==(jacobian==0)))
@@ -149,8 +160,7 @@ class TRAINING_Test(unittest.TestCase):
 			residsdict=incrementOneParam(i)
 			dResiddX[:,i]=(residsdict['resid']-residuals)/dx
 			dLognormdX[i]=(residsdict['lognorm']-lognorm)/dx
-		import pdb;pdb.set_trace()
-		#import pdb;pdb.set_trace()
+
 		if not np.allclose(jacobian,dResiddX,rtol,atol): print('Problems with residual derivatives: ',np.unique(self.parlist[np.where(~np.isclose(jacobian,dResiddX,rtol,atol))[1]]))
 		if not np.allclose(grad,dLognormdX,rtol,atol): print('Problems with lognorm derivatives: ',np.unique(self.parlist[np.where(~np.isclose(grad,dLognormdX,rtol,atol))[0]]))
 		self.assertTrue(np.allclose(jacobian,dResiddX,rtol,atol))
@@ -516,6 +526,7 @@ class TRAINING_Test(unittest.TestCase):
 		for i in range(self.guess.size):
 			dResiddX[:,i]=(incrementOneParam(i,dx)-residuals)/dx
 		if not np.allclose(jacobian,dResiddX,rtol,atol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(jacobian,dResiddX,rtol,atol))[1]]))
+
 		self.assertTrue(np.allclose(jacobian,dResiddX,rtol,atol))
 
 	def test_specresid_jacobian_vary_uncertainty(self):
@@ -559,7 +570,7 @@ class TRAINING_Test(unittest.TestCase):
 			dLognormdX[i]=(residsdict['lognorm']-lognorm)/dx
 		if not np.allclose(jacobian,dResiddX,rtol,atol): print('Problems with residual derivatives: ',np.unique(self.parlist[np.where(~np.isclose(jacobian,dResiddX,rtol,atol))[1]]))
 		if not np.allclose(grad,dLognormdX,rtol,atol): print('Problems with lognorm derivatives: ',np.unique(self.parlist[np.where(~np.isclose(grad,dLognormdX,rtol,atol))[0]]))
-		import pdb; pdb.set_trace()
+
 		self.assertTrue(np.allclose(jacobian,dResiddX,rtol,atol))
 		self.assertTrue(np.allclose(grad,dLognormdX,rtol,atol))
 	
@@ -614,7 +625,7 @@ class TRAINING_Test(unittest.TestCase):
 					guess=self.guess.copy()
 					guess[i]+=dx
 					return regularization(guess,False)[0][component]
-			
+
 				print('Checking jacobian of {} regularization, {} component'.format(name,component))
 				#Only checking the first component, since they're calculated using the same code
 				residuals,jacobian=[x[component] for x in regularization(self.guess,True)]

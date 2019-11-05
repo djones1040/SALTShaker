@@ -29,6 +29,7 @@ class SALTPriors:
 				self.priors[prior].numResids=result[0].size
 			except:
 				self.priors[prior].numResids=1
+
 		self.numPriorResids=sum([self.priors[x].numResids for x in self.priors])
 		self.numBoundResids=0
 		for boundedparam in self.boundedParams:
@@ -84,7 +85,38 @@ class SALTPriors:
 		
 		jacobian=-fluxDeriv* (2.5 / (np.log(10) *m0Bflux * width))
 		return residual,m0B,jacobian
+
+	@prior
+	def m1prior(self,width,x,components):
+		"""M1 should have zero flux at t=0 in the B band"""
+		int1d = interp1d(self.phase,components[1],axis=0,assume_sorted=True)
+		m1Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
+			self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
+		residual = m1Bflux / width
+		#This derivative is constant, and never needs to be recalculated, so I store it in a hidden attribute
+		try:
+			fluxDeriv= self.__m1priorfluxderiv__.copy()
+		except:
+			fluxDeriv= np.zeros(self.npar)
+			passbandColorExp = self.kcordict['default']['Bpbspl']
+			intmult = (self.wave[1] - self.wave[0])*self.kcordict['default']['fluxfactor']
+			for i in range(self.im1.size):
+				waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+				phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+				#Check if this filter is inside values affected by changes in knot i
+				if waverange[0] > self.kcordict['default']['maxlam'] or waverange[1] < self.kcordict['default']['minlam']:
+					pass
+				if (0>=phaserange[0] ) & (0<=phaserange[1]):
+					#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
+					#Integrate only over wavelengths within the relevant range
+					inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
+					derivInterp = interp1d(self.phase,self.spline_derivs[:,inbounds,i],axis=0,kind=self.interpMethod,bounds_error=False,fill_value="extrapolate",assume_sorted=True)
+					fluxDeriv[self.im1[i]] = np.sum( passbandColorExp[inbounds] * derivInterp(0))*intmult 
+			self.__m1priorfluxderiv__=fluxDeriv.copy()
 		
+		jacobian=fluxDeriv/width 
+		return residual,m1Bflux,jacobian
+	
 	@prior
 	def x1mean(self,width,x,components):
 		"""Prior such that the mean of the x1 population is 0"""
