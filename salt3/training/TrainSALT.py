@@ -126,6 +126,7 @@ class TrainSALT(TrainSALTBase):
 				specdata=datadict[sn]['specdata']
 				photdata=datadict[sn]['photdata']
 				for k in specdata.keys():
+					print(sn)
 					init_scale = getScaleForSN(specdata[k],photdata,self.kcordict,datadict[sn]['survey'])
 					guess[np.where(parlist == 'specrecal_{}_{}'.format(sn,k))[0][-1]] = init_scale
 		i=0
@@ -343,8 +344,8 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		plotSALTModel.mkModelPlot(outputdir,outfile='%s/SALTmodelcomp.pdf'%outputdir,
 								  xlimits=[self.options.waverange[0],self.options.waverange[1]])
 		if self.options.dospec:
-			ValidateSpectra.compareSpectra(snlist,
-										   self.options.outputdir,maxspec=50)
+			ValidateSpectra.compareSpectra(
+				snlist,self.options.outputdir,maxspec=50,base=self)
 		
 		snfiles = np.genfromtxt(snlist,dtype='str')
 		snfiles = np.atleast_1d(snfiles)
@@ -430,7 +431,8 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		
 		# read the data
 		datadict = readutils.rdAllData(self.options.snlist,self.options.estimate_tpk,self.kcordict,
-									   self.addwarning,dospec=self.options.dospec,KeepOnlySpec=False)
+									   self.addwarning,dospec=self.options.dospec,KeepOnlySpec=True,
+									   peakmjdlist=self.options.tmaxlist)
 		
 		if not os.path.exists(self.options.outputdir):
 			os.makedirs(self.options.outputdir)
