@@ -164,9 +164,11 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False):
 
 	return datadict
 
-def rdAllData(snlist,estimate_tpk,kcordict,addwarning,dospec=False,KeepOnlySpec=False):
+def rdAllData(snlist,estimate_tpk,kcordict,addwarning,dospec=False,KeepOnlySpec=False,peakmjdlist=None):
 	datadict = {}
-
+	if peakmjdlist:
+		pksnid,pkmjd,pkmjderr = np.loadtxt(peakmjdlist,unpack=True,dtype=str)
+		pkmjd,pkmjderr = pkmjd.astype('float'),pkmjderr.astype('float')
 
 	if not os.path.exists(snlist):
 		print('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
@@ -208,6 +210,16 @@ def rdAllData(snlist,estimate_tpk,kcordict,addwarning,dospec=False,KeepOnlySpec=
 					sn.MJD[sn.FLT == 'c'],sn.FLUXCAL[sn.FLT == 'c'],sn.FLUXCALERR[sn.FLT == 'c'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
 			else:
 				raise RuntimeError('need a blue filter to estimate tmax')
+		elif peakmjdlist:
+			if sn.SNID in pksnid:
+				tpk = pkmjd[sn.SNID == pksnid][0]
+				tpkerr = pkmjderr[sn.SNID == pksnid][0]
+				if tpkerr < 2: tpkmsg = 'termination condition is satisfied'
+				else: tpkmsg = 'time of max uncertainty of +/- %.1f days is too uncertain!'%tpkerr
+			else:
+				tpkmsg = 'can\'t fint tmax in file %s'%peakmjdlist
+				addwarning(tpkmsg)
+				#raise RuntimeError('SN ID %s not found in peak MJD list'%sn.SNID)
 		else:
 			tpk = sn.SEARCH_PEAKMJD
 			if type(tpk) == str:

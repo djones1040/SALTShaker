@@ -656,7 +656,8 @@ class SALTResids:
 		if not computePCDerivs and computeDerivatives and 'dmodelflux_dM0_spec_%s'%sn in self.__dict__ :
 			specresultsdict['modelflux_jacobian'][:,self.im0] = self.__dict__['dmodelflux_dM0_spec_%s'%sn]*x0
 			specresultsdict['modelflux_jacobian'][:,self.im1] = self.__dict__['dmodelflux_dM0_spec_%s'%sn]*x0*x1
-
+		if len(np.where(specresultsdict['modelflux'] != specresultsdict['modelflux'])[0]):
+			import pdb; pdb.set_trace()
 		return specresultsdict
 		
 	def specVarianceForSN(self,x,sn,interr1d,intcorr1d,colorlaw,colorexp,computeDerivatives):
@@ -938,6 +939,8 @@ class SALTResids:
 			elif 'dmodelflux_dM0_phot_%s'%sn  in self.__dict__:
 					photresultsdict['modelflux_jacobian'][:,self.im0] = self.__dict__['dmodelflux_dM0_phot_%s'%sn]*x0
 					photresultsdict['modelflux_jacobian'][:,self.im1]= self.__dict__['dmodelflux_dM0_phot_%s'%sn]*x0*x1
+		if len(np.where(photresultsdict['modelflux'] != photresultsdict['modelflux'])[0]):
+			import pdb; pdb.set_trace()
 		return photresultsdict
 	
 	

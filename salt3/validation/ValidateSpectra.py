@@ -64,10 +64,11 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 				   lcrv00file='salt3_lc_relative_variance_0.dat',
 				   lcrv11file='salt3_lc_relative_variance_1.dat',
 				   lcrv01file='salt3_lc_relative_covariance_01.dat',
-				   ax=None,maxspec=None):
+				   ax=None,maxspec=None,base=None):
 
 	plt.close('all')
 	datadict=readutils.rdAllData(speclist,False,None,lambda x: None,speclist,KeepOnlySpec=True)
+	if base: datadict = base.mkcuts(datadict)
 	salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,
 								m1file=m1file,
 								clfile=clfile,cdfile=cdfile,

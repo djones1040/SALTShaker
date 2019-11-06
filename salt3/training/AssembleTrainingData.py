@@ -58,11 +58,12 @@ def main():
 				zhel = vold(float(sn.RA.split()[0]),float(sn.DECL.split()[0]),float(sn.REDSHIFT_FINAL.split()[0]))
 				sn.REDSHIFT_HELIO = '%.7f +- 0.000'%zhel
 			#import pdb; pdb.set_trace()
-			try:
+			if 'hi': #try:
 				if t == _foundation_dir: sn.appendspec2snanafile('%s/%s'%(_outdir,l),_foundspecdir,verbose=True)
 				elif t == _ps1_dir: sn.appendspec2snanafile('%s/%s'%(_outdir,l),_ps1specdir,verbose=True,ps=True)
 				else: sn.appendspec2snanafile('%s/%s'%(_outdir,l),_jlaspecdir,verbose=False)
-			except: import pdb; pdb.set_trace()
+			else: pass
+			#except: import pdb; pdb.set_trace()
 
 def vnew(ra, dec, z):
 	c_icrs = SkyCoord(ra=ra*u.degree, dec=dec*u.degree, frame = 'icrs')
