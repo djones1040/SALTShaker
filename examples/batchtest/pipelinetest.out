@@ -1,0 +1,28 @@
+Current procedures:  ['byosed', 'sim', 'lcfit']
+Adding/modifying key COLOR=False in [FLAGS]
+Adding/modifying key STRETCH=False in [FLAGS]
+input file saved as: pipelinetest/TEST_BYOSED.params
+pipelinetest/TEST_BYOSED.params is copied to byosed/byosed.params
+Load base sim input file.. simulation/SIMGEN_BYOSED_MASTER.INPUT
+Setting GENVERSION = MD_BYOSEDTEST_TEST
+Adding key NGEN_LC = 20 at the end of file
+Adding key GENSOURCE = RANDOM at the end of file
+Adding key GENRANGE_REDSHIFT = 0.01 0.1 at the end of file
+Write sim input to file: pipelinetest/TEST_SIMGEN_BYOSEDTEST.INPUT
+warning : clobbering old sim dir SIMLOGS_BYOSEDTEST so SNANA doesn't hang
+Load base fit input file.. lcfitting/snfit_base.nml
+Setting key VERSION_PHOTOMETRY=SALT3TEST_SIMPLE in &SNLCINP
+Setting key KCOR_FILE=lcfitting/kcor_PS1_LOWZ_COMBINED.fits in &SNLCINP
+Setting key FILTLIST_FIT=bcdeghi in &FITINP
+Write fit input to file: pipelinetest/snfit_TEST.nml
+Connecting  ['sim', 'lcfit']
+Load base fit input file.. pipelinetest/snfit_TEST.nml
+Setting key VERSION_PHOTOMETRY=MD_BYOSEDTEST_TEST in &SNLCINP
+Setting key VERSION=MD_BYOSEDTEST_TEST in &HEADER
+Write fit input to file: pipelinetest/snfit_TEST.nml
+looking for DONE_STAMP in /home/midai/salt3_local/SALT3/examples/batchtest/SIMLOGS_BYOSEDTEST/Sim.DONE
+Running sim_SNmix.pl /home/midai/salt3_local/SALT3/examples/batchtest/pipelinetest/TEST_SIMGEN_BYOSEDTEST.INPUT
+sim_SNmix.pl finished successfully.
+looking for DONE_STAMP in ALL.DONE
+Running split_and_fit.pl /home/midai/salt3_local/SALT3/examples/batchtest/pipelinetest/snfit_TEST.nml
+split_and_fit.pl finished successfully.
