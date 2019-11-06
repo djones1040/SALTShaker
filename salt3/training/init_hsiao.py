@@ -42,6 +42,7 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 	
 	m1fluxguess = flux*10**(-0.4*(-8.93+(synphotB(refWave,refFlux,0,0,Bfilt)-\
 										 synphotB(wave[phase==0],flux[phase==0],0,0,Bfilt))))
+	m1fluxguess *= 1e2
 	#m1fluxguess -= 2.0933145e-5
 	#m1fluxadj = synphotBflux(wave[phase==0],m1fluxguess[phase==0],0,0,Bfilt)
 	#import pdb; pdb.set_trace()
