@@ -31,6 +31,7 @@ class RunPipe():
                 raise RuntimeError("batch script is None")
             f = open(self.batch_script,'r')
             lines = f.read()
+            f.close()
             pypro = '/home/midai/salt3_local/SALT3/salt3/pipeline/runpipe.py'
             pycommand = 'python {} -c {} --mypipe {} --batch_mode 0'.format(pypro,self.pipeinput,self.mypipe)
             cwd = os.getcwd()
@@ -40,6 +41,7 @@ class RunPipe():
             outf.write('\n')
             outf.write(pycommand)
             outf.write('\n')
+            outf.close()
             print('Submitting batch job...')
             shellcommand = "sbatch {}".format(outfname) 
             print(shellcommand)
