@@ -39,6 +39,6 @@ mag0=-29.7754
 uave=1
 sntype=-1
 hgtype=-1
-file=/Users/david/Dropbox/research/SALT3_runpipe/smallsim_perfect/snfit_test.FITRES.TEXT
+file=/project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/smallsim_perfect/snfit_test.FITRES.TEXT
 prefix=test_salt2mu
-DONE_STAMP: /Users/david/Dropbox/research/SALT3_runpipe/smallsim_perfect/pipelinetest/GetMu.DONE
+DONE_STAMP=/project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/smallsim_perfect/pipelinetest/GetMu.DONE
