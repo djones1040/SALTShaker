@@ -366,14 +366,14 @@ class BYOSED(PyPipeProcedure):
         if bkp_orig_param:
             byosed_rename = "{}.{}".format(byosed_default,int(time.time()))
             if os.path.isfile(byosed_default):
-                shellcommand = "cp -p {} {}".format(byosed_default,byosed_rename) 
+                shellcommand = "cp {} {}".format(byosed_default,byosed_rename) 
                 shellrun = subprocess.run(list(shellcommand.split()))
                 if shellrun.returncode != 0:
                     raise RuntimeError(shellrun.stdout)
                 else:
                     print("{} copied as {}".format(byosed_default,byosed_rename))
         #copy new byosed input to BYOSED folder
-        shellcommand = "cp -p {} {}".format(outname,byosed_default)
+        shellcommand = "cp {} {}".format(outname,byosed_default)
         shellrun = subprocess.run(list(shellcommand.split()))
         if shellrun.returncode != 0:
             raise RuntimeError(shellrun.stdout)

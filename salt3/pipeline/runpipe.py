@@ -1,5 +1,4 @@
 import sys
-sys.path.append('/home/midai/salt3_local/SALT3/salt3')
 import pandas as pd
 import pipeline
 from pipeline import *
@@ -32,7 +31,7 @@ class RunPipe():
             f = open(self.batch_script,'r')
             lines = f.read()
             f.close()
-            pypro = '/home/midai/salt3_local/SALT3/salt3/pipeline/runpipe.py'
+            pypro = os.path.expandvars('$WFIRST_ROOT/SALT3/salt3/pipeline/runpipe.py')
             pycommand = 'python {} -c {} --mypipe {} --batch_mode 0'.format(pypro,self.pipeinput,self.mypipe)
             cwd = os.getcwd()
             outfname = os.path.join(cwd,'test_pipeline_batch_script')
