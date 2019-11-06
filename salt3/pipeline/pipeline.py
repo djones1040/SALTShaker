@@ -983,7 +983,7 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
         outfile = open(outname,"w")
         for line in lines:
             outfile.write(line)
-
+        outfile.close()
         print("Write sim input to file:",outname)
 
     with open(outname,'a') as fout:
