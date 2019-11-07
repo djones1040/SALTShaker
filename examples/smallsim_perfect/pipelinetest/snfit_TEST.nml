@@ -4,7 +4,7 @@
   PHOTFLAG_MSKREJ = 0,0
   SNTABLE_LIST = 'FITRES LCPLOT(text:key)'
   TEXTFILE_PREFIX = 'snfit_test'
-  KCOR_FILE = '/Users/david/Dropbox/research/SALT3_runpipe/smallsim_perfect/lcfitting/kcor_PS1_LOWZ_COMBINED.fits'
+  KCOR_FILE = '/project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/smallsim_perfect/lcfitting/kcor_PS1_LOWZ_COMBINED.fits'
   NFIT_ITERATION = 3
   INTERP_OPT = 1
   H0_REF = 70.0
@@ -46,3 +46,4 @@
 &END
 
 DONE_STAMP: ALL.DONE
+VERSION: MD_BYOSEDTEST

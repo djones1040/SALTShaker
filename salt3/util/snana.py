@@ -116,7 +116,8 @@ class SuperNovaSpectrum( object ) :
 				self.__dict__['WAVE'].append( str2num(obsdat[0]) )
 				self.__dict__['FLUX'].append( str2num(obsdat[1]) )
 				self.__dict__['FLUXERR'].append( str2num(obsdat[2]) )
-				self.__dict__['VALID'].append( str2num(obsdat[3]) )
+				if len(obsdat) >= 4: self.__dict__['VALID'].append( str2num(obsdat[3]) )
+				else: self.__dict__['VALID'].append( 1.0 )
 		for col in colnames : 
 			self.__dict__[col] = array( self.__dict__[col] )
 		return( None )
@@ -639,7 +640,7 @@ NSPECTRA:  %i
 		fout.close()
 		return( datfile )
 
-	def appendspec2snanafile(self, outfile, specdir, verbose=False, **kwarg ):
+	def appendspec2snanafile(self, outfile, specdir, verbose=False, ps=False, **kwarg ):
 		""" function to write jla data in snana format. Use as
 		sn_lc=jla.SuperNova(full_path_of_jla_data/lc-sn_name.list)
 		sn_lc.writesnanafile(full_path_of_jla_data/lc-sn_name.list)
@@ -647,7 +648,7 @@ NSPECTRA:  %i
 		from numpy import array,log10,unique,where,absolute
 		if 'FLT' not in self.__dict__.keys():
 			self.FLT = self.BAND[:]
-		if verbose:	 print("Writing data from light curve file %s to snana format"%(datfile))
+		#if verbose:	 print("Writing data from light curve file %s to snana format"%(datfile))
 		fout = open(outfile,'w')
 		list_snana_headers=['SURVEY','SNID','RA','DEC','MWEBV','REDSHIFT_HELIO','MJDPK']
 		list_jla_headers=['SURVEY','SN','RA','DEC','MWEBV','Z_HELIO','DayMax']
@@ -674,10 +675,22 @@ NSPECTRA:  %i
 		#self.datfile = os.path.abspath(datfile)
 		#folder_data=datfile[0:datfile.rfind('/')]+'/'
 		#import pdb; pdb.set_trace()
+		if ps: self.SNID = '%06i'%self.SNID
 		if type(self.SNID) == float: self.SNID == str(int(self.SNID))
+
 		list_file_spec=glob.glob(specdir+'/spectrum*'+str(self.__dict__['SNID'])+'*.list')
+		if not len(list_file_spec) and isinstance(self.SNID,str):
+			snid2 = self.SNID[:]
+			snid2 = snid2[:-1]+snid2[-1].lower()
+			list_file_spec=glob.glob(specdir+'/spectrum*'+snid2+'*.list')
+		#if verbose and len(list_file_spec) > 1:
+		#	import pdb; pdb.set_trace()
 		if not len(list_file_spec):
+			if verbose:
+				print('warning: no spectrum for SNID %s'%self.SNID)
 			return( None )
+		#else:
+		#	print(self.SNID,list_file_spec[0])
 		print('\nNSPECTRA: %i \n'%len(list_file_spec),file=fout)
 		print('\nNVAR_SPEC: 5',file=fout)
 		print('VARNAMES_SPEC: LAMMIN LAMMAX  FLAM  FLAMERR DQ\n',file=fout)
@@ -691,7 +704,7 @@ NSPECTRA:  %i
 			for wl,fl,flerr,dq in zip(sn_spectrum.WAVE,sn_spectrum.FLUX,sn_spectrum.FLUXERR,sn_spectrum.VALID):
 				wl_l=wl-resolution/2.0
 				wl_u=wl+resolution/2.0
-				print('SPEC: %9.2f %9.2f %9.5e %9.5e %i'%(wl_l,wl_u,fl,flerr,dq),file=fout)
+				if fl == fl and flerr == flerr: print('SPEC: %9.2f %9.2f %9.5e %9.5e %i'%(wl_l,wl_u,fl,flerr,dq),file=fout)
 			print('SPECTRUM_END:\n',file=fout)	
 		fout.close()
 

@@ -44,7 +44,9 @@ class TrainSALTBase:
 							help='training config file')
 		parser.add_argument('--snlist', default=config.get('iodata','snlist'), type=str,
 							help="""list of SNANA-formatted SN data files, including both photometry and spectroscopy. (default=%default)""")
-		parser.add_argument('--dospec', default=config.get('iodata','dospec'), type=bool,
+		parser.add_argument('--tmaxlist', default=config.get('iodata','tmaxlist'), type=str,
+							help="""optional space-delimited list with SN ID, tmax, tmaxerr (default=%default)""")
+		parser.add_argument('--dospec', default=config.get('iodata','dospec'), type=boolean_string,
 							help="""if set, look for spectra in the snlist files (default=%default)""")
 		parser.add_argument('--maxsn', default=config.get('iodata','maxsn'), type=nonetype_or_int,
 							help="""sets maximum number of SNe to fit for debugging (default=%default)""")
@@ -298,6 +300,10 @@ class TrainSALTBase:
 				   ((specdata[k]['tobs'])/(1+z)>self.options.phaserange[1]):
 					specdata.pop(k)
 					numSpecElimmed+=1
+				elif specdata[k]['mjd'] < np.min(photdata['mjd']) or \
+					 specdata[k]['mjd'] > np.max(photdata['mjd']):
+					specdata.pop(k)
+					numSpecElimmed+=1
 				else:
 					numSpec+=1
 					numSpecPoints+=((specdata[k]['wavelength']/(1+z)>self.options.waverange[0]) &
@@ -308,8 +314,11 @@ class TrainSALTBase:
 			def checkFilterMass(flt):
 				survey = datadict[sn]['survey']
 				filtwave = self.kcordict[survey]['filtwave']
-				filttrans = self.kcordict[survey][flt]['filttrans']
-			
+				try:
+					filttrans = self.kcordict[survey][flt]['filttrans']
+				except:
+					raise RuntimeError('filter %s not found in kcor file'%flt)
+					
 				#Check how much mass of the filter is inside the wavelength range
 				filtRange=(filtwave/(1+z) > self.options.waverange[0]) & \
 						   (filtwave/(1+z) < self.options.waverange[1])
@@ -329,9 +338,8 @@ class TrainSALTBase:
 			for i,sn in enumerate(list(datadict.keys())):
 				if i >= self.options.maxsn:
 					datadict.pop(sn)
-			
 		print('{} spectra and {} photometric observations removed for being outside phase range'.format(numSpecElimmed,numPhotElimmed))
 		print('{} spectra and {} photometric observations remaining'.format(numSpec,numPhot))
 		print('{} total spectroscopic data points'.format(numSpecPoints))
-
+		print('Total number of supernovae: {}'.format(len(datadict)))
 		return datadict
