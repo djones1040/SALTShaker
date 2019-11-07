@@ -195,6 +195,8 @@ def plot_zdepend(datafile,simfile,fitvars=['x1','c'],survey=None,zstep=.05,versi
 
 	data = txtobj_abv(datafile)
 	sim = txtobj_abv(simfile)
+	data.version=version
+	sim.version=version
 	if survey is not None:
 		data.cut_byVar('FIELD',survey)
 		sim.cut_byVar('FIELD',survey)
