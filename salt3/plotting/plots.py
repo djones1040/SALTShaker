@@ -211,8 +211,8 @@ def plot_zdepend(simfile,datafile,fitvars=['x1','c'],survey=None,zstep=.05,versi
 		survey=''
 	ax = None
 	for var in fitvars:
-		stats,edges,bins = scipy.stats.binned_statistic(data.zCMB,data.__dict__[var],'mean',bins=np.arange(np.min(zdata),np.max(zdata)+.001,zstep))
-		stats_err,edges_err,bins_err = scipy.stats.binned_statistic(data.zCMB,data.__dict__[var],'std',bins=np.arange(np.min(zdata),np.max(zdata)+.001,zstep))
+		stats,edges,bins = scipy.stats.binned_statistic(data.zCMB,data.__dict__[var],'mean',bins=np.arange(np.min(data.zCMB),np.max(data.zCMB)+.001,zstep))
+		stats_err,edges_err,bins_err = scipy.stats.binned_statistic(data.zCMB,data.__dict__[var],'std',bins=np.arange(np.min(sim.zCMB),np.max(sim.zCMB)+.001,zstep))
 		stats1,edges1,bins1 = scipy.stats.binned_statistic(sim.zCMB,sim.__dict__[var],'mean',bins=edges)
 		stats1_err,edges1_err,bins1_err = scipy.stats.binned_statistic(sim.zCMB,sim.__dict__[var],'std',bins=edges)
 		bin_data1=[]
