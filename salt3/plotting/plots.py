@@ -263,7 +263,7 @@ def plot_zdepend(datafile,simfile,fitvars=['x1','c'],survey=None,zstep=.05,versi
 
 
 
-def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None,survey=None,**kwargs):
+def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',cuts={},xlimits=None,survey=None,**kwargs):
 	
 	ovhist_obj=ovhist()
 	parser = ovhist_obj.add_options(usage=usagestring)
@@ -282,7 +282,8 @@ def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None,s
 	if survey is not None:
 		data.cut_byVar('FIELD',survey)
 		sim.cut_byVar('FIELD',survey)
-
+	for cut in cuts.keys():
+		data.cut_inrange(cut,cuts[cut][0],cuts[cut][1])
 	# getting distance modulus is slow, so don't do it unless necessary
 	getMU = False
 	if len(ovhist_obj.options.cutwin):

@@ -50,6 +50,26 @@ class txtobj_abv:
 		for k in self.__dict__.keys():
 			self.__dict__[k] = self.__dict__[k][iCut]
 
+	def cut_inrange(self,col,minval,maxval,rows=[]):
+		if not len(rows):
+			rows = np.where((self.__dict__[col] > minval) &
+							(self.__dict__[col] < maxval))[0]
+			for k in self.__dict__.keys():
+				try:
+					self.__dict__[k] = self.__dict__[k][rows]
+				except:
+					pass
+			return(rows)
+		else:
+			rows2 = np.where((self.__dict__[col][rows] > minval) &
+							(self.__dict__[col][rows] < maxval))[0]
+			for k in self.__dict__.keys():
+				try:
+					self.__dict__[k] = self.__dict__[k][rows[rows2]]
+				except:
+					pass
+			return(rows[rows2])
+
 class ovhist:
 	def __init__(self):
 		self.clobber = False
