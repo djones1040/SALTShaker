@@ -191,9 +191,10 @@ def plot_hubble(fr,binned=True,multisurvey=False,nbins=6):
 
 	plt.clf()
 
-def plot_zdepend(data,sim,fitvars=['x1','c'],survey=None,zstep=.05,version='',**kwargs):
+def plot_zdepend(datafile,simfile,fitvars=['x1','c'],survey=None,zstep=.05,version='',**kwargs):
 
-	
+	data = txtobj_abv(datafile)
+	sim = txtobj_abv(simfile)
 	if survey is not None:
 		data.cut_byVar('FIELD',survey)
 		sim.cut_byVar('FIELD',survey)
