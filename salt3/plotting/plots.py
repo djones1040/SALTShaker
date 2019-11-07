@@ -10,6 +10,19 @@ from .getmu import *
 from .util import *
 from .ovdatamc import *
 
+usagestring="""
+	ovdatamc.py <DataFitresFile> <SimFitresFile>  <varName1:varName2:varName3....>  [--cutwin NN_ITYPE 1 1 --cutwin x1 -3 3]
+
+	Given a FITRES file for both data and an SNANA simulation, 
+	ovdatamc.py creates histograms that compare fit parameters or other 
+	variables between the two.  If distance moduli/residuals are not 
+	included in the fitres file, specify MU/MURES as the varName and 
+	they will be computed with standard SALT2 nuisance parameters.  To 
+	specify multiple variable names, use colons to separate them.
+
+	use -h/--help for full options list
+	"""
+
 def getObj(fitresfile, fitresheader = True, makeCuts = True, version=None):
 	fr = txtobj(fitresfile,fitresheader = fitresheader)
 	if makeCuts:
@@ -257,18 +270,7 @@ def plot_zdepend(simfile,datafile,fitvars=['x1','c'],survey=None,zstep=.05,**kwa
 
 
 def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None,survey=None,**kwargs):
-	usagestring="""
-	ovdatamc.py <DataFitresFile> <SimFitresFile>  <varName1:varName2:varName3....>  [--cutwin NN_ITYPE 1 1 --cutwin x1 -3 3]
-
-	Given a FITRES file for both data and an SNANA simulation, 
-	ovdatamc.py creates histograms that compare fit parameters or other 
-	variables between the two.  If distance moduli/residuals are not 
-	included in the fitres file, specify MU/MURES as the varName and 
-	they will be computed with standard SALT2 nuisance parameters.  To 
-	specify multiple variable names, use colons to separate them.
-
-	use -h/--help for full options list
-	"""
+	
 	ovhist_obj=ovhist()
 	parser = ovhist_obj.add_options(usage=usagestring)
 	options,  args = parser.parse_args()
