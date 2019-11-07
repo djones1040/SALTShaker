@@ -203,6 +203,7 @@ def plot_zdepend(data,sim,fitvars=['x1','c'],survey=None,zstep=.05,version='',**
 		survey=''
 	data.version=version
 	sim.version=version
+	print(data.zCMB)
 	ax = None
 	for var in fitvars:
 		stats,edges,bins = scipy.stats.binned_statistic(data.zCMB,data.__dict__[var],'mean',bins=np.arange(np.min(data.zCMB),np.max(data.zCMB)+.001,zstep))
