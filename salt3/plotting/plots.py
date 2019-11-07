@@ -191,19 +191,9 @@ def plot_hubble(fr,binned=True,multisurvey=False,nbins=6):
 
 	plt.clf()
 
-def plot_zdepend(simfile,datafile,fitvars=['x1','c'],survey=None,zstep=.05,version='',**kwargs):
-	ovhist_obj=ovhist()
-	parser = ovhist_obj.add_options(usage=usagestring)
-	options,  args = parser.parse_args()
-	options.histvar = fitvars#['x1','c']
+def plot_zdepend(data,sim,fitvars=['x1','c'],survey=None,zstep=.05,version='',**kwargs):
 
-	ovhist_obj.options = options
-	for k in kwargs.keys():
-		ovhist_obj.options.__dict__[k]=kwargs.get(k)
-	ovhist_obj.version=version
 	
-	data = txtobj_abv(datafile)
-	sim = txtobj_abv(simfile)
 	if survey is not None:
 		data.cut_byVar('FIELD',survey)
 		sim.cut_byVar('FIELD',survey)
