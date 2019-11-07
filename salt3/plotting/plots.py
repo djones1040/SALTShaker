@@ -234,11 +234,11 @@ def plot_zdepend(simfile,datafile,fitvars=['x1','c'],survey=None,zstep=.05,versi
 		bin_data2=np.array(bin_data2)
 		if ax is None:
 			ax=plot('errorbar',[(edges[i]+edges[i+1])/2 for i in final_inds],bin_data1-bin_data2,yerr=np.sqrt(stats_err[final_inds]**2+stats1_err[final_inds]**2),
-				x_lab=r'$z_{\rm{CMB}}$',y_lab=r'$\mu$ Residual',fmt='o',color=col_dict[survey],label=survey+'_%s'%var)
+				x_lab=r'$z_{\rm{CMB}}$',y_lab=r'$\mu$ Residual',fmt='o',label=survey+'_%s'%var)
 			
 		else:
 			ax.errorbar([(edges1[i]+edges1[i+1])/2 for i in final_inds],bin_data1-bin_data2,yerr=np.sqrt(stats_err[final_inds]**2+stats1_err[final_inds]**2),
-				fmt='o',color=col_dict[survey],label=survey+'_%s'%var)
+				fmt='o',label=survey+'_%s'%var)
 
 	ax.legend(fontsize=16)
 	lims=ax.get_xlim()
