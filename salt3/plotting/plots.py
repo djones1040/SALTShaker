@@ -245,10 +245,8 @@ def plot_zdepend(datafile,simfile,fitvars=['x1','c'],survey=None,zstep=.05,versi
 		fname1=data.version
 	else:
 		fname1=data.filename
-	if sim.version is not None:
-		fname2=sim.version
-	else:
-		fname2=sim.filename
+	if survey is not None:
+		fname1+='_'+survey
 	if os.path.exists(os.path.join('figures',fname1+'_zdepend.pdf')):
 		ext=1
 		while os.path.exists(os.path.join('figures',fname1+'_zdepend'+str(ext)+'.pdf')):
