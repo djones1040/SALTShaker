@@ -191,7 +191,7 @@ def plot_hubble(fr,binned=True,multisurvey=False,nbins=6):
 
 	plt.clf()
 
-def plot_zdepend(simfile,datafile,fitvars=['x1','c'],survey=None,zstep=.05,**kwargs):
+def plot_zdepend(simfile,datafile,fitvars=['x1','c'],survey=None,zstep=.05,version='',**kwargs):
 	ovhist_obj=ovhist()
 	parser = ovhist_obj.add_options(usage=usagestring)
 	options,  args = parser.parse_args()
