@@ -284,6 +284,8 @@ def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',cuts={},xlimit
 		sim.cut_byVar('FIELD',survey)
 	for cut in cuts.keys():
 		data.cut_inrange(cut,cuts[cut][0],cuts[cut][1])
+	print(np.mean(data.x1ERR))
+	sys.exit()
 	# getting distance modulus is slow, so don't do it unless necessary
 	getMU = False
 	if len(ovhist_obj.options.cutwin):
