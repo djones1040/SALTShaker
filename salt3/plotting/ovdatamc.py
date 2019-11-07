@@ -13,12 +13,12 @@ histvardict = {'SNRMAX1':'max SNR',
 			   'x1ERR':'$\sigma_{x_1}$',
 			   'cERR':'$\sigma_C$',
 			   'MURES':'Hubble Residual',
-			   'x1vzHD':'mean $X_1$',
-			   'cvzHD':'mean $C$',
-			   'x1ERRvzHD':'$\sigma_{X_1}$',
-			   'cERRvzHD':'$\sigma_C$',
-			   'mBvzHD':'$m_B$',
-			   'mBERRvzHD':'$\sigma_{m_B}$',
+			   'x1vzCMB':'mean $X_1$',
+			   'cvzCMB':'mean $C$',
+			   'x1ERRvzCMB':'$\sigma_{X_1}$',
+			   'cERRvzCMB':'$\sigma_C$',
+			   'mBvzCMB':'$m_B$',
+			   'mBERRvzCMB':'$\sigma_{m_B}$',
 			   'SNRMAX1vmB':'max SNR'}
 
 class txtobj_abv:
@@ -211,14 +211,14 @@ class ovhist:
 				except KeyError:
 					ax.set_xlabel(histvar)
 				ax.set_ylabel('$N_{SNe}$',labelpad=0,fontsize=30)
-				if 'vzHD' in histvar: 
+				if 'vzCMB' in histvar: 
 					ax.set_ylabel(histvardict[histvar],fontsize=30)
 					ax.set_xlabel('$z_{CMB}$',fontsize=30)
 				elif 'vmB' in histvar: 
 					ax.set_ylabel(histvardict[histvar],fontsize=30)
 					ax.set_xlabel('$m_{B}$',fontsize=30)
 
-			if 'vzHD' in histvar:
+			if 'vzCMB' in histvar:
 				self.plt2var(data,sim,ax,histvar)
 				continue
 			if 'vmB' in histvar:
@@ -326,7 +326,7 @@ class ovhist:
 
 	def plt2var(self,data,sim,ax,histvar):
 		from scipy.stats import binned_statistic
-		plotvar = histvar.split('vzHD')[0]
+		plotvar = histvar.split('vzCMB')[0]
 		histvar = 'zHD'
 
 		self.options.histmin,self.options.histmax = None,None

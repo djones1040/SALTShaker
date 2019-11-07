@@ -385,14 +385,14 @@ def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',cuts={},xlimit
 			except KeyError:
 				ax.set_xlabel(histvar)
 			ax.set_ylabel('$N_{SNe}$',labelpad=0,fontsize=30)
-			if 'vzHD' in histvar: 
+			if 'vzCMB' in histvar: 
 				ax.set_ylabel(histvardict[histvar],fontsize=30)
 				ax.set_xlabel('$z_{CMB}$',fontsize=30)
 			elif 'vmB' in histvar: 
 				ax.set_ylabel(histvardict[histvar],fontsize=30)
 				ax.set_xlabel('$m_{B}$',fontsize=30)
 
-		if 'vzHD' in histvar:
+		if 'vzCMB' in histvar:
 			ovhist_obj.plt2var(data,sim,ax,histvar)
 			continue
 		if 'vmB' in histvar:
