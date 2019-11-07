@@ -122,10 +122,20 @@ class txtobj:
 		if not len(rows):
 			rows = np.where((self.__dict__[col] > minval) &
 							(self.__dict__[col] < maxval))[0]
+			for k in self.__dict__.keys():
+				try:
+					self.__dict__[k] = self.__dict__[k][rows]
+				except:
+					pass
 			return(rows)
 		else:
 			rows2 = np.where((self.__dict__[col][rows] > minval) &
 							(self.__dict__[col][rows] < maxval))[0]
+			for k in self.__dict__.keys():
+				try:
+					self.__dict__[k] = self.__dict__[k][rows[rows2]]
+				except:
+					pass
 			return(rows[rows2])
 	def cut_byVar(self,varname,val_or_range):
 		if isinstance(val_or_range,(tuple,list,np.ndarray)):
