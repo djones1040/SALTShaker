@@ -284,6 +284,7 @@ def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',cuts={},xlimit
 		sim.cut_byVar('FIELD',survey)
 	for cut in cuts.keys():
 		data.cut_inrange(cut,cuts[cut][0],cuts[cut][1])
+		sim.cut_inrange(cut,cuts[cut][0],cuts[cut][1])
 	print(np.mean(data.x1ERR))
 	print(np.mean(sim.x1ERR))
 	sys.exit()
