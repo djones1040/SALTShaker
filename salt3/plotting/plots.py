@@ -195,13 +195,14 @@ def plot_zdepend(datafile,simfile,fitvars=['x1','c'],survey=None,zstep=.05,versi
 
 	data = txtobj_abv(datafile)
 	sim = txtobj_abv(simfile)
-	data.version=version
-	sim.version=version
+
 	if survey is not None:
 		data.cut_byVar('FIELD',survey)
 		sim.cut_byVar('FIELD',survey)
 	else:
 		survey=''
+	data.version=version
+	sim.version=version
 	ax = None
 	for var in fitvars:
 		stats,edges,bins = scipy.stats.binned_statistic(data.zCMB,data.__dict__[var],'mean',bins=np.arange(np.min(data.zCMB),np.max(data.zCMB)+.001,zstep))
