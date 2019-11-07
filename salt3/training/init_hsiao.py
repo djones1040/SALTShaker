@@ -25,7 +25,7 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 		m0flux = flux*10**(-0.4*(-19.49+(synphotB(refWave,refFlux,0,0,Bfilt)-synphotB(wave[phase==0],flux[phase==0],0,0,Bfilt))))#*_SCALE_FACTOR
 	else:
 		m0flux = flux[:]
-		
+
 	#m1phase = phase*1.1
 	# was *3 (phase), *5 (wave)
 	splinephase = np.linspace(phaserange[0],phaserange[1],int((phaserange[1]-phaserange[0])/phasesplineres)+1,True)
@@ -42,6 +42,11 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 	
 	m1fluxguess = flux*10**(-0.4*(-8.93+(synphotB(refWave,refFlux,0,0,Bfilt)-\
 										 synphotB(wave[phase==0],flux[phase==0],0,0,Bfilt))))
+	m1fluxguess *= 1e2
+	#m1fluxguess -= 2.0933145e-5
+	#m1fluxadj = synphotBflux(wave[phase==0],m1fluxguess[phase==0],0,0,Bfilt)
+	#import pdb; pdb.set_trace()
+	#m1fluxguess -= m1fluxadj
 	bsplm1 = bisplrep(phase,wave,
 					  m1fluxguess,kx=3,ky=3,
 					  tx=splinephase,ty=splinewave,task=-1)
@@ -191,3 +196,17 @@ def synphotB(sourcewave,sourceflux,zpoff,redshift=0,
 
 	res = np.trapz(pbspl*sourceflux[g]/HC_ERG_AA,obswave[g])/np.trapz(pbspl,obswave[g])
 	return(zpoff-2.5*np.log10(res))
+
+def synphotBflux(sourcewave,sourceflux,zpoff,redshift=0,
+			 Bfilt='initfiles/Bessell90_B.dat'):
+	obswave = sourcewave*(1+redshift)
+
+	filtwave,filttrans = np.genfromtxt(Bfilt,unpack=True)
+
+	g = (obswave >= filtwave[0]) & (obswave <= filtwave[-1])  # overlap range
+
+	pbspl = np.interp(obswave[g],filtwave,filttrans)
+	pbspl *= obswave[g]
+
+	res = np.trapz(pbspl*sourceflux[g]/HC_ERG_AA,obswave[g])/np.trapz(pbspl,obswave[g])
+	return res
