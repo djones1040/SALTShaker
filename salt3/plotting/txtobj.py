@@ -127,6 +127,15 @@ class txtobj:
 			rows2 = np.where((self.__dict__[col][rows] > minval) &
 							(self.__dict__[col][rows] < maxval))[0]
 			return(rows[rows2])
+	def cut_byVar(self,varname,val_or_range):
+		if isinstance(val_or_range,(tuple,list,np.ndarray)):
+			iCut = np.where(np.logical_and(self.__dict__[varname]>=val_or_range[0],self.__dict__[varname]<=val_or_range[1]))[0]
+			
+		else:
+			iCut = self.__dict__[varname]==val_or_range
+
+		for k in self.__dict__.keys():
+			self.__dict__[k] = self.__dict__[k][iCut]
 	def appendfile(self,filename,usegenfromtxt=False):
 		if usegenfromtxt:
 			fin = open(filename,'r')
