@@ -178,6 +178,84 @@ def plot_hubble(fr,binned=True,multisurvey=False,nbins=6):
 
 	plt.clf()
 
+def plot_zdepend(simfile,datafile,fitvars=['x1','c'],survey=None,zstep=.05,**kwargs):
+	ovhist_obj=ovhist()
+	parser = ovhist_obj.add_options(usage=usagestring)
+	options,  args = parser.parse_args()
+	options.histvar = fitvars#['x1','c']
+
+	ovhist_obj.options = options
+	for k in kwargs.keys():
+		ovhist_obj.options.__dict__[k]=kwargs.get(k)
+	ovhist_obj.version=version
+	
+	data = txtobj_abv(datafile)
+	sim = txtobj_abv(simfile)
+	if survey is not None:
+		data.cut_byVar('FIELD',survey)
+		sim.cut_byVar('FIELD',survey)
+	else:
+		survey=''
+	ax = None
+	for var in fitvars:
+		stats,edges,bins = scipy.stats.binned_statistic(data.zCMB,data.__dict__[var],'mean',bins=np.arange(np.min(zdata),np.max(zdata)+.001,zstep))
+		stats_err,edges_err,bins_err = scipy.stats.binned_statistic(data.zCMB,data.__dict__[var],'std',bins=np.arange(np.min(zdata),np.max(zdata)+.001,zstep))
+		stats1,edges1,bins1 = scipy.stats.binned_statistic(sim.zCMB,sim.__dict__[var],'mean',bins=edges)
+		stats1_err,edges1_err,bins1_err = scipy.stats.binned_statistic(sim.zCMB,sim.__dict__[var],'std',bins=edges)
+		bin_data1=[]
+		bin_data2=[]
+
+		final_inds=[]
+		for i in range(1,len(edges1)):
+			inds1=np.where(bins1==i)[0]
+			inds2=np.where(bins2==i)[0]
+			if len(inds1)==0 or len(inds2)==0:
+				continue
+			final_inds.append(i-1)
+			
+			stats_err[i-1]/=np.sqrt(len(inds1))
+			stats1_err[i-1]/=np.sqrt(len(inds2))
+			bin_data1.append(np.average(data.__dict__[var][inds1],weights=1./data.__dict__[var+'ERR'][inds1]))
+			bin_data2.append(np.average(sim.__dict__[var][inds2],weights=1./sim.__dict__[var+'ERR'][inds2]))
+		bin_data1=np.array(bin_data1)
+		bin_data2=np.array(bin_data2)
+		if ax is None:
+			ax=plot('errorbar',[(edges[i]+edges[i+1])/2 for i in final_inds],bin_data1-bin_data2,yerr=np.sqrt(stats_err[final_inds]**2+stats1_err[final_inds]**2),
+				x_lab=r'$z_{\rm{CMB}}$',y_lab=r'$\mu$ Residual',fmt='o',color=col_dict[survey],label=survey+'_%s'%var)
+			
+		else:
+			ax.errorbar([(edges1[i]+edges1[i+1])/2 for i in final_inds],bin_data1-bin_data2,yerr=np.sqrt(stats_err[final_inds]**2+stats1_err[final_inds]**2),
+				fmt='o',color=col_dict[survey],label=survey+'_%s'%var)
+
+	ax.legend(fontsize=16)
+	lims=ax.get_xlim()
+	ax.plot(lims,[0,0],'k--',linewidth=3)
+	
+		
+	if not os.path.exists('figures'):
+		os.makedirs('figures')
+	if fr1.version is not None:
+		fname1=fr1.version
+	else:
+		fname1=fr1.filename
+	if fr2.version is not None:
+		fname2=fr2.version
+	else:
+		fname2=fr2.filename
+	if os.path.exists(os.path.join('figures',fname1+'-'+fname2+'_zdepend.pdf')):
+		ext=1
+		while os.path.exists(os.path.join('figures',fname1+'-'+fname2+'_zdepend'+str(ext)+'.pdf')):
+			ext+=1
+		outname=os.path.join('figures',fname1+'-'+fname2+'_zdepend'+str(ext)+'.pdf')
+	else:
+		outname=os.path.join('figures',fname1+'-'+fname2+'_zdepend.pdf')
+	plt.tight_layout()
+	plt.savefig(outname,format='pdf')
+
+	plt.clf()
+
+
+
 def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None,survey=None,**kwargs):
 	usagestring="""
 	ovdatamc.py <DataFitresFile> <SimFitresFile>  <varName1:varName2:varName3....>  [--cutwin NN_ITYPE 1 1 --cutwin x1 -3 3]
