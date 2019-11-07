@@ -219,7 +219,7 @@ def plot_zdepend(simfile,datafile,fitvars=['x1','c'],survey=None,zstep=.05,versi
 		bin_data2=[]
 
 		final_inds=[]
-		for i in range(1,len(edges1)):
+		for i in range(1,len(edges)):
 			inds1=np.where(bins==i)[0]
 			inds2=np.where(bins1==i)[0]
 			if len(inds1)==0 or len(inds2)==0:
