@@ -135,7 +135,10 @@ class txtobj:
 			iCut = self.__dict__[varname]==val_or_range
 
 		for k in self.__dict__.keys():
-			self.__dict__[k] = self.__dict__[k][iCut]
+			try:
+				self.__dict__[k] = self.__dict__[k][iCut]
+			except:
+				pass
 	def appendfile(self,filename,usegenfromtxt=False):
 		if usegenfromtxt:
 			fin = open(filename,'r')
