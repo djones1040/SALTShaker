@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os,scipy,optparse
 import scipy.stats
-
+from copy import deepcopy
 
 from .txtobj import txtobj
 from .getmu import *
@@ -191,8 +191,9 @@ def plot_hubble(fr,binned=True,multisurvey=False,nbins=6):
 
 	plt.clf()
 
-def plot_zdepend(data,sim,fitvars=['x1','c'],survey=None,zstep=.05,version='',**kwargs):
-
+def plot_zdepend(datafile,simfile,fitvars=['x1','c'],survey=None,zstep=.05,version='',**kwargs):
+	data=deepcopy(datafile)
+	sim=deepcopy(simfile)
 	#data = txtobj_abv(datafile)
 	#sim = txtobj_abv(simfile)
 	print(data.zCMB)
