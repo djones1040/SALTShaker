@@ -285,6 +285,7 @@ def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',cuts={},xlimit
 	for cut in cuts.keys():
 		data.cut_inrange(cut,cuts[cut][0],cuts[cut][1])
 	print(np.mean(data.x1ERR))
+	print(np.mean(sim.x1ERR))
 	sys.exit()
 	# getting distance modulus is slow, so don't do it unless necessary
 	getMU = False
