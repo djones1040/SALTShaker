@@ -3,6 +3,7 @@ import argparse
 import configparser
 import numpy as np
 from salt3.config import config_rootdir
+from salt3.util.specSynPhot import getColorsForSN
 
 def boolean_string(s):
 	if s not in {'False', 'True', 'false', 'true', '1', '0'}:
@@ -296,7 +297,13 @@ class TrainSALTBase:
 
 			#Remove spectra outside phase range
 			for k in list(specdata.keys()):
-				if ((specdata[k]['tobs'])/(1+z)<self.options.phaserange[0]) or \
+				# remove spectra with bad colors
+				colordiffs = getColorsForSN(
+					specdata[k],photdata,self.kcordict,datadict[sn]['survey'])
+				if colordiffs is None or len(colordiffs[np.abs(colordiffs) > 0.1]):
+					specdata.pop(k)
+					numSpecElimmed += 1
+				elif ((specdata[k]['tobs'])/(1+z)<self.options.phaserange[0]) or \
 				   ((specdata[k]['tobs'])/(1+z)>self.options.phaserange[1]):
 					specdata.pop(k)
 					numSpecElimmed+=1
@@ -308,7 +315,7 @@ class TrainSALTBase:
 					numSpec+=1
 					numSpecPoints+=((specdata[k]['wavelength']/(1+z)>self.options.waverange[0]) &
 									(specdata[k]['wavelength']/(1+z)<self.options.waverange[1])).sum()
-					
+				
 			#Remove photometric data outside phase range
 			phase=(photdata['tobs'])/(1+z)
 			def checkFilterMass(flt):

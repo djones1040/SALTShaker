@@ -774,6 +774,9 @@ class SALTResids:
 				coeffs/=factorial(pow)
 				lameffPrime=lameff/(1+z)/1000
 				colorscat=np.exp(np.poly1d(coeffs)(lameffPrime))
+				if colorscat == np.inf:
+					print('infinite color scatter!')
+					import pdb; pdb.set_trace()
 				if computeDerivatives:
 					dcolorscatdx= colorscat*((lameffPrime) ** (pow) )/ factorial(pow)
 
