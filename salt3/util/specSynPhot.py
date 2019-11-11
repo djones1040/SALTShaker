@@ -79,8 +79,8 @@ def getScaleForSN(spectrum,photdata,kcordict,survey,colorcut=0.1):
 		photcolor = photmag1-photmag2
 		speccolor = specmag1-specmag2
 		colordiffs = np.append(colordiffs,photcolor-speccolor)
-	import pdb; pdb.set_trace()
-		
+	#import pdb; pdb.set_trace()
+
 	scale_guess,scale_guess_err = np.array(scale_guess),np.array(scale_guess_err)
 	scale_out = np.average(scale_guess,weights=1/scale_guess_err**2.)
 	print(scale_out)
