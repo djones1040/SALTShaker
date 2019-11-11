@@ -127,7 +127,7 @@ class TrainSALT(TrainSALTBase):
 				photdata=datadict[sn]['photdata']
 				for k in specdata.keys():
 					print(sn)
-					init_scale = getScaleForSN(specdata[k],photdata,self.kcordict,datadict[sn]['survey'])
+					init_scale,colordiffs = getScaleForSN(specdata[k],photdata,self.kcordict,datadict[sn]['survey'])
 					guess[np.where(parlist == 'specrecal_{}_{}'.format(sn,k))[0][-1]] = init_scale
 		i=0
 		for k in datadict.keys():
