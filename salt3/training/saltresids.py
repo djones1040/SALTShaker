@@ -193,6 +193,13 @@ class SALTResids:
 		fluxes=self.SALTModel(guess,evaluatePhase=self.phaseRegularizationPoints,evaluateWave=self.waveRegularizationPoints)
 		self.guessScale=[np.sqrt(np.mean(f**2)) for f in fluxes]
 		
+		self.colorLawDeriv=np.empty((self.wave.size,self.n_colorpars))
+		for i in range(self.n_colorpars):
+			self.colorLawDeriv[:,i]=SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(self.wave)-SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(self.wave)
+		
+		self.colorLawDerivInterp=interp1d(self.wave,self.colorLawDeriv,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
+		
+		
 		print('Time to calculate spline_derivs: %.2f'%(time.time()-starttime))
 		
 		
@@ -626,11 +633,7 @@ class SALTResids:
 					specresultsdict['modelflux_jacobian'][iSpecStart:iSpecStart+SpecLen,self.parlist == 'specrecal_{}_{}'.format(sn,k)]  = modulatedFlux[:,np.newaxis] * drecaltermdrecal
 					
 				# color law
-				for i in range(self.n_colorpars):
-					dcolorlaw_dcli = interp1d(obswave,SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(self.wave)-SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(self.wave),kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(specdata[k]['wavelength'])
-
-					#dcolorlaw_dcli = SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(specdata[k]['wavelength']/(1+z))-SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(specdata[k]['wavelength']/(1+z))
-					specresultsdict['modelflux_jacobian'][iSpecStart:iSpecStart+SpecLen,self.iCL[i]] = modulatedFlux*-0.4*np.log(10)*c*dcolorlaw_dcli
+				specresultsdict['modelflux_jacobian'][iSpecStart:iSpecStart+SpecLen,self.iCL] = modulatedFlux*-0.4*np.log(10)*c*self.colorLawDerivInterp(specdata[k]['wavelength'])
 				
 				# M0, M1
 				if computePCDerivs:
@@ -723,10 +726,8 @@ class SALTResids:
 					specresultsdict['modelvariance_jacobian'][iSpecStart:iSpecStart+SpecLen,self.parlist == 'specrecal_{}_{}'.format(sn,k)]  = x0**2 * modelUncertainty[:,np.newaxis] * drecaltermdrecal * 2
 			
 				# color law
-				for i in range(self.n_colorpars):
-					dcolorlaw_dcli = interp1d(obswave,SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(self.wave)-SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(self.wave),kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(specdata[k]['wavelength'])
-					specresultsdict['modelvariance_jacobian'][iSpecStart:iSpecStart+SpecLen,self.iCL[i]] = x0**2 *2* (-0.4 *np.log(10)*c)*modelUncertainty*dcolorlaw_dcli
-				
+				specresultsdict['modelvariance_jacobian'][iSpecStart:iSpecStart+SpecLen,self.iCL] = x0**2 *2* (-0.4 *np.log(10)*c)*modelUncertainty[:,np.newaxis]*self.colorLawDerivInterp(specdata[k]['wavelength'])
+
 				interpresult=  self.errorspline_deriv_interp((clippedPhase[0]/(1+z),specdata[k]['wavelength']/(1+z)),method=self.interpMethod) 
 				extinctionexp=(recalexp*colorexpinterp* _SCALE_FACTOR/(1+z)*self.datadict[sn]['mwextcurveint'](specdata[k]['wavelength']))
 				specresultsdict['modelvariance_jacobian'][iSpecStart:iSpecStart+SpecLen,np.where(self.parlist=='modelerr_0')[0]]   = 2* x0**2  * (extinctionexp *( modelerrnox[0] + corr[0]*modelerrnox[1]*x1))[:,np.newaxis] * interpresult
@@ -815,9 +816,7 @@ class SALTResids:
 				photresultsdict['modelvariance_jacobian'][selectFilter,np.where(self.parlist == 'x1_{}'.format(sn))[0][0]] = x0**2 *fluxfactor* 2*(modelerrnox[0]*modelerrnox[1]*corr[0]+ x1* modelerrnox[1]**2)
 
 				# color law
-				for i in range(self.n_colorpars):
-					dcolorlaw_dcli = interp1d(obswave,SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(self.wave)-SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(self.wave),kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(lameff)
-					photresultsdict['modelvariance_jacobian'][selectFilter,self.iCL[i]] =fluxfactor* x0**2 *2* (-0.4 *np.log(10)*c)*modelUncertainty*dcolorlaw_dcli
+				photresultsdict['modelvariance_jacobian'][selectFilter,self.iCL] =fluxfactor* x0**2 *2* (-0.4 *np.log(10)*c)*modelUncertainty*self.colorLawDerivInterp(lameff)
 
 				interpresult=  self.errorspline_deriv_interp((clippedPhase/(1+z),lameff/(1+z)),method=self.interpMethod) 
 				extinctionexp=(colorexpinterp* _SCALE_FACTOR/(1+z)*self.datadict[sn]['mwextcurveint'](lameff))
@@ -900,13 +899,9 @@ class SALTResids:
 				
 				#d model / dc is total flux (M0 and M1 components (already modulated with passband)) times the color law and a factor of ln(10)
 				photresultsdict['modelflux_jacobian'][selectFilter,self.parlist == 'c_{}'.format(sn)]=np.sum((modulatedFlux)*np.log(10)*colorlaw[np.newaxis,idx[flt]], axis=1)*dwave*self.fluxfactor[survey][flt]
-				for i in range(self.n_colorpars):
-					#Color law is linear wrt to the color law parameters; therefore derivative of the color law
-					# with respect to color law parameter i is the color law with all other values zeroed minus the color law with all values zeroed
-					dcolorlaw_dcli = SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(self.wave[idx[flt]])-SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(self.wave[idx[flt]])
-					#Multiply M0 and M1 components (already modulated with passband) by c* d colorlaw / d cl_i, with associated normalizations
-					photresultsdict['modelflux_jacobian'][selectFilter,self.iCL[i]] =  np.sum((modulatedFlux)*-0.4*np.log(10)*c*dcolorlaw_dcli[np.newaxis,:], axis=1)*dwave*self.fluxfactor[survey][flt]
-				
+				#Multiply M0 and M1 components (already modulated with passband) by c* d colorlaw / d cl_i, with associated normalizations
+				photresultsdict['modelflux_jacobian'][selectFilter,self.iCL] =  np.sum((modulatedFlux)[:,:,np.newaxis]*-0.4*np.log(10)*c*self.colorLawDeriv[np.newaxis,idx[flt],:], axis=1)*dwave*self.fluxfactor[survey][flt]
+			
 				if computePCDerivs:
 					passbandColorExp=pbspl[flt]*colorexp[idx[flt]]*self.datadict[sn]['mwextcurve'][idx[flt]]
 					intmult = dwave*self.fluxfactor[survey][flt]*_SCALE_FACTOR/(1+z)*x0
