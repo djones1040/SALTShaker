@@ -30,7 +30,7 @@ class SALTPriors:
 			except:
 				self.priors[prior].numResids=1
 
-		self.numPriorResids=sum([self.priors[x].numResids for x in self.priors])
+		self.numPriorResids=sum([self.priors[x].numResids for x in self.usePriors])
 		self.numBoundResids=0
 		for boundedparam in self.boundedParams:
 			#width,bound,x,par
