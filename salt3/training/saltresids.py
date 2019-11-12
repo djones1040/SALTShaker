@@ -585,7 +585,6 @@ class SALTResids:
 			pow=coeffs.size-1-np.arange(coeffs.size)
 			coeffs/=factorial(pow)
 			recalexp = np.exp(np.poly1d(coeffs)((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal))
-			#import pdb; pdb.set_trace()
 			if computeDerivatives:
 				M0int = interp1d(obswave,M0interp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
 				M0interp = M0int(specdata[k]['wavelength'])*recalexp
@@ -658,6 +657,7 @@ class SALTResids:
 			specresultsdict['modelflux_jacobian'][:,self.im1] = self.__dict__['dmodelflux_dM0_spec_%s'%sn]*x0*x1
 		if len(np.where(specresultsdict['modelflux'] != specresultsdict['modelflux'])[0]):
 			import pdb; pdb.set_trace()
+		#import pdb; pdb.set_trace()
 		return specresultsdict
 		
 	def specVarianceForSN(self,x,sn,interr1d,intcorr1d,colorlaw,colorexp,computeDerivatives):
@@ -977,7 +977,7 @@ class SALTResids:
 			M0 *= colorexp; M1 *= colorexp
 			M0phasederiv *= colorexp; M1phasederiv *= colorexp
 		else: mod = x0*(M0 + x1*M1)*colorexp
-				
+
 		if computeDerivatives:
 			M0 *= _SCALE_FACTOR/(1+z); M1 *= _SCALE_FACTOR/(1+z)
 			int1dM0 = interp1d(obsphase,M0,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)

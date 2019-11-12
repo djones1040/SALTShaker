@@ -265,7 +265,7 @@ class TrainSALTBase:
 				saltfitkwargs[k] = self.options.__dict__[k]
 		return saltfitkwargs
 
-	def mkcuts(self,datadict):
+	def mkcuts(self,datadict,KeepOnlySpec=False):
 
 		# Eliminate all data outside wave/phase range
 		numSpecElimmed,numSpec=0,0
@@ -315,7 +315,10 @@ class TrainSALTBase:
 					numSpec+=1
 					numSpecPoints+=((specdata[k]['wavelength']/(1+z)>self.options.waverange[0]) &
 									(specdata[k]['wavelength']/(1+z)<self.options.waverange[1])).sum()
-				
+			if KeepOnlySpec and not len(specdata.keys()):
+				datadict.pop(sn)
+				continue
+			
 			#Remove photometric data outside phase range
 			phase=(photdata['tobs'])/(1+z)
 			def checkFilterMass(flt):
