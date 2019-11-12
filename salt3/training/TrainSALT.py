@@ -127,7 +127,7 @@ class TrainSALT(TrainSALTBase):
 				photdata=datadict[sn]['photdata']
 				for k in specdata.keys():
 					print(sn)
-					init_scale = getScaleForSN(specdata[k],photdata,self.kcordict,datadict[sn]['survey'])
+					init_scale,colordiffs = getScaleForSN(specdata[k],photdata,self.kcordict,datadict[sn]['survey'])
 					guess[np.where(parlist == 'specrecal_{}_{}'.format(sn,k))[0][-1]] = init_scale
 		i=0
 		for k in datadict.keys():
@@ -136,11 +136,12 @@ class TrainSALT(TrainSALTBase):
 
 		if self.options.resume_from_outputdir:
 			try:
-				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.resume_from_outputdir,unpack=True,skiprows=1,dtype="U20,f8")
+				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.resume_from_outputdir,unpack=True,skiprows=1,dtype="U30,f8")
 			except:
-				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.outputdir,unpack=True,skiprows=1,dtype="U20,f8")
+				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.outputdir,unpack=True,skiprows=1,dtype="U30,f8")
 			for key in np.unique(parlist):
 				try:
+					#if 'specrecal' not in key: 
 					guess[parlist == key] = pars[names == key]
 					
 				except:
@@ -205,7 +206,7 @@ class TrainSALT(TrainSALTBase):
 			chain = saltfitter.chain
 			loglikes = saltfitter.loglikes
 		else: chain,loglikes = None,None
-			
+
 		return phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams,x_modelpars,parlist,chain,loglikes
 
@@ -441,7 +442,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			datadict = readutils.rdAllData(self.options.snlist,self.options.estimate_tpk,self.kcordict,
 										   self.addwarning,dospec=self.options.dospec,KeepOnlySpec=True,
 										   peakmjdlist=self.options.tmaxlist)
-			datadict = self.mkcuts(datadict)
+			datadict = self.mkcuts(datadict,KeepOnlySpec=True)
 
 			phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 				modelerr,clpars,clerr,clscat,SNParams,pars,parlist,chain,loglikes = self.fitSALTModel(datadict)
