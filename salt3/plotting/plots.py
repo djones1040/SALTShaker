@@ -191,7 +191,7 @@ def plot_hubble(fr,binned=True,multisurvey=False,nbins=6):
 
 	plt.clf()
 
-def plot_zdepend(datafile,simfile,fitvars=['x1','c'],survey=None,zstep=.05,version='',**kwargs):
+def plot_zdepend(datafile,simfile,fitvars=['x1','c'],survey=None,zstep=.05,version='',alpha=1,beta=1,**kwargs):
 	data=deepcopy(datafile)
 	sim=deepcopy(simfile)
 	#data = txtobj_abv(datafile)
@@ -207,6 +207,12 @@ def plot_zdepend(datafile,simfile,fitvars=['x1','c'],survey=None,zstep=.05,versi
 
 	ax = None
 	for var in fitvars:
+		if var=='x1':
+			const=alpha
+		elif var=='c':
+			const=beta
+		else:
+			const=1
 		stats,edges,bins = scipy.stats.binned_statistic(data.zCMB,data.__dict__[var],'mean',bins=np.arange(np.min(data.zCMB),np.max(data.zCMB)+.001,zstep))
 		stats_err,edges_err,bins_err = scipy.stats.binned_statistic(data.zCMB,data.__dict__[var],'std',bins=edges)
 		stats1,edges1,bins1 = scipy.stats.binned_statistic(sim.zCMB,sim.__dict__[var],'mean',bins=edges)
@@ -229,11 +235,11 @@ def plot_zdepend(datafile,simfile,fitvars=['x1','c'],survey=None,zstep=.05,versi
 		bin_data1=np.array(bin_data1)
 		bin_data2=np.array(bin_data2)
 		if ax is None:
-			ax=plot('errorbar',[(edges[i]+edges[i+1])/2 for i in final_inds],bin_data1-bin_data2,yerr=np.sqrt(stats_err[final_inds]**2+stats1_err[final_inds]**2),
+			ax=plot('errorbar',[(edges[i]+edges[i+1])/2 for i in final_inds],(bin_data1-bin_data2)*const,yerr=const*np.sqrt(stats_err[final_inds]**2+stats1_err[final_inds]**2),
 				x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o',label=survey+'_%s'%var)
 			
 		else:
-			ax.errorbar([(edges1[i]+edges1[i+1])/2 for i in final_inds],bin_data1-bin_data2,yerr=np.sqrt(stats_err[final_inds]**2+stats1_err[final_inds]**2),
+			ax.errorbar([(edges1[i]+edges1[i+1])/2 for i in final_inds],const*(bin_data1-bin_data2),yerr=const*np.sqrt(stats_err[final_inds]**2+stats1_err[final_inds]**2),
 				fmt='o',label=survey+'_%s'%var)
 
 	ax.legend(fontsize=16)
@@ -285,8 +291,8 @@ def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',cuts={},xlimit
 	for cut in cuts.keys():
 		data.cut_inrange(cut,cuts[cut][0],cuts[cut][1])
 		sim.cut_inrange(cut,cuts[cut][0],cuts[cut][1])
-	print(np.mean(data.x1ERR))
-	print(np.mean(sim.x1ERR))
+
+
 	#sys.exit()
 	# getting distance modulus is slow, so don't do it unless necessary
 	getMU = False
