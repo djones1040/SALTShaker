@@ -1455,22 +1455,22 @@ class SALTResids:
 # 			spectime+=time.time()
 # 			phottime-=time.time()
 			#For each photometric filter, weight the contribution by  
-			for flt in np.unique(photdata['filt']):
-				selectFilter=(photdata['filt']==flt)
-				phase=(photdata['tobs'][selectFilter]+tpkoff)/(1+z)
-				
-				waveAffected= (self.waveBins[1] > (self.kcordict[survey][flt]['minlam']/(1+z))) & (self.waveBins[0] < (self.kcordict[survey][flt]['maxlam']/(1+z)))
-				phaseAffected= ((phase[:,np.newaxis]>self.phaseBins[0][np.newaxis,:])& (phase[:,np.newaxis]<self.phaseBins[1][np.newaxis,:]))
-				phaseAffected[:,0]=phaseAffected[:,0] | (phase<=self.phaseBins[0][0])
-				phaseAffected[:,-1]=phaseAffected[:,-1] | (phase>=self.phaseBins[1][-1])
-				basisAffected=(phaseAffected[:,:,np.newaxis] & waveAffected[np.newaxis,np.newaxis,:]).reshape((phase.size,self.im0.size))
-				for pdx,p in enumerate(np.where(selectFilter)[0]):
-					
-					derivInterp = self.spline_deriv_interp((phase[pdx],self.wave[idx[flt]]),method=self.interpMethod)[:,basisAffected[pdx]]
-					
-					summation = np.sum( pbspl[flt].reshape((pbspl[flt].size,1)) * derivInterp, axis=0)/ np.sum(pbspl[flt])
-					if phase[pdx]>=self.phaseBins[1][-1]: summation*=10**(-0.4*self.extrapolateDecline*((1+z)*(phase[pdx]-self.phaseBins[1][-1])))
-					self.neffRaw[np.where(basisAffected[pdx].reshape(self.neffRaw.shape))]+=summation
+# 			for flt in np.unique(photdata['filt']):
+# 				selectFilter=(photdata['filt']==flt)
+# 				phase=(photdata['tobs'][selectFilter]+tpkoff)/(1+z)
+# 				
+# 				waveAffected= (self.waveBins[1] > (self.kcordict[survey][flt]['minlam']/(1+z))) & (self.waveBins[0] < (self.kcordict[survey][flt]['maxlam']/(1+z)))
+# 				phaseAffected= ((phase[:,np.newaxis]>self.phaseBins[0][np.newaxis,:])& (phase[:,np.newaxis]<self.phaseBins[1][np.newaxis,:]))
+# 				phaseAffected[:,0]=phaseAffected[:,0] | (phase<=self.phaseBins[0][0])
+# 				phaseAffected[:,-1]=phaseAffected[:,-1] | (phase>=self.phaseBins[1][-1])
+# 				basisAffected=(phaseAffected[:,:,np.newaxis] & waveAffected[np.newaxis,np.newaxis,:]).reshape((phase.size,self.im0.size))
+# 				for pdx,p in enumerate(np.where(selectFilter)[0]):
+# 					
+# 					derivInterp = self.spline_deriv_interp((phase[pdx],self.wave[idx[flt]]),method=self.interpMethod)[:,basisAffected[pdx]]
+# 					
+# 					summation = np.sum( pbspl[flt].reshape((pbspl[flt].size,1)) * derivInterp, axis=0)/ np.sum(pbspl[flt])
+# 					if phase[pdx]>=self.phaseBins[1][-1]: summation*=10**(-0.4*self.extrapolateDecline*((1+z)*(phase[pdx]-self.phaseBins[1][-1])))
+# 					self.neffRaw[np.where(basisAffected[pdx].reshape(self.neffRaw.shape))]+=summation
 # 			phottime+=time.time()
 # 		print('Time for total neff is ',time.time()-start)
 # 		print('Spectime: ',spectime,'Phottime: ',phottime)
@@ -1479,30 +1479,31 @@ class SALTResids:
 		#self.neff=gaussian_filter1d(self.neff,1,0)
 		self.neffRaw=interp2d(self.waveBinCenters,self.phaseBinCenters,self.neffRaw)(self.waveRegularizationPoints,self.phaseRegularizationPoints)		
 		
-		self.neff=np.clip(self.neffRaw,5e-10,5)
 		# hack!
-# 		self.plotEffectivePoints([-12.5,0,12.5,40],'neff.png')
-# 		self.plotEffectivePoints(None,'neff-heatmap.png')
-
+		self.plotEffectivePoints([-12.5,0,12.5,40],'neff.png')
+		self.plotEffectivePoints(None,'neff-heatmap.png')
+		self.neff=np.clip(self.neffRaw,1e-4,None)
+		
+		self.neff[self.neff>200]=np.inf
+		
 	def plotEffectivePoints(self,phases=None,output=None):
-
 		import matplotlib.pyplot as plt
 		if phases is None:
-			plt.imshow(self.neff,cmap='Greys',aspect='auto')
-			xticks=np.linspace(0,self.waveBins[0].size,8,False)
-			plt.xticks(xticks,['{:.0f}'.format(self.waveBins[int(x)]) for x in xticks])
+			plt.imshow(self.neffRaw,cmap='Greys',aspect='auto')
+			xticks=np.linspace(0,self.waveRegularizationPoints[0].size,8,False)
+			plt.xticks(xticks,['{:.0f}'.format(self.waveRegularizationPoints[int(x)]) for x in xticks])
 			plt.xlabel('$\lambda$ / Angstrom')
-			yticks=np.linspace(0,self.phaseBins[0].size,8,False)
-			plt.yticks(yticks,['{:.0f}'.format(self.phaseBins[int(x)]) for x in yticks])
+			yticks=np.linspace(0,self.phaseRegularizationPoints[0].size,8,False)
+			plt.yticks(yticks,['{:.0f}'.format(self.phaseRegularizationPoints[int(x)]) for x in yticks])
 			plt.ylabel('Phase / days')
 		else:
 			inds=np.searchsorted(self.phaseRegularizationPoints,phases)
 			# hack!
 			for i in inds:
-				plt.plot(self.waveBins[:-1],self.neff[i,:],label='{:.1f} days'.format(self.phaseRegularizationPoints[i]))
+				plt.plot(self.waveRegularizationPoints[:],self.neffRaw[i,:],label='{:.1f} days'.format(self.phaseRegularizationPoints[i]))
 			plt.ylabel('$N_eff$')
 			plt.xlabel('$\lambda (\AA)$')
-			plt.xlim(self.phaseRegularizationPoints.min(),self.phaseRegularizationPoints.max())
+			plt.xlim(self.waveRegularizationPoints.min(),self.waveRegularizationPoints.max())
 			plt.legend()
 		
 		if output is None:
@@ -1556,8 +1557,8 @@ class SALTResids:
 				#0 if model is locally separable in phase and wavelength i.e. flux=g(phase)* h(wavelength) for arbitrary functions g and h
 				numerator=(dfluxdphase[i] *dfluxdwave[i] -d2fluxdphasedwave[i] *fluxes[i] )
 				dnumerator=( self.regularizationDerivs[1]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2]* dfluxdphase[i][:,:,np.newaxis] - self.regularizationDerivs[3]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0]* d2fluxdphasedwave[i][:,:,np.newaxis] )			
-				resids += [normalization* (numerator / (scale[i]**2 * np.sqrt( self.neff ))).flatten()]
-				if computeJac: jac += [((dnumerator*(scale[i]**2 )- scaleDeriv[i][np.newaxis,np.newaxis,:]*2*scale[i]*numerator[:,:,np.newaxis])/np.sqrt(self.neff)[:,:,np.newaxis]*normalization / scale[i]**4  ).reshape(-1, self.im0.size)]
+				resids += [normalization* (numerator / (scale[i]**2 * self.neff)).flatten()]
+				if computeJac: jac += [((dnumerator*(scale[i]**2 )- scaleDeriv[i][np.newaxis,np.newaxis,:]*2*scale[i]*numerator[:,:,np.newaxis])/self.neff[:,:,np.newaxis]*normalization / scale[i]**4  ).reshape(-1, self.im0.size)]
 				else: jac+=[None]
 
 			self.__dyadic_resids__ = resids
@@ -1585,8 +1586,8 @@ class SALTResids:
 				#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
 				normalization=np.sqrt(1/((self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
 				#Minimize model derivative w.r.t wavelength in unconstrained regions
-				resids+= [normalization* ( normedGrad /	np.sqrt( self.neff )).flatten()]
-				if computeJac: jac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
+				resids+= [normalization* ( normedGrad /	self.neff).flatten()]
+				if computeJac: jac+= [normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, self.im0.size)]
 				else: jac+=[None]
 
 			self.__phasegrad_resids__ = resids
@@ -1614,8 +1615,8 @@ class SALTResids:
 				#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
 				normalization=np.sqrt(1/((self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
 				#Minimize model derivative w.r.t wavelength in unconstrained regions
-				waveGradResids+= [normalization* ( normedGrad /	np.sqrt( self.neff )).flatten()]
-				if computeJac: jac+= [normalization*((normedGradDerivs) / np.sqrt( self.neff )[:,:,np.newaxis]).reshape(-1, self.im0.size)]
+				waveGradResids+= [normalization* ( normedGrad /	self.neff).flatten()]
+				if computeJac: jac+= [normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, self.im0.size)]
 				else: jac+=[None]
 				self.__wavegrad_resids__ = waveGradResids
 				self.__wavegrad_jac__ = jac
