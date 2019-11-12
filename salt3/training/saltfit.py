@@ -604,7 +604,7 @@ class GaussNewton(saltresids.SALTResids):
 		print('Initialized log likelihood: ' ,self.maxlikefit(X))
 		params=['x'+str(i) for i in range(includePars.sum())]
 		initVals=X[includePars].copy()
-		import pdb;pdb.set_trace()
+		#import pdb;pdb.set_trace()
 		#kwargs={'limit_'+params[i] : self.bounds[np.where(includePars)[0][i]] for i in range(includePars.sum()) if }
 		kwargs=({params[i]: initVals[i] for i in range(includePars.sum())})
 		kwargs.update({'error_'+params[i]: np.abs(X[includePars][i])/10 for i in range(includePars.sum())})

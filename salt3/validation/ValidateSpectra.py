@@ -32,7 +32,13 @@ def flux(salt3dir,obsphase,obswave,z,x0,x1,c,mwebv):
 	#z,x0,x1,c = 0.178516, 7.485606e-08, -1.054627, 0.7379956
 	#obsphase = -4.119
 	modelflux = x0*(m0flux + x1*m1flux)*10**(-0.4*c*salt3colorlaw(np.unique(m0wave)))*1e-12/(1+z)
-	# 
+	# 8.798589051785977e-11
+	#7.902258833221662e-12
+	#105.04341581178245
+
+	#2716.62193985209
+	#116.9842636395274
+	#705.3372836613883
 	m0interp = interp1d(np.unique(m0phase)*(1+z),m0flux*10**(-0.4*c*salt3colorlaw(np.unique(m0wave)))*1e-12/(1+z),axis=0,
 						kind='nearest',bounds_error=False,fill_value="extrapolate")
 	m0phaseinterp = m0interp(obsphase)
@@ -52,7 +58,8 @@ def flux(salt3dir,obsphase,obswave,z,x0,x1,c,mwebv):
 	mwextcurve = 10**(-0.4*extinction.fitzpatrick99(obswave,mwebv*3.1))
 	modelflux_wave *= mwextcurve
 
-	#import pdb; pdb.set_trace()
+	#(0.03222331315711098, 0.006309237183488867, -0.1190830213724053, 0.01285)
+	#array([ 0.07056906,  0.02290504, -0.01061583, -0.01343562])
 	return modelflux_wave
 	
 def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
@@ -67,8 +74,12 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 				   ax=None,maxspec=None,base=None):
 
 	plt.close('all')
-	datadict=readutils.rdAllData(speclist,False,None,lambda x: None,speclist,KeepOnlySpec=True)
-	if base: datadict = base.mkcuts(datadict)
+	if base:
+		datadict=readutils.rdAllData(speclist,False,None,lambda x: None,speclist,KeepOnlySpec=True,peakmjdlist=base.options.tmaxlist)
+	else:
+		datadict=readutils.rdAllData(speclist,False,None,lambda x: None,speclist,KeepOnlySpec=True,peakmjdlist=None)
+	if base: datadict = base.mkcuts(datadict,KeepOnlySpec=True)
+
 	salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,
 								m1file=m1file,
 								clfile=clfile,cdfile=cdfile,
@@ -96,8 +107,9 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 			print('SN {} is not in parameters, skipping'.format(sn))
 			continue
 		model.update(snPars)
+		#import pdb; pdb.set_trace()
 		for k in specdata.keys():
-			try:
+			if 'hi': #try:
 				coeffs=pars[parlist=='specrecal_{}_{}'.format(sn,k)]
 				pow=coeffs.size-1-np.arange(coeffs.size)
 				coeffs/=factorial(pow)
@@ -132,7 +144,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 					pdf_pages.savefig()
 				if maxspec and axcount >= maxspec:
 					break
-			except Exception as e:
+			else: #except Exception as e:
 				print(e)
 				continue
 	pdf_pages.savefig()
