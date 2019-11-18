@@ -19,7 +19,7 @@ batch=True
 #outinput=pipelinetest/TEST_SIMGEN_SALT3TEST.INPUT
 prooptions=
 set_key= 2
-    NGEN_LC 20
+    NGEN_LC 100
     GENSOURCE RANDOM
     GENRANGE_REDSHIFT 0.01 0.1
     GENVERSION MD_BYOSEDTEST_TEST
