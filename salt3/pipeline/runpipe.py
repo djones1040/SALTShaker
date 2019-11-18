@@ -100,14 +100,22 @@ class RunPipe():
         
 def main(**kwargs):
     parser = argparse.ArgumentParser(description='Run SALT3 Pipe.')
-    parser.add_argument('-c',dest='pipeinput',default=None)
-    parser.add_argument('--mypipe',dest='mypipe',default=0,type=int)
-    parser.add_argument('--batch_mode',dest='batch_mode',default=0,type=int)
-    parser.add_argument('--batch_script',dest='batch_script',default=None)
-    parser.add_argument('--randseed',dest='randseed',default=None,type=int)
-    parser.add_argument('--fseeds',dest='fseeds',default=None)
-    parser.add_argument('--num',dest='num',default=None,type=int)   
-    parser.add_argument('--norun',dest='norun', action='store_true')   
+    parser.add_argument('-c',dest='pipeinput',default=None,
+                        help='pipeline input file')
+    parser.add_argument('--mypipe',dest='mypipe',default=0,type=int,
+                        help='def your own pipe set to 1; 0 using default pipe')
+    parser.add_argument('--batch_mode',dest='batch_mode',default=0,type=int,
+                        help='>0 to specify how many batch jobs to submit')
+    parser.add_argument('--batch_script',dest='batch_script',default=None,
+                        help='base batch submission script')
+    parser.add_argument('--randseed',dest='randseed',default=None,type=int,
+                        help='[internal use] specify randseed for single simulation')
+    parser.add_argument('--fseeds',dest='fseeds',default=None,
+                        help='provide a list of randseeds for multiple batch jobs')
+    parser.add_argument('--num',dest='num',default=None,type=int,
+                        help='[internal use] suffix for multiple batch jobs')   
+    parser.add_argument('--norun',dest='norun', action='store_true',
+                        help='set to only check configurations without launch jobs')   
     
     p = parser.parse_args()
     
