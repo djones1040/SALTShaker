@@ -3,12 +3,25 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os,scipy,optparse
 import scipy.stats
-
+from copy import deepcopy
 
 from .txtobj import txtobj
 from .getmu import *
 from .util import *
 from .ovdatamc import *
+
+usagestring="""
+	ovdatamc.py <DataFitresFile> <SimFitresFile>  <varName1:varName2:varName3....>  [--cutwin NN_ITYPE 1 1 --cutwin x1 -3 3]
+
+	Given a FITRES file for both data and an SNANA simulation, 
+	ovdatamc.py creates histograms that compare fit parameters or other 
+	variables between the two.  If distance moduli/residuals are not 
+	included in the fitres file, specify MU/MURES as the varName and 
+	they will be computed with standard SALT2 nuisance parameters.  To 
+	specify multiple variable names, use colons to separate them.
+
+	use -h/--help for full options list
+	"""
 
 def getObj(fitresfile, fitresheader = True, makeCuts = True, version=None):
 	fr = txtobj(fitresfile,fitresheader = fitresheader)
@@ -178,19 +191,86 @@ def plot_hubble(fr,binned=True,multisurvey=False,nbins=6):
 
 	plt.clf()
 
-def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None,survey=None,**kwargs):
-	usagestring="""
-	ovdatamc.py <DataFitresFile> <SimFitresFile>  <varName1:varName2:varName3....>  [--cutwin NN_ITYPE 1 1 --cutwin x1 -3 3]
+def plot_zdepend(datafile,simfile,fitvars=['x1','c'],survey=None,zstep=.05,version='',alpha=1,beta=1,**kwargs):
+	data=deepcopy(datafile)
+	sim=deepcopy(simfile)
+	#data = txtobj_abv(datafile)
+	#sim = txtobj_abv(simfile)
 
-	Given a FITRES file for both data and an SNANA simulation, 
-	ovdatamc.py creates histograms that compare fit parameters or other 
-	variables between the two.  If distance moduli/residuals are not 
-	included in the fitres file, specify MU/MURES as the varName and 
-	they will be computed with standard SALT2 nuisance parameters.  To 
-	specify multiple variable names, use colons to separate them.
+	if survey is not None:
+		data.cut_byVar('FIELD',survey)
+		sim.cut_byVar('FIELD',survey)
+	else:
+		survey=''
+	data.version=version
+	sim.version=version
 
-	use -h/--help for full options list
-	"""
+	ax = None
+	for var in fitvars:
+		if var=='x1':
+			const=alpha
+		elif var=='c':
+			const=beta
+		else:
+			const=1
+		stats,edges,bins = scipy.stats.binned_statistic(data.zCMB,data.__dict__[var],'mean',bins=np.arange(np.min(data.zCMB),np.max(data.zCMB)+.001,zstep))
+		stats_err,edges_err,bins_err = scipy.stats.binned_statistic(data.zCMB,data.__dict__[var],'std',bins=edges)
+		stats1,edges1,bins1 = scipy.stats.binned_statistic(sim.zCMB,sim.__dict__[var],'mean',bins=edges)
+		stats1_err,edges1_err,bins1_err = scipy.stats.binned_statistic(sim.zCMB,sim.__dict__[var],'std',bins=edges)
+		bin_data1=[]
+		bin_data2=[]
+
+		final_inds=[]
+		for i in range(1,len(edges)):
+			inds1=np.where(bins==i)[0]
+			inds2=np.where(bins1==i)[0]
+			if len(inds1)==0 or len(inds2)==0:
+				continue
+			final_inds.append(i-1)
+			
+			stats_err[i-1]/=np.sqrt(len(inds1))
+			stats1_err[i-1]/=np.sqrt(len(inds2))
+			bin_data1.append(np.average(data.__dict__[var][inds1],weights=1./data.__dict__[var+'ERR'][inds1]))
+			bin_data2.append(np.average(sim.__dict__[var][inds2],weights=1./sim.__dict__[var+'ERR'][inds2]))
+		bin_data1=np.array(bin_data1)
+		bin_data2=np.array(bin_data2)
+		if ax is None:
+			ax=plot('errorbar',[(edges[i]+edges[i+1])/2 for i in final_inds],(bin_data1-bin_data2)*const,yerr=const*np.sqrt(stats_err[final_inds]**2+stats1_err[final_inds]**2),
+				x_lab=r'$z_{\rm{CMB}}$',y_lab='Residual',fmt='o',label=survey+'_%s'%var)
+			
+		else:
+			ax.errorbar([(edges1[i]+edges1[i+1])/2 for i in final_inds],const*(bin_data1-bin_data2),yerr=const*np.sqrt(stats_err[final_inds]**2+stats1_err[final_inds]**2),
+				fmt='o',label=survey+'_%s'%var)
+
+	ax.legend(fontsize=16)
+	lims=ax.get_xlim()
+	ax.plot(lims,[0,0],'k--',linewidth=3)
+	
+		
+	if not os.path.exists('figures'):
+		os.makedirs('figures')
+	if data.version is not None:
+		fname1=data.version
+	else:
+		fname1=data.filename
+	if survey is not None:
+		fname1+='_'+survey
+	if os.path.exists(os.path.join('figures',fname1+'_zdepend.pdf')):
+		ext=1
+		while os.path.exists(os.path.join('figures',fname1+'_zdepend'+str(ext)+'.pdf')):
+			ext+=1
+		outname=os.path.join('figures',fname1+'_zdepend'+str(ext)+'.pdf')
+	else:
+		outname=os.path.join('figures',fname1+'_zdepend.pdf')
+	plt.tight_layout()
+	plt.savefig(outname,format='pdf')
+
+	plt.clf()
+
+
+
+def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',cuts={},xlimits=None,survey=None,**kwargs):
+	
 	ovhist_obj=ovhist()
 	parser = ovhist_obj.add_options(usage=usagestring)
 	options,  args = parser.parse_args()
@@ -208,7 +288,12 @@ def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None,s
 	if survey is not None:
 		data.cut_byVar('FIELD',survey)
 		sim.cut_byVar('FIELD',survey)
+	for cut in cuts.keys():
+		data.cut_inrange(cut,cuts[cut][0],cuts[cut][1])
+		sim.cut_inrange(cut,cuts[cut][0],cuts[cut][1])
 
+
+	#sys.exit()
 	# getting distance modulus is slow, so don't do it unless necessary
 	getMU = False
 	if len(ovhist_obj.options.cutwin):
@@ -306,14 +391,14 @@ def plot_fits(simfile,datafile=None,fitvars=['x1','c'],version='',xlimits=None,s
 			except KeyError:
 				ax.set_xlabel(histvar)
 			ax.set_ylabel('$N_{SNe}$',labelpad=0,fontsize=30)
-			if 'vzHD' in histvar: 
+			if 'vzCMB' in histvar: 
 				ax.set_ylabel(histvardict[histvar],fontsize=30)
 				ax.set_xlabel('$z_{CMB}$',fontsize=30)
 			elif 'vmB' in histvar: 
 				ax.set_ylabel(histvardict[histvar],fontsize=30)
 				ax.set_xlabel('$m_{B}$',fontsize=30)
 
-		if 'vzHD' in histvar:
+		if 'vzCMB' in histvar:
 			ovhist_obj.plt2var(data,sim,ax,histvar)
 			continue
 		if 'vmB' in histvar:
