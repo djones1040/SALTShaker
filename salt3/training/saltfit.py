@@ -575,10 +575,11 @@ class GaussNewton(saltresids.SALTResids):
 
 		X[self.im0]+= np.mean(X[self.ix1])*X[self.im1]
 		X[self.ix1]-=np.mean(X[self.ix1])
-		
-		X[self.im1]*=np.std(X[self.ix1])
-		X[self.ix1]/=np.std(X[self.ix1])
-		
+
+		x1std = np.std(X[self.ix1])
+		if x1std == x1std and x1std != 0.0:
+			X[self.im1]*= x1std
+			X[self.ix1]/= x1std
 		print(np.sum(self.lsqwrap(X,uncertainties,False,False,doPriors=True)**2.))
 
 		xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
@@ -603,7 +604,7 @@ class GaussNewton(saltresids.SALTResids):
 		print('Initialized log likelihood: ' ,self.maxlikefit(X))
 		params=['x'+str(i) for i in range(includePars.sum())]
 		initVals=X[includePars].copy()
-		import pdb;pdb.set_trace()
+		#import pdb;pdb.set_trace()
 		#kwargs={'limit_'+params[i] : self.bounds[np.where(includePars)[0][i]] for i in range(includePars.sum()) if }
 		kwargs=({params[i]: initVals[i] for i in range(includePars.sum())})
 		kwargs.update({'error_'+params[i]: np.abs(X[includePars][i])/10 for i in range(includePars.sum())})

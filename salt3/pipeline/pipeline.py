@@ -400,7 +400,7 @@ class Simulation(PipeProcedure):
         self.outname = outname
         self.finput,self.keys,self.done_file = _gen_snana_sim_input(basefilename=self.baseinput,setkeys=self.setkeys,
                                                                     outname=outname,done_file=self.done_file)
-    
+
     def _get_output_info(self):
         if self.batch:
             keys = ['PATH_SNDATA_SIM','GENVERSION','GENPREFIX']
@@ -986,16 +986,24 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
         outfile.close()
         print("Write sim input to file:",outname)
 
-    with open(outname,'a') as fout:
-        if 'GENPREFIX' in config.keys():
-            done_file = finput_abspath('%s/%s'%('SIMLOGS_%s'%config['GENPREFIX'],done_file.split('/')[-1]))
-            print('DONE_STAMP: %s'%done_file,file=fout)
+    with open(outname) as fin:
+        lines = fin.readlines()
 
-            if os.path.exists('SIMLOGS_%s'%config['GENPREFIX']):
-                print('warning : clobbering old sim dir SIMLOGS_%s so SNANA doesn\'t hang'%config['GENPREFIX'])
-                os.system('rm -r SIMLOGS_%s'%config['GENPREFIX'])
-        else:
-            print('DONE_STAMP: %s'%done_file,file=fout)
+    with open(outname,'w') as fout:
+        for line in lines:
+            print(line.replace('\n',''),file=fout)
+            if 'ENDLIST_GENVERSION' in line:
+                print('',file=fout)
+                if 'GENPREFIX' in config.keys():
+                    done_file = finput_abspath('%s/%s'%('SIMLOGS_%s'%config['GENPREFIX'].split('#')[0].replace(' ',''),done_file.split('/')[-1]))
+                    print('DONE_STAMP: %s'%done_file,file=fout)
+
+                    if os.path.exists('SIMLOGS_%s'%config['GENPREFIX'].split('#')[0].replace(' ','')):
+                        print('warning : clobbering old sim dir SIMLOGS_%s so SNANA doesn\'t hang'%config['GENPREFIX'].split('#')[0].replace(' ',''))
+                        os.system('rm -r SIMLOGS_%s'%config['GENPREFIX'])
+                else:
+                    print('DONE_STAMP: %s'%done_file,file=fout)
+
 
     return outname,config,done_file
 
