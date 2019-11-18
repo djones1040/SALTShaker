@@ -794,7 +794,7 @@ def _run_batch_pro(pro,args,done_file=None):
         # SNANA doesn't remove old done files
         if os.path.exists(done_file): os.system('rm %s'%done_file)
 
-    print("Running",' '.join([pro] + args))
+    print("[BATCH] Running",' '.join([pro] + args))
     res = subprocess.run(args = list([pro] + args),capture_output=True)
     stdout = res.stdout.decode('utf-8')
 
