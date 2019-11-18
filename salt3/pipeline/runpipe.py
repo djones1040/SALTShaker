@@ -8,17 +8,29 @@ import os
 import shlex
 import random
 
-def MyPipe(finput):
-    # write your own pipeline here        
-    pipe = SALT3pipe(finput)
-    pipe.build(data=False,mode='customize',onlyrun=['byosed','sim'])
-    pipe.configure()
-    return pipe
+def _MyPipe(mypipe):
+    # Write your own pipeline in a separate file  
+    # For example:
+    # ./mypipetest.py
+    # -------------------------------------------
+    # def MyPipe(finput,**kwargs): ##do not change the name of the function [MyPipe]
+    #     pipe = SALT3pipe(finput)
+    #     pipe.build(data=False,mode='customize',onlyrun=['byosed','sim','train'])
+    #     pipe.configure()
+    #     pipe.glue(['sim','train'])
+    #     return pipe
+    # -------------------------------------------
+    # and set --mypipe mypipetest
+    import importlib
+    mymod = importlib.import_module(mypipe.split('.py')[0])
+    print("Using user defined pipeline: {}.py".format(mypipe.split('.py')[0]))
+    return mymod.MyPipe
+
 
 class RunPipe():
     def __init__(self, pipeinput, mypipe=False, batch_mode=False,batch_script=None,randseed=None,
                  fseeds=None,num=None,norun=None):
-        if not mypipe:
+        if mypipe is None:
             self.pipedef = self.__DefaultPipe
         else:
             self.pipedef = self.__MyPipe
@@ -30,26 +42,58 @@ class RunPipe():
         self.fseeds = fseeds
         self.num = num
         self.norun = norun
+ 
+    def __DefaultPipe(self):
+        pipe = SALT3pipe(finput=self.pipeinput)
+        pipe.build(data=False,mode='customize',onlyrun=['byosed','sim','lcfit'])
+        pipe.configure()
+        pipe.glue(['sim','lcfit'],on='phot')
+        return pipe
+        
+    def __MyPipe(self): 
+        MyPipe = _MyPipe(self.mypipe)
+        pipe = MyPipe(finput=self.pipeinput)
+        return pipe
+
+    def _add_suffix(self,pro,keylist,suffix,section=None):
+        df = pd.DataFrame()
+        for i,key in enumerate(keylist):
+            if section is None:
+                val_old = pro.keys[key]
+                sec = None
+            else:
+                sec = section[i]
+                val_old = pro.keys[sec][key]
+            val_new = '{}_{:03d}'.format(val_old.strip(),suffix)
+            df = pd.concat([df,pd.DataFrame([{'section':sec,'key':key,'value':val_new}])])
+        return df
+    
+    def _reconfig_w_suffix(self,proname,df,suffix):
+        proname.outname = '{}_{:03d}'.format(proname.outname,self.num)
+        proname.configure(pro=proname.pro,baseinput=proname.baseinput,setkeys=df,prooptions=proname.prooptions,
+                        batch=proname.batch,validplots=proname.validplots,outname=proname.outname,proargs=proname.proargs)  
     
     def run(self):
         if self.batch_mode == 0:
             self.pipe = self.pipedef()
             if self.randseed is not None:
-                print('randseed = {}'.format(self.randseed))
+                if not any([p.startswith('sim') for p in self.pipe.pipepros]):
+                    raise RuntimeError("randseed was given but sim is not defined in the pipeline")
+                print('randseed = {}'.format(self.randseed))                   
                 sim = self.pipe.Simulation
                 randseed_old = sim.keys['RANSEED_REPEAT']
                 randseed_new = [randseed_old.split(' ')[0],str(self.randseed)]
                 df = pd.DataFrame([{'key':'RANSEED_REPEAT','value':randseed_new}])
-                if self.num is not None:
-                    genversion_old = sim.keys['GENVERSION']
-                    genversion_new = '{}_{:03d}'.format(genversion_old.strip(),self.num)
-                    df = pd.concat([df,pd.DataFrame([{'key':'GENVERSION','value':genversion_new}])])
-                    genprefix_old = sim.keys['GENPREFIX']
-                    genprefix_new = '{}_{:03d}'.format(genprefix_old.strip(),self.num)
-                    df = pd.concat([df,pd.DataFrame([{'key':'GENPREFIX','value':genprefix_new}])])
-                    sim.outname = '{}_{:03d}'.format(sim.outname,self.num)
                 sim.configure(pro=sim.pro,baseinput=sim.baseinput,setkeys=df,prooptions=sim.prooptions,
-                              batch=sim.batch,validplots=sim.validplots,outname=sim.outname)      
+                              batch=sim.batch,validplots=sim.validplots,outname=sim.outname)    
+                if self.num is not None:
+                    df_sim = self._add_suffix(sim,['GENVERSION','GENPREFIX'],self.num)
+                    self._reconfig_w_suffix(sim,df_sim,self.num)
+                    if any([p.startswith('train') for p in self.pipe.pipepros]):    
+                        self.pipe.glue(['sim','train'])
+                    if any([p.startswith('lcfit') for p in self.pipe.pipepros]):                           
+                        self.pipe.glue(['sim','lcfit'],on='phot')
+     
             if not self.norun:
                 self.pipe.run()
         else:
@@ -86,23 +130,12 @@ class RunPipe():
                 print(shellcommand)
                 if not self.norun:
                     shellrun = subprocess.run(args=shlex.split(shellcommand))
-
-    def __DefaultPipe(self):
-        pipe = SALT3pipe(finput=self.pipeinput)
-        pipe.build(data=False,mode='customize',onlyrun=['byosed','sim','lcfit'])
-        pipe.configure()
-        pipe.glue(['sim','lcfit'],on='phot')
-        return pipe
-        
-    def __MyPipe(self):       
-        pipe = MyPipe(finput=self.pipeinput)
-        return pipe
         
 def main(**kwargs):
     parser = argparse.ArgumentParser(description='Run SALT3 Pipe.')
     parser.add_argument('-c',dest='pipeinput',default=None,
                         help='pipeline input file')
-    parser.add_argument('--mypipe',dest='mypipe',default=0,type=int,
+    parser.add_argument('--mypipe',dest='mypipe',default=None,
                         help='def your own pipe set to 1; 0 using default pipe')
     parser.add_argument('--batch_mode',dest='batch_mode',default=0,type=int,
                         help='>0 to specify how many batch jobs to submit')
