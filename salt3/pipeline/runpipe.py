@@ -136,7 +136,7 @@ def main(**kwargs):
     parser.add_argument('-c',dest='pipeinput',default=None,
                         help='pipeline input file')
     parser.add_argument('--mypipe',dest='mypipe',default=None,
-                        help='def your own pipe set to 1; 0 using default pipe')
+                        help='define your own pipe in yourownfilename.py')
     parser.add_argument('--batch_mode',dest='batch_mode',default=0,type=int,
                         help='>0 to specify how many batch jobs to submit')
     parser.add_argument('--batch_script',dest='batch_script',default=None,
