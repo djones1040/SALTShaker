@@ -425,8 +425,7 @@ class Simulation(PipeProcedure):
             else:
                 df0['value'] = ''
                 df0['ind'] = None
-                df = df.append(df0, ignore_index=True)
-
+                df = df.append(df0, ignore_index=True)               
         return df
 
     def glueto(self,pipepro):
@@ -913,10 +912,20 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
             if ":" in line and not line.strip().startswith("#"):
                 kwline = line.split(":",maxsplit=1)
                 kw = kwline[0]
-                if kw not in config:
-                    config[kw] = kwline[1].strip()
-                else:
-                    config[kw] = np.append([config[kw]],[kwline[1].strip()])
+                kv = kwline[1]
+                if "#" in kwline[1]:
+                    kv = kwline[1].split("#")[0].strip()
+                if "GENOPT" in line:
+                    kw = kwline[1].split()[0]
+                    kv = kwline[1].split(maxsplit=1)[1]
+                basekws.append(kw.strip())
+                basevals.append(kv.strip())
+                linenum.append(i)
+
+        basekws_renamed = _rename_duplicate_keys(basekws)
+        for i,kw in enumerate(basekws_renamed): 
+            config[kw] = basevals[i]  
+        
     else:
         setkeys = pd.DataFrame(setkeys)
         if np.any(setkeys.key.duplicated()):
