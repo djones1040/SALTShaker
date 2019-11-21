@@ -22,7 +22,7 @@ snrmin_sigint_biascor=30 # SNRMIN to compute siginit_biascor
 
 # idsample_select=150
 # for testing, select on sample IDs
-
+file=blah
 simfile_biascor=/project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/batchtest/lcfitting_biascor/SNFIT_BYOSED_BIASCOR/BYOSED_BIASCOR/FITOPT000.FITRES
 
 FITOPT000_ONLY: 1   # process only default FITOPT000
