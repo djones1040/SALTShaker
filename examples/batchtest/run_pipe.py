@@ -14,9 +14,9 @@ def test_pipeline():
     pipe.glue(['sim','lcfit'],on='phot')
     #pipe.glue(['train','lcfit'],on='model')
     pipe.glue(['lcfit','getmu'])
-    pipe.run(onlyrun=['sim','lcfit','getmu'])
+    #pipe.run(onlyrun=['sim','train','lcfit','getmu'])
     #pipe.glue(['getmu','cosmofit'])
-    #pipe.run(onlyrun=['getmu'])
+    pipe.run(onlyrun=['sim','train','lcfit','getmu'])
 
 if __name__=='__main__':
     test_pipeline()
