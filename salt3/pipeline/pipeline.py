@@ -228,18 +228,27 @@ class SALT3pipe():
         return pipepro
 
     def _multivalues_to_df(self,values,colnames=None,stackvalues=False):
-        df = pd.DataFrame([s.split() for s in values.split('\n')])
+        df = pd.DataFrame([s.split() for s in values.split('\n')[1:]])
         if df.empty:
             return None
         if colnames is None:
-            if df.shape[1] == 2:
+            ncol = int(values.split('\n')[0])
+            if ncol == 2:
                 colnames = ['key','value']
-            elif df.shape[1] == 3:
-                if np.any(df.isna()):
-                    colnames = ['key','value']
-                    stackvalues = True
-                else:
-                    colnames=['section','key','value']
+            elif ncol == 3:
+                colnames = ['section','key','value']
+            else:
+                raise ValueError("column number for set_key must be 2 or 3")
+            if df.shape[1] > ncol:
+                stackvalues = True
+            # if df.shape[1] == 2:
+            #     colnames = ['key','value']
+            # elif df.shape[1] == 3:
+            #     if np.any(df.isna()):
+            #         colnames = ['key','value']
+            #         stackvalues = True
+            #     else:
+            #         colnames=['section','key','value']
         if stackvalues and df.shape[1] > len(colnames):
             numbercol = [colnames[-1]+'.'+str(i) for i in range(df.shape[1]-len(colnames)+1)]
             df.columns = colnames[0:-1] + numbercol
@@ -357,14 +366,14 @@ class BYOSED(PyPipeProcedure):
         if bkp_orig_param:
             byosed_rename = "{}.{}".format(byosed_default,int(time.time()))
             if os.path.isfile(byosed_default):
-                shellcommand = "cp -p {} {}".format(byosed_default,byosed_rename) 
+                shellcommand = "cp {} {}".format(byosed_default,byosed_rename) 
                 shellrun = subprocess.run(list(shellcommand.split()))
                 if shellrun.returncode != 0:
                     raise RuntimeError(shellrun.stdout)
                 else:
                     print("{} copied as {}".format(byosed_default,byosed_rename))
         #copy new byosed input to BYOSED folder
-        shellcommand = "cp -p {} {}".format(outname,byosed_default)
+        shellcommand = "cp {} {}".format(outname,byosed_default)
         shellrun = subprocess.run(list(shellcommand.split()))
         if shellrun.returncode != 0:
             raise RuntimeError(shellrun.stdout)
@@ -400,12 +409,23 @@ class Simulation(PipeProcedure):
         df = pd.DataFrame()
         for key in keys:
             df0 = {}     
-            df0['key'] = key
-            if key in self.keys.keys():
-                df0['value'] = self.keys[key]
+            keystrs = [x.split('[')[0] for x in self.keys.keys()]
+            keyarr = [x for x in self.keys.keys() if x.startswith(key)]
+            if len(keyarr ) > 0:
+                for ki in keyarr:
+                    df0['key'] = key
+                    if '[' in ki:
+                        ind = ki.split('[')[1].split(']')[0]
+                        df0['value'] = self.keys[ki]
+                        df0['ind'] = ind
+                    else:
+                        df0['value'] = self.keys[ki]
+                        df0['ind'] = None
+                    df = df.append(df0, ignore_index=True)
             else:
                 df0['value'] = ''
-            df = df.append(df0, ignore_index=True)
+                df0['ind'] = None
+                df = df.append(df0, ignore_index=True)
 
         return df
 
@@ -413,22 +433,7 @@ class Simulation(PipeProcedure):
         if not isinstance(pipepro,str):
             pipepro = type(pipepro).__name__
         df = self._get_output_info()
-        if df.set_index('key').loc['PATH_SNDATA_SIM'].value:
-            if isinstance(df.set_index('key').loc['GENVERSION'].value,str):
-                outdirs = [os.sep.join(df.set_index('key').loc[['PATH_SNDATA_SIM','GENVERSION'],'value'].values.tolist())]
-            else:
-                outdirs = []
-                for genversion in df.set_index('key').loc['GENVERSION'].value:
-                    outdirs += [os.sep.join([df.set_index('key').loc['PATH_SNDATA_SIM'].value,
-                                             genversion])]
-        else:
-            if isinstance(df.set_index('key').loc['GENVERSION'].value,str):
-                outdirs = [os.sep.join(['$SNDATA_ROOT/SIM',df.set_index('key').loc['GENVERSION'].value])]
-            else:
-                outdirs = []
-                for genversion in df.set_index('key').loc['GENVERSION'].value:
-                    outdirs += [os.sep.join(['$SNDATA_ROOT/SIM',
-                                             genversion])]
+        outdirs = self.get_outdirs(outinfo=df)
         for i,o in enumerate(outdirs):
             outdirs[i] = os.path.expandvars(outdirs[i])
         #res = os.path.expandvars(outdir)
@@ -457,7 +462,7 @@ class Simulation(PipeProcedure):
             prefix = df.loc[df.key=='GENVERSION','value'].values[0]
             return ["{}/{}.LIST".format(res,prefix) for res in outdirs]
         elif pipepro.lower().startswith('lcfit'):
-            return df.loc[df.key=='GENVERSION','value'].values[0]
+            return df.loc[df.key=='GENVERSION','value'].values
             # idx = res.find(simpath)
             # if idx !=0:
             #     raise ValueError("photometry must be in $SNDATA_ROOT/SIM")
@@ -466,6 +471,30 @@ class Simulation(PipeProcedure):
         else:
             raise ValueError("sim can only glue to training or lcfitting")
         
+    def get_outdirs(self,outinfo=None):
+        if outinfo is None:
+            df = self._get_output_info()
+        else:
+            df = outinfo
+        if df.set_index('key').loc['PATH_SNDATA_SIM'].value:
+            if isinstance(df.set_index('key').loc['GENVERSION'].value,str):
+                outdirs = [os.sep.join(df.set_index('key').loc[['PATH_SNDATA_SIM','GENVERSION'],'value'].values.tolist())]
+            else:
+                outdirs = []
+                for genversion in df.set_index('key').loc['GENVERSION'].value:
+                    outdirs += [os.sep.join([df.set_index('key').loc['PATH_SNDATA_SIM'].value,
+                                             genversion])]
+        else:
+            if isinstance(df.set_index('key').loc['GENVERSION'].value,str):
+                outdirs = [os.sep.join(['$SNDATA_ROOT/SIM',df.set_index('key').loc['GENVERSION'].value])]
+            else:
+                outdirs = []
+                for genversion in df.set_index('key').loc['GENVERSION'].value:
+                    outdirs += [os.sep.join(['$SNDATA_ROOT/SIM',
+                                             genversion])]
+        return [os.path.expandvars(x) for x in outdirs]
+
+
 class Training(PyPipeProcedure):
 
     def configure(self,pro=None,baseinput=None,setkeys=None,proargs=None,
@@ -626,6 +655,10 @@ class LCFitting(PipeProcedure):
         else:
             raise ValueError("lcfitting can only glue to getmu")
 
+    def get_outdirs(self):
+        return abspath_for_getmu(self._get_output_info().value.values[0])
+
+
     def _get_input_info(self):
         df = {}       
         section = 'SNLCINP'
@@ -761,7 +794,7 @@ def _run_batch_pro(pro,args,done_file=None):
         # SNANA doesn't remove old done files
         if os.path.exists(done_file): os.system('rm %s'%done_file)
 
-    print("Running",' '.join([pro] + args))
+    print("[BATCH] Running",' '.join([pro] + args))
     res = subprocess.run(args = list([pro] + args),capture_output=True)
     stdout = res.stdout.decode('utf-8')
 
@@ -840,6 +873,19 @@ def _gen_general_python_input(basefilename=None,setkeys=None,
         print("input file saved as:",outname)
     return outname,config
 
+def _rename_duplicate_keys(keys):
+    df = pd.DataFrame(keys,columns=['value'])
+    df['count'] = 1
+    counts = df.groupby('value').count() 
+    for key in counts.index:
+        ct = counts.loc[key,'count']
+        if ct > 1:
+            df.loc[df['value']==key,'value'] = ['{}[{}]'.format(key,i) for i in range(ct)]
+        else:
+            df.loc[df['value']==key] = key
+    newkeys = df['value'].values
+    return newkeys
+
 def _gen_snana_sim_input(basefilename=None,setkeys=None,
                          outname=None,done_file=None):
 
@@ -856,7 +902,9 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
     basefile = open(basefilename,"r")
     lines = basefile.readlines()
     basekws = []
-    
+    basevals = []
+    linenum = []
+
     if setkeys is None:
         print("No modification on the input file, copying {} to {}".format(basefilename,outname))
         os.system('cp %s %s'%(basefilename,outname))
@@ -879,34 +927,63 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
             if ":" in line and not line.strip().startswith("#"):
                 kwline = line.split(":",maxsplit=1)
                 kw = kwline[0]
+                kv = kwline[1]
                 if "#" in kwline[1]:
-                    kwline[1] = kwline[1].split("#")[0].strip()+'\n'
-                basekws.append(kw)
-                if kw in setkeys.key.values:
-                    keyvalue = setkeys[setkeys.key==kw].value.values[0]
-                    if isinstance(keyvalue,list):
-                        kwline[1] = ' '.join(list(filter(None,keyvalue)))+'\n'
-                    else:
-                        kwline[1] = str(keyvalue)+'\n'
-                    print("Setting {} = {}".format(kw,kwline[1].strip()))
-                lines[i] = ": ".join(kwline)
-                config[kw] = kwline[1].strip()
+                    kv = kwline[1].split("#")[0].strip()
+                if "GENOPT" in line:
+                    kw = kwline[1].split()[0]
+                    kv = kwline[1].split(maxsplit=1)[1]
+                basekws.append(kw.strip())
+                basevals.append(kv.strip())
+                linenum.append(i)
 
-        outfile = open(outname,"w")
-        for line in lines:
-            outfile.write(line)
+        basekws_renamed = _rename_duplicate_keys(basekws)
+        # print(basekws_renamed)
+
+        for i,kw in enumerate(basekws_renamed): 
+            if kw in setkeys.key.values:
+                keyvalue = setkeys[setkeys.key==kw].value.values[0]
+                if isinstance(keyvalue,list):
+                    val = ' '.join(list(filter(None,keyvalue)))
+                else:
+                    val = str(keyvalue)
+                basevals[i] = val
+                keystr = kw.split('[')[0]
+                if "[" in kw and 'GENVERSION' not in kw:
+                    lines[linenum[i]] = "GENOPT:{} {}\n".format(keystr,val)
+                else:
+                    lines[linenum[i]] = "{}: {}\n".format(keystr,val)
+                print("Setting {} = {}".format(keystr,val.strip()))
+                config[kw] = val 
+            else:
+                config[kw] = basevals[i]          
 
         for key,value in zip(setkeys.key,setkeys.value):
-            if not key in basekws:
+            if not key in basekws_renamed:
                 if isinstance(value,list):
                     valuestr = ' '.join(list(filter(None,value)))
                 else:
                     valuestr = str(value)
-                newline = key+": "+valuestr+'\n'
-                print("Adding key {} = {}".format(key,valuestr))
-                outfile.write(newline)
+                if key.startswith('GENVERSION'):
+                    raise ValueError("Can not add new GENVERSION at the moment")
+                if "[" in key and 'GENVERSION' not in key:
+                    keystr = key.split('[')[0]
+                    numstr = key.split('[')[1].split(']')[0]
+                    newline = "GENOPT:{} {}\n".format(keystr,valuestr)
+                    lineloc = [i for i,line in enumerate(lines) if "GENVERSION".format(numstr) in line][int(numstr)]            
+                    print("Adding key {} = {} for GENVERSION[{}]".format(keystr,valuestr,numstr))
+                else:
+                    keystr = key
+                    newline = "{}: {}\n".format(keystr,valuestr)
+                    lineloc = len(lines)-1
+                    print("Adding key {} = {} at the end of file".format(keystr,valuestr))
+                lines.insert(lineloc+1,newline)
                 config[key] = valuestr.strip()
 
+        outfile = open(outname,"w")
+        for line in lines:
+            outfile.write(line)
+        outfile.close()
         print("Write sim input to file:",outname)
 
     with open(outname) as fin:
@@ -976,7 +1053,10 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
             v = row['value']
             if not sec.lower() in nml.keys():
                 raise ValueError("No section named",sec)
-            print("Adding/modifying key {}={} in &{}".format(key,v,sec))
+            if key in nml[sec]:
+                print("Setting key {}={} in &{}".format(key,v,sec))
+            else:
+                print("Addding key {}={} in &{}".format(key,v,sec))               
             nml[sec][key] = v
 
     # a bit clumsy, but need to make sure these are the same for now:
@@ -1054,34 +1134,52 @@ def _write_simple_config_file(config,filename,delimiter,sep='='):
     return
 
 def _write_nml_to_file(nml,filename,headerlines=[],append=False):
-    outfile = open(filename,"w")
+    lines = []
 
     for key in nml.keys():
         if key.lower() == 'header':
+            headercount = 0
             for key2 in nml[key].keys():
                 value = nml[key][key2]
                 if isinstance(value,str):
                     value = "{}".format(value)
                 elif isinstance(value,list):
-                    value = ','.join([str(x) for x in value if not isinstance(x,str)])
+                    value = ','.join([str(x) for x in value if x is not None])
                 if key2.lower() == 'version':
-                    for version in value.replace(',','').split():
-                        outfile.write("{}: {}".format(key2.upper(),version))
-                        outfile.write("\n")
+                    # for version in value.replace(',','').split():
+                    for version in value.split(','):
+                        # outfile.write("{}: {}".format(key2.upper(),version))
+                        # outfile.write("\n")
+                        valstr = "{}: {}\n".format(key2.upper(),version)
+                        lines.insert(0,valstr)
+                        headercount += 1
                 else:
-                    outfile.write("{}: {}".format(key2.upper(),value))
-                    outfile.write("\n")
+                    # outfile.write("{}: {}".format(key2.upper(),value))
+                    # outfile.write("\n")
+                    valstr = "{}: {}\n".format(key2.upper(),value)
+                    lines.insert(0,valstr)
+                    headercount += 1
+            lines.insert(headercount,'\n\n')
 
         else:
-            outfile.write('&'+key.upper())
-            outfile.write('\n')
+            # outfile.write('&'+key.upper())
+            # outfile.write('\n')
+            lines.append('&'+key.upper()+'\n')
             for key2 in nml[key].keys():
                 value = nmlval_to_abspath(key2,nml[key][key2])
                 if isinstance(value,str):
                     value = "'{}'".format(value)
                 elif isinstance(value,list):
-                    value = ','.join([str(x) for x in value if not isinstance(x,str)])
-                outfile.write("  {} = {}".format(key2.upper(),value))
-                outfile.write("\n")
-            outfile.write('&END\n\n')
+                    value = ','.join([str(x) for x in value if x is not None])
+                # outfile.write("  {} = {}".format(key2.upper(),value))
+                # outfile.write("\n")
+                valstr = "  {} = {}\n".format(key2.upper(),value)
+                lines.append(valstr)
+            # outfile.write('&END\n\n')
+            lines.append('&END\n\n')
+
+    outfile = open(filename,"w")
+    for line in lines:
+        outfile.write(line)
+
     return

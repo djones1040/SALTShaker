@@ -1,0 +1,62 @@
+Current procedures:  ['byosed', 'sim']
+Adding/modifying key COLOR=False in [FLAGS]
+Adding/modifying key STRETCH=False in [FLAGS]
+input file saved as: pipelinetest/TEST_BYOSED.params
+pipelinetest/TEST_BYOSED.params is copied to byosed/byosed.params
+Load base sim input file.. simulation/SIMGEN_BYOSED_MASTER.INPUT
+Setting GENVERSION = MD_BYOSEDTEST_TEST
+Adding key NGEN_LC = 100 at the end of file
+Adding key GENSOURCE = RANDOM at the end of file
+Adding key GENRANGE_REDSHIFT = 0.01 0.1 at the end of file
+Write sim input to file: pipelinetest/TEST_SIMGEN_BYOSEDTEST.INPUT
+randseed = 91225
+Load base sim input file.. simulation/SIMGEN_BYOSED_MASTER.INPUT
+Setting GENVERSION = MD_BYOSEDTEST_TEST_002
+Setting GENPREFIX = BYOSEDTEST_002
+Setting RANSEED_REPEAT = 5 91225
+Write sim input to file: pipelinetest/TEST_SIMGEN_BYOSEDTEST.INPUT_002
+warning : clobbering old sim dir SIMLOGS_BYOSEDTEST_002 so SNANA doesn't hang
+looking for DONE_STAMP in /home/midai/salt3_local/SALT3/examples/batchtest/SIMLOGS_BYOSEDTEST_002/Sim.DONE
+[BATCH] Running sim_SNmix.pl /home/midai/salt3_local/SALT3/examples/batchtest/pipelinetest/TEST_SIMGEN_BYOSEDTEST.INPUT_002
+sim_SNmix.pl finished successfully.
+Current procedures:  ['byosed', 'sim']
+Adding/modifying key COLOR=False in [FLAGS]
+Adding/modifying key STRETCH=False in [FLAGS]
+input file saved as: pipelinetest/TEST_BYOSED.params
+pipelinetest/TEST_BYOSED.params is copied to byosed/byosed.params
+Load base sim input file.. simulation/SIMGEN_BYOSED_MASTER.INPUT
+Setting GENVERSION = MD_BYOSEDTEST_TEST
+Adding key NGEN_LC = 100 at the end of file
+Adding key GENSOURCE = RANDOM at the end of file
+Adding key GENRANGE_REDSHIFT = 0.01 0.1 at the end of file
+Write sim input to file: pipelinetest/TEST_SIMGEN_BYOSEDTEST.INPUT
+randseed = 12492
+Load base sim input file.. simulation/SIMGEN_BYOSED_MASTER.INPUT
+Setting GENVERSION = MD_BYOSEDTEST_TEST_000
+Setting GENPREFIX = BYOSEDTEST_000
+Setting RANSEED_REPEAT = 5 12492
+Write sim input to file: pipelinetest/TEST_SIMGEN_BYOSEDTEST.INPUT_000
+looking for DONE_STAMP in /home/midai/salt3_local/SALT3/examples/batchtest/SIMLOGS_BYOSEDTEST_000/Sim.DONE
+[BATCH] Running sim_SNmix.pl /home/midai/salt3_local/SALT3/examples/batchtest/pipelinetest/TEST_SIMGEN_BYOSEDTEST.INPUT_000
+sim_SNmix.pl finished successfully.
+Current procedures:  ['byosed', 'sim']
+Adding/modifying key COLOR=False in [FLAGS]
+Adding/modifying key STRETCH=False in [FLAGS]
+input file saved as: pipelinetest/TEST_BYOSED.params
+pipelinetest/TEST_BYOSED.params is copied to byosed/byosed.params
+Load base sim input file.. simulation/SIMGEN_BYOSED_MASTER.INPUT
+Setting GENVERSION = MD_BYOSEDTEST_TEST
+Adding key NGEN_LC = 100 at the end of file
+Adding key GENSOURCE = RANDOM at the end of file
+Adding key GENRANGE_REDSHIFT = 0.01 0.1 at the end of file
+Write sim input to file: pipelinetest/TEST_SIMGEN_BYOSEDTEST.INPUT
+randseed = 24305
+Load base sim input file.. simulation/SIMGEN_BYOSED_MASTER.INPUT
+Setting GENVERSION = MD_BYOSEDTEST_TEST_001
+Setting GENPREFIX = BYOSEDTEST_001
+Setting RANSEED_REPEAT = 5 24305
+Write sim input to file: pipelinetest/TEST_SIMGEN_BYOSEDTEST.INPUT_001
+warning : clobbering old sim dir SIMLOGS_BYOSEDTEST_001 so SNANA doesn't hang
+looking for DONE_STAMP in /home/midai/salt3_local/SALT3/examples/batchtest/SIMLOGS_BYOSEDTEST_001/Sim.DONE
+[BATCH] Running sim_SNmix.pl /home/midai/salt3_local/SALT3/examples/batchtest/pipelinetest/TEST_SIMGEN_BYOSEDTEST.INPUT_001
+sim_SNmix.pl finished successfully.
