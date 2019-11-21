@@ -17,10 +17,12 @@ batch=True
 #baseinput=simulation/SIMGEN_SALT3TEST.INPUT
 #outinput=pipelinetest/TEST_SIMGEN_SALT3TEST.INPUT
 prooptions=
-set_key= NGEN_LC 20
-    GENSOURCE RANDOM
-    GENRANGE_REDSHIFT 0.01 0.1
-    GENVERSION MD_BYOSEDTEST_TEST
+set_key=
+
+# NGEN_LC 20
+#    GENSOURCE RANDOM
+#    GENRANGE_REDSHIFT 0.01 0.1
+#    GENVERSION MD_BYOSEDTEST_TEST
     
 [training]
 pro=trainsalt
