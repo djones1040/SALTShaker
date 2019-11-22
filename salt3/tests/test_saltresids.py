@@ -46,12 +46,89 @@ class TRAINING_Test(unittest.TestCase):
 		# read the data
 		datadict = readutils.rdAllData(ts.options.snlist,ts.options.estimate_tpk,kcordict,
 									   ts.addwarning,dospec=ts.options.dospec)
-
+		ts.kcordict=kcordict
 		self.parlist,self.guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc = ts.initialParameters(datadict)
 		saltfitkwargs = ts.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
-
+				 
 		self.resids = saltresids.SALTResids(self.guess,datadict,self.parlist,**saltfitkwargs)	
 		
+		sn=self.resids.datadict.keys().__iter__().__next__()
+		self.guess[self.parlist == 'x0_%s'%sn]=1.31e-4
+		self.guess[self.parlist == 'x1_%s'%sn]=0.7707
+		self.guess[self.parlist == 'c_%s'%sn]=0.0514
+		self.guess[self.parlist == 'tpkoff_%s'%sn] = 0
+
+		
+	def defineStoredResults(self,guess,defineInterpolations=True):
+		sn=self.resids.datadict.keys().__iter__().__next__()
+		
+		components = self.resids.SALTModel(guess)
+		componentderivs = self.resids.SALTModelDeriv(guess,1,0,self.resids.phase,self.resids.wave)
+		salterr = self.resids.ErrModel(guess)
+		colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.resids.parlist == 'cl'])
+		
+		M0,M1=self.resids.SALTModel(guess)
+		M0deriv,M1deriv=self.resids.SALTModelDeriv(guess,1,0,self.resids.phase,self.resids.wave)
+		colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
+
+		z = self.resids.datadict[sn]['zHelio']
+		obsphase = self.resids.datadict[sn]['obsphase'] #self.phase*(1+z)
+		x0,x1,c,tpkoff = guess[self.parlist == 'x0_%s'%sn],guess[self.parlist == 'x1_%s'%sn],\
+						 guess[self.parlist == 'c_%s'%sn],guess[self.parlist == 'tpkoff_%s'%sn]
+
+		#Apply MW extinction
+		M0 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
+		M1 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
+
+		M0deriv *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
+		M1deriv *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
+	
+		colorlaw = -0.4 * colorLaw(self.resids.wave)
+		colorexp = 10. ** (colorlaw * c)
+		M0 *= colorexp; M1 *= colorexp
+		M0 *= _SCALE_FACTOR/(1+z); M1 *= _SCALE_FACTOR/(1+z)
+
+		int1dM0 = interp1d(obsphase,M0,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
+		int1dM1 = interp1d(obsphase,M1,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
+
+		# derivs
+		M0deriv *= colorexp; M1deriv *= colorexp
+		M0deriv *= _SCALE_FACTOR/(1+z); M1deriv *= _SCALE_FACTOR/(1+z)
+		
+		mod = x0*(M0 + x1*M1)
+		int1d = interp1d(obsphase,mod,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
+		
+		modderiv = x0*(M0deriv + x1*M1deriv)
+		int1dderiv = interp1d(obsphase,modderiv,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
+		
+		saltErr=self.resids.ErrModel(guess)
+		saltCorr=self.resids.CorrelationModel(guess)
+		
+		prefactor=(self.resids.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z))
+		interr1d = [interp1d(obsphase,err * prefactor ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr ]
+		intcorr1d= [interp1d(obsphase,corr ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for corr in saltCorr ]
+
+		modelUncertainty= x0**2 * prefactor**2 *(saltErr[0]**2  + 2*x1* saltCorr[0]*saltErr[0]*saltErr[1] + x1**2 *saltErr[1]**2)
+		uncertaintyInterp=interp1d(obsphase,modelUncertainty ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
+
+		storedResults={}
+		storedResults['components']=components
+		storedResults['componentderivs']=componentderivs
+		storedResults['saltErr']=saltErr
+		storedResults['saltCorr']=saltCorr
+		storedResults['colorLaw']=colorlaw
+		storedResults['colorLawInterp']= interp1d(self.resids.wave,storedResults['colorLaw'],kind=self.resids.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
+		if defineInterpolations:
+			storedResults['fluxInterp_{}'.format(sn)]=int1d
+			storedResults['componentsInterp_{}'.format(sn)]=int1dM0,int1dM1
+			storedResults['phaseDerivInterp_{}'.format(sn)]=int1dderiv
+			storedResults['colorexp_{}'.format(sn)]=colorexp
+			storedResults['uncertaintyComponentsInterp_{}'.format(sn)]=interr1d
+			storedResults['uncertaintyCorrelationsInterp_{}'.format(sn)]=intcorr1d
+			storedResults['modelUncertaintyInterp_{}'.format(sn)]=uncertaintyInterp
+	
+		return storedResults
+	
 	def test_prior_jacobian(self):
 		"""Checks that all designated priors are properly calculating the jacobian of their residuals to within 1%"""
 				#Define simple models for m0,m1
@@ -84,39 +161,29 @@ class TRAINING_Test(unittest.TestCase):
 		dx=1e-3
 		rtol=1e-2
 		sn=self.resids.datadict.keys().__iter__().__next__()
-		components = self.resids.SALTModel(self.resids.guess)
-		componentderivs = self.resids.SALTModelDeriv(self.resids.guess,1,0,self.resids.phase,self.resids.wave)
-
-		uncertainties=self.resids.getFixedUncertainties(self.guess)
-		if self.resids.n_colorpars:
-			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.resids.guess[self.resids.parlist == 'cl'])
-		else: colorLaw = None
-		if self.resids.n_colorscatpars:
-			colorScat = True
-		else: colorScat = None
-
-		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,componentderivs,colorLaw,None,None,False,False,fixedUncertainties=uncertainties)
-
 		
+		storedResults=self.defineStoredResults(self.guess,defineInterpolations=False)
+		#import pdb;pdb.set_trace()
+		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,storedResults,varyParams=np.zeros(self.resids.npar,dtype=bool),fixUncertainty=True)
 		residuals = photresidsdict['resid']
-		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,componentderivs,colorLaw,None,None,True,True,fixedUncertainties=uncertainties)
+		uncertainties={key:storedResults[key] for key in storedResults if key.startswith('photvariances_') or key.startswith('specvariances_') }
+		
+		storedResults=self.defineStoredResults(self.guess,defineInterpolations=False)
+		storedResults.update(uncertainties)
 
+		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,storedResults,varyParams=np.ones(self.resids.npar,dtype=bool),fixUncertainty=True)
 		jacobian=photresidsdict['resid_jacobian']
 		def incrementOneParam(i):
 			guess=self.guess.copy()
 			guess[i]+=dx
-			components=self.resids.SALTModel(guess)
-			componentderivs = self.resids.SALTModelDeriv(guess,1,0,self.resids.phase,self.resids.wave)
-			if self.resids.n_colorpars:
-				colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
-			else: colorLaw = None
-			
-			return self.resids.ResidsForSN(guess,sn,components,componentderivs,colorLaw,None,None,False,fixedUncertainties=uncertainties)[0]['resid']
+			storedResults=self.defineStoredResults(guess,defineInterpolations=False)
+			storedResults.update(uncertainties)
+			return self.resids.ResidsForSN(guess,sn,storedResults ,np.zeros(self.resids.npar,dtype=bool),fixUncertainty=True)[0]['resid']
 
 		dResiddX=np.zeros((residuals.size,self.parlist.size))
 		for i in range(self.guess.size):
 			dResiddX[:,i]=(incrementOneParam(i)-residuals)/dx
-
+		import pdb;pdb.set_trace()
 		if not np.allclose(jacobian,dResiddX,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(jacobian,dResiddX,rtol))[1]]))
 		self.assertTrue(np.allclose(jacobian,dResiddX,rtol))
 
@@ -172,89 +239,27 @@ class TRAINING_Test(unittest.TestCase):
 		dx=1e-3
 		rtol=1e-2
 		atol=1e-8
+		storedResults=self.defineStoredResults(self.guess)
 		sn=self.resids.datadict.keys().__iter__().__next__()
-		components = self.resids.SALTModel(self.resids.guess)
-		componentderivs = self.resids.SALTModelDeriv(self.resids.guess,1,0,self.resids.phase,self.resids.wave)
-		salterr = self.resids.ErrModel(self.resids.guess)
-		colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.guess[self.resids.parlist == 'cl'])
-
-		M0,M1=self.resids.SALTModel(self.guess)
-		M0deriv,M1deriv=self.resids.SALTModelDeriv(self.guess,1,0,self.resids.phase,self.resids.wave)
-		colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.guess[self.parlist == 'cl'])
-
-		z = self.resids.datadict[sn]['zHelio']
-		obsphase = self.resids.datadict[sn]['obsphase'] #self.phase*(1+z)
-		x0,x1,c,tpkoff = self.guess[self.parlist == 'x0_%s'%sn],self.guess[self.parlist == 'x1_%s'%sn],\
-						 self.guess[self.parlist == 'c_%s'%sn],self.guess[self.parlist == 'tpkoff_%s'%sn]
-
-
-		#Apply MW extinction
-		M0 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
-		M1 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
-		M0deriv *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
-		M1deriv *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
-	
-		colorlaw = -0.4 * colorLaw(self.resids.wave)
-		colorexp = 10. ** (colorlaw * c)
-		M0 *= colorexp; M1 *= colorexp
-		M0 *= _SCALE_FACTOR/(1+z); M1 *= _SCALE_FACTOR/(1+z)
-		int1dM0 = interp1d(obsphase,M0,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-		int1dM1 = interp1d(obsphase,M1,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-
-		# derivs
-		M0deriv *= colorexp; M1deriv *= colorexp
-		M0deriv *= _SCALE_FACTOR/(1+z); M1deriv *= _SCALE_FACTOR/(1+z)
-		int1dM0deriv = interp1d(obsphase,M0deriv,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-		int1dM1deriv = interp1d(obsphase,M1deriv,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-
 		
-		mod = x0*(M0 + x1*M1)
-		int1d = interp1d(obsphase,mod,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-		modderiv = x0*(M0deriv + x1*M1deriv)
-		int1dderiv = interp1d(obsphase,modderiv,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-
-		valsdict=self.resids.photValsForSN(self.guess,sn, (int1dM0,int1dM1),(int1dM0deriv,int1dM1deriv),colorlaw,colorexp,True,True)
+		valsdict=self.resids.photValsForSN(self.guess,sn, storedResults,np.ones(self.guess.size,dtype=bool))
 		jacobian=valsdict['modelflux_jacobian']
 
-		valsdict=self.resids.photValsForSN(self.guess,sn, int1d, int1dderiv, colorlaw,colorexp,False,False)
+		valsdict=self.resids.photValsForSN(self.guess,sn, storedResults,np.zeros(self.guess.size,dtype=bool))
 		vals = valsdict['modelflux']
 		
 		def incrementOneParam(i):
 			guess=self.guess.copy()
 			guess[i]+=dx
-			M0,M1=self.resids.SALTModel(guess)
-			M0deriv,M1deriv=self.resids.SALTModelDeriv(guess,1,0,self.resids.phase,self.resids.wave)
-			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
-			saltErr=self.resids.ErrModel(guess)
-			z = self.resids.datadict[sn]['zHelio']
-			obsphase = self.resids.datadict[sn]['obsphase'] #self.phase*(1+z)
-			x0,x1,c,tpkoff = guess[self.parlist == 'x0_%s'%sn],guess[self.parlist == 'x1_%s'%sn],\
-							 guess[self.parlist == 'c_%s'%sn],guess[self.parlist == 'tpkoff_%s'%sn]
-
-			#Apply MW extinction
-			M0 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
-			M1 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
-			M0deriv *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
-			M1deriv *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
-	
-			colorlaw = -0.4 * colorLaw(self.resids.wave)
-			colorexp = 10. ** (colorlaw * c)
-	
-			mod = x0*(M0 + x1*M1)*colorexp
-			mod *= _SCALE_FACTOR/(1+z)
-			int1d = interp1d(obsphase,mod,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-
-			modderiv = x0*(M0deriv + x1*M1deriv)*colorexp
-			modderiv *= _SCALE_FACTOR/(1+z)
-			int1dderiv = interp1d(obsphase,modderiv,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-
+			storedResults=self.defineStoredResults(guess)		
+			return self.resids.photValsForSN(guess,sn, storedResults,np.zeros(self.guess.size,dtype=bool))
 			
-			return self.resids.photValsForSN(guess,sn, int1d, int1dderiv, colorlaw,colorexp,False,False)
 		dValdX=np.zeros((vals.size,self.parlist.size))
 		for i in range(self.guess.size):
 			valsdict=incrementOneParam(i)
 			dValdX[:,i]=(valsdict['modelflux']-vals)/dx
-
+		
+		import pdb;pdb.set_trace()
 		if not np.allclose(dValdX,jacobian,rtol,atol): print('Problems with model value derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dValdX,jacobian,rtol,atol))[1]]))
 
 		self.assertTrue(np.allclose(dValdX,jacobian,rtol,atol))
@@ -265,69 +270,27 @@ class TRAINING_Test(unittest.TestCase):
 		dx=1e-8
 		rtol=1e-2
 		atol=1e-10
+		storedResults=self.defineStoredResults(self.guess)
 		sn=self.resids.datadict.keys().__iter__().__next__()
-		components = self.resids.SALTModel(self.resids.guess)
-		componentderivs = self.resids.SALTModelDeriv(self.resids.guess,1,0,self.resids.phase,self.resids.wave)
-		salterr = self.resids.ErrModel(self.resids.guess)
-		colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.guess[self.resids.parlist == 'cl'])
-
-		M0,M1=self.resids.SALTModel(self.guess)
-		colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.guess[self.parlist == 'cl'])
-		saltErr=self.resids.ErrModel(self.guess)
-		saltCorr=self.resids.CorrelationModel(self.guess)
-
-		z = self.resids.datadict[sn]['zHelio']
-		obsphase = self.resids.datadict[sn]['obsphase'] #self.phase*(1+z)
-		x0,x1,c,tpkoff = self.guess[self.parlist == 'x0_%s'%sn],self.guess[self.parlist == 'x1_%s'%sn],\
-						 self.guess[self.parlist == 'c_%s'%sn],self.guess[self.parlist == 'tpkoff_%s'%sn]
-
-		#Apply MW extinction
-		M0 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
-		M1 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
-	
-		colorlaw = -0.4 * colorLaw(self.resids.wave)
-		colorexp = 10. ** (colorlaw * c)
-		M0 *= colorexp; M1 *= colorexp
-		M0 *= _SCALE_FACTOR/(1+z); M1 *= _SCALE_FACTOR/(1+z)
-		int1dM0 = interp1d(obsphase,M0,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-		int1dM1 = interp1d(obsphase,M1,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-		intcorr1d= [interp1d(obsphase,corr ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for corr in saltCorr]
-
-		interr1d = [interp1d(obsphase,err * (self.resids.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z)) ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
-
-		mod = x0*(M0 + x1*M1)
-		int1d = interp1d(obsphase,mod,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-
-		uncertaintydict=self.resids.photVarianceForSN(self.guess,sn,interr1d,intcorr1d,colorlaw,colorexp,True)
+		
+		uncertaintydict=self.resids.photVarianceForSN(self.guess,sn,storedResults,np.ones(self.guess.size,dtype=bool))
 		uncJac=	uncertaintydict['modelvariance_jacobian']
 
-		uncertaintydict=self.resids.photVarianceForSN(self.guess,sn,interr1d,intcorr1d,colorlaw,colorexp,False)
+		uncertaintydict=self.resids.photVarianceForSN(self.guess,sn,storedResults,np.zeros(self.guess.size,dtype=bool))
 		uncertainty = uncertaintydict['modelvariance']
 		
-		def incrementOneParam(i):
+		def incrementOneParam(i,dx):
 			guess=self.guess.copy()
 			guess[i]+=dx
-
-			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
-			saltErr=self.resids.ErrModel(guess)
-			saltCorr=self.resids.CorrelationModel(guess)
-
-			z = self.resids.datadict[sn]['zHelio']
-			obsphase = self.resids.datadict[sn]['obsphase'] #self.phase*(1+z)
-			x0,x1,c,tpkoff = guess[self.parlist == 'x0_%s'%sn],guess[self.parlist == 'x1_%s'%sn],\
-							 guess[self.parlist == 'c_%s'%sn],guess[self.parlist == 'tpkoff_%s'%sn]
-	
-			colorlaw = -0.4 * colorLaw(self.resids.wave)
-			colorexp = 10. ** (colorlaw * c)
-			intcorr1d= [interp1d(obsphase,corr ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for corr in saltCorr]
-			interr1d = [interp1d(obsphase,err * (self.resids.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z)) ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
-
-			return self.resids.photVarianceForSN(guess,sn,interr1d,intcorr1d,colorlaw,colorexp,False)
+			newResults=self.defineStoredResults(guess)
+			return self.resids.photVarianceForSN(guess,sn,newResults,np.zeros(self.guess.size,dtype=bool))
+		
+		
 		dUncertaintydX=np.zeros((uncertainty.size,self.parlist.size))
 		for i in range(self.guess.size):
-			uncertaintydict=incrementOneParam(i)
+			uncertaintydict=incrementOneParam(i,dx)
 			dUncertaintydX[:,i]=(uncertaintydict['modelvariance']-uncertainty)/dx
-		
+
 		if not np.allclose(uncJac,dUncertaintydX,rtol,atol): print('Problems with model uncertainty derivatives: ',np.unique(self.parlist[np.where(~np.isclose(uncJac,dUncertaintydX,rtol,atol))[1]]))
 		self.assertTrue(np.allclose(uncJac,dUncertaintydX,rtol,atol))
 
@@ -337,67 +300,25 @@ class TRAINING_Test(unittest.TestCase):
 		dx=1e-8
 		rtol=1e-2
 		atol=1e-48
+		storedResults=self.defineStoredResults(self.guess)
 		sn=self.resids.datadict.keys().__iter__().__next__()
-		components = self.resids.SALTModel(self.resids.guess)
-		componentderivs = self.resids.SALTModelDeriv(self.resids.guess,1,0,self.resids.phase,self.resids.wave)
-		saltErr = self.resids.ErrModel(self.resids.guess)
-		colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.guess[self.resids.parlist == 'cl'])
-		saltCorr=self.resids.CorrelationModel(self.guess)
 		
-		M0,M1=components
-		z = self.resids.datadict[sn]['zHelio']
-		obsphase = self.resids.datadict[sn]['obsphase'] #self.phase*(1+z)
-		x0,x1,c,tpkoff = self.guess[self.parlist == 'x0_%s'%sn],self.guess[self.parlist == 'x1_%s'%sn],\
-						 self.guess[self.parlist == 'c_%s'%sn],self.guess[self.parlist == 'tpkoff_%s'%sn]
-		
-		#Apply MW extinction
-		M0 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
-		M1 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
-	
-		colorlaw = -0.4 * colorLaw(self.resids.wave)
-		colorexp = 10. ** (colorlaw * c)
-		M0 *= colorexp; M1 *= colorexp
-		M0 *= _SCALE_FACTOR/(1+z); M1 *= _SCALE_FACTOR/(1+z)
-		int1dM0 = interp1d(obsphase,M0,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-		int1dM1 = interp1d(obsphase,M1,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-		
-		intcorr1d= [interp1d(obsphase,corr ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for corr in saltCorr]
-		interr1d = [interp1d(obsphase,err * (self.resids.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z)) ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
-
-		mod = x0*(M0 + x1*M1)
-		int1d = interp1d(obsphase,mod,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-
-		uncertaintydict=self.resids.specVarianceForSN(self.guess,sn,interr1d,intcorr1d,colorlaw,colorexp,True)
+		uncertaintydict=self.resids.specVarianceForSN(self.guess,sn,storedResults,np.ones(self.guess.size,dtype=bool))
 		uncJac=	uncertaintydict['modelvariance_jacobian']
 
-		uncertaintydict=self.resids.specVarianceForSN(self.guess,sn,interr1d,intcorr1d,colorlaw,colorexp,False)
+		uncertaintydict=self.resids.specVarianceForSN(self.guess,sn,storedResults,np.zeros(self.guess.size,dtype=bool))
 		uncertainty = uncertaintydict['modelvariance']
 		
-		
-		
-		def incrementOneParam(i):
+		def incrementOneParam(i,dx):
 			guess=self.guess.copy()
 			guess[i]+=dx
-			M0,M1=self.resids.SALTModel(guess)
-			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
-			saltErr=self.resids.ErrModel(guess)
-			saltCorr=self.resids.CorrelationModel(guess)
-
-			z = self.resids.datadict[sn]['zHelio']
-			obsphase = self.resids.datadict[sn]['obsphase'] #self.phase*(1+z)
-			x0,x1,c,tpkoff = guess[self.parlist == 'x0_%s'%sn],guess[self.parlist == 'x1_%s'%sn],\
-							 guess[self.parlist == 'c_%s'%sn],guess[self.parlist == 'tpkoff_%s'%sn]
-	
-			colorlaw = -0.4 * colorLaw(self.resids.wave)
-			colorexp = 10. ** (colorlaw * c)
-			intcorr1d= [interp1d(obsphase,corr ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for corr in saltCorr]
-			interr1d = [interp1d(obsphase,err * (self.resids.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z)) ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr]
-			
-			return self.resids.specVarianceForSN(guess,sn,interr1d,intcorr1d,colorlaw,colorexp,False)
+			newResults=self.defineStoredResults(guess)
+			return self.resids.specVarianceForSN(guess,sn,newResults,np.zeros(self.guess.size,dtype=bool))
+		
 
 		dUncertaintydX=np.zeros((uncertainty.size,self.parlist.size))
 		for i in range(self.guess.size):
-			uncertaintydict=incrementOneParam(i)
+			uncertaintydict=incrementOneParam(i,dx)
 			dUncertaintydX[:,i]=(uncertaintydict['modelvariance']-uncertainty)/dx
 		if not np.allclose(uncJac,dUncertaintydX,rtol,atol): print('Problems with model variance derivatives: ',np.unique(self.parlist[np.where(~np.isclose(uncJac,dUncertaintydX,rtol,atol))[1]]))
 
@@ -411,75 +332,20 @@ class TRAINING_Test(unittest.TestCase):
 		rtol=1e-2
 		atol=1e-20
 		sn=self.resids.datadict.keys().__iter__().__next__()
-		components = self.resids.SALTModel(self.resids.guess)
-		componentderivs = self.resids.SALTModelDeriv(self.resids.guess,1,0,self.resids.phase,self.resids.wave)
-		salterr = self.resids.ErrModel(self.resids.guess)
-		colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.guess[self.resids.parlist == 'cl'])
 
-		M0,M1=self.resids.SALTModel(self.guess)
-		M0deriv,M1deriv=self.resids.SALTModelDeriv(self.guess,1,0,self.resids.phase,self.resids.wave)
-		colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.guess[self.parlist == 'cl'])
-
-		z = self.resids.datadict[sn]['zHelio']
-		obsphase = self.resids.datadict[sn]['obsphase'] #self.phase*(1+z)
-		x0,x1,c,tpkoff = self.guess[self.parlist == 'x0_%s'%sn],self.guess[self.parlist == 'x1_%s'%sn],\
-						 self.guess[self.parlist == 'c_%s'%sn],self.guess[self.parlist == 'tpkoff_%s'%sn]
-
-		#Apply MW extinction
-		M0 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
-		M1 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
-		M0deriv *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
-		M1deriv *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
+		storedResults=self.defineStoredResults(self.guess)
 		
-		colorlaw = -0.4 * colorLaw(self.resids.wave)
-		colorexp = 10. ** (colorlaw * c)
-		M0 *= colorexp; M1 *= colorexp
-		M0 *= _SCALE_FACTOR/(1+z); M1 *= _SCALE_FACTOR/(1+z)
-		int1dM0 = interp1d(obsphase,M0,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-		int1dM1 = interp1d(obsphase,M1,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-
-		# derivs
-		M0deriv *= colorexp; M1deriv *= colorexp
-		M0deriv *= _SCALE_FACTOR/(1+z); M1deriv *= _SCALE_FACTOR/(1+z)
-		int1dM0deriv = interp1d(obsphase,M0deriv,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-		int1dM1deriv = interp1d(obsphase,M1deriv,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-		
-		mod = x0*(M0 + x1*M1)
-		int1d = interp1d(obsphase,mod,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-		modderiv = x0*(M0deriv + x1*M1deriv)
-		int1dderiv = interp1d(obsphase,modderiv,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-
-		
-		valsdict=self.resids.specValsForSN(self.resids.guess,sn, (int1dM0,int1dM1),(int1dM0deriv,int1dM1deriv),colorlaw,colorexp,True,True)
+		valsdict=self.resids.specValsForSN(self.resids.guess,sn, storedResults,np.ones(self.guess.size,dtype=bool))
 		jacobian=valsdict['modelflux_jacobian']
 
-		valsdict=self.resids.specValsForSN(self.resids.guess,sn, int1d,colorlaw,colorexp,False,False)
+		valsdict=self.resids.specValsForSN(self.resids.guess,sn, storedResults,np.zeros(self.guess.size,dtype=bool))
 		vals = valsdict['modelflux']
 		
 		def incrementOneParam(i):
 			guess=self.guess.copy()
 			guess[i]+=dx
-			M0,M1=self.resids.SALTModel(guess)
-			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
-			saltErr=self.resids.ErrModel(guess)
-			z = self.resids.datadict[sn]['zHelio']
-			obsphase = self.resids.datadict[sn]['obsphase'] #self.phase*(1+z)
-			x0,x1,c,tpkoff = guess[self.parlist == 'x0_%s'%sn],guess[self.parlist == 'x1_%s'%sn],\
-							 guess[self.parlist == 'c_%s'%sn],guess[self.parlist == 'tpkoff_%s'%sn]
-
-			#Apply MW extinction
-			M0 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
-			M1 *= self.resids.datadict[sn]['mwextcurve'][np.newaxis,:]
-	
-			colorlaw = -0.4 * colorLaw(self.resids.wave)
-			colorexp = 10. ** (colorlaw * c)
-	
-
-			mod = x0*(M0 + x1*M1)*colorexp
-			mod *= _SCALE_FACTOR/(1+z)
-			int1d = interp1d(obsphase,mod,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
-
-			return self.resids.specValsForSN(guess,sn, int1d,colorlaw,colorexp,False,False)
+			storedResults=self.defineStoredResults(guess)
+			return self.resids.specValsForSN(guess,sn, storedResults,np.zeros(self.guess.size,dtype=bool))
 		dValdX=np.zeros((vals.size,self.parlist.size))
 		for i in range(self.guess.size):
 			valsdict=incrementOneParam(i)
