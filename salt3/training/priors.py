@@ -54,6 +54,40 @@ class SALTPriors:
 		#Need to write the derivative with respect to parameters
 		return value/width,value,np.zeros(self.npar)
 	
+	def satisfyDefintions(self,X,components):
+		"""Ensures that the definitions of M1,M0,x0,x1 are satisfied"""
+
+		int1d = interp1d(self.phase,components[0],axis=0,assume_sorted=True)
+		m0Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
+			self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
+			
+		int1d = interp1d(self.phase,components[1],axis=0,assume_sorted=True)
+		m1Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
+			self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
+		ratio=m1Bflux/m0Bflux
+		#Define M1 to have no effect on B band at t=0
+		X[self.ix0]*=1+ratio*X[self.ix1]
+		X[self.ix1]/=1+ratio*X[self.ix1]
+		X[self.im1]-=ratio*X[self.im0]
+		
+		#Define x1 to have mean 0
+		X[self.im0]+= np.mean(X[self.ix1])*X[self.im1]
+		X[self.ix1]-=np.mean(X[self.ix1])
+		
+		#Define x1 to have std deviation 1
+		x1std = np.std(X[self.ix1])
+		if x1std == x1std and x1std != 0.0:
+			X[self.im1]*= x1std
+			X[self.ix1]/= x1std
+			
+		#Recalculate m0 peak B band flux since it's modified by this function
+		m0Bflux=m0Bflux+np.mean(X[self.ix1])*m1Bflux
+		
+		#Define m0 to have a standard B-band magnitude at peak
+		bStdFlux=(10**((self.m0guess-27.5)/-2.5) )
+		X[self.im0]*=bStdFlux/m0Bflux 
+		X[self.ix0]*=m0Bflux /bStdFlux
+		return X
 	@prior
 	def m0prior(self,width,x,components):
 		"""Prior on the magnitude of the M0 component at t=0"""
