@@ -442,6 +442,10 @@ class GaussNewton(saltresids.SALTResids):
 		self._writetmp = False
 		self.chi2_diff_cutoff = 1
 		self.fitOptions={}
+		self.iModelParam=np.ones(self.npar,dtype=bool)
+		self.iModelParam[self.imodelerr]=False
+		self.iModelParam[self.imodelcorr]=False
+		self.iModelParam[self.iclscat]=False
 		fitlist = [('all parameters','all'),('all parameters grouped','all-grouped'),
 				   (" x0",'x0'),('x1','x1'),('principal component 0','component0'),
 				   ('principal component 1','component1'),('color','color'),('color law','colorlaw'),
@@ -516,7 +520,7 @@ class GaussNewton(saltresids.SALTResids):
 	def convergence_loop(self,guess,loop_niter=3):
 		lastResid = 1e20
 		print('Initializing')
-		uncertainties=self.getFixedUncertainties(guess)
+		
 
 		#if self.fit_model_err: fixUncertainty = False
 		#else: fixUncertainty = True
@@ -526,7 +530,10 @@ class GaussNewton(saltresids.SALTResids):
 
 		#print('hack!')
 		#residuals = self.lsqwrap(guess,uncertainties,False,False,doPriors=False)
-		residuals = self.lsqwrap(guess,uncertainties,False,False,doPriors=True)
+		storedResults={}
+		residuals = self.lsqwrap(guess,storedResults)
+		self.uncertaintyKeys={key for key in storedResults if key.startswith('photvariances_') or key.startswith('specvariances_') or key.startswith('photCholesky_') }
+		print(self.uncertaintyKeys)
 		chi2_init = (residuals**2.).sum()
 		X = copy.deepcopy(guess[:])
 		Xlast = copy.deepcopy(guess[:])
@@ -535,7 +542,7 @@ class GaussNewton(saltresids.SALTResids):
 		print(loop_niter)
 		for superloop in range(loop_niter):
 
-			X,chi2,converged = self.robust_process_fit(X,uncertainties,chi2_init,superloop)
+			X,chi2,converged = self.robust_process_fit(X,{key:storedResults[key] for key in self.uncertaintyKeys},chi2_init,superloop)
 			if chi2_init-chi2 < -1.e-6:
 				self.addwarning("MESSAGE WARNING chi2 has increased")
 			elif np.abs(chi2_init-chi2) < self.chi2_diff_cutoff:
@@ -609,8 +616,9 @@ class GaussNewton(saltresids.SALTResids):
 		#import pdb; pdb.set_trace()
 		return stepsizes
 	
-	def lsqwrap(self,guess,storedResults,varyParams,doPriors=True):
-
+	def lsqwrap(self,guess,storedResults,varyParams=None,doPriors=True):
+		if varyParams is None:
+			varyParams=np.zeros(self.npar,dtype=bool)
 		if self.n_colorpars:
 			if not 'colorLaw' in storedResults:
 				storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, guess[self.parlist == 'cl'])(self.wave)
@@ -621,7 +629,10 @@ class GaussNewton(saltresids.SALTResids):
 			storedResults['components'] =self.SALTModel(guess)
 		if not 'componentderivs' in storedResults:
 			storedResults['componentderivs'] = self.SALTModelDeriv(guess,1,0,self.phase,self.wave)
-			
+		
+		if not all([('specvariances_{}'.format(sn) in storedResults) and ('photvariances_{}'.format(sn) in storedResults) for sn in self.datadict]):
+			storedResults['saltErr']=self.ErrModel(guess)
+			storedResults['saltCorr']=self.CorrelationModel(guess)
 		if varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any() or varyParams[self.iclscat].any():
 			raise ValueError('lsqwrap not allowed to handle varying model uncertainties')
 		
@@ -639,12 +650,12 @@ class GaussNewton(saltresids.SALTResids):
 
 			priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,guess)
 			residuals+=[priorResids]
-			jacobian+=[priorJac]
+			jacobian+=[priorJac[:,varyParams]]
 
 			BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
 				self.priors.BoundedPriorResids(self.bounds,self.boundedParams,guess)
 			residuals+=[BoundedPriorResids]
-			jacobian+=[BoundedPriorJac]
+			jacobian+=[BoundedPriorJac[:,varyParams]]
 
 
 		if self.regularize:
@@ -662,7 +673,7 @@ class GaussNewton(saltresids.SALTResids):
 		else:
 			return  np.concatenate(residuals)
 
-	def robust_process_fit(self,X_init,storedResults,chi2_init,niter):
+	def robust_process_fit(self,X_init,uncertainties,chi2_init,niter):
 		X,chi2=X_init,chi2_init
 		
 		for fit in  self.fitOptions:
@@ -672,7 +683,8 @@ class GaussNewton(saltresids.SALTResids):
 
 			Xprop = X.copy()
 			for i in range(self.GN_iter[fit]):
-				Xprop,chi2prop,storedResults = self.process_fit(Xprop,storedResults,fit=fit,computePCDerivs= (fit=='component0') or ('all' in fit))
+				storedResults=uncertainties.copy()
+				Xprop,chi2prop = self.process_fit(Xprop,storedResults,fit=fit)
 
 			if chi2prop<chi2:
 				if (fit=='all'):
@@ -684,45 +696,47 @@ class GaussNewton(saltresids.SALTResids):
 				else:
 					X,chi2=Xprop,chi2prop
 		#In this case GN optimizer can do no better
-		return X,chi2,(X is X_init),storedResults
+		return X,chi2,(X is X_init)
 		 #_init
 	
-	def process_fit(self,X,storedResults,fit='all',snid=None,doPriors=True,computePCDerivs=False):
+	def process_fit(self,X,storedResults,fit='all',doPriors=True):
 		X=X.copy()
 
-		if fit == 'spectralrecalibration_norm':
-			residuals,jacobian,specdataflux,specmodelflux,specuncertainty=self.lsqwrap(X,storedResults,True,computePCDerivs,doPriors)
-
-			jacobian = self.AdjustSpecJac(X,specdataflux,specmodelflux,specuncertainty,jacobian)
-			
-			#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
-			includePars=self.fitOptions[fit][1] & ~(np.all(0==jacobian,axis=0))
+# 		if fit == 'spectralrecalibration_norm':
+# 			residuals,jacobian,specdataflux,specmodelflux,specuncertainty=self.lsqwrap(X,storedResults,True,computePCDerivs,doPriors)
+# 
+# 			jacobian = self.AdjustSpecJac(X,specdataflux,specmodelflux,specuncertainty,jacobian)
+# 			
+# 			#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
+# 			includePars=self.fitOptions[fit][1] & ~(np.all(0==jacobian,axis=0))
+# 		
+# 			print('Number of parameters fit this round: {}'.format(includePars.sum()))
+# 			jacobian=jacobian[:,includePars]
+# 			stepsize=linalg.lstsq(jacobian,residuals)[0]
+# 			if np.any(np.isnan(stepsize)):
+# 				print('NaN detected in stepsize; exitting to debugger')
+# 				import pdb;pdb.set_trace()
+# 
+# 			Xtmp = np.log(np.exp(X[includePars])- stepsize)
+# 			Xtmp[Xtmp != Xtmp] = X[includePars][Xtmp != Xtmp]
+# 			X[includePars] = Xtmp #np.log(np.exp(X[includePars])- stepsize)
+# 		else:
 		
-			print('Number of parameters fit this round: {}'.format(includePars.sum()))
-			jacobian=jacobian[:,includePars]
-			stepsize=linalg.lstsq(jacobian,residuals)[0]
-			if np.any(np.isnan(stepsize)):
-				print('NaN detected in stepsize; exitting to debugger')
-				import pdb;pdb.set_trace()
-
-			Xtmp = np.log(np.exp(X[includePars])- stepsize)
-			Xtmp[Xtmp != Xtmp] = X[includePars][Xtmp != Xtmp]
-			X[includePars] = Xtmp #np.log(np.exp(X[includePars])- stepsize)
-		else:
-			varyingParams=self.fitOptions[fit][1]
-			residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors)
-			#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
-			includePars=self.fitOptions[fit][1] & ~(np.all(0==jacobian,axis=0))
-			print('Number of parameters fit this round: {}'.format(includePars.sum()))
-			jacobian=jacobian[:,includePars]
-			stepsize=linalg.lstsq(jacobian,residuals,cond=1e-6)[0]
-			if np.any(np.isnan(stepsize)):
-				print('NaN detected in stepsize; exitting to debugger')
-				import pdb;pdb.set_trace()
-			X[includePars] -= stepsize
+		varyingParams=self.fitOptions[fit][1]&self.iModelParam
+		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors)
+		#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
+		includePars= ~(np.all(0==jacobian,axis=0))
+		print('Number of parameters fit this round: {}'.format(includePars.sum()))
+		jacobian=jacobian[:,includePars]
+		stepsize=linalg.lstsq(jacobian,residuals,cond=1e-6)[0]
+		if np.any(np.isnan(stepsize)):
+			print('NaN detected in stepsize; exitting to debugger')
+			import pdb;pdb.set_trace()
+		varyingParams[varyingParams]=varyingParams[varyingParams] & includePars
+		X[varyingParams] -= stepsize
 		
 		# quick eval
-		chi2 = np.sum(self.lsqwrap(X,uncertainties,False,False,doPriors=doPriors)**2.)
+		chi2 = np.sum(self.lsqwrap(X, {key:storedResults[key] for key in self.uncertaintyKeys},varyParams=None)**2.)
 		print("chi2: old, new, diff")
 		print((residuals**2).sum(),chi2,(residuals**2).sum()-chi2)
 		#import pdb; pdb.set_trace()
