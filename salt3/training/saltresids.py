@@ -377,39 +377,6 @@ class SALTResids:
 		else:
 			return logp
 	
-	#def getCholesky(self,photmodel)
-	def getFixedUncertainties(self,x):		
-		colorLaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
-		components=self.SALTModel(x)
-		componentderivs=self.SALTModelDeriv(x,1,0,self.phase,self.wave)
-		saltErr=self.ErrModel(x)
-		saltCorr=self.CorrelationModel(x)
-
-		fixedUncertainties={}
-		for sn in self.datadict:
-
-			photmodel,specmodel=self.modelvalsforSN(x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,False,False)
-			variance=photmodel['fluxvariance']+photmodel['modelvariance']
-			Ls,colorvar=[],[]
-			#Add color scatter
-			for selectFilter,clscat,dclscat in photmodel['colorvariance']:
-				flux=clscat*photmodel['modelflux'][selectFilter]
-				#Find cholesky matrix as sqrt of diagonal uncertainties, then perform rank one update to incorporate color scatter
-				L= np.diag(np.sqrt(variance[selectFilter]))
-				for k in range(flux.size):
-					r = np.sqrt(L[k,k]**2 + flux[k]**2)
-					c = r/L[k,k]
-					s = flux[k]/L[k,k]
-					L[k,k] = r
-					L[k+1:,k] = (L[k+1:,k] + s*flux[k+1:])/c
-					flux[k+1:]= c*flux[k+1:] - s*L[k+1:,k]
-				Ls+=[L]
-				colorvar+=[(selectFilter,clscat,dclscat)]
-			fixedUncertainties['phot_{}'.format(sn)]=Ls,colorvar
-			fixedUncertainties['spec_{}'.format(sn)]=specmodel['fluxvariance'] + specmodel['modelvariance']
-		return fixedUncertainties
-
-
 				
 	def ResidsForSN(self,x,sn,storedResults,varyParams=None,fixUncertainty=False,SpecErrScale=1.):
 		""" This method should be the only one required for any fitter to process the supernova data. 
@@ -457,7 +424,7 @@ class SALTResids:
 		
 		for L,(selectFilter,clscat,dclscat) in zip(Ls,colorvar):
 			#More stable to solve by backsubstitution than to invert and multiply
-
+			#import pdb;pdb.set_trace()
 			fluxdiff=photmodel['modelflux'][selectFilter]-photmodel['dataflux'][selectFilter]
 			photresids['resid'][selectFilter]=linalg.solve_triangular(L, fluxdiff,lower=True)
 
@@ -1532,7 +1499,7 @@ class SALTResids:
 		else:
 			raise ValueError('Regularization scale method invalid: ',self.regularizationScaleMethod)
 
-	def dyadicRegularization(self,x, components,computeJac=True):
+	def dyadicRegularization(self,x, storedResults,varyParams):
 		phase=self.phaseRegularizationPoints
 		wave=self.waveRegularizationPoints
 		
@@ -1540,7 +1507,7 @@ class SALTResids:
 		dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
 		dfluxdphase=self.SALTModelDeriv(x,1,0,phase,wave)
 		d2fluxdphasedwave=self.SALTModelDeriv(x,1,1,phase,wave)
-		scale,scaleDeriv=self.regularizationScale(components,fluxes)
+		scale,scaleDeriv=self.regularizationScale(storedResults['components'],fluxes)
 		resids=[]
 		jac=[]
 		for i in range(len(fluxes)):
@@ -1555,7 +1522,8 @@ class SALTResids:
 			dnumerator=( self.regularizationDerivs[1][:,:,varyParams[indices]]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2][:,:,varyParams[indices]]* dfluxdphase[i][:,:,np.newaxis] - self.regularizationDerivs[3][:,:,varyParams[indices]]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0][:,:,varyParams[indices]]* d2fluxdphasedwave[i][:,:,np.newaxis] )			
 			resids += [normalization* (numerator / (scale[i]**2 * self.neff)).flatten()]
 			jacobian=np.zeros((resids[-1].size,varyParams.sum()))
-			jacobian[boolIndex[varyParams]]=((dnumerator*(scale[i]**2 )- scaleDeriv[i][np.newaxis,np.newaxis,varyParams[indices]]*2*scale[i]*numerator[:,:,np.newaxis])/self.neff[:,:,np.newaxis]*normalization / scale[i]**4  ).reshape(-1, varyParams[indices].sum())
+			if boolIndex[varyParams].any():
+				jacobian[:,boolIndex[varyParams]]=((dnumerator*(scale[i]**2 )- scaleDeriv[i][np.newaxis,np.newaxis,varyParams[indices]]*2*scale[i]*numerator[:,:,np.newaxis])/self.neff[:,:,np.newaxis]*normalization / scale[i]**4  ).reshape(-1, varyParams[indices].sum())
 			jac += [jacobian]
 		return resids,jac
 	
@@ -1580,7 +1548,8 @@ class SALTResids:
 			#Minimize model derivative w.r.t wavelength in unconstrained regions
 			resids+= [normalization* ( normedGrad /	self.neff).flatten()]
 			jacobian=np.zeros((resids[-1].size,varyParams.sum()))
-			jacobian[boolIndex[varyParams]]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
+			if boolIndex[varyParams].any():
+				jacobian[:,boolIndex[varyParams]]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
 			jac+= [jacobian]
 				
 		return resids,jac
@@ -1607,7 +1576,8 @@ class SALTResids:
 			#Minimize model derivative w.r.t wavelength in unconstrained regions
 			waveGradResids+= [normalization* ( normedGrad /	self.neff).flatten()]
 			jacobian=np.zeros((waveGradResids[-1].size,varyParams.sum()))
-			jacobian[boolIndex[varyParams]]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
+			if boolIndex[varyParams].any():
+				jacobian[:,boolIndex[varyParams]]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
 			jac+= [jacobian]
 
 		return waveGradResids,jac

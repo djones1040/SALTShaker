@@ -166,14 +166,14 @@ class TRAINING_Test(unittest.TestCase):
 		#import pdb;pdb.set_trace()
 		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,storedResults,varyParams=np.zeros(self.resids.npar,dtype=bool),fixUncertainty=True)
 		residuals = photresidsdict['resid']
-		uncertainties={key:storedResults[key] for key in storedResults if key.startswith('photvariances_') or key.startswith('specvariances_') }
 		
+		uncertainties={key:storedResults[key] for key in storedResults if key.startswith('photvariances_') or key.startswith('specvariances_') or key.startswith('photCholesky_') }
 		storedResults=self.defineStoredResults(self.guess,defineInterpolations=False)
 		storedResults.update(uncertainties)
 
 		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,storedResults,varyParams=np.ones(self.resids.npar,dtype=bool),fixUncertainty=True)
 		jacobian=photresidsdict['resid_jacobian']
-		def incrementOneParam(i):
+		def incrementOneParam(i,dx):
 			guess=self.guess.copy()
 			guess[i]+=dx
 			storedResults=self.defineStoredResults(guess,defineInterpolations=False)
@@ -182,8 +182,8 @@ class TRAINING_Test(unittest.TestCase):
 
 		dResiddX=np.zeros((residuals.size,self.parlist.size))
 		for i in range(self.guess.size):
-			dResiddX[:,i]=(incrementOneParam(i)-residuals)/dx
-		import pdb;pdb.set_trace()
+			dResiddX[:,i]=(incrementOneParam(i,dx/2)-incrementOneParam(i,-dx/2))/dx
+
 		if not np.allclose(jacobian,dResiddX,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(jacobian,dResiddX,rtol))[1]]))
 		self.assertTrue(np.allclose(jacobian,dResiddX,rtol))
 
@@ -361,39 +361,34 @@ class TRAINING_Test(unittest.TestCase):
 		dx=1e-8
 		rtol=1e-2
 		atol=1e-4
+		dx=1e-3
+		rtol=1e-2
 		sn=self.resids.datadict.keys().__iter__().__next__()
-		components = self.resids.SALTModel(self.resids.guess)
-		componentderivs = self.resids.SALTModelDeriv(self.resids.guess,1,0,self.resids.phase,self.resids.wave)
-
-		uncertainties=self.resids.getFixedUncertainties(self.guess)
-		if self.resids.n_colorpars:
-			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, self.resids.guess[self.resids.parlist == 'cl'])
-		else: colorLaw = None
 		
-		specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,componentderivs,
-											   colorLaw,None,None,False,False,fixedUncertainties=uncertainties)[1]
-		
+		storedResults=self.defineStoredResults(self.guess,defineInterpolations=False)
+		#import pdb;pdb.set_trace()
+		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,storedResults,varyParams=np.zeros(self.resids.npar,dtype=bool),fixUncertainty=True)
 		residuals = specresidsdict['resid']
 		
-		specresidsdict=self.resids.ResidsForSN(self.guess,sn,components,componentderivs,
-											   colorLaw,None,None,True,True,fixedUncertainties=uncertainties)[1]
-		
+		uncertainties={key:storedResults[key] for key in storedResults if key.startswith('photvariances_') or key.startswith('specvariances_') or key.startswith('photCholesky_') }
+		storedResults=self.defineStoredResults(self.guess,defineInterpolations=False)
+		storedResults.update(uncertainties)
+
+		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,storedResults,varyParams=np.ones(self.resids.npar,dtype=bool),fixUncertainty=True)
 		jacobian=specresidsdict['resid_jacobian']
 		def incrementOneParam(i,dx):
 			guess=self.guess.copy()
 			guess[i]+=dx
-			components=self.resids.SALTModel(guess)
-			componentderivs = self.resids.SALTModelDeriv(guess,1,0,self.resids.phase,self.resids.wave)
-			colorLaw = SALT2ColorLaw(self.resids.colorwaverange, guess[self.parlist == 'cl'])
+			storedResults=self.defineStoredResults(guess,defineInterpolations=False)
+			storedResults.update(uncertainties)
+			return self.resids.ResidsForSN(guess,sn,storedResults ,np.zeros(self.resids.npar,dtype=bool),fixUncertainty=True)[1]['resid']
 
-			return self.resids.ResidsForSN(guess,sn,components,componentderivs,
-										   colorLaw,None,None,False,fixedUncertainties=uncertainties)[1]['resid']
 		dResiddX=np.zeros((residuals.size,self.parlist.size))
 		for i in range(self.guess.size):
-			dResiddX[:,i]=(incrementOneParam(i,dx)-residuals)/dx
-		if not np.allclose(jacobian,dResiddX,rtol,atol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(jacobian,dResiddX,rtol,atol))[1]]))
+			dResiddX[:,i]=(incrementOneParam(i,dx/2)-incrementOneParam(i,-dx/2))/dx
 
-		self.assertTrue(np.allclose(jacobian,dResiddX,rtol,atol))
+		if not np.allclose(jacobian,dResiddX,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(jacobian,dResiddX,rtol))[1]]))
+		self.assertTrue(np.allclose(jacobian,dResiddX,rtol))
 
 	def test_specresid_jacobian_vary_uncertainty(self):
 		"""Check that lognorm gradient and residuals' jacobian are correctly calculated with fixUncertainty=False"""
