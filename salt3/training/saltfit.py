@@ -534,7 +534,6 @@ class GaussNewton(saltresids.SALTResids):
 		residuals = self.lsqwrap(guess,storedResults)
 		self.uncertaintyKeys={key for key in storedResults if key.startswith('photvariances_') or key.startswith('specvariances_') or key.startswith('photCholesky_') }
 		uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
-		print(self.uncertaintyKeys)
 		chi2_init = (residuals**2.).sum()
 		X = copy.deepcopy(guess[:])
 		Xlast = copy.deepcopy(guess[:])
@@ -660,15 +659,19 @@ class GaussNewton(saltresids.SALTResids):
 
 
 		if self.regularize:
-			for regularization, weight,resultKey in [(self.phaseGradientRegularization, self.regulargradientphase,'regresult_phase'),
+			for regularization, weight,regKey in [(self.phaseGradientRegularization, self.regulargradientphase,'regresult_phase'),
 										   (self.waveGradientRegularization,self.regulargradientwave,'regresult_wave' ),
 										   (self.dyadicRegularization,self.regulardyad,'regresult_dyad')]:
 				if weight ==0:
 					continue
-				for regResids,regJac in zip( *regularization(guess,storedResults,varyParams)):
-					residuals += [regResids*np.sqrt(weight)]
-					jacobian+=[regJac*np.sqrt(weight)]
-
+				if regKey in storedResults and not (varyParams[self.im0].any() or varyParams[self.im1].any()):
+					residuals += storedResults[regKey]
+					jacobian +=  [np.zeros((r.size,varyParams.sum())) for r in storedResults[regKey]]
+				else:
+					for regResids,regJac in zip( *regularization(guess,storedResults,varyParams)):
+						residuals += [regResids*np.sqrt(weight)]
+						jacobian+=[regJac*np.sqrt(weight)]
+					storedResults[regKey]=residuals[-self.n_components:]
 		if varyParams.any():
 			return np.concatenate(residuals),np.concatenate(jacobian)
 		else:
@@ -678,24 +681,30 @@ class GaussNewton(saltresids.SALTResids):
 		X,chi2=X_init,chi2_init
 		
 		for fit in  self.fitOptions:
-			if 'all-grouped' in fit :continue
+			if 'all-grouped' in fit :continue #
 			if 'modelerr' in fit: continue
 			print('fitting '+self.fitOptions[fit][0])
-
+			storedResults=uncertainties.copy()
 			Xprop = X.copy()
 			for i in range(self.GN_iter[fit]):
-				storedResults=uncertainties.copy()
 				Xprop,chi2prop = self.process_fit(Xprop,storedResults,fit=fit)
-
-			if chi2prop<chi2:
-				if (fit=='all'):
-					if (chi2prop/chi2 < 0.9):
-						print('Terminating iteration ',niter,', continuing with all parameter fit')
-						return Xprop,chi2prop,False
-					else:
-						pass
-				else:
+				if chi2prop<chi2 and not fit=='all':
 					X,chi2=Xprop,chi2prop
+				retainReg=(not ('all' in fit or 'component' in fit))
+				retainPhotFlux=fit.startswith('spectralrecalibration') 
+				retainPCDerivs=fit.startswith('component')  or fit.startswith('x')
+				storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
+						(retainReg and key.startswith('regresult' )) or
+					   (retainPhotFlux and key.startswith('photfluxes')) or
+					   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
+#				print('Retaining results from fit: ',storedResults.keys())
+
+		if (fit=='all'):
+			if (chi2prop/chi2 < 0.9):
+				print('Terminating iteration ',niter,', continuing with all parameter fit')
+				return Xprop,chi2prop,False
+			else:
+				pass
 		#In this case GN optimizer can do no better
 		return X,chi2,(X is X_init)
 		 #_init
