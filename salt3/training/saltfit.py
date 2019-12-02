@@ -533,6 +533,7 @@ class GaussNewton(saltresids.SALTResids):
 		storedResults={}
 		residuals = self.lsqwrap(guess,storedResults)
 		self.uncertaintyKeys={key for key in storedResults if key.startswith('photvariances_') or key.startswith('specvariances_') or key.startswith('photCholesky_') }
+		uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
 		print(self.uncertaintyKeys)
 		chi2_init = (residuals**2.).sum()
 		X = copy.deepcopy(guess[:])
@@ -542,7 +543,7 @@ class GaussNewton(saltresids.SALTResids):
 		print(loop_niter)
 		for superloop in range(loop_niter):
 
-			X,chi2,converged = self.robust_process_fit(X,{key:storedResults[key] for key in self.uncertaintyKeys},chi2_init,superloop)
+			X,chi2,converged = self.robust_process_fit(X,uncertainties,chi2_init,superloop)
 			if chi2_init-chi2 < -1.e-6:
 				self.addwarning("MESSAGE WARNING chi2 has increased")
 			elif np.abs(chi2_init-chi2) < self.chi2_diff_cutoff:

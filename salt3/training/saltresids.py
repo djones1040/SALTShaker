@@ -292,7 +292,7 @@ class SALTResids:
 		self.kcordict['default']['Bpbspl'] = pbspl
 		self.kcordict['default']['Bdwave'] = self.wave[1] - self.wave[0]
 
-	def maxlikefit(self,x,pool=None,debug=False,timeit=False,computeDerivatives=False,computePCDerivs=False,SpecErrScale=1.0):
+	def maxlikefit(self,x,storedResults={},varyParams=None,pool=None,debug=False,SpecErrScale=1.0):
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic data given during initialization
 		
@@ -313,44 +313,46 @@ class SALTResids:
 		chi2: float
 			Goodness of fit of model to training data	
 		"""
-		
+		if varyParams is None:
+			varyParams=np.zeros(self.npar,dtype=bool)
+		computeDerivatives=np.any(varyParams)
 		#Set up SALT model
 		# HACK
-		components = self.SALTModel(x)
-		if computeDerivatives:
-			componentderivs = self.SALTModelDeriv(x,1,0,self.phase,self.wave)
-		else:
-			componentderivs = None
-			
-		salterr = self.ErrModel(x)
-		saltcorr= self.CorrelationModel(x)
 		if self.n_colorpars:
-			colorLaw = SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])
-		else: colorLaw = None
+			if not 'colorLaw' in storedResults:
+				storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])(self.wave)
+				storedResults['colorLawInterp']= interp1d(self.wave,storedResults['colorLaw'],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
+		else: storedResults['colorLaw'] = 1
+
+		if not all([('specfluxes_{}'.format(sn) in storedResults) and ('photfluxes_{}'.format(sn) in storedResults) for sn in self.datadict]):
+				
+			if not 'components' in storedResults:
+				storedResults['components'] =self.SALTModel(x)
+			if not 'componentderivs' in storedResults:
+				storedResults['componentderivs'] = self.SALTModelDeriv(x,1,0,self.phase,self.wave)
+		
+		if not all([('specvariances_{}'.format(sn) in storedResults) and ('photvariances_{}'.format(sn) in storedResults) for sn in self.datadict]):
+			storedResults['saltErr']=self.ErrModel(x)
+			storedResults['saltCorr']=self.CorrelationModel(x)
 
 
 		
 		# timing stuff
-		if timeit:
-			self.tdelt0,self.tdelt1,self.tdelt2,self.tdelt3,self.tdelt4,self.tdelt5 = 0,0,0,0,0,0
 		
 		chi2 = 0
 		#Construct arguments for maxlikeforSN method
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
-		args=[(None,sn,x,components,componentderivs,salterr,saltcorr,colorLaw,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale) for sn in self.datadict.keys()]
-		args2 = (x,components,componentderivs,salterr,saltcorr,colorLaw,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale)
+		args=[(sn,x,storedResults,varyParams,debug,SpecErrScale) for sn in self.datadict.keys()]
+		#args2 = (x,components,componentderivs,salterr,saltcorr,colorLaw,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale)
 		mapFun=pool.map if pool else starmap
+
+		#result = list(pyParz.foreach(self.datadict.keys(),self.loglikeforSN,args2))
+		result=list(mapFun(self.loglikeforSN,args))
 		if computeDerivatives:
-			#result = list(pyParz.foreach(self.datadict.keys(),self.loglikeforSN,args2))
-			result=list(mapFun(self.loglikeforSN,args))
 			loglike=sum([r[0] for r in result])
 			grad=sum([r[1] for r in result])
 		else:
-			#import pdb; pdb.set_trace()
-			#result = list(pyParz.foreach(list(self.datadict.keys())[:4],self.loglikeforSN_multiprocess,args2))
-			#import pdb; pdb.set_trace()
-			loglike=sum(mapFun(self.loglikeforSN,args))
-
+			loglike=sum(result)
 		logp = loglike
 		if len(self.usePriors):
 			priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,x)	
@@ -362,16 +364,14 @@ class SALTResids:
 			for regularization, weight in [(self.phaseGradientRegularization, self.regulargradientphase),(self.waveGradientRegularization,self.regulargradientwave ),(self.dyadicRegularization,self.regulardyad)]:
 				if weight ==0:
 					continue
-				regResids,regJac=regularization(x,components,computeDerivatives)
+				regResids,regJac=regularization(x,storedResults,varyParams)
 				logp-= sum([(res**2).sum()*weight/2 for res in regResids])
 				if computeDerivatives:
-					for idx,res,jac in zip([self.im0,self.im1],regResids,regJac):
-						grad[idx] -= (res[:,np.newaxis]*jac ).sum(axis=0)
+					for res,jac in zip(regResids,regJac):
+						grad -= (res[:,np.newaxis]*jac ).sum(axis=0)
 		self.nstep += 1
 		print(logp.sum()*-2)
 
-		if timeit:
-			print('%.3f %.3f %.3f %.3f %.3f'%(self.tdelt0,self.tdelt1,self.tdelt2,self.tdelt3,self.tdelt4))
 		if computeDerivatives:
 			return logp,grad
 		else:
@@ -419,8 +419,7 @@ class SALTResids:
 		
 		if not fixUncertainty: 
 			photresids['lognorm']=0
-			if computeDerivatives:
-				photresids['lognorm_grad']=np.zeros(self.npar)
+			photresids['lognorm_grad']=np.zeros(self.npar)
 		
 		for L,(selectFilter,clscat,dclscat) in zip(Ls,colorvar):
 			#More stable to solve by backsubstitution than to invert and multiply
@@ -960,12 +959,9 @@ class SALTResids:
 					
 		return photresultsdict
 		
-
+		
 	
-		
-		
-		
-	def loglikeforSN_multiprocess(self,args):
+	def loglikeforSN(self,sn,x,storedResults={},varyParams=None,debug=False,SpecErrScale=1.0):
 		
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic observations of a single SN 
@@ -996,89 +992,11 @@ class SALTResids:
 			Model chi2 relative to training data	
 		"""
 
-		#if timeit: tstart = time.time()
-
-		sn,x,components,componentderivs,salterr,saltcorr,colorLaw,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale = args[:]
-		x = np.array(x)
-		
-		#Set up SALT model
-		if components is None:
-			components = self.SALTModel(x)
-		if componentderivs is None and computeDerivatives:
-			componentderivs = self.SALTModelDeriv(x,1,0,self.phase,self.wave)			
-		if salterr is None:
-			salterr = self.ErrModel(x)
-
-
-		photResidsDict,specResidsDict = self.ResidsForSN(
-			x,sn,components,componentderivs,colorLaw,salterr,
-			saltcorr,computeDerivatives,computePCDerivs,
-			SpecErrScale=SpecErrScale)
+		photResidsDict,specResidsDict = self.ResidsForSN(x,sn,storedResults,varyParams,fixUncertainty=False,SpecErrScale=SpecErrScale)
 
 		
 		loglike= - (photResidsDict['resid']**2).sum() / 2.   -(specResidsDict['resid']**2).sum()/2.+photResidsDict['lognorm']+specResidsDict['lognorm']
-		if computeDerivatives: 
-			grad_loglike=  - (photResidsDict['resid'][:,np.newaxis] * photResidsDict['resid_jacobian']).sum(axis=0) - (specResidsDict['resid'][:,np.newaxis] * specResidsDict['resid_jacobian']).sum(axis=0) + photResidsDict['lognorm_grad'] +specResidsDict['lognorm_grad']
-			return loglike,grad_loglike
-		else:
-			return loglike
-
-	
-	def loglikeforSN(self,args,sn=None,x=None,components=None,componentderivs=None,salterr=None,saltcorr=None,
-					 colorLaw=None,
-					 debug=False,timeit=False,computeDerivatives=False,computePCDerivs=False,SpecErrScale=1.0):
-		
-		"""
-		Calculates the likelihood of given SALT model to photometric and spectroscopic observations of a single SN 
-
-		Parameters
-		----------
-		args : tuple or None
-			Placeholder that contains all the other variables for multiprocessing quirks
-
-		sn : str
-			Name of supernova to compare to model
-			
-		x : array
-			SALT model parameters
-			
-		components: array_like, optional
-			SALT model components, if not provided will be derived from SALT model parameters passed in \'x\'
-		
-		colorLaw: function, optional
-			SALT color law which takes wavelength as an argument
-
-		debug : boolean, optional
-			Debug flag
-		
-		Returns
-		-------
-		chi2: float
-			Model chi2 relative to training data	
-		"""
-
-		if timeit: tstart = time.time()
-
-		if args: empty,sn,x,components,salterr,colorLaw,debug = args[:]
-		x = np.array(x)
-		
-		#Set up SALT model
-		if components is None:
-			components = self.SALTModel(x)
-		if componentderivs is None and computeDerivatives:
-			componentderivs = self.SALTModelDeriv(x,1,0,self.phase,self.wave)			
-		if salterr is None:
-			salterr = self.ErrModel(x)
-
-
-		photResidsDict,specResidsDict = self.ResidsForSN(
-			x,sn,components,componentderivs,colorLaw,salterr,
-			saltcorr,computeDerivatives,computePCDerivs,
-			SpecErrScale=SpecErrScale)
-
-		
-		loglike= - (photResidsDict['resid']**2).sum() / 2.   -(specResidsDict['resid']**2).sum()/2.+photResidsDict['lognorm']+specResidsDict['lognorm']
-		if computeDerivatives: 
+		if (not varyParams is None) and np.any(varyParams):
 			grad_loglike=  - (photResidsDict['resid'][:,np.newaxis] * photResidsDict['resid_jacobian']).sum(axis=0) - (specResidsDict['resid'][:,np.newaxis] * specResidsDict['resid_jacobian']).sum(axis=0) + photResidsDict['lognorm_grad'] +specResidsDict['lognorm_grad']
 			return loglike,grad_loglike
 		else:
