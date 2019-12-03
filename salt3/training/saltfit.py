@@ -442,6 +442,10 @@ class GaussNewton(saltresids.SALTResids):
 		self._writetmp = False
 		self.chi2_diff_cutoff = 1
 		self.fitOptions={}
+		self.iModelParam=np.ones(self.npar,dtype=bool)
+		self.iModelParam[self.imodelerr]=False
+		self.iModelParam[self.imodelcorr]=False
+		self.iModelParam[self.iclscat]=False
 		fitlist = [('all parameters','all'),('all parameters grouped','all-grouped'),
 				   (" x0",'x0'),('x1','x1'),('principal component 0','component0'),
 				   ('principal component 1','component1'),('color','color'),('color law','colorlaw'),
@@ -516,7 +520,7 @@ class GaussNewton(saltresids.SALTResids):
 	def convergence_loop(self,guess,loop_niter=3):
 		lastResid = 1e20
 		print('Initializing')
-		uncertainties=self.getFixedUncertainties(guess)
+		
 
 		#if self.fit_model_err: fixUncertainty = False
 		#else: fixUncertainty = True
@@ -526,7 +530,10 @@ class GaussNewton(saltresids.SALTResids):
 
 		#print('hack!')
 		#residuals = self.lsqwrap(guess,uncertainties,False,False,doPriors=False)
-		residuals = self.lsqwrap(guess,uncertainties,False,False,doPriors=True)
+		storedResults={}
+		residuals = self.lsqwrap(guess,storedResults)
+		self.uncertaintyKeys={key for key in storedResults if key.startswith('photvariances_') or key.startswith('specvariances_') or key.startswith('photCholesky_') }
+		uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
 		chi2_init = (residuals**2.).sum()
 		X = copy.deepcopy(guess[:])
 		Xlast = copy.deepcopy(guess[:])
@@ -559,28 +566,6 @@ class GaussNewton(saltresids.SALTResids):
 			Xlast = copy.deepcopy(X)
 
 		#Retranslate x1, M1, x0, M0 to obey definitions
-		print(np.sum(self.lsqwrap(X,uncertainties,False,False,doPriors=True)**2.))
-		components=self.SALTModel(X)
-		int1d = interp1d(self.phase,components[0],axis=0,assume_sorted=True)
-		m0Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
-			self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
-		int1d = interp1d(self.phase,components[1],axis=0,assume_sorted=True)
-		m1Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
-			self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
-		ratio=m1Bflux/m0Bflux
-		
-		X[self.ix0]*=1+ratio*X[self.ix1]
-		X[self.ix1]/=1+ratio*X[self.ix1]
-		X[self.im1]-=ratio*X[self.im0]
-
-		X[self.im0]+= np.mean(X[self.ix1])*X[self.im1]
-		X[self.ix1]-=np.mean(X[self.ix1])
-
-		x1std = np.std(X[self.ix1])
-		if x1std == x1std and x1std != 0.0:
-			X[self.im1]*= x1std
-			X[self.ix1]/= x1std
-		print(np.sum(self.lsqwrap(X,uncertainties,False,False,doPriors=True)**2.))
 
 		xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams = \
@@ -641,184 +626,136 @@ class GaussNewton(saltresids.SALTResids):
 		#import pdb; pdb.set_trace()
 		return stepsizes
 	
-	def lsqwrap(self,guess,uncertainties,computeDerivatives,computePCDerivs=True,doPriors=True,returnSpecFluxes=False):
-
-		tstart = time.time()
-
-		if returnSpecFluxes:
-			specdataflux,specmodelflux,specuncertainty = np.array([]),np.array([]),np.array([])
-
+	def lsqwrap(self,guess,storedResults,varyParams=None,doPriors=True):
+		if varyParams is None:
+			varyParams=np.zeros(self.npar,dtype=bool)
 		if self.n_colorpars:
-			colorLaw = SALT2ColorLaw(self.colorwaverange, guess[self.parlist == 'cl'])
-		else: colorLaw = None
-
-		components = self.SALTModel(guess)
-		componentderivs = self.SALTModelDeriv(guess,1,0,self.phase,self.wave)
+			if not 'colorLaw' in storedResults:
+				storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, guess[self.parlist == 'cl'])(self.wave)
+				storedResults['colorLawInterp']= interp1d(self.wave,storedResults['colorLaw'],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
+		else: storedResults['colorLaw'] = 1
+				
+		if not 'components' in storedResults:
+			storedResults['components'] =self.SALTModel(guess)
+		if not 'componentderivs' in storedResults:
+			storedResults['componentderivs'] = self.SALTModelDeriv(guess,1,0,self.phase,self.wave)
 		
-		saltCorr=self.CorrelationModel(guess)
+		if not all([('specvariances_{}'.format(sn) in storedResults) and ('photvariances_{}'.format(sn) in storedResults) for sn in self.datadict]):
+			storedResults['saltErr']=self.ErrModel(guess)
+			storedResults['saltCorr']=self.CorrelationModel(guess)
+		if varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any() or varyParams[self.iclscat].any():
+			raise ValueError('lsqwrap not allowed to handle varying model uncertainties')
+		
+		residuals = []
+		jacobian = [] # Jacobian matrix from r
 
-		numResids=self.num_phot+self.num_spec + (self.numPriorResids+self.priors.numBoundResids if doPriors else 0)
-		if self.regularize:
-			numRegResids=sum([ self.n_components*(self.waveRegularizationPoints.size*self.phaseRegularizationPoints.size) for weight in [self.regulargradientphase,self.regulargradientwave ,self.regulardyad] if not weight == 0])
-			numResids+=numRegResids
-			
-		residuals = np.zeros( numResids)
-		jacobian =	np.zeros((numResids,self.npar)) # Jacobian matrix from r
-
-		idx = 0
 		for sn in self.datadict.keys():
-
-			#photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,components,componentderivs,colorLaw,None,None,computeDerivatives,computePCDerivs,fixedUncertainties=uncertainties)
-
-			if returnSpecFluxes:
-				photresidsdict,specresidsdict,specmodeldict=self.ResidsForSN(
-					guess,sn,components,componentderivs,colorLaw,None,None, #salterr,saltCorr,
-					computeDerivatives,computePCDerivs,fixedUncertainties=uncertainties,returnSpecModel=True)
-			else:
-				photresidsdict,specresidsdict=self.ResidsForSN(
-					guess,sn,components,componentderivs,colorLaw,None,None, #salterr,saltCorr,
-					computeDerivatives,computePCDerivs,fixedUncertainties=uncertainties)
-
+			photresidsdict,specresidsdict=self.ResidsForSN(
+				guess,sn,storedResults,varyParams,fixUncertainty=True)
+			residuals+=[photresidsdict['resid'],specresidsdict['resid']]
+			jacobian+=[photresidsdict['resid_jacobian'],specresidsdict['resid_jacobian']]
 			
-			idxp = photresidsdict['resid'].size
-
-			residuals[idx:idx+idxp] = photresidsdict['resid']
-			if computeDerivatives:
-				jacobian[idx:idx+idxp,:] = photresidsdict['resid_jacobian']
-			idx += idxp
-
-			idxp = specresidsdict['resid'].size
-
-			residuals[idx:idx+idxp] = specresidsdict['resid']
-			if computeDerivatives:
-				jacobian[idx:idx+idxp,:]=specresidsdict['resid_jacobian']
-			idx += idxp
-
-			if returnSpecFluxes:
-				specdataflux = np.append(specdataflux,specmodeldict['dataflux'])
-				specmodelflux = np.append(specmodelflux,specmodeldict['modelflux'])
-				specuncertainty = np.append(specuncertainty,specresidsdict['uncertainty'])
-				# priors
 
 		if doPriors:
-			
+
 			priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,guess)
-			residuals[idx:idx+priorResids.size]=priorResids
-			jacobian[idx:idx+priorResids.size,:]=priorJac
-			idx+=priorResids.size
+			residuals+=[priorResids]
+			jacobian+=[priorJac[:,varyParams]]
 
 			BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
 				self.priors.BoundedPriorResids(self.bounds,self.boundedParams,guess)
-			residuals[idx:idx+BoundedPriorResids.size]=BoundedPriorResids
-			jacobian[idx:idx+BoundedPriorResids.size,:]=BoundedPriorJac
-			idx+=BoundedPriorResids.size
+			residuals+=[BoundedPriorResids]
+			jacobian+=[BoundedPriorJac[:,varyParams]]
 
 
 		if self.regularize:
-			for regularization, weight in [(self.phaseGradientRegularization, self.regulargradientphase),
-										   (self.waveGradientRegularization,self.regulargradientwave ),
-										   (self.dyadicRegularization,self.regulardyad)]:
+			for regularization, weight,regKey in [(self.phaseGradientRegularization, self.regulargradientphase,'regresult_phase'),
+										   (self.waveGradientRegularization,self.regulargradientwave,'regresult_wave' ),
+										   (self.dyadicRegularization,self.regulardyad,'regresult_dyad')]:
 				if weight ==0:
 					continue
-				for regResids,regJac,indices in zip( *regularization(guess,components,computeDerivatives), [self.im0,self.im1]):
-					residuals[idx:idx+regResids.size]=regResids*np.sqrt(weight)
-					if computeDerivatives:
-						jacobian[idx:idx+regResids.size,indices]=regJac*np.sqrt(weight)
-					idx+=regResids.size
-
-		if computeDerivatives:
-			print('loop took %i seconds'%(time.time()-tstart))
-			if returnSpecFluxes:
-				return residuals,jacobian,specdataflux,specmodelflux,specuncertainty
-			else:
-				return residuals,jacobian
+				if regKey in storedResults and not (varyParams[self.im0].any() or varyParams[self.im1].any()):
+					residuals += storedResults[regKey]
+					jacobian +=  [np.zeros((r.size,varyParams.sum())) for r in storedResults[regKey]]
+				else:
+					for regResids,regJac in zip( *regularization(guess,storedResults,varyParams)):
+						residuals += [regResids*np.sqrt(weight)]
+						jacobian+=[regJac*np.sqrt(weight)]
+					storedResults[regKey]=residuals[-self.n_components:]
+		if varyParams.any():
+			return np.concatenate(residuals),np.concatenate(jacobian)
 		else:
-			if returnSpecFluxes:
-				return residuals,specdataflux,specmodelflux,specuncertainty
-			else:
-				return residuals
+			return  np.concatenate(residuals)
 
 	def robust_process_fit(self,X_init,uncertainties,chi2_init,niter):
 		X,chi2=X_init,chi2_init
 		
 		for fit in  self.fitOptions:
-			if 'all-grouped' in fit :continue
+			if 'all-grouped' in fit :continue #
 			if 'modelerr' in fit: continue
 			print('fitting '+self.fitOptions[fit][0])
-
+			storedResults=uncertainties.copy()
 			Xprop = X.copy()
 			for i in range(self.GN_iter[fit]):
-				Xprop,chi2prop = self.process_fit(Xprop,uncertainties,fit=fit,computePCDerivs= (fit=='component0') or ('all' in fit))
-
-			if chi2prop<chi2:
+				Xprop,chi2prop = self.process_fit(Xprop,storedResults,fit=fit)
 				if (fit=='all'):
 					if (chi2prop/chi2 < 0.9):
 						print('Terminating iteration ',niter,', continuing with all parameter fit')
 						return Xprop,chi2prop,False
-					else:
-						pass
-				else:
+				elif chi2prop<chi2 :
 					X,chi2=Xprop,chi2prop
+				retainReg=(not ('all' in fit or 'component' in fit))
+				retainPhotFlux=fit.startswith('spectralrecalibration') 
+				retainPCDerivs=fit.startswith('component')  or fit.startswith('x')
+				storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
+						(retainReg and key.startswith('regresult' )) or
+					   (retainPhotFlux and key.startswith('photfluxes')) or
+					   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
+#				print('Retaining results from fit: ',storedResults.keys())
+
+			
 		#In this case GN optimizer can do no better
-		if X is X_init:
-			return X,chi2,True
-		else:
-			return X,chi2,False
+		return X,chi2,(X is X_init)
 		 #_init
 	
-	def process_fit(self,X,uncertainties,fit='all',snid=None,doPriors=True,computePCDerivs=False):
+	def process_fit(self,X,storedResults,fit='all',doPriors=True):
 		X=X.copy()
 
-		if fit == 'spectralrecalibration_norm':
-			residuals,jacobian,specdataflux,specmodelflux,specuncertainty=self.lsqwrap(
-				X,uncertainties,True,computePCDerivs,doPriors,returnSpecFluxes=True)
-
-			jacobian = self.AdjustSpecJac(X,specdataflux,specmodelflux,specuncertainty,jacobian)
-			
-			#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
-			includePars=self.fitOptions[fit][1] & ~(np.all(0==jacobian,axis=0))
+# 		if fit == 'spectralrecalibration_norm':
+# 			residuals,jacobian,specdataflux,specmodelflux,specuncertainty=self.lsqwrap(X,storedResults,True,computePCDerivs,doPriors)
+# 
+# 			jacobian = self.AdjustSpecJac(X,specdataflux,specmodelflux,specuncertainty,jacobian)
+# 			
+# 			#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
+# 			includePars=self.fitOptions[fit][1] & ~(np.all(0==jacobian,axis=0))
+# 		
+# 			print('Number of parameters fit this round: {}'.format(includePars.sum()))
+# 			jacobian=jacobian[:,includePars]
+# 			stepsize=linalg.lstsq(jacobian,residuals)[0]
+# 			if np.any(np.isnan(stepsize)):
+# 				print('NaN detected in stepsize; exitting to debugger')
+# 				import pdb;pdb.set_trace()
+# 
+# 			Xtmp = np.log(np.exp(X[includePars])- stepsize)
+# 			Xtmp[Xtmp != Xtmp] = X[includePars][Xtmp != Xtmp]
+# 			X[includePars] = Xtmp #np.log(np.exp(X[includePars])- stepsize)
+# 		else:
 		
-			print('Number of parameters fit this round: {}'.format(includePars.sum()))
-			jacobian=jacobian[:,includePars]
-			stepsize=linalg.lstsq(jacobian,residuals)[0]
-			if np.any(np.isnan(stepsize)):
-				print('NaN detected in stepsize; exitting to debugger')
-				import pdb;pdb.set_trace()
-
-			Xtmp = np.log(np.exp(X[includePars])- stepsize)
-			Xtmp[Xtmp != Xtmp] = X[includePars][Xtmp != Xtmp]
-			X[includePars] = Xtmp #np.log(np.exp(X[includePars])- stepsize)
-
-		elif fit=='all-grouped':
-			residuals,jacobian=self.lsqwrap(X,uncertainties,True,computePCDerivs,doPriors)
-			
-			designMatrix=np.zeros((self.parlist.size,len([fit for fit in self.fitOptions if 'all' not in fit])))
-			
-			for i,fit in enumerate([fit for fit in self.fitOptions if 'all' not in fit]):
-				includePars=self.fitOptions[fit][1] & ~(np.all(0==jacobian,axis=0))
-				designMatrix[includePars,i]=linalg.lstsq(jacobian[:,includePars],residuals)[0]
-
-			designJacobian=np.dot(jacobian,designMatrix)
-			stepsize=linalg.lstsq(designJacobian,residuals)[0]
-			X-=np.dot(designMatrix,stepsize)
-			self.__components_time_stamp__ = time.time()
-		else:
-			#print('hack!')
-			#doPriors = False
-			residuals,jacobian=self.lsqwrap(X,uncertainties,True,computePCDerivs,doPriors)
-			#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
-			includePars=self.fitOptions[fit][1] & ~(np.all(0==jacobian,axis=0))
-			print('Number of parameters fit this round: {}'.format(includePars.sum()))
-			jacobian=jacobian[:,includePars]
-			stepsize=linalg.lstsq(jacobian,residuals,cond=1e-6)[0]
-			if np.any(np.isnan(stepsize)):
-				print('NaN detected in stepsize; exitting to debugger')
-				import pdb;pdb.set_trace()
-			X[includePars] -= stepsize
-			if 'm0' in self.parlist[includePars] or 'm1' in self.parlist[includePars]: self.__components_time_stamp__ = time.time()
-			
+		varyingParams=self.fitOptions[fit][1]&self.iModelParam
+		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors)
+		#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
+		includePars= ~(np.all(0==jacobian,axis=0))
+		print('Number of parameters fit this round: {}'.format(includePars.sum()))
+		jacobian=jacobian[:,includePars]
+		stepsize=linalg.lstsq(jacobian,residuals,cond=1e-6)[0]
+		if np.any(np.isnan(stepsize)):
+			print('NaN detected in stepsize; exitting to debugger')
+			import pdb;pdb.set_trace()
+		varyingParams[varyingParams]=varyingParams[varyingParams] & includePars
+		X[varyingParams] -= stepsize
+		
 		# quick eval
-		chi2 = np.sum(self.lsqwrap(X,uncertainties,False,False,doPriors=doPriors)**2.)
+		chi2 = np.sum(self.lsqwrap(X, {key:storedResults[key] for key in self.uncertaintyKeys},varyParams=None)**2.)
 		print("chi2: old, new, diff")
 		print((residuals**2).sum(),chi2,(residuals**2).sum()-chi2)
 		#import pdb; pdb.set_trace()
