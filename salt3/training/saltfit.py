@@ -688,7 +688,11 @@ class GaussNewton(saltresids.SALTResids):
 			Xprop = X.copy()
 			for i in range(self.GN_iter[fit]):
 				Xprop,chi2prop = self.process_fit(Xprop,storedResults,fit=fit)
-				if chi2prop<chi2 and not fit=='all':
+				if (fit=='all'):
+					if (chi2prop/chi2 < 0.9):
+						print('Terminating iteration ',niter,', continuing with all parameter fit')
+						return Xprop,chi2prop,False
+				elif chi2prop<chi2 :
 					X,chi2=Xprop,chi2prop
 				retainReg=(not ('all' in fit or 'component' in fit))
 				retainPhotFlux=fit.startswith('spectralrecalibration') 
@@ -699,12 +703,7 @@ class GaussNewton(saltresids.SALTResids):
 					   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
 #				print('Retaining results from fit: ',storedResults.keys())
 
-		if (fit=='all'):
-			if (chi2prop/chi2 < 0.9):
-				print('Terminating iteration ',niter,', continuing with all parameter fit')
-				return Xprop,chi2prop,False
-			else:
-				pass
+			
 		#In this case GN optimizer can do no better
 		return X,chi2,(X is X_init)
 		 #_init
