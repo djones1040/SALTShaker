@@ -448,7 +448,7 @@ class GaussNewton(saltresids.SALTResids):
 				   ('spectral recalibration const.','spectralrecalibration_norm'),
 				   ('spectral recalibration higher orders','spectralrecalibration_poly'),
 				   ('time of max','tpk'),('error model','modelerr')]
-		fitlist_debug = [('spectral recalibration const.','spectralrecalibration_norm')] #('principal component 0','component0')] #(" x0",'x0')] #('all parameters','all')]#
+		#fitlist_debug = [('all parameters','all'),(" x0",'x0'),('error model','modelerr')] #[('spectral recalibration const.','spectralrecalibration_norm')] #('principal component 0','component0')] #(" x0",'x0')] #('all parameters','all')]#
 		#print('hack!!')
 		for message,fit in fitlist:
 			if 'all' in fit:
@@ -594,12 +594,18 @@ class GaussNewton(saltresids.SALTResids):
 	def minuitOptimize(self,X,fit='all'):
 		includePars=self.fitOptions[fit][1] 
 		def fn(Y):
+			if len(Y[Y != Y]):
+				import pdb; pdb.set_trace()
 			Xnew=X.copy()
 			Xnew[includePars]=Y
 			return - self.maxlikefit(Xnew)
 		def grad(Y):
+			if len(Y[Y != Y]):
+				import pdb; pdb.set_trace()
 			Xnew=X.copy()
 			Xnew[includePars]=Y
+			#print(self.maxlikefit(Xnew,computeDerivatives=True)[1])
+			#import pdb; pdb.set_trace()
 			return - self.maxlikefit(Xnew,computeDerivatives=True)[1]
 		print('Initialized log likelihood: ' ,self.maxlikefit(X))
 		params=['x'+str(i) for i in range(includePars.sum())]
@@ -608,12 +614,16 @@ class GaussNewton(saltresids.SALTResids):
 		#kwargs={'limit_'+params[i] : self.bounds[np.where(includePars)[0][i]] for i in range(includePars.sum()) if }
 		kwargs=({params[i]: initVals[i] for i in range(includePars.sum())})
 		kwargs.update({'error_'+params[i]: np.abs(X[includePars][i])/10 for i in range(includePars.sum())})
+		kwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'clscat')[0]})
+		kwargs.update({'limit_'+params[i]: (0,100) for i in np.where(self.parlist[includePars] == 'modelerr_0')[0]})
+		kwargs.update({'limit_'+params[i]: (0,100) for i in np.where(self.parlist[includePars] == 'modelerr_1')[0]})
 		m=Minuit(fn,use_array_call=True,forced_parameters=params,grad=grad,errordef=1,**kwargs)
 		result,paramResults=m.migrad(1200)
 		X=X.copy()
 		
 		X[includePars]=np.array([x.value for x  in paramResults])
-# 		if np.allclose(X[includePars],initVals):
+
+		# 		if np.allclose(X[includePars],initVals):
 # 			import pdb;pdb.set_trace()
 		print('Final log likelihood: ', -result.fval)
 		

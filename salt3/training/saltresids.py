@@ -382,6 +382,11 @@ class SALTResids:
 		for sn in self.datadict:
 
 			photmodel,specmodel=self.modelvalsforSN(x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,False,False)
+			if (photmodel['modelvariance']<0).any():
+				warnings.warn('Negative variance in photometry',RuntimeWarning)
+				negVals=photmodel['modelvariance']<0
+				photmodel['modelvariance'][negVals]=0
+
 			variance=photmodel['fluxvariance']+photmodel['modelvariance']
 			Ls,colorvar=[],[]
 			#Add color scatter
@@ -400,8 +405,8 @@ class SALTResids:
 				colorvar+=[(selectFilter,clscat,dclscat)]
 			fixedUncertainties['phot_{}'.format(sn)]=Ls,colorvar
 			fixedUncertainties['spec_{}'.format(sn)]=specmodel['fluxvariance'] + specmodel['modelvariance']
-		return fixedUncertainties
 
+		return fixedUncertainties
 
 				
 	def ResidsForSN(self,x,sn,components,componentderivs,colorLaw,saltErr,saltCorr,
@@ -416,10 +421,8 @@ class SALTResids:
 
 		if fixUncertainty:
 			Ls,colorvar=fixedUncertainties['phot_{}'.format(sn)]
-			
 		else:
 			#Calculate cholesky matrix for each set of photometric measurements in each filter
-			
 			if (photmodel['modelvariance']<0).any():
 				warnings.warn('Negative variance in photometry',RuntimeWarning)
 				negVals=photmodel['modelvariance']<0
@@ -458,7 +461,7 @@ class SALTResids:
 				import pdb;pdb.set_trace()
 			if not fixUncertainty:
 				photresids['lognorm']-= (np.log(np.diag(L)).sum())
-		
+				
 			if computeDerivatives:
 				photresids['resid_jacobian'][selectFilter]=linalg.solve_triangular(L,photmodel['modelflux_jacobian'][selectFilter],lower=True)
 				if not fixUncertainty:
@@ -503,7 +506,8 @@ class SALTResids:
 				warnings.warn('Negative variance in spectra',RuntimeWarning)
 				negVals=specmodel['modelvariance']<0
 				specmodel['modelvariance'][negVals]=0
-
+				variance=specmodel['fluxvariance'] + specmodel['modelvariance']
+				
 		uncertainty=np.sqrt(variance)*SpecErrScale
 		# HACK
 		#uncertainty *= 0.01
@@ -514,7 +518,10 @@ class SALTResids:
 		specresids['uncertainty'] = uncertainty
 		if not fixUncertainty:
 			specresids['lognorm']=-np.log((np.sqrt(2*np.pi)*uncertainty)).sum()
-		
+			if len(specresids['lognorm'][specresids['lognorm'] != specresids['lognorm']]):
+					import pdb;pdb.set_trace()
+
+			
 		if computeDerivatives:
 			specresids['resid_jacobian']=spectralSuppression * specmodel['modelflux_jacobian']/(uncertainty[:,np.newaxis])
 			if not fixUncertainty:
@@ -530,6 +537,12 @@ class SALTResids:
 		#plt.show()
 		#import pdb; pdb.set_trace()
 
+		if computeDerivatives and not fixUncertainty:
+			for var in [photresids['resid_jacobian'],specresids['resid_jacobian'],photresids['lognorm_grad'],
+						photmodel['modelvariance_jacobian'],specmodel['modelvariance_jacobian'],specresids['lognorm_grad']]:
+				if len(var[var != var]):
+					import pdb; pdb.set_trace()
+					
 		if returnSpecModel: return photresids,specresids,specmodel
 		else: return photresids,specresids
 		
@@ -777,6 +790,9 @@ class SALTResids:
 				if colorscat == np.inf:
 					print('infinite color scatter!')
 					import pdb; pdb.set_trace()
+				if colorscat != colorscat:
+					print('color scatter is nan!')
+					import pdb; pdb.set_trace()					
 				if computeDerivatives:
 					dcolorscatdx= colorscat*((lameffPrime) ** (pow) )/ factorial(pow)
 
@@ -1270,7 +1286,7 @@ class SALTResids:
 		from matplotlib.backends.backend_pdf import PdfPages
 		pdf_pages = PdfPages('%s/MCMC_hist.pdf'%self.outputdir)
 		fig = plt.figure()
-		
+
 		m0pars = np.array([])
 		m0err = np.array([])
 		for i in self.im0:
