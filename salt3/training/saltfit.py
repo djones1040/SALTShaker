@@ -498,6 +498,31 @@ class GaussNewton(saltresids.SALTResids):
 		print(warning)
 		self.warnings.append(warning)
 
+	def satisfyDefinitions(self,X):
+		X=X.copy()
+		components=self.SALTModel(X)
+		int1d = interp1d(self.phase,components[0],axis=0,assume_sorted=True)
+		m0Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
+			  self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
+		int1d = interp1d(self.phase,components[1],axis=0,assume_sorted=True)
+		m1Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
+			  self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
+		ratio=m1Bflux/m0Bflux
+
+		X[self.ix0]*=1+ratio*X[self.ix1]
+		X[self.ix1]/=1+ratio*X[self.ix1]
+		X[self.im1]-=ratio*X[self.im0]
+
+		X[self.im0]+= np.mean(X[self.ix1])*X[self.im1]
+		X[self.ix1]-=np.mean(X[self.ix1])
+
+		x1std = np.std(X[self.ix1])
+		if x1std == x1std and x1std != 0.0:
+			  X[self.im1]*= x1std
+			  X[self.ix1]/= x1std
+
+		return X
+
 	def AdjustSpecJac(self,X,specdataflux,specmodelflux,specuncertainty,jacobian):
 
 		iSpecStart = 0
@@ -566,10 +591,13 @@ class GaussNewton(saltresids.SALTResids):
 			Xlast = copy.deepcopy(X)
 
 		#Retranslate x1, M1, x0, M0 to obey definitions
-
+		
+		X=satisfyDefinitions(X)
+		
 		xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams = \
 			self.getParsGN(X)
+
 
 		return xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams,stepsizes
