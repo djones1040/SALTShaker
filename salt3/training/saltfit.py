@@ -591,8 +591,7 @@ class GaussNewton(saltresids.SALTResids):
 			Xlast = copy.deepcopy(X)
 
 		#Retranslate x1, M1, x0, M0 to obey definitions
-		
-		X=satisfyDefinitions(X)
+		X=self.satisfyDefinitions(X)
 		
 		xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams = \
