@@ -171,14 +171,14 @@ class SALTResids:
 		#Find the iqr of the phase/wavelength basis functions
 		self.phaseRegularizationPoints=np.zeros(self.phaseBins[0].size*2)
 		self.waveRegularizationPoints=np.zeros(self.waveBins[0].size*2)
-		binRange=1/3,2/3
+		binRange=0.5
 		phaseCumulative=(np.cumsum(self.spline_derivs[:,:,::self.waveBins[0].size],axis=0).sum(axis=1)/np.sum(self.spline_derivs[:,:,::self.waveBins[0].size],axis=(0,1)))
-		self.phaseRegularizationPoints[::2]=self.phase[ np.abs(phaseCumulative-binRange[0]).argmin(axis=0)]
-		self.phaseRegularizationPoints[1::2]=self.phase[ np.abs(phaseCumulative-binRange[1]).argmin(axis=0)]
+		self.phaseRegularizationPoints=self.phase[ np.abs(phaseCumulative-binRange).argmin(axis=0)]
+		#self.phaseRegularizationPoints[1::2]=self.phase[ np.abs(phaseCumulative-binRange[1]).argmin(axis=0)]
 		
 		waveCumulative=(np.cumsum(self.spline_derivs[:,:,:self.waveBins[0].size],axis=1).sum(axis=0)/np.sum(self.spline_derivs[:,:,:self.waveBins[0].size],axis=(0,1)))
-		self.waveRegularizationPoints[::2]=self.wave[ np.abs(waveCumulative-binRange[0]).argmin(axis=0)]
-		self.waveRegularizationPoints[1::2]=self.wave[ np.abs(waveCumulative-binRange[1]).argmin(axis=0)]
+		self.waveRegularizationPoints=self.wave[ np.abs(waveCumulative-binRange).argmin(axis=0)]
+		#self.waveRegularizationPoints[1::2]=self.wave[ np.abs(waveCumulative-binRange[1]).argmin(axis=0)]
 
 		self.phaseBinCenters=np.array([(self.phase[:,np.newaxis]* self.spline_derivs[:,:,i*(self.waveBins[0].size)]).sum()/self.spline_derivs[:,:,i*(self.waveBins[0].size)].sum() for i in range(self.phaseBins[0].size) ])
 		self.waveBinCenters=np.array([(self.wave[np.newaxis,:]* self.spline_derivs[:,:,i]).sum()/self.spline_derivs[:,:,i].sum() for i in range(self.waveBins[0].size)])
@@ -692,6 +692,8 @@ class SALTResids:
 
 		iSpecStart = 0
 		for k in specdata.keys():
+			if sn==5999462 and k==0:
+				import pdb;pdb.set_trace()
 			SpecLen = specdata[k]['flux'].size
 			phase=specdata[k]['tobs']+tpkoff
 			specSlice=slice(iSpecStart,iSpecStart+SpecLen)
@@ -1476,7 +1478,7 @@ class SALTResids:
 		phase=self.phaseRegularizationPoints
 		wave=self.waveRegularizationPoints
 		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
-		dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
+		dfluxdwave=[ (flux[:,1:]-flux[:,:-1])/(self.waveRegularizationPoints[1:]-self.waveRegularizationPoints[:-1])[np.newaxis,:] for flux in fluxes]
 		scale,scaleDeriv=self.regularizationScale(storedResults['components'],fluxes)
 		waveGradResids=[]
 		jac=[]
@@ -1488,14 +1490,15 @@ class SALTResids:
 			#Normalize gradient by flux scale
 			normedGrad=dfluxdwave[i]/scale[i]
 			#Derivative of normalized gradient with respect to model parameters
-			normedGradDerivs=(self.regularizationDerivs[2][:,:,varyParams[indices]] * scale[i] - scaleDeriv[i][np.newaxis,np.newaxis,varyParams[indices]]*dfluxdwave[i][:,:,np.newaxis])/ scale[i]**2
+			derivs=(self.regularizationDerivs[0][:,1:,varyParams[indices]]-self.regularizationDerivs[0][:,:-1,varyParams[indices]])/(self.waveRegularizationPoints[1:]-self.waveRegularizationPoints[:-1])[np.newaxis,:,np.newaxis]
+			normedGradDerivs=( derivs* scale[i] - scaleDeriv[i][np.newaxis,np.newaxis,varyParams[indices]]*dfluxdwave[i][:,:,np.newaxis])/ scale[i]**2
 			#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
 			normalization=np.sqrt(1/((self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
 			#Minimize model derivative w.r.t wavelength in unconstrained regions
-			waveGradResids+= [normalization* ( normedGrad /	self.neff).flatten()]
+			waveGradResids+= [normalization* ( normedGrad /	self.neff[:,:-1]).flatten()]
 			jacobian=np.zeros((waveGradResids[-1].size,varyParams.sum()))
 			if boolIndex[varyParams].any():
-				jacobian[:,boolIndex[varyParams]]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
+				jacobian[:,boolIndex[varyParams]]=normalization*((normedGradDerivs) / self.neff[:,:-1,np.newaxis]).reshape(-1, varyParams[indices].sum())
 			jac+= [jacobian]
 
 		return waveGradResids,jac
