@@ -49,7 +49,7 @@ VERSION: MD_BYOSEDTEST
      CUTWIN_SNRMAX       =  5.0, 1.0E8
      CUTWIN_NFILT_SNRMAX =  2.0, 99.
 
-     cutwin_Nband_thresh = 1
+     !cutwin_Nband_thresh = 1
 
      !SNCID_IGNORE_FILE = '$DES3YR/config/35sigignore.list'
 	  
