@@ -54,6 +54,8 @@ class SALT3pipe():
         self.build_flag = False
         self.config_flag = False
         self.glue_flag = False
+        
+        self.gluepairs = []
 
     def gen_input(self):
         pass
@@ -192,6 +194,7 @@ class SALT3pipe():
                            batch=pro2.batch,
                            validplots=pro2.validplots)
 
+        self.gluepairs.append(pipepros)
 
     def _get_config_option(self,config,prostr,option,dtype=None):
         if config.has_option(prostr, option):
@@ -805,6 +808,10 @@ def _run_batch_pro(pro,args,done_file=None):
         for line in stdout[stdout.find('WARNING'):].split('\n'):
             print(line)
         raise RuntimeError("Something went wrong...")
+    if 'FATAL ERROR' in stdout:
+        for line in stdout[stdout.find('FATAL ERROR'):].split('\n'):
+            print(line)
+        raise RuntimeError("Something went wrong...")
 
     if not done_file:
         for line in res.stdout.decode('utf-8').split('\n'):
@@ -823,8 +830,8 @@ def _run_batch_pro(pro,args,done_file=None):
         if os.path.exists(done_file): 
             job_complete = True
             # apparently there's a lag between creating the file and writing to it
-			while os.stat(done_file).st_size == 0:
-				time.sleep(15)
+            while os.stat(done_file).st_size == 0:
+                time.sleep(15)
 
     success = False
     with open(done_file,'r') as fin:
