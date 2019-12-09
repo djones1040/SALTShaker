@@ -522,25 +522,6 @@ class GaussNewton(saltresids.SALTResids):
 			  X[self.ix1]/= x1std
 
 		return X
-
-	def AdjustSpecJac(self,X,specdataflux,specmodelflux,specuncertainty,jacobian):
-
-		iSpecStart = 0
-		count = 0
-		for sn in self.datadict.keys():
-			specdata = self.datadict[sn]['specdata']
-			
-			for k in specdata.keys():
-				SpecLen = specdata[k]['flux'].size
-
-				coeffs=X[self.parlist=='specrecal_{}_{}'.format(sn,k)]
-				irecal = np.where(self.parlist=='specrecal_{}_{}'.format(sn,k))[0][-1]
-				#recalexp = np.exp(np.poly1d(coeffs[-1])((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal))
-				recalexp = np.exp(coeffs[-1])
-				jacobian[iSpecStart:iSpecStart+SpecLen,irecal] /= recalexp
-				iSpecStart += SpecLen
-				count += 1
-		return jacobian
 		
 	def convergence_loop(self,guess,loop_niter=3):
 		lastResid = 1e20
@@ -699,6 +680,7 @@ class GaussNewton(saltresids.SALTResids):
 						residuals += [regResids*np.sqrt(weight)]
 						jacobian+=[regJac*np.sqrt(weight)]
 					storedResults[regKey]=residuals[-self.n_components:]
+		import pdb;pdb.set_trace()
 		if varyParams.any():
 			return np.concatenate(residuals),np.concatenate(jacobian)
 		else:
@@ -737,26 +719,6 @@ class GaussNewton(saltresids.SALTResids):
 	
 	def process_fit(self,X,storedResults,fit='all',doPriors=True):
 		X=X.copy()
-
-# 		if fit == 'spectralrecalibration_norm':
-# 			residuals,jacobian,specdataflux,specmodelflux,specuncertainty=self.lsqwrap(X,storedResults,True,computePCDerivs,doPriors)
-# 
-# 			jacobian = self.AdjustSpecJac(X,specdataflux,specmodelflux,specuncertainty,jacobian)
-# 			
-# 			#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
-# 			includePars=self.fitOptions[fit][1] & ~(np.all(0==jacobian,axis=0))
-# 		
-# 			print('Number of parameters fit this round: {}'.format(includePars.sum()))
-# 			jacobian=jacobian[:,includePars]
-# 			stepsize=linalg.lstsq(jacobian,residuals)[0]
-# 			if np.any(np.isnan(stepsize)):
-# 				print('NaN detected in stepsize; exitting to debugger')
-# 				import pdb;pdb.set_trace()
-# 
-# 			Xtmp = np.log(np.exp(X[includePars])- stepsize)
-# 			Xtmp[Xtmp != Xtmp] = X[includePars][Xtmp != Xtmp]
-# 			X[includePars] = Xtmp #np.log(np.exp(X[includePars])- stepsize)
-# 		else:
 		
 		varyingParams=self.fitOptions[fit][1]&self.iModelParam
 		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors)
