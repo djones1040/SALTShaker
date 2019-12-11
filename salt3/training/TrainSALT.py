@@ -274,56 +274,49 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		foutclscat.close()
 		
 		# best-fit and simulated SN params
-		snlist = os.path.expandvars(self.options.snlist[:])
-		if not os.path.exists(snlist):
-			print('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
-			snlist = '%s/trainingdata/%s'%(data_rootdir,snlist)
-			if not os.path.exists(snlist):
-				raise RuntimeError('SN list file %s does not exist'%snlist)
-
-		
-		snfiles = np.genfromtxt(snlist,dtype='str')
-		snfiles = np.atleast_1d(snfiles)
-		
 		foutsn = open('%s/salt3train_snparams.txt'%outdir,'w')
 		print('# SN x0 x1 c t0 tpkoff SIM_x0 SIM_x1 SIM_c SIM_t0',file=foutsn)
-		for k in SNParams.keys():
-			foundfile = False
-			for l in snfiles:
-				if str(k) not in l: continue
-				foundfile = True
-				if '/' not in l:
-					l = '%s/%s'%(os.path.dirname(snlist),l)
-				sn = snana.SuperNova(l)
-				sn.SNID = str(sn.SNID)
-				if 'SIM_SALT2x0' in sn.__dict__.keys(): SIM_x0 = sn.SIM_SALT2x0
-				else: SIM_x0 = -99
-				if 'SIM_SALT2x1' in sn.__dict__.keys(): SIM_x1 = sn.SIM_SALT2x1
-				else: SIM_x1 = -99
-				if 'SIM_SALT2c' in sn.__dict__.keys(): SIM_c = sn.SIM_SALT2c
-				else: SIM_c = -99
-				if 'SIM_PEAKMJD' in sn.__dict__.keys(): SIM_PEAKMJD = float(sn.SIM_PEAKMJD.split()[0])
-				else: SIM_PEAKMJD = -99
-			if not foundfile: SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD = -99,-99,-99,-99
+		for snlist in self.options.snlists.split(','):
+			snlist = os.path.expandvars(snlist)
+			if not os.path.exists(snlist):
+				print('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
+				snlist = '%s/trainingdata/%s'%(data_rootdir,snlist)
+				if not os.path.exists(snlist):
+					raise RuntimeError('SN list file %s does not exist'%snlist)
 
-			if 't0' not in SNParams[k].keys():
-				SNParams[k]['t0'] = 0.0
-			print('%s %8.10e %.10f %.10f %.10f %.10f %8.10e %.10f %.10f %.2f'%(
-				k,SNParams[k]['x0'],SNParams[k]['x1'],SNParams[k]['c'],SNParams[k]['t0'],
-				SNParams[k]['tpkoff'],SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD),file=foutsn)
+
+			snfiles = np.genfromtxt(snlist,dtype='str')
+			snfiles = np.atleast_1d(snfiles)
+		
+			for k in SNParams.keys():
+				foundfile = False
+				for l in snfiles:
+					if str(k) not in l: continue
+					foundfile = True
+					if '/' not in l:
+						l = '%s/%s'%(os.path.dirname(snlist),l)
+					sn = snana.SuperNova(l)
+					sn.SNID = str(sn.SNID)
+					if 'SIM_SALT2x0' in sn.__dict__.keys(): SIM_x0 = sn.SIM_SALT2x0
+					else: SIM_x0 = -99
+					if 'SIM_SALT2x1' in sn.__dict__.keys(): SIM_x1 = sn.SIM_SALT2x1
+					else: SIM_x1 = -99
+					if 'SIM_SALT2c' in sn.__dict__.keys(): SIM_c = sn.SIM_SALT2c
+					else: SIM_c = -99
+					if 'SIM_PEAKMJD' in sn.__dict__.keys(): SIM_PEAKMJD = float(sn.SIM_PEAKMJD.split()[0])
+					else: SIM_PEAKMJD = -99
+				if not foundfile: SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD = -99,-99,-99,-99
+
+				if 't0' not in SNParams[k].keys():
+					SNParams[k]['t0'] = 0.0
+				print('%s %8.10e %.10f %.10f %.10f %.10f %8.10e %.10f %.10f %.2f'%(
+					k,SNParams[k]['x0'],SNParams[k]['x1'],SNParams[k]['c'],SNParams[k]['t0'],
+					SNParams[k]['tpkoff'],SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD),file=foutsn)
 		foutsn.close()
 			
 		return
 
 	def validate(self,outputdir):
-
-		snlist = os.path.expandvars(self.options.snlist[:])
-		if not os.path.exists(snlist):
-			print('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
-			snlist = '%s/trainingdata/%s'%(data_rootdir,snlist)
-			if not os.path.exists(snlist):
-				raise RuntimeError('SN list file %s does not exist'%snlist)
-
 		
 		import pylab as plt
 		plt.subplots_adjust(left=None, bottom=None, right=None, top=0.85, wspace=0.025, hspace=0)
@@ -346,17 +339,6 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 		plotSALTModel.mkModelPlot(outputdir,outfile='%s/SALTmodelcomp.pdf'%outputdir,
 								  xlimits=[self.options.waverange[0],self.options.waverange[1]])
-		if self.options.dospec:
-			ValidateSpectra.compareSpectra(
-				snlist,self.options.outputdir,maxspec=50,base=self)
-		
-		snfiles = np.genfromtxt(snlist,dtype='str')
-		snfiles = np.atleast_1d(snfiles)
-		fitx1,fitc = False,False
-		if self.options.n_components == 2:
-			fitx1 = True
-		if self.options.n_colorpars > 0:
-			fitc = True
 
 		from salt3.util.synphot import synphot
 		kcordict = {}
@@ -387,40 +369,61 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		gs1.update(wspace=0.0)
 		print('debug1')
 		i = 0
-		for l in snfiles:
-			if not i % 9:
-				fig = plt.figure()
-			try:
-				ax1 = plt.subplot(gs1[i % 9]); ax2 = plt.subplot(gs1[(i+1) % 9]); ax3 = plt.subplot(gs1[(i+2) % 9])
-			except:
-				import pdb; pdb.set_trace()
-
-			if '/' not in l:
-				l = '%s/%s'%(os.path.dirname(snlist),l)
-			sn = snana.SuperNova(l)
-			sn.SNID = str(sn.SNID)
-
-			if sn.SNID not in snid:
-				self.addwarning('sn %s not in output files'%sn.SNID)
-				continue
-			x0sn,x1sn,csn,t0sn = \
-				x0[snid == sn.SNID][0],x1[snid == sn.SNID][0],\
-				c[snid == sn.SNID][0],t0[snid == sn.SNID][0]
-			if not fitc: csn = 0
-			if not fitx1: x1sn = 0
 			
-			ValidateLightcurves.customfilt(
-				'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,outputdir,
-				t0=t0sn,x0=x0sn,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc,
-				bandpassdict=self.kcordict,n_components=self.options.n_components,
-				ax1=ax1,ax2=ax2,ax3=ax3)
-			if i % 9 == 6:
-				pdf_pages.savefig()
-			else:
-				for ax in [ax1,ax2,ax3]:
-					ax.xaxis.set_ticklabels([])
-					ax.set_xlabel(None)
-			i += 3
+		for snlist in self.options.snlists.split(','):
+			snlist = os.path.expandvars(snlist)
+			if not os.path.exists(snlist):
+				print('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
+				snlist = '%s/trainingdata/%s'%(data_rootdir,snlist)
+				if not os.path.exists(snlist):
+					raise RuntimeError('SN list file %s does not exist'%snlist)
+
+			if self.options.dospec:
+				ValidateSpectra.compareSpectra(
+					snlist,self.options.outputdir,maxspec=50,base=self)
+				
+			snfiles = np.genfromtxt(snlist,dtype='str')
+			snfiles = np.atleast_1d(snfiles)
+			fitx1,fitc = False,False
+			if self.options.n_components == 2:
+				fitx1 = True
+			if self.options.n_colorpars > 0:
+				fitc = True
+
+			for l in snfiles:
+				if not i % 9:
+					fig = plt.figure()
+				try:
+					ax1 = plt.subplot(gs1[i % 9]); ax2 = plt.subplot(gs1[(i+1) % 9]); ax3 = plt.subplot(gs1[(i+2) % 9])
+				except:
+					import pdb; pdb.set_trace()
+
+				if '/' not in l:
+					l = '%s/%s'%(os.path.dirname(snlist),l)
+				sn = snana.SuperNova(l)
+				sn.SNID = str(sn.SNID)
+
+				if sn.SNID not in snid:
+					self.addwarning('sn %s not in output files'%sn.SNID)
+					continue
+				x0sn,x1sn,csn,t0sn = \
+					x0[snid == sn.SNID][0],x1[snid == sn.SNID][0],\
+					c[snid == sn.SNID][0],t0[snid == sn.SNID][0]
+				if not fitc: csn = 0
+				if not fitx1: x1sn = 0
+
+				ValidateLightcurves.customfilt(
+					'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,outputdir,
+					t0=t0sn,x0=x0sn,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc,
+					bandpassdict=self.kcordict,n_components=self.options.n_components,
+					ax1=ax1,ax2=ax2,ax3=ax3)
+				if i % 9 == 6:
+					pdf_pages.savefig()
+				else:
+					for ax in [ax1,ax2,ax3]:
+						ax.xaxis.set_ticklabels([])
+						ax.set_xlabel(None)
+				i += 3
 
 		pdf_pages.savefig()
 		pdf_pages.close()
@@ -439,10 +442,10 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		# fit the model - initial pass
 		if self.options.stage == "all" or self.options.stage == "train":
 			# read the data
-			datadict = readutils.rdAllData(self.options.snlist,self.options.estimate_tpk,self.kcordict,
-										   self.addwarning,dospec=self.options.dospec,KeepOnlySpec=True,
+			datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,self.kcordict,
+										   self.addwarning,dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
 										   peakmjdlist=self.options.tmaxlist)
-			datadict = self.mkcuts(datadict,KeepOnlySpec=True)
+			datadict = self.mkcuts(datadict,KeepOnlySpec=self.options.keeponlyspec)
 
 			phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 				modelerr,clpars,clerr,clscat,SNParams,pars,parlist,chain,loglikes = self.fitSALTModel(datadict)
