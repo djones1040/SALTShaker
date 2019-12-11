@@ -46,6 +46,8 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 	salt3m0fluxerr = salt3m0fluxerr.reshape([len(np.unique(salt3m0errphase)),len(np.unique(salt3m0errwave))])
 	salt3m1flux = salt3m1flux.reshape([len(np.unique(salt3m1phase)),len(np.unique(salt3m1wave))])
 	salt3m1fluxerr = salt3m1fluxerr.reshape([len(np.unique(salt3m1errphase)),len(np.unique(salt3m1errwave))])
+	#print('hack!')
+	#salt3m1flux /= 300
 
 	salt2m0phase = np.unique(salt2m0phase)
 	salt2m0wave = np.unique(salt2m0wave)
