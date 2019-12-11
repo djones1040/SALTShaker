@@ -43,14 +43,16 @@ class TrainSALTBase:
 		# input/output files
 		parser.add_argument('--trainingconfig', default=config.get('iodata','trainingconfig'), type=str,
 							help='training config file')
-		parser.add_argument('--snlist', default=config.get('iodata','snlist'), type=str,
-							help="""list of SNANA-formatted SN data files, including both photometry and spectroscopy. (default=%default)""")
+		parser.add_argument('--snlists', default=config.get('iodata','snlists'), type=str,
+							help="""list of SNANA-formatted SN data files, including both photometry and spectroscopy. Can be multiple comma-separated lists. (default=%default)""")
 		parser.add_argument('--tmaxlist', default=config.get('iodata','tmaxlist'), type=str,
 							help="""optional space-delimited list with SN ID, tmax, tmaxerr (default=%default)""")
 		parser.add_argument('--dospec', default=config.get('iodata','dospec'), type=boolean_string,
 							help="""if set, look for spectra in the snlist files (default=%default)""")
 		parser.add_argument('--maxsn', default=config.get('iodata','maxsn'), type=nonetype_or_int,
 							help="""sets maximum number of SNe to fit for debugging (default=%default)""")
+		parser.add_argument('--keeponlyspec', default=config.get('iodata','keeponlyspec'), type=boolean_string,
+							help="""if set, only train on SNe with spectra (default=%default)""")
 		parser.add_argument('--outputdir', default=config.get('iodata','outputdir'), type=str,
 							help="""data directory for spectroscopy, format should be ASCII 
 							with columns wavelength, flux, fluxerr (optional) (default=%default)""")
