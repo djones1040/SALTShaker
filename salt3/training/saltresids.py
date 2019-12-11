@@ -572,7 +572,6 @@ class SALTResids:
 		tpkDeriv=varyParams[self.parlist=='tpkoff_{}'.format(sn)][0]
 		cDeriv=varyParams[self.parlist=='c_{}'.format(sn)][0]
 		requiredPCDerivs=varyParams[self.im0]|varyParams[self.im1]
->>>>>>> a5856a3edd80000bb9ae3eeaa1e908652adf7867
 		
 		varyParList=self.parlist[varyParams]
 		
@@ -1324,10 +1323,10 @@ class SALTResids:
 					phaseAffected[0]=True
 				elif phase>= self.phaseBins[1][-1]:
 					phaseAffected[-1]=True
-					
+
 				waveAffected= (restWave.min()<self.waveBins[1])&(restWave.max()>self.waveBins[0])
 				basisAffected=(phaseAffected[:,np.newaxis] & waveAffected[np.newaxis,:]).flatten()
-				
+
 				result=self.spline_deriv_interp((phase, restWave),method=self.interpMethod )[:,basisAffected].sum(axis=0)
 				if phase>=self.phaseBins[1][-1]: result*=10**(-0.4*self.extrapolateDecline*((1+z)*(phase-self.phaseBins[1][-1])))
 				self.neffRaw[np.where(basisAffected.reshape(self.neffRaw.shape))]+=result
@@ -1356,7 +1355,14 @@ class SALTResids:
 		#import pdb; pdb.set_trace()
 		#Smear it out a bit along phase axis
 		#self.neff=gaussian_filter1d(self.neff,1,0)
-		self.neffRaw=interp2d(self.waveBinCenters,self.phaseBinCenters,self.neffRaw)(self.waveRegularizationPoints,self.phaseRegularizationPoints)		
+		self.neffRaw=interp2d(self.waveBinCenters,self.phaseBinCenters,self.neffRaw)(self.waveRegularizationPoints,self.phaseRegularizationPoints)
+
+		# D. Jones - just testing this out
+		#for j,p in enumerate(self.phaseBinCenters):
+		#	if np.max(self.neffRaw[j,:]) > 0: self.neffRaw[j,:] /= np.max(self.neffRaw[j,:])
+		#import pdb; pdb.set_trace()
+		#self.neffRaw[self.neffRaw > 1] = 1
+		#self.neffRaw[self.neffRaw < 1e-6] = 1e-6
 		
 		# hack!
 		self.plotEffectivePoints([-12.5,0,12.5,40],'neff.png')
@@ -1384,7 +1390,7 @@ class SALTResids:
 			plt.xlabel('$\lambda (\AA)$')
 			plt.xlim(self.waveRegularizationPoints.min(),self.waveRegularizationPoints.max())
 			plt.legend()
-		
+		#import pdb; pdb.set_trace()
 		if output is None:
 			plt.show()
 		else:
