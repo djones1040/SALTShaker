@@ -169,16 +169,11 @@ class SALTResids:
 		self.waveBins=self.waveknotloc[:-(self.bsorder+1)],self.waveknotloc[(self.bsorder+1):]
 		
 		#Find the iqr of the phase/wavelength basis functions
-		self.phaseRegularizationPoints=np.zeros(self.phaseBins[0].size*2)
-		self.waveRegularizationPoints=np.zeros(self.waveBins[0].size*2)
-		binRange=1/3,2/3
-		phaseCumulative=(np.cumsum(self.spline_derivs[:,:,::self.waveBins[0].size],axis=0).sum(axis=1)/np.sum(self.spline_derivs[:,:,::self.waveBins[0].size],axis=(0,1)))
-		self.phaseRegularizationPoints[::2]=self.phase[ np.abs(phaseCumulative-binRange[0]).argmin(axis=0)]
-		self.phaseRegularizationPoints[1::2]=self.phase[ np.abs(phaseCumulative-binRange[1]).argmin(axis=0)]
-		
-		waveCumulative=(np.cumsum(self.spline_derivs[:,:,:self.waveBins[0].size],axis=1).sum(axis=0)/np.sum(self.spline_derivs[:,:,:self.waveBins[0].size],axis=(0,1)))
-		self.waveRegularizationPoints[::2]=self.wave[ np.abs(waveCumulative-binRange[0]).argmin(axis=0)]
-		self.waveRegularizationPoints[1::2]=self.wave[ np.abs(waveCumulative-binRange[1]).argmin(axis=0)]
+		self.phaseRegularizationBins=np.linspace(self.phase[0],self.phase[-1],self.phaseBins[0].size*2+1,True)
+		self.waveRegularizationBins=np.linspace(self.wave[0],self.wave[-1],self.waveBins[0].size*2+1,True)
+
+		self.phaseRegularizationPoints=(self.phaseRegularizationBins[1:]+self.phaseRegularizationBins[:-1])/2
+		self.waveRegularizationPoints=(self.waveRegularizationBins[1:]+self.waveRegularizationBins[:-1])/2
 
 		self.phaseBinCenters=np.array([(self.phase[:,np.newaxis]* self.spline_derivs[:,:,i*(self.waveBins[0].size)]).sum()/self.spline_derivs[:,:,i*(self.waveBins[0].size)].sum() for i in range(self.phaseBins[0].size) ])
 		self.waveBinCenters=np.array([(self.wave[np.newaxis,:]* self.spline_derivs[:,:,i]).sum()/self.spline_derivs[:,:,i].sum() for i in range(self.waveBins[0].size)])
@@ -692,6 +687,7 @@ class SALTResids:
 
 		iSpecStart = 0
 		for k in specdata.keys():
+			
 			SpecLen = specdata[k]['flux'].size
 			phase=specdata[k]['tobs']+tpkoff
 			specSlice=slice(iSpecStart,iSpecStart+SpecLen)
@@ -702,7 +698,8 @@ class SALTResids:
 			pow=coeffs.size-1-np.arange(coeffs.size)
 			coeffs/=factorial(pow)
 			recalexp = np.exp(np.poly1d(coeffs)((specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal))
-
+			
+				
 			if xDeriv:
 				M0interp = temporaryResults['componentsInterp'][0](phase)
 				M0int = interp1d(obswave,M0interp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
@@ -1299,8 +1296,8 @@ class SALTResids:
 					
 		"""
 		#Clean out array
-		self.neffRaw=np.zeros((self.phaseBinCenters.size,self.waveBinCenters.size))
-		phaseIndices,waveIndices=np.unravel_index(np.arange(self.im0.size),(self.phaseRegularizationPoints.size,self.waveRegularizationPoints.size))
+		self.neffRaw=np.zeros((self.phaseRegularizationPoints.size,self.waveRegularizationPoints.size))
+
 # 		start=time.time()
 # 		spectime,phottime=0,0
 		for sn in (self.datadict.keys()):
@@ -1317,62 +1314,36 @@ class SALTResids:
 # 			spectime-=time.time()
 			for k in specdata.keys():
 				restWave=specdata[k]['wavelength']/(1+z)
-				restWave=restWave[(restWave>self.waveBins[0][0])&(restWave<self.waveBins[1][-1])]
+				restWave=restWave[(restWave>self.waveRegularizationBins[0])&(restWave<self.waveRegularizationBins[-1])]
 				phase=(specdata[k]['tobs']+tpkoff)/(1+z)
-				phaseAffected= (phase>self.phaseBins[0]) & (phase<self.phaseBins[1])
-				if phase <= self.phaseBins[0][0]:
-					phaseAffected[0]=True
-				elif phase>= self.phaseBins[1][-1]:
-					phaseAffected[-1]=True
-					
-				waveAffected= (restWave.min()<self.waveBins[1])&(restWave.max()>self.waveBins[0])
-				basisAffected=(phaseAffected[:,np.newaxis] & waveAffected[np.newaxis,:]).flatten()
+				if phase<self.phaseRegularizationBins[0]:
+					phaseIndex=0
+				elif phase>self.phaseRegularizationBins[-1]:
+					phaseIndex=-1
+				else:
+					phaseIndex= np.where( (phase>=self.phaseRegularizationBins[:-1]) & (phase<self.phaseRegularizationBins[1:]))[0][0]
 				
-				result=self.spline_deriv_interp((phase, restWave),method=self.interpMethod )[:,basisAffected].sum(axis=0)
-				if phase>=self.phaseBins[1][-1]: result*=10**(-0.4*self.extrapolateDecline*((1+z)*(phase-self.phaseBins[1][-1])))
-				self.neffRaw[np.where(basisAffected.reshape(self.neffRaw.shape))]+=result
-# 			spectime+=time.time()
-# 			phottime-=time.time()
-			#For each photometric filter, weight the contribution by  
-# 			for flt in np.unique(photdata['filt']):
-# 				selectFilter=(photdata['filt']==flt)
-# 				phase=(photdata['tobs'][selectFilter]+tpkoff)/(1+z)
-# 				
-# 				waveAffected= (self.waveBins[1] > (self.kcordict[survey][flt]['minlam']/(1+z))) & (self.waveBins[0] < (self.kcordict[survey][flt]['maxlam']/(1+z)))
-# 				phaseAffected= ((phase[:,np.newaxis]>self.phaseBins[0][np.newaxis,:])& (phase[:,np.newaxis]<self.phaseBins[1][np.newaxis,:]))
-# 				phaseAffected[:,0]=phaseAffected[:,0] | (phase<=self.phaseBins[0][0])
-# 				phaseAffected[:,-1]=phaseAffected[:,-1] | (phase>=self.phaseBins[1][-1])
-# 				basisAffected=(phaseAffected[:,:,np.newaxis] & waveAffected[np.newaxis,np.newaxis,:]).reshape((phase.size,self.im0.size))
-# 				for pdx,p in enumerate(np.where(selectFilter)[0]):
-# 					
-# 					derivInterp = self.spline_deriv_interp((phase[pdx],self.wave[idx[flt]]),method=self.interpMethod)[:,basisAffected[pdx]]
-# 					
-# 					summation = np.sum( pbspl[flt].reshape((pbspl[flt].size,1)) * derivInterp, axis=0)/ np.sum(pbspl[flt])
-# 					if phase[pdx]>=self.phaseBins[1][-1]: summation*=10**(-0.4*self.extrapolateDecline*((1+z)*(phase[pdx]-self.phaseBins[1][-1])))
-# 					self.neffRaw[np.where(basisAffected[pdx].reshape(self.neffRaw.shape))]+=summation
-# 			phottime+=time.time()
-# 		print('Time for total neff is ',time.time()-start)
-# 		print('Spectime: ',spectime,'Phottime: ',phottime)
-		#import pdb; pdb.set_trace()
-		#Smear it out a bit along phase axis
-		#self.neff=gaussian_filter1d(self.neff,1,0)
-		self.neffRaw=interp2d(self.waveBinCenters,self.phaseBinCenters,self.neffRaw)(self.waveRegularizationPoints,self.phaseRegularizationPoints)		
-		
+				
+				self.neffRaw[phaseIndex,:]+=np.histogram(restWave,self.waveRegularizationBins)[0]
+				
+		self.neffRaw=gaussian_filter1d(self.neffRaw,0.5,0)
+		self.neffRaw=gaussian_filter1d(self.neffRaw,0.5,1)
 		# hack!
 		self.plotEffectivePoints([-12.5,0,12.5,40],'neff.png')
 		self.plotEffectivePoints(None,'neff-heatmap.png')
 		self.neff=np.clip(self.neffRaw,1e-4,None)
 		
-		self.neff[self.neff>200]=np.inf
+		self.neff[self.neff>50]=np.inf
+		#import pdb;pdb.set_trace()
 		
 	def plotEffectivePoints(self,phases=None,output=None):
 		import matplotlib.pyplot as plt
 		if phases is None:
 			plt.imshow(self.neffRaw,cmap='Greys',aspect='auto')
-			xticks=np.linspace(0,self.waveRegularizationPoints[0].size,8,False)
+			xticks=np.linspace(0,self.waveRegularizationPoints.size,8,False)
 			plt.xticks(xticks,['{:.0f}'.format(self.waveRegularizationPoints[int(x)]) for x in xticks])
 			plt.xlabel('$\lambda$ / Angstrom')
-			yticks=np.linspace(0,self.phaseRegularizationPoints[0].size,8,False)
+			yticks=np.linspace(0,self.phaseRegularizationPoints.size,8,False)
 			plt.yticks(yticks,['{:.0f}'.format(self.phaseRegularizationPoints[int(x)]) for x in yticks])
 			plt.ylabel('Phase / days')
 		else:
@@ -1474,6 +1445,7 @@ class SALTResids:
 		return resids,jac
 	
 	def waveGradientRegularization(self, x, storedResults,varyParams):
+		#Declarations
 		phase=self.phaseRegularizationPoints
 		wave=self.waveRegularizationPoints
 		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
