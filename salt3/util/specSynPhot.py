@@ -126,17 +126,16 @@ def getColorsForSN(spectrum,photdata,kcordict,survey,colorcut=0.1):
 		
 		phot1d = interp1d(photdata['mjd'][photdata['filt'] == flt],
 						  photdata['fluxcal'][photdata['filt'] == flt],
-						  axis=0,kind='linear',bounds_error=True,
-						  assume_sorted=True)
+						  axis=0,kind='linear',#bounds_error=True,
+						  assume_sorted=True,fill_value="extrapolate")
 		photerr1d = interp1d(photdata['mjd'][photdata['filt'] == flt],
 							 photdata['fluxcalerr'][photdata['filt'] == flt],
-							 axis=0,kind='linear',bounds_error=True,
-							 assume_sorted=True)
-
-		try:
-			flux = phot1d(spectrum['mjd'])
-			fluxerr = photerr1d(spectrum['mjd'])
-		except: continue
+							 axis=0,kind='linear',#bounds_error=True,
+							 assume_sorted=True,fill_value="extrapolate")
+		#try:
+		flux = phot1d(spectrum['mjd'])
+		fluxerr = photerr1d(spectrum['mjd'])
+		#except: continue
 		if np.min(np.abs(photdata['mjd'][photdata['filt'] == flt] - spectrum['mjd'])) > 3:
 			continue
 		
