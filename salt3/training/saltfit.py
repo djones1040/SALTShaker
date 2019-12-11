@@ -680,7 +680,7 @@ class GaussNewton(saltresids.SALTResids):
 						residuals += [regResids*np.sqrt(weight)]
 						jacobian+=[regJac*np.sqrt(weight)]
 					storedResults[regKey]=residuals[-self.n_components:]
-		import pdb;pdb.set_trace()
+		#import pdb;pdb.set_trace()
 		if varyParams.any():
 			return np.concatenate(residuals),np.concatenate(jacobian)
 		else:
