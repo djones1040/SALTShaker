@@ -823,7 +823,8 @@ def _run_batch_pro(pro,args,done_file=None):
         if os.path.exists(done_file): 
             job_complete = True
             # apparently there's a lag between creating the file and writing to it
-            time.sleep(15)
+			while os.stat(done_file).st_size == 0:
+				time.sleep(15)
 
     success = False
     with open(done_file,'r') as fin:
