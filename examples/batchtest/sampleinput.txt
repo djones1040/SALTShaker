@@ -18,7 +18,8 @@ batch=True
 #baseinput=simulation/SIMGEN_SALT3TEST.INPUT
 #outinput=pipelinetest/TEST_SIMGEN_SALT3TEST.INPUT
 prooptions=
-set_key=
+set_key=2
+	FORMAT_MASK 18
 
 # NGEN_LC 20
 #    GENSOURCE RANDOM
@@ -39,6 +40,7 @@ set_key=3
     iodata snlist training/data/SALT3TEST_SIMPLE.LIST
     trainparams waveoutres 5
     survey_PS1_LOWZ_COMBINED kcorfile kcor/kcor_PS1_LOWZ_COMBINED.fits
+    trainparams dospec 0
 
 [lcfitting]
 pro=split_and_fit.pl
@@ -56,6 +58,7 @@ pro=SALT2mu_fit.pl
 baseinput=getmu/BBC_test.input
 outinput=pipelinetest/test_BBC.input
 prooptions=
+batch=True
 set_key=
 #2
 #    file ps1sim_default.fitres
