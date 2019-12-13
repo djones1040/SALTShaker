@@ -111,14 +111,14 @@ class SALT3pipe():
             validplots = self._get_config_option(config,prostr,'validplots',dtype=boolean_string)
             proargs = self._get_config_option(config,prostr,'proargs')
             prooptions = self._get_config_option(config,prostr,'prooptions')
-            snlist = self._get_config_option(config,prostr,'snlist')
+            snlists = self._get_config_option(config,prostr,'snlists')
             pipepro.configure(baseinput=baseinput,
                               setkeys=pipepro.setkeys,
                               outname=outname,
                               pro=pro,
                               proargs=proargs,
                               prooptions=prooptions,
-                              snlist=snlist,
+                              snlists=snlists,
                               batch=batch,
                               validplots=validplots)
 
@@ -318,12 +318,12 @@ class PyPipeProcedure(PipeProcedure):
 
 class Data(PipeProcedure):
 
-    def configure(self,snlist=None,**kwargs):
-        self.keys = {'snlist':snlist}
+    def configure(self,snlists=None,**kwargs):
+        self.keys = {'snlists':snlists}
 
     def _get_output_info(self):
         df = {}
-        key = 'snlist'
+        key = 'snlists'
         df['key'] = key
         df['value'] = self.keys[key]
         return pd.DataFrame([df])
@@ -331,18 +331,18 @@ class Data(PipeProcedure):
     def glueto(self,pipepro):
         if not isinstance(pipepro,str):
             pipepro = type(pipepro).__name__
-        snlist = self._get_output_info().value.values[0]
-        if not os.path.exists(snlist):
-            raise ValueError("Path does not exists",snlist)             
+        snlists = self._get_output_info().value.values[0]
+        if not os.path.exists(snlists):
+            raise ValueError("Path does not exists",snlists)             
         if pipepro.lower().startswith('train'):
-            return snlist
+            return snlists
         elif pipepro.lower().startswith('lcfit'):
             simpath = os.path.join(os.environ['SNDATA_ROOT'],'SIM/')
-            idx = snlist.find(simpath)
+            idx = snlists.find(simpath)
             if idx !=0:
                 raise ValueError("photometry must be in $SNDATA_ROOT/SIM")
             else:
-                return os.path.dirname(snlist[len(simpath):]) 
+                return os.path.dirname(snlists[len(simpath):]) 
         else:
             raise ValueError("data can only glue to training or lcfitting")
     
@@ -461,8 +461,10 @@ class Simulation(PipeProcedure):
             #     prefix = df.loc[df.key=='GENPREFIX','value'].values[0]
             # else:
             #     prefix = df.loc[df.key=='GENVERSION','value'].values[0]
-            prefix = df.loc[df.key=='GENVERSION','value'].values[0]
-            return ["{}/{}.LIST".format(res,prefix) for res in outdirs]
+
+            # D. Jones - uncomment this line if this doesn't work....
+            #prefix = df.loc[df.key=='GENVERSION','value'].values[0]
+            return ["{}/{}.LIST".format(res,prefix) for res,prefix in zip(outdirs,df.loc[df.key=='GENVERSION','value'].values)]
         elif pipepro.lower().startswith('lcfit'):
             return df.loc[df.key=='GENVERSION','value'].values
             # idx = res.find(simpath)
@@ -524,7 +526,7 @@ class Training(PyPipeProcedure):
     def _get_input_info(self):
         df = {}
         section = 'iodata'
-        key = 'snlist'
+        key = 'snlists'
         df['section'] = section
         df['key'] = key
         df['value'] = self.keys[section][key]

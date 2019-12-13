@@ -147,6 +147,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 			else: #except Exception as e:
 				print(e)
 				continue
+
 	pdf_pages.savefig()
 	pdf_pages.close()
 			
