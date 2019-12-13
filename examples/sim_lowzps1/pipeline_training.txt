@@ -1,7 +1,7 @@
 ##SALT3 INPUT
 
 [data]
-snlist=/home/midai/salt3_local/SALT3/examples/pipelinetest/training/data/SALT3TEST_SIMPLE.LIST
+snlists=/home/midai/salt3_local/SALT3/examples/pipelinetest/training/data/SALT3TEST_SIMPLE.LIST
 
 [byosed]
 baseinput=byosed/BYOSED_base.params
