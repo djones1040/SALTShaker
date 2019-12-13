@@ -746,8 +746,9 @@ class SALTResids:
 
 			# color law
 			if varyParams[self.iCL].any():
-				specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='cl')] = modulatedFlux[:,np.newaxis]*-0.4*np.log(10)*c*self.colorLawDerivInterp(specdata[k]['wavelength']/(1+z))[:,varyParams[self.iCL]]
-				
+				try: specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='cl')] = modulatedFlux[:,np.newaxis]*-0.4*np.log(10)*c*self.colorLawDerivInterp(specdata[k]['wavelength']/(1+z))[:,varyParams[self.iCL]]
+				except: import pdb; pdb.set_trace()
+
 				# M0, M1
 			if (requiredPCDerivs).any():
 				intmult = _SCALE_FACTOR/(1+z)*recalexp*colorexpinterp*self.datadict[sn]['mwextcurveint'](specdata[k]['wavelength'])
