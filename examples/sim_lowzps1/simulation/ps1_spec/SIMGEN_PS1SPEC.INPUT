@@ -15,7 +15,7 @@ CIDOFF: 0
 SIMLIB_FILE: simulation/ps1_spec/PS1MD.simlib
 
 # should be 46.46% SNe Ia
-NGENTOT_LC:    3000 # 500 #2000 # 40000                 # number of SN lightcurves to generate 
+NGENTOT_LC:    400 # 500 #2000 # 40000                 # number of SN lightcurves to generate 
 GENVERSION: PS1_SIM_IA_SPEC             # SNDATA version to generate
 GENSOURCE:  RANDOM
 GENMODEL:   SALT2.JLA-B14
@@ -24,7 +24,7 @@ EFFERR_STOPGEN: 1.0E-7
 
 CLEARPROMPT: 0
 
-KCOR_FILE:  PS1/PS1s_RS14/kcor_PS1_none.fits
+KCOR_FILE:  kcor/kcor_PS1_PS1MD_SPEC.fits
 
 APPLY_SEARCHEFF_OPT: 3
 SEARCHEFF_PIPELINE_FILE: simulation/ps1_spec/SEARCHEFF_PIPELINE_PS1.DAT
@@ -46,7 +46,7 @@ FUDGE_MAGERR: 0.005
 
 GENSIGMA_SEARCH_PEAKMJD:  1.0     # sigma-smearing for  SEARCH_PEAKMJD (days)
 
-GENRANGE_REDSHIFT:  0.05   0.69
+GENRANGE_REDSHIFT:  0.05   0.7
 GENSIGMA_REDSHIFT:  0.0005
 
 GENRANGE_TREST:   -20.0    60.0     # rest epoch relative to peak (days)
@@ -103,3 +103,5 @@ GENSIGMA_SALT2c:    0.029   0.121     # bifurcated sigmas
 #ZVARIATION_POLY: GENPEAK_SALT2x1 0.0,0.593,-7.648,11.955
 
 SEARCHEFF_PIPELINE_LOGIC_FILE: simulation/ps1_spec/SEARCHEFF_PIPELINE_LOGIC.DAT
+
+TAKE_SPECTRUM:  TOBS(-5:10)  SNR_ZPOLY(10,0,0)  SNR_LAMOBS(5000:6000)
