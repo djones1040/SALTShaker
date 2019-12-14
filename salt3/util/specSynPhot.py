@@ -149,7 +149,8 @@ def getColorsForSN(spectrum,photdata,kcordict,survey,colorcut=0.1):
 		scale_guess_err += [scale_guess[-1]*np.sqrt((synpherr/synph)**2. + (fluxerr/flux)**2.)]
 
 		specmag += [-2.5*np.log10(synph) + 27.5]
-		photmag += [-2.5*np.log10(flux) + 27.5]
+		if flux > 0: photmag += [-2.5*np.log10(flux) + 27.5]
+		else: photmag += [np.nan]
 
 	if not len(scale_guess):
 		return None

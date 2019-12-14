@@ -149,7 +149,7 @@ class SuperNova( object ) :
 		"""
 		if not (datfile or (snid and simname)) : 
 			if verbose:	 print("No datfile or simname provided. Returning an empty SuperNova object.")
-			
+		
 		if simname and snid :
 			if verbose : print("Reading in data from binary fits tables for %s %s"%(simname, str(snid)))
 			self.simname = simname
@@ -479,18 +479,26 @@ class SuperNova( object ) :
 
 	def readspecfromlcfile(self,datfile):
 		"""read spectroscopy from the SNANA lightcurve file"""
+
 		with open(datfile) as fin:
+			reader = [x.split()[1:] for x in fin if x.startswith('SPEC:')]
+
+		with open(datfile) as fin:			
 			self.SPECTRA = {}
 			startSpec = False
+			i = 0
 			for line in fin:
 				if line.startswith('SPECTRUM_ID'):
 					startSpec = True
 					specid = int(line.split()[1])-1
 					self.SPECTRA[specid] = {}
-					for v in specvarnames:
-						self.SPECTRA[specid][v] = np.array([])
+					istart = i
 				elif (line.startswith('END_SPECTRUM') or line.startswith('SPECTRUM_END')) and startSpec:
-					startSpec = False
+					startSpec = False; iend = i
+					j = 0
+					for column in zip(*reader):
+						self.SPECTRA[specid][specvarnames[j]] = np.array(column[:][istart:iend]).astype(float)
+						j += 1
 				elif line.startswith('VARNAMES_SPEC'):
 					specvarnames = line.split()[1:]
 				elif startSpec and not line.startswith('SPEC:'):
@@ -499,10 +507,8 @@ class SuperNova( object ) :
 					except:
 						self.SPECTRA[specid][line.split()[0][:-1]] = line.split('#')[0].split()[1]
 				elif startSpec and line.startswith('SPEC'):
-					specvals = line.split('#')[0].split()[1:]
-					for v,sv in zip(specvarnames,specvals):
-						self.SPECTRA[specid][v] = np.append(self.SPECTRA[specid][v],float(sv))
-
+					i += 1
+				
 	def readnewspec(self,datfile):
 		"""read spectroscopy from an ascii file with columns wavelength, flux, (fluxerr)
 Header must include one of two following lines at the top:
