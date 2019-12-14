@@ -52,7 +52,7 @@ def flux(salt3dir,obsphase,obswave,z,x0,x1,c,mwebv):
 
 	return modelflux_wave
 	
-def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
+def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_parameters.dat',
 				   m0file='salt3_template_0.dat',
 				   m1file='salt3_template_1.dat',
 				   clfile='salt3_color_correction.dat',
@@ -87,7 +87,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,parfile='salt3_parameters.dat',
 	if outdir is None: outdir=salt3dir
 
 	#pars[parlist=='specrecal_{}_{}'.format(7194,1)]
-	pdf_pages = PdfPages('%s/speccomp.pdf'%outdir)
+	pdf_pages = PdfPages(specfile)
 	axcount = 0
 	for sn in datadict.keys():
 		specdata=datadict[sn]['specdata']
