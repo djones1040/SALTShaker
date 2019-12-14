@@ -75,7 +75,7 @@ def rdkcor(surveylist,options,addwarning=None):
 	kcordict['default']['primarywave']=primarywave
 	return kcordict
 			
-def rdSpecData(datadict,speclist,KeepOnlySpec=False):
+def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200]):
 	if not os.path.exists(speclist):
 		raise RuntimeError('speclist %s does not exist')
 	
@@ -123,6 +123,13 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False):
 					datadict[s]['specdata'][speccount]['flux'] = spec['FLAM']
 					datadict[s]['specdata'][speccount]['tobs'] = m - tpk
 					datadict[s]['specdata'][speccount]['mjd'] = m
+
+					z = datadict[s]['zHelio']
+					iGood = ((datadict[s]['specdata'][speccount]['wavelength']/(1+z) > waverange[0]) &
+							 (datadict[s]['specdata'][speccount]['wavelength']/(1+z) < waverange[1]))
+					datadict[s]['specdata'][speccount]['flux'] = datadict[s]['specdata'][speccount]['flux'][iGood]
+					datadict[s]['specdata'][speccount]['wavelength'] = datadict[s]['specdata'][speccount]['wavelength'][iGood]
+					datadict[s]['specdata'][speccount]['fluxerr'] = datadict[s]['specdata'][speccount]['fluxerr'][iGood]
 					speccount+=1
 			else:
 				print('SNID %s has no photometry so I\'m ignoring it'%s)
@@ -164,7 +171,8 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False):
 
 	return datadict
 
-def rdAllData(snlists,estimate_tpk,kcordict,addwarning,dospec=False,KeepOnlySpec=False,peakmjdlist=None):
+def rdAllData(snlists,estimate_tpk,kcordict,addwarning,
+			  dospec=False,KeepOnlySpec=False,peakmjdlist=None,waverange=[2000,9200]):
 	datadict = {}
 	if peakmjdlist:
 		pksnid,pkmjd,pkmjderr = np.loadtxt(peakmjdlist,unpack=True,dtype=str)
@@ -269,7 +277,8 @@ def rdAllData(snlists,estimate_tpk,kcordict,addwarning,dospec=False,KeepOnlySpec
 		raise RuntimeError('no light curve data to train on!!')
 		
 	if dospec:
-		datadict = rdSpecData(datadict,snlist,KeepOnlySpec=KeepOnlySpec)
+		for snlist in snlists.split(','):
+			datadict = rdSpecData(datadict,snlist,KeepOnlySpec=KeepOnlySpec,waverange=waverange)
 		
 	return datadict
 	

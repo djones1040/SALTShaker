@@ -444,7 +444,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			# read the data
 			datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,self.kcordict,
 										   self.addwarning,dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
-										   peakmjdlist=self.options.tmaxlist)
+										   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange)
 			datadict = self.mkcuts(datadict,KeepOnlySpec=self.options.keeponlyspec)
 
 			phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
