@@ -9,6 +9,7 @@ from astroquery.irsa_dust import IrsaDust
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 import warnings
+from time import time
 
 def rdkcor(surveylist,options,addwarning=None):
 
@@ -177,8 +178,10 @@ def rdAllData(snlists,estimate_tpk,kcordict,addwarning,
 	if peakmjdlist:
 		pksnid,pkmjd,pkmjderr = np.loadtxt(peakmjdlist,unpack=True,dtype=str)
 		pkmjd,pkmjderr = pkmjd.astype('float'),pkmjderr.astype('float')
-
+	rdtime = 0
 	for snlist in snlists.split(','):
+		tsn = time()
+		snlist = os.path.expandvars(snlist)
 		if not os.path.exists(snlist):
 			print('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
 			snlist = '%s/trainingdata/%s'%(data_rootdir,snlist)
@@ -194,8 +197,10 @@ def rdAllData(snlists,estimate_tpk,kcordict,addwarning,
 
 			if '/' not in f:
 				f = '%s/%s'%(os.path.dirname(snlist),f)
+			rdstart = time()
 			sn = snana.SuperNova(f)
-
+			rdtime += time()-rdstart
+			
 			if sn.SNID in datadict.keys():
 				addwarning('SNID %s is a duplicate!	 Skipping'%sn.SNID)
 				continue
@@ -272,13 +277,14 @@ def rdAllData(snlists,estimate_tpk,kcordict,addwarning,
 				datadict[sn.SNID]['MWEBV'] = IrsaDust.get_query_table(sc)['ext SandF mean'][0]
 			else:
 				raise RuntimeError('Could not determine E(B-V) from files.	Set MWEBV keyword in input file header for SN %s'%sn.SNID)
-			
+
+		if dospec:
+			tspec = time()
+			datadict = rdSpecData(datadict,snlist,KeepOnlySpec=KeepOnlySpec,waverange=waverange)
+
+	print('reading data files took %.1f'%(rdtime))
 	if not len(datadict.keys()):
 		raise RuntimeError('no light curve data to train on!!')
-		
-	if dospec:
-		for snlist in snlists.split(','):
-			datadict = rdSpecData(datadict,snlist,KeepOnlySpec=KeepOnlySpec,waverange=waverange)
 		
 	return datadict
 	
