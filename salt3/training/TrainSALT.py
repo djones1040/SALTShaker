@@ -373,7 +373,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		gs1.update(wspace=0.0)
 		i = 0
 			
-		for snlist in self.options.snlists.split(','):
+		for j,snlist in enumerate(self.options.snlists.split(',')):
 			snlist = os.path.expandvars(snlist)
 			if not os.path.exists(snlist):
 				print('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
@@ -384,7 +384,8 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			tspec = time()
 			if self.options.dospec:
 				ValidateSpectra.compareSpectra(
-					snlist,self.options.outputdir,maxspec=50,base=self,verbose=self.verbose)
+					snlist,self.options.outputdir,specfile='%s/speccomp_%i.pdf'%(self.options.outputdir,j),
+					maxspec=50,base=self,verbose=self.verbose)
 			print('plotting spectra took %.1f'%(time()-tspec))
 				
 			snfiles = np.genfromtxt(snlist,dtype='str')
