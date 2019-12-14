@@ -18,9 +18,10 @@ def nonetype_or_int(s):
 class TrainSALTBase:
 	def __init__(self):
 		self.warnings = []
-	
+		self.verbose = False
+		
 	def addwarning(self,warning):
-		print(warning)
+		if self.verbose: print(warning)
 		self.warnings.append(warning)
 
 	def add_user_options(self, parser=None, usage=None, config=None):
@@ -29,7 +30,7 @@ class TrainSALTBase:
 
 		# The basics
 		parser.add_argument('-v', '--verbose', action="count", dest="verbose",
-							default=1,help='verbosity level')
+							default=0,help='verbosity level')
 		parser.add_argument('--debug', default=False, action="store_true",
 							help='debug mode: more output and debug files')
 		parser.add_argument('--clobber', default=False, action="store_true",
@@ -273,6 +274,7 @@ class TrainSALTBase:
 		numSpecElimmed,numSpec=0,0
 		numPhotElimmed,numPhot=0,0
 		numSpecPoints=0
+		failedlist = []
 		for sn in list(datadict.keys()):
 			photdata = datadict[sn]['photdata']
 			specdata = datadict[sn]['specdata']
@@ -291,7 +293,8 @@ class TrainSALTBase:
 			NFiltColorCut = len(np.unique(photdata['filt'][iColorCut]))
 			if len(iEpochsCut) < 4 or not len(iPkCut) or not len(iShapeCut) or NFiltColorCut < 2:
 				datadict.pop(sn)
-				print('SN %s fails cuts'%sn)
+				failedlist += [sn]
+				#print('SN %s fails cuts'%sn)
 				if self.verbose:
 					print('%i epochs, %i epochs near peak, %i epochs post-peak, %i filters near peak'%(
 						len(iEpochsCut),len(iPkCut),len(iShapeCut),NFiltColorCut))
