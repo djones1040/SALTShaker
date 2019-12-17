@@ -33,6 +33,7 @@ def getScaleForSN(spectrum,photdata,kcordict,survey,colorcut=0.1):
 			(kcordict[survey]['filtwave'] > maxwave) |
 			(kcordict[survey]['filtwave'] < minwave)])/np.sum(kcordict[survey][flt]['filttrans'])
 		if wht > 0.02: continue
+		if len(photdata['filt'][photdata['filt'] == flt]) == 1: continue
 		flt_out += [flt]
 
 		filttrans = kcordict[survey][flt]['filttrans']
@@ -112,6 +113,7 @@ def getColorsForSN(spectrum,photdata,kcordict,survey,colorcut=0.1):
 			(kcordict[survey]['filtwave'] > maxwave) |
 			(kcordict[survey]['filtwave'] < minwave)])/np.sum(kcordict[survey][flt]['filttrans'])
 		if wht > 0.02: continue
+		if len(photdata['filt'][photdata['filt'] == flt]) == 1: continue
 		flt_out += [flt]
 
 		filttrans = kcordict[survey][flt]['filttrans']
@@ -123,11 +125,13 @@ def getColorsForSN(spectrum,photdata,kcordict,survey,colorcut=0.1):
 		denom = trapz(pbspl,spectrum['wavelength'])
 		pbspl /= denom*HC_ERG_AA
 
-		
-		phot1d = interp1d(photdata['mjd'][photdata['filt'] == flt],
-						  photdata['fluxcal'][photdata['filt'] == flt],
-						  axis=0,kind='linear',#bounds_error=True,
-						  assume_sorted=True,fill_value="extrapolate")
+		try:
+			phot1d = interp1d(photdata['mjd'][photdata['filt'] == flt],
+							  photdata['fluxcal'][photdata['filt'] == flt],
+							  axis=0,kind='linear',#bounds_error=True,
+							  assume_sorted=True,fill_value="extrapolate")
+		except:
+			import pdb; pdb.set_trace()
 		photerr1d = interp1d(photdata['mjd'][photdata['filt'] == flt],
 							 photdata['fluxcalerr'][photdata['filt'] == flt],
 							 axis=0,kind='linear',#bounds_error=True,
@@ -145,7 +149,8 @@ def getColorsForSN(spectrum,photdata,kcordict,survey,colorcut=0.1):
 		scale_guess_err += [scale_guess[-1]*np.sqrt((synpherr/synph)**2. + (fluxerr/flux)**2.)]
 
 		specmag += [-2.5*np.log10(synph) + 27.5]
-		photmag += [-2.5*np.log10(flux) + 27.5]
+		if flux > 0: photmag += [-2.5*np.log10(flux) + 27.5]
+		else: photmag += [np.nan]
 
 	if not len(scale_guess):
 		return None
