@@ -9,6 +9,7 @@ from astroquery.irsa_dust import IrsaDust
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 import warnings
+from time import time
 
 def rdkcor(surveylist,options,addwarning=None):
 
@@ -75,7 +76,7 @@ def rdkcor(surveylist,options,addwarning=None):
 	kcordict['default']['primarywave']=primarywave
 	return kcordict
 			
-def rdSpecData(datadict,speclist,KeepOnlySpec=False):
+def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200]):
 	if not os.path.exists(speclist):
 		raise RuntimeError('speclist %s does not exist')
 	
@@ -123,6 +124,13 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False):
 					datadict[s]['specdata'][speccount]['flux'] = spec['FLAM']
 					datadict[s]['specdata'][speccount]['tobs'] = m - tpk
 					datadict[s]['specdata'][speccount]['mjd'] = m
+
+					z = datadict[s]['zHelio']
+					iGood = ((datadict[s]['specdata'][speccount]['wavelength']/(1+z) > waverange[0]) &
+							 (datadict[s]['specdata'][speccount]['wavelength']/(1+z) < waverange[1]))
+					datadict[s]['specdata'][speccount]['flux'] = datadict[s]['specdata'][speccount]['flux'][iGood]
+					datadict[s]['specdata'][speccount]['wavelength'] = datadict[s]['specdata'][speccount]['wavelength'][iGood]
+					datadict[s]['specdata'][speccount]['fluxerr'] = datadict[s]['specdata'][speccount]['fluxerr'][iGood]
 					speccount+=1
 			else:
 				print('SNID %s has no photometry so I\'m ignoring it'%s)
@@ -164,13 +172,16 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False):
 
 	return datadict
 
-def rdAllData(snlists,estimate_tpk,kcordict,addwarning,dospec=False,KeepOnlySpec=False,peakmjdlist=None):
+def rdAllData(snlists,estimate_tpk,kcordict,addwarning,
+			  dospec=False,KeepOnlySpec=False,peakmjdlist=None,waverange=[2000,9200]):
 	datadict = {}
 	if peakmjdlist:
 		pksnid,pkmjd,pkmjderr = np.loadtxt(peakmjdlist,unpack=True,dtype=str)
 		pkmjd,pkmjderr = pkmjd.astype('float'),pkmjderr.astype('float')
-
+	rdtime = 0
 	for snlist in snlists.split(','):
+		tsn = time()
+		snlist = os.path.expandvars(snlist)
 		if not os.path.exists(snlist):
 			print('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
 			snlist = '%s/trainingdata/%s'%(data_rootdir,snlist)
@@ -186,8 +197,10 @@ def rdAllData(snlists,estimate_tpk,kcordict,addwarning,dospec=False,KeepOnlySpec
 
 			if '/' not in f:
 				f = '%s/%s'%(os.path.dirname(snlist),f)
+			rdstart = time()
 			sn = snana.SuperNova(f)
-
+			rdtime += time()-rdstart
+			
 			if sn.SNID in datadict.keys():
 				addwarning('SNID %s is a duplicate!	 Skipping'%sn.SNID)
 				continue
@@ -264,12 +277,14 @@ def rdAllData(snlists,estimate_tpk,kcordict,addwarning,dospec=False,KeepOnlySpec
 				datadict[sn.SNID]['MWEBV'] = IrsaDust.get_query_table(sc)['ext SandF mean'][0]
 			else:
 				raise RuntimeError('Could not determine E(B-V) from files.	Set MWEBV keyword in input file header for SN %s'%sn.SNID)
-			
+
+		if dospec:
+			tspec = time()
+			datadict = rdSpecData(datadict,snlist,KeepOnlySpec=KeepOnlySpec,waverange=waverange)
+
+	print('reading data files took %.1f'%(rdtime))
 	if not len(datadict.keys()):
 		raise RuntimeError('no light curve data to train on!!')
-		
-	if dospec:
-		datadict = rdSpecData(datadict,snlist,KeepOnlySpec=KeepOnlySpec)
 		
 	return datadict
 	
