@@ -371,8 +371,7 @@ class SALTResids:
 			return logp,grad
 		else:
 			return logp
-	
-				
+					
 	def ResidsForSN(self,x,sn,storedResults,varyParams=None,fixUncertainty=False,SpecErrScale=1.):
 		""" This method should be the only one required for any fitter to process the supernova data. 
 		Find the residuals of a set of parameters to the photometric and spectroscopic data of a given supernova. 
@@ -747,8 +746,9 @@ class SALTResids:
 
 			# color law
 			if varyParams[self.iCL].any():
-				specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='cl')] = modulatedFlux[:,np.newaxis]*-0.4*np.log(10)*c*self.colorLawDerivInterp(specdata[k]['wavelength']/(1+z))[:,varyParams[self.iCL]]
-				
+				try: specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='cl')] = modulatedFlux[:,np.newaxis]*-0.4*np.log(10)*c*self.colorLawDerivInterp(specdata[k]['wavelength']/(1+z))[:,varyParams[self.iCL]]
+				except: import pdb; pdb.set_trace()
+
 				# M0, M1
 			if (requiredPCDerivs).any():
 				intmult = _SCALE_FACTOR/(1+z)*recalexp*colorexpinterp*self.datadict[sn]['mwextcurveint'](specdata[k]['wavelength'])
@@ -905,6 +905,7 @@ class SALTResids:
 				if colorscat == np.inf:
 					print('infinite color scatter!')
 					import pdb; pdb.set_trace()
+
 				pow=pow[varyParams[self.parlist=='clscat']]
 				dcolorscatdx= colorscat*((lameffPrime) ** (pow) )/ factorial(pow)
 			else:
@@ -1145,7 +1146,7 @@ class SALTResids:
 		from matplotlib.backends.backend_pdf import PdfPages
 		pdf_pages = PdfPages('%s/MCMC_hist.pdf'%self.outputdir)
 		fig = plt.figure()
-		
+
 		m0pars = np.array([])
 		m0err = np.array([])
 		for i in self.im0:
@@ -1328,6 +1329,13 @@ class SALTResids:
 		self.neffRaw=gaussian_filter1d(self.neffRaw,self.phaseSmoothingNeff,0)
 		self.neffRaw=gaussian_filter1d(self.neffRaw,self.waveSmoothingNeff,1)
 		# hack!
+		# D. Jones - just testing this out
+		#for j,p in enumerate(self.phaseBinCenters):
+		#	if np.max(self.neffRaw[j,:]) > 0: self.neffRaw[j,:] /= np.max(self.neffRaw[j,:])
+		#import pdb; pdb.set_trace()
+		#self.neffRaw[self.neffRaw > 1] = 1
+		#self.neffRaw[self.neffRaw < 1e-6] = 1e-6
+
 		self.plotEffectivePoints([-12.5,0,12.5,40],'neff.png')
 		self.plotEffectivePoints(None,'neff-heatmap.png')
 		self.neff=np.clip(self.neffRaw,self.neffFloor,None)
@@ -1354,7 +1362,7 @@ class SALTResids:
 			plt.xlabel('$\lambda (\AA)$')
 			plt.xlim(self.waveRegularizationPoints.min(),self.waveRegularizationPoints.max())
 			plt.legend()
-		
+		#import pdb; pdb.set_trace()
 		if output is None:
 			plt.show()
 		else:
