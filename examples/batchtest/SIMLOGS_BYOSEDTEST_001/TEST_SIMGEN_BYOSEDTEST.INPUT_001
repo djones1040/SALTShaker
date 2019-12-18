@@ -1,0 +1,20 @@
+BATCH_INFO:      sbatch  $SBATCH_TEMPLATES/SBATCH_Midway2_short.TEMPLATE 5
+
+# nominal generation
+GENVERSION: MD_BYOSEDTEST_TEST_001
+
+ENDLIST_GENVERSION:
+
+DONE_STAMP: /home/midai/salt3_local/SALT3/examples/batchtest/SIMLOGS_BYOSEDTEST_001/Sim.DONE
+
+# specify sim-input files for snlc_sim.exe
+SIMGEN_INFILE_Ia: simulation/SIMGEN_BYOSEDTEST.INPUT
+
+# define required global items to ensure uniformity among all jobs
+#H0: 70
+#ZRANGE:	         0.01   0.1
+GENPREFIX: BYOSEDTEST_001
+FORMAT_MASK: 48	   # 2=TERSE        16=RanCID  32=FITS-FORMAT
+PATH_SNDATA_SIM: $SCRATCH_SIMDIR
+
+RANSEED_REPEAT: 5 24305

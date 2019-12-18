@@ -9,6 +9,7 @@ from astroquery.irsa_dust import IrsaDust
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 import warnings
+from time import time
 
 def rdkcor(surveylist,options,addwarning=None):
 
@@ -75,7 +76,7 @@ def rdkcor(surveylist,options,addwarning=None):
 	kcordict['default']['primarywave']=primarywave
 	return kcordict
 			
-def rdSpecData(datadict,speclist):
+def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200]):
 	if not os.path.exists(speclist):
 		raise RuntimeError('speclist %s does not exist')
 	
@@ -102,6 +103,9 @@ def rdSpecData(datadict,speclist):
 					
 				if len(sn.SPECTRA)==0:
 					print('warning: File {} contains no supernova spectra'.format(sf))
+					if KeepOnlySpec: 
+						print('KeepOnlySpec (debug) flag is set, removing SN')
+						datadict.pop(s)
 					continue
 				
 					#raise ValueError('File {} contains no supernova spectra'.format(sf))
@@ -120,6 +124,13 @@ def rdSpecData(datadict,speclist):
 					datadict[s]['specdata'][speccount]['flux'] = spec['FLAM']
 					datadict[s]['specdata'][speccount]['tobs'] = m - tpk
 					datadict[s]['specdata'][speccount]['mjd'] = m
+
+					z = datadict[s]['zHelio']
+					iGood = ((datadict[s]['specdata'][speccount]['wavelength']/(1+z) > waverange[0]) &
+							 (datadict[s]['specdata'][speccount]['wavelength']/(1+z) < waverange[1]))
+					datadict[s]['specdata'][speccount]['flux'] = datadict[s]['specdata'][speccount]['flux'][iGood]
+					datadict[s]['specdata'][speccount]['wavelength'] = datadict[s]['specdata'][speccount]['wavelength'][iGood]
+					datadict[s]['specdata'][speccount]['fluxerr'] = datadict[s]['specdata'][speccount]['fluxerr'][iGood]
 					speccount+=1
 			else:
 				print('SNID %s has no photometry so I\'m ignoring it'%s)
@@ -161,99 +172,119 @@ def rdSpecData(datadict,speclist):
 
 	return datadict
 
-def rdAllData(snlist,estimate_tpk,kcordict,addwarning,dospec=False):
+def rdAllData(snlists,estimate_tpk,kcordict,addwarning,
+			  dospec=False,KeepOnlySpec=False,peakmjdlist=None,waverange=[2000,9200]):
 	datadict = {}
+	if peakmjdlist:
+		pksnid,pkmjd,pkmjderr = np.loadtxt(peakmjdlist,unpack=True,dtype=str)
+		pkmjd,pkmjderr = pkmjd.astype('float'),pkmjderr.astype('float')
+	rdtime = 0
+	for snlist in snlists.split(','):
+		tsn = time()
+		snlist = os.path.expandvars(snlist)
+		if not os.path.exists(snlist):
+			print('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
+			snlist = '%s/trainingdata/%s'%(data_rootdir,snlist)
+		if not os.path.exists(snlist):
+			raise RuntimeError('SN list file %s does not exist'%snlist)
 
+		snfiles = np.genfromtxt(snlist,dtype='str')
+		snfiles = np.atleast_1d(snfiles)
 
-	if not os.path.exists(snlist):
-		print('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
-		snlist = '%s/trainingdata/%s'%(data_rootdir,snlist)
-	if not os.path.exists(snlist):
-		raise RuntimeError('SN list file %s does not exist'%snlist)
+		for f in snfiles:
+			if f.lower().endswith('.fits'):
+				raise RuntimeError('FITS extensions are not supported yet')
 
-	snfiles = np.genfromtxt(snlist,dtype='str')
-	snfiles = np.atleast_1d(snfiles)
-
-	for f in snfiles:
-		if f.lower().endswith('.fits'):
-			raise RuntimeError('FITS extensions are not supported yet')
-
-		if '/' not in f:
-			f = '%s/%s'%(os.path.dirname(snlist),f)
-		sn = snana.SuperNova(f)
-
-		if sn.SNID in datadict.keys():
-			addwarning('SNID %s is a duplicate!	 Skipping'%sn.SNID)
-			continue
-
-		if not 'SURVEY' in sn.__dict__.keys():
-			raise RuntimeError('File %s has no SURVEY key, which is needed to find the filter transmission curves'%PhotSNID[0])
-		if not 'REDSHIFT_HELIO' in sn.__dict__.keys():
-			raise RuntimeError('File %s has no heliocentric redshift information in the header'%PhotSNID[0])
-
-		if 'PEAKMJD' in sn.__dict__.keys(): sn.SEARCH_PEAKMJD = sn.PEAKMJD
-		zHel = float(sn.REDSHIFT_HELIO.split('+-')[0])
-		if estimate_tpk:
-			if 'B' in sn.FLT:
-				tpk,tpkmsg = estimate_tpk_bazin(
-					sn.MJD[sn.FLT == 'B'],sn.FLUXCAL[sn.FLT == 'B'],sn.FLUXCALERR[sn.FLT == 'B'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
-			elif 'g' in sn.FLT:
-				tpk,tpkmsg = estimate_tpk_bazin(
-					sn.MJD[sn.FLT == 'g'],sn.FLUXCAL[sn.FLT == 'g'],sn.FLUXCALERR[sn.FLT == 'g'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
-			elif 'c' in sn.FLT:
-				tpk,tpkmsg = estimate_tpk_bazin(
-					sn.MJD[sn.FLT == 'c'],sn.FLUXCAL[sn.FLT == 'c'],sn.FLUXCALERR[sn.FLT == 'c'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
-			else:
-				raise RuntimeError('need a blue filter to estimate tmax')
-		else:
-			tpk = sn.SEARCH_PEAKMJD
-			if type(tpk) == str:
-				tpk = float(sn.SEARCH_PEAKMJD.split()[0])
-			tpkmsg = 'termination condition is satisfied'
-
-		# at least one epoch 3 days before max
-		try:
-			if not len(sn.MJD[sn.MJD < tpk-3]):
-				addwarning('skipping SN %s; no epochs 3 days pre-max'%sn.SNID)
+			if '/' not in f:
+				f = '%s/%s'%(os.path.dirname(snlist),f)
+			rdstart = time()
+			sn = snana.SuperNova(f)
+			rdtime += time()-rdstart
+			
+			if sn.SNID in datadict.keys():
+				addwarning('SNID %s is a duplicate!	 Skipping'%sn.SNID)
 				continue
-		except: import pdb; pdb.set_trace()
-			
-		if 'termination condition is satisfied' not in tpkmsg:
-			addwarning('skipping SN %s; can\'t estimate t_max'%sn.SNID)
-			continue
 
-		if not (kcordict is None ) and sn.SURVEY not in kcordict.keys():
-			raise RuntimeError('survey %s not in kcor file'%(sn.SURVEY))
+			if not 'SURVEY' in sn.__dict__.keys():
+				raise RuntimeError('File %s has no SURVEY key, which is needed to find the filter transmission curves'%PhotSNID[0])
+			if not 'REDSHIFT_HELIO' in sn.__dict__.keys():
+				raise RuntimeError('File %s has no heliocentric redshift information in the header'%sn.SNID)
 
-		datadict[sn.SNID] = {'snfile':f,
-							 'zHelio':zHel,
-							 'survey':sn.SURVEY,
-							 'tpk':tpk}
-		#datadict[snid]['zHelio'] = zHel
-		
-		# TODO: flux errors
-		datadict[sn.SNID]['specdata'] = {}				
-		datadict[sn.SNID]['photdata'] = {}
-		datadict[sn.SNID]['photdata']['tobs'] = sn.MJD - tpk
-		datadict[sn.SNID]['photdata']['mjd'] = sn.MJD
-		datadict[sn.SNID]['photdata']['fluxcal'] = sn.FLUXCAL
-		datadict[sn.SNID]['photdata']['fluxcalerr'] = sn.FLUXCALERR
-		datadict[sn.SNID]['photdata']['filt'] = sn.FLT
-		if 'MWEBV' in sn.__dict__.keys():
-			try: datadict[sn.SNID]['MWEBV'] = float(sn.MWEBV.split()[0])
-			except: datadict[sn.SNID]['MWEBV'] = float(sn.MWEBV)
-		elif 'RA' in sn.__dict__.keys() and 'DEC' in sn.__dict__.keys():
-			print('determining MW E(B-V) from IRSA for SN %s using RA/Dec in file'%sn.SNID)
-			sc = SkyCoord(sn.RA,sn.DEC,frame="fk5",unit=u.deg)
-			datadict[sn.SNID]['MWEBV'] = IrsaDust.get_query_table(sc)['ext SandF mean'][0]
-		else:
-			raise RuntimeError('Could not determine E(B-V) from files.	Set MWEBV keyword in input file header for SN %s'%sn.SNID)
-			
+			if 'PEAKMJD' in sn.__dict__.keys(): sn.SEARCH_PEAKMJD = sn.PEAKMJD
+			zHel = float(sn.REDSHIFT_HELIO.split('+-')[0])
+			if estimate_tpk:
+				if 'B' in sn.FLT:
+					tpk,tpkmsg = estimate_tpk_bazin(
+						sn.MJD[sn.FLT == 'B'],sn.FLUXCAL[sn.FLT == 'B'],sn.FLUXCALERR[sn.FLT == 'B'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
+				elif 'g' in sn.FLT:
+					tpk,tpkmsg = estimate_tpk_bazin(
+						sn.MJD[sn.FLT == 'g'],sn.FLUXCAL[sn.FLT == 'g'],sn.FLUXCALERR[sn.FLT == 'g'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
+				elif 'c' in sn.FLT:
+					tpk,tpkmsg = estimate_tpk_bazin(
+						sn.MJD[sn.FLT == 'c'],sn.FLUXCAL[sn.FLT == 'c'],sn.FLUXCALERR[sn.FLT == 'c'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
+				else:
+					raise RuntimeError('need a blue filter to estimate tmax')
+			elif peakmjdlist:
+				if sn.SNID in pksnid:
+					tpk = pkmjd[sn.SNID == pksnid][0]
+					tpkerr = pkmjderr[sn.SNID == pksnid][0]
+					if tpkerr < 2: tpkmsg = 'termination condition is satisfied'
+					else: tpkmsg = 'time of max uncertainty of +/- %.1f days is too uncertain!'%tpkerr
+				else:
+					tpkmsg = 'can\'t fint tmax in file %s'%peakmjdlist
+					addwarning(tpkmsg)
+					#raise RuntimeError('SN ID %s not found in peak MJD list'%sn.SNID)
+			else:
+				tpk = sn.SEARCH_PEAKMJD
+				if type(tpk) == str:
+					tpk = float(sn.SEARCH_PEAKMJD.split()[0])
+				tpkmsg = 'termination condition is satisfied'
+
+			# at least one epoch 3 days before max
+			#try:
+			#	if not len(sn.MJD[sn.MJD < tpk-3]):
+			#		addwarning('skipping SN %s; no epochs 3 days pre-max'%sn.SNID)
+			#		continue
+			#except: import pdb; pdb.set_trace()
+
+			if 'termination condition is satisfied' not in tpkmsg:
+				addwarning('skipping SN %s; can\'t estimate t_max'%sn.SNID)
+				continue
+
+			if not (kcordict is None ) and sn.SURVEY not in kcordict.keys():
+				raise RuntimeError('survey %s not in kcor file'%(sn.SURVEY))
+
+			datadict[sn.SNID] = {'snfile':f,
+								 'zHelio':zHel,
+								 'survey':sn.SURVEY,
+								 'tpk':tpk}
+			#datadict[snid]['zHelio'] = zHel
+
+			# TODO: flux errors
+			datadict[sn.SNID]['specdata'] = {}				
+			datadict[sn.SNID]['photdata'] = {}
+			datadict[sn.SNID]['photdata']['tobs'] = sn.MJD - tpk
+			datadict[sn.SNID]['photdata']['mjd'] = sn.MJD
+			datadict[sn.SNID]['photdata']['fluxcal'] = sn.FLUXCAL
+			datadict[sn.SNID]['photdata']['fluxcalerr'] = sn.FLUXCALERR
+			datadict[sn.SNID]['photdata']['filt'] = sn.FLT
+			if 'MWEBV' in sn.__dict__.keys():
+				try: datadict[sn.SNID]['MWEBV'] = float(sn.MWEBV.split()[0])
+				except: datadict[sn.SNID]['MWEBV'] = float(sn.MWEBV)
+			elif 'RA' in sn.__dict__.keys() and 'DEC' in sn.__dict__.keys():
+				print('determining MW E(B-V) from IRSA for SN %s using RA/Dec in file'%sn.SNID)
+				sc = SkyCoord(sn.RA,sn.DEC,frame="fk5",unit=u.deg)
+				datadict[sn.SNID]['MWEBV'] = IrsaDust.get_query_table(sc)['ext SandF mean'][0]
+			else:
+				raise RuntimeError('Could not determine E(B-V) from files.	Set MWEBV keyword in input file header for SN %s'%sn.SNID)
+
+		if dospec:
+			tspec = time()
+			datadict = rdSpecData(datadict,snlist,KeepOnlySpec=KeepOnlySpec,waverange=waverange)
+
+	print('reading data files took %.1f'%(rdtime))
 	if not len(datadict.keys()):
 		raise RuntimeError('no light curve data to train on!!')
-		
-	if dospec:
-		datadict = rdSpecData(datadict,snlist)
 		
 	return datadict
 	

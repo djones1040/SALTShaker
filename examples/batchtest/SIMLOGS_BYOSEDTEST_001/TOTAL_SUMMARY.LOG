@@ -1,0 +1,12 @@
+                                                SUM-SNIa  : 
+  GENVERSION                                  NGEN     NWRITE  NSPEC   
+# ----------------------------------------------------------------- 
+MD_BYOSEDTEST_TEST_001                        5000      11     11
+
+
+                                                SUM-NONIa : 
+  GENVERSION                                  NGEN     NWRITE  NSPEC   
+# ----------------------------------------------------------------- 
+MD_BYOSEDTEST_TEST_001                           0       0      0
+
+
