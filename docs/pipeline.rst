@@ -7,7 +7,6 @@ Pipeline Discription
 
 The SALT3 Training pipeline consists of several procedures that will be run in series. The pipeline modifies a base input file to create a customized one and calls the external program with the customized input. Details are described below.
 
-
 Param File
 ==========
 
@@ -31,9 +30,18 @@ Each section in the param file defines one procedure in the pipeline. The gerena
 
     # define the section (optional), key and value to be added or changed from the base input
 
-    set_key=[SECTION1] [KEY] [VALUE]
+    set_key= [NCOL] # 2 if no section or 3 if section exists in the config file
+        [SECTION1] [KEY] [VALUE]
         [SECTION2] [KEY2] [VALUE2]
         [SECTION2] [KEY3] [VALUE3]
+
+Batch mode
+----------
+
+The pipeline supports batch submission for certain stages (e.g. simulation, lcfitting, ...)
+
+set `batch=True` under that stage.
+
 
 
 Running the Pipeline
@@ -132,19 +140,70 @@ The following example will run the Simulation and Training stages first with the
         pipe.glue(['getmu','cosmofit'])
         pipe.run()
 
+Running the Pipeline using the `runpipe.py` utility [batch submission supported]
+================================================================================
+
+Currently the `runpipe.py` utility is under `salt3/pipeline/`. We plan to pre-install it in the future. 
+
+Using `runpipe.py`
+------------------
+
+To use the utility, first define the environmental variable `MY_SALT3_DIR`:
+
+::
+
+    export MY_SALT3_DIR='THE_SALT3_DIRECTORY'
+
+Then in the terminal call:
+
+:: 
+
+    python $MY_SALT3_DIR/SALT3/salt3/pipeline/runpipe.py -[OPTIONS] [OPTVALUES]
+
+To see the currently available options, use
+
+::
+
+    python $MY_SALT3_DIR/SALT3/salt3/pipeline/runpipe.py --help
+
+::
+
+    usage: runpipe.py [-h] [-c PIPEINPUT] [--mypipe MYPIPE]
+                      [--batch_mode BATCH_MODE] [--batch_script BATCH_SCRIPT]
+                      [--randseed RANDSEED] [--fseeds FSEEDS] [--num NUM]
+                      [--norun]
+
+    Run SALT3 Pipe.
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      -c PIPEINPUT          pipeline input file
+      --mypipe MYPIPE       define your own pipe in yourownfilename.py
+      --batch_mode BATCH_MODE
+                            >0 to specify how many batch jobs to submit
+      --batch_script BATCH_SCRIPT
+                            base batch submission script
+      --randseed RANDSEED   [internal use] specify randseed for single simulation
+      --fseeds FSEEDS       provide a list of randseeds for multiple batch jobs
+      --num NUM             [internal use] suffix for multiple batch jobs
+      --norun               set to only check configurations without launch jobs
 
 
+Define your own pipeline
+------------------------
 
+Define your own pipeline is supported by `runpipe.py`. 
 
+Simply write your own pipeline in a `MYPIPE.py` (name can be arbitrary) file and use the `--mypipe MYPIPE` flag when calling the program. Make sure to drop the `pipe.run()` line, the pipeline will be called and run in the program. Example `MYPIPE.py` file:
 
-
-
-
-
-
-
-
-
-
-
-
+::
+    
+    def MyPipe(finput,**kwargs):
+        from pipeline import SALT3pipe
+        # write your own pipeline here        
+        pipe = SALT3pipe(finput)
+        pipe.build(data=False,mode='customize',onlyrun=['byosed','sim','train','lcfit'])
+        pipe.configure()
+        pipe.glue(['sim','train'])
+        pipe.glue(['sim','lcfit'])
+        return pipe
