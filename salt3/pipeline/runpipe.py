@@ -69,8 +69,9 @@ class RunPipe():
         return df
     
     def _reconfig_w_suffix(self,proname,df,suffix):
+        outname_orig = proname.outname
         proname.outname = '{}_{:03d}'.format(proname.outname,self.num)
-        proname.configure(pro=proname.pro,baseinput=proname.baseinput,setkeys=df,prooptions=proname.prooptions,
+        proname.configure(pro=proname.pro,baseinput=outname_orig,setkeys=df,prooptions=proname.prooptions,
                         batch=proname.batch,validplots=proname.validplots,outname=proname.outname,proargs=proname.proargs)  
     
     def run(self):
@@ -84,16 +85,20 @@ class RunPipe():
                 randseed_old = sim.keys['RANSEED_REPEAT']
                 randseed_new = [randseed_old.split(' ')[0],str(self.randseed)]
                 df = pd.DataFrame([{'key':'RANSEED_REPEAT','value':randseed_new}])
-                sim.configure(pro=sim.pro,baseinput=sim.baseinput,setkeys=df,prooptions=sim.prooptions,
+                sim.configure(pro=sim.pro,baseinput=sim.outname,setkeys=df,prooptions=sim.prooptions,
                               batch=sim.batch,validplots=sim.validplots,outname=sim.outname)    
                 if self.num is not None:
                     df_sim = self._add_suffix(sim,['GENVERSION','GENPREFIX'],self.num)
                     self._reconfig_w_suffix(sim,df_sim,self.num)
-                    if any([p.startswith('train') for p in self.pipe.pipepros]):    
-                        self.pipe.glue(['sim','train'])
-                    if any([p.startswith('lcfit') for p in self.pipe.pipepros]):                           
-                        self.pipe.glue(['sim','lcfit'],on='phot')
-     
+                    if any([p.startswith('train') for p in self.pipe.pipepros]): 
+                        if ['sim','train'] in self.pipe.gluepairs: 
+                            self.pipe.glue(['sim','train'])
+                        self._reconfig_w_suffix(self.pipe.Training,None,self.num)
+                    if any([p.startswith('lcfit') for p in self.pipe.pipepros]):       
+                        if ['sim','lcfit'] in self.pipe.gluepairs:
+                            self.pipe.glue(['sim','lcfit'],on='phot')
+                        self._reconfig_w_suffix(self.pipe.LCFitting,None,self.num)
+
             if not self.norun:
                 self.pipe.run()
         else:
