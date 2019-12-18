@@ -1314,6 +1314,7 @@ class SALTResids:
 			for k in specdata.keys():
 				restWave=specdata[k]['wavelength']/(1+z)
 				restWave=restWave[(restWave>self.waveRegularizationBins[0])&(restWave<self.waveRegularizationBins[-1])]
+
 				phase=(specdata[k]['tobs']+tpkoff)/(1+z)
 				if phase<self.phaseRegularizationBins[0]:
 					phaseIndex=0
@@ -1322,17 +1323,16 @@ class SALTResids:
 				else:
 					phaseIndex= np.where( (phase>=self.phaseRegularizationBins[:-1]) & (phase<self.phaseRegularizationBins[1:]))[0][0]
 				
-				
 				self.neffRaw[phaseIndex,:]+=np.histogram(restWave,self.waveRegularizationBins)[0]
-				
-		self.neffRaw=gaussian_filter1d(self.neffRaw,0.5,0)
-		self.neffRaw=gaussian_filter1d(self.neffRaw,0.5,1)
+		#import pdb;pdb.set_trace()
+		self.neffRaw=gaussian_filter1d(self.neffRaw,self.phaseSmoothingNeff,0)
+		self.neffRaw=gaussian_filter1d(self.neffRaw,self.waveSmoothingNeff,1)
 		# hack!
 		self.plotEffectivePoints([-12.5,0,12.5,40],'neff.png')
 		self.plotEffectivePoints(None,'neff-heatmap.png')
-		self.neff=np.clip(self.neffRaw,1e-4,None)
+		self.neff=np.clip(self.neffRaw,self.neffFloor,None)
 		
-		self.neff[self.neff>50]=np.inf
+		self.neff[self.neff>self.neffMax]=np.inf
 		#import pdb;pdb.set_trace()
 		
 	def plotEffectivePoints(self,phases=None,output=None):

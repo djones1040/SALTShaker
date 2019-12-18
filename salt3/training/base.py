@@ -132,6 +132,16 @@ class TrainSALTBase:
 		parser.add_argument('--regularizationScaleMethod', default=config.get('trainingparams','regularizationScaleMethod'), type=str,
 							help='Choose how scale for regularization is calculated (default=%default)')
     
+   		#neff parameters
+		parser.add_argument('--wavesmoothingneff', default=config.get('trainingparams','wavesmoothingneff'), type=float,
+							help='Smooth effective # of spectral points along wave axis (in units of waveoutres) (default=%default)')
+		parser.add_argument('--phasesmoothingneff', default=config.get('trainingparams','phasesmoothingneff'), type=float,
+							help='Smooth effective # of spectral points along phase axis (in units of phaseoutres) (default=%default)')
+		parser.add_argument('--nefffloor', default=config.get('trainingparams','nefffloor'), type=float,
+							help='Minimum number of effective points (has to be > 0 to prevent divide by zero errors).(default=%default)')
+		parser.add_argument('--neffmax', default=config.get('trainingparams','neffmax'), type=float,
+							help='Threshold for spectral coverage at which regularization will be turned off (default=%default)')
+
 		# training model parameters
 		parser.add_argument('--waverange', default=list(map(int,config.get('modelparams','waverange').split(','))), type=int, nargs=2,
 							help='wavelength range over which the model is defined (default=%default)')
@@ -161,6 +171,7 @@ class TrainSALTBase:
 							help='number of days over which to compute scaling of error model (default=%default)')
 		parser.add_argument('--error_snake_wave_binsize', default=config.get('modelparams','error_snake_wave_binsize'), type=float,
 							help='number of angstroms over which to compute scaling of error model (default=%default)')
+		
 		
 		# mcmc parameters
 		parser.add_argument('--stepsize_magscale_M0', default=config.get('mcmcparams','stepsize_magscale_M0'), type=float,
@@ -221,7 +232,10 @@ class TrainSALTBase:
 
 	def get_saltkw(self,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc):
 
-		saltfitkwargs = {'specrecal':self.options.specrecal, 'regularizationScaleMethod':self.options.regularizationScaleMethod,
+
+		saltfitkwargs = {'waveSmoothingNeff':self.options.wavesmoothingneff,'phaseSmoothingNeff':self.options.phasesmoothingneff,
+						 'neffFloor':self.options.nefffloor, 'neffMax':self.options.neffmax,
+						 'specrecal':self.options.specrecal, 'regularizationScaleMethod':self.options.regularizationScaleMethod,
 						 'phaseknotloc':phaseknotloc,'waveknotloc':waveknotloc,
 						 'errphaseknotloc':errphaseknotloc,'errwaveknotloc':errwaveknotloc,
 						 'phaserange':self.options.phaserange,
