@@ -1,0 +1,107 @@
+>
+########################################################
+#
+# Input file for $SNANA_DIR/bin/snlc_sim.exe
+#
+#           
+#########################################################
+
+SOLID_ANGLE:  0.021   # 70 sq deg
+
+#USE_SIMLIB_PEAKMJD: 1
+#USE_SIMLIB_REDSHIFT: 0
+CIDOFF: 0
+
+SIMLIB_FILE: simulation/ps1_spec/PS1MD.simlib
+
+# should be 46.46% SNe Ia
+NGENTOT_LC:    400 # 500 #2000 # 40000                 # number of SN lightcurves to generate 
+GENVERSION: PS1_SIM_IA_SPEC             # SNDATA version to generate
+GENSOURCE:  RANDOM
+GENMODEL:   SALT2.JLA-B14
+
+EFFERR_STOPGEN: 1.0E-7
+
+CLEARPROMPT: 0
+
+KCOR_FILE:  kcor/kcor_PS1_PS1MD_SPEC.fits
+
+APPLY_SEARCHEFF_OPT: 3
+SEARCHEFF_PIPELINE_FILE: simulation/ps1_spec/SEARCHEFF_PIPELINE_PS1.DAT
+SEARCHEFF_SPEC_FILE:  simulation/ps1_spec/spec_dave_r_e6.txt
+
+APPLY_CUTWIN_OPT: 1
+CUTWIN_TRESTMIN: -25 +5 # at least 1 epoch before -5 d (rest-frame)
+CUTWIN_TRESTMAX: +5 +1000000
+CUTWIN_SNRMAX:   5 griz 2 -20. 80.  # require 1 of griz with S/N > 5
+
+# selection criteria for generation
+GENFILTERS:        griz
+GENRANGE_RA:      -1.0     +1.0   deg
+GENRANGE_DECL:    -1.258    +1.258  deg
+
+GENRANGE_PEAKMJD:  55080.0  56660.0
+SOLID_ANGLE: 0.022 # 1 field, 7 sq degreees
+FUDGE_MAGERR: 0.005
+
+GENSIGMA_SEARCH_PEAKMJD:  1.0     # sigma-smearing for  SEARCH_PEAKMJD (days)
+
+GENRANGE_REDSHIFT:  0.05   0.7
+GENSIGMA_REDSHIFT:  0.0005
+
+GENRANGE_TREST:   -20.0    60.0     # rest epoch relative to peak (days)
+OPT_MWEBV:    1                 # 0,1 => MW extinction off,on
+
+GENRANGE_DMPEVENT:    0  0     # screen dump events in this NGEN range
+#GENRANGE_DMPTREST:    0  0     # dump rest-mags for this Trest range
+
+DNDZ: POWERLAW  2.6E-5  2.2    # SNLS result
+#DNDZ: POWERLAW2 1.8E-5   2.15  0.0   1.0  # rate = R0(1+z)^Beta for z<1
+#DNDZ: POWERLAW2 9.5E-5   -0.25 1.0   2.0  # rate = R0(1+z)^Beta for z>1
+
+# smear flags: 0=off, 1=on
+SMEARFLAG_FLUX:    1  # photo-stat smearing of signal, sky, etc ...
+SMEARFLAG_ZEROPT:  1  # smear zero-point with zptsig
+#SMEARFLAG_HOSTGAL: 1  # include host-gal noise
+
+FORMAT_MASK:   32  # terse format
+
+HOSTLIB_FILE: simulation/ps1_spec/PS1.HOSTLIB
+HOSTLIB_MSKOPT:   258
+HOSTLIB_DZTOL: 0.03 0 0
+HOSTNOISE_FILE:  simulation/ps1_spec/PS1MD_SBNOISEMODEL.DAT
+
+# cosmological params for lightcurve generation and redshift distribution
+OMEGA_MATTER:  0.3
+OMEGA_LAMBDA:  0.7
+W0_LAMBDA:    -1.00
+H0:            70.0   
+
+GENRANGE_SALT2x1:  -5.0  5.0
+GENRANGE_SALT2c:   -1.0  1.0
+GENPEAK_SALT2ALPHA: 0.165
+GENPEAK_SALT2BETA: 3.032
+
+GENMEAN_RV:         3.1               # mean RV to generate
+
+RANSEED: 58474       # random number seed
+
+GENMAG_SMEAR_MODELNAME: G10
+
+GENMEAN_SALT2x1:    0.598
+#0.37
+#0.37
+GENRANGE_SALT2x1:   -4.0  +4.0     # x1 (stretch) range
+GENSIGMA_SALT2x1:    0.963   0.514     # bifurcated sigmas
+
+GENMEAN_SALT2c:    -0.077
+#0.093
+GENRANGE_SALT2c:   -0.4   0.4     # color range
+GENSIGMA_SALT2c:    0.029   0.121     # bifurcated sigmas
+
+#ZVARIATION_POLY: GENPEAK_SALT2c 0.0,-2.099,7.029,-6.787
+#ZVARIATION_POLY: GENPEAK_SALT2x1 0.0,0.593,-7.648,11.955
+
+SEARCHEFF_PIPELINE_LOGIC_FILE: simulation/ps1_spec/SEARCHEFF_PIPELINE_LOGIC.DAT
+
+TAKE_SPECTRUM:  TOBS(-5:10)  SNR_ZPOLY(10,0,0)  SNR_LAMOBS(5000:6000)

@@ -4,8 +4,8 @@ magsmear = 0.0
 magoff = 0.0
 
 [FLAGS]
-color = True
-stretch = True
+color = False
+stretch = False
 velocity = True
 sfr = False
 metallicity = False
@@ -50,5 +50,4 @@ sn_function = salt2_colorlaw.dat
 scale_dist_peak = 0.0
 scale_dist_sigma = 0.07 0.1
 scale_dist_limits = -0.3 0.3
-dist_peak = 0.0
 

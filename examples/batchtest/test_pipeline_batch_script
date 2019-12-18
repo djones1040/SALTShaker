@@ -1,0 +1,11 @@
+#!/bin/bash
+#SBATCH --job-name=pipelinetest
+#SBATCH --output=pipelinetest.out
+#SBATCH --error=pipelinetest.err
+#SBATCH --time=1:00:00
+#SBATCH --partition=broadwl
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem-per-cpu=2000
+
+python /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/salt3/pipeline/runpipe.py -c sampleinput.txt --mypipe 0 --batch_mode 0
