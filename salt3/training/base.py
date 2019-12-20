@@ -85,6 +85,8 @@ class TrainSALTBase:
 							help='repeat mcmc and/or gauss newton n times (default=%default)')
 		parser.add_argument('--fit_model_err', default=config.get('trainparams','fit_model_err'), type=boolean_string,
 							help='fit for model error if set (default=%default)')
+		parser.add_argument('--condition_number', default=config.get('trainparams','condition_number'), type=float,
+							help='Largest singular value not set to zero for least-squares solver (default=%default)')
 
 		# mcmc parameters
 		parser.add_argument('--n_steps_mcmc', default=config.get('mcmcparams','n_steps_mcmc'), type=int,
@@ -239,7 +241,7 @@ class TrainSALTBase:
 		saltfitkwargs = {'waveSmoothingNeff':self.options.wavesmoothingneff,'phaseSmoothingNeff':self.options.phasesmoothingneff,
 						 'neffFloor':self.options.nefffloor, 'neffMax':self.options.neffmax,
 						 'specrecal':self.options.specrecal, 'regularizationScaleMethod':self.options.regularizationScaleMethod,
-						 'phaseknotloc':phaseknotloc,'waveknotloc':waveknotloc,
+						 'conditionNumber':self.options.condition_number,'phaseknotloc':phaseknotloc,'waveknotloc':waveknotloc,
 						 'errphaseknotloc':errphaseknotloc,'errwaveknotloc':errwaveknotloc,
 						 'phaserange':self.options.phaserange,
 						 'waverange':self.options.waverange,'phaseres':self.options.phasesplineres,

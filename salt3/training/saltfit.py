@@ -446,6 +446,7 @@ class GaussNewton(saltresids.SALTResids):
 		self.iModelParam[self.imodelerr]=False
 		self.iModelParam[self.imodelcorr]=False
 		self.iModelParam[self.iclscat]=False
+		self.tryFittingAllParams=True
 		fitlist = [('all parameters','all'),('all parameters grouped','all-grouped'),
 				   (" x0",'x0'),('x1','x1'),('principal component 0','component0'),
 				   ('principal component 1','component1'),('color','color'),('color law','colorlaw'),
@@ -706,13 +707,21 @@ class GaussNewton(saltresids.SALTResids):
 			storedResults=uncertainties.copy()
 			Xprop = X.copy()
 			for i in range(self.GN_iter[fit]):
-				Xprop,chi2prop = self.process_fit(Xprop,storedResults,fit=fit)
-				if (fit=='all'):
-					if (chi2prop/chi2 < 0.9):
-						print('Terminating iteration ',niter,', continuing with all parameter fit')
-						return Xprop,chi2prop,False
-				elif chi2prop<chi2 :
-					X,chi2=Xprop,chi2prop
+				if fit=='all':
+					if self.tryFittingAllParams:
+						Xprop,chi2prop = self.process_fit(Xprop,storedResults,fit=fit)
+						if (chi2prop/chi2 < 0.9):
+							print('Terminating iteration ',niter,', continuing with all parameter fit')
+							return Xprop,chi2prop,False
+						elif chi2prop<chi2:
+							print('All parameter fit returned better position, but not by enough')
+						else:
+							self.tryFittingAllParams=False
+							print('Discontinuing all parameter fit')
+				else:
+					Xprop,chi2prop = self.process_fit(Xprop,storedResults,fit=fit)
+					if chi2prop<chi2 :
+						X,chi2=Xprop,chi2prop
 				retainReg=(not ('all' in fit or 'component' in fit))
 				retainPhotFlux=fit.startswith('spectralrecalibration') 
 				retainPCDerivs=fit.startswith('component')  or fit.startswith('x')
@@ -736,7 +745,7 @@ class GaussNewton(saltresids.SALTResids):
 		includePars= ~(np.all(0==jacobian,axis=0))
 		print('Number of parameters fit this round: {}'.format(includePars.sum()))
 		jacobian=jacobian[:,includePars]
-		stepsize=linalg.lstsq(jacobian,residuals,cond=1e-6)[0]
+		stepsize=linalg.lstsq(jacobian,residuals,cond=self.conditionNumber)[0]
 		if np.any(np.isnan(stepsize)):
 			print('NaN detected in stepsize; exitting to debugger')
 			import pdb;pdb.set_trace()
