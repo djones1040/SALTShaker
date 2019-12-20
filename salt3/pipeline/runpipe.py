@@ -58,14 +58,16 @@ class RunPipe():
     def _add_suffix(self,pro,keylist,suffix,section=None):
         df = pd.DataFrame()
         for i,key in enumerate(keylist):
-            if section is None:
-                val_old = pro.keys[key]
-                sec = None
-            else:
-                sec = section[i]
-                val_old = pro.keys[sec][key]
-            val_new = '{}_{:03d}'.format(val_old.strip(),suffix)
-            df = pd.concat([df,pd.DataFrame([{'section':sec,'key':key,'value':val_new}])])
+            keystrlist = [x for x in pro.keys.keys() if x.startswith(key)]
+            for keystr in keystrlist:
+                if section is None:
+                    val_old = pro.keys[keystr]
+                    sec = None
+                else:
+                    sec = section[i]
+                    val_old = pro.keys[sec][keystr]
+                val_new = '{}_{:03d}'.format(val_old.strip(),suffix)
+                df = pd.concat([df,pd.DataFrame([{'section':sec,'key':keystr,'value':val_new}])])
         return df
     
     def _reconfig_w_suffix(self,proname,df,suffix):
