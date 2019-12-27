@@ -39,6 +39,9 @@ class RunPipe():
         self.pipeinput = pipeinput
         self.mypipe = mypipe
         self.randseed = randseed
+        if (not self.batch_mode) and (self.randseed is None):
+            self.randseed = random.sample(range(100000),1)[0]
+            print("No randseed was given, auto-generated randseed={}".format(self.randseed))
         self.fseeds = fseeds
         self.num = num
         self.norun = norun
