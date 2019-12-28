@@ -452,8 +452,13 @@ class GaussNewton(saltresids.SALTResids):
 				   ('spectral recalibration const.','spectralrecalibration_norm'),
 				   ('spectral recalibration higher orders','spectralrecalibration_poly'),
 				   ('time of max','tpk'),('error model','modelerr')]
-		#fitlist_debug = [('all parameters','all'),(" x0",'x0'),('error model','modelerr')] #[('spectral recalibration const.','spectralrecalibration_norm')] #('principal component 0','component0')] #(" x0",'x0')] #('all parameters','all')]#
 		#print('hack!!')
+		#fitlist_debug = [#('all parameters','all'),('all parameters grouped','all-grouped'),
+		#		   (" x0",'x0'),('x1','x1'),('principal component 0','component0'),
+		#		   ('principal component 1','component1'),('color','color'),('color law','colorlaw'),
+		#		   ('spectral recalibration const.','spectralrecalibration_norm'),
+		#		   ('spectral recalibration higher orders','spectralrecalibration_poly'),
+		#		   ('time of max','tpk'),('error model','modelerr')]
 		for message,fit in fitlist:
 			if 'all' in fit:
 				includePars=np.ones(self.npar,dtype=bool)
