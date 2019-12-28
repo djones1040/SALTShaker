@@ -88,6 +88,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 
 	#pars[parlist=='specrecal_{}_{}'.format(7194,1)]
 	pdf_pages = PdfPages(specfile)
+	fig = plt.figure()
 	axcount = 0
 	for sn in datadict.keys():
 		specdata=datadict[sn]['specdata']
@@ -115,7 +116,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 									  snPars['z'],snPars['x0'],snPars['x1'],snPars['c'],mwebv=datadict[sn]['MWEBV'])
 				modelflux = unncalledModel*recalexp
 
-				if not axcount % 3:
+				if not axcount % 3 and axcount != 0:
 					fig = plt.figure()
 				ax = plt.subplot(3,1,axcount % 3 + 1)
 			
