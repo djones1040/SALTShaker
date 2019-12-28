@@ -8,7 +8,7 @@ def MyPipe(finput,**kwargs):
 #    pipe.glue(['sim','lcfit'])
 #    return pipe
 
-    pipe = SALT3pipe(finput='sampleinput.txt')
+    pipe = SALT3pipe(finput=finput)
     pipe.build(data=False,mode='customize',onlyrun=['sim','train','lcfit','getmu'])
     pipe.configure()
     #pipe.glue(['byosed','sim'])
