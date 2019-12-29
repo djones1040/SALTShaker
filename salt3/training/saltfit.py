@@ -452,7 +452,7 @@ class GaussNewton(saltresids.SALTResids):
 				   ('spectral recalibration const.','spectralrecalibration_norm'),
 				   ('spectral recalibration higher orders','spectralrecalibration_poly'),
 				   ('time of max','tpk'),('error model','modelerr')]
-		print('hack!!')
+		#print('hack!!')
 		#fitlist_debug = [('x1','x1'),('principal component 1','component1')]
 		#fitlist_debug = [#('all parameters','all'),('all parameters grouped','all-grouped'),
 		#		   (" x0",'x0'),('x1','x1'),('principal component 0','component0'),
@@ -742,11 +742,16 @@ class GaussNewton(saltresids.SALTResids):
 		includePars= ~(np.all(0==jacobian,axis=0))
 		print('Number of parameters fit this round: {}'.format(includePars.sum()))
 		jacobian=jacobian[:,includePars]
-		stepsize=linalg.lstsq(jacobian,residuals,cond=1e-6)[0]
+		#print('playing w/ conditioning!')
+		if fit == 'component1':
+			stepsize=linalg.lstsq(jacobian,residuals,cond=1e-17)[0]
+		else:
+			stepsize=linalg.lstsq(jacobian,residuals,cond=1e-6)[0]
 		if np.any(np.isnan(stepsize)):
 			print('NaN detected in stepsize; exitting to debugger')
 			import pdb;pdb.set_trace()
 		varyingParams[varyingParams]=varyingParams[varyingParams] & includePars
+		#import pdb; pdb.set_trace()
 		X[varyingParams] -= stepsize
 		
 		# quick eval
