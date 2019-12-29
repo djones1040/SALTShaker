@@ -452,7 +452,8 @@ class GaussNewton(saltresids.SALTResids):
 				   ('spectral recalibration const.','spectralrecalibration_norm'),
 				   ('spectral recalibration higher orders','spectralrecalibration_poly'),
 				   ('time of max','tpk'),('error model','modelerr')]
-		#print('hack!!')
+		print('hack!!')
+		#fitlist_debug = [('x1','x1'),('principal component 1','component1')]
 		#fitlist_debug = [#('all parameters','all'),('all parameters grouped','all-grouped'),
 		#		   (" x0",'x0'),('x1','x1'),('principal component 0','component0'),
 		#		   ('principal component 1','component1'),('color','color'),('color law','colorlaw'),
