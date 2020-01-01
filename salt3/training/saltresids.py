@@ -203,7 +203,6 @@ class SALTResids:
 			self.updateEffectivePoints(guess)
 
 		self.priors = SALTPriors(self)
-		self.numPriorResids=self.priors.numPriorResids
 		
 		self.__specFixedUncertainty__={}
 		self.__photFixedUncertainty__={}
@@ -232,6 +231,11 @@ class SALTResids:
 		self.imodelcorr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelcorr')])
 		self.iclscat = np.where(self.parlist=='clscat')[0]
 		self.ispcrcl_norm,self.ispcrcl_poly = np.array([],dtype='int'),np.array([],dtype='int')
+		self.iModelParam=np.ones(self.npar,dtype=bool)
+		self.iModelParam[self.imodelerr]=False
+		self.iModelParam[self.imodelcorr]=False
+		self.iModelParam[self.iclscat]=False
+
 		if len(self.ispcrcl):
 			for i,parname in enumerate(np.unique(self.parlist[self.ispcrcl])):
 				self.ispcrcl_norm = np.append(self.ispcrcl_norm,np.where(self.parlist == parname)[0][-1])
@@ -431,7 +435,7 @@ class SALTResids:
 					#Cut out zeroed jacobian entries to save time
 					nonzero=(~((photmodel['modelvariance_jacobian'][selectFilter]==0) & (photmodel['modelflux_jacobian'][selectFilter]==0)).all(axis=0)) | (self.parlist=='clscat')
 					reducedJac=photmodel['modelvariance_jacobian'][selectFilter][:,nonzero]
-					
+					#import pdb;pdb.set_trace()
 					#Calculate L^-1 (necessary for the diagonal derivative)
 					invL=linalg.solve_triangular(L,np.diag(np.ones(fluxdiff.size)),lower=True)
 					
@@ -457,7 +461,7 @@ class SALTResids:
 					#Multiply by size of transformed residuals and apply to resiudal jacobian
 					
 					photresids['resid_jacobian'][np.outer(selectFilter,nonzero)]-=np.dot(np.swapaxes(fractionalLDeriv,1,2),photresids['resid'][selectFilter]).flatten()
-				
+					
 					#Trace of fractional derivative gives the gradient of the lognorm term, since determinant is product of diagonal
 					photresids['lognorm_grad'][nonzero]-= np.trace(fractionalLDeriv)
 				
