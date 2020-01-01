@@ -13,17 +13,25 @@ class TRAINING_Test(unittest.TestCase):
 		ts=TrainSALT()
 		config = configparser.ConfigParser()
 		config.read('testdata/test.conf')
-		parser = argparse.ArgumentParser()
-		parser = ts.add_options(usage='',config=config)
-		options = parser.parse_args([])
-		ts.options=options
-		kcordict=readutils.rdkcor(ts.surveylist,options,addwarning=ts.addwarning)
+		user_parser = ts.add_user_options(usage='',config=config)
+		user_options = user_parser.parse_known_args()[0]
+		
+		trainingconfig = configparser.ConfigParser()
+		trainingconfig.read(user_options.trainingconfig)
+
+		training_parser = ts.add_training_options(
+			usage='',config=trainingconfig)
+		training_options = training_parser.parse_known_args(namespace=user_options)[0]
+		
+		ts.options=training_options
+		
+		kcordict=readutils.rdkcor(ts.surveylist,ts.options,addwarning=ts.addwarning)
 		ts.kcordict=kcordict
 
 		# TODO: ASCII filter files
 		# read the data
-		datadict = readutils.rdAllData(options.snlist,options.estimate_tpk,kcordict,
-									   ts.addwarning,dospec=options.dospec)
+		datadict = readutils.rdAllData(ts.options.snlists,ts.options.estimate_tpk,kcordict,
+									   ts.addwarning,dospec=ts.options.dospec)
 
 		self.parlist,self.guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc = ts.initialParameters(datadict)
 		saltfitkwargs = ts.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
@@ -33,27 +41,30 @@ class TRAINING_Test(unittest.TestCase):
 	def test_lsqwrap_jacobian(self):
 		dx=1e-8
 		rtol,atol=0.1,1e-2
-		residuals,jacobian=self.fitter.lsqwrap(self.guess,True,True,True)
+		residuals,jacobian=self.fitter.lsqwrap(self.guess,{},self.fitter.iModelParam)
 		#Other test already makes sure these are close enough for normal purposes, but small differences make a big difference in these results
-		residuals=self.fitter.lsqwrap(self.guess,False,False)
+		storedResults={}
+		residuals=self.fitter.lsqwrap(self.guess,storedResults,np.zeros(self.parlist.size,dtype=bool))
+		self.uncertaintyKeys={key for key in storedResults if key.startswith('photvariances_') or key.startswith('specvariances_') or key.startswith('photCholesky_') }
+		uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
+
 		def incrementOneParam(i):
 			guess=self.guess.copy()
 			guess[i]+=dx
-			return self.fitter.lsqwrap(guess,False,False)
+			return self.fitter.lsqwrap(guess,uncertainties.copy(),np.zeros(self.parlist.size,dtype=bool))
+
 		dResiddX=np.zeros((residuals.size,self.guess.size))
-		
 		for i in (trange if sys.stdout.isatty() else np.arange)(self.guess.size):
 			dResiddX[:,i]=(incrementOneParam(i)-residuals)/dx
-		num=(~np.isclose(dResiddX,jacobian,rtol,atol) ).sum()
+		dResiddX=dResiddX[:,self.fitter.iModelParam]
+		num=(~(np.isclose(dResiddX,jacobian,rtol,atol) | (self.parlist[self.fitter.iModelParam]=='tpkoff_5999390')[np.newaxis,:] )).sum()
 		if num>0: 
-			print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dResiddX,jacobian,rtol,atol))[1]]))
+			print('Problems with derivatives: ',np.unique(self.parlist[self.fitter.iModelParam][np.where(~np.isclose(dResiddX,jacobian,rtol,atol))[1]]))
 			if num<5:
 				print('Passing with {} problematic derivatives'.format(num))
 		#Set these tolerances pretty broadly considering the small step size and the effects of numerical errors
 		self.assertTrue(num<5)
 
 	def test_lsqwrap_computeDerivatives(self):
-		combinations= [(True,True),(True,False),(False,False)]
-		results=[self.fitter.lsqwrap(self.guess,*combinations)[0] if combinations[0] else self.fitter.lsqwrap(self.guess,*combinations) for x in combinations]
-		first=results[0]
-		self.assertTrue([np.allclose(first,result) for result in results[1:]])
+
+		self.assertTrue(np.allclose(self.fitter.lsqwrap(self.guess,{}, np.zeros(self.parlist.size,dtype=bool)),self.fitter.lsqwrap(self.guess,{}, self.fitter.iModelParam)[0]))
