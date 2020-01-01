@@ -83,7 +83,7 @@ def getScaleForSN(spectrum,photdata,kcordict,survey,colorcut=0.1):
 
 	scale_guess,scale_guess_err = np.array(scale_guess),np.array(scale_guess_err)
 	scale_out = np.average(scale_guess,weights=1/scale_guess_err**2.)
-	print(scale_out)
+	#print(scale_out)
 	return np.log(1/scale_out),colordiffs
 
 def getColorsForSN(spectrum,photdata,kcordict,survey,colorcut=0.1):
