@@ -751,7 +751,6 @@ class GaussNewton(saltresids.SALTResids):
 		includePars= ~(np.all(0==jacobian,axis=0))
 		print('Number of parameters fit this round: {}'.format(includePars.sum()))
 		jacobian=jacobian[:,includePars]
-		stepsize=linalg.lstsq(jacobian,residuals,cond=)[0]
 		#print('playing w/ conditioning!')
 		if fit == 'component1':
 			stepsize=linalg.lstsq(jacobian,residuals,cond=1e-17)[0]

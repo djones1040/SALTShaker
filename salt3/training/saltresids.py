@@ -400,7 +400,7 @@ class SALTResids:
 				#Find cholesky matrix as sqrt of diagonal uncertainties, then perform rank one update to incorporate color scatter
 				L= np.diag(np.sqrt(variance[selectFilter]))
 				for k in range(flux.size):
-					r = np.sqrt(L[k,k]**2 + flux[k]**2)
+					r = np.sqrt(variance[selectFilter][k] + flux[k]**2)
 					c = r/L[k,k]
 					s = flux[k]/L[k,k]
 					L[k,k] = r
