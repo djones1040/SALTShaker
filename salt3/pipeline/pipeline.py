@@ -1077,7 +1077,8 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
             else:
                 print("Addding key {}={} in &{}".format(key,v,sec))               
             nml[sec][key] = v
-
+    if nml['header']['version'].lstrip().startswith(','):
+        nml['header']['version'] = nml['header']['version'].split(',',maxsplit=1)[1]
     # a bit clumsy, but need to make sure these are the same for now:
     #nml['header'].__setitem__('version',nml['snlcinp']['version_photometry'])
     print("Write fit input to file:",outname)
