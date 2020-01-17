@@ -39,6 +39,18 @@ _V_LAMBDA_EFF = np.array([5428.55])	 # V-band-ish wavelength
 warnings.simplefilter('ignore',category=FutureWarning)
 	
 
+def rankOneCholesky(variance,beta,v):
+	"""Given variances, a scalar, and a vector, returns the cholesky matrix describing the covariance formed by the sum of the diagonal variance and the self outer product of the vector multiplied by the scalar"""
+	b=1
+	Lprime=np.zeros((variance.size,variance.size))
+	for j in range(v.size):
+		Lprime[j,j]=np.sqrt(variance[j]+beta/b*v[j]**2)
+		gamma=(b*variance[j]+beta*v[j]**2)
+		Lprime[j+1:,j]=Lprime[j,j]*beta*v[j+1:]*v[j]/gamma
+		b+=beta*v[j]**2/variance[j]
+	return Lprime
+	
+
 class SALTResids:
 	def __init__(self,guess,datadict,parlist,**kwargs):
 		
@@ -396,17 +408,8 @@ class SALTResids:
 			Ls,colorvar=[],[]
 			#Add color scatter
 			for selectFilter,clscat,dclscat in photmodel['colorvariance']:
-				flux=clscat*photmodel['modelflux'][selectFilter]
 				#Find cholesky matrix as sqrt of diagonal uncertainties, then perform rank one update to incorporate color scatter
-				L= np.diag(np.sqrt(variance[selectFilter]))
-				for k in range(flux.size):
-					r = np.sqrt(variance[selectFilter][k] + flux[k]**2)
-					c = r/L[k,k]
-					s = flux[k]/L[k,k]
-					L[k,k] = r
-					L[k+1:,k] = (L[k+1:,k] + s*flux[k+1:])/c
-					flux[k+1:]= c*flux[k+1:] - s*L[k+1:,k]
-				Ls+=[L]
+				Ls+=[rankOneCholesky(variance,clscat**2,photmodel['modelflux'][selectFilter])]
 				colorvar+=[(selectFilter,clscat,dclscat)]
 			storedResults['photCholesky_{}'.format(sn)]=Ls,colorvar
 
