@@ -1,0 +1,2 @@
+rsync  -r dkenworthy@midway2.rcc.uchicago.edu:/scratch/midway2/rkessler/SNDATA_ROOT/SIM/ALLSurveys_PS1/ $SNDATA_ROOT/SIM/ALLSurveys_PS1/
+rsync  -r dkenworthy@midway2.rcc.uchicago.edu:/scratch/midway2/rkessler/SNDATA_ROOT/SIM/AllSurveys_LOWZ/ $SNDATA_ROOT/SIM/AllSurveys_LOWZ/
