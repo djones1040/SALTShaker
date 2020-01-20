@@ -321,11 +321,12 @@ class TrainSALTBase:
 				# remove spectra with bad colors
 				colordiffs = getColorsForSN(
 					specdata[k],photdata,self.kcordict,datadict[sn]['survey'])
-				if colordiffs is None or len(colordiffs[np.abs(colordiffs) > 0.1]):
-					specdata.pop(k)
-					numSpecElimmed += 1
-				elif ((specdata[k]['tobs'])/(1+z)<self.options.phaserange[0]) or \
-				   ((specdata[k]['tobs'])/(1+z)>self.options.phaserange[1]):
+				print('hack! no spec color cut')
+				#if colordiffs is None or len(colordiffs[np.abs(colordiffs) > 0.1]):
+				#	specdata.pop(k)
+				#	numSpecElimmed += 1
+				if ((specdata[k]['tobs'])/(1+z)<self.options.phaserange[0]) or \
+				   ((specdata[k]['tobs'])/(1+z)>self.options.phaserange[1]-3):
 					specdata.pop(k)
 					numSpecElimmed+=1
 				elif specdata[k]['mjd'] < np.min(photdata['mjd']) or \
@@ -348,7 +349,7 @@ class TrainSALTBase:
 				try:
 					filttrans = self.kcordict[survey][flt]['filttrans']
 				except:
-					raise RuntimeError('filter %s not found in kcor file'%flt)
+					raise RuntimeError('filter %s not found in kcor file for SN %s'%(flt,sn))
 					
 				#Check how much mass of the filter is inside the wavelength range
 				filtRange=(filtwave/(1+z) > self.options.waverange[0]) & \
