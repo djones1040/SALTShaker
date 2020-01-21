@@ -80,7 +80,7 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 	maxSalt2 = interp1d(salt2m1phase,salt2m1flux,axis=0)(15)
 	maxSalt3 = interp1d(salt3m1phase,salt3m1flux,axis=0)(15)
 	sgn=np.sign(maxSalt3.sum())*np.sign(maxSalt2.sum())
-	salt3m1flux*=sgn
+	salt3m1flux*=-sgn
 	spacing = 0.5
 	for plotphase,i,plotphasestr in zip([-5,0,10],range(3),['-5','+0','+10']):
 		int_salt2m0 = interp2d(salt2m0wave,salt2m0phase,salt2m0flux)
