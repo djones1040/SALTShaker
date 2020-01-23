@@ -209,14 +209,14 @@ def customfilt(outfile,lcfile,salt3dir,
 
 		salt3flux = salt3flux.reshape([len(np.unique(salt3phase)),len(np.unique(salt3wave))])
 		salt3m1flux = salt3m1flux.reshape([len(np.unique(salt3phase)),len(np.unique(salt3wave))])
-		salt3phase = np.unique(salt3phase)*(1+float(sn.REDSHIFT_HELIO[0:5]))
-		salt3wave = np.unique(salt3wave)*(1+float(sn.REDSHIFT_HELIO[0:5]))
+		salt3phase = np.unique(salt3phase)*(1+float(sn.REDSHIFT_HELIO.split('+-')[0]))
+		salt3wave = np.unique(salt3wave)*(1+float(sn.REDSHIFT_HELIO.split('+-')[0]))
 
 		salt2m0flux = salt2flux.reshape([len(np.unique(salt2phase)),len(np.unique(salt2wave))])
 		salt2flux = salt2flux.reshape([len(np.unique(salt2phase)),len(np.unique(salt2wave))])
 		salt2m1flux = salt2m1flux.reshape([len(np.unique(salt2phase)),len(np.unique(salt2wave))])
-		salt2phase = np.unique(salt2phase)*(1+float(sn.REDSHIFT_HELIO))
-		salt2wave = np.unique(salt2wave)*(1+float(sn.REDSHIFT_HELIO))
+		salt2phase = np.unique(salt2phase)*(1+float(sn.REDSHIFT_HELIO.split('+-')[0]))
+		salt2wave = np.unique(salt2wave)*(1+float(sn.REDSHIFT_HELIO.split('+-')[0]))
 
 	else:
 		salt3phase,salt3wave,salt3flux = copy.deepcopy(saltdict['salt3phase']),copy.deepcopy(saltdict['salt3wave']),copy.deepcopy(saltdict['salt3flux'])
@@ -262,8 +262,8 @@ def customfilt(outfile,lcfile,salt3dir,
 								lcrv01file=lcrv01file)
 	
 	if 'PEAKMJD' in sn.__dict__.keys():
-		plotmjd = np.linspace(sn.PEAKMJD-20,
-							  sn.PEAKMJD+55,200)
+		plotmjd = np.linspace(float(sn.PEAKMJD.split()[0])-20,
+							  float(sn.PEAKMJD.split()[0])+55,200)
 	else:
 		print('BLAH!')
 		plotmjd = np.linspace(sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)][0]-20,
@@ -300,7 +300,7 @@ def customfilt(outfile,lcfile,salt3dir,
 		#denom = np.trapz(pbspl,salt3wave[g])
 		salt3synflux=np.sum(pbspl[np.newaxis,:]*salt3fluxnew[:,g],axis=1)*deltawave/HC_ERG_AA/denom
 		#salt3synflux=np.trapz(pbspl[np.newaxis,:]*salt3fluxnew[:,g]/HC_ERG_AA,salt3wave[g],axis=1)/denom
-		salt3synflux *= 10**(0.4*bandpassdict[sn.SURVEY][flt]['stdmag'])*10**(0.4*27.5)/(1+float(sn.REDSHIFT_HELIO[0:5]))
+		salt3synflux *= 10**(0.4*bandpassdict[sn.SURVEY][flt]['stdmag'])*10**(0.4*27.5)/(1+float(sn.REDSHIFT_HELIO.split('+-')[0].replace(' ','')))
 		
 		if 'SIM_SALT2x0' in sn.__dict__.keys():
 			g = (salt2wave >= filtwave[0]) & (salt2wave <= filtwave[-1])  # overlap range
@@ -312,11 +312,11 @@ def customfilt(outfile,lcfile,salt3dir,
 			salt2synflux=np.sum(pbspl[np.newaxis,:]*salt2fluxnew[:,g],axis=1)*deltawave/HC_ERG_AA/denom
 			#salt2synflux=np.trapz(pbspl[np.newaxis,:]*salt2fluxnew[:,g]/HC_ERG_AA,salt2wave[g],axis=1)/denom
 			#print(salt2synfluxtest,salt2synflux)
-			salt2synflux *= 10**(0.4*bandpassdict[sn.SURVEY][flt]['stdmag'])*10**(0.4*27.5)*10**(-0.4*0.27)/(1+float(sn.REDSHIFT_HELIO[0:5]))
+			salt2synflux *= 10**(0.4*bandpassdict[sn.SURVEY][flt]['stdmag'])*10**(0.4*27.5)*10**(-0.4*0.27)/(1+float(sn.REDSHIFT_HELIO.split('+-')[0]))
 
 		
 		ax.plot(plotmjd-t0,salt3synflux,color='C2',
-				label='SALT3, $x_0$ = %8.5e, \nx1=%.2f, z=%.3f\nc=%.3f'%(x0,x1,float(sn.REDSHIFT_HELIO[0:5]),c))
+				label='SALT3, $x_0$ = %8.5e, \nx1=%.2f, z=%.3f\nc=%.3f'%(x0,x1,float(sn.REDSHIFT_HELIO.split('+-')[0]),c))
 		if 'SIM_SALT2x0' in sn.__dict__.keys():
 			ax.plot(plotmjd-t0,salt2synflux,color='C1',
 					label='SALT2')

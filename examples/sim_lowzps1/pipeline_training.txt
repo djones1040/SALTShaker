@@ -13,7 +13,7 @@ set_key= FLAGS COLOR False
 pro=sim_SNmix.pl
 baseinput=simulation/MASTER_LOWZ_PS1.INPUT
 outinput=pipeline/MASTER_LOWZ_PS1.INPUT
-batch=False
+batch=True
 prooptions=
 set_key=
 

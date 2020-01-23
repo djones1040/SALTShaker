@@ -10,6 +10,7 @@ import astropy.units as u
 
 #_cfa_early_dir = "$SNDATA_ROOT/lcmerge/
 _lowz_dir = "$SNDATA_ROOT/lcmerge/Pantheon_LOWZ_TEXT"
+_jla_lowz_dir = "$SNDATA_ROOT/lcmerge/SNLS3year_JRK07"
 _foundation_dir = "$SNDATA_ROOT/lcmerge/Foundation_DJ17"
 #_lowz_dir = "$SNDATA_ROOT/lcmerge/02-DATA_PHOTOMETRY/DES-SN3YR_LOWZ"
 _des_dir = "$SNDATA_ROOT/lcmerge/02-DATA_PHOTOMETRY/DES-SN3YR_DES"
@@ -23,10 +24,14 @@ _ps1_dir = "$SNDATA_ROOT/lcmerge/Pantheon_PS1MD"
 _training_dirs = [_lowz_dir,_snls_dir,
 				  _sdss_dir1,_sdss_dir2,_sdss_dir3,_sdss_dir4,
 				  _des_dir,_foundation_dir,_ps1_dir]
+_training_dirs_orig = [_jla_lowz_dir,_snls_dir,
+					   _sdss_dir1,_sdss_dir2,_sdss_dir3,_sdss_dir4]
+
 #_outdir = '%s/trainingdata/snana'%(data_rootdir)
 _jladir = '%s/trainingdata/jla'%(data_rootdir)
 #_outdir = '%s/trainingdata/Pantheon_noPS1'%(data_rootdir)
 _outdir = '%s/trainingdata/Pantheon_Found_DES'%(data_rootdir)
+_outdir_orig = '%s/trainingdata/JLA_training_orig'%(data_rootdir)
 
 _jlaspecdir = '%s/trainingdata/jla'%(data_rootdir)
 _ps1specdir = '%s/trainingdata/ps1spec_formatted'%(data_rootdir)
@@ -35,6 +40,35 @@ _foundoldspecdir = '%s/trainingdata/FoundModSpec'%(data_rootdir)
 _foundpubspecdir = '%s/trainingdata/FoundationSpeccopy'%(data_rootdir)
 _ps1oldspecdir = '%s/trainingdata/PS1Spec'%(data_rootdir)
 
+
+def orig_training_data():
+
+	for t in _training_dirs_orig:
+		version = t.split('/')[-1]
+		listfile = os.path.expandvars('%s/%s.LIST'%(t,version))
+		if not os.path.exists(listfile):
+			raise RuntimeError('listfile %s does not exist'%listfile)
+
+		lcfiles = np.genfromtxt(listfile,unpack=True,dtype='str')
+		for l in lcfiles:
+			try: sn = snana.SuperNova(os.path.expandvars('%s/%s'%(t,l)))
+			except: print(os.path.expandvars('%s/%s'%(t,l)))
+
+			if t in [_sdss_dir1,_sdss_dir2,_sdss_dir3,_sdss_dir4]:
+				sdss_lcfile = glob.glob('%s/SDSS3_%06i.DAT'%(_jladir,sn.SNID))
+				if not len(sdss_lcfile): continue
+
+			#if isinstance(sn.SNID,str) and '2004dt' in sn.SNID: import pdb; pdb.set_trace()
+			if 'REDSHIFT_HELIO' not in sn.__dict__.keys():
+				zhel = vold(float(sn.RA.split()[0]),float(sn.DECL.split()[0]),float(sn.REDSHIFT_FINAL.split()[0]))
+				sn.REDSHIFT_HELIO = '%.7f +- 0.000'%zhel
+			#import pdb; pdb.set_trace()
+			if 'hi': #try:
+				#if t == _foundation_dir: sn.appendspec2snanafile('%s/%s'%(_outdir,l),_foundspecdir,verbose=True)
+				#elif t == _ps1_dir: sn.appendspec2snanafile('%s/%s'%(_outdir,l),_ps1specdir,verbose=True,ps=True)
+				sn.appendspec2snanafile('%s/%s'%(_outdir_orig,l),_jlaspecdir,verbose=False)
+			else: pass
+			#except: import pdb; pdb.set_trace()
 
 def main():
 
@@ -65,6 +99,7 @@ def main():
 			else: pass
 			#except: import pdb; pdb.set_trace()
 
+			
 def vnew(ra, dec, z):
 	c_icrs = SkyCoord(ra=ra*u.degree, dec=dec*u.degree, frame = 'icrs')
 	c_icrs = c_icrs.galactic
@@ -500,4 +535,5 @@ def formatPS1Spec(outdir='/Users/David/Dropbox/research/SALT3/salt3/data/trainin
 if __name__ == "__main__":
 	#formatPS1Spec()
 	#formatFoundSpecNew()
-	main()
+	#main()
+	orig_training_data()

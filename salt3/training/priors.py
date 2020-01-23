@@ -25,19 +25,12 @@ class SALTPriors:
 		self.priors={ key: partial(__priors__[key],self) for key in __priors__}
 		for prior in self.usePriors:
 			result=self.priors[prior](1,self.guess,self.SALTModel(self.guess))
-			try:
-				self.priors[prior].numResids=result[0].size
-			except:
-				self.priors[prior].numResids=1
-
-		self.numPriorResids=sum([self.priors[x].numResids for x in self.usePriors])
 		self.numBoundResids=0
 		for boundedparam in self.boundedParams:
 			#width,bound,x,par
 			result=self.boundedprior(0.1,(0,1),self.guess,boundedparam)
 			self.numBoundResids += result[0].size
-			
-		#self.numPriorResids += sum([self.boundedpriors[x].numResids for x in self.boundedpriors])
+
 
 	#@prior
 	def peakprior(self,width,x,components):
@@ -88,6 +81,7 @@ class SALTPriors:
 		X[self.im0]*=bStdFlux/m0Bflux 
 		X[self.ix0]*=m0Bflux /bStdFlux
 		return X
+		
 	@prior
 	def m0prior(self,width,x,components):
 		"""Prior on the magnitude of the M0 component at t=0"""
@@ -223,20 +217,15 @@ class SALTPriors:
 
 		alllam_vals = range(0,self.im0.size)
 		components = self.SALTModel(x)
-		residuals=np.zeros(self.numPriorResids)
-		jacobian=np.zeros((self.numPriorResids,self.npar))
-		values=np.zeros(self.numPriorResids)
-		idx=0
+		results=[]
 		for prior,width in zip(priors,widths):
 			try:
 				priorFunction=self.priors[prior]
 			except:
 				raise ValueError('Invalid prior supplied: {}'.format(prior)) 
-			
-			residuals[idx:idx+priorFunction.numResids],values[idx:idx+priorFunction.numResids],\
-				jacobian[idx:idx+priorFunction.numResids,:]=priorFunction(width,x,components)
-			idx+=priorFunction.numResids
-		return residuals,values,jacobian
+			results+=[priorFunction(width,x,components)]
+		residuals,values,jacobian=zip(*results)
+		return np.concatenate([np.array([x]) if x.shape==() else x for x in residuals]),np.concatenate([np.array([x]) if x.shape==() else x for x in values]),np.concatenate([x if len(x.shape)==2 else x[np.newaxis,:] for x in jacobian])
 
 
 	def BoundedPriorResids(self,bounds,boundparams,x):

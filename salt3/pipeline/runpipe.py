@@ -39,6 +39,9 @@ class RunPipe():
         self.pipeinput = pipeinput
         self.mypipe = mypipe
         self.randseed = randseed
+        if (not self.batch_mode) and (self.randseed is None):
+            self.randseed = random.sample(range(100000),1)[0]
+            print("No randseed was given, auto-generated randseed={}".format(self.randseed))
         self.fseeds = fseeds
         self.num = num
         self.norun = norun
@@ -58,14 +61,21 @@ class RunPipe():
     def _add_suffix(self,pro,keylist,suffix,section=None):
         df = pd.DataFrame()
         for i,key in enumerate(keylist):
-            if section is None:
-                val_old = pro.keys[key]
-                sec = None
-            else:
-                sec = section[i]
-                val_old = pro.keys[sec][key]
-            val_new = '{}_{:03d}'.format(val_old.strip(),suffix)
-            df = pd.concat([df,pd.DataFrame([{'section':sec,'key':key,'value':val_new}])])
+            if isinstance(pro.keys, dict):
+                keystrlist = [x for x in pro.keys.keys() if x.startswith(key)]
+            elif isinstance(pro.keys, configparser.ConfigParser):
+                keystrlist = []
+                for sec in section:
+                    keystrlist += [x for x in pro.keys[sec] if x.startswith(key)]
+            for keystr in keystrlist:
+                if section is None:
+                    val_old = pro.keys[keystr]
+                    sec = None
+                else:
+                    sec = section[i]
+                    val_old = pro.keys[sec][keystr]
+                val_new = '{}_{:03d}'.format(val_old.strip(),suffix)
+                df = pd.concat([df,pd.DataFrame([{'section':sec,'key':keystr,'value':val_new}])])
         return df
     
     def _reconfig_w_suffix(self,proname,df,suffix):
@@ -91,9 +101,10 @@ class RunPipe():
                     df_sim = self._add_suffix(sim,['GENVERSION','GENPREFIX'],self.num)
                     self._reconfig_w_suffix(sim,df_sim,self.num)
                     if any([p.startswith('train') for p in self.pipe.pipepros]): 
+                        df_train = self._add_suffix(self.pipe.Training,['outputdir'],self.num,section=['iodata'])
                         if ['sim','train'] in self.pipe.gluepairs: 
                             self.pipe.glue(['sim','train'])
-                        self._reconfig_w_suffix(self.pipe.Training,None,self.num)
+                        self._reconfig_w_suffix(self.pipe.Training,df_train,self.num)
                     if any([p.startswith('lcfit') for p in self.pipe.pipepros]):       
                         if ['sim','lcfit'] in self.pipe.gluepairs:
                             self.pipe.glue(['sim','lcfit'],on='phot')
@@ -122,6 +133,8 @@ class RunPipe():
             pycommand_base = 'python {} -c {} --mypipe {} --batch_mode 0'.format(pypro,self.pipeinput,self.mypipe)
             for i in range(self.batch_mode):
                 pycommand = pycommand_base + ' --randseed {} --num {}'.format(self.randseeds[i],i)
+                if self.norun:
+                    pycommand += ' --norun'
                 cwd = os.getcwd()
                 outfname = os.path.join(cwd,'test_pipeline_batch_script_{:03d}'.format(i))
                 outf = open(outfname,'w')
@@ -133,8 +146,8 @@ class RunPipe():
                 print('Submitting batch job...')
                 shellcommand = "sbatch {}".format(outfname) 
                 print(shellcommand)
-                if not self.norun:
-                    shellrun = subprocess.run(args=shlex.split(shellcommand))
+                
+                shellrun = subprocess.run(args=shlex.split(shellcommand))
         
 def main(**kwargs):
     parser = argparse.ArgumentParser(description='Run SALT3 Pipe.')

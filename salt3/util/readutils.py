@@ -225,9 +225,9 @@ def rdAllData(snlists,estimate_tpk,kcordict,addwarning,
 				else:
 					raise RuntimeError('need a blue filter to estimate tmax')
 			elif peakmjdlist:
-				if sn.SNID in pksnid:
-					tpk = pkmjd[sn.SNID == pksnid][0]
-					tpkerr = pkmjderr[sn.SNID == pksnid][0]
+				if str(sn.SNID) in pksnid:
+					tpk = pkmjd[str(sn.SNID) == pksnid][0]
+					tpkerr = pkmjderr[str(sn.SNID) == pksnid][0]
 					if tpkerr < 2: tpkmsg = 'termination condition is satisfied'
 					else: tpkmsg = 'time of max uncertainty of +/- %.1f days is too uncertain!'%tpkerr
 				else:
