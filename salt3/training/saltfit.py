@@ -747,6 +747,28 @@ class GaussNewton(saltresids.SALTResids):
 						   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
 
 	#				print('Retaining results from fit: ',storedResults.keys())
+			elif fit.startswith('spectralrecalibration'):
+				if fit == 'spectralrecalibration_norm': rclstr = 'norm'
+				elif fit == 'spectralrecalibration_poly': rclstr = 'poly'
+				#for i in range(self.GN_iter[fit]):
+				for i,p in enumerate(self.__dict__['ispcrcl_%s'%rclstr]):
+					print('fitting spec recal')
+					includeParsPhase=np.zeros(self.npar,dtype=bool)
+					includeParsPhase[self.__dict__['ispcrcl_%s'%rclstr][i]] = True
+
+					Xprop,chi2prop = self.process_fit(X,includeParsPhase,storedResults,fit=fit)
+					if chi2prop<chi2 :
+						X,chi2=Xprop,chi2prop
+					retainReg=(not ('all' in fit or 'component' in fit))
+					retainPhotFlux=fit.startswith('spectralrecalibration') 
+					retainPCDerivs=fit.startswith('component')  or fit.startswith('x')
+					storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
+							(retainReg and key.startswith('regresult' )) or
+						   (retainPhotFlux and key.startswith('photfluxes')) or
+						   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
+					# print('Retaining results from fit: ',storedResults.keys())
+					if chi2 != chi2 or chi2 == np.inf:
+						break
 			else:
 				for i in range(self.GN_iter[fit]):
 					for i,p in enumerate(self.phaseBinCenters):
@@ -772,28 +794,6 @@ class GaussNewton(saltresids.SALTResids):
 						# print('Retaining results from fit: ',storedResults.keys())
 						if chi2 != chi2 or chi2 != np.inf:
 							break
-			elif fit.startswith('spectralrecalibration'):
-				if fit == 'spectralrecalibration_norm': rclstr = 'norm'
-				elif fit == 'spectralrecalibration_poly': rclstr = 'poly'
-				#for i in range(self.GN_iter[fit]):
-				for i,p in enumerate(self.__dict__['ispcrcl_%s'%rclstr]):
-					print('fitting spec recal')
-					includeParsPhase=np.zeros(self.npar,dtype=bool)
-					includeParsPhase[self.__dict__['ispcrcl_%s'%rclstr][i]] = True
-
-					Xprop,chi2prop = self.process_fit(X,includeParsPhase,storedResults,fit=fit)
-					if chi2prop<chi2 :
-						X,chi2=Xprop,chi2prop
-					retainReg=(not ('all' in fit or 'component' in fit))
-					retainPhotFlux=fit.startswith('spectralrecalibration') 
-					retainPCDerivs=fit.startswith('component')  or fit.startswith('x')
-					storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
-							(retainReg and key.startswith('regresult' )) or
-						   (retainPhotFlux and key.startswith('photfluxes')) or
-						   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
-					# print('Retaining results from fit: ',storedResults.keys())
-					if chi2 != chi2 or chi2 == np.inf:
-						break
 						
 
 		#In this case GN optimizer can do no better
@@ -814,7 +814,6 @@ class GaussNewton(saltresids.SALTResids):
 			stepsize=linalg.lstsq(jacobian,residuals)[0] #,cond=1e-17)[0]
 		else:
 			stepsize=linalg.lstsq(jacobian,residuals,cond=self.conditionNumber)[0]
-
 		if np.any(np.isnan(stepsize)):
 			print('NaN detected in stepsize; exitting to debugger')
 			import pdb;pdb.set_trace()
