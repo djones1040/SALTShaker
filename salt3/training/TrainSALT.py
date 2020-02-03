@@ -372,6 +372,29 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		gs1 = gridspec.GridSpec(3, 3)
 		gs1.update(wspace=0.0)
 		i = 0
+		
+		# read in and save SALT2 files
+		m0file='salt3_template_0.dat'
+		m1file='salt3_template_1.dat'
+		salt3phase,salt3wave,salt3flux = np.genfromtxt('%s/%s'%(outputdir,m0file),unpack=True)
+		salt3m1phase,salt3m1wave,salt3m1flux = np.genfromtxt('%s/%s'%(outputdir,m1file),unpack=True)
+		salt2phase,salt2wave,salt2flux = np.genfromtxt('{}/salt2_template_0.dat'.format(salt2dir),unpack=True)
+		salt2m1phase,salt2m1wave,salt2m1flux = np.genfromtxt('{}/salt2_template_1.dat'.format(salt2dir),unpack=True)
+		salt3phase = np.unique(salt3phase)
+		salt3wave = np.unique(salt3wave)
+		salt3flux = salt3flux.reshape([len(salt3phase),len(salt3wave)])
+		salt3m1flux = salt3m1flux.reshape([len(salt3phase),len(salt3wave)])
+		salt2phase = np.unique(salt2phase)
+		salt2wave = np.unique(salt2wave)
+		salt2m0flux = salt2flux.reshape([len(salt2phase),len(salt2wave)])
+		salt2flux = salt2flux.reshape([len(salt2phase),len(salt2wave)])
+		salt2m1flux = salt2m1flux.reshape([len(salt2phase),len(salt2wave)])
+
+		saltdict = {'salt3phase':salt3phase,'salt3wave':salt3wave,'salt3flux':salt3flux,
+					'salt3m1phase':salt3m1phase,'salt3m1wave':salt3m1wave,'salt3m1flux':salt3m1flux,
+					'salt2phase':salt2phase,'salt2wave':salt2wave,'salt2m0flux':salt2m0flux,
+					'salt2m1phase':salt2m1phase,'salt2m1wave':salt2m1wave,'salt2m1flux':salt2m1flux}
+
 			
 		for j,snlist in enumerate(self.options.snlists.split(',')):
 			snlist = os.path.expandvars(snlist)
@@ -396,28 +419,6 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			if self.options.n_colorpars > 0:
 				fitc = True
 
-
-			# read in and save SALT2 files
-			m0file='salt3_template_0.dat'
-			m1file='salt3_template_1.dat'
-			salt3phase,salt3wave,salt3flux = np.genfromtxt('%s/%s'%(outputdir,m0file),unpack=True)
-			salt3m1phase,salt3m1wave,salt3m1flux = np.genfromtxt('%s/%s'%(outputdir,m1file),unpack=True)
-			salt2phase,salt2wave,salt2flux = np.genfromtxt('{}/salt2_template_0.dat'.format(salt2dir),unpack=True)
-			salt2m1phase,salt2m1wave,salt2m1flux = np.genfromtxt('{}/salt2_template_1.dat'.format(salt2dir),unpack=True)
-			salt3phase = np.unique(salt3phase)
-			salt3wave = np.unique(salt3wave)
-			salt3flux = salt3flux.reshape([len(salt3phase),len(salt3wave)])
-			salt3m1flux = salt3m1flux.reshape([len(salt3phase),len(salt3wave)])
-			salt2phase = np.unique(salt2phase)
-			salt2wave = np.unique(salt2wave)
-			salt2m0flux = salt2flux.reshape([len(salt2phase),len(salt2wave)])
-			salt2flux = salt2flux.reshape([len(salt2phase),len(salt2wave)])
-			salt2m1flux = salt2m1flux.reshape([len(salt2phase),len(salt2wave)])
-
-			saltdict = {'salt3phase':salt3phase,'salt3wave':salt3wave,'salt3flux':salt3flux,
-						'salt3m1phase':salt3m1phase,'salt3m1wave':salt3m1wave,'salt3m1flux':salt3m1flux,
-						'salt2phase':salt2phase,'salt2wave':salt2wave,'salt2m0flux':salt2m0flux,
-						'salt2m1phase':salt2m1phase,'salt2m1wave':salt2m1wave,'salt2m1flux':salt2m1flux}
 
 			tlc = time()
 			for l in snfiles:
@@ -456,8 +457,9 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 						ax.set_xlabel(None)
 				i += 3
 
-		pdf_pages.savefig()
-		pdf_pages.close()
+		if not i %9 ==0:
+			pdf_pages.savefig()
+			pdf_pages.close()
 		print('plotting light curves took %.1f'%(time()-tlc))
 		
 	def main(self):
