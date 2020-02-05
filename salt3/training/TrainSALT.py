@@ -136,7 +136,6 @@ class TrainSALT(TrainSALTBase):
 				specdata=datadict[sn]['specdata']
 				photdata=datadict[sn]['photdata']
 				for k in specdata.keys():
-					print(sn)
 					init_scale,colordiffs = getScaleForSN(specdata[k],photdata,self.kcordict,datadict[sn]['survey'])
 					guess[np.where(parlist == 'specrecal_{}_{}'.format(sn,k))[0][-1]] = init_scale
 		i=0
@@ -459,7 +458,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 		if not i %9 ==0:
 			pdf_pages.savefig()
-			pdf_pages.close()
+		pdf_pages.close()
 		print('plotting light curves took %.1f'%(time()-tlc))
 		
 	def main(self):
