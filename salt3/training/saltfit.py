@@ -432,9 +432,9 @@ class GaussNewton(saltresids.SALTResids):
 		super().__init__(guess,datadict,parlist,**kwargs)
 		self.lsqfit = False
 		
-		self.GN_iter = {'all':1,'all-grouped':1,'x0':1,'x1':1,'component0':1,'piecewisecomponent0':1,'piecewisecomponent1':1,
-						'component1':1,'color':3,'colorlaw':3,
-						'spectralrecalibration_norm':3,'spectralrecalibration_poly':3,
+		self.GN_iter = {'all':1,'all-grouped':1,'x0':1,'x1':1,'component0':1,'piecewisecomponents':1,'piecewisecomponent0':1,'piecewisecomponent1':1,
+						'component1':1,'color':2,'colorlaw':2,'spectralrecalibration':2,
+						'spectralrecalibration_norm':2,'spectralrecalibration_poly':2,
 					    'tpk':1,'modelerr':1}
 
 		self._robustify = False
@@ -456,18 +456,18 @@ class GaussNewton(saltresids.SALTResids):
 		#print('hack!!')
 		#self.fitlist_debug = [('x1','x1'),('principal component 1','component1')]
 		self.fitlist_debug = [('all parameters','all'),#('all parameters grouped','all-grouped'),
+			('piecewise both components','piecewisecomponents'),
 			(" x0",'x0'),('principal component 0','component0'),
 			('x1','x1'),('principal component 1','component1'),
 			('color','color'),('color law','colorlaw'),
-			('spectral recalibration const.','spectralrecalibration_norm'),
-			('spectral recalibration higher orders','spectralrecalibration_poly'),
+			('spectral recalibration ','spectralrecalibration'),
 			('time of max','tpk'),('error model','modelerr')]
 		for message,fit in self.fitlist_debug:
 			if 'all' in fit:
 				includePars=np.ones(self.npar,dtype=bool)
 			else:
 				includePars=np.zeros(self.npar,dtype=bool)
-				if fit=='components':
+				if 'components' in fit:
 					includePars[self.im0]=True
 					includePars[self.im1]=True
 				elif 'component0' in fit :
@@ -736,7 +736,11 @@ class GaussNewton(saltresids.SALTResids):
 						indices=np.arange((self.waveknotloc.size-4)*(self.phaseknotloc.size-4))
 						iFit= (((i-1)*(self.waveknotloc.size-4)) <= indices) & (indices <((i+2)*(self.waveknotloc.size-4)))
 						includeParsPhase=np.zeros(self.npar,dtype=bool)
-						includeParsPhase[self.__dict__['im%s'%fit[-1]][iFit]] = True
+						if fit== 'piecewisecomponents':
+							includeParsPhase[self.im0[iFit]]=True
+							includeParsPhase[self.im1[iFit]]=True
+						else:
+							includeParsPhase[self.__dict__['im%s'%fit[-1]][iFit]] = True
 						Xprop,chi2prop = self.process_fit(Xprop,includeParsPhase,storedResults,fit=fit)
 						if np.isnan(Xprop).any() or (~np.isfinite(Xprop)).any() or np.isnan(chi2prop) or ~np.isfinite(chi2prop):
 							print('NaN detected, breaking out of loop')
@@ -752,8 +756,6 @@ class GaussNewton(saltresids.SALTResids):
 							   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
 
 						# print('Retaining results from fit: ',storedResults.keys())
-						if chi2 != chi2 or chi2 != np.inf:
-							break
 
 			else:
 				for i in range(self.GN_iter[fit]):
@@ -776,20 +778,13 @@ class GaussNewton(saltresids.SALTResids):
 		return X,chi2,(X is X_init)
 		 #_init
 	def linear_fit(self,X,gaussnewtonstep,uncertainties):
-		gaussnewtonstep=gaussnewtonstep.copy()
-		gaussnewtonstep[self.ic]=np.clip(gaussnewtonstep[self.ic],-1,1)
-		gaussnewtonstep[self.iCL]=np.clip(gaussnewtonstep[self.iCL],-3,3)
-		gaussnewtonstep[self.ispcrcl]=np.clip(gaussnewtonstep[self.ispcrcl],-1,1)
-		gaussnewtonstep[self.itpk]=np.clip(gaussnewtonstep[self.itpk],-2,2)
-		def opFunc(x):
-			Xiter=X-(x*gaussnewtonstep)
-			return ((self.lsqwrap(Xiter,uncertainties.copy(),None,True))**2).sum()
-		print('After clipping Gauss-Newton step chi2 is ',opFunc(1))
-		result=minimize_scalar(opFunc)
-		print('Linear optimization factor is {:.2f} x gauss newton step'.format(result.x))
+		def opFunc(x,stepdir):
+			return ((self.lsqwrap(X-(x*stepdir),uncertainties.copy(),None,True))**2).sum()
+		result,step,stepType=minimize_scalar(opFunc,args=(gaussnewtonstep,)),gaussnewtonstep,'Gauss-Newton'
+		print('Linear optimization factor is {:.2f} x {} step'.format(result.x,stepType))
 		print('Linear optimized chi2 is ',result.fun)
 		return result.x*gaussnewtonstep,result.fun
-			
+		
 		
 	def process_fit(self,X,iFit,storedResults,fit='all',doPriors=True):
 		X=X.copy()
@@ -800,12 +795,14 @@ class GaussNewton(saltresids.SALTResids):
 		
 		#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
 		includePars= ~(np.all(0==jacobian,axis=0))
-		varyingParams[varyingParams]=varyingParams[varyingParams] & includePars
+		if not includePars.all():
+			varyingParams[varyingParams]=varyingParams[varyingParams] & includePars
+			jacobian=jacobian[:,includePars]		
 
 		print('Number of parameters fit this round: {}'.format(includePars.sum()))
 		print('Initial chi2 ',oldChi)
-		jacobian=jacobian[:,includePars]
-		
+		import pdb;pdb.set_trace()
+
 		stepsize=linalg.lstsq(jacobian,residuals,cond=self.conditionNumber)[0]
 		if np.any(np.isnan(stepsize)):
 			print('NaN detected in stepsize; exitting to debugger')
@@ -813,11 +810,11 @@ class GaussNewton(saltresids.SALTResids):
 		
 		gaussNewtonStep=np.zeros(X.size)
 		gaussNewtonStep[varyingParams]=stepsize
-		
 		uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
+		#Was trying a clip in linear_fit; may not be worth it with new, more stable algorithm
 		preclip=((self.lsqwrap(X-gaussNewtonStep,uncertainties.copy(),None,True))**2).sum()
 		print('After Gauss-Newton chi2 is ',preclip)
-		
+	
 		linearStep,linearChi2=self.linear_fit(X,gaussNewtonStep,uncertainties)
 		if linearChi2>preclip:
 			X-=gaussNewtonStep
