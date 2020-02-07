@@ -1,30 +1,33 @@
 #!/usr/bin/env python
 
 import numpy as np
+from numpy.random import standard_normal
+from numpy.linalg import inv,pinv
+
+import time,copy,extinction
+
 from scipy.interpolate import splprep,splev,BSpline,griddata,bisplev,bisplrep,interp1d,interp2d
 from scipy.integrate import trapz, simps
-from salt3.util.synphot import synphot
-from sncosmo.salt2utils import SALT2ColorLaw
-import time
-from itertools import starmap
-from salt3.training import init_hsiao,saltresids #_master as saltresids
-from sncosmo.models import StretchSource
 from scipy.optimize import minimize, least_squares,minimize_scalar,lsq_linear
 from scipy.stats import norm
 from scipy.ndimage import gaussian_filter1d
-import pylab as plt
 from scipy.special import factorial
-from astropy.cosmology import Planck15 as cosmo
-from sncosmo.constants import HC_ERG_AA, MODEL_BANDFLUX_SPACING
-import extinction
-from multiprocessing import Pool, get_context
-import copy
+from scipy import linalg,sparse
+from scipy.sparse import linalg as sprslinalg
+
 import scipy.stats as ss
-from numpy.random import standard_normal
-from scipy import linalg
-from emcee.interruptible_pool import InterruptiblePool
+
+from sncosmo.salt2utils import SALT2ColorLaw
+from sncosmo.models import StretchSource
+from sncosmo.constants import HC_ERG_AA, MODEL_BANDFLUX_SPACING
 from sncosmo.utils import integration_grid
-from numpy.linalg import inv,pinv
+
+from salt3.util.synphot import synphot
+from salt3.training import saltresids #_master as saltresids
+
+
+from multiprocessing import Pool, get_context
+from emcee.interruptible_pool import InterruptiblePool
 from iminuit import Minuit
 import iminuit,warnings
 
@@ -456,10 +459,11 @@ class GaussNewton(saltresids.SALTResids):
 		#print('hack!!')
 		#self.fitlist_debug = [('x1','x1'),('principal component 1','component1')]
 		self.fitlist_debug = [('all parameters','all'),#('all parameters grouped','all-grouped'),
-			('piecewise both components','piecewisecomponents'),
+			#('piecewise both components','piecewisecomponents'),
 			(" x0",'x0'),('principal component 0','component0'),
 			('x1','x1'),('principal component 1','component1'),
-			('color','color'),('color law','colorlaw'),
+			('color','color'),
+			('color law','colorlaw'),
 			('spectral recalibration ','spectralrecalibration'),
 			('time of max','tpk'),('error model','modelerr')]
 		for message,fit in self.fitlist_debug:
@@ -531,7 +535,7 @@ class GaussNewton(saltresids.SALTResids):
 		print('starting loop; %i iterations'%loop_niter)
 		for superloop in range(loop_niter):
 
-			X,chi2,converged = self.robust_process_fit(X,uncertainties,chi2_init,superloop)
+			X,chi2,converged = self.robust_process_fit(X,uncertainties.copy(),chi2_init,superloop)
 			if chi2_init-chi2 < -1.e-6:
 				self.addwarning("MESSAGE WARNING chi2 has increased")
 			elif np.abs(chi2_init-chi2) < self.chi2_diff_cutoff:
@@ -615,6 +619,59 @@ class GaussNewton(saltresids.SALTResids):
 		#	(X[self.parlist == 'clscat']-Xlast[self.parlist == 'clscat'])/Xlast[self.parlist == 'clscat']
 		#import pdb; pdb.set_trace()
 		return stepsizes
+		
+	def printChi2Contributions(self,guess,storedResults):
+		if self.n_colorpars:
+			if not 'colorLaw' in storedResults:
+				storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, guess[self.parlist == 'cl'])(self.wave)
+				storedResults['colorLawInterp']= interp1d(self.wave,storedResults['colorLaw'],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
+		else: storedResults['colorLaw'] = 1
+				
+		if not 'components' in storedResults:
+			storedResults['components'] =self.SALTModel(guess)
+		if not 'componentderivs' in storedResults:
+			storedResults['componentderivs'] = self.SALTModelDeriv(guess,1,0,self.phase,self.wave)
+		
+		if not all([('specvariances_{}'.format(sn) in storedResults) and ('photvariances_{}'.format(sn) in storedResults) for sn in self.datadict]):
+			storedResults['saltErr']=self.ErrModel(guess)
+			storedResults['saltCorr']=self.CorrelationModel(guess)
+		varyParams=np.zeros(guess.size,dtype=bool)
+		photresids = []
+		specresids = [] # Jacobian matrix from r
+
+		for sn in self.datadict.keys():
+			photresidsdict,specresidsdict=self.ResidsForSN(
+				guess,sn,storedResults,varyParams,fixUncertainty=True)
+			photresids+=[photresidsdict['resid']]
+			specresids+=[specresidsdict['resid']]
+
+
+		priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,guess)
+		priorResids=[priorResids]
+
+		BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
+			self.priors.BoundedPriorResids(self.bounds,self.boundedParams,guess)
+		priorResids+=[BoundedPriorResids]
+
+		if self.regularize:
+			for regularization, weight,regKey in [(self.phaseGradientRegularization, self.regulargradientphase,'regresult_phase'),
+										   (self.waveGradientRegularization,self.regulargradientwave,'regresult_wave' ),
+										   (self.dyadicRegularization,self.regulardyad,'regresult_dyad')]:
+				if weight ==0:
+					continue
+				if regKey in storedResults:
+					priorResids += storedResults[regKey]
+				else:
+					for regResids,regJac in zip( *regularization(guess,storedResults,varyParams)):
+						priorResids += [regResids*np.sqrt(weight)]
+					storedResults[regKey]=priorResids[-self.n_components:]
+		chi2Results=[]
+		for name,x in [('Photometric',photresids),('Spectroscopic',specresids),('Prior',priorResids)]:
+			x=np.concatenate(x)
+			chi2Results+=[(name,(x**2).sum(),x.size)]
+		totalChi2=sum([x[1] for x in chi2Results])
+		for name,chi2,dof in chi2Results:
+			print('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2/dof,chi2/totalChi2*100))
 	
 	def lsqwrap(self,guess,storedResults,varyParams=None,doPriors=True):
 		if varyParams is None:
@@ -643,7 +700,7 @@ class GaussNewton(saltresids.SALTResids):
 			photresidsdict,specresidsdict=self.ResidsForSN(
 				guess,sn,storedResults,varyParams,fixUncertainty=True)
 			residuals+=[photresidsdict['resid'],specresidsdict['resid']]
-			jacobian+=[photresidsdict['resid_jacobian'],specresidsdict['resid_jacobian']]
+			jacobian+=[sparse.coo_matrix(photresidsdict['resid_jacobian']),sparse.coo_matrix(specresidsdict['resid_jacobian'])]
 			
 
 		if doPriors:
@@ -655,8 +712,7 @@ class GaussNewton(saltresids.SALTResids):
 			BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
 				self.priors.BoundedPriorResids(self.bounds,self.boundedParams,guess)
 			residuals+=[BoundedPriorResids]
-			jacobian+=[BoundedPriorJac[:,varyParams]]
-
+			jacobian+=[sparse.coo_matrix(BoundedPriorJac[:,varyParams])]
 
 		if self.regularize:
 			for regularization, weight,regKey in [(self.phaseGradientRegularization, self.regulargradientphase,'regresult_phase'),
@@ -666,28 +722,29 @@ class GaussNewton(saltresids.SALTResids):
 					continue
 				if regKey in storedResults and not (varyParams[self.im0].any() or varyParams[self.im1].any()):
 					residuals += storedResults[regKey]
-					jacobian +=  [np.zeros((r.size,varyParams.sum())) for r in storedResults[regKey]]
+					jacobian +=  [sparse.coo_matrix(np.zeros((r.size,varyParams.sum())) )for r in storedResults[regKey]]
 				else:
 					for regResids,regJac in zip( *regularization(guess,storedResults,varyParams)):
 						residuals += [regResids*np.sqrt(weight)]
-						jacobian+=[regJac*np.sqrt(weight)]
+						jacobian+=[sparse.coo_matrix(regJac)*np.sqrt(weight)]
 					storedResults[regKey]=residuals[-self.n_components:]
-		#import pdb;pdb.set_trace()
+				
 		if varyParams.any():
-			return np.concatenate(residuals),np.concatenate(jacobian)
+			return np.concatenate(residuals),sparse.vstack(jacobian)
 		else:
 			return  np.concatenate(residuals)
 
 	def robust_process_fit(self,X_init,uncertainties,chi2_init,niter):
 		X,chi2=X_init,chi2_init
-		
+		self.printChi2Contributions(X,uncertainties.copy())
+		storedResults=uncertainties.copy()
 		for fit in self.fitOptions:
 			if 'all-grouped' in fit :continue #
 			if 'modelerr' in fit: continue
 			print('fitting '+self.fitOptions[fit][0])
-			storedResults=uncertainties.copy()
-			Xprop = X.copy()
 			
+			Xprop = X.copy()
+
 			if (fit=='all'):
 # 				if self.tryFittingAllParams:
 				Xprop,chi2prop = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
@@ -696,39 +753,15 @@ class GaussNewton(saltresids.SALTResids):
 					return Xprop,chi2prop,False
 				elif (chi2prop<chi2):
 					X,chi2=Xprop,chi2prop
+					storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys)}
 				else:
 # 						self.tryFittingAllParams=False
 # 						print('Discontinuing all parameter fit')
 					retainReg=True
-					retainPhotFlux=True
 					retainPCDerivs=True
 					storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
 							(retainReg and key.startswith('regresult' )) or
-						   (retainPhotFlux and key.startswith('photfluxes')) or
 						   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
-
-# 			elif fit.startswith('spectralrecalibration'):
-# 				if fit == 'spectralrecalibration_norm': rclstr = 'norm'
-# 				elif fit == 'spectralrecalibration_poly': rclstr = 'poly'
-# 				#for i in range(self.GN_iter[fit]):
-# 				for i,p in enumerate(self.__dict__['ispcrcl_%s'%rclstr]):
-# 					print('fitting spec recal')
-# 					includeParsPhase=np.zeros(self.npar,dtype=bool)
-# 					includeParsPhase[self.__dict__['ispcrcl_%s'%rclstr][i]] = True
-# 
-# 					Xprop,chi2prop = self.process_fit(X,includeParsPhase,storedResults,fit=fit)
-# 					if chi2prop<chi2 :
-# 						X,chi2=Xprop,chi2prop
-# 					retainReg=(not ('all' in fit or 'component' in fit))
-# 					retainPhotFlux=fit.startswith('spectralrecalibration') 
-# 					retainPCDerivs=fit.startswith('component')  or fit.startswith('x')
-# 					storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
-# 							(retainReg and key.startswith('regresult' )) or
-# 						   (retainPhotFlux and key.startswith('photfluxes')) or
-# 						   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
-# 					# print('Retaining results from fit: ',storedResults.keys())
-# 					if chi2 != chi2 or chi2 == np.inf:
-# 						break
 			elif fit.startswith('piecewisecomponent'):
 				for i in range(self.GN_iter[fit]):
 					for i,p in enumerate(self.phaseBinCenters):
@@ -747,12 +780,8 @@ class GaussNewton(saltresids.SALTResids):
 							break;
 						if chi2prop<chi2 :
 							X,chi2=Xprop,chi2prop
-						retainReg=(not ('all' in fit or 'component' in fit))
-						retainPhotFlux=fit.startswith('spectralrecalibration') 
-						retainPCDerivs=fit.startswith('component')  or fit.startswith('x')
+						retainPCDerivs=True
 						storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
-								(retainReg and key.startswith('regresult' )) or
-							   (retainPhotFlux and key.startswith('photfluxes')) or
 							   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
 
 						# print('Retaining results from fit: ',storedResults.keys())
@@ -766,13 +795,10 @@ class GaussNewton(saltresids.SALTResids):
 					if chi2prop<chi2 :
 						X,chi2=Xprop,chi2prop
 					retainReg=(not ('all' in fit or 'component' in fit))
-					retainPhotFlux=fit.startswith('spectralrecalibration') 
-					retainPCDerivs=fit.startswith('component')  or fit.startswith('x')
+					retainPCDerivs=('component' in fit)  or fit.startswith('x')
 					storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
 							(retainReg and key.startswith('regresult' )) or
-						   (retainPhotFlux and key.startswith('photfluxes')) or
 						   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
-			
 
 		#In this case GN optimizer can do no better
 		return X,chi2,(X is X_init)
@@ -794,16 +820,33 @@ class GaussNewton(saltresids.SALTResids):
 		oldChi=(residuals**2).sum()
 		
 		#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
-		includePars= ~(np.all(0==jacobian,axis=0))
+		jacobian=jacobian.tocsc()
+		includePars= np.diff(jacobian.indptr) != 0
 		if not includePars.all():
 			varyingParams[varyingParams]=varyingParams[varyingParams] & includePars
 			jacobian=jacobian[:,includePars]		
+		
+		#Exclude any residuals unaffected by the current fit (column in jacobian zeroed for that index)
+		jacobian=jacobian.tocsr()
+		includeResids=np.diff(jacobian.indptr) != 0
+		if not includeResids.all():
+			jacobian=jacobian[includeResids,:]		
 
 		print('Number of parameters fit this round: {}'.format(includePars.sum()))
 		print('Initial chi2 ',oldChi)
-		import pdb;pdb.set_trace()
-
-		stepsize=linalg.lstsq(jacobian,residuals,cond=self.conditionNumber)[0]
+		isJacobianSparse=jacobian.nnz/(jacobian.shape[0]*jacobian.shape[1])<0.5
+		#If this is a sparse matrix, treat it as such, otherwise use standard linear algebra solver
+		if isJacobianSparse:
+		
+			print('Using sparse linear algebra')
+			result=sprslinalg.lsmr(jacobian,residuals[includeResids],atol=1e-8,btol=1e-8)
+			if result[1]==7: print('Gauss-Newton solver reached max # of iterations')
+			stepsize=result[0]
+		else:
+			print('Using dense linear algebra')
+			jacobian=jacobian.toarray()
+			stepsize=linalg.lstsq(jacobian,residuals[includeResids],cond=self.conditionNumber)[0]
+			
 		if np.any(np.isnan(stepsize)):
 			print('NaN detected in stepsize; exitting to debugger')
 			import pdb;pdb.set_trace()
@@ -824,6 +867,7 @@ class GaussNewton(saltresids.SALTResids):
 			chi2=linearChi2
 		print('Chi2 diff, % diff')
 		print(oldChi-chi2,'{:.2f}'.format(100*(oldChi-chi2)/oldChi))
+		print('')
 		#import pdb; pdb.set_trace()
 		return X,chi2
 

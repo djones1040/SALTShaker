@@ -430,9 +430,11 @@ class SALTResids:
 
 			if not fixUncertainty:
 				photresids['lognorm']-= (np.log(np.diag(L)).sum())
-		
 			if varyParams.any():
-				photresids['resid_jacobian'][selectFilter]=linalg.solve_triangular(L,photmodel['modelflux_jacobian'][selectFilter],lower=True)
+				try:
+					photresids['resid_jacobian'][selectFilter]=linalg.solve_triangular(L,photmodel['modelflux_jacobian'][selectFilter],lower=True)
+				except:
+					import pdb;pdb.set_trace()
 				if not fixUncertainty:
 					varyParlist=self.parlist[varyParams]
 					#Cut out zeroed jacobian entries to save time
@@ -834,7 +836,7 @@ class SALTResids:
 				modelUncertainty=recalexp**2 *  modelErrInt
 				
 			specresultsdict['fluxvariance'][specSlice] = specdata[k]['fluxerr']**2
-			specresultsdict['modelvariance'][specSlice] = modelUncertainty
+			specresultsdict['modelvariance'][specSlice] = modelUncertainty # np.clip(modelUncertainty, (specdata[k]['flux']*1e-3)**2,None)
 
 			if x0Deriv:
 				specresultsdict['modelvariance_jacobian'][specSlice,(varyParlist == 'x0_{}'.format(sn))] = uncertaintyNoX0[:,np.newaxis]*2*x0
@@ -1339,7 +1341,8 @@ class SALTResids:
 			
 
 				neffNoWeight = np.histogram(restWave,self.waveRegularizationBins)[0]
-				snr = ss.binned_statistic(restWave,snr,bins=self.waveRegularizationBins,statistic='sum').statistic
+				snr = ss.binned_statistic(restWave,snr,bins=self.waveRegularizationBins,statistic='sum').statistic#np.clip(,None,1000)
+				#import pdb;pdb.set_trace()
 				#if len(np.where((snr < 5) & (snr > 0))[0]): import pdb; pdb.set_trace()
 				neffNoWeight = neffNoWeight*snr**2./900 #[snr < 5] = 0.0
 				#neffNoWeight[snr < 5] = 0.0
@@ -1368,9 +1371,11 @@ class SALTResids:
 		self.plotEffectivePoints([-12.5,0,12.5,40],'neff.png')
 		#import pdb; pdb.set_trace()
 		self.plotEffectivePoints(None,'neff-heatmap.png')
-		self.neff=np.clip(self.neffRaw,self.neffFloor,None)
+		self.neff=self.neffRaw
+		self.neff[self.neff>self.neffMax]=np.inf		
+		self.neff/=self.neffMax
+		self.neff=np.clip(self.neff,self.neffFloor,None)
 	
-		self.neff[self.neff>self.neffMax]=np.inf
 		#import pdb;pdb.set_trace()
 		
 	def plotEffectivePoints(self,phases=None,output=None):
