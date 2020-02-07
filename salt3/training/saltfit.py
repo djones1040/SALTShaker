@@ -448,21 +448,25 @@ class GaussNewton(saltresids.SALTResids):
 
 		self.tryFittingAllParams=True
 		self.fitlist = [('all parameters','all'),('all parameters grouped','all-grouped'),
-				   (" x0",'x0'),('component 0 piecewise','piecewisecomponent0'),('principal component 0','component0'),('x1','x1'),
-				   ('component 1 piecewise','piecewisecomponent1'),('principal component 1','component1'),('color','color'),('color law','colorlaw'),
-				   ('spectral recalibration const.','spectralrecalibration_norm'),
-				   ('spectral recalibration higher orders','spectralrecalibration_poly'),
-				   ('time of max','tpk'),('error model','modelerr')]
+						(" x0",'x0'),('component 0 piecewise','piecewisecomponent0'),
+						('principal component 0','component0'),('x1','x1'),
+						('component 1 piecewise','piecewisecomponent1'),
+						('principal component 1','component1'),('color','color'),('color law','colorlaw'),
+						('spectral recalibration const.','spectralrecalibration_norm'),
+						('spectral recalibration higher orders','spectralrecalibration_poly'),
+						('time of max','tpk'),('error model','modelerr')]
 		#print('hack!!')
 		#self.fitlist_debug = [('x1','x1'),('principal component 1','component1')]
 		self.fitlist_debug = [#('all parameters','all'),('all parameters grouped','all-grouped'),
-			(" x0",'x0'),('principal component 0','component0'),
+			(" x0",'x0'),#('component 0 piecewise','piecewisecomponent0'),
+			('principal component 0','component0'),
 			('x1','x1'),('principal component 1','component1'),
+			#('component 1 piecewise','piecewisecomponent1'),
 			('color','color'),('color law','colorlaw'),
 			('spectral recalibration const.','spectralrecalibration_norm'),
-			('spectral recalibration higher orders','spectralrecalibration_poly'),
-			('time of max','tpk'),('error model','modelerr')]
-		for message,fit in self.fitlist:
+			('spectral recalibration higher orders','spectralrecalibration_poly'),('error model','modelerr')]
+		#('time of max','tpk')
+		for message,fit in self.fitlist_debug:
 			if 'all' in fit:
 				includePars=np.ones(self.npar,dtype=bool)
 			else:
@@ -697,7 +701,6 @@ class GaussNewton(saltresids.SALTResids):
 						residuals += [regResids*np.sqrt(weight)]
 						jacobian+=[regJac*np.sqrt(weight)]
 					storedResults[regKey]=residuals[-self.n_components:]
-					
 
 		if varyParams.any():
 			return np.concatenate(residuals),np.concatenate(jacobian)
@@ -813,11 +816,11 @@ class GaussNewton(saltresids.SALTResids):
 		jacobian=jacobian[:,includePars]
 		#print('playing w/ conditioning!')
 
-		if fit == 'component1':
-			stepsize=linalg.lstsq(jacobian,residuals)[0] #,cond=1e-17)[0]
-		else:
-			stepsize=linalg.lstsq(jacobian,residuals,cond=self.conditionNumber)[0]
-
+		#if fit == 'component1':
+		#	stepsize=linalg.lstsq(jacobian,residuals)[0] #,cond=1e-17)[0]
+		#else:
+		stepsize=linalg.lstsq(jacobian,residuals,cond=self.conditionNumber)[0]
+		
 		if np.any(np.isnan(stepsize)):
 			print('NaN detected in stepsize; exitting to debugger')
 			import pdb;pdb.set_trace()
