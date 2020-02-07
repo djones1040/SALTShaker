@@ -1,0 +1,103 @@
+
+ ****************************************************************** 
+   Begin execution of snlc_sim.exe    
+   Full command: snlc_sim.exe simulation/SIMGEN_WFIRST_SALT2_Specz.INPUT GENVERSION AllSurveys_Spec_DMS_BYO_norm INIT_ONLY 1 GENMODEL /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/byosed/BYOSED.TEST GENRANGE_REDSHIFT 0.6 1.5 SIMLIB_MAXRANSTART 0 
+
+ SNDATA_ROOT = /project2/rkessler/PRODUCTS/SNDATA_ROOT 
+ SNANA_DIR   = /project2/rkessler/SURVEYS/WFIRST/ROOT/BYOSED_dev/SNANA 
+  
+  ######################################################## 
+     INIT_SNVAR: Init variables.
+  ######################################################## 
+  
+   Allocate 12.50 MB for CIDMASK array (to check duplicates)
+   HOST MACHINE =    ()
+   SNDATA_ROOT = /project2/rkessler/PRODUCTS/SNDATA_ROOT
+   SNANA_DIR = /project2/rkessler/SURVEYS/WFIRST/ROOT/BYOSED_dev/SNANA    (v10_74m)
+   sizeof(INPUTS) =   1.104 MB 
+   sizeof(GENLC)  =   7.919 MB 
+ --------------------------------------------------------
+  Initialize uniqueMatch for sim-input file
+  Read user input file 1: simulation/SIMGEN_WFIRST_SALT2_Specz.INPUT 
+
+  PROCESS COMMAND LINE ARG: GENVERSION 
+  PROCESS COMMAND LINE ARG: INIT_ONLY 
+  PROCESS COMMAND LINE ARG: GENMODEL 
+  PROCESS COMMAND LINE ARG: GENRANGE_REDSHIFT 
+  PROCESS COMMAND LINE ARG: SIMLIB_MAXRANSTART 
+
+ ****************************************************************** 
+    prep_user_inputs summary   
+	 SIMLIB file        : simulation/3tier_Survey.SIMLIB   (start LIBID=0)
+	 Generation Version : AllSurveys_Spec_DMS_BYO_norm 
+	 Generation source  : RANDOM 
+	 Generation model   : BYOSED.TEST 
+	 Number of LC to Generate: 0 
+	 OMEGA_(MATTER,LAMBDA)= 0.300, 0.700,    W= -1.00   H0= 70.0 
+	 KCOR  file : /project2/rkessler/SURVEYS/WFIRST/ROOT/kcor/H19_cut/kcor_WFIRST_CYCLE8_IMG.fits 
+	 Observer Gen-FILTERS  :  RZYJHF  
+	 Random number seed: 12945 
+	 Gen-Range for RA(deg)  : -360.000 to  360.000 
+	 Gen-Range for DEC(deg): -360.000 to  360.000 
+	 Gen-Range for ZCMB :  0.600 to  1.500  (sigma= 0.0000, bias=0.00000) 
+	 Gen-Range for PEAKMJD  :  54930.0 to  55775.0  
+	 Gen-Range for Trest    :    -12.0 to     45.0  days 
+	 Gen-Range for SHAPEPAR  :      0.0 to      0.0  
+	 Gen-Range for AV  : 0.00 to 0.00  (dN/dAv = exp(-AV/0.00) 
+	 Gen-Mean  for RV  : 3.10  
+	 Gen-sigma for RV  : 0.00 , 0.00 (lower , upper ) 
+	 Gen-Range for RV  : 2.10 to 4.10 
+	 ZP offsets (RZYJHF) :  0.000 0.000 0.000 0.000 0.000 0.000
+	 MODEL mag offsets (RZYJHF) :   0.00  0.00  0.00  0.00  0.00  0.00
+
+
+ ****************************************************************** 
+   init_CIDRAN: initialize 200 RANDOM CIDs (CIDOFF=100)  
+     Allocate 0.38 MB for CIDMASK array (to check duplicates)
+	 CIDRAN_MIN/MAX = 0/3000000   CIDOFF=100   NSTORE_JOB=100
+	 CIDRAN_LIST memory allocation:  0.000 MB 
+
+	 Done allocating 200 random CIDs: 100 for current sim-job 
+	 Called random() function 201 times.
+
+ ****************************************************************** 
+    init_RANDOMsource : CIDOFF=100   
+
+ ****************************************************************** 
+   SIMLIB_readGlobalHeader_TEXT  
+	 Opened : simulation/3tier_Survey.SIMLIB 
+
+ ****************************************************************** 
+   SIMLIB_prepGlobalHeader  
+	 SIMLIB Survey    : WFIRST 
+	 SIMLIB telescope : WFIRST 
+	 SIMLIB Filters   : FHJRYZ 
+	 SIMLIB PSF unit:    ARCSEC_FWHM 
+	 SIMLIB SKYSIG unit: ADU_PER_SQPIXEL 
+
+ *********************************** 
+   SIMULATED VOLUME, TIME, RATE(POWERLAW2)
+	 Survey dOmega  = 1.2754e-02 steradians  ( 0.00406 PI) 
+	 Redshift range =  0.6000 -  1.5000
+	 <redsfhit>     =  1.1063  (volume-weighted) 
+	 Survey Volume  = 3.0763e+08  sr*(MPc/h70)^3 
+	 Survey Time    =  2.3151  years/season 
+	 Co-moving Time =  1.0991  years/season  [ T/(1+<z>) ] 
+	 Co-moving V*T  = 3.3812e+08  sr*(MPc/h70)^3 * yr / season 
+	 POWERLAW MODEL:  2.50e-05*(1+z)^1.50  (0.0 < z < 1.0) 
+	 POWERLAW MODEL:  9.70e-05*(1+z)^-0.50  (1.0 < z < 3.0) 
+	    MODEL-RATE(z=0.60) = 5.060e-05/Mpc^3/yr    
+	    MODEL-RATE(z=0.80) = 6.037e-05/Mpc^3/yr    
+	    MODEL-RATE(z=1.00) = 6.859e-05/Mpc^3/yr    
+	    MODEL-RATE(z=1.20) = 6.540e-05/Mpc^3/yr    
+	    MODEL-RATE(z=1.40) = 6.261e-05/Mpc^3/yr    
+	 Number of EVENTS per season =  2.170e+04 
+
+
+ xxx DEBUG EXIT: main: QUIT AFTER RATE-INIT 
+!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=! 
+
+   Don't panic: abort was deliberate to read 
+   'Number of SN per season' above. 
+
+!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=!=! 
