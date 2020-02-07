@@ -126,7 +126,7 @@ class TrainSALT(TrainSALTBase):
 		if self.options.n_components == 2:
 			guess[parlist == 'm1'] = m1knots*1e3
 		if self.options.n_colorpars:
-			guess[parlist == 'cl'] = [-0.504294, 0.787691, -0.461715, 0.0815619] #[0.]*self.options.n_colorpars
+			guess[parlist == 'cl'] = [0.]*self.options.n_colorpars #[-0.504294, 0.787691, -0.461715, 0.0815619]
 		if self.options.n_colorscatpars:
 			guess[parlist == 'clscat'] = [1e-6]*self.options.n_colorscatpars
 			guess[np.where(parlist == 'clscat')[0][-1]]=-10
