@@ -1,0 +1,83 @@
+
+cd /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT 
+
+
+#Submit batch file number 1
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00001.BUSY
+sbatch FITSPLIT_00001.BATCH 
+
+#Submit batch file number 2
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00002.BUSY
+sbatch FITSPLIT_00002.BATCH 
+
+#Submit batch file number 3
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00003.BUSY
+sbatch FITSPLIT_00003.BATCH 
+
+#Submit batch file number 4
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00004.BUSY
+sbatch FITSPLIT_00004.BATCH 
+
+#Submit batch file number 5
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00005.BUSY
+sbatch FITSPLIT_00005.BATCH 
+
+#Submit batch file number 6
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00006.BUSY
+sbatch FITSPLIT_00006.BATCH 
+
+#Submit batch file number 7
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00007.BUSY
+sbatch FITSPLIT_00007.BATCH 
+
+#Submit batch file number 8
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00008.BUSY
+sbatch FITSPLIT_00008.BATCH 
+
+#Submit batch file number 9
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00009.BUSY
+sbatch FITSPLIT_00009.BATCH 
+
+#Submit batch file number 10
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00010.BUSY
+sbatch FITSPLIT_00010.BATCH 
+
+#Submit batch file number 11
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00011.BUSY
+sbatch FITSPLIT_00011.BATCH 
+
+#Submit batch file number 12
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00012.BUSY
+sbatch FITSPLIT_00012.BATCH 
+
+#Submit batch file number 13
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00013.BUSY
+sbatch FITSPLIT_00013.BATCH 
+
+#Submit batch file number 14
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00014.BUSY
+sbatch FITSPLIT_00014.BATCH 
+
+#Submit batch file number 15
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00015.BUSY
+sbatch FITSPLIT_00015.BATCH 
+
+#Submit batch file number 16
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00016.BUSY
+sbatch FITSPLIT_00016.BATCH 
+
+#Submit batch file number 17
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00017.BUSY
+sbatch FITSPLIT_00017.BATCH 
+
+#Submit batch file number 18
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00018.BUSY
+sbatch FITSPLIT_00018.BATCH 
+
+#Submit batch file number 19
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00019.BUSY
+sbatch FITSPLIT_00019.BATCH 
+
+#Submit batch file number 20
+touch /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT/FITSPLIT_00020.BUSY
+sbatch FITSPLIT_00020.BATCH 

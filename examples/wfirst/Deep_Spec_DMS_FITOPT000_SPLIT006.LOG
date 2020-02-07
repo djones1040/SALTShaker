@@ -1,0 +1,317 @@
+  
+  ######################################################## 
+     INIT_SNVAR: Init variables.
+  ######################################################## 
+  
+   Allocate 12.50 MB for CIDMASK array (to check duplicates)
+   HOST MACHINE =    ()
+   SNDATA_ROOT = /project2/rkessler/PRODUCTS/SNDATA_ROOT
+   SNANA_DIR = /project2/rkessler/SURVEYS/WFIRST/ROOT/BYOSED_dev/SNANA    (v10_74f)
+  
+  ######################################################## 
+     READ SNLCINP NAMELIST. 
+  ######################################################## 
+  
+    Read namelist file: /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/pipeline/WFIRST_ALLSURVEYS.NML
+      PROCESS COMMAND LINE ARG: VERSION_PHOTOMETRY
+      PROCESS COMMAND LINE ARG: ROOTFILE_OUT
+      PROCESS COMMAND LINE ARG: TEXTFILE_PREFIX
+      PROCESS COMMAND LINE ARG: JOBSPLIT
+      PROCESS COMMAND LINE ARG: MXLC_PLOT
+&SNLCINP
+ VERSION_PHOTOMETRY="Deep_Spec_DMS                                                           ", 49*"NULL                                                                    ",
+ VERSION_REPLACE="NULL                                                                    ",
+ VERSION_REFORMAT_FITS="NULL                                                                    ",
+ PRIVATE_DATA_PATH="                                                                                                                                                                ",
+ FILTER_UPDATE_PATH="                                                                                                                                                                ",
+ NONSURVEY_FILTERS="                                                                                                    ",
+ SNRMAX_FILTERS="                                                                                                    ",
+ VPEC_ERR_OVERRIDE=  0.00000000    ,
+ FILTER_REPLACE="                                                                                                    ",
+ FILTLIST_LAMSHIFT="                                                                                                    ",
+ JOBSPLIT= 2*6          ,
+ JOBSPLIT_EXTERNAL= 2*1          ,
+ SIM_PRESCALE=  1.00000000    ,
+ MXLC_FIT=  999888777,
+ OPTSIM_LCWIDTH=          0,
+ OPT_REFORMAT_TERSE=          0,
+ OPT_REFORMAT_TEXT=          0,
+ OPT_REFORMAT_SALT2=          0,
+ REFORMAT_KEYS="NULL                                                                                                                                                                                                    ",
+ OPT_REFORMAT_FITS=          0,
+ SNMJD_LIST_FILE="                                                                                                                                                                                                        ",
+ SNMJD_OUT_FILE="                                                                                                                                                                                                        ",
+ MNFIT_PKMJD_LOGFILE="MNFIT_PKMJD.LOG                                                                                                                                                                                         ",
+ HFILE_OUT="                                                                                                                                                                                                        ",
+ ROOTFILE_OUT="Deep_Spec_DMS_FITOPT000_SPLIT006.ROOT                                                                                                                                                                   ",
+ TEXTFILE_PREFIX="Deep_Spec_DMS_FITOPT000_SPLIT006                                                                                                                                                                        ",
+ SNTABLE_LIST="FITRES NOZPHOT                                                                                                                                                                                          ",
+ SNTABLE_FILTER_REMAP="                                                                                                                                                                                                        ",
+ HFILE_KCOR="NULL                                                                                                                                                                                                    ",
+ KCOR_FILE="$WFIRST_ROOT/kcor/H19/kcor_WFIRST_CYCLE8_IMG.fits                                                                                                                                                       ",
+ ZPOFF_FILE="NULL                                                                                                                                                                                                    ",
+ USERTAGS_FILE="                                                                                                                                                                                                        ",
+ VPEC_FILE="                                                                                                                                                                                                        ",
+ HEADER_OVERRIDE_FILE="                                                                                                                                                                                                        ",
+ EPOCH_IGNORE_FILE="DEFAULT                                                                                                                                                                                                 ",
+ SNCID_LIST_FILE="                                                                                                                                                                                                        ",
+ SIMLIB_OUT="                                                                                                                                                                                                        ",
+ SIMLIB_ZPERR_LIST="                                                                                                                                                                                                        ",
+ NONLINEARITY_FILE="                                                                                                                                                                                                        ",
+ NFIT_ITERATION=          2,
+ MINUIT_PRINT_LEVEL=         -1,
+ INTERP_OPT=          1,
+ USE_MINOS=T,
+ OPT_SETPKMJD=          0,
+ SNRCUT_SETPKMJD=  5.00000000    ,
+ MJDWIN_SETPKMJD=  60.0000000    ,
+ OPT_DEBUG=          0,
+ LSIM_SEARCH_SPEC=F,
+ LSIM_SEARCH_ZHOST=F,
+ LDMP_SNFAIL=F,
+ LDMP_SNANA_VERSION=F,
+ LTEST_KCOR=F,
+ LTEST_INTERP=F,
+ LTEST_MAG=F,
+ LTEST_U3BAND=F,
+ USESIM_SNIA=T,
+ USESIM_SNCC=F,
+ USESIM_TRUEFLUX=F,
+ USE_SNHOST_ZPHOT=F,
+ ABORT_ON_NOEPOCHS=F,
+ ABORT_ON_BADAVWARP=T,
+ ABORT_ON_NOPKMJD=T,
+ ABORT_ON_BADZ=T,
+ ABORT_ON_BADKCOR=T,
+ ABORT_ON_BADSURVEY=T,
+ ABORT_ON_MARGPDF0=T,
+ ABORT_ON_TRESTCUT=T,
+ ABORT_ON_DUPLCID=F,
+ ABORT_ON_DUPLMJD=F,
+ ABORT_ON_BADHEADER=T,
+ ABORT_ON_BADFILTER=F,
+ H0_REF=  70.000000000000000     ,  7.0000000000000009     ,
+ OLAM_REF= 0.69999999999999996     ,  2.9999999329447746E-002,
+ OMAT_REF= 0.29999999999999999     ,  2.9999999329447746E-002,
+ W0_REF= -1.0000000000000000     , 0.10000000149011612     ,
+ DWDA_REF= 2*0.0000000000000000       ,
+ USE_MWCOR=F,
+ DOBUG_LAMRANGE=F,
+ MXLC_PLOT=          3,
+ NCCID_PLOT=          0,
+ SNCCID_PLOT= 52*"                    ",
+ DTOBS_MODEL_PLOT=  2.00000000    ,
+ MULTISEASON_OPTMASK=          0,
+ MULTISEASON_TGAP=  1.00000000E+09,
+ MULTISEASON_NREJECT_OUTLIER=  0.00000000    ,
+ MULTISEASON_CHI2RED_ACTIVE=  5.00000000    ,
+ APPLY_FLUXCOR_BUG=          1,
+ PHOTFLAG_DETECT=          0,
+ PHOTFLAG_TRIGGER=          0,
+ SNTYPE_LIST= 52*0          ,
+ SNCID_LIST= 52*0          ,
+ SNCCID_LIST= 52*"                    ",
+ MXEVT_PROCESS=  999888777,
+ SNCCID_IGNORE= 52*"                    ",
+ SNCID_IGNORE_FILE="                                                                                                                                                                                                        ",
+ SNCID_IGNORE= 52*0          ,
+ SNTYPE_IGNORE= 52*0          ,
+ CCDNUM_LIST= 52*0          ,
+ SIM_TEMPLATE_INDEX_LIST= 52*0          ,
+ SNFIELD_LIST="ALL                                                         ", 51*"                                                            ",
+ SNTEL_LIST="ALL                 ", 51*"                    ",
+ PHOTFLAG_MSKREJ= 5*0          ,
+ CUTWIN_CID= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_REDSHIFT= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_REDSHIFT_ERR= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_RA= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_DEC= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_HOSTSEP= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_NEPOCH= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_SNRMAX=  10.0000000    ,  9.99999996E+11,
+ CUTWIN_SNRMAX2=  5.00000000    ,  999999.000    ,
+ CUTWIN_NFIELD=  1.00000000    ,  999.000000    ,
+ CUTWIN_MWEBV= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_NSEASON_ACTIVE= -99.0000000    ,  99.0000000    ,
+ CUTWIN_TRESTMIN= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_TRESTMAX= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_TRESTRANGE= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_TREST= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_TOBS= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_TGAPMAX= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_T0GAPMAX= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_TOBSMIN= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_TOBSMAX= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_PEAKMJD= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_MJD= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_PSF= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_ZP= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_ZPADU= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_ZPNPE= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_PHOTPROB= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_NBAND_THRESH= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_NFILT_SNRMAX=  1.00000000    ,  99.0000000    ,
+ CUTWIN_NFILT_SNRMAX2=  2.00000000    ,  99.0000000    ,
+ CUTWIN_NFILT_TRESTMIN=  1.00000000    ,  100.000000    ,
+ CUTWIN_NFILT_TRESTMAX=  1.00000000    ,  100.000000    ,
+ CUTWIN_TREST2= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_NFILT_TREST2=  1.00000000    ,  100.000000    ,
+ CUTWIN_RESTLAM=  2000.00000    ,  25000.0000    ,
+ CUTWIN_LAMREST=  2000.00000    ,  25000.0000    ,
+ CUTWIN_LAMOBS=  2000.00000    ,  25000.0000    ,
+ PRIVATE_CUTWIN_STRING= 10*"                                                                                                                                                                ",
+ PRIVATE_REDSHIFT_CMB="                                                            ",
+ SIMVAR_CUTWIN_STRING="                                                                                                                                                                ",
+ EARLYLC_STRING="                                                                                                                                                                ",
+ REQUIRE_EPOCHS_STRING="                                                                                                    ",
+ DUMP_STRING="                                                                                                    ",
+ SNCUT_SNRMAX="                                                                                                                                                                ",
+ SNCUT_HOST_SBFLUX="                                                                                                                                                                ",
+ EPCUT_SNRMIN="                                                                                                                                                                ",
+ EPCUT_SKYSIG="                                                                                                                                                                ",
+ EPCUT_PSFSIG="                                                                                                                                                                ",
+ MAGOBS_SHIFT_PRIMARY="                                                                                                                                                                ",
+ MAGOBS_SHIFT_ZP="                                                                                                                                                                ",
+ MAGREST_SHIFT_PRIMARY="                                                                                                                                                                ",
+ MAGREST_SHIFT_ZP="                                                                                                                                                                ",
+ FILTER_LAMSHIFT="                                                                                                                                                                ",
+ MAGOBS_SHIFT_PRIMARY_PARAMS= 3*0.00000000      ,
+ MAGOBS_SHIFT_ZP_PARAMS= 3*0.00000000      ,
+ FUDGE_FLUXCAL_OFFSET="                                                                                                                                                                ",
+ FUDGE_FLUXCAL_ERROR="                                                                                                                                                                ",
+ FUDGE_FLUXCAL_ERRPIX="                                                                                                                                                                ",
+ FUDGE_MAG_ERROR="                                                                                                                                                                ",
+ FUDGE_MAG_COVERR="                                                                                                                                                                ",
+ FLUXERRMODEL_FILE="                                                                                                                                                                                                        ",
+ SIM_FLUXERRMODEL_FILE="                                                                                                                                                                                                        ",
+ FLUXERRMODEL_OPTMASK=          0,
+ MAGCOR_FILE="                                                                                                                                                                                                        ",
+ SIM_MAGCOR_FILE="                                                                                                                                                                                                        ",
+ FUDGE_HOSTNOISE_FILE="                                                                                                                                                                                                        ",
+ RV_MWCOLORLAW= -9.00000000    ,
+ OPT_MWCOLORLAW=         -9,
+ OPT_MWEBV=          1,
+ MWEBV_SCALE=  1.00000000    ,
+ MWEBV_SHIFT=  0.00000000    ,
+ REDSHIFT_FINAL_SHIFT=  0.00000000    ,
+ FLUXERRCALC_ZPTERR= -9.89999962    ,
+ CUTWIN_MJD_EXCLUDE= 2*0.00000000      ,
+ CUTWIN_MJD_INCLUDE= -9.99999996E+11,  9.99999996E+11,
+ CUTWIN_NMJD_INCLUDE= 0.990000010    ,  9.99999996E+11,
+ /
+  ###################################################### 
+  RD_SNFITSIO_INIT: 
+  Prepare to read PHOTOMETRY VERSION 'Deep_Spec_DMS' from 
+	 /scratch/midway2/rkessler/SNDATA_ROOT/SIM/Deep_Spec_DMS 
+  ###################################################### 
+  
+  ######################################################## 
+    RDSURVEY_FITS: FETCH GLOBAL SURVEY INFO from HEADER         
+  ######################################################## 
+  
+    Found SURVEY  = WFIRST   (IDSURVEY=103)
+    Found FILTERS = YJHF   (NFILTDEF=  4)
+    Found     110 SN Candidates to Process.
+  
+  
+  INIT_CUTMASK: NCUTBIT          =           58
+  INIT_CUTMASK: CUTMASK8_SN_ALL  =      1125899906842623
+  INIT_CUTMASK: CUTMASK8_MJD_ALL =    287104476244869120
+  
+  ============================================= 
+  RDKCOR_FITS: Read Calib/Kcor tables.
+    Opened /project2/rkessler/SURVEYS/WFIRST/ROOT/kcor/H19/kcor_WFIRST_CYCLE8_IMG.fits
+    with Blocksize=  1   and ISTAT=     0
+  
+      RDKCOR_FITS_HEAD    
+         Read VERSION      =   3  (kcor.exe version)
+         Read NPRIM        =   1  primary refs
+         Read NFILTERS     =   7  filters
+         Read NKCOR        =   0  K-COR tables
+      RDKCOR_FITS_ZPT 
+      RDKCOR_FITS_SNSED 
+      RDKCOR_FITS_KCOR  
+      RDKCOR_FITS_MAGS  
+      RDKCOR_FITS_FILTERS 
+      RDKCOR_FITS_PRIMARYSED  
+      FTCLOSE  
+         ---------------------- 
+         !!! RDKCOR_SUMMARY !!! 
+         ---------------------- 
+    Primary spectrum: AB                                      
+  
+  FILTER SUMMARY (RDKCOR) : 
+  internal                    LAM  LAM   rest-lam      primary
+  index name                  AVG  RMS   kcor range    mag   ZP
+ ------------------------------------------------------------------
+  06 Y106-Y                 10588  785      0-    0   0.000  0.000
+  07 J129-J                 12924  959      0-    0   0.000  0.000
+  08 H158-H                 15796 1168      0-    0   0.000  0.000
+  40 F184-F                 18426  963      0-    0   0.000  0.000
+ ------------------------------------------------------------------
+    NFILTDEF[SURVEY,REST] =    4   0
+  
+  
+   RDKCOR: Done. 
+  ---------------------------------------------- 
+  
+    Zeropoint offsets (ZPOFF) from : KCOR file
+         Will apply net MAGOBS_SHIFT_ZP(Y) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(J) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(H) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(F) =  0.0000
+  
+  ######################################################## 
+    INIT_GALextinct
+  ######################################################## 
+  
+    RV_MWCOLORLAW  ->  3.10 from Simulation
+    OPT_MWCOLORLAW ->  94 from Simulation
+    OPT_MWCOLORLAW =   94 -> CCM89+ODonell94
+  
+    OPT_MWEBV ->   1 from User (&SNLCINP)
+    OPT_MWEBV =    1 -> FILE value (SIMLIB or data header)
+  
+  ######################################################## 
+    INIT_SNTABLE_OPTIONS  
+  ######################################################## 
+  
+       SNANA-table: USE=0   TEXTFORMAT=none
+      FITRES-table: USE=1   TEXTFORMAT=key 
+     SNLCPAK-table: MXLC_PLOT=     0   TEXTFORMAT=none
+     SPECPAK-table: MXLC_PLOT=     0   TEXTFORMAT=none
+    MODELSPE-table: USE=0   TEXTFORMAT=none
+       SNANA-table: select CUTFLAG_SNANA &  63
+
+Program received signal SIGSEGV: Segmentation fault - invalid memory reference.
+
+Backtrace for this error:
+#0  0x7f41fca4527f in ???
+#1  0x7f41fd2cede1 in __exchange_and_add_single
+	at /srv/software/src/gcc-7.2.0-build/x86_64-pc-linux-gnu/libstdc++-v3/include/ext/atomicity.h:67
+#2  0x7f41fd2cede1 in __exchange_and_add_dispatch
+	at /srv/software/src/gcc-7.2.0-build/x86_64-pc-linux-gnu/libstdc++-v3/include/ext/atomicity.h:86
+#3  0x7f41fd2cede1 in _ZNSt6locale5_Impl19_M_remove_referenceEv
+	at /srv/software/src/gcc-7.2.0-build/x86_64-pc-linux-gnu/libstdc++-v3/include/bits/locale_classes.h:564
+#4  0x7f41fd2cede1 in _ZNSt6localeaSERKS_
+	at /srv/software/src/gcc-7.2.0/libstdc++-v3/src/c++98/locale.cc:116
+#5  0x7f41fd2ce1db in _ZNSt8ios_base7_M_initEv
+	at /srv/software/src/gcc-7.2.0/libstdc++-v3/src/c++98/ios_locale.cc:44
+#6  0x7f41fd31eea0 in _ZNSt9basic_iosIcSt11char_traitsIcEE4initEPSt15basic_streambufIcS1_E
+	at /srv/software/src/gcc-7.2.0-build/x86_64-pc-linux-gnu/libstdc++-v3/include/bits/basic_ios.tcc:129
+#7  0x7f4201a0329a in ???
+#8  0x7f4201a65481 in ???
+#9  0x7f42019fb382 in ???
+#10  0x7f42019fd406 in ???
+#11  0x7f42019fd862 in ???
+#12  0x7f42019fe879 in ???
+#13  0x7f4200a89170 in ???
+#14  0x7f4200a81fd0 in ???
+#15  0x503e63 in ???
+#16  0x5108a5 in ???
+#17  0x510909 in ???
+#18  0x42d7b8 in ???
+#19  0x4c1468 in ???
+#20  0x7f41fca313d4 in ???
+#21  0x405ab4 in ???
+#22  0xffffffffffffffff in ???

@@ -1,0 +1,479 @@
+
+ ****************************************************************** 
+   Begin execution of snlc_sim.exe    
+   Full command: snlc_sim.exe simulation/SIMGEN_WFIRST_SALT2_Specz.INPUT PATH_SNDATA_SIM /scratch/midway2/rkessler/SNDATA_ROOT/SIM CIDRAN_MIN 0 CIDRAN_MAX 48238 CIDOFF 28437 JOBID 7 NJOBTOT 20 GENVERSION TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0007_36320 GENPREFIX SIMULATEED_SPEC_SURVEY_DMS_SNIa-0007 RANSEED 123459 FORMAT_MASK 48 GENMODEL SALT2.P18_UV2IR GENMAG_SMEAR 0.1 GENRANGE_REDSHIFT 0.6 1.5 NGENTOT_LC 1085 NGEN_LC 0 
+
+ SNDATA_ROOT = /project2/rkessler/PRODUCTS/SNDATA_ROOT 
+ SNANA_DIR   = /project2/rkessler/SURVEYS/WFIRST/ROOT/BYOSED_dev/SNANA 
+  
+  ######################################################## 
+     INIT_SNVAR: Init variables.
+  ######################################################## 
+  
+   Allocate 12.50 MB for CIDMASK array (to check duplicates)
+   HOST MACHINE =    ()
+   SNDATA_ROOT = /project2/rkessler/PRODUCTS/SNDATA_ROOT
+   SNANA_DIR = /project2/rkessler/SURVEYS/WFIRST/ROOT/BYOSED_dev/SNANA    (v10_74m)
+   sizeof(INPUTS) =   1.104 MB 
+   sizeof(GENLC)  =   7.919 MB 
+ --------------------------------------------------------
+  Initialize uniqueMatch for sim-input file
+  Read user input file 1: simulation/SIMGEN_WFIRST_SALT2_Specz.INPUT 
+
+  PROCESS COMMAND LINE ARG: PATH_SNDATA_SIM 
+  PROCESS COMMAND LINE ARG: CIDRAN_MIN 
+  PROCESS COMMAND LINE ARG: CIDRAN_MAX 
+  PROCESS COMMAND LINE ARG: CIDOFF 
+  PROCESS COMMAND LINE ARG: JOBID 
+  PROCESS COMMAND LINE ARG: NJOBTOT 
+  PROCESS COMMAND LINE ARG: GENVERSION 
+  PROCESS COMMAND LINE ARG: GENPREFIX 
+  PROCESS COMMAND LINE ARG: RANSEED 
+  PROCESS COMMAND LINE ARG: FORMAT_MASK 
+  PROCESS COMMAND LINE ARG: GENMODEL 
+  PROCESS COMMAND LINE ARG: GENMAG_SMEAR 
+  PROCESS COMMAND LINE ARG: GENRANGE_REDSHIFT 
+  PROCESS COMMAND LINE ARG: NGENTOT_LC 
+  PROCESS COMMAND LINE ARG: NGEN_LC 
+
+ ****************************************************************** 
+    prep_user_inputs summary   
+	 SIMLIB file        : simulation/3tier_Survey.SIMLIB   (start LIBID=0)
+	 Generation Version : TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0007_36320 
+	 Generation source  : RANDOM 
+	 Generation model   : SALT2.P18_UV2IR 
+	 Number of LC to Generate: 0 
+	 OMEGA_(MATTER,LAMBDA)= 0.300, 0.700,    W= -1.00   H0= 70.0 
+	 KCOR  file : /project2/rkessler/SURVEYS/WFIRST/ROOT/kcor/H19_cut/kcor_WFIRST_CYCLE8_IMG.fits 
+	 Observer Gen-FILTERS  :  RZYJHF  
+	 Random number seed: 123459 
+	 Gen-Range for RA(deg)  : -360.000 to  360.000 
+	 Gen-Range for DEC(deg): -360.000 to  360.000 
+	 Gen-Range for ZCMB :  0.600 to  1.500  (sigma= 0.0000, bias=0.00000) 
+	 Gen-Range for PEAKMJD  :  54930.0 to  55775.0  
+	 Gen-Range for Trest    :    -12.0 to     45.0  days 
+	 Gen-Range for SHAPEPAR  :     -3.0 to      2.0  
+	 Gen-Range for AV  : 0.00 to 0.00  (dN/dAv = exp(-AV/0.00) 
+	 Gen-Mean  for RV  : 3.10  
+	 Gen-sigma for RV  : 0.00 , 0.00 (lower , upper ) 
+	 Gen-Range for RV  : 2.10 to 4.10 
+	 ZP offsets (RZYJHF) :  0.000 0.000 0.000 0.000 0.000 0.000
+	 MODEL mag offsets (RZYJHF) :   0.00  0.00  0.00  0.00  0.00  0.00
+
+
+ ****************************************************************** 
+   init_CIDRAN: initialize 29522 RANDOM CIDs (CIDOFF=28437)  
+     Allocate 0.01 MB for CIDMASK array (to check duplicates)
+	 CIDRAN_MIN/MAX = 0/48238   CIDOFF=28437   NSTORE_JOB=1085
+	 CIDRAN_LIST memory allocation:  0.004 MB 
+ 10000  20000 
+	 Done allocating 29522 random CIDs: 1085 for current sim-job 
+	 Called random() function 29523 times.
+
+ ****************************************************************** 
+    init_RANDOMsource : CIDOFF=28437   
+
+ ****************************************************************** 
+   SIMLIB_readGlobalHeader_TEXT  
+	 Opened : simulation/3tier_Survey.SIMLIB 
+
+ ****************************************************************** 
+   SIMLIB_prepGlobalHeader  
+	 SIMLIB Survey    : WFIRST 
+	 SIMLIB telescope : WFIRST 
+	 SIMLIB Filters   : FHJRYZ 
+	 SIMLIB PSF unit:    ARCSEC_FWHM 
+	 SIMLIB SKYSIG unit: ADU_PER_SQPIXEL 
+
+ *********************************** 
+   SIMULATED VOLUME, TIME, RATE(POWERLAW2)
+	 Survey dOmega  = 1.2754e-02 steradians  ( 0.00406 PI) 
+	 Redshift range =  0.6000 -  1.5000
+	 <redsfhit>     =  1.1063  (volume-weighted) 
+	 Survey Volume  = 3.0763e+08  sr*(MPc/h70)^3 
+	 Survey Time    =  2.3151  years/season 
+	 Co-moving Time =  1.0991  years/season  [ T/(1+<z>) ] 
+	 Co-moving V*T  = 3.3812e+08  sr*(MPc/h70)^3 * yr / season 
+	 POWERLAW MODEL:  2.50e-05*(1+z)^1.50  (0.0 < z < 1.0) 
+	 POWERLAW MODEL:  9.70e-05*(1+z)^-0.50  (1.0 < z < 3.0) 
+	    MODEL-RATE(z=0.60) = 5.060e-05/Mpc^3/yr    
+	    MODEL-RATE(z=0.80) = 6.037e-05/Mpc^3/yr    
+	    MODEL-RATE(z=1.00) = 6.859e-05/Mpc^3/yr    
+	    MODEL-RATE(z=1.20) = 6.540e-05/Mpc^3/yr    
+	    MODEL-RATE(z=1.40) = 6.261e-05/Mpc^3/yr    
+	 Number of EVENTS per season =  2.170e+04 
+
+
+ ****************************************************************** 
+   init_lensDMU  
+	 Opened : /project2/rkessler/PRODUCTS/SNDATA_ROOT/models/lensing/LENSING_PROBMAP_LogNormal+MICECATv1.DAT 
+	 Found 7200 rows to read. 
+		 <dmu>[z=1.005] =  -4.7394e-04 
+		 <dmu>[z=2.005] =   1.3686e-05 
+		 <dmu>[z=3.005] =   5.6426e-05 
+	 Done initializing Prpb(-1.516 < DeltaMU < 0.213) 
+	 in 36 redshfit bins from 0.405 to 3.905 
+
+ ****************************************************************** 
+   Initialize SEARCH EFFICIENCY for 'WFIRST' 
+  
+   Read Detection-efficiency curves: 
+	 Epoch SEARCH_EFF(Z) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(Z) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(Y) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(Y) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(J) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(J) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(H) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(H) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(F) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(F) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(B) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(B) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(V) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(V) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(R) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(R) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(I) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(I) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(G) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(G) =  0.00 at SNR =  0.00 
+
+   Fetch SOFTWARE SEARCH-LOGIC from : 
+	 /project2/rkessler/SURVEYS/WFIRST/ROOT/models/searcheff/SEARCHEFF_PIPELINE_LOGIC.DAT 
+	 Logic: 1 MJDs require filters=YJ+HJ 
+	 Trigger epoch contains all obs withing 0.400 days
+
+
+  Optional SEARCHEFF_SPEC_FILE not specified -> skip. 
+
+  Optional SEARCHEFF_zHOST_FILE not specified -> Eff=1.0 
+
+  Optional SEARCHEFF_zHOST_FILE not specified -> Eff=1.0 
+  
+  ============================================= 
+  RDKCOR_FITS: Read Calib/Kcor tables.
+    Opened /project2/rkessler/SURVEYS/WFIRST/ROOT/kcor/H19_cut/kcor_WFIRST_CYCLE8_IMG.fits
+    with Blocksize=  1   and ISTAT=     0
+  
+      RDKCOR_FITS_HEAD    
+         Read VERSION      =   3  (kcor.exe version)
+         Read NPRIM        =   1  primary refs
+         Read NFILTERS     =   7  filters
+         Read NKCOR        =   0  K-COR tables
+      RDKCOR_FITS_ZPT 
+      RDKCOR_FITS_SNSED 
+      RDKCOR_FITS_KCOR  
+      RDKCOR_FITS_MAGS  
+      RDKCOR_FITS_FILTERS 
+      RDKCOR_FITS_PRIMARYSED  
+      FTCLOSE  
+         ---------------------- 
+         !!! RDKCOR_SUMMARY !!! 
+         ---------------------- 
+    Primary spectrum: AB                                      
+  
+  FILTER SUMMARY (RDKCOR) : 
+  internal                    LAM  LAM   rest-lam      primary
+  index name                  AVG  RMS   kcor range    mag   ZP
+ ------------------------------------------------------------------
+  14 R062-R                  6359  780      0-    0   0.000  0.000
+  51 Z087-Z                  8702  635      0-    0   0.000  0.000
+  06 Y106-Y                 10589  779      0-    0   0.000  0.000
+  07 J129-J                 12926  954      0-    0   0.000  0.000
+  08 H158-H                 15798 1161      0-    0   0.000  0.000
+  40 F184-F                 18429  946      0-    0   0.000  0.000
+ ------------------------------------------------------------------
+    NFILTDEF[SURVEY,REST] =    6   0
+  
+  
+   RDKCOR: Done. 
+  ---------------------------------------------- 
+  
+    Zeropoint offsets (ZPOFF) from : KCOR file
+         Will apply net MAGOBS_SHIFT_ZP(R) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(Z) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(Y) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(J) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(H) =  0.0000
+         Will apply net MAGOBS_SHIFT_ZP(F) =  0.0000
+
+
+ ****************************************************************** 
+   init_genmag_SALT2 : Initialize SALT2.P18_UV2IR  
+   filtdump_SEDMODEL: Read primary ref 'AB' with 2311 lambda bins 
+
+   Defined                                 Lambda           AB     AB 
+   Filter                  <LAMBDA>        Range(step)      mag    ZP 
+   ----------------------------------------------------------------------
+   id=14 (      R062-R)   ( 6358.7 + 0)   4200- 7900( 10)   0.000  15.807  
+   id=51 (      Z087-Z)   ( 8702.5 + 0)   7000-10200( 10)   0.000  15.318  
+   id=06 (      Y106-Y)   (10588.8 + 0)   8600-12400( 10)   0.000  15.334  
+   id=07 (      J129-J)   (12925.6 + 0)  10600-15100( 10)   0.000  15.340  
+   id=08 (      H158-H)   (15797.9 + 0)  13000-18400( 10)   0.000  15.308  
+   id=40 (      F184-F)   (18429.4 + 0)  15900-20700( 10)   0.000  14.919  
+   ----------------------------------------------------------------------
+  Read SALT2 model parameters from  
+	  /project2/rkessler/PRODUCTS/SNDATA_ROOT/models/SALT2/SALT2.P18_UV2IR
+
+  SALT2.INFO 
+	 RESTLAMBDA_RANGE:    1700 -  23000 A
+	 Global MAG OFFSET:   0.270 mag  
+	 COLOR OFFSET:   0.000 mag  
+	 COLORLAW PARAMS:  
+	    B,V_WAVELENGTH = 4302.6 , 5428.6 
+	    INTERP LAMBDA RANGE:  2800.0 -  7000.0 
+	    Polynomial params: -0.504  0.788 -0.462  0.082 
+	 MAGERR_FLOOR:   0.005 mag  
+	 MAGERR(OBS)  +=  0.100 mag for   2000  < LAMOBS <   4000 
+	 MAGERR(REST) =  0.100 mag for    100 < LAMREST <    200 
+	 SEDFLUX_INTERP_OPT:  2  (Spline  then Linear with LAMSTEP/2 and DAYSTEP/5) 
+	 ERRMAP_INTERP_OPT:   1  (Linear) 
+	 ERRMAP_KCOR_OPT:     1  (ON) 
+
+  Read  SALT2-0  SED  from : 
+    /project2/rkessler/PRODUCTS/SNDATA_ROOT/models/SALT2/SALT2.P18_UV2IR/salt2_template_0.dat 
+  Store SED-0  LAM(MIN,MAX,STEP)=1700,24990,5  DAY(MIN,MAX,STEP)=-20,50,0.2 
+
+  Read  SALT2-1  SED  from : 
+    /project2/rkessler/PRODUCTS/SNDATA_ROOT/models/SALT2/SALT2.P18_UV2IR/salt2_template_1.dat 
+  Store SED-1  LAM(MIN,MAX,STEP)=1700,24990,5  DAY(MIN,MAX,STEP)=-20,50,0.2 
+
+	 mB = 10.6350 - 2.5*log10(x0)  
+
+ Read SALT2 ERROR MAPS: 
+  Read  SALT2-VAR0  SED  from : 
+    /project2/rkessler/PRODUCTS/SNDATA_ROOT/models/SALT2/SALT2.P18_UV2IR/salt2_lc_relative_variance_0.dat 
+  Read  SALT2-VAR1  SED  from : 
+    /project2/rkessler/PRODUCTS/SNDATA_ROOT/models/SALT2/SALT2.P18_UV2IR/salt2_lc_relative_variance_1.dat 
+  Read  SALT2-COVAR  SED  from : 
+    /project2/rkessler/PRODUCTS/SNDATA_ROOT/models/SALT2/SALT2.P18_UV2IR/salt2_lc_relative_covariance_01.dat 
+  Read  SALT2-ERRSCALE  SED  from : 
+    /project2/rkessler/PRODUCTS/SNDATA_ROOT/models/SALT2/SALT2.P18_UV2IR/salt2_lc_dispersion_scaling.dat 
+
+  Read color-dispersion vs. lambda from salt2_color_dispersion.dat 
+  Create ColorLaw Table: COLOR(MIN,MAX,STEP) = -2.0,2.0,0.01
+
+                               peak     color  
+            LAMBDA(A)  e^CL    dS0/S0   disp   
+  --------------------------------------------- 
+  LAMINFO:    2000     0.000   0.0041   1.309  
+  LAMINFO:    2500     0.000   0.0041   0.435  
+  LAMINFO:    3000     0.022   0.0089   0.170  
+  LAMINFO:    3500     0.261   0.0065   0.078  
+  LAMINFO:    3560     0.312   0.0059   0.072  
+  LAMINFO:    3900     0.631   0.0045   0.047  
+  LAMINFO:    4302     1.000   0.0007   0.031  
+  LAMINFO:    4720     1.405   0.0045   0.023  
+  LAMINFO:    5428     2.512   0.0051   0.017  
+  LAMINFO:    6185     4.219   0.0136   0.018  
+  LAMINFO:    6500     4.725   0.0167   0.020  
+  LAMINFO:    7500     5.843   0.0541   0.047  
+  LAMINFO:    8030     6.604   0.0718   0.094  
+  LAMINFO:    8500     7.361   0.1581   0.204  
+  LAMINFO:    9210     8.673   0.1541   0.196  
+  LAMINFO:    9940    10.266   0.1484   0.187  
+
+  init_genmag_SALT2 : Done. 
+
+ ****************************************************************** 
+   init_modelSmear: init intrinsic SN smearing with model=NONE  
+	 Smear-mode: complete wavelength dependence. 
+
+ ****************************************************************** 
+    Fill comments for README doc-file  
+
+ ****************************************************************** 
+   clr_VERSION  
+	 LCMERGE Version TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0007_36320 does not exist. 
+	 SIM Version TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0007_36320 does not exist. 
+	 PHOTOMETRY Version TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0007_36320 does not exist. 
+
+ ****************************************************************** 
+   Init SIMGEN_DUMP file   
+	 open /scratch/midway2/rkessler/SNDATA_ROOT/SIM/TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0007_36320/TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0007_36320.DUMP
+
+ ****************************************************************** 
+    Begin Generating Lightcurves.   
+  Found Max dN/dz * wgt = 2.753704e+64 at z =    0.999 
+	 Finished generating        1 of 1085 (CID= 12195) 
+	 Finished generating      100 of 1085 (CID= 10767) 
+	 Finished generating      200 of 1085 (CID=  1487) 
+	 Finished generating      300 of 1085 (CID= 22526) 
+	 Finished generating      400 of 1085 (CID= 25612) 
+	 Finished generating      500 of 1085 (CID= 21039) 
+	 Finished generating      600 of 1085 (CID= 11504) 
+	 Finished generating      700 of 1085 (CID= 45172) 
+	 Finished generating      800 of 1085 (CID= 38372) 
+	 Finished generating      900 of 1085 (CID= 21833) 
+	 Finished generating     1000 of 1085 (CID= 32575) 
+
+ ****************************************************************** 
+    Done generating 1085 SN lightcurves from RANDOM source.  
+	 (1085 lightcurves requested => 665 were written) 
+
+ ****************************************************************** 
+    Fill comments for README doc-file  
+
+ ****************************************************************** 
+   DUMP README CONTENTS TO SCREEN
+  
+ BRIEF_DESCRIPTION: simulate RANDOM SNe with GENMODEL = SALT2.P18_UV2IR 
+
+  HOST MACHINE: (null) 
+  USERNAME:  jpierel 
+  SNDATA_ROOT:  /project2/rkessler/PRODUCTS/SNDATA_ROOT 
+  SNANA_DIR:     /project2/rkessler/SURVEYS/WFIRST/ROOT/BYOSED_dev/SNANA 
+  SNANA_VERSION: v10_74m 
+  Current Dir:  /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst 
+
+ FULL_DESCRIPTION: 
+	 SIMLIB filename  : simulation/3tier_Survey.SIMLIB (start at LIBID=0) 
+	 SIMLIB SURVEY    : WFIRST  (TELESCOPE=WFIRST, MINOBS=1) 
+	 SIMLIB UNITS     : ARCSEC_FWHM for PSF,  ADU_PER_SQPIXEL for SKYSIG 
+	 NEWMJD_DIF       : 576.00  minutes (defines trigger epoch)
+	 Generation VERSION: TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0007_36320 
+	 Generation source : RANDOM 
+	 Generation FILTERS: RZYJHF 
+	 KCOR lookup tables: /project2/rkessler/SURVEYS/WFIRST/ROOT/kcor/H19_cut/kcor_WFIRST_CYCLE8_IMG.fits 
+	 Flux-smearing is ON 
+	 Reported flux-uncertainty includes SKY+GALAXY+SOURCE
+	 Zeropt-smearing is ON 
+	 Host-galaxy shot-noise  is OFF 
+	 Host-galaxy image-noise  is OFF 
+	 MilkyWay extinction  is OFF 
+
+ *********************************** 
+   SIMULATED VOLUME, TIME, RATE(POWERLAW2)
+	 Survey dOmega  = 1.2754e-02 steradians  ( 0.00406 PI) 
+	 Redshift range =  0.6000 -  1.5000
+	 <redsfhit>     =  1.1063  (volume-weighted) 
+	 Survey Volume  = 3.0763e+08  sr*(MPc/h70)^3 
+	 Survey Time    =  2.3151  years/season 
+	 Co-moving Time =  1.0991  years/season  [ T/(1+<z>) ] 
+	 Co-moving V*T  = 3.3812e+08  sr*(MPc/h70)^3 * yr / season 
+	 POWERLAW MODEL:  2.50e-05*(1+z)^1.50  (0.0 < z < 1.0) 
+	 POWERLAW MODEL:  9.70e-05*(1+z)^-0.50  (1.0 < z < 3.0) 
+	    MODEL-RATE(z=0.60) = 5.060e-05/Mpc^3/yr    
+	    MODEL-RATE(z=0.80) = 6.037e-05/Mpc^3/yr    
+	    MODEL-RATE(z=1.00) = 6.859e-05/Mpc^3/yr    
+	    MODEL-RATE(z=1.20) = 6.540e-05/Mpc^3/yr    
+	    MODEL-RATE(z=1.40) = 6.261e-05/Mpc^3/yr    
+	 Number of EVENTS per season =  2.170e+04 
+
+
+  GENERATION RANGES: 
+	 Generate Redshift :  0.600 to  1.500  using  POWERLAW2 distribution. 
+	 REDSHIFT_FINAL is ZCMB_GEN smeared by :  0.00001 
+	 Peculiar Velocity Gaussian sigma: 0.0 km/sec
+	 RZYJHF   ZP   offsets :  0.000  0.000  0.000  0.000  0.000  0.000 
+	 RZYJHF  MODEL offsets :  0.000  0.000  0.000  0.000  0.000  0.000 
+	 RZYJHF  exposure times: 1.0000 1.0000 1.0000 1.0000 1.0000 1.0000 
+	 RA       : -360.00 to 360.00  deg
+	 PEAKMJD  :  54930.0 to  55775.0   
+	 PEAKMJD-estimate  : Gauss smear, sigma= 1.00 days
+	 Trest    :   -12.00 to    45.00  days 
+	 RISETIME-SHIFT(days) SIGMA(lo,hi) : 0.0 , 0.0  (Mean= 0.0) 
+	 FALLTIME-SHIFT(days) SIGMA(lo,hi) : 0.0 , 0.0  (Mean= 0.0) 
+	 Shape-par(x1): Peak=0.97  SIG-+= 1.472,0.222  SKEW=0.00,0.00  BND=-3.00,2.00
+	 SALT2c: Peak=-0.05  SIG-+= 0.043,0.101  SKEW=0.00,0.00  BND=-0.30,0.50
+	 Alpha : Peak=0.14  SIG-+= 0.000,0.000  SKEW=0.00,0.00  BND=0.00,0.40
+	 Beta  : Peak=3.10  SIG-+= 0.000,0.000  SKEW=0.00,0.00  BND=0.50,9.90
+
+  Z-dependent SN-parameter shifts:  None. 
+
+  Intrinsic MAG-smearing models (sigma clip -3.0 to  3.0) : 
+   Model 1: Coherent MAG-smearing (GENMAG_SMEAR) :  0.100  
+   Model 2: passband MAG-smearing is OFF 
+   Model 3:  model-smear is OFF  
+   Model 4: intrinsic scatter matrix is OFF 
+   Model 5: GENMAG_SMEAR_USRFUN is  OFF 
+
+  AVWARP_OVERFLOWS:  NONE. 
+
+  Cosmology Parameters: 
+	 H0 =  70.00 km/s per MPc 
+	 Omega_{M,L} =  0.30,  0.70   w = -1.00  
+
+ --------------------------------------------------- 
+  Software-Pipeline Search Efficiency (MINOBS=2) from 
+	 /project2/rkessler/SURVEYS/WFIRST/ROOT/models/searcheff/SEARCHEFF_PIPELINE_WFIRST.DAT
+	 Epoch SEARCH_EFF(Z) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(Z) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(Y) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(Y) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(J) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(J) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(H) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(H) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(F) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(F) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(B) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(B) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(V) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(V) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(R) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(R) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(I) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(I) =  0.00 at SNR =  0.00 
+	 Epoch SEARCH_EFF(G) =  1.00 at SNR =  3.00 
+	 Epoch SEARCH_EFF(G) =  0.00 at SNR =  0.00 
+
+   Fetch SOFTWARE SEARCH-LOGIC from : 
+	 /project2/rkessler/SURVEYS/WFIRST/ROOT/models/searcheff/SEARCHEFF_PIPELINE_LOGIC.DAT 
+	 Logic: 1 MJDs require filters=YJ+HJ 
+	 Trigger epoch contains all obs withing 0.400 days
+
+  Spectroscopic Efficiency : 
+	 No spec-eff option specified ==> 100% efficiency. 
+
+  APPLY_SEARCHEFF_OPT=1 --> Require EFF(PIPELINE) 
+  SNTYPE(Ia) = 1(SPEC)  and 101(PHOT) 
+ --------------------------------------------------- 
+
+  SOFTWARE CUTS: 
+	 EPOCH CUT:  2000 Lambda(rest) < 22000 A 
+	 EPOCH CUT: SNR >= -9999  
+	 TrestMIN <  -5.0  &&  TrestMAX > 25.0 days 
+	 Max TGAP(rest) <=  20.0  days 
+	 Max T0GAP(rest) <=  10.0  days 
+	 NOBS(MJDDIF > 0.0) >=  0 
+	 NEPOCH(SNR > -9999.0) >=  1 
+	 SIMGEN_DUMP file includes SNe passing software cuts. 
+	 PEAKMAG(any filter) < 999.0 
+	 MWEBV <= 5.0 
+
+  HOSTLIB Summary: None. 
+
+  Fudges on SIMLIB Seeing Conditions: NONE. 
+
+ ============ END OF SIMULATION SUMMARY ============== 
+
+  Random Number Sync: 
+	 RANDOM SEED: 123459   (RANLIST_START_GENSMEAR: 1)
+	 FIRST/LAST Random Number (List=1): 0.181881 0.381462  
+	 FIRST/LAST Random Number (List=2): 0.196079 0.670121  
+	 FIRST/LAST Random Number (List=3): 0.178817 0.919923  
+
+  Generation Statistics (total CPU=0.1 minutes): 
+	 Generated  1085 simulated light curves (136/sec) 
+	 Wrote       665 simulated light curves to SNDATA files (83/sec). 
+  Spectroscopic-type: 782 -> 665 (before -> after cuts)
+  Photometric-type:   0 -> 0 (before -> after cuts)
+  Rejection Statistics: 
+	    51 rejected by NEPOCH<1 
+	     0 rejected by GENRANGEs 
+	   252 rejected by SEARCH-TRIGGER 
+	   117 rejected by CUTWIN-SELECTION 
+  SEARCH+CUTS Efficiency:  0.6129 +-  0.0148 
+
+  Number of SNe per season AFTER CUTS :  13303 +-   516 
+
+	 ===== END OF README FILE ====== 
+
+  AUXILIARY FILES: 
+  /scratch/midway2/rkessler/SNDATA_ROOT/SIM/TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0007_36320/TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0007_36320.LIST 
+  /scratch/midway2/rkessler/SNDATA_ROOT/SIM/TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0007_36320/TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0007_36320.README 
+  /scratch/midway2/rkessler/SNDATA_ROOT/SIM/TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0007_36320/TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0007_36320.DUMP
+
+ DONE with snlc_sim.
