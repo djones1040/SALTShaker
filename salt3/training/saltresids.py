@@ -183,7 +183,11 @@ class SALTResids:
 		#Find the iqr of the phase/wavelength basis functions
 		self.phaseRegularizationBins=np.linspace(self.phase[0],self.phase[-1],self.phaseBins[0].size*2+1,True)
 		self.waveRegularizationBins=np.linspace(self.wave[0],self.wave[-1],self.waveBins[0].size*2+1,True)
+		# HACK to match snpca
+		#self.phaseRegularizationBins=np.linspace(self.phase[0],self.phase[-1],self.phaseBins[0].size+1,True)
+		#self.waveRegularizationBins=np.linspace(self.wave[0],self.wave[-1],self.waveBins[0].size+1,True)
 
+		
 		self.phaseRegularizationPoints=(self.phaseRegularizationBins[1:]+self.phaseRegularizationBins[:-1])/2
 		self.waveRegularizationPoints=(self.waveRegularizationBins[1:]+self.waveRegularizationBins[:-1])/2
 
@@ -759,7 +763,7 @@ class SALTResids:
 				try: specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='cl')] = modulatedFlux[:,np.newaxis]*-0.4*np.log(10)*c*self.colorLawDerivInterp(specdata[k]['wavelength']/(1+z))[:,varyParams[self.iCL]]
 				except: import pdb; pdb.set_trace()
 
-				# M0, M1
+			# M0, M1
 			if (requiredPCDerivs).any():
 				intmult = _SCALE_FACTOR/(1+z)*recalexp*colorexpinterp*self.datadict[sn]['mwextcurveint'](specdata[k]['wavelength'])
 				if 'pcDeriv_spec_%s'%sn in storedResults:
@@ -1329,8 +1333,10 @@ class SALTResids:
 				restWave=specdata[k]['wavelength']/(1+z)
 				err=err[(restWave>self.waveRegularizationBins[0])&(restWave<self.waveRegularizationBins[-1])]
 				snr=snr[(restWave>self.waveRegularizationBins[0])&(restWave<self.waveRegularizationBins[-1])]
+				flux=specdata[k]['flux'][(restWave>self.waveRegularizationBins[0])&(restWave<self.waveRegularizationBins[-1])]
+				fluxerr=specdata[k]['fluxerr'][(restWave>self.waveRegularizationBins[0])&(restWave<self.waveRegularizationBins[-1])]
 				restWave=restWave[(restWave>self.waveRegularizationBins[0])&(restWave<self.waveRegularizationBins[-1])]
-
+				
 				phase=(specdata[k]['tobs']+tpkoff)/(1+z)
 				if phase<self.phaseRegularizationBins[0]:
 					phaseIndex=0
@@ -1343,9 +1349,9 @@ class SALTResids:
 				#neffNoWeight = np.histogram(restWave,self.waveRegularizationBins)[0]
 				#snr = ss.binned_statistic(restWave,snr,bins=self.waveRegularizationBins,statistic='sum').statistic
 				#neffNoWeight = neffNoWeight*snr**2./900 #[snr < 5] = 0.0
-				spec_cov = ss.binned_statistic(restWave,specdata[k]['flux']/specdata[k]['flux'].max()/len(specdata[k]['flux']),
-											   bins=self.waveRegularizationBins,statistic='sum').statistic
-				
+				spec_cov = ss.binned_statistic(
+					restWave,flux/flux.max()/len(flux),
+					bins=self.waveRegularizationBins,statistic='sum').statistic
 				# HACK
 				self.neffRaw[phaseIndex,:]+=spec_cov
 				
@@ -1353,7 +1359,6 @@ class SALTResids:
 				#																(self.waveRegularizationBins[1:] > self.waveRegularizationBins.min()-500)])
 				#np.histogram(restWave,self.waveRegularizationBins)[0]
 
-    
 		self.neffRaw=gaussian_filter1d(self.neffRaw,self.phaseSmoothingNeff,0)
 		self.neffRaw=gaussian_filter1d(self.neffRaw,self.waveSmoothingNeff,1)
 
@@ -1365,7 +1370,7 @@ class SALTResids:
 		#self.neffRaw[self.neffRaw > 1] = 1
 		#self.neffRaw[self.neffRaw < 1e-6] = 1e-6
 
-		self.plotEffectivePoints([-12.5,0,12.5,40],'neff.png')
+		self.plotEffectivePoints([-12.5,0.5,16.5,26],'neff.png')
 		#import pdb; pdb.set_trace()
 		self.plotEffectivePoints(None,'neff-heatmap.png')
 		self.neff=np.clip(self.neffRaw,self.neffFloor,None)
@@ -1448,7 +1453,7 @@ class SALTResids:
 			boolIndex[indices]=True
 
 			#Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
-			normalization=np.sqrt(1/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
+			normalization=np.sqrt(1/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))**2.
 			#0 if model is locally separable in phase and wavelength i.e. flux=g(phase)* h(wavelength) for arbitrary functions g and h
 			numerator=(dfluxdphase[i] *dfluxdwave[i] -d2fluxdphasedwave[i] *fluxes[i] )
 			dnumerator=( self.regularizationDerivs[1][:,:,varyParams[indices]]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2][:,:,varyParams[indices]]* dfluxdphase[i][:,:,np.newaxis] - self.regularizationDerivs[3][:,:,varyParams[indices]]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0][:,:,varyParams[indices]]* d2fluxdphasedwave[i][:,:,np.newaxis] )			
@@ -1457,6 +1462,7 @@ class SALTResids:
 			if boolIndex[varyParams].any():
 				jacobian[:,boolIndex[varyParams]]=((dnumerator*(scale[i]**2 )- scaleDeriv[i][np.newaxis,np.newaxis,varyParams[indices]]*2*scale[i]*numerator[:,:,np.newaxis])/self.neff[:,:,np.newaxis]*normalization / scale[i]**4  ).reshape(-1, varyParams[indices].sum())
 			jac += [jacobian]
+
 		return resids,jac
 
 	def dyadicRegularizationTest(self,x, storedResults,varyParams):
@@ -1541,7 +1547,7 @@ class SALTResids:
 			if boolIndex[varyParams].any():
 				jacobian[:,boolIndex[varyParams]]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
 			jac+= [jacobian]
-		#import pdb; pdb.set_trace()
+		#if len(waveGradResids[waveGradResids != waveGradResids]): import pdb; pdb.set_trace()
 		return waveGradResids,jac
 
 	#def waveGradientRegularization_snpca(self, x, storedResults,varyParams):
@@ -1549,27 +1555,29 @@ class SALTResids:
 	#	ny = len(self.waveRegularizationPoints)
 	#	
 	#	def total_weight():
-
-	#		reference_flux = 7.1739e+13
-	#		bmaxintegral = 2.008780068e+14
-	#		
-	#		scale = 1./(nx*(ny-1)) # remove dependence on number of bins
-	#		scale *= np.sqrt(bmaxintegral/reference_flux) # remove dependence on both total flux and values of the function basis
-	#		# now chi2 is in unit of (% variation per A)^2
+#
+#			reference_flux = 7.1739e+13
+#			bmaxintegral = 2.008780068e+14
+#			
+#			scale = 1./(nx*(ny-1)) # remove dependence on number of bins
+#			scale *= (bmaxintegral/reference_flux)**2. # remove dependence on both total flux and values of the function basis
+#			# now chi2 is in unit of (% variation per A)^2
 #
 #			# calibrated using SNLS3 template 0:
 #			scale *= 4.85547e5 # so approx. 0.15% variation allowed per A (wrt to flux at max)
 #
 #			scale *= weight; # tunable weight
 #			return scale
-
-
-	#	def chi2(const FunctionBasis &V, const Vect* mask):  
 #
+#
+#		def chi2():
+#
+#			waveGradResids=[]
+#			
 #			result = 0
-#			v = SV.Data()
+#			#v = SV.Data()
 #			y = self.waveRegularizationPoints #SV.MeanLambdas().Data()
-#			m = 0; if(mask) m = mask->Data();
+#			#m = 0; if(mask) m = mask->Data();
 #
 #			phase=self.phaseRegularizationPoints
 #			wave=self.waveRegularizationPoints
@@ -1578,38 +1586,32 @@ class SALTResids:
 #			for j in range(ny):
 #				for i in range(nx):
  #     
-#					i0 = i+nx*j;
- #     
-#					if(mask && m[i0]>1) continue;
+#					i0 = i+nx*j
+#					i1 = i+nx*(j+1)
+ #    
+#					waveGradResids += [( ( fluxes[i1] - fluxes[i0] ) / ( y[j+1] - y[j] ) )**2.]
+#			
+#			return total_weight()*np.array(waveGradResids)
 #
-#					int i1 = i+nx*(j+1);
- #     
-#					result += np.sqrt( ( fluxes[i1] - fluxes[i0] ) / ( y[j+1] - y[j] ) )
-#			return total_weight()*result
-
-	#	def chi2_derivatives(): #const FunctionBasis &V, Mat &A, Vect& B, const Vect* mask) const {
-  
-			# A and B can be already filled with some other regularization term, so allocate only if necessary  
-    
-	#		residual = 0
-	#		dy_inv = 0
-	#		dy_inv2 = 0
-
-	#		phase=self.phaseRegularizationPoints
-	#		wave=self.waveRegularizationPoints
-	#		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave).flatten()
-	#		v = SV.Data()
-	#		y = self.waveRegularizationPoints #SV.MeanLambdas().Data()
-			#m = 0; if(mask) m = mask->Data()
-	#		scale = total_weight()
-  
-	#		for j in range(ny):
-	#			for i in range(nx):
-	#				i0 = i+nx*j
-     # 
-	#				if(mask & m[i0]>1): continue
+#		def chi2_derivatives(jacobian): #const FunctionBasis &V, Mat &A, Vect& B, const Vect* mask) const {
+ # 
+#			# A and B can be already filled with some other regularization term, so allocate only if necessary  
+ #   
+#			residual = 0
+#			dy_inv = 0
+#			dy_inv2 = 0
 #
-#					int i1 = i+nx*(j+1)
+#			phase=self.phaseRegularizationPoints
+#			wave=self.waveRegularizationPoints
+#			fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave).flatten()
+#			y = self.waveRegularizationPoints #SV.MeanLambdas().Data()
+#			#m = 0; if(mask) m = mask->Data()
+#			scale = total_weight()
+ # 
+#			for j in range(ny):
+#				for i in range(nx):
+#					i0 = i+nx*j
+#					i1 = i+nx*(j+1)
 #					
 #					dy_inv =  1. / ( y[j+1] - y[j] )
 #					residual = ( fluxes[i1] - fluxes[i0] ) * dy_inv
@@ -1618,11 +1620,16 @@ class SALTResids:
 #					B[i1] -= scale * residual * dy_inv
 #					dy_inv2 = np.sqrt(dy_inv);
  #     
-#					A[i0,i0] += scale * dy_inv2 # 0.5*d2chi2/didj = dres/di*dres/dj
-#					A[i1,i1] += scale * dy_inv2
-#					A[i0,i1] -= scale * dy_inv2
-#					A[i1,i0] -= scale * dy_inv2
-	
+#					jacobian[i0,i0] += scale * dy_inv2 # 0.5*d2chi2/didj = dres/di*dres/dj
+#					jacobian[i1,i1] += scale * dy_inv2
+#					jacobian[i0,i1] -= scale * dy_inv2
+#					jacobian[i1,i0] -= scale * dy_inv2
+#
+#
+#		waveGradResids = chi2()
+#		jacobian=np.zeros((waveGradResids[-1].size,varyParams.sum()))
+#		jacobian = chi2_derivatives(jacobian)
+		
 	def waveGradientRegularizationTest(self, x, storedResults,varyParams):
 		#Declarations
 		phase=self.phaseRegularizationPoints
