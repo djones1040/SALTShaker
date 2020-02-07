@@ -758,7 +758,9 @@ class GaussNewton(saltresids.SALTResids):
 					includeParsPhase=np.zeros(self.npar,dtype=bool)
 					includeParsPhase[self.__dict__['ispcrcl_%s'%rclstr][i]] = True
 
-					Xprop,chi2prop = self.process_fit(X.copy(),includeParsPhase,storedResults,fit=fit)
+
+					Xprop,chi2prop = self.process_fit(X,includeParsPhase,storedResults,fit=fit)
+
 					if chi2prop<chi2 :
 						X,chi2=Xprop,chi2prop
 					retainReg=(not ('all' in fit or 'component' in fit))
@@ -817,7 +819,6 @@ class GaussNewton(saltresids.SALTResids):
 			stepsize=linalg.lstsq(jacobian,residuals)[0] #,cond=1e-17)[0]
 		else:
 			stepsize=linalg.lstsq(jacobian,residuals,cond=self.conditionNumber)[0]
-
 		if np.any(np.isnan(stepsize)):
 			print('NaN detected in stepsize; exitting to debugger')
 			import pdb;pdb.set_trace()

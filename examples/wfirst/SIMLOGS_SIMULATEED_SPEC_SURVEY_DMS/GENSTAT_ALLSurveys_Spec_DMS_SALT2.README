@@ -1,0 +1,41 @@
+GENVERSION: ALLSurveys_Spec_DMS_SALT2 
+
+
+
+#     model  CLASS          INFILE 
+# ------------------------------------------------ 
+INFILE:  0   SNIa          simulation/SIMGEN_WFIRST_SALT2_Specz.INPUT
+
+
+#     model   CLASS         GENOPT    
+# ----------------------------------------------------- 
+GENOPT:  0   SNIa           GENMODEL SALT2.P18_UV2IR  GENMAG_SMEAR 0.1    GENRANGE_REDSHIFT 0.6 1.5
+
+TABLE_INSERT_MARK1:
+
+
+   *** TABLES BELOW ARE FOR DEBUG *** 
+
+ALLSurveys_Spec_DMS_SALT2 stats for each individiaul sim-job
+#   jobid iver  m   iver_link  m_link     NGEN    NWRITE    NSPEC
+# ----------------------------------------------------------------
+JOB: 20     2   0      -9       -9        1085      677      677 
+JOB:  9     2   0      -9       -9        1085      667      667 
+JOB:  7     2   0      -9       -9        1085      665      665 
+JOB: 15     2   0      -9       -9        1085      669      669 
+JOB: 11     2   0      -9       -9        1085      639      639 
+JOB: 14     2   0      -9       -9        1085      620      620 
+JOB:  4     2   0      -9       -9        1085      663      663 
+JOB: 19     2   0      -9       -9        1085      653      653 
+JOB:  6     2   0      -9       -9        1085      689      689 
+JOB:  5     2   0      -9       -9        1085      660      660 
+JOB: 16     2   0      -9       -9        1085      639      639 
+JOB: 12     2   0      -9       -9        1085      665      665 
+JOB: 17     2   0      -9       -9        1085      679      679 
+JOB:  3     2   0      -9       -9        1085      689      689 
+JOB:  2     2   0      -9       -9        1085      666      666 
+JOB: 13     2   0      -9       -9        1085      675      675 
+JOB: 18     2   0      -9       -9        1085      676      676 
+JOB:  8     2   0      -9       -9        1085      694      694 
+JOB:  1     2   0      -9       -9        1085      677      677 
+JOB: 10     2   0      -9       -9        1085      682      682 

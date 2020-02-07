@@ -29,7 +29,8 @@ blindflag=0
 opt_biascor=2
 file=SALT2mu_SHALLOW+MEDIUM+DEEP/DMS/FITOPT000.FITRES
 #Info for WFIRST survey
-simfile_biascor=/project2/rkessler/SURVEYS/WFIRST/USERS/rhounsell/CYCLE8/PHOTO_Z/Dan/BIASCOR.FITRES #My analysis file
+#simfile_biascor=/project2/rkessler/SURVEYS/WFIRST/USERS/rhounsell/CYCLE8/PHOTO_Z/Dan/BIASCOR.FITRES #My analysis file
+simfile_biascor=/project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/biascor_output/BIASCOR_Spec_DMS/FITOPT000.FITRES
 prefix=SALT2mu_fitopt
 vpecerr=150
 min_per_zbin=1

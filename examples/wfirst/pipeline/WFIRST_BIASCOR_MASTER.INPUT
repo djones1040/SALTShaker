@@ -1,0 +1,24 @@
+BATCH_INFO: sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 100
+PATH_SNDATA_SIM:  $SCRATCH_SIMDIR
+# specify the three survey tiers: SHALLOW,MEDIUM,DEEP
+
+GENVERSION: BIASCOR_Spec_DMS 
+GENOPT: DNDZ_SCALE 3.0 1.0E-1
+
+ENDLIST_GENVERSION:
+
+DONE_STAMP: /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/SIMLOGS_SURVEY_DMS_BIASCOR/Sim.DONE
+
+RESET_CIDOFF:  2  # uniqe random CID among all versions
+# specify sim-input files for snlc_sim.exe
+SIMGEN_INFILE_Ia: simulation_biascor/SIMGEN_WFIRST_SALT2_Specz.INPUT
+NGEN_UNIT:  0.05  SURVEY   # each job is 0.1 of a WFIRST survey
+
+# Define required global items to ensure uniformity among all jobs
+#H0: 70
+#ZRANGE:      0.03 2.5
+#GENOPT_GLOBAL: GENRANGE_REDSHIFT 0.03 2.5
+GENOPT_GLOBAL: GENRANGE_REDSHIFT .6 1.5
+GENPREFIX:   SURVEY_DMS_BIASCOR
+FORMAT_MASK: 48          # 2=TERSE    16=RanCID  32=FITS-FORMAT
+RANSEED_REPEAT: 20 123459
