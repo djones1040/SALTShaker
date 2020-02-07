@@ -1312,8 +1312,8 @@ class SALTResids:
 		#Clean out array
 		self.neffRaw=np.zeros((self.phaseRegularizationPoints.size,self.waveRegularizationPoints.size))
 
-# 		start=time.time()
-# 		spectime,phottime=0,0
+	# 		start=time.time()
+	# 		spectime,phottime=0,0
 		for sn in (self.datadict.keys()):
 			tpkoff=x[self.parlist == 'tpkoff_%s'%sn]
 			photdata = self.datadict[sn]['photdata']
@@ -1325,7 +1325,7 @@ class SALTResids:
 			obswave=self.datadict[sn]['obswave']
 			idx=self.datadict[sn]['idx']
 			#For each spectrum, add one point to each bin for every spectral measurement in that bin
-# 			spectime-=time.time()
+	# 			spectime-=time.time()
 			for k in specdata.keys():
 				# weight by ~mag err?
 				err=specdata[k]['fluxerr']/specdata[k]['flux']
@@ -1344,7 +1344,7 @@ class SALTResids:
 					phaseIndex=-1
 				else:
 					phaseIndex= np.where( (phase>=self.phaseRegularizationBins[:-1]) & (phase<self.phaseRegularizationBins[1:]))[0][0]
-				
+			
 
 				#neffNoWeight = np.histogram(restWave,self.waveRegularizationBins)[0]
 				#snr = ss.binned_statistic(restWave,snr,bins=self.waveRegularizationBins,statistic='sum').statistic
@@ -1358,10 +1358,7 @@ class SALTResids:
 				#neffNoWeight/np.median(neffNoWeight[(self.waveRegularizationBins[1:] < self.waveRegularizationBins.min()+500) |
 				#																(self.waveRegularizationBins[1:] > self.waveRegularizationBins.min()-500)])
 				#np.histogram(restWave,self.waveRegularizationBins)[0]
-				
 
-		#self.neffRaw *= 5.2657 # correcting for bin size between SALT3 and snpca, for funzies
-		#self.neffRaw[self.neffRaw < self.neffMax] = self.neffFloor
 		self.neffRaw=gaussian_filter1d(self.neffRaw,self.phaseSmoothingNeff,0)
 		self.neffRaw=gaussian_filter1d(self.neffRaw,self.waveSmoothingNeff,1)
 
@@ -1377,7 +1374,7 @@ class SALTResids:
 		#import pdb; pdb.set_trace()
 		self.plotEffectivePoints(None,'neff-heatmap.png')
 		self.neff=np.clip(self.neffRaw,self.neffFloor,None)
-		
+	
 		self.neff[self.neff>self.neffMax]=np.inf
 		#import pdb;pdb.set_trace()
 		
