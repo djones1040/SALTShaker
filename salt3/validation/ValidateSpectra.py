@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import sys,os,sncosmo
 import numpy as np
 from salt3.util import readutils

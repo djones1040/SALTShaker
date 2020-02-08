@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import numpy as np
 import pylab as plt
 import sncosmo
@@ -262,7 +264,6 @@ def customfilt(outfile,lcfile,salt3dir,
 								lcrv01file=lcrv01file)
 	
 	if 'PEAKMJD' in sn.__dict__.keys():
-
 		try:
 			plotmjd = np.linspace(float(sn.PEAKMJD.split()[0])-20,
 								  float(sn.PEAKMJD.split()[0])+55,200)
@@ -271,9 +272,10 @@ def customfilt(outfile,lcfile,salt3dir,
 								  float(sn.PEAKMJD)+55,200)
 
 	else:
-		print('BLAH!')
-		plotmjd = np.linspace(sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)][0]-20,
-							  sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)][0]+55,200)
+		sn.PEAKMJD=sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)][0]
+
+	plotmjd = np.linspace(float(sn.PEAKMJD)-20,
+						  float(sn.PEAKMJD)+55,200)
 	
 	if not ax1:
 		fig = plt.figure(figsize=(15, 5))

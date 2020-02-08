@@ -1,30 +1,33 @@
 #!/usr/bin/env python
 
 import numpy as np
+from numpy.random import standard_normal
+from numpy.linalg import inv,pinv
+
+import time,copy,extinction
+
 from scipy.interpolate import splprep,splev,BSpline,griddata,bisplev,bisplrep,interp1d,interp2d
 from scipy.integrate import trapz, simps
-from salt3.util.synphot import synphot
-from sncosmo.salt2utils import SALT2ColorLaw
-import time
-from itertools import starmap
-from salt3.training import init_hsiao,saltresids #_master as saltresids
-from sncosmo.models import StretchSource
-from scipy.optimize import minimize, least_squares
+from scipy.optimize import minimize, least_squares,minimize_scalar,lsq_linear
 from scipy.stats import norm
 from scipy.ndimage import gaussian_filter1d
-import pylab as plt
 from scipy.special import factorial
-from astropy.cosmology import Planck15 as cosmo
-from sncosmo.constants import HC_ERG_AA, MODEL_BANDFLUX_SPACING
-import extinction
-from multiprocessing import Pool, get_context
-import copy
+from scipy import linalg,sparse
+from scipy.sparse import linalg as sprslinalg
+
 import scipy.stats as ss
-from numpy.random import standard_normal
-from scipy import linalg
-from emcee.interruptible_pool import InterruptiblePool
+
+from sncosmo.salt2utils import SALT2ColorLaw
+from sncosmo.models import StretchSource
+from sncosmo.constants import HC_ERG_AA, MODEL_BANDFLUX_SPACING
 from sncosmo.utils import integration_grid
-from numpy.linalg import inv,pinv
+
+from salt3.util.synphot import synphot
+from salt3.training import saltresids #_master as saltresids
+
+
+from multiprocessing import Pool, get_context
+from emcee.interruptible_pool import InterruptiblePool
 from iminuit import Minuit
 import iminuit,warnings
 
@@ -432,9 +435,9 @@ class GaussNewton(saltresids.SALTResids):
 		super().__init__(guess,datadict,parlist,**kwargs)
 		self.lsqfit = False
 		
-		self.GN_iter = {'all':1,'all-grouped':1,'x0':1,'x1':1,'component0':1,'piecewisecomponent0':1,'piecewisecomponent1':1,
-						'component1':1,'color':3,'colorlaw':3,
-						'spectralrecalibration_norm':3,'spectralrecalibration_poly':3,
+		self.GN_iter = {'all':1,'all-grouped':1,'x0':1,'x1':1,'component0':1,'piecewisecomponents':1,'piecewisecomponent0':1,'piecewisecomponent1':1,
+						'component1':1,'color':2,'colorlaw':2,'spectralrecalibration':2,
+						'spectralrecalibration_norm':2,'spectralrecalibration_poly':2,
 					    'tpk':1,'modelerr':1}
 
 		self._robustify = False
@@ -466,12 +469,12 @@ class GaussNewton(saltresids.SALTResids):
 			('spectral recalibration const.','spectralrecalibration_norm'),
 			('spectral recalibration higher orders','spectralrecalibration_poly'),('error model','modelerr')]
 		#('time of max','tpk')
-		for message,fit in self.fitlist_debug:
+		for message,fit in self.fitlist:
 			if 'all' in fit:
 				includePars=np.ones(self.npar,dtype=bool)
 			else:
 				includePars=np.zeros(self.npar,dtype=bool)
-				if fit=='components':
+				if 'components' in fit:
 					includePars[self.im0]=True
 					includePars[self.im1]=True
 				elif 'component0' in fit :
@@ -510,31 +513,7 @@ class GaussNewton(saltresids.SALTResids):
 		print(warning)
 		self.warnings.append(warning)
 
-	def satisfyDefinitions(self,X):
-		X=X.copy()
-		components=self.SALTModel(X)
-		int1d = interp1d(self.phase,components[0],axis=0,assume_sorted=True)
-		m0Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
-			  self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
-		int1d = interp1d(self.phase,components[1],axis=0,assume_sorted=True)
-		m1Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
-			  self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
-		ratio=m1Bflux/m0Bflux
 
-		X[self.ix0]*=1+ratio*X[self.ix1]
-		X[self.ix1]/=1+ratio*X[self.ix1]
-		X[self.im1]-=ratio*X[self.im0]
-
-		X[self.im0]+= np.mean(X[self.ix1])*X[self.im1]
-		X[self.ix1]-=np.mean(X[self.ix1])
-
-		x1std = np.std(X[self.ix1])
-		if x1std == x1std and x1std != 0.0:
-			  X[self.im1]*= x1std
-			  X[self.ix1]/= x1std
-
-		return X
-		
 	def convergence_loop(self,guess,loop_niter=3):
 		lastResid = 1e20
 		print('Initializing')
@@ -559,7 +538,7 @@ class GaussNewton(saltresids.SALTResids):
 		print('starting loop; %i iterations'%loop_niter)
 		for superloop in range(loop_niter):
 
-			X,chi2,converged = self.robust_process_fit(X,uncertainties,chi2_init,superloop)
+			X,chi2,converged = self.robust_process_fit(X,uncertainties.copy(),chi2_init,superloop)
 			if chi2_init-chi2 < -1.e-6:
 				self.addwarning("MESSAGE WARNING chi2 has increased")
 			elif np.abs(chi2_init-chi2) < self.chi2_diff_cutoff:
@@ -581,9 +560,8 @@ class GaussNewton(saltresids.SALTResids):
 			chi2_init = chi2
 			stepsizes = self.getstepsizes(X,Xlast)
 			Xlast = copy.deepcopy(X)
-
 		#Retranslate x1, M1, x0, M0 to obey definitions
-		X=self.satisfyDefinitions(X)
+		X=self.priors.satisfyDefinitions(X,self.SALTModel(X))
 		
 		xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams = \
@@ -644,6 +622,59 @@ class GaussNewton(saltresids.SALTResids):
 		#	(X[self.parlist == 'clscat']-Xlast[self.parlist == 'clscat'])/Xlast[self.parlist == 'clscat']
 		#import pdb; pdb.set_trace()
 		return stepsizes
+		
+	def printChi2Contributions(self,guess,storedResults):
+		if self.n_colorpars:
+			if not 'colorLaw' in storedResults:
+				storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, guess[self.parlist == 'cl'])(self.wave)
+				storedResults['colorLawInterp']= interp1d(self.wave,storedResults['colorLaw'],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
+		else: storedResults['colorLaw'] = 1
+				
+		if not 'components' in storedResults:
+			storedResults['components'] =self.SALTModel(guess)
+		if not 'componentderivs' in storedResults:
+			storedResults['componentderivs'] = self.SALTModelDeriv(guess,1,0,self.phase,self.wave)
+		
+		if not all([('specvariances_{}'.format(sn) in storedResults) and ('photvariances_{}'.format(sn) in storedResults) for sn in self.datadict]):
+			storedResults['saltErr']=self.ErrModel(guess)
+			storedResults['saltCorr']=self.CorrelationModel(guess)
+		varyParams=np.zeros(guess.size,dtype=bool)
+		photresids = []
+		specresids = [] # Jacobian matrix from r
+
+		for sn in self.datadict.keys():
+			photresidsdict,specresidsdict=self.ResidsForSN(
+				guess,sn,storedResults,varyParams,fixUncertainty=True)
+			photresids+=[photresidsdict['resid']]
+			specresids+=[specresidsdict['resid']]
+
+
+		priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,guess)
+		priorResids=[priorResids]
+
+		BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
+			self.priors.BoundedPriorResids(self.bounds,self.boundedParams,guess)
+		priorResids+=[BoundedPriorResids]
+
+		if self.regularize:
+			for regularization, weight,regKey in [(self.phaseGradientRegularization, self.regulargradientphase,'regresult_phase'),
+										   (self.waveGradientRegularization,self.regulargradientwave,'regresult_wave' ),
+										   (self.dyadicRegularization,self.regulardyad,'regresult_dyad')]:
+				if weight ==0:
+					continue
+				if regKey in storedResults:
+					priorResids += storedResults[regKey]
+				else:
+					for regResids,regJac in zip( *regularization(guess,storedResults,varyParams)):
+						priorResids += [regResids*np.sqrt(weight)]
+					storedResults[regKey]=priorResids[-self.n_components:]
+		chi2Results=[]
+		for name,x in [('Photometric',photresids),('Spectroscopic',specresids),('Prior',priorResids)]:
+			x=np.concatenate(x)
+			chi2Results+=[(name,(x**2).sum(),x.size)]
+		totalChi2=sum([x[1] for x in chi2Results])
+		for name,chi2,dof in chi2Results:
+			print('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2/dof,chi2/totalChi2*100))
 	
 	def lsqwrap(self,guess,storedResults,varyParams=None,doPriors=True):
 		if varyParams is None:
@@ -672,7 +703,7 @@ class GaussNewton(saltresids.SALTResids):
 			photresidsdict,specresidsdict=self.ResidsForSN(
 				guess,sn,storedResults,varyParams,fixUncertainty=True)
 			residuals+=[photresidsdict['resid'],specresidsdict['resid']]
-			jacobian+=[photresidsdict['resid_jacobian'],specresidsdict['resid_jacobian']]
+			jacobian+=[sparse.coo_matrix(photresidsdict['resid_jacobian']),sparse.coo_matrix(specresidsdict['resid_jacobian'])]
 			
 
 		if doPriors:
@@ -684,8 +715,7 @@ class GaussNewton(saltresids.SALTResids):
 			BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
 				self.priors.BoundedPriorResids(self.bounds,self.boundedParams,guess)
 			residuals+=[BoundedPriorResids]
-			jacobian+=[BoundedPriorJac[:,varyParams]]
-
+			jacobian+=[sparse.coo_matrix(BoundedPriorJac[:,varyParams])]
 
 		if self.regularize:
 			for regularization, weight,regKey in [(self.phaseGradientRegularization, self.regulargradientphase,'regresult_phase'),
@@ -695,48 +725,133 @@ class GaussNewton(saltresids.SALTResids):
 					continue
 				if regKey in storedResults and not (varyParams[self.im0].any() or varyParams[self.im1].any()):
 					residuals += storedResults[regKey]
-					jacobian +=  [np.zeros((r.size,varyParams.sum())) for r in storedResults[regKey]]
+					jacobian +=  [sparse.coo_matrix(np.zeros((r.size,varyParams.sum())) )for r in storedResults[regKey]]
 				else:
 					for regResids,regJac in zip( *regularization(guess,storedResults,varyParams)):
 						residuals += [regResids*np.sqrt(weight)]
-						jacobian+=[regJac*np.sqrt(weight)]
+						jacobian+=[sparse.coo_matrix(regJac)*np.sqrt(weight)]
 					storedResults[regKey]=residuals[-self.n_components:]
 
 		if varyParams.any():
-			return np.concatenate(residuals),np.concatenate(jacobian)
+			return np.concatenate(residuals),sparse.vstack(jacobian)
 		else:
 			return  np.concatenate(residuals)
 
 	def robust_process_fit(self,X_init,uncertainties,chi2_init,niter):
 		X,chi2=X_init,chi2_init
-		
+		self.printChi2Contributions(X,uncertainties.copy())
+		storedResults=uncertainties.copy()
 		for fit in self.fitOptions:
 			if 'all-grouped' in fit :continue #
 			if 'modelerr' in fit: continue
 			print('fitting '+self.fitOptions[fit][0])
-			storedResults=uncertainties.copy()
-			Xprop = X.copy()
 			
+
+			Xprop = X.copy()
+
 			if (fit=='all'):
-				if self.tryFittingAllParams:
-					Xprop,chi2prop = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
-					if (chi2prop/chi2 < 0.9):
-						print('Terminating iteration ',niter,', continuing with all parameter fit')
-						return Xprop,chi2prop,False
-					else:
-						self.tryFittingAllParams=False
-						print('Discontinuing all parameter fit')
-						retainReg=True
-						retainPhotFlux=True
+# 				if self.tryFittingAllParams:
+				Xprop,chi2prop = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
+				if (chi2prop/chi2 < 0.9):
+					print('Terminating iteration ',niter,', continuing with all parameter fit')
+					return Xprop,chi2prop,False
+				elif (chi2prop<chi2):
+					X,chi2=Xprop,chi2prop
+					storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys)}
+				else:
+# 						self.tryFittingAllParams=False
+# 						print('Discontinuing all parameter fit')
+					retainReg=True
+					retainPCDerivs=True
+
+			#if (fit=='all'):
+			#	if self.tryFittingAllParams:
+			#		Xprop,chi2prop = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
+			#		if (chi2prop/chi2 < 0.9):
+			#			print('Terminating iteration ',niter,', continuing with all parameter fit')
+			#			return Xprop,chi2prop,False
+			#		else:
+			#			self.tryFittingAllParams=False
+			#			print('Discontinuing all parameter fit')
+			#			retainReg=True
+			#			retainPhotFlux=True
+			#			retainPCDerivs=True
+			#			storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
+			#					(retainReg and key.startswith('regresult' )) or
+			#				   (retainPhotFlux and key.startswith('photfluxes')) or
+			#				   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
+
+			#elif not fit.startswith('piecewisecomponent'):
+			#	for i in range(self.GN_iter[fit]):
+			#		if not len(np.where(self.fitOptions[fit][1])[0]): continue
+			#		Xprop,chi2prop = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
+			#		if np.isnan(Xprop).any() or (~np.isfinite(Xprop)).any() or np.isnan(chi2prop) or ~np.isfinite(chi2prop):
+			#			print('NaN detected, breaking out of loop')
+			#			break;
+			#		if chi2prop<chi2 :
+			#			X,chi2=Xprop,chi2prop
+			#		retainReg=(not ('all' in fit or 'component' in fit))
+			#		retainPhotFlux=fit.startswith('spectralrecalibration') 
+			#		retainPCDerivs=fit.startswith('component')  or fit.startswith('x')
+			#		storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
+			#				(retainReg and key.startswith('regresult' )) or
+			#			   (retainPhotFlux and key.startswith('photfluxes')) or
+			#			   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
+
+	#				print('Retaining results from fit: ',storedResults.keys())
+			#elif fit.startswith('spectralrecalibration'):
+			#	if fit == 'spectralrecalibration_norm': rclstr = 'norm'
+			#	elif fit == 'spectralrecalibration_poly': rclstr = 'poly'
+			#	#for i in range(self.GN_iter[fit]):
+			#	for i,p in enumerate(self.__dict__['ispcrcl_%s'%rclstr]):
+			#		print('fitting spec recal')
+			#		includeParsPhase=np.zeros(self.npar,dtype=bool)
+			#		includeParsPhase[self.__dict__['ispcrcl_%s'%rclstr][i]] = True
+
+
+			#		Xprop,chi2prop = self.process_fit(X,includeParsPhase,storedResults,fit=fit)
+
+			#		if chi2prop<chi2 :
+			#			X,chi2=Xprop,chi2prop
+			#		retainReg=(not ('all' in fit or 'component' in fit))
+			#		retainPhotFlux=fit.startswith('spectralrecalibration') 
+			#		retainPCDerivs=fit.startswith('component')  or fit.startswith('x')
+
+					storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
+							(retainReg and key.startswith('regresult' )) or
+						   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
+			elif fit.startswith('piecewisecomponent'):
+				for i in range(self.GN_iter[fit]):
+					for i,p in enumerate(self.phaseBinCenters):
+						print('fitting phase %.1f'%p)
+						indices=np.arange((self.waveknotloc.size-4)*(self.phaseknotloc.size-4))
+						iFit= (((i-1)*(self.waveknotloc.size-4)) <= indices) & (indices <((i+2)*(self.waveknotloc.size-4)))
+						includeParsPhase=np.zeros(self.npar,dtype=bool)
+
+						if fit== 'piecewisecomponents':
+							includeParsPhase[self.im0[iFit]]=True
+							includeParsPhase[self.im1[iFit]]=True
+						else:
+							includeParsPhase[self.__dict__['im%s'%fit[-1]][iFit]] = True
+						Xprop,chi2prop = self.process_fit(Xprop,includeParsPhase,storedResults,fit=fit)
+
+						#includeParsPhase[self.__dict__['im%s'%fit[-1]][iFit]] = True
+						#Xprop,chi2prop = self.process_fit(X,includeParsPhase,storedResults,fit=fit)
+
+						if np.isnan(Xprop).any() or (~np.isfinite(Xprop)).any() or np.isnan(chi2prop) or ~np.isfinite(chi2prop):
+							print('NaN detected, breaking out of loop')
+							break;
+						if chi2prop<chi2 :
+							X,chi2=Xprop,chi2prop
 						retainPCDerivs=True
 						storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
-								(retainReg and key.startswith('regresult' )) or
-							   (retainPhotFlux and key.startswith('photfluxes')) or
 							   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
 
-			elif not fit.startswith('piecewisecomponent'):
+						# print('Retaining results from fit: ',storedResults.keys())
+
+
+			else:
 				for i in range(self.GN_iter[fit]):
-					if not len(np.where(self.fitOptions[fit][1])[0]): continue
 					Xprop,chi2prop = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
 					if np.isnan(Xprop).any() or (~np.isfinite(Xprop)).any() or np.isnan(chi2prop) or ~np.isfinite(chi2prop):
 						print('NaN detected, breaking out of loop')
@@ -744,96 +859,84 @@ class GaussNewton(saltresids.SALTResids):
 					if chi2prop<chi2 :
 						X,chi2=Xprop,chi2prop
 					retainReg=(not ('all' in fit or 'component' in fit))
-					retainPhotFlux=fit.startswith('spectralrecalibration') 
-					retainPCDerivs=fit.startswith('component')  or fit.startswith('x')
+					retainPCDerivs=('component' in fit)  or fit.startswith('x')
 					storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
 							(retainReg and key.startswith('regresult' )) or
-						   (retainPhotFlux and key.startswith('photfluxes')) or
 						   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
 
-	#				print('Retaining results from fit: ',storedResults.keys())
-			elif fit.startswith('spectralrecalibration'):
-				if fit == 'spectralrecalibration_norm': rclstr = 'norm'
-				elif fit == 'spectralrecalibration_poly': rclstr = 'poly'
-				#for i in range(self.GN_iter[fit]):
-				for i,p in enumerate(self.__dict__['ispcrcl_%s'%rclstr]):
-					print('fitting spec recal')
-					includeParsPhase=np.zeros(self.npar,dtype=bool)
-					includeParsPhase[self.__dict__['ispcrcl_%s'%rclstr][i]] = True
-
-
-					Xprop,chi2prop = self.process_fit(X,includeParsPhase,storedResults,fit=fit)
-
-					if chi2prop<chi2 :
-						X,chi2=Xprop,chi2prop
-					retainReg=(not ('all' in fit or 'component' in fit))
-					retainPhotFlux=fit.startswith('spectralrecalibration') 
-					retainPCDerivs=fit.startswith('component')  or fit.startswith('x')
-					storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
-							(retainReg and key.startswith('regresult' )) or
-						   (retainPhotFlux and key.startswith('photfluxes')) or
-						   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
-					# print('Retaining results from fit: ',storedResults.keys())
 					if chi2 != chi2 or chi2 == np.inf:
 						break
-			else:
-				for i in range(self.GN_iter[fit]):
-					for i,p in enumerate(self.phaseBinCenters):
-						print('fitting phase %.1f'%p)
-						indices=np.arange((self.waveknotloc.size-4)*(self.phaseknotloc.size-4))
-						iFit= (((i-1)*(self.waveknotloc.size-4)) <= indices) & (indices <((i+2)*(self.waveknotloc.size-4)))
-						includeParsPhase=np.zeros(self.npar,dtype=bool)
-						includeParsPhase[self.__dict__['im%s'%fit[-1]][iFit]] = True
-						Xprop,chi2prop = self.process_fit(X,includeParsPhase,storedResults,fit=fit)
-						if np.isnan(Xprop).any() or (~np.isfinite(Xprop)).any() or np.isnan(chi2prop) or ~np.isfinite(chi2prop):
-							print('NaN detected, breaking out of loop')
-							break;
-						if chi2prop<chi2 :
-							X,chi2=Xprop,chi2prop
-						retainReg=(not ('all' in fit or 'component' in fit))
-						retainPhotFlux=fit.startswith('spectralrecalibration') 
-						retainPCDerivs=fit.startswith('component')  or fit.startswith('x')
-						storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
-								(retainReg and key.startswith('regresult' )) or
-							   (retainPhotFlux and key.startswith('photfluxes')) or
-							   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
-
-						# print('Retaining results from fit: ',storedResults.keys())
-						if chi2 != chi2 or chi2 == np.inf:
-							break
 						
+
 
 		#In this case GN optimizer can do no better
 		return X,chi2,(X is X_init)
 		 #_init
-	
+	def linear_fit(self,X,gaussnewtonstep,uncertainties):
+		def opFunc(x,stepdir):
+			return ((self.lsqwrap(X-(x*stepdir),uncertainties.copy(),None,True))**2).sum()
+		result,step,stepType=minimize_scalar(opFunc,args=(gaussnewtonstep,)),gaussnewtonstep,'Gauss-Newton'
+		print('Linear optimization factor is {:.2f} x {} step'.format(result.x,stepType))
+		print('Linear optimized chi2 is ',result.fun)
+		return result.x*gaussnewtonstep,result.fun
+		
+		
 	def process_fit(self,X,iFit,storedResults,fit='all',doPriors=True):
 		X=X.copy()
-
 		varyingParams=iFit&self.iModelParam
+		
 		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors)
+		oldChi=(residuals**2).sum()
+		
 		#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
-		includePars= ~(np.all(0==jacobian,axis=0))
+		jacobian=jacobian.tocsc()
+		includePars= np.diff(jacobian.indptr) != 0
+		if not includePars.all():
+			varyingParams[varyingParams]=varyingParams[varyingParams] & includePars
+			jacobian=jacobian[:,includePars]		
+		
+		#Exclude any residuals unaffected by the current fit (column in jacobian zeroed for that index)
+		jacobian=jacobian.tocsr()
+		includeResids=np.diff(jacobian.indptr) != 0
+		if not includeResids.all():
+			jacobian=jacobian[includeResids,:]		
+
 		print('Number of parameters fit this round: {}'.format(includePars.sum()))
-		jacobian=jacobian[:,includePars]
-		#print('playing w/ conditioning!')
-
-		#if fit == 'component1':
-		#	stepsize=linalg.lstsq(jacobian,residuals)[0] #,cond=1e-17)[0]
-		#else:
-		stepsize=linalg.lstsq(jacobian,residuals,cond=self.conditionNumber)[0]
-
+		print('Initial chi2 ',oldChi)
+		isJacobianSparse=jacobian.nnz/(jacobian.shape[0]*jacobian.shape[1])<0.5
+		#If this is a sparse matrix, treat it as such, otherwise use standard linear algebra solver
+		if isJacobianSparse:
+		
+			print('Using sparse linear algebra')
+			result=sprslinalg.lsmr(jacobian,residuals[includeResids],atol=1e-6,btol=1e-6)
+			if result[1]==7: print('Gauss-Newton solver reached max # of iterations')
+			stepsize=result[0]
+		else:
+			print('Using dense linear algebra')
+			jacobian=jacobian.toarray()
+			stepsize=linalg.lstsq(jacobian,residuals[includeResids],cond=self.conditionNumber)[0]
+			
 		if np.any(np.isnan(stepsize)):
 			print('NaN detected in stepsize; exitting to debugger')
 			import pdb;pdb.set_trace()
-		varyingParams[varyingParams]=varyingParams[varyingParams] & includePars
-		#import pdb; pdb.set_trace()
-		X[varyingParams] -= stepsize
 		
-		# quick eval
-		chi2 = np.sum(self.lsqwrap(X, {key:storedResults[key] for key in self.uncertaintyKeys},varyParams=None)**2.)
-		print("chi2: old, new, diff")
-		print((residuals**2).sum(),chi2,(residuals**2).sum()-chi2)
+		gaussNewtonStep=np.zeros(X.size)
+		gaussNewtonStep[varyingParams]=stepsize
+		uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
+		#Was trying a clip in linear_fit; may not be worth it with new, more stable algorithm
+		preclip=((self.lsqwrap(X-gaussNewtonStep,uncertainties.copy(),None,True))**2).sum()
+		print('After Gauss-Newton chi2 is ',preclip)
+	
+		linearStep,linearChi2=self.linear_fit(X,gaussNewtonStep,uncertainties)
+		if linearChi2>preclip:
+			X-=gaussNewtonStep
+			chi2=preclip
+		else:
+			X-=linearStep
+			chi2=linearChi2
+		print('Chi2 diff, % diff')
+		print(oldChi-chi2,'{:.2f}'.format(100*(oldChi-chi2)/oldChi))
+		print('')
 		#import pdb; pdb.set_trace()
 		return X,chi2
 
