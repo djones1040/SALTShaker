@@ -450,23 +450,26 @@ class GaussNewton(saltresids.SALTResids):
 		self.iModelParam[self.iclscat]=False
 
 		self.tryFittingAllParams=True
-		fitlist = [('all parameters','all'),('all parameters grouped','all-grouped'),
-				   (" x0",'x0'),('component 0 piecewise','piecewisecomponent0'),('principal component 0','component0'),('x1','x1'),
-				   ('component 1 piecewise','piecewisecomponent1'),('principal component 1','component1'),('color','color'),('color law','colorlaw'),
-				   ('spectral recalibration const.','spectralrecalibration_norm'),
-				   ('spectral recalibration higher orders','spectralrecalibration_poly'),
-				   ('time of max','tpk'),('error model','modelerr')]
+		self.fitlist = [('all parameters','all'),('all parameters grouped','all-grouped'),
+						(" x0",'x0'),('component 0 piecewise','piecewisecomponent0'),
+						('principal component 0','component0'),('x1','x1'),
+						('component 1 piecewise','piecewisecomponent1'),
+						('principal component 1','component1'),('color','color'),('color law','colorlaw'),
+						('spectral recalibration const.','spectralrecalibration_norm'),
+						('spectral recalibration higher orders','spectralrecalibration_poly'),
+						('time of max','tpk'),('error model','modelerr')]
 		#print('hack!!')
 		#self.fitlist_debug = [('x1','x1'),('principal component 1','component1')]
-		self.fitlist_debug = [('all parameters','all'),#('all parameters grouped','all-grouped'),
-			#('piecewise both components','piecewisecomponents'),
-			(" x0",'x0'),('principal component 0','component0'),
+		self.fitlist_debug = [#('all parameters','all'),('all parameters grouped','all-grouped'),
+			(" x0",'x0'),#('component 0 piecewise','piecewisecomponent0'),
+			('principal component 0','component0'),
 			('x1','x1'),('principal component 1','component1'),
-			('color','color'),
-			('color law','colorlaw'),
-			('spectral recalibration ','spectralrecalibration'),
-			('time of max','tpk'),('error model','modelerr')]
-		for message,fit in self.fitlist_debug:
+			#('component 1 piecewise','piecewisecomponent1'),
+			('color','color'),('color law','colorlaw'),
+			('spectral recalibration const.','spectralrecalibration_norm'),
+			('spectral recalibration higher orders','spectralrecalibration_poly'),('error model','modelerr')]
+		#('time of max','tpk')
+		for message,fit in self.fitlist:
 			if 'all' in fit:
 				includePars=np.ones(self.npar,dtype=bool)
 			else:
@@ -728,7 +731,7 @@ class GaussNewton(saltresids.SALTResids):
 						residuals += [regResids*np.sqrt(weight)]
 						jacobian+=[sparse.coo_matrix(regJac)*np.sqrt(weight)]
 					storedResults[regKey]=residuals[-self.n_components:]
-				
+
 		if varyParams.any():
 			return np.concatenate(residuals),sparse.vstack(jacobian)
 		else:
@@ -743,6 +746,7 @@ class GaussNewton(saltresids.SALTResids):
 			if 'modelerr' in fit: continue
 			print('fitting '+self.fitOptions[fit][0])
 			
+
 			Xprop = X.copy()
 
 			if (fit=='all'):
@@ -759,6 +763,60 @@ class GaussNewton(saltresids.SALTResids):
 # 						print('Discontinuing all parameter fit')
 					retainReg=True
 					retainPCDerivs=True
+
+			#if (fit=='all'):
+			#	if self.tryFittingAllParams:
+			#		Xprop,chi2prop = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
+			#		if (chi2prop/chi2 < 0.9):
+			#			print('Terminating iteration ',niter,', continuing with all parameter fit')
+			#			return Xprop,chi2prop,False
+			#		else:
+			#			self.tryFittingAllParams=False
+			#			print('Discontinuing all parameter fit')
+			#			retainReg=True
+			#			retainPhotFlux=True
+			#			retainPCDerivs=True
+			#			storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
+			#					(retainReg and key.startswith('regresult' )) or
+			#				   (retainPhotFlux and key.startswith('photfluxes')) or
+			#				   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
+
+			#elif not fit.startswith('piecewisecomponent'):
+			#	for i in range(self.GN_iter[fit]):
+			#		if not len(np.where(self.fitOptions[fit][1])[0]): continue
+			#		Xprop,chi2prop = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
+			#		if np.isnan(Xprop).any() or (~np.isfinite(Xprop)).any() or np.isnan(chi2prop) or ~np.isfinite(chi2prop):
+			#			print('NaN detected, breaking out of loop')
+			#			break;
+			#		if chi2prop<chi2 :
+			#			X,chi2=Xprop,chi2prop
+			#		retainReg=(not ('all' in fit or 'component' in fit))
+			#		retainPhotFlux=fit.startswith('spectralrecalibration') 
+			#		retainPCDerivs=fit.startswith('component')  or fit.startswith('x')
+			#		storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
+			#				(retainReg and key.startswith('regresult' )) or
+			#			   (retainPhotFlux and key.startswith('photfluxes')) or
+			#			   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
+
+	#				print('Retaining results from fit: ',storedResults.keys())
+			#elif fit.startswith('spectralrecalibration'):
+			#	if fit == 'spectralrecalibration_norm': rclstr = 'norm'
+			#	elif fit == 'spectralrecalibration_poly': rclstr = 'poly'
+			#	#for i in range(self.GN_iter[fit]):
+			#	for i,p in enumerate(self.__dict__['ispcrcl_%s'%rclstr]):
+			#		print('fitting spec recal')
+			#		includeParsPhase=np.zeros(self.npar,dtype=bool)
+			#		includeParsPhase[self.__dict__['ispcrcl_%s'%rclstr][i]] = True
+
+
+			#		Xprop,chi2prop = self.process_fit(X,includeParsPhase,storedResults,fit=fit)
+
+			#		if chi2prop<chi2 :
+			#			X,chi2=Xprop,chi2prop
+			#		retainReg=(not ('all' in fit or 'component' in fit))
+			#		retainPhotFlux=fit.startswith('spectralrecalibration') 
+			#		retainPCDerivs=fit.startswith('component')  or fit.startswith('x')
+
 					storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
 							(retainReg and key.startswith('regresult' )) or
 						   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
@@ -769,12 +827,17 @@ class GaussNewton(saltresids.SALTResids):
 						indices=np.arange((self.waveknotloc.size-4)*(self.phaseknotloc.size-4))
 						iFit= (((i-1)*(self.waveknotloc.size-4)) <= indices) & (indices <((i+2)*(self.waveknotloc.size-4)))
 						includeParsPhase=np.zeros(self.npar,dtype=bool)
+
 						if fit== 'piecewisecomponents':
 							includeParsPhase[self.im0[iFit]]=True
 							includeParsPhase[self.im1[iFit]]=True
 						else:
 							includeParsPhase[self.__dict__['im%s'%fit[-1]][iFit]] = True
 						Xprop,chi2prop = self.process_fit(Xprop,includeParsPhase,storedResults,fit=fit)
+
+						#includeParsPhase[self.__dict__['im%s'%fit[-1]][iFit]] = True
+						#Xprop,chi2prop = self.process_fit(X,includeParsPhase,storedResults,fit=fit)
+
 						if np.isnan(Xprop).any() or (~np.isfinite(Xprop)).any() or np.isnan(chi2prop) or ~np.isfinite(chi2prop):
 							print('NaN detected, breaking out of loop')
 							break;
@@ -785,6 +848,7 @@ class GaussNewton(saltresids.SALTResids):
 							   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
 
 						# print('Retaining results from fit: ',storedResults.keys())
+
 
 			else:
 				for i in range(self.GN_iter[fit]):
@@ -799,6 +863,11 @@ class GaussNewton(saltresids.SALTResids):
 					storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
 							(retainReg and key.startswith('regresult' )) or
 						   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
+
+					if chi2 != chi2 or chi2 == np.inf:
+						break
+						
+
 
 		#In this case GN optimizer can do no better
 		return X,chi2,(X is X_init)
