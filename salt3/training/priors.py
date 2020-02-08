@@ -32,15 +32,15 @@ class SALTPriors:
 			self.numBoundResids += result[0].size
 
 
-	#@prior
+#	@prior
 	def peakprior(self,width,x,components):
 		wave=self.wave[self.bbandoverlap]
 		lightcurve=np.sum(self.bbandpbspl[np.newaxis,:]*components[0][:,self.bbandoverlap],axis=1)
 		# from D'Arcy - disabled for now!!	(barfs if model goes crazy w/o regularization)
-		#maxPhase=np.argmax(lightcurve)
-		#finePhase=np.arange(self.phase[maxPhase-1],self.phase[maxPhase+1],0.1)
-		finePhase=np.arange(self.phase[self.maxPhase-1],self.phase[self.maxPhase+1],0.1)
-		fineGrid=self.SALTModel(x,evaluatePhase=finePhase,evaluateWave=wave)[0]
+		maxPhase=np.argmax(lightcurve)
+		finePhase=np.arange(self.phase[maxPhase-1],self.phase[maxPhase+1],0.1)
+# 		finePhase=np.arange(self.phase[self.maxPhase-1],self.phase[self.maxPhase+1],0.1)
+# 		fineGrid=self.SALTModel(x,evaluatePhase=finePhase,evaluateWave=wave)[0]
 		lightcurve=np.sum(self.bbandpbspl[np.newaxis,:]*fineGrid,axis=1)
 
 		value=finePhase[np.argmax(lightcurve)]	
