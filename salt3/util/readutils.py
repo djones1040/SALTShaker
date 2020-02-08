@@ -84,6 +84,8 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 	specfiles=np.genfromtxt(speclist,dtype='str')
 	specfiles=np.atleast_1d(specfiles)
 	snanaSpec=True
+	
+	if KeepOnlySpec: print('KeepOnlySpec (debug) flag is set, removing any supernova without spectra')
 
 	if snanaSpec:
 		for sf in specfiles:
@@ -103,9 +105,8 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 					speccount = len(datadict[s]['specdata'].keys())
 					
 				if len(sn.SPECTRA)==0:
-					print('warning: File {} contains no supernova spectra'.format(sf))
+					#print('warning: File {} contains no supernova spectra'.format(sf))
 					if KeepOnlySpec: 
-						print('KeepOnlySpec (debug) flag is set, removing SN')
 						datadict.pop(s)
 					continue
 				
