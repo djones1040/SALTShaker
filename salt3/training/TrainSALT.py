@@ -124,7 +124,7 @@ class TrainSALT(TrainSALTBase):
 		guess[parlist == 'm0'] = m0knots
 		for i in range(3): guess[parlist == 'modelerr_{}'.format(i)] = 1e-6 
 		if self.options.n_components == 2:
-			guess[parlist == 'm1'] = m1knots*1e3
+			guess[parlist == 'm1'] = m1knots
 		if self.options.n_colorpars:
 			guess[parlist == 'cl'] = [0.]*self.options.n_colorpars #[-0.504294, 0.787691, -0.461715, 0.0815619]
 		if self.options.n_colorscatpars:
@@ -132,18 +132,17 @@ class TrainSALT(TrainSALTBase):
 			guess[np.where(parlist == 'clscat')[0][-1]]=-10
 		guess[(parlist == 'm0') & (guess < 0)] = 1e-4
 
+		i=0
+		for k in datadict.keys():
+			guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36-10.635))
+			i+=1
 		if self.options.specrecal:
 			for sn in datadict.keys():
 				specdata=datadict[sn]['specdata']
 				photdata=datadict[sn]['photdata']
 				for k in specdata.keys():
-					print(sn)
 					init_scale,colordiffs = getScaleForSN(specdata[k],photdata,self.kcordict,datadict[sn]['survey'])
-					guess[np.where(parlist == 'specrecal_{}_{}'.format(sn,k))[0][-1]] = init_scale
-		i=0
-		for k in datadict.keys():
-			guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36-10.635))
-			i+=1
+					guess[np.where(parlist == 'specrecal_{}_{}'.format(sn,k))[0][-1]] = init_scale+np.log(guess[parlist == 'x0_%s'%sn][0])
 
 		if self.options.resume_from_outputdir:
 			try:
@@ -460,7 +459,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 		if not i %9 ==0:
 			pdf_pages.savefig()
-			pdf_pages.close()
+		pdf_pages.close()
 		print('plotting light curves took %.1f'%(time()-tlc))
 		
 	def main(self):
