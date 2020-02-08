@@ -839,7 +839,7 @@ class GaussNewton(saltresids.SALTResids):
 		if isJacobianSparse:
 		
 			print('Using sparse linear algebra')
-			result=sprslinalg.lsmr(jacobian,residuals[includeResids],atol=1e-8,btol=1e-8)
+			result=sprslinalg.lsmr(jacobian,residuals[includeResids],atol=1e-6,btol=1e-6)
 			if result[1]==7: print('Gauss-Newton solver reached max # of iterations')
 			stepsize=result[0]
 		else:
