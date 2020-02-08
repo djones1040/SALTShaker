@@ -10,6 +10,7 @@ from astropy.coordinates import SkyCoord
 import astropy.units as u
 import warnings
 from time import time
+import scipy.stats as ss
 
 def rdkcor(surveylist,options,addwarning=None):
 
@@ -76,7 +77,7 @@ def rdkcor(surveylist,options,addwarning=None):
 	kcordict['default']['primarywave']=primarywave
 	return kcordict
 			
-def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200]):
+def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspecres=None):
 	if not os.path.exists(speclist):
 		raise RuntimeError('speclist %s does not exist')
 	
@@ -129,10 +130,50 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200]):
 					z = datadict[s]['zHelio']
 					iGood = ((datadict[s]['specdata'][speccount]['wavelength']/(1+z) > waverange[0]) &
 							 (datadict[s]['specdata'][speccount]['wavelength']/(1+z) < waverange[1]))
-					datadict[s]['specdata'][speccount]['flux'] = datadict[s]['specdata'][speccount]['flux'][iGood]
-					datadict[s]['specdata'][speccount]['wavelength'] = datadict[s]['specdata'][speccount]['wavelength'][iGood]
-					datadict[s]['specdata'][speccount]['fluxerr'] = datadict[s]['specdata'][speccount]['fluxerr'][iGood]
+					if binspecres is not None:
+						flux = datadict[s]['specdata'][speccount]['flux'][iGood]
+						wavelength = datadict[s]['specdata'][speccount]['wavelength'][iGood]
+						fluxerr = datadict[s]['specdata'][speccount]['fluxerr'][iGood]
+						weights = 1/fluxerr**2.
+						
+						def weighted_avg(values):
+							"""
+							Return the weighted average and standard deviation.
+							values, weights -- Numpy ndarrays with the same shape.
+							"""
+							#try:
+							average = np.average(flux[values], weights=weights[values])
+							variance = np.average((flux[values]-average)**2, weights=weights[values])  # Fast and numerically precise
+							#except:
+							#	import pdb; pdb.set_trace()
+								
+							return average
+
+						def weighted_err(values):
+							"""
+							Return the weighted average and standard deviation.
+							values, weights -- Numpy ndarrays with the same shape.
+							"""
+							average = np.average(flux[values], weights=weights[values])
+							variance = np.average((flux[values]-average)**2, weights=weights[values])  # Fast and numerically precise
+							return np.sqrt(variance)/np.sqrt(len(values))
+
+
+						
+						wavebins = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/binspecres)
+						binned_flux = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_avg).statistic
+						binned_fluxerr = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_err).statistic
+						iGood = binned_flux == binned_flux
+						datadict[s]['specdata'][speccount]['flux'] = binned_flux[iGood]
+						datadict[s]['specdata'][speccount]['wavelength'] = (wavebins[1:][iGood]+wavebins[:-1][iGood])/2.
+						datadict[s]['specdata'][speccount]['fluxerr'] = binned_fluxerr[iGood]
+					else:
+						
+						datadict[s]['specdata'][speccount]['flux'] = datadict[s]['specdata'][speccount]['flux'][iGood]
+						datadict[s]['specdata'][speccount]['wavelength'] = datadict[s]['specdata'][speccount]['wavelength'][iGood]
+						datadict[s]['specdata'][speccount]['fluxerr'] = datadict[s]['specdata'][speccount]['fluxerr'][iGood]
 					speccount+=1
+
 			else:
 				print('SNID %s has no photometry so I\'m ignoring it'%s)
 
@@ -162,19 +203,56 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200]):
 					wave,flux = np.genfromtxt(sf,unpack=True,usecols=[0,1])
 					fluxerr=np.tile(np.nan,flux.size)
 
-				datadict[s]['specdata'][speccount] = {}
-				datadict[s]['specdata'][speccount]['fluxerr'] = fluxerr
-				datadict[s]['specdata'][speccount]['wavelength'] = wave
-				datadict[s]['specdata'][speccount]['flux'] = flux
-				datadict[s]['specdata'][speccount]['tobs'] = m - tpk
-				datadict[s]['specdata'][speccount]['mjd'] = m
+				if binspecres is not None:
+					weights = 1/fluxerr**2.
+						
+					def weighted_avg(values):
+						"""
+						Return the weighted average and standard deviation.
+						values, weights -- Numpy ndarrays with the same shape.
+						"""
+						average = np.average(values, weights=weights)
+						variance = np.average((values-average)**2, weights=weights)  # Fast and numerically precise
+
+						return average
+
+					def weighted_err(values):
+						"""
+						Return the weighted average and standard deviation.
+						values, weights -- Numpy ndarrays with the same shape.
+						"""
+						average = np.average(values, weights=weights)
+						variance = np.average((values-average)**2, weights=weights)  # Fast and numerically precise
+						return np.sqrt(variance)/np.sqrt(len(values))
+					
+					wavebins = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/binspecres)
+
+					binned_flux = ss.binned_statistic(wave,flux,bins=wavebins,statistic=weighted_avg).statistic
+					binned_fluxerr = ss.binned_statistic(wave,flux,bins=wavebins,statistic=weighted_err).statistic
+					
+					datadict[s]['specdata'][speccount] = {}
+					datadict[s]['specdata'][speccount]['fluxerr'] = binned_fluxerr
+					datadict[s]['specdata'][speccount]['wavelength'] = (wavebins[1:]+wavebins[0:])/2.
+					datadict[s]['specdata'][speccount]['flux'] = binned_flux
+					datadict[s]['specdata'][speccount]['tobs'] = m - tpk
+					datadict[s]['specdata'][speccount]['mjd'] = m
+
+				else:
+					datadict[s]['specdata'][speccount] = {}
+					datadict[s]['specdata'][speccount]['fluxerr'] = fluxerr
+					datadict[s]['specdata'][speccount]['wavelength'] = wave
+					datadict[s]['specdata'][speccount]['flux'] = flux
+					datadict[s]['specdata'][speccount]['tobs'] = m - tpk
+					datadict[s]['specdata'][speccount]['mjd'] = m
+
+				
 			else:
 				print('SNID %s has no photometry so I\'m ignoring it'%s)
 
 	return datadict
 
 def rdAllData(snlists,estimate_tpk,kcordict,addwarning,
-			  dospec=False,KeepOnlySpec=False,peakmjdlist=None,waverange=[2000,9200]):
+			  dospec=False,KeepOnlySpec=False,peakmjdlist=None,waverange=[2000,9200],binspecres=None):
 	datadict = {}
 	if peakmjdlist:
 		pksnid,pkmjd,pkmjderr = np.loadtxt(peakmjdlist,unpack=True,dtype=str)
@@ -281,7 +359,7 @@ def rdAllData(snlists,estimate_tpk,kcordict,addwarning,
 
 		if dospec:
 			tspec = time()
-			datadict = rdSpecData(datadict,snlist,KeepOnlySpec=KeepOnlySpec,waverange=waverange)
+			datadict = rdSpecData(datadict,snlist,KeepOnlySpec=KeepOnlySpec,waverange=waverange,binspecres=binspecres)
 
 	print('reading data files took %.1f'%(rdtime))
 	if not len(datadict.keys()):

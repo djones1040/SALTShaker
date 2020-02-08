@@ -72,7 +72,8 @@ class TrainSALT(TrainSALTBase):
 		if self.options.initm0modelfile:
 			phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_kaepora(
 				self.options.initm0modelfile,self.options.initm1modelfile,self.options.initbfilt,flatnu,**init_options)
-
+		#import pdb; pdb.set_trace()
+			
 		init_options['phasesplineres'] = self.options.error_snake_phase_binsize
 		init_options['wavesplineres'] = self.options.error_snake_wave_binsize
 		
@@ -125,7 +126,7 @@ class TrainSALT(TrainSALTBase):
 		if self.options.n_components == 2:
 			guess[parlist == 'm1'] = m1knots
 		if self.options.n_colorpars:
-			guess[parlist == 'cl'] = [0.]*self.options.n_colorpars
+			guess[parlist == 'cl'] = [0.]*self.options.n_colorpars #[-0.504294, 0.787691, -0.461715, 0.0815619]
 		if self.options.n_colorscatpars:
 			guess[parlist == 'clscat'] = [1e-6]*self.options.n_colorscatpars
 			guess[np.where(parlist == 'clscat')[0][-1]]=-10
@@ -475,9 +476,15 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		# fit the model - initial pass
 		if self.options.stage == "all" or self.options.stage == "train":
 			# read the data
+			if self.options.binspec:
+				binspecres = self.options.binspecres
+			else:
+				binspecres = None
+				
 			datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,self.kcordict,
 										   self.addwarning,dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
-										   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange)
+										   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
+										   binspecres=binspecres)
 			datadict = self.mkcuts(datadict,KeepOnlySpec=self.options.keeponlyspec)
 
 			phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
