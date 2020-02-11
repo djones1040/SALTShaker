@@ -23,6 +23,7 @@ from sncosmo.constants import HC_ERG_AA, MODEL_BANDFLUX_SPACING
 from sncosmo.utils import integration_grid
 
 from salt3.util.synphot import synphot
+from salt3.util.query import query_yes_no
 from salt3.training import saltresids #_master as saltresids
 
 
@@ -453,20 +454,12 @@ class GaussNewton(saltresids.SALTResids):
 		fitlist = [('all parameters','all'),('all parameters grouped','all-grouped'),
 				   (" x0",'x0'),('component 0 piecewise','piecewisecomponent0'),('principal component 0','component0'),('x1','x1'),
 				   ('component 1 piecewise','piecewisecomponent1'),('principal component 1','component1'),('color','color'),('color law','colorlaw'),
-				   ('spectral recalibration const.','spectralrecalibration_norm'),
+				   ('spectral recalibration const.','spectralrecalibration_norm'),('all spectral recalibration','spectralrecalibration'),
 				   ('spectral recalibration higher orders','spectralrecalibration_poly'),
 				   ('time of max','tpk'),('error model','modelerr')]
 		#print('hack!!')
 		#self.fitlist_debug = [('x1','x1'),('principal component 1','component1')]
-		self.fitlist_debug = [('all parameters','all'),#('all parameters grouped','all-grouped'),
-			#('piecewise both components','piecewisecomponents'),
-			(" x0",'x0'),('principal component 0','component0'),
-			('x1','x1'),('principal component 1','component1'),
-			('color','color'),
-			('color law','colorlaw'),
-			('spectral recalibration ','spectralrecalibration'),
-			('time of max','tpk'),('error model','modelerr')]
-		for message,fit in self.fitlist_debug:
+		for message,fit in fitlist:
 			if 'all' in fit:
 				includePars=np.ones(self.npar,dtype=bool)
 			else:
@@ -505,6 +498,14 @@ class GaussNewton(saltresids.SALTResids):
 					raise NotImplementedError("""This option for a Gauss-Newton fit with a 
 	restricted parameter set has not been implemented: {}""".format(fit))
 			self.fitOptions[fit]=(message,includePars)
+		self.fitlist = [('all'),#('all parameters grouped','all-grouped'),
+			#('piecewise both components','piecewisecomponents'),
+			('x0'),('component0'),
+			('x1'),('component1'),
+			('spectralrecalibration'),
+			('color'),
+			('colorlaw'),
+			('tpk'),('modelerr')]
 
 	def addwarning(self,warning):
 		print(warning)
@@ -521,7 +522,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 		if len(self.usePriors) != len(self.priorWidths):
 			raise RuntimeError('length of priors does not equal length of prior widths!')
-
+		stepsizes=None
 		#print('hack!')
 		#residuals = self.lsqwrap(guess,uncertainties,False,False,doPriors=False)
 		storedResults={}
@@ -531,29 +532,36 @@ class GaussNewton(saltresids.SALTResids):
 		chi2_init = (residuals**2.).sum()
 		X = copy.deepcopy(guess[:])
 		Xlast = copy.deepcopy(guess[:])
-		
+		print('Estimating supernova parameters x0,x1,c and spectral normalization')
+		for fit in ['x0','x1','spectralrecalibration_norm','color']:
+			X,chi2_init=self.process_fit(X,self.fitOptions[fit][1],uncertainties.copy(),fit=fit)
+		self.printChi2Contributions(X,uncertainties.copy())
 		print('starting loop; %i iterations'%loop_niter)
 		for superloop in range(loop_niter):
+			try:
+				X,chi2,converged = self.robust_process_fit(X,uncertainties.copy(),chi2_init,superloop)
+				self.printChi2Contributions(X,uncertainties.copy())
+				if chi2_init-chi2 < -1.e-6:
+					self.addwarning("MESSAGE WARNING chi2 has increased")
+				elif np.abs(chi2_init-chi2) < self.chi2_diff_cutoff:
+					xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+						modelerr,clpars,clerr,clscat,SNParams = \
+						self.getParsGN(X)
+					stepsizes = self.getstepsizes(X,Xlast)
+					return xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+						modelerr,clpars,clerr,clscat,SNParams,stepsizes
+				if self.fit_model_err and (superloop % 3 ==2 or superloop+1==loop_niter):
+					print('Optimizing model error')
+					X,loglike=self.minuitOptimize(X,'modelerr')
+					uncertainties=self.getFixedUncertainties(X)
 
-			X,chi2,converged = self.robust_process_fit(X,uncertainties.copy(),chi2_init,superloop)
-			if chi2_init-chi2 < -1.e-6:
-				self.addwarning("MESSAGE WARNING chi2 has increased")
-			elif np.abs(chi2_init-chi2) < self.chi2_diff_cutoff:
-				xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-					modelerr,clpars,clerr,clscat,SNParams = \
-					self.getParsGN(X)
-				stepsizes = self.getstepsizes(X,Xlast)
-				return xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-					modelerr,clpars,clerr,clscat,SNParams,stepsizes
-			if self.fit_model_err and (superloop % 3 ==2 or superloop+1==loop_niter):
-				print('Optimizing model error')
-				X,loglike=self.minuitOptimize(X,'modelerr')
-				uncertainties=self.getFixedUncertainties(X)
-
-			print('finished iteration %i, chi2 improved by %.1f'%(superloop+1,chi2_init-chi2))
-			if converged:
-				print('Gauss-Newton optimizer could not further improve chi2')
-				break
+				print('finished iteration %i, chi2 improved by %.1f'%(superloop+1,chi2_init-chi2))
+				if converged:
+					print('Gauss-Newton optimizer could not further improve chi2')
+					break
+			except KeyboardInterrupt:
+				if query_yes_no("Terminate optimization loop and begin writing output?"):
+					break
 			chi2_init = chi2
 			stepsizes = self.getstepsizes(X,Xlast)
 			Xlast = copy.deepcopy(X)
@@ -736,9 +744,8 @@ class GaussNewton(saltresids.SALTResids):
 
 	def robust_process_fit(self,X_init,uncertainties,chi2_init,niter):
 		X,chi2=X_init,chi2_init
-		self.printChi2Contributions(X,uncertainties.copy())
 		storedResults=uncertainties.copy()
-		for fit in self.fitOptions:
+		for fit in self.fitlist:
 			if 'all-grouped' in fit :continue #
 			if 'modelerr' in fit: continue
 			print('fitting '+self.fitOptions[fit][0])
@@ -749,7 +756,7 @@ class GaussNewton(saltresids.SALTResids):
 # 				if self.tryFittingAllParams:
 				Xprop,chi2prop = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
 				if (chi2prop/chi2 < 0.9):
-					print('Terminating iteration ',niter,', continuing with all parameter fit')
+					print('Terminating iteration ',niter+1,', continuing with all parameter fit')
 					return Xprop,chi2prop,False
 				elif (chi2prop<chi2):
 					X,chi2=Xprop,chi2prop
@@ -839,7 +846,7 @@ class GaussNewton(saltresids.SALTResids):
 		if isJacobianSparse:
 		
 			print('Using sparse linear algebra')
-			result=sprslinalg.lsmr(jacobian,residuals[includeResids],atol=1e-6,btol=1e-6)
+			result=sprslinalg.lsmr(jacobian,residuals[includeResids],atol=1e-6,btol=1e-6,maxiter=2*min(jacobian.shape))
 			if result[1]==7: print('Gauss-Newton solver reached max # of iterations')
 			stepsize=result[0]
 		else:
