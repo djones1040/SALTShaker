@@ -140,6 +140,7 @@ class TRAINING_Test(unittest.TestCase):
 			resid,val,jacobian=self.resids.priors.priors[prior](0.3145,self.guess,components)
 			dx=1e-3
 			rtol=1e-2
+			atol=1e-10
 			def incrementOneParam(i):
 				guess=self.guess.copy()
 				guess[i]+=dx
@@ -148,11 +149,10 @@ class TRAINING_Test(unittest.TestCase):
 			dPriordX=np.zeros((resid.size,self.guess.size))
 			for i in range(self.guess.size):
 				dPriordX[:,i]=(incrementOneParam(i)-resid)/dx
-
 			#Check that all derivatives that should be 0 are zero
 			if  not np.allclose(jacobian,dPriordX,rtol): print('Problems with derivatives for prior {} : '.format(prior),np.unique(self.parlist[np.where(~np.isclose(jacobian,dPriordX,rtol))]))
-			self.assertTrue(np.all((dPriordX==0)==(jacobian==0)))
-			self.assertTrue(np.allclose(jacobian,dPriordX,rtol))
+			
+			self.assertTrue(np.allclose(jacobian,dPriordX,rtol,atol))
 
 	def test_photresid_jacobian(self):
 		"""Checks that the the jacobian of the photometric residuals is being correctly calculated to within 1%"""
@@ -449,7 +449,9 @@ class TRAINING_Test(unittest.TestCase):
 		dx=1e-6
 		rtol=1e-2
 		atol=1e-7
-		for regularization, name in [(self.resids.dyadicRegularization,'dyadic'),(self.resids.phaseGradientRegularization, 'phase gradient'),(self.resids.waveGradientRegularization,'wave gradient' )]:
+		for regularization, name in [(self.resids.dyadicRegularization,'dyadic'),
+		(self.resids.phaseGradientRegularization, 'phase gradient'),
+		(self.resids.waveGradientRegularization,'wave gradient' )]:
 			for component in range(2):
 				
 				def incrementOneParam(i):
