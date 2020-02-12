@@ -64,14 +64,20 @@ def rdkcor(surveylist,options,addwarning=None):
 				kcordict[kcorkey][filt.split('-')[-1].split('/')[-1]]['primarymag'] = \
 					zpoff['Primary Mag'][zpoff['Filter Name'] == filt][0]
 
-	initBfilt = '%s/Bessell90_B.dat'%init_rootdir
-	filtwave,filttp = np.genfromtxt(initBfilt,unpack=True)
 		
 	primarywave,primarysed = np.genfromtxt('%s/flatnu.dat'%init_rootdir,unpack=True)
 	
 	kcordict['default'] = {}
+	initBfilt = '%s/Bessell90_B.dat'%init_rootdir
+	filtwave,filttp = np.genfromtxt(initBfilt,unpack=True)
 	kcordict['default']['Bwave'] = filtwave
 	kcordict['default']['Btp'] = filttp
+	
+	initVfilt = '%s/Bessell90_V.dat'%init_rootdir
+	filtwave,filttp = np.genfromtxt(initVfilt,unpack=True)
+	kcordict['default']['Vwave'] = filtwave
+	kcordict['default']['Vtp'] = filttp
+	
 	kcordict['default']['AB']=primarysed
 	kcordict['default']['primarywave']=primarywave
 	return kcordict

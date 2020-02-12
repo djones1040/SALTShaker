@@ -114,16 +114,20 @@ class SALTResids:
 			if survey == 'default': 
 				self.stdmag[survey] = {}
 				self.bbandoverlap = (self.wave>=self.kcordict['default']['Bwave'].min())&(self.wave<=self.kcordict['default']['Bwave'].max())
-				self.bbandpbspl = np.interp(self.wave[self.bbandoverlap],self.kcordict['default']['Bwave'],self.kcordict['default']['Bwave'])
+				self.bbandpbspl = np.interp(self.wave[self.bbandoverlap],self.kcordict['default']['Bwave'],self.kcordict['default']['Btp'])
 				self.bbandpbspl *= self.wave[self.bbandoverlap]
 				self.bbandpbspl /= np.trapz(self.bbandpbspl,self.wave[self.bbandoverlap])*HC_ERG_AA
 				self.stdmag[survey]['B']=synphot(
 					self.kcordict[survey]['primarywave'],self.kcordict[survey]['AB'],
 					filtwave=self.kcordict['default']['Bwave'],filttp=self.kcordict[survey]['Btp'],
 					zpoff=0)
-				self.kcordict['default']['minlam'] = np.min(self.kcordict['default']['Bwave'][self.kcordict['default']['Btp'] > 0.01])
-				self.kcordict['default']['maxlam'] = np.max(self.kcordict['default']['Bwave'][self.kcordict['default']['Btp'] > 0.01])
-				self.kcordict['default']['fluxfactor'] = 10**(0.4*(self.stdmag[survey]['B']+27.5))
+				self.stdmag[survey]['V']=synphot(
+					self.kcordict[survey]['primarywave'],self.kcordict[survey]['AB'],
+					filtwave=self.kcordict['default']['Vwave'],filttp=self.kcordict[survey]['Vtp'],
+					zpoff=0)
+				self.fluxfactor['default']={}
+				self.fluxfactor[survey]['B'] = 10**(0.4*(self.stdmag[survey]['B']+27.5))
+				self.fluxfactor[survey]['V'] = 10**(0.4*(self.stdmag[survey]['V']+27.5))
 				continue
 
 			self.stdmag[survey] = {}
@@ -296,12 +300,24 @@ class SALTResids:
 		filttrans = self.kcordict['default']['Btp']
 		filtwave = self.kcordict['default']['Bwave']
 			
-		pbspl = np.interp(self.wave,filtwave,filttrans)
+		pbspl = np.interp(self.wave,filtwave,filttrans,left=0,right=0)
+		
 		pbspl *= self.wave
 		denom = np.trapz(pbspl,self.wave)
 		pbspl /= denom*HC_ERG_AA
 		self.kcordict['default']['Bpbspl'] = pbspl
-		self.kcordict['default']['Bdwave'] = self.wave[1] - self.wave[0]
+		self.kcordict['default']['dwave'] = self.wave[1] - self.wave[0]
+		
+		#rest-frame V
+		filttrans = self.kcordict['default']['Vtp']
+		filtwave = self.kcordict['default']['Vwave']
+			
+		pbspl = np.interp(self.wave,filtwave,filttrans,left=0,right=0)
+		
+		pbspl *= self.wave
+		denom = np.trapz(pbspl,self.wave)
+		pbspl /= denom*HC_ERG_AA
+		self.kcordict['default']['Vpbspl'] = pbspl
 
 	def maxlikefit(self,x,storedResults={},varyParams=None,pool=None,debug=False,SpecErrScale=1.0):
 		"""
