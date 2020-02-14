@@ -12,9 +12,7 @@ import os
 from salt3.config import config_rootdir
 
 class TRAINING_Test(unittest.TestCase):
-	
-	
-	
+
 	def setUp(self):
 		ts=TrainSALT()
 

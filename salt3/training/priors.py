@@ -31,6 +31,25 @@ class SALTPriors:
 			#width,bound,x,par
 			result=self.boundedprior(0.1,(0,1),self.guess,boundedparam)
 			self.numBoundResids += result[0].size
+	@prior
+	def m0m1prior(self,width,x,components):
+		"""M1 should have no outer product with M0"""
+		phase=self.phaseRegularizationPoints
+		wave=self.waveRegularizationPoints
+		components=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
+		
+		m0sqr=(components[0]**2).sum()
+		m1sqr=(components[1]**2).sum()
+		m0m1=(components[0]*components[1]).sum()
+		
+		corr=np.array([m0m1/np.sqrt(m1sqr*m0sqr)])
+		#Derivative with respect to m0
+		jacobian=np.zeros((1,self.npar))
+		jacobian[:,self.im0]= ((components[1]* m1sqr*m0sqr - m0m1*m1sqr*components[0] )[:,:,np.newaxis]*self.regularizationDerivs[0]).sum(axis=(0,1))/np.sqrt((m0sqr*m1sqr)**3)
+		jacobian[:,self.im1]= ((components[0]* m1sqr*m0sqr - m0m1*m0sqr*components[1] )[:,:,np.newaxis]*self.regularizationDerivs[0]).sum(axis=(0,1))/np.sqrt((m0sqr*m1sqr)**3)
+		residual=corr/width
+		
+		return corr/width,corr,jacobian/width	
 
 
 	@prior
@@ -139,11 +158,13 @@ class SALTPriors:
 		jacobian=fluxDeriv/ (bStdFlux* width)
 		return residual,m0B,jacobian
 
+
+
 		
 	@prior
 	def m1prior(self,width,x,components):
 		"""M1 should have zero flux at t=0 in the B and V bands"""
-		pbspl=np.stack((self.kcordict['default']['Bpbspl']*(self.wave[1]-self.wave[0])*self.fluxfactor['default']['B'],self.kcordict['default']['Vpbspl']*(self.wave[1]-self.wave[0])*self.fluxfactor['default']['V']))
+		pbspl=(self.kcordict['default']['Bpbspl']*(self.wave[1]-self.wave[0])*self.fluxfactor['default']['B'])[np.newaxis,:]
 		int1d = interp1d(self.phase,components[1],axis=0,assume_sorted=True)
 		m1flux = np.sum(pbspl*int1d([0]), axis=1)
 		bStdFlux=(10**((self.m0guess-27.5)/-2.5) )
@@ -152,13 +173,13 @@ class SALTPriors:
 		try:
 			fluxDeriv= self.__m1priorfluxderiv__.copy()
 		except:
-			fluxDeriv= np.zeros((2,self.npar))
+			fluxDeriv= np.zeros((pbspl.shape[0],self.npar))
 			for i in range(self.im1.size):
 				waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
 				phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
 				#Check if this filter is inside values affected by changes in knot i
-				minlam=min([np.min(self.kcordict['default'][filt+'wave'][self.kcordict['default'][filt+'tp'] > 0.01]) for filt in ['B','V']]) 
-				maxlam=max([np.max(self.kcordict['default'][filt+'wave'][self.kcordict['default'][filt+'tp'] > 0.01]) for filt in ['B','V']]) 
+				minlam=min([np.min(self.kcordict['default'][filt+'wave'][self.kcordict['default'][filt+'tp'] > 0.01]) for filt in ['B']]) 
+				maxlam=max([np.max(self.kcordict['default'][filt+'wave'][self.kcordict['default'][filt+'tp'] > 0.01]) for filt in ['B']]) 
 				if waverange[0] > maxlam or waverange[1] < minlam:
 					pass
 				if (0>=phaserange[0] ) & (0<=phaserange[1]):
@@ -170,7 +191,8 @@ class SALTPriors:
 			self.__m1priorfluxderiv__=fluxDeriv.copy()
 		
 		jacobian=fluxDeriv/ (bStdFlux* width)
-		return residual,m1flux,jacobian	
+		
+		return residual,m1flux,jacobian
 		
 	@prior
 	def x1mean(self,width,x,components):

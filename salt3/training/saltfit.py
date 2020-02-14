@@ -501,10 +501,10 @@ class GaussNewton(saltresids.SALTResids):
 		self.fitlist = [('all'),#('all parameters grouped','all-grouped'),
 			#('piecewise both components','piecewisecomponents'),
 			('x0'),('component0'),
+			('color'),('colorlaw'),
 			('x1'),('component1'),
 			('spectralrecalibration'),
-			('color'),
-			('colorlaw'),
+			
 			('tpk'),('modelerr')]
 
 	def addwarning(self,warning):
@@ -533,7 +533,7 @@ class GaussNewton(saltresids.SALTResids):
 		X = copy.deepcopy(guess[:])
 		Xlast = copy.deepcopy(guess[:])
 		print('Estimating supernova parameters x0,x1,c and spectral normalization')
-		for fit in ['x0','x1','spectralrecalibration_norm','color']:
+		for fit in ['x0','spectralrecalibration_norm','color','x1']:
 			X,chi2_init=self.process_fit(X,self.fitOptions[fit][1],uncertainties.copy(),fit=fit)
 		self.printChi2Contributions(X,uncertainties.copy())
 		print('starting loop; %i iterations'%loop_niter)
@@ -753,22 +753,23 @@ class GaussNewton(saltresids.SALTResids):
 			Xprop = X.copy()
 
 			if (fit=='all'):
-# 				if self.tryFittingAllParams:
-				Xprop,chi2prop = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
-				if (chi2prop/chi2 < 0.9):
-					print('Terminating iteration ',niter+1,', continuing with all parameter fit')
-					return Xprop,chi2prop,False
-				elif (chi2prop<chi2):
-					X,chi2=Xprop,chi2prop
-					storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys)}
-				else:
-# 						self.tryFittingAllParams=False
-# 						print('Discontinuing all parameter fit')
-					retainReg=True
-					retainPCDerivs=True
-					storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
-							(retainReg and key.startswith('regresult' )) or
-						   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
+				if self.tryFittingAllParams:
+					Xprop,chi2prop = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
+					if (chi2prop/chi2 < 0.9):
+						print('Terminating iteration ',niter+1,', continuing with all parameter fit')
+						return Xprop,chi2prop,False
+					elif (chi2prop<chi2):
+						if chi2prop>chi2*(1-1e-3):
+							self.tryFittingAllParams=False
+							print('Discontinuing all parameter fit')
+						X,chi2=Xprop,chi2prop
+						storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys)}
+					else:
+						retainReg=True
+						retainPCDerivs=True
+						storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
+								(retainReg and key.startswith('regresult' )) or
+							   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
 			elif fit.startswith('piecewisecomponent'):
 				for i in range(self.GN_iter[fit]):
 					for i,p in enumerate(self.phaseBinCenters):

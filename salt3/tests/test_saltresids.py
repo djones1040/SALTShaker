@@ -138,9 +138,9 @@ class TRAINING_Test(unittest.TestCase):
 			print('Testing prior', prior)
 			components=self.resids.SALTModel(self.guess)
 			resid,val,jacobian=self.resids.priors.priors[prior](0.3145,self.guess,components)
-			dx=1e-3
+			dx=1e-8
 			rtol=1e-2
-			atol=1e-10
+			atol=1e-6
 			def incrementOneParam(i):
 				guess=self.guess.copy()
 				guess[i]+=dx
@@ -150,8 +150,7 @@ class TRAINING_Test(unittest.TestCase):
 			for i in range(self.guess.size):
 				dPriordX[:,i]=(incrementOneParam(i)-resid)/dx
 			#Check that all derivatives that should be 0 are zero
-			if  not np.allclose(jacobian,dPriordX,rtol): print('Problems with derivatives for prior {} : '.format(prior),np.unique(self.parlist[np.where(~np.isclose(jacobian,dPriordX,rtol))]))
-			
+			if  not np.allclose(jacobian,dPriordX,rtol,atol): print('Problems with derivatives for prior {} : '.format(prior),np.unique(self.parlist[np.where(~np.isclose(jacobian,dPriordX,rtol,atol))[1]]))
 			self.assertTrue(np.allclose(jacobian,dPriordX,rtol,atol))
 
 	def test_photresid_jacobian(self):
