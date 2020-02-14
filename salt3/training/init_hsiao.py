@@ -30,6 +30,10 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 	# was *3 (phase), *5 (wave)
 	splinephase = np.linspace(phaserange[0],phaserange[1],int((phaserange[1]-phaserange[0])/phasesplineres)+1,True)
 	splinewave = np.linspace(waverange[0],waverange[1],int((waverange[1]-waverange[0])/wavesplineres)+1,True)
+	#splinephase = [-8.2, -3.85, -0.05, 3.65, 7.9, 12.55, 16.9, 20.9, 25.25, 30.95, 38.55, 50, 50.05, 50.05]
+	#splinewave = [2198,2262.08,2325.44,2387.36,2449.28,2510.48,2570.24,2630,2689.04,2748.08,2805.68,2863.28,2920.88,2977.76,3033.92,3089.36,3145.52,3200.24,3255.68,3310.4,3364.4,3418.4,3472.4,3526.4,3580.4,3633.68,3686.96,3740.24,3793.52,3846.08,3899.36,3952.64,4005.2,4058.48,4111.04,4164.32,4217.6,4270.16,4323.44,4376.72,4430.72,4484,4538,4592,4646,4700.72,4755.44,4810.16,4865.6,4921.76,4977.2,5034.08,5090.24,5147.84,5205.44,5263.76,5322.08,5381.84,5441.6,5502.08,5562.56,5624.48,5687.12,5750.48,5814.56,5880.08,5945.6,6012.56,6080.96,6150.08,6220.64,6291.92,6365.36,6439.52,6515.84,6593.6,6672.8,6754.16,6836.96,6922.64,7010.48,7101.2,7194.08,7289.84,7389.2,7492.16,7598.72,7709.6,7825.52,7945.76,8072.48,8205.68,8345.36,8494.4,8652.08,8821.28,9003.44,9200,9200.72,9200.72]
+
+
 	bspl = bisplrep(phase,wave,m0flux,kx=3,ky=3, tx=splinephase,ty=splinewave,task=-1)
 
 	intphase = np.linspace(phaserange[0],phaserange[1]+phaseinterpres,
@@ -60,7 +64,7 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 		plt.legend()
 		plt.plot(intwave,m0test,label='interp')
 		bspltmp = bspl[2].reshape([len(splinephase)-4,len(splinewave)-4])
-
+	#import pdb; pdb.set_trace()
 	return intphase,intwave,m0,m1,bspl[0],bspl[1],bspl[2],bsplm1[2]
 
 def init_kaepora(x10file='initfiles/Kaepora_dm15_1.1.txt',
