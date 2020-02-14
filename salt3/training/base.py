@@ -136,7 +136,12 @@ class TrainSALTBase:
 							help='Number of additional spectral recalibration orders per lightcurve (default=%default)')
 		parser.add_argument('--regularizationScaleMethod', default=config.get('trainingparams','regularizationScaleMethod'), type=str,
 							help='Choose how scale for regularization is calculated (default=%default)')
-    
+		parser.add_argument('--binspec', default=config.get('trainingparams','binspec'), type=boolean_string,
+							help='bin the spectra if set (default=%default)')
+		parser.add_argument('--binspecres', default=config.get('trainingparams','binspecres'), type=int,
+							help='binning resolution (default=%default)')
+
+		
    		#neff parameters
 		parser.add_argument('--wavesmoothingneff', default=config.get('trainingparams','wavesmoothingneff'), type=float,
 							help='Smooth effective # of spectral points along wave axis (in units of waveoutres) (default=%default)')
