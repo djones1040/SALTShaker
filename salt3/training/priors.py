@@ -22,6 +22,7 @@ class SALTPriors:
 		for k in SALTResidsObj.__dict__.keys():
 			self.__dict__[k] = SALTResidsObj.__dict__[k]
 		self.SALTModel = SALTResidsObj.SALTModel
+		self.SALTModelDeriv = SALTResidsObj.SALTModelDeriv
 		self.priors={ key: partial(__priors__[key],self) for key in __priors__}
 		for prior in self.usePriors:
 			result=self.priors[prior](1,self.guess,self.SALTModel(self.guess))
@@ -30,22 +31,61 @@ class SALTPriors:
 			#width,bound,x,par
 			result=self.boundedprior(0.1,(0,1),self.guess,boundedparam)
 			self.numBoundResids += result[0].size
+	@prior
+	def m0m1prior(self,width,x,components):
+		"""M1 should have no outer product with M0"""
+		phase=self.phaseRegularizationPoints
+		wave=self.waveRegularizationPoints
+		components=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
+		
+		m0sqr=(components[0]**2).sum()
+		m1sqr=(components[1]**2).sum()
+		m0m1=(components[0]*components[1]).sum()
+		
+		corr=np.array([m0m1/np.sqrt(m1sqr*m0sqr)])
+		#Derivative with respect to m0
+		jacobian=np.zeros((1,self.npar))
+		jacobian[:,self.im0]= ((components[1]* m1sqr*m0sqr - m0m1*m1sqr*components[0] )[:,:,np.newaxis]*self.regularizationDerivs[0]).sum(axis=(0,1))/np.sqrt((m0sqr*m1sqr)**3)
+		jacobian[:,self.im1]= ((components[0]* m1sqr*m0sqr - m0m1*m0sqr*components[1] )[:,:,np.newaxis]*self.regularizationDerivs[0]).sum(axis=(0,1))/np.sqrt((m0sqr*m1sqr)**3)
+		residual=corr/width
+		
+		return corr/width,corr,jacobian/width	
 
 
-#	@prior
+	@prior
 	def peakprior(self,width,x,components):
-		wave=self.wave[self.bbandoverlap]
-		lightcurve=np.sum(self.bbandpbspl[np.newaxis,:]*components[0][:,self.bbandoverlap],axis=1)
-		# from D'Arcy - disabled for now!!	(barfs if model goes crazy w/o regularization)
-		maxPhase=np.argmax(lightcurve)
-		finePhase=np.arange(self.phase[maxPhase-1],self.phase[maxPhase+1],0.1)
-# 		finePhase=np.arange(self.phase[self.maxPhase-1],self.phase[self.maxPhase+1],0.1)
-# 		fineGrid=self.SALTModel(x,evaluatePhase=finePhase,evaluateWave=wave)[0]
-		lightcurve=np.sum(self.bbandpbspl[np.newaxis,:]*fineGrid,axis=1)
+		""" At t=0, minimize time derivative of B-band lightcurve"""
+		M0deriv=self.SALTModelDeriv(x,1,0,self.phase,self.wave)[0]
+		int1d = interp1d(self.phase,M0deriv,axis=0,assume_sorted=True)
+		m0Bderiv = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
+			(self.wave[1]-self.wave[0])*self.fluxfactor['default']['B']
+		bStdFlux=(10**((self.m0guess-27.5)/-2.5) )
+		#This derivative is constant, and never needs to be recalculated, so I store it in a hidden attribute
+		try:
+			m0Bderivjac = self.__peakpriorderiv__.copy()
+		except:
+			m0Bderivjac= np.zeros(self.npar)
+			passbandColorExp = self.kcordict['default']['Bpbspl']
+			intmult = (self.wave[1]-self.wave[0])*self.fluxfactor['default']['B']
+			for i in range(self.im0.size):
+				waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+				phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+				#Check if this filter is inside values affected by changes in knot i
+				minlam=np.min(self.kcordict['default']['Bwave'][self.kcordict['default']['Btp'] > 0.01])
+				maxlam=np.max(self.kcordict['default']['Bwave'][self.kcordict['default']['Btp'] > 0.01])
 
-		value=finePhase[np.argmax(lightcurve)]	
-		#Need to write the derivative with respect to parameters
-		return value/width,value,np.zeros(self.npar)
+				if waverange[0] > maxlam or waverange[1] < minlam:
+					pass
+				if (0>=phaserange[0] ) & (0<=phaserange[1]):
+					#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
+					#Integrate only over wavelengths within the relevant range
+					inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
+					derivInterp = interp1d(self.phase,bisplev(self.phase,self.wave[inbounds],(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder),dx=1),axis=0,kind=self.interpMethod,bounds_error=False,fill_value="extrapolate",assume_sorted=True)
+					m0Bderivjac[self.im0[i]] = np.sum( passbandColorExp[inbounds] * derivInterp(0))*intmult 
+			self.__peakpriorderiv__=m0Bderivjac.copy()
+		#import pdb;pdb.set_trace()
+		value=m0Bderiv/bStdFlux
+		return value/width,value, m0Bderivjac/(bStdFlux*width)
 	
 	def satisfyDefinitions(self,X,components):
 		"""Ensures that the definitions of M1,M0,x0,x1 are satisfied"""
@@ -53,11 +93,11 @@ class SALTPriors:
 
 		int1d = interp1d(self.phase,components[0],axis=0,assume_sorted=True)
 		m0Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
-			self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
+			(self.wave[1]-self.wave[0])*self.fluxfactor['default']['B']
 			
 		int1d = interp1d(self.phase,components[1],axis=0,assume_sorted=True)
 		m1Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
-			self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
+			(self.wave[1]-self.wave[0])*self.fluxfactor['default']['B']
 		ratio=m1Bflux/m0Bflux
 		#Define M1 to have no effect on B band at t=0
 		X[self.ix0]*=1+ratio*X[self.ix1]
@@ -87,7 +127,7 @@ class SALTPriors:
 		"""Prior on the magnitude of the M0 component at t=0"""
 		int1d = interp1d(self.phase,components[0],axis=0,assume_sorted=True)
 		m0Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
-			self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
+			(self.wave[1]-self.wave[0])*self.fluxfactor['default']['B']
 		#m0Bflux=np.clip(m0Bflux,(10**((self.m0guess-27.5)/-2.5) ),None)
 		m0B= -2.5*np.log10(m0Bflux)+27.5
 		bStdFlux=(10**((self.m0guess-27.5)/-2.5) )
@@ -98,12 +138,14 @@ class SALTPriors:
 		except:
 			fluxDeriv= np.zeros(self.npar)
 			passbandColorExp = self.kcordict['default']['Bpbspl']
-			intmult = (self.wave[1] - self.wave[0])*self.kcordict['default']['fluxfactor']
+			intmult = (self.wave[1] - self.wave[0])*self.fluxfactor['default']['B']
 			for i in range(self.im0.size):
 				waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
 				phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
 				#Check if this filter is inside values affected by changes in knot i
-				if waverange[0] > self.kcordict['default']['maxlam'] or waverange[1] < self.kcordict['default']['minlam']:
+				minlam=np.min(self.kcordict['default']['Bwave'][self.kcordict['default']['Btp'] > 0.01])
+				maxlam=np.max(self.kcordict['default']['Bwave'][self.kcordict['default']['Btp'] > 0.01])
+				if waverange[0] > maxlam or waverange[1] < minlam:
 					pass
 				if (0>=phaserange[0] ) & (0<=phaserange[1]):
 					#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
@@ -116,37 +158,42 @@ class SALTPriors:
 		jacobian=fluxDeriv/ (bStdFlux* width)
 		return residual,m0B,jacobian
 
+
+
+		
 	@prior
 	def m1prior(self,width,x,components):
-		"""M1 should have zero flux at t=0 in the B band"""
+		"""M1 should have zero flux at t=0 in the B and V bands"""
+		pbspl=(self.kcordict['default']['Bpbspl']*(self.wave[1]-self.wave[0])*self.fluxfactor['default']['B'])[np.newaxis,:]
 		int1d = interp1d(self.phase,components[1],axis=0,assume_sorted=True)
-		m1Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
-			self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
-		residual = m1Bflux / width
+		m1flux = np.sum(pbspl*int1d([0]), axis=1)
+		bStdFlux=(10**((self.m0guess-27.5)/-2.5) )
+		residual = (m1flux) / (width*bStdFlux)
 		#This derivative is constant, and never needs to be recalculated, so I store it in a hidden attribute
 		try:
 			fluxDeriv= self.__m1priorfluxderiv__.copy()
 		except:
-			fluxDeriv= np.zeros(self.npar)
-			passbandColorExp = self.kcordict['default']['Bpbspl']
-			intmult = (self.wave[1] - self.wave[0])*self.kcordict['default']['fluxfactor']
+			fluxDeriv= np.zeros((pbspl.shape[0],self.npar))
 			for i in range(self.im1.size):
 				waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
 				phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
 				#Check if this filter is inside values affected by changes in knot i
-				if waverange[0] > self.kcordict['default']['maxlam'] or waverange[1] < self.kcordict['default']['minlam']:
+				minlam=min([np.min(self.kcordict['default'][filt+'wave'][self.kcordict['default'][filt+'tp'] > 0.01]) for filt in ['B']]) 
+				maxlam=max([np.max(self.kcordict['default'][filt+'wave'][self.kcordict['default'][filt+'tp'] > 0.01]) for filt in ['B']]) 
+				if waverange[0] > maxlam or waverange[1] < minlam:
 					pass
 				if (0>=phaserange[0] ) & (0<=phaserange[1]):
 					#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
 					#Integrate only over wavelengths within the relevant range
 					inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
 					derivInterp = interp1d(self.phase,self.spline_derivs[:,inbounds,i],axis=0,kind=self.interpMethod,bounds_error=False,fill_value="extrapolate",assume_sorted=True)
-					fluxDeriv[self.im1[i]] = np.sum( passbandColorExp[inbounds] * derivInterp(0))*intmult 
+					fluxDeriv[:,self.im1[i]] = np.sum( pbspl[:,inbounds]* derivInterp([0]),axis=1) 
 			self.__m1priorfluxderiv__=fluxDeriv.copy()
-
-		jacobian=fluxDeriv/width 
-		return residual,m1Bflux,jacobian
-	
+		
+		jacobian=fluxDeriv/ (bStdFlux* width)
+		
+		return residual,m1flux,jacobian
+		
 	@prior
 	def x1mean(self,width,x,components):
 		"""Prior such that the mean of the x1 population is 0"""
