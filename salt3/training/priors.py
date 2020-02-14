@@ -32,23 +32,24 @@ class SALTPriors:
 			self.numBoundResids += result[0].size
 
 
-	#@prior
+#	@prior
 	def peakprior(self,width,x,components):
 		wave=self.wave[self.bbandoverlap]
 		lightcurve=np.sum(self.bbandpbspl[np.newaxis,:]*components[0][:,self.bbandoverlap],axis=1)
 		# from D'Arcy - disabled for now!!	(barfs if model goes crazy w/o regularization)
-		#maxPhase=np.argmax(lightcurve)
-		#finePhase=np.arange(self.phase[maxPhase-1],self.phase[maxPhase+1],0.1)
-		finePhase=np.arange(self.phase[self.maxPhase-1],self.phase[self.maxPhase+1],0.1)
-		fineGrid=self.SALTModel(x,evaluatePhase=finePhase,evaluateWave=wave)[0]
+		maxPhase=np.argmax(lightcurve)
+		finePhase=np.arange(self.phase[maxPhase-1],self.phase[maxPhase+1],0.1)
+# 		finePhase=np.arange(self.phase[self.maxPhase-1],self.phase[self.maxPhase+1],0.1)
+# 		fineGrid=self.SALTModel(x,evaluatePhase=finePhase,evaluateWave=wave)[0]
 		lightcurve=np.sum(self.bbandpbspl[np.newaxis,:]*fineGrid,axis=1)
 
 		value=finePhase[np.argmax(lightcurve)]	
 		#Need to write the derivative with respect to parameters
 		return value/width,value,np.zeros(self.npar)
 	
-	def satisfyDefintions(self,X,components):
+	def satisfyDefinitions(self,X,components):
 		"""Ensures that the definitions of M1,M0,x0,x1 are satisfied"""
+		X=X.copy()
 
 		int1d = interp1d(self.phase,components[0],axis=0,assume_sorted=True)
 		m0Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
@@ -64,6 +65,8 @@ class SALTPriors:
 		X[self.im1]-=ratio*X[self.im0]
 		
 		#Define x1 to have mean 0
+		#m0 at peak is not modified, since m1B at peak is defined as 0
+		#Thus does not need to be recalculated for the last definition
 		X[self.im0]+= np.mean(X[self.ix1])*X[self.im1]
 		X[self.ix1]-=np.mean(X[self.ix1])
 		
@@ -73,9 +76,6 @@ class SALTPriors:
 			X[self.im1]*= x1std
 			X[self.ix1]/= x1std
 			
-		#Recalculate m0 peak B band flux since it's modified by this function
-		m0Bflux=m0Bflux+np.mean(X[self.ix1])*m1Bflux
-		
 		#Define m0 to have a standard B-band magnitude at peak
 		bStdFlux=(10**((self.m0guess-27.5)/-2.5) )
 		X[self.im0]*=bStdFlux/m0Bflux 
@@ -88,8 +88,10 @@ class SALTPriors:
 		int1d = interp1d(self.phase,components[0],axis=0,assume_sorted=True)
 		m0Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
 			self.kcordict['default']['Bdwave']*self.kcordict['default']['fluxfactor']
-		m0B = -2.5*np.log10(m0Bflux) + 27.5
-		residual = (m0B-self.m0guess) / width
+		#m0Bflux=np.clip(m0Bflux,(10**((self.m0guess-27.5)/-2.5) ),None)
+		m0B= -2.5*np.log10(m0Bflux)+27.5
+		bStdFlux=(10**((self.m0guess-27.5)/-2.5) )
+		residual = (m0Bflux-bStdFlux) / (width*bStdFlux)
 		#This derivative is constant, and never needs to be recalculated, so I store it in a hidden attribute
 		try:
 			fluxDeriv= self.__m0priorfluxderiv__.copy()
@@ -111,7 +113,7 @@ class SALTPriors:
 					fluxDeriv[self.im0[i]] = np.sum( passbandColorExp[inbounds] * derivInterp(0))*intmult 
 			self.__m0priorfluxderiv__=fluxDeriv.copy()
 		
-		jacobian=-fluxDeriv* (2.5 / (np.log(10) *m0Bflux * width))
+		jacobian=fluxDeriv/ (bStdFlux* width)
 		return residual,m0B,jacobian
 
 	@prior
@@ -211,6 +213,15 @@ class SALTPriors:
 		
 		return residual,x[iPar],jacobian	
 
+	def getBounds(self,bounds,boundparams):
+		lower=np.ones(self.npar)*-np.inf
+		upper=np.ones(self.npar)*np.inf
+		for bound,par in zip(bounds,boundparams):
+			lbound,ubound,width = bound
+			iPar = self.__dict__['i%s'%par]
+			lower[iPar]=lbound
+			upper[iPar]=ubound
+		return lower,upper
 		
 	def priorResids(self,priors,widths,x):
 		"""Given a list of names of priors and widths returns a residuals vector, list of prior values, and Jacobian """

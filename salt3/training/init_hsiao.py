@@ -43,10 +43,11 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 
 
 	m0 = bisplev(intphase,intwave,bspl)
+	#Define m1 guess by a simple stretch of the Hsiao template (chose these numbers off of the effect of x1 on B-band stretch)
+	stretch=(1.07+0.069-0.015+0.00067)/1.07
+	stretchedPhase=np.clip(intphase*stretch,phaserange[0],phaserange[1])
+	m1fluxguess = (m0-bisplev(stretchedPhase,intwave,bspl)).flatten()
 	
-	m1fluxguess = flux*10**(-0.4*(-8.93+(synphotB(refWave,refFlux,0,0,Bfilt)-\
-										 synphotB(wave[phase==0],flux[phase==0],0,0,Bfilt))))
-	m1fluxguess *= 1e2
 	#m1fluxguess -= 2.0933145e-5
 	#m1fluxadj = synphotBflux(wave[phase==0],m1fluxguess[phase==0],0,0,Bfilt)
 	#import pdb; pdb.set_trace()
