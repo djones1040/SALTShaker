@@ -296,6 +296,7 @@ class TrainSALTBase:
 		numPhotElimmed,numPhot=0,0
 		numSpecPoints=0
 		failedlist = []
+		print('hack! no spec color cut')
 		for sn in list(datadict.keys()):
 			photdata = datadict[sn]['photdata']
 			specdata = datadict[sn]['specdata']
@@ -326,7 +327,7 @@ class TrainSALTBase:
 				# remove spectra with bad colors
 				colordiffs = getColorsForSN(
 					specdata[k],photdata,self.kcordict,datadict[sn]['survey'])
-				print('hack! no spec color cut')
+				
 				#if colordiffs is None or len(colordiffs[np.abs(colordiffs) > 0.1]):
 				#	specdata.pop(k)
 				#	numSpecElimmed += 1
