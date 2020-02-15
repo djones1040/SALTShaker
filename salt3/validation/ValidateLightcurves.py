@@ -265,12 +265,9 @@ def customfilt(outfile,lcfile,salt3dir,
 	
 	if 'PEAKMJD' in sn.__dict__.keys():
 		try:
-			plotmjd = np.linspace(float(sn.PEAKMJD.split()[0])-20,
-								  float(sn.PEAKMJD.split()[0])+55,200)
+			sn.PEAKMJD=float(sn.PEAKMJD)
 		except:
-			plotmjd = np.linspace(float(sn.PEAKMJD)-20,
-								  float(sn.PEAKMJD)+55,200)
-
+			sn.PEAKMJD=float(sn.PEAKMJD.split()[0])
 	else:
 		sn.PEAKMJD=sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)][0]
 
@@ -345,9 +342,7 @@ def customfilt(outfile,lcfile,salt3dir,
 
 				ax.set_xlim([-20,50])
 		except:
-			ax.set_xlim([t0-30,
-						 t0+55])
-			#import pdb; pdb.set_trace()
+			import pdb; pdb.set_trace()
 		ax.set_ylim([-np.max(sn.FLUXCAL)*1/20.,np.max(sn.FLUXCAL)*1.1])
 
 		#if flt == 'c': import pdb; pdb.set_trace()
