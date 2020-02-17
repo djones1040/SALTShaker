@@ -59,8 +59,7 @@ class TRAINING_Test(unittest.TestCase):
 		self.guess[self.parlist == 'tpkoff_%s'%sn] = 0
 
 		
-	def defineStoredResults(self,guess,defineInterpolations=True):
-		sn=self.resids.datadict.keys().__iter__().__next__()
+	def defineStoredResults(self,guess,sn,defineInterpolations=True):
 		
 		components = self.resids.SALTModel(guess)
 		componentderivs = self.resids.SALTModelDeriv(guess,1,0,self.resids.phase,self.resids.wave)
@@ -161,13 +160,13 @@ class TRAINING_Test(unittest.TestCase):
 		atol=1e-8
 		sn=self.resids.datadict.keys().__iter__().__next__()
 		
-		storedResults=self.defineStoredResults(self.guess,defineInterpolations=False)[0]
+		storedResults=self.defineStoredResults(self.guess,sn,defineInterpolations=False)[0]
 		#import pdb;pdb.set_trace()
 		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,storedResults,varyParams=np.zeros(self.resids.npar,dtype=bool),fixUncertainty=True)
 		residuals = photresidsdict['resid']
 		
 		uncertainties={key:storedResults[key] for key in storedResults if key.startswith('photvariances_') or key.startswith('specvariances_') or key.startswith('photCholesky_') }
-		storedResults=self.defineStoredResults(self.guess,defineInterpolations=False)[0]
+		storedResults=self.defineStoredResults(self.guess,sn,defineInterpolations=False)[0]
 		storedResults.update(uncertainties)
 
 		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,storedResults,varyParams=np.ones(self.resids.npar,dtype=bool),fixUncertainty=True)
@@ -175,7 +174,7 @@ class TRAINING_Test(unittest.TestCase):
 		def incrementOneParam(i,dx):
 			guess=self.guess.copy()
 			guess[i]+=dx
-			storedResults=self.defineStoredResults(guess,defineInterpolations=False)[0]
+			storedResults=self.defineStoredResults(guess,sn,defineInterpolations=False)[0]
 			storedResults.update(uncertainties)
 			return self.resids.ResidsForSN(guess,sn,storedResults ,np.zeros(self.resids.npar,dtype=bool),fixUncertainty=True)[0]['resid']
 
@@ -195,19 +194,19 @@ class TRAINING_Test(unittest.TestCase):
 		atol=1e-4
 		sn=self.resids.datadict.keys().__iter__().__next__()
 		self.guess[self.resids.iclscat[-1]]=-15
-		storedResults=self.defineStoredResults(self.guess,defineInterpolations=False)[0]
+		storedResults=self.defineStoredResults(self.guess,sn,defineInterpolations=False)[0]
 		#import pdb;pdb.set_trace()
 		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,storedResults,varyParams=np.zeros(self.resids.npar,dtype=bool))
 		residuals = photresidsdict['resid']
 		lognorm=photresidsdict['lognorm']
-		storedResults=self.defineStoredResults(self.guess,defineInterpolations=False)[0]
+		storedResults=self.defineStoredResults(self.guess,sn,defineInterpolations=False)[0]
 		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,storedResults,varyParams=np.ones(self.resids.npar,dtype=bool))
 		jacobian=photresidsdict['resid_jacobian']
 		grad=photresidsdict['lognorm_grad']
 		def incrementOneParam(i,dx):
 			guess=self.guess.copy()
 			guess[i]+=dx
-			storedResults=self.defineStoredResults(guess,defineInterpolations=False)[0]
+			storedResults=self.defineStoredResults(guess,sn,defineInterpolations=False)[0]
 			return self.resids.ResidsForSN(guess,sn,storedResults ,np.zeros(self.resids.npar,dtype=bool))[0]
 
 		dResiddX=np.zeros((residuals.size,self.parlist.size))
@@ -230,8 +229,8 @@ class TRAINING_Test(unittest.TestCase):
 		dx=1e-3
 		rtol=1e-2
 		atol=1e-8
-		storedResults=self.defineStoredResults(self.guess)
 		sn=self.resids.datadict.keys().__iter__().__next__()
+		storedResults=self.defineStoredResults(self.guess,sn)
 		
 		valsdict=self.resids.photValsForSN(self.guess,sn, *storedResults,np.ones(self.guess.size,dtype=bool))
 		jacobian=valsdict['modelflux_jacobian']
@@ -242,7 +241,7 @@ class TRAINING_Test(unittest.TestCase):
 		def incrementOneParam(i):
 			guess=self.guess.copy()
 			guess[i]+=dx
-			storedResults=self.defineStoredResults(guess)		
+			storedResults=self.defineStoredResults(guess,sn)		
 			return self.resids.photValsForSN(guess,sn, *storedResults,np.zeros(self.guess.size,dtype=bool))
 			
 		dValdX=np.zeros((vals.size,self.parlist.size))
@@ -260,7 +259,7 @@ class TRAINING_Test(unittest.TestCase):
 		dx=1e-8
 		rtol=1e-2
 		atol=1e-10
-		storedResults=self.defineStoredResults(self.guess)
+		storedResults=self.defineStoredResults(self.guess,sn)
 		sn=self.resids.datadict.keys().__iter__().__next__()
 		
 		uncertaintydict=self.resids.photVarianceForSN(self.guess,sn,*storedResults,np.ones(self.guess.size,dtype=bool))
@@ -272,7 +271,7 @@ class TRAINING_Test(unittest.TestCase):
 		def incrementOneParam(i,dx):
 			guess=self.guess.copy()
 			guess[i]+=dx
-			newResults=self.defineStoredResults(guess)
+			newResults=self.defineStoredResults(guess,sn)
 			return self.resids.photVarianceForSN(guess,sn,*newResults,np.zeros(self.guess.size,dtype=bool))
 		
 		
@@ -289,7 +288,7 @@ class TRAINING_Test(unittest.TestCase):
 		dx=1e-8
 		rtol=1e-2
 		atol=1e-48
-		storedResults=self.defineStoredResults(self.guess)
+		storedResults=self.defineStoredResults(self.guess,sn)
 		sn=self.resids.datadict.keys().__iter__().__next__()
 		
 		uncertaintydict=self.resids.specVarianceForSN(self.guess,sn,*storedResults,np.ones(self.guess.size,dtype=bool))
@@ -301,7 +300,7 @@ class TRAINING_Test(unittest.TestCase):
 		def incrementOneParam(i,dx):
 			guess=self.guess.copy()
 			guess[i]+=dx
-			newResults=self.defineStoredResults(guess)
+			newResults=self.defineStoredResults(guess,sn)
 			return self.resids.specVarianceForSN(guess,sn,*newResults,np.zeros(self.guess.size,dtype=bool))
 		
 
@@ -322,7 +321,7 @@ class TRAINING_Test(unittest.TestCase):
 		atol=1e-20
 		sn=self.resids.datadict.keys().__iter__().__next__()
 
-		storedResults=self.defineStoredResults(self.guess)
+		storedResults=self.defineStoredResults(self.guess,sn)
 		
 		valsdict=self.resids.specValsForSN(self.resids.guess,sn, *storedResults,np.ones(self.guess.size,dtype=bool))
 		jacobian=valsdict['modelflux_jacobian']
@@ -333,7 +332,7 @@ class TRAINING_Test(unittest.TestCase):
 		def incrementOneParam(i):
 			guess=self.guess.copy()
 			guess[i]+=dx
-			storedResults=self.defineStoredResults(guess)
+			storedResults=self.defineStoredResults(guess,sn)
 			return self.resids.specValsForSN(guess,sn, *storedResults,np.zeros(self.guess.size,dtype=bool))
 		dValdX=np.zeros((vals.size,self.parlist.size))
 		for i in range(self.guess.size):
@@ -344,6 +343,21 @@ class TRAINING_Test(unittest.TestCase):
 
 		self.assertTrue((np.isclose(jacobian,dValdX,rtol,atol).all(axis=0)|((self.parlist=='tpkoff_5999390'))).all())
 
+	def test_storePCDerivs(self):
+		
+		sn=self.resids.datadict.keys().__iter__().__next__()
+		guess=self.guess
+		resids=self.resids
+		storedResults,temporaryResults=self.defineStoredResults(guess,sn)
+		print("Testing that storing principal component deriviatives doesn't affect  photometric derivatives")
+		jac=resids.photValsForSN(guess,sn, storedResults,temporaryResults,np.ones(resids.npar,dtype=bool))['modelflux_jacobian']
+		newJac=resids.photValsForSN(guess,sn, storedResults,temporaryResults,np.ones(resids.npar,dtype=bool))['modelflux_jacobian']
+		self.assertTrue(np.allclose(jac,newJac))
+		print("Testing that storing principal component deriviatives doesn't affect  spectral derivatives")
+		jac=resids.photValsForSN(guess,sn, storedResults,temporaryResults,np.ones(resids.npar,dtype=bool))['modelflux_jacobian']
+		newJac=resids.photValsForSN(guess,sn, storedResults,temporaryResults,np.ones(resids.npar,dtype=bool))['modelflux_jacobian']
+		self.assertTrue(np.allclose(jac,newJac))
+		
 	def test_specresid_jacobian(self):
 		"""Checks that the the jacobian of the spectroscopic residuals is being correctly calculated to within 1%"""
 		print("Checking spectral derivatives")
@@ -352,13 +366,13 @@ class TRAINING_Test(unittest.TestCase):
 		atol=1e-4
 		sn=self.resids.datadict.keys().__iter__().__next__()
 		
-		storedResults=self.defineStoredResults(self.guess,defineInterpolations=False)[0]
+		storedResults=self.defineStoredResults(self.guess,sn,defineInterpolations=False)[0]
 		#import pdb;pdb.set_trace()
 		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,storedResults,varyParams=np.zeros(self.resids.npar,dtype=bool),fixUncertainty=True)
 		residuals = specresidsdict['resid']
 		
 		uncertainties={key:storedResults[key] for key in storedResults if key.startswith('photvariances_') or key.startswith('specvariances_') or key.startswith('photCholesky_') }
-		storedResults=self.defineStoredResults(self.guess,defineInterpolations=False)[0]
+		storedResults=self.defineStoredResults(self.guess,sn,defineInterpolations=False)[0]
 		storedResults.update(uncertainties)
 
 		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,storedResults,varyParams=np.ones(self.resids.npar,dtype=bool),fixUncertainty=True)
@@ -366,7 +380,7 @@ class TRAINING_Test(unittest.TestCase):
 		def incrementOneParam(i,dx):
 			guess=self.guess.copy()
 			guess[i]+=dx
-			storedResults=self.defineStoredResults(guess,defineInterpolations=False)[0]
+			storedResults=self.defineStoredResults(guess,sn,defineInterpolations=False)[0]
 			storedResults.update(uncertainties)
 			return self.resids.ResidsForSN(guess,sn,storedResults ,np.zeros(self.resids.npar,dtype=bool),fixUncertainty=True)[1]['resid']
 
@@ -384,7 +398,7 @@ class TRAINING_Test(unittest.TestCase):
 		rtol=1e-2
 		atol=1e-2
 		sn=self.resids.datadict.keys().__iter__().__next__()
-		storedResults=self.defineStoredResults(self.guess,defineInterpolations=False)[0]
+		storedResults=self.defineStoredResults(self.guess,sn,defineInterpolations=False)[0]
 		
 		specresidsdict=self.resids.ResidsForSN(self.guess,sn,storedResults,varyParams=np.ones(self.resids.npar,dtype=bool))[1]
 		grad=specresidsdict['lognorm_grad']
@@ -398,7 +412,7 @@ class TRAINING_Test(unittest.TestCase):
 		def incrementOneParam(i,dx):
 			guess=self.guess.copy()
 			guess[i]+=dx
-			storedResults=self.defineStoredResults(guess,defineInterpolations=False)[0]
+			storedResults=self.defineStoredResults(guess,sn,defineInterpolations=False)[0]
 			return self.resids.ResidsForSN(guess,sn,storedResults ,np.zeros(self.resids.npar,dtype=bool))[1]
 			
 		dResiddX=np.zeros((residuals.size,self.parlist.size))
@@ -418,7 +432,7 @@ class TRAINING_Test(unittest.TestCase):
 		sn=self.resids.datadict.keys().__iter__().__next__()
 
 		combinations= [np.zeros(self.parlist.size,dtype=bool),np.ones(self.parlist.size,dtype=bool)]
-		results=[self.resids.ResidsForSN(self.guess,sn,self.defineStoredResults(self.guess,defineInterpolations=False)[0],x) for x in combinations]
+		results=[self.resids.ResidsForSN(self.guess,sn,self.defineStoredResults(self.guess,sn,defineInterpolations=False)[0],x) for x in combinations]
 
 		first=results[0]
 		
@@ -456,10 +470,10 @@ class TRAINING_Test(unittest.TestCase):
 				def incrementOneParam(i):
 					guess=self.guess.copy()
 					guess[i]+=dx
-					storedResults=self.defineStoredResults(guess,defineInterpolations=False)[0]
+					storedResults=self.defineStoredResults(guess,sn,defineInterpolations=False)[0]
 					return regularization(guess,storedResults,np.zeros(self.parlist.size,dtype=bool))[0][component]
 					
-				storedResults=self.defineStoredResults(self.guess,defineInterpolations=False)[0]
+				storedResults=self.defineStoredResults(self.guess,sn,defineInterpolations=False)[0]
 				print('Checking jacobian of {} regularization, {} component'.format(name,component))
 
 				residuals,jacobian=[x[component] for x in regularization(self.guess,storedResults,np.ones(self.parlist.size,dtype=bool))]
