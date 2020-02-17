@@ -662,27 +662,28 @@ class SALTResids:
 			for i,varIndex in enumerate(np.where(varyParList=='cl')[0]): 
 				photresultsdict['modelflux_jacobian'][selectFilter,varIndex]= (np.sum((modulatedFlux)[:,:]*self.colorLawDeriv[np.newaxis,idx[flt],i], axis=1)*-0.4*np.log(10)*c*dwave*self.fluxfactor[survey][flt])			
 			
-			if requiredPCDerivs.any() and not 'pcDeriv_phot_%s'%sn in storedResults:
-				passbandColorExp=pbspl[flt]*colorexp[idx[flt]]*self.datadict[sn]['mwextcurve'][idx[flt]]
-				for pdx,p in enumerate(np.where(selectFilter)[0]):
-					derivInterp = self.spline_deriv_interp(
-						(clippedPhase[pdx]/(1+z),self.wave[idx[flt]]),
-						method=self.interpMethod)[:,requiredPCDerivs]
-					summation = np.sum( passbandColorExp.T * derivInterp, axis=0)
-					if phase[pdx]>obsphase.max():
-						decayFactor= 10**(-0.4*self.extrapolateDecline*(phase[pdx]-obsphase.max()))
-						summation*=decayFactor
-					if requiredPCDerivs.all():
-						summationCache[p,:]=summation
-					photresultsdict['modelflux_jacobian'][p,(varyParList=='m0')]=summation[varyParams[self.im0][requiredPCDerivs]]*intmult
-					photresultsdict['modelflux_jacobian'][p,(varyParList=='m1')]=summation[varyParams[self.im1][requiredPCDerivs]]*intmult*x1
+			if requiredPCDerivs.any():
+					passbandColorExp=pbspl[flt]*colorexp[idx[flt]]*self.datadict[sn]['mwextcurve'][idx[flt]]
+					for pdx,p in enumerate(np.where(selectFilter)[0]):
+						if 'pcDeriv_phot_%s'%sn in storedResults:
+							summation=storedResults['pcDeriv_phot_%s'%sn][p,requiredPCDerivs]
+						else:
+							derivInterp = self.spline_deriv_interp(
+								(clippedPhase[pdx]/(1+z),self.wave[idx[flt]]),
+								method=self.interpMethod)[:,requiredPCDerivs]
+							summation = np.sum( passbandColorExp.T * derivInterp, axis=0)
+							if phase[pdx]>obsphase.max():
+								decayFactor= 10**(-0.4*self.extrapolateDecline*(phase[pdx]-obsphase.max()))
+								summation*=decayFactor
+							if requiredPCDerivs.all():
+								summationCache[p,:]=summation
+							
+							
+						photresultsdict['modelflux_jacobian'][p,(varyParList=='m0')]=summation[varyParams[self.im0][requiredPCDerivs]]*intmult
+						photresultsdict['modelflux_jacobian'][p,(varyParList=='m1')]=summation[varyParams[self.im1][requiredPCDerivs]]*intmult*x1
 			
 			photresultsdict['modelflux'][selectFilter]=modelflux
-		if 'pcDeriv_phot_%s'%sn in storedResults:
-			if requiredPCDerivs.any():
-				photresultsdict['modelflux_jacobian'][:,(varyParList=='m0')]=storedResults['pcDeriv_phot_%s'%sn][:,varyParams[self.im0]]*intmult
-				photresultsdict['modelflux_jacobian'][:,(varyParList=='m1')]=storedResults['pcDeriv_phot_%s'%sn][:,varyParams[self.im1]]*intmult*x1
-		elif requiredPCDerivs.all():
+		if requiredPCDerivs.all() and not 'pcDeriv_phot_%s'%sn in storedResults :
 			storedResults['pcDeriv_phot_%s'%sn]=summationCache
 		return photresultsdict
 			
