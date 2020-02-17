@@ -433,6 +433,7 @@ class GaussNewton(saltresids.SALTResids):
 	def __init__(self,guess,datadict,parlist,**kwargs):
 		self.warnings = []
 		self.debug=False
+		self.fitTpkOff=False
 		super().__init__(guess,datadict,parlist,**kwargs)
 		self.lsqfit = False
 		
@@ -748,6 +749,7 @@ class GaussNewton(saltresids.SALTResids):
 		for fit in self.fitlist:
 			if 'all-grouped' in fit :continue #
 			if 'modelerr' in fit: continue
+			if 'tpk'==fit and not self.fitTpkOff: continue
 			print('fitting '+self.fitOptions[fit][0])
 			
 
@@ -835,6 +837,7 @@ class GaussNewton(saltresids.SALTResids):
 	def process_fit(self,X,iFit,storedResults,fit='all',doPriors=True):
 		X=X.copy()
 		varyingParams=iFit&self.iModelParam
+		if not self.fitTpkOff: varyingParams[self.itpk]=False
 		
 		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors)
 		oldChi=(residuals**2).sum()
