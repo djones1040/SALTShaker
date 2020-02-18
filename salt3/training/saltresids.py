@@ -710,10 +710,11 @@ class SALTResids:
 							else:
 								derivInterp=self.pcderivsparse[f'derivInterp_phot_{sn}_{flt}'][pdx][:,requiredPCDerivs]
 								summation=derivInterp.T.dot(passbandColorExp[0])
+							if requiredPCDerivs.all():
+								summationCache[p,:]=summation
+
 						photresultsdict['modelflux_jacobian'][p,(varyParList=='m0')]=summation[varyParams[self.im0][requiredPCDerivs]]*intmult
 						photresultsdict['modelflux_jacobian'][p,(varyParList=='m1')]=summation[varyParams[self.im1][requiredPCDerivs]]*intmult*x1
-						if requiredPCDerivs.all():
-							summationCache[p,:]=summation
 					
 			photresultsdict['modelflux'][selectFilter]=modelflux
 		if requiredPCDerivs.all() and not 'pcDeriv_phot_%s'%sn in storedResults :
