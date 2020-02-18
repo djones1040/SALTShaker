@@ -433,7 +433,6 @@ class GaussNewton(saltresids.SALTResids):
 	def __init__(self,guess,datadict,parlist,**kwargs):
 		self.warnings = []
 		self.debug=False
-		self.fitTpkOff=False
 		super().__init__(guess,datadict,parlist,**kwargs)
 		self.lsqfit = False
 		

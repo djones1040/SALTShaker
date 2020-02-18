@@ -710,10 +710,11 @@ class SALTResids:
 							else:
 								derivInterp=self.pcderivsparse[f'derivInterp_phot_{sn}_{flt}'][pdx][:,requiredPCDerivs]
 								summation=derivInterp.T.dot(passbandColorExp[0])
+							if requiredPCDerivs.all():
+								summationCache[p,:]=summation
+
 						photresultsdict['modelflux_jacobian'][p,(varyParList=='m0')]=summation[varyParams[self.im0][requiredPCDerivs]]*intmult
 						photresultsdict['modelflux_jacobian'][p,(varyParList=='m1')]=summation[varyParams[self.im1][requiredPCDerivs]]*intmult*x1
-						if requiredPCDerivs.all():
-							summationCache[p,:]=summation
 					
 			photresultsdict['modelflux'][selectFilter]=modelflux
 		if requiredPCDerivs.all() and not 'pcDeriv_phot_%s'%sn in storedResults :
@@ -820,15 +821,7 @@ class SALTResids:
 			# M0, M1
 			if (requiredPCDerivs).any():
 				intmult = _SCALE_FACTOR/(1+z)*recalexp*colorexpinterp*self.datadict[sn]['mwextcurveint'](specdata[k]['wavelength'])
-				if not self.fitTpkOff:
-					if 'pcDeriv_spec_%s'%sn in storedResults:
-						derivInterp=storedResults['pcDeriv_spec_%s'%sn][k]
-					else:
-						derivInterp=self.pcderivsparse[f'derivInterp_spec_{sn}_{k}'].multiply(intmult[:,np.newaxis]).tocsc()
-						interpCache[k]=derivInterp
-					specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='m0')]  = (derivInterp[:,varyParams[self.im0]]*(x0[0])).toarray()
-					specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='m1')] = ( derivInterp[:,varyParams[self.im1]]*(x1[0]*x0[0])).toarray()
-				else:
+				if self.fitTpkOff:
 					if 'pcDeriv_spec_%s'%sn in storedResults:
 						derivInterp= storedResults['pcDeriv_spec_%s'%sn][specSlice,:]
 					else:
@@ -837,6 +830,14 @@ class SALTResids:
 					specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='m1')] =  derivInterp[:,varyParams[self.im1]]*(x1*x0)
 					if requiredPCDerivs.all() and not 'pcDeriv_spec_%s'%sn in storedResults:
 						interpCache[specSlice,:] = derivInterp
+				else:
+					if 'pcDeriv_spec_%s'%sn in storedResults:
+						derivInterp=storedResults['pcDeriv_spec_%s'%sn][k]
+					else:
+						derivInterp=self.pcderivsparse[f'derivInterp_spec_{sn}_{k}'].multiply(intmult[:,np.newaxis]).tocsc()
+						interpCache[k]=derivInterp
+					specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='m0')]  = (derivInterp[:,varyParams[self.im0]]*(x0[0])).toarray()
+					specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='m1')] = ( derivInterp[:,varyParams[self.im1]]*(x1[0]*x0[0])).toarray()
 # 				if ( (phase>obsphase.max())).any():
 # 					if phase > obsphase.max():
 # 						#if computePCDerivs != 2:
