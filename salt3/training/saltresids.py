@@ -227,7 +227,7 @@ class SALTResids:
 		self.priors = SALTPriors(self)
 		
 		if not self.fitTpkOff:
-			self.setPCDerivsSparse()
+			self.setPCDerivsSparse(self.guess)
 	def set_param_indices(self):
 
 		self.parameters = ['x0','x1','c','m0','m1','spcrcl','spcrcl_norm','spcrcl_poly',
@@ -266,16 +266,41 @@ class SALTResids:
 				self.iclscat_0 = np.append(self.iclscat_0,np.where(self.parlist == parname)[0][-1])
 				self.iclscat_poly = np.append(self.iclscat_poly,np.where(self.parlist == parname)[0][:-1])
 
-	def setPCDerivsSparse(self):
+	def setPCDerivsSparse(self,X):
+		start=time.time()
 		self.pcderivsparse={}
 		for sn in self.datadict:
 			z = self.datadict[sn]['zHelio']
 			specdata=self.datadict[sn]['specdata']
+			photdata = self.datadict[sn]['photdata']
+			idx = self.datadict[sn]['idx']
+			tpkoff=X[self.parlist == 'tpkoff_%s'%sn]
+			obsphase = self.datadict[sn]['obsphase'] 
 			for k in specdata.keys():
 				
-				phase=specdata[k]['tobs']
+				phase=specdata[k]['tobs']+tpkoff
 				self.pcderivsparse[f'derivInterp_spec_{sn}_{k}']=sparse.csr_matrix(self.spline_deriv_interp((phase/(1+z),specdata[k]['wavelength']/(1+z)),method=self.interpMethod))
-
+				
+			for flt in np.unique(photdata['filt']):
+				#Select data from the appropriate filter filter
+				selectFilter=(photdata['filt']==flt)
+				phase=photdata['tobs']+tpkoff
+				phase=phase[selectFilter]
+				clippedPhase=np.clip(phase,obsphase.min(),obsphase.max())
+				#Array output indices match time along 0th axis, wavelength along 1st axis
+				result=[]
+				for pdx,p in enumerate(np.where(selectFilter)[0]):
+					derivInterp = self.spline_deriv_interp(
+						(clippedPhase[pdx]/(1+z),self.wave[idx[flt]]),
+						method=self.interpMethod)
+					if phase[pdx]>obsphase.max():
+						decayFactor= 10**(-0.4*self.extrapolateDecline*(phase[pdx]-obsphase.max()))
+						derivInterp*=decayFactor
+					result+=[sparse.csr_matrix(derivInterp)]
+				self.pcderivsparse[f'derivInterp_phot_{sn}_{flt}']=result
+					
+		print('Time required to calculate all PC derivatives as sparse matrices ',time.time()-start, 's')
+		
 	def getobswave(self):
 		"for each filter, setting up some things needed for synthetic photometry"
 		
@@ -674,20 +699,22 @@ class SALTResids:
 						if 'pcDeriv_phot_%s'%sn in storedResults:
 							summation=storedResults['pcDeriv_phot_%s'%sn][p,requiredPCDerivs]
 						else:
-							derivInterp = self.spline_deriv_interp(
-								(clippedPhase[pdx]/(1+z),self.wave[idx[flt]]),
-								method=self.interpMethod)[:,requiredPCDerivs]
-							summation = np.sum( passbandColorExp.T * derivInterp, axis=0)
-							if phase[pdx]>obsphase.max():
-								decayFactor= 10**(-0.4*self.extrapolateDecline*(phase[pdx]-obsphase.max()))
-								summation*=decayFactor
-							if requiredPCDerivs.all():
-								summationCache[p,:]=summation
-							
-							
+							if self.fitTpkOff:
+								derivInterp = self.spline_deriv_interp(
+									(clippedPhase[pdx]/(1+z),self.wave[idx[flt]]),
+									method=self.interpMethod)[:,requiredPCDerivs]
+								summation = np.sum( passbandColorExp.T * derivInterp, axis=0)
+								if phase[pdx]>obsphase.max():
+									decayFactor= 10**(-0.4*self.extrapolateDecline*(phase[pdx]-obsphase.max()))
+									summation*=decayFactor
+							else:
+								derivInterp=self.pcderivsparse[f'derivInterp_phot_{sn}_{flt}'][pdx][:,requiredPCDerivs]
+								summation=derivInterp.T.dot(passbandColorExp[0])
 						photresultsdict['modelflux_jacobian'][p,(varyParList=='m0')]=summation[varyParams[self.im0][requiredPCDerivs]]*intmult
 						photresultsdict['modelflux_jacobian'][p,(varyParList=='m1')]=summation[varyParams[self.im1][requiredPCDerivs]]*intmult*x1
-			
+						if requiredPCDerivs.all():
+							summationCache[p,:]=summation
+					
 			photresultsdict['modelflux'][selectFilter]=modelflux
 		if requiredPCDerivs.all() and not 'pcDeriv_phot_%s'%sn in storedResults :
 			storedResults['pcDeriv_phot_%s'%sn]=summationCache
