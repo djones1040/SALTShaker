@@ -85,6 +85,8 @@ class TrainSALTBase:
 							help='repeat mcmc and/or gauss newton n times (default=%default)')
 		parser.add_argument('--fit_model_err', default=config.get('trainparams','fit_model_err'), type=boolean_string,
 							help='fit for model error if set (default=%default)')
+		parser.add_argument('--fit_tpkoff', default=config.get('trainparams','fit_tpkoff'), type=boolean_string,
+							help='fit for time of max in B-band if set (default=%default)')
 		parser.add_argument('--condition_number', default=config.get('trainparams','condition_number'), type=float,
 							help='Largest singular value not set to zero for least-squares solver (default=%default)')
 
@@ -283,7 +285,8 @@ class TrainSALTBase:
 						 'use_lsqfit':self.options.use_lsqfit,
 						 'regularize':self.options.regularize,
 						 'outputdir':self.options.outputdir,
-						 'fit_model_err':self.options.fit_model_err}
+						 'fit_model_err':self.options.fit_model_err,
+						 'fitTpkOff':self.options.fit_tpkoff}
 		for k in self.options.__dict__.keys():
 			if k.startswith('prior') or k.startswith('bound'):
 				saltfitkwargs[k] = self.options.__dict__[k]
