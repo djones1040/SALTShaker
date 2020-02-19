@@ -14,7 +14,7 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.special import factorial
 from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
 from scipy.integrate import trapz
-from scipy import linalg 
+from scipy import linalg,sparse
 
 import numpy as np
 from numpy.random import standard_normal
@@ -226,10 +226,8 @@ class SALTResids:
 
 		self.priors = SALTPriors(self)
 		
-		self.__specFixedUncertainty__={}
-		self.__photFixedUncertainty__={}
-		self.__components_time_stamp__ = time.time()
-
+		if not self.fitTpkOff:
+			self.setPCDerivsSparse(self.guess)
 	def set_param_indices(self):
 
 		self.parameters = ['x0','x1','c','m0','m1','spcrcl','spcrcl_norm','spcrcl_poly',
@@ -268,7 +266,40 @@ class SALTResids:
 				self.iclscat_0 = np.append(self.iclscat_0,np.where(self.parlist == parname)[0][-1])
 				self.iclscat_poly = np.append(self.iclscat_poly,np.where(self.parlist == parname)[0][:-1])
 
-
+	def setPCDerivsSparse(self,X):
+		start=time.time()
+		self.pcderivsparse={}
+		for sn in self.datadict:
+			z = self.datadict[sn]['zHelio']
+			specdata=self.datadict[sn]['specdata']
+			photdata = self.datadict[sn]['photdata']
+			idx = self.datadict[sn]['idx']
+			tpkoff=X[self.parlist == 'tpkoff_%s'%sn]
+			obsphase = self.datadict[sn]['obsphase'] 
+			for k in specdata.keys():
+				
+				phase=specdata[k]['tobs']+tpkoff
+				self.pcderivsparse[f'derivInterp_spec_{sn}_{k}']=sparse.csr_matrix(self.spline_deriv_interp((phase/(1+z),specdata[k]['wavelength']/(1+z)),method=self.interpMethod))
+				
+			for flt in np.unique(photdata['filt']):
+				#Select data from the appropriate filter filter
+				selectFilter=(photdata['filt']==flt)
+				phase=photdata['tobs']+tpkoff
+				phase=phase[selectFilter]
+				clippedPhase=np.clip(phase,obsphase.min(),obsphase.max())
+				#Array output indices match time along 0th axis, wavelength along 1st axis
+				result=[]
+				for pdx,p in enumerate(np.where(selectFilter)[0]):
+					derivInterp = self.spline_deriv_interp(
+						(clippedPhase[pdx]/(1+z),self.wave[idx[flt]]),
+						method=self.interpMethod)
+					if phase[pdx]>obsphase.max():
+						decayFactor= 10**(-0.4*self.extrapolateDecline*(phase[pdx]-obsphase.max()))
+						derivInterp*=decayFactor
+					result+=[sparse.csr_matrix(derivInterp)]
+				self.pcderivsparse[f'derivInterp_phot_{sn}_{flt}']=result
+					
+		print('Time required to calculate all PC derivatives as sparse matrices ',time.time()-start, 's')
 		
 	def getobswave(self):
 		"for each filter, setting up some things needed for synthetic photometry"
@@ -668,20 +699,23 @@ class SALTResids:
 						if 'pcDeriv_phot_%s'%sn in storedResults:
 							summation=storedResults['pcDeriv_phot_%s'%sn][p,requiredPCDerivs]
 						else:
-							derivInterp = self.spline_deriv_interp(
-								(clippedPhase[pdx]/(1+z),self.wave[idx[flt]]),
-								method=self.interpMethod)[:,requiredPCDerivs]
-							summation = np.sum( passbandColorExp.T * derivInterp, axis=0)
-							if phase[pdx]>obsphase.max():
-								decayFactor= 10**(-0.4*self.extrapolateDecline*(phase[pdx]-obsphase.max()))
-								summation*=decayFactor
+							if self.fitTpkOff:
+								derivInterp = self.spline_deriv_interp(
+									(clippedPhase[pdx]/(1+z),self.wave[idx[flt]]),
+									method=self.interpMethod)[:,requiredPCDerivs]
+								summation = np.sum( passbandColorExp.T * derivInterp, axis=0)
+								if phase[pdx]>obsphase.max():
+									decayFactor= 10**(-0.4*self.extrapolateDecline*(phase[pdx]-obsphase.max()))
+									summation*=decayFactor
+							else:
+								derivInterp=self.pcderivsparse[f'derivInterp_phot_{sn}_{flt}'][pdx][:,requiredPCDerivs]
+								summation=derivInterp.T.dot(passbandColorExp[0])
 							if requiredPCDerivs.all():
 								summationCache[p,:]=summation
-							
-							
+
 						photresultsdict['modelflux_jacobian'][p,(varyParList=='m0')]=summation[varyParams[self.im0][requiredPCDerivs]]*intmult
 						photresultsdict['modelflux_jacobian'][p,(varyParList=='m1')]=summation[varyParams[self.im1][requiredPCDerivs]]*intmult*x1
-			
+					
 			photresultsdict['modelflux'][selectFilter]=modelflux
 		if requiredPCDerivs.all() and not 'pcDeriv_phot_%s'%sn in storedResults :
 			storedResults['pcDeriv_phot_%s'%sn]=summationCache
@@ -714,8 +748,10 @@ class SALTResids:
 		specresultsdict['modelflux_jacobian'] = np.zeros((nspecdata,varyParams.sum()))
 		
 		if requiredPCDerivs.all() and not 'pcDeriv_spec_%s'%sn in storedResults:
-			interpCache=np.zeros((nspecdata,self.im0.size))
-
+			if self.fitTpkOff:
+				interpCache=np.zeros((nspecdata,self.im0.size))
+			else:
+				interpCache={}
 		iSpecStart = 0
 		for k in specdata.keys():
 			
@@ -785,14 +821,23 @@ class SALTResids:
 			# M0, M1
 			if (requiredPCDerivs).any():
 				intmult = _SCALE_FACTOR/(1+z)*recalexp*colorexpinterp*self.datadict[sn]['mwextcurveint'](specdata[k]['wavelength'])
-				if 'pcDeriv_spec_%s'%sn in storedResults:
-					derivInterp= storedResults['pcDeriv_spec_%s'%sn][specSlice,:]
-				else:
-					derivInterp = self.spline_deriv_interp((phase[0]/(1+z),specdata[k]['wavelength']/(1+z)),method=self.interpMethod)*intmult[:,np.newaxis]
+				if self.fitTpkOff:
+					if 'pcDeriv_spec_%s'%sn in storedResults:
+						derivInterp= storedResults['pcDeriv_spec_%s'%sn][specSlice,:]
+					else:
+						derivInterp=self.spline_deriv_interp((phase[0]/(1+z),specdata[k]['wavelength']/(1+z)),method=self.interpMethod)*intmult[:,np.newaxis]
+					specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='m0')]  = derivInterp[:,varyParams[self.im0]]*(x0)
+					specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='m1')] =  derivInterp[:,varyParams[self.im1]]*(x1*x0)
 					if requiredPCDerivs.all() and not 'pcDeriv_spec_%s'%sn in storedResults:
 						interpCache[specSlice,:] = derivInterp
-				specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='m0')]  = derivInterp[:,varyParams[self.im0]]*(x0)
-				specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='m1')] =  derivInterp[:,varyParams[self.im1]]*(x1*x0)
+				else:
+					if 'pcDeriv_spec_%s'%sn in storedResults:
+						derivInterp=storedResults['pcDeriv_spec_%s'%sn][k]
+					else:
+						derivInterp=self.pcderivsparse[f'derivInterp_spec_{sn}_{k}'].multiply(intmult[:,np.newaxis]).tocsc()
+						interpCache[k]=derivInterp
+					specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='m0')]  = (derivInterp[:,varyParams[self.im0]]*(x0[0])).toarray()
+					specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='m1')] = ( derivInterp[:,varyParams[self.im1]]*(x1[0]*x0[0])).toarray()
 # 				if ( (phase>obsphase.max())).any():
 # 					if phase > obsphase.max():
 # 						#if computePCDerivs != 2:

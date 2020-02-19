@@ -49,12 +49,12 @@ class fitting:
 					gaussnewton_maxiter):
 
 		gn.debug = False
-		x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+		xfinal,xunscaled,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams,stepsizes = \
 			gn.convergence_loop(
 				guess,loop_niter=gaussnewton_maxiter)
 
-		return x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+		return xfinal,xunscaled,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams,stepsizes,\
 			'Gauss-Newton MCMC was successful'
 
@@ -566,14 +566,14 @@ class GaussNewton(saltresids.SALTResids):
 			stepsizes = self.getstepsizes(X,Xlast)
 			Xlast = copy.deepcopy(X)
 		#Retranslate x1, M1, x0, M0 to obey definitions
-		X=self.priors.satisfyDefinitions(X,self.SALTModel(X))
+		Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
 		
 		xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams = \
-			self.getParsGN(X)
+			self.getParsGN(Xredefined)
 
 
-		return xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+		return xfinal,X,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams,stepsizes
 		
 		#raise RuntimeError("convergence_loop reached 100000 iterations without convergence")
@@ -748,6 +748,7 @@ class GaussNewton(saltresids.SALTResids):
 		for fit in self.fitlist:
 			if 'all-grouped' in fit :continue #
 			if 'modelerr' in fit: continue
+			if 'tpk'==fit and not self.fitTpkOff: continue
 			print('fitting '+self.fitOptions[fit][0])
 			
 
@@ -835,6 +836,7 @@ class GaussNewton(saltresids.SALTResids):
 	def process_fit(self,X,iFit,storedResults,fit='all',doPriors=True):
 		X=X.copy()
 		varyingParams=iFit&self.iModelParam
+		if not self.fitTpkOff: varyingParams[self.itpk]=False
 		
 		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors)
 		oldChi=(residuals**2).sum()

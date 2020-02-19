@@ -2,12 +2,14 @@
 # D. Jones, R. Kessler - 8/31/18
 from __future__ import print_function
 
-import os
 import argparse
 import configparser
 import numpy as np
 import sys
 import multiprocessing
+
+import os
+from os import path
 
 from scipy.linalg import lstsq
 from scipy.optimize import minimize, least_squares, differential_evolution
@@ -122,10 +124,16 @@ class TrainSALT(TrainSALTBase):
 		guess = np.zeros(parlist.size)
 
 		if self.options.resume_from_outputdir:
-			try:
-				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.resume_from_outputdir,unpack=True,skiprows=1,dtype="U30,f8")
-			except:
-				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.outputdir,unpack=True,skiprows=1,dtype="U30,f8")
+			names=None
+			for possibleDir in [self.options.resume_from_outputdir,self.options.outputdir]:
+				for possibleFile in ['salt3_parameters_unscaled.dat','salt3_parameters.dat']:	
+					if names is None:
+						try:
+							names,pars = np.loadtxt(path.join(possibleDir,possibleFile),unpack=True,skiprows=1,dtype="U30,f8")
+							break
+						except:
+							continue
+						
 			for key in np.unique(parlist):
 				try:
 					#if 'specrecal' not in key: 
@@ -190,7 +198,7 @@ class TrainSALT(TrainSALTBase):
 				saltfitkwargs['regularize'] = self.options.regularize
 				saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)			
 				# do the fitting
-				x_modelpars,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+				x_modelpars,x_unscaled,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 					modelerr,clpars,clerr,clscat,SNParams,laststepsize,message = fitter.gaussnewton(
 						saltfitter,x_modelpars,self.options.n_processes,
 						self.options.n_steps_mcmc,self.options.n_burnin_mcmc,
@@ -205,7 +213,7 @@ class TrainSALT(TrainSALTBase):
 		print('MCMC message: %s'%message)
 		#print('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
 		#	  saltfitter.regularizationChi2(x_modelpars,0,1,0),saltfitter.regularizationChi2(x_modelpars,0,0,1))
-		print('Final loglike'); saltfitter.maxlikefit(x_modelpars)
+		print('Final loglike'); saltfitter.maxlikefit(x_unscaled)
 
 		print(x_modelpars.size)
 
@@ -219,12 +227,12 @@ class TrainSALT(TrainSALTBase):
 		else: chain,loglikes = None,None
 
 		return phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-			modelerr,clpars,clerr,clscat,SNParams,x_modelpars,parlist,chain,loglikes
+			modelerr,clpars,clerr,clscat,SNParams,x_modelpars,x_unscaled,parlist,chain,loglikes
 
 	def wrtoutput(self,outdir,phase,wave,
 				  M0,M0err,M1,M1err,cov_M0_M1,
 				  modelerr,clpars,
-				  clerr,clscat,SNParams,pars,parlist,chain,loglikes):
+				  clerr,clscat,SNParams,pars,pars_unscaled,parlist,chain,loglikes):
 		if not os.path.exists(outdir):
 			raise RuntimeError('desired output directory %s doesn\'t exist'%outdir)
 
@@ -233,6 +241,12 @@ class TrainSALT(TrainSALTBase):
 		with  open('{}/salt3_parameters.dat'.format(outdir),'w') as foutpars:
 			foutpars.write('{: <30} {}\n'.format('Parameter Name','Value'))
 			for name,par in zip(parlist,pars):
+
+				foutpars.write('{: <30} {:.15e}\n'.format(name,par))
+
+		with  open('{}/salt3_parameters_unscaled.dat'.format(outdir),'w') as foutpars:
+			foutpars.write('{: <30} {}\n'.format('Parameter Name','Value'))
+			for name,par in zip(parlist,pars_unscaled):
 
 				foutpars.write('{: <30} {:.15e}\n'.format(name,par))
 		
@@ -489,12 +503,12 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			datadict = self.mkcuts(datadict,KeepOnlySpec=self.options.keeponlyspec)
 
 			phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-				modelerr,clpars,clerr,clscat,SNParams,pars,parlist,chain,loglikes = self.fitSALTModel(datadict)
+				modelerr,clpars,clerr,clscat,SNParams,pars,pars_unscaled,parlist,chain,loglikes = self.fitSALTModel(datadict)
 		
 			# write the output model - M0, M1, c
 			self.wrtoutput(self.options.outputdir,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,
 						   modelerr,clpars,clerr,clscat,SNParams,
-						   pars,parlist,chain,loglikes)
+						   pars,pars_unscaled,parlist,chain,loglikes)
 
 		if self.options.stage == "all" or self.options.stage == "validate":
 			self.validate(self.options.outputdir)
