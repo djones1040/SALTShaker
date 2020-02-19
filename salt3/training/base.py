@@ -42,6 +42,8 @@ class TrainSALTBase:
 
 		
 		# input/output files
+		parser.add_argument('--loggingconfig', default=config.get('iodata','loggingconfig'), type=str,
+							help='logging config file')
 		parser.add_argument('--trainingconfig', default=config.get('iodata','trainingconfig'), type=str,
 							help='training config file')
 		parser.add_argument('--snlists', default=config.get('iodata','snlists'), type=str,

@@ -11,6 +11,8 @@ import astropy.units as u
 import warnings
 from time import time
 import scipy.stats as ss
+import logging
+log=logging.getLogger('salt3.default')
 
 def rdkcor(surveylist,options,addwarning=None):
 
@@ -20,7 +22,7 @@ def rdkcor(surveylist,options,addwarning=None):
 		subsurveys = options.__dict__['%s_subsurveylist'%survey].split(',')
 		kcorfile = os.path.expandvars(kcorfile)
 		if not os.path.exists(kcorfile):
-			print('kcor file %s does not exist.	 Checking %s/kcor'%(kcorfile,data_rootdir))
+			log.info('kcor file %s does not exist.	 Checking %s/kcor'%(kcorfile,data_rootdir))
 			kcorfile = '%s/kcor/%s'%(data_rootdir,kcorfile)
 			if not os.path.exists(kcorfile):
 				raise RuntimeError('kcor file %s does not exist'%kcorfile)

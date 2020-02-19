@@ -122,7 +122,7 @@ class TrainSALT(TrainSALTBase):
 		# initial guesses
 		n_params=parlist.size
 		guess = np.zeros(parlist.size)
-
+		#Option to reinitialize the model parameters from the output of a previous run to continue optimizing it
 		if self.options.resume_from_outputdir:
 			names=None
 			for possibleDir in [self.options.resume_from_outputdir,self.options.outputdir]:
@@ -144,19 +144,23 @@ class TrainSALT(TrainSALTBase):
 					import pdb;pdb.set_trace()
 					sys.exit(1)
 		else:
-			m0knots[m0knots == 0] = 1e-4
+			#Otherwise we initialize M0 and M1 based off the Hsiao model (with a simple stretch to determine M1)
+			m0knots[m0knots <= 0] = 1e-4
 			guess[parlist == 'm0'] = m0knots
 			for i in range(3): guess[parlist == 'modelerr_{}'.format(i)] = 1e-6 
 			if self.options.n_components == 2:
 				guess[parlist == 'm1'] = m1knots
+			#Linear color model to begin with
 			if self.options.n_colorpars:
 				guess[parlist == 'cl'] = [0.]*self.options.n_colorpars
+			
+			#Very small color scatter to start
 			if self.options.n_colorscatpars:
 				guess[parlist == 'clscat'] = [1e-6]*self.options.n_colorscatpars
 				guess[np.where(parlist == 'clscat')[0][-1]]=-10
-			guess[(parlist == 'm0') & (guess < 0)] = 1e-4
 
 			i=0
+			#Initialize x0 based on the redshift and some cosmology
 			for k in datadict.keys():
 				guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36-10.635))
 				i+=1
