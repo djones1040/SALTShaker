@@ -3,6 +3,8 @@
 from salt3.training.TrainSALT import TrainSALT
 import sys, argparse, configparser, os
 from salt3.config import config_rootdir
+import yaml
+from logging import config as logconfig
 
 usagestring = """SALT3 Training
 
@@ -33,12 +35,22 @@ else:
 user_parser = salt.add_user_options(usage=usagestring,config=config)
 user_options = user_parser.parse_known_args()[0]
 
+if not os.path.exists(user_options.loggingconfig):
+	print(f"warning: logger config file{user_options.loggingconfig} doesn't exist, default logger configuration will be used (everything above debug to console)")
+else:
+	with open(user_options.loggingconfig,'r') as logConfigFile:
+		configdictionary=yaml.safe_load(logConfigFile.read())
+		for handler in configdictionary['handlers']:
+			if 'filename' in configdictionary['handlers'][handler]:
+				configdictionary['handlers'][handler]['filename']=configdictionary['handlers'][handler]['filename'].replace('OUTPUTDIR',user_options.outputdir)
+		logconfig.dictConfig(configdictionary)
+
 if not os.path.exists(user_options.trainingconfig):
 	print('warning : training config file %s doesn\'t exist.  Trying package directory'%user_options.trainingconfig)
 	user_options.trainingconfig = '%s/%s'%(config_rootdir,user_options.trainingconfig)
 if not os.path.exists(user_options.trainingconfig):
 	raise RuntimeError('can\'t find training config file!  Checked %s'%user_options.trainingconfig)
-	
+
 trainingconfig = configparser.ConfigParser()
 trainingconfig.read(user_options.trainingconfig)
 training_parser = salt.add_training_options(
@@ -54,6 +66,3 @@ if salt.options.stage not in ['all','validate','train']:
 	
 salt.main()
 	
-if len(salt.warnings):
-    print('There were warnings!!')
-    print(salt.warnings)

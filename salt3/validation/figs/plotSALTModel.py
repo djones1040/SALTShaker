@@ -8,6 +8,9 @@ from scipy.interpolate import interp1d, interp2d
 from sncosmo.salt2utils import SALT2ColorLaw
 from salt3.initfiles import init_rootdir
 from argparse import ArgumentParser
+import logging
+log=logging.getLogger(__name__)
+
 def mkModelPlot(salt3dir='modelfiles/salt3',
 				xlimits=[2000,9200],outfile=None,plotErr=True):
 	
