@@ -48,8 +48,8 @@ class SALT3pipe():
         self.GetMu = GetMu()
         self.CosmoFit = CosmoFit()
         self.Data = Data()
-        self.BiascorSim = Simulation()
-        self.BiascorLCFit = LCFitting()
+        self.BiascorSim = Simulation(biascor=True)
+        self.BiascorLCFit = LCFitting(biascor=True)
 
         self.build_flag = False
         self.config_flag = False
@@ -158,6 +158,13 @@ class SALT3pipe():
             pro2_in = pro2._get_input_info().loc[on]
             if isinstance(pro1_out,list) or isinstance(pro1_out,np.ndarray): pro2_in['value'] = ', '.join(pro1_out)
             else:
+                pro2_in['value'] = pro1_out
+        elif 'getmu' in pipepros[1].lower():
+            if pro1.biascor:
+                pro2_in = pro2._get_input_info().loc['biascor']
+                pro2_in['value'] = pro1_out
+            else:
+                pro2_in = pro2._get_input_info().loc['normal']
                 pro2_in['value'] = pro1_out
         else:
             pro2_in = pro2._get_input_info().loc[0]
@@ -387,6 +394,10 @@ class BYOSED(PyPipeProcedure):
         pass
 
 class Simulation(PipeProcedure):
+    
+    def __init__(self,biascor=False):
+        self.biascor = biascor
+        super().__init__()
 
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
                   batch=False,validplots=False,
@@ -632,7 +643,11 @@ class Training(PyPipeProcedure):
 
 
 class LCFitting(PipeProcedure):
-
+            
+    def __init__(self,biascor=False):
+        self.biascor = biascor
+        super().__init__()
+        
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
                   batch=False,validplots=False,outname="pipeline_lcfit_input.input",**kwargs):
         self.done_file = 'ALL.DONE'
@@ -653,9 +668,16 @@ class LCFitting(PipeProcedure):
         if not isinstance(pipepro,str):
             pipepro = type(pipepro).__name__
         if pipepro.lower().startswith('getmu'):
-            outprefix = abspath_for_getmu(self._get_output_info().value.values[0])
-            if self.batch: return str(outprefix)
-            else: return str(outprefix)+'.FITRES.TEXT'
+            output_df = self._get_output_info().set_index('key')
+            if self.batch: 
+                outprefix = str(output_df.loc['OUTDIR','value'])
+                if self.biascor:
+                    outprefix += '/{}/FITOPT000.FITRES'.format(str(output_df.loc['VERSION','value']))
+                output_abspath = abspath_for_getmu(outprefix) 
+                return(str(output_abspath))
+            else:
+                outprefix = abspath_for_getmu(str(output_df.loc['TEXTFILE_PREFIX','value']))
+                return str(outprefix)+'.FITRES.TEXT'
         else:
             raise ValueError("lcfitting can only glue to getmu")
 
@@ -694,19 +716,31 @@ class LCFitting(PipeProcedure):
             return df2.set_index('type')
 
     def _get_output_info(self):
-        df = {}
         if self.batch:
             section = 'HEADER'
-            key = 'OUTDIR'
+            keys = ['OUTDIR']
+            if self.biascor:
+                keys.append('VERSION')
         else:
             section = 'SNLCINP'
-            key = 'TEXTFILE_PREFIX'
-        df['section'] = section
-        df['key'] = key
-        df['value'] = self.keys[section][key]
-        return pd.DataFrame([df])
- 
+            keys = ['TEXTFILE_PREFIX']
+
+        df_list = []
+        for key in keys:
+            df = {}
+            df['section'] = section
+            df['key'] = key
+            df['value'] = self.keys[section][key]
+            df_list.append(df)
+        return pd.DataFrame(df_list)
+
+            
 class GetMu(PipeProcedure):
+            
+    def __init__(self,bbc=True):
+        self.bbc = bbc
+        super().__init__()
+        
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
                   batch=False,validplots=False,outname="pipeline_getmu_input.input",**kwargs):
         self.done_file = finput_abspath('%s/GetMu.DONE'%os.path.dirname(baseinput))
@@ -746,8 +780,17 @@ class GetMu(PipeProcedure):
                 df['key'] = key
                 df['value'] = self.keys[key]
                 df['delimiter'] = self.delimiter[key]
-
-        return pd.DataFrame([df])
+            df['tag'] = 'normal'
+            if self.bbc:
+                df2 = {}
+                key = 'simfile_biascor'
+                df2['key'] = key
+                df2['value'] = self.keys[key].strip()
+                df2['tag'] = 'biascor' 
+            else:
+                df2 = {}
+                
+        return pd.DataFrame([df,df2]).set_index('tag')
 
     def _get_output_info(self):
         df = {}
