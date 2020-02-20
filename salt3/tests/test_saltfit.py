@@ -25,13 +25,12 @@ class TRAINING_Test(unittest.TestCase):
 		
 		ts.options=training_options
 		
-		kcordict=readutils.rdkcor(ts.surveylist,ts.options,addwarning=ts.addwarning)
+		kcordict=readutils.rdkcor(ts.surveylist,ts.options)
 		ts.kcordict=kcordict
 
 		# TODO: ASCII filter files
 		# read the data
-		datadict = readutils.rdAllData(ts.options.snlists,ts.options.estimate_tpk,kcordict,
-									   ts.addwarning,dospec=ts.options.dospec)
+		datadict = readutils.rdAllData(ts.options.snlists,ts.options.estimate_tpk,kcordict,dospec=ts.options.dospec)
 
 		self.parlist,self.guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc = ts.initialParameters(datadict)
 		saltfitkwargs = ts.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)

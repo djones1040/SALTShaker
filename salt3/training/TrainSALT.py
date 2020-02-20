@@ -7,7 +7,8 @@ import configparser
 import numpy as np
 import sys
 import multiprocessing
-
+import logging
+log=logging.getLogger(__name__)
 import os
 from os import path
 
@@ -42,8 +43,6 @@ from salt3.initfiles import init_rootdir as salt2dir
 from time import time
 
 class TrainSALT(TrainSALTBase):
-	def __init__(self):
-		self.warnings = []
 	
 	def initialParameters(self,datadict):
 		from salt3.initfiles import init_rootdir
@@ -183,14 +182,14 @@ class TrainSALT(TrainSALTBase):
 		fitter = fitting(self.options.n_components,self.options.n_colorpars,
 						 n_phaseknots,n_waveknots,
 						 datadict)
-		print('training on %i SNe!'%len(datadict.keys()))
+		log.info('training on %i SNe!'%len(datadict.keys()))
 		for i in range(self.options.n_repeat):
 			if i == 0: laststepsize = None
 			
 			if self.options.do_mcmc:
 				saltfitkwargs['regularize'] = False
 				saltfitter = saltfit.mcmc(x_modelpars,datadict,parlist,**saltfitkwargs)
-				print('initial loglike: %.1f'%saltfitter.maxlikefit(x_modelpars,{},np.zeros(len(x_modelpars),dtype=bool)))
+				log.info('initial loglike: %.1f'%saltfitter.maxlikefit(x_modelpars,{},np.zeros(len(x_modelpars),dtype=bool)))
 				# do the fitting
 				x_modelpars,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 					modelerr,clpars,clerr,clscat,SNParams,message = fitter.mcmc(
@@ -214,12 +213,12 @@ class TrainSALT(TrainSALTBase):
 				except:
 					SNParams[k]['t0'] = -99
 		
-		print('MCMC message: %s'%message)
-		#print('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
+		log.info('MCMC message: %s'%message)
+		#log.info('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
 		#	  saltfitter.regularizationChi2(x_modelpars,0,1,0),saltfitter.regularizationChi2(x_modelpars,0,0,1))
-		print('Final loglike'); saltfitter.maxlikefit(x_unscaled)
+		log.info('Final loglike'); saltfitter.maxlikefit(x_unscaled)
 
-		print(x_modelpars.size)
+		log.info(f'{x_modelpars.size}')
 
 
 		#print('Finishing...To write files, hit c')
@@ -308,7 +307,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		for snlist in self.options.snlists.split(','):
 			snlist = os.path.expandvars(snlist)
 			if not os.path.exists(snlist):
-				print('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
+				log.warning('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
 				snlist = '%s/trainingdata/%s'%(data_rootdir,snlist)
 				if not os.path.exists(snlist):
 					raise RuntimeError('SN list file %s does not exist'%snlist)
@@ -418,7 +417,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		for j,snlist in enumerate(self.options.snlists.split(',')):
 			snlist = os.path.expandvars(snlist)
 			if not os.path.exists(snlist):
-				print('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
+				log.info('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
 				snlist = '%s/trainingdata/%s'%(data_rootdir,snlist)
 				if not os.path.exists(snlist):
 					raise RuntimeError('SN list file %s does not exist'%snlist)
@@ -428,7 +427,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				ValidateSpectra.compareSpectra(
 					snlist,self.options.outputdir,specfile='%s/speccomp_%i.pdf'%(self.options.outputdir,j),
 					maxspec=50,base=self,verbose=self.verbose)
-			print('plotting spectra took %.1f'%(time()-tspec))
+			log.info('plotting spectra took %.1f'%(time()-tspec))
 				
 			snfiles = np.genfromtxt(snlist,dtype='str')
 			snfiles = np.atleast_1d(snfiles)
@@ -454,7 +453,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				sn.SNID = str(sn.SNID)
 
 				if sn.SNID not in snid:
-					self.addwarning('sn %s not in output files'%sn.SNID)
+					log.warning('sn %s not in output files'%sn.SNID)
 					continue
 				x0sn,x1sn,csn,t0sn = \
 					x0[snid == sn.SNID][0],x1[snid == sn.SNID][0],\
@@ -479,13 +478,13 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		if not i %9 ==0:
 			pdf_pages.savefig()
 		pdf_pages.close()
-		print('plotting light curves took %.1f'%(time()-tlc))
+		log.info('plotting light curves took %.1f'%(time()-tlc))
 		
 	def main(self):
 
 		if not len(self.surveylist):
 			raise RuntimeError('surveys are not defined - see documentation')
-		self.kcordict=readutils.rdkcor(self.surveylist,self.options,addwarning=self.addwarning)
+		self.kcordict=readutils.rdkcor(self.surveylist,self.options)
 		# TODO: ASCII filter files
 				
 		if not os.path.exists(self.options.outputdir):
@@ -501,7 +500,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				binspecres = None
 				
 			datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,self.kcordict,
-										   self.addwarning,dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
+										   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
 										   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
 										   binspecres=binspecres)
 			datadict = self.mkcuts(datadict,KeepOnlySpec=self.options.keeponlyspec)
@@ -517,6 +516,6 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		if self.options.stage == "all" or self.options.stage == "validate":
 			self.validate(self.options.outputdir)
 		
-		print('successful SALT2 training!  Output files written to %s'%self.options.outputdir)
+		log.info('successful SALT2 training!  Output files written to %s'%self.options.outputdir)
 		
 	

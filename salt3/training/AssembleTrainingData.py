@@ -8,6 +8,9 @@ from salt3.data import data_rootdir
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 
+import logging
+log=logging.getLogger(__name__)
+
 #_cfa_early_dir = "$SNDATA_ROOT/lcmerge/
 _lowz_dir = "$SNDATA_ROOT/lcmerge/Pantheon_LOWZ_TEXT"
 _jla_lowz_dir = "$SNDATA_ROOT/lcmerge/SNLS3year_JRK07"
