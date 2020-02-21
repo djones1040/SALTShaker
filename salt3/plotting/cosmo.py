@@ -8,6 +8,9 @@ from __future__ import print_function
 #  WORK IN PROGRESS : 
 #    STILL NEED TO EXTRACT SOME OTHER FUNCTIONS FROM CALCULATE
 
+import logging
+log=logging.getLogger(__name__)
+
 helpstring = '''
 Cosmology calculator ala Ned Wright (www.astro.ucla.edu/~wright)
 input values = redshift, Ho, Omega_m, Omega_vac

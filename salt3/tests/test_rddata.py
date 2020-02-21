@@ -23,8 +23,8 @@ class RdTest(unittest.TestCase):
 		options= type('test', (), {})()
 		options.PS1_LOWZ_COMBINED_kcorfile='kcor_PS1_LOWZ_COMBINED.fits'
 		options.PS1_LOWZ_COMBINED_subsurveylist='CFA3S,CFA3K,CFA4p1,CFA4p2,CSP,CFA1,CFA2'
-		kcordict=readutils.rdkcor(['PS1_LOWZ_COMBINED'],options,addwarning=lambda x: None)
-		datadict = readutils.rdAllData(snlist,False,kcordict,ts.addwarning)
+		kcordict=readutils.rdkcor(['PS1_LOWZ_COMBINED'],options)
+		datadict = readutils.rdAllData(snlist,False,kcordict)
 
 		self.assertTrue(len(datadict.keys()) == nsn)
 
@@ -38,8 +38,8 @@ class RdTest(unittest.TestCase):
 		options.PS1_LOWZ_COMBINED_kcorfile='kcor_PS1_LOWZ_COMBINED.fits'
 		options.PS1_LOWZ_COMBINED_subsurveylist='CFA3S,CFA3K,CFA4p1,CFA4p2,CSP,CFA1,CFA2'
 		
-		kcordict=readutils.rdkcor(['PS1_LOWZ_COMBINED'],options,addwarning=lambda x: None)
-		datadict = readutils.rdAllData(snlist,False,kcordict,ts.addwarning,speclist)
+		kcordict=readutils.rdkcor(['PS1_LOWZ_COMBINED'],options)
+		datadict = readutils.rdAllData(snlist,False,kcordict,speclist)
 
 		self.assertTrue(len(datadict.keys()) == nsn)
 		
@@ -49,7 +49,7 @@ class RdTest(unittest.TestCase):
 		options= type('test', (), {})()
 		options.PS1MD_kcorfile='kcor_PS1_PS1MD.fits'
 		options.PS1MD_subsurveylist='PS1MD'
-		ts.kcordict=readutils.rdkcor(['PS1MD'],options,addwarning=lambda x: None)
+		ts.kcordict=readutils.rdkcor(['PS1MD'],options)
 
 		self.assertTrue('kcordict' in ts.__dict__.keys())
 		self.assertTrue('g' in ts.kcordict[survey].keys())
