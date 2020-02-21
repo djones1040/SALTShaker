@@ -10,11 +10,13 @@ import astropy.units as u
 
 #_cfa_early_dir = "$SNDATA_ROOT/lcmerge/
 _lowz_dir = "$SNDATA_ROOT/lcmerge/Pantheon_LOWZ_TEXT"
+_pantheon_lowz_dir = "$SNDATA_ROOT/lcmerge/Pantheon_LOWZ_TEXT"
 _jla_lowz_dir = "$SNDATA_ROOT/lcmerge/SNLS3year_JRK07"
 _foundation_dir = "$SNDATA_ROOT/lcmerge/Foundation_DJ17"
 #_lowz_dir = "$SNDATA_ROOT/lcmerge/02-DATA_PHOTOMETRY/DES-SN3YR_LOWZ"
 _des_dir = "$SNDATA_ROOT/lcmerge/02-DATA_PHOTOMETRY/DES-SN3YR_DES"
 _snls_dir = "$SNDATA_ROOT/lcmerge/JLA2014_SNLS"
+_snls_orig_dir = "$SNDATA_ROOT/lcmerge/SNLS3year_MEGACAM"
 _sdss_dir1 = "$SNDATA_ROOT/lcmerge/SMPv8+BOSS/SMPv8+BOSS_2004"
 _sdss_dir2 = "$SNDATA_ROOT/lcmerge/SMPv8+BOSS/SMPv8+BOSS_2005"
 _sdss_dir3 = "$SNDATA_ROOT/lcmerge/SMPv8+BOSS/SMPv8+BOSS_2006"
@@ -24,7 +26,7 @@ _ps1_dir = "$SNDATA_ROOT/lcmerge/Pantheon_PS1MD"
 _training_dirs = [_lowz_dir,_snls_dir,
 				  _sdss_dir1,_sdss_dir2,_sdss_dir3,_sdss_dir4,
 				  _des_dir,_foundation_dir,_ps1_dir]
-_training_dirs_orig = [_jla_lowz_dir,_snls_dir,
+_training_dirs_orig = [_jla_lowz_dir,_pantheon_lowz_dir,_snls_dir,_snls_orig_dir,
 					   _sdss_dir1,_sdss_dir2,_sdss_dir3,_sdss_dir4]
 
 #_outdir = '%s/trainingdata/snana'%(data_rootdir)
@@ -43,6 +45,7 @@ _ps1oldspecdir = '%s/trainingdata/PS1Spec'%(data_rootdir)
 
 def orig_training_data():
 
+	snidlist_out = []
 	for t in _training_dirs_orig:
 		version = t.split('/')[-1]
 		listfile = os.path.expandvars('%s/%s.LIST'%(t,version))
@@ -51,9 +54,15 @@ def orig_training_data():
 
 		lcfiles = np.genfromtxt(listfile,unpack=True,dtype='str')
 		for l in lcfiles:
-			try: sn = snana.SuperNova(os.path.expandvars('%s/%s'%(t,l)))
+			if '05ir' in l:
+				import pdb; pdb.set_trace()
+			
+			try:
+				sn = snana.SuperNova(os.path.expandvars('%s/%s'%(t,l)))
+				if sn.SNID in snidlist_out: continue
+				snidlist_out += [sn.SNID]
 			except: print(os.path.expandvars('%s/%s'%(t,l)))
-
+			
 			if t in [_sdss_dir1,_sdss_dir2,_sdss_dir3,_sdss_dir4]:
 				sdss_lcfile = glob.glob('%s/SDSS3_%06i.DAT'%(_jladir,sn.SNID))
 				if not len(sdss_lcfile): continue
