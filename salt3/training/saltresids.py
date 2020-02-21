@@ -33,6 +33,9 @@ import copy
 import warnings
 import pyParz
 
+import logging
+log=logging.getLogger(__name__)
+
 _SCALE_FACTOR = 1e-12
 _B_LAMBDA_EFF = np.array([4302.57])	 # B-band-ish wavelength
 _V_LAMBDA_EFF = np.array([5428.55])	 # V-band-ish wavelength
@@ -217,7 +220,7 @@ class SALTResids:
 		self.colorLawDerivInterp=interp1d(self.wave,self.colorLawDeriv,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
 		
 		
-		print('Time to calculate spline_derivs: %.2f'%(time.time()-starttime))
+		log.info('Time to calculate spline_derivs: %.2f'%(time.time()-starttime))
 		
 		
 		self.getobswave()
@@ -299,7 +302,7 @@ class SALTResids:
 					result+=[sparse.csr_matrix(derivInterp)]
 				self.pcderivsparse[f'derivInterp_phot_{sn}_{flt}']=result
 					
-		print('Time required to calculate all PC derivatives as sparse matrices ',time.time()-start, 's')
+		log.info('Time required to calculate all PC derivatives as sparse matrices {:.1f}s'.format(time.time()-start))
 		
 	def getobswave(self):
 		"for each filter, setting up some things needed for synthetic photometry"
@@ -434,7 +437,7 @@ class SALTResids:
 					for res,jac in zip(regResids,regJac):
 						grad -= (res[:,np.newaxis]*jac ).sum(axis=0)
 		self.nstep += 1
-		print(logp.sum()*-2)
+		log.info(logp.sum()*-2)
 
 		if computeDerivatives:
 			return logp,grad
@@ -981,7 +984,7 @@ class SALTResids:
 				lameffPrime=lameff/(1+z)/1000
 				colorscat=np.exp(np.poly1d(coeffs)(lameffPrime))
 				if colorscat == np.inf:
-					print('infinite color scatter!')
+					log.error('infinite color scatter!')
 					import pdb; pdb.set_trace()
 
 				pow=pow[varyParams[self.parlist=='clscat']]

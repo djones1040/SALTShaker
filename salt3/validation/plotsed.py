@@ -5,6 +5,9 @@ import sncosmo
 from salt3.util import snana
 from astropy.table import Table
 
+import logging
+log=logging.getLogger(__name__)
+
 def plot_io_sed(inputfile='../initfiles/Hsiao07.dat',
 				outputfile='../../examples/output/salt3_template_0.dat',phase=None):
 
