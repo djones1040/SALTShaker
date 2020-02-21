@@ -4,6 +4,9 @@ from scipy.interpolate import bisplrep,bisplev
 from scipy.interpolate import interp1d
 from sncosmo.constants import HC_ERG_AA
 
+import logging
+log=logging.getLogger(__name__)
+
 _SCALE_FACTOR = 1e-12
 
 def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',

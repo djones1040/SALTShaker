@@ -11,6 +11,8 @@ from scipy.interpolate import interp1d
 import os
 from salt3.config import config_rootdir
 
+
+
 class TRAINING_Test(unittest.TestCase):
 	
 	
@@ -32,7 +34,7 @@ class TRAINING_Test(unittest.TestCase):
 		training_options = training_parser.parse_known_args(namespace=user_options)[0]
 		
 		ts.options=training_options
-		kcordict=readutils.rdkcor(ts.surveylist,ts.options,addwarning=ts.addwarning)
+		kcordict=readutils.rdkcor(ts.surveylist,ts.options)
 
 		#if not os.path.exists(user_options.trainingconfig):
 		#	print('warning : training config file %s doesn\'t exist.  Trying package directory'%user_options.trainingconfig)
@@ -45,7 +47,7 @@ class TRAINING_Test(unittest.TestCase):
 		# TODO: ASCII filter files
 		# read the data
 		datadict = readutils.rdAllData(ts.options.snlists,ts.options.estimate_tpk,kcordict,
-									   ts.addwarning,dospec=ts.options.dospec)
+									   dospec=ts.options.dospec)
 		ts.kcordict=kcordict
 		self.parlist,self.guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc = ts.initialParameters(datadict)
 		saltfitkwargs = ts.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
