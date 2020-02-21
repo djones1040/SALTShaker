@@ -2,6 +2,8 @@
 """very basic utilities for dealing w/ fitres objects"""
 import numpy as np
 #import cosmo
+import logging
+log=logging.getLogger(__name__)
 
 def getmu(inp,salt2alpha=0.147,salt2beta=3.13,sigint=0.1,deltam=0,peczerr=0.00083):
 
@@ -47,7 +49,7 @@ def mkcuts(fr,salt2alpha=0.147,salt2beta=3.13,zmin=None,zmax=None,fitprobmin=0.0
 						(invvars > 0) & (fr.zHD >= zmin) & 
 						(fr.zHD <= zmax) & (fr.TrestMAX > trestmax))
 	except:
-		print('Warning : Keyword TrestMAX not found!!!')
+		log.warning('Keyword TrestMAX not found!!!')
 		cols = np.where((fr.x1 > -3.0) & (fr.x1 < 3.0) &
 						(fr.c > -0.3) & (fr.c < 0.3) &
 						(fr.x1ERR < 1) & (fr.PKMJDERR < 2*(1+fr.zHD)) &
@@ -79,7 +81,7 @@ def mkfoundcuts(fr,salt2alpha=0.147,salt2beta=3.13,zmin=None,zmax=None,fitprobmi
 						(invvars > 0) & (fr.zHD >= zmin) & 
 						(fr.zHD <= zmax) & (fr.TrestMAX > 5))
 	except:
-		print('Warning : Keyword TrestMAX not found!!!')
+		log.warning(' Keyword TrestMAX not found!!!')
 		cols = np.where((fr.x1 > -3.0) & (fr.x1 < 3.0) &
 						(fr.c > -0.3) & (fr.c < 0.3) &
 						(fr.x1ERR < 1) & (fr.PKMJDERR < 1*(1+fr.zHD)) &

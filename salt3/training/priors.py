@@ -3,6 +3,8 @@ from salt3.training import saltresids
 from inspect import signature
 from functools import partial
 from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
+import logging
+log=logging.getLogger(__name__)
 
 __priors__=dict()
 def prior(prior):

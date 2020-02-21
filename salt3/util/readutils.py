@@ -11,8 +11,10 @@ import astropy.units as u
 import warnings
 from time import time
 import scipy.stats as ss
+import logging
+log=logging.getLogger(__name__)
 
-def rdkcor(surveylist,options,addwarning=None):
+def rdkcor(surveylist,options):
 
 	kcordict = {}
 	for survey in surveylist:
@@ -20,7 +22,7 @@ def rdkcor(surveylist,options,addwarning=None):
 		subsurveys = options.__dict__['%s_subsurveylist'%survey].split(',')
 		kcorfile = os.path.expandvars(kcorfile)
 		if not os.path.exists(kcorfile):
-			print('kcor file %s does not exist.	 Checking %s/kcor'%(kcorfile,data_rootdir))
+			log.info('kcor file %s does not exist.	 Checking %s/kcor'%(kcorfile,data_rootdir))
 			kcorfile = '%s/kcor/%s'%(data_rootdir,kcorfile)
 			if not os.path.exists(kcorfile):
 				raise RuntimeError('kcor file %s does not exist'%kcorfile)
@@ -91,7 +93,7 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 	specfiles=np.atleast_1d(specfiles)
 	snanaSpec=True
 	
-	if KeepOnlySpec: print('KeepOnlySpec (debug) flag is set, removing any supernova without spectra')
+	if KeepOnlySpec: log.info('KeepOnlySpec (debug) flag is set, removing any supernova without spectra')
 
 	if snanaSpec:
 		for sf in specfiles:
@@ -111,7 +113,7 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 					speccount = len(datadict[s]['specdata'].keys())
 					
 				if len(sn.SPECTRA)==0:
-					#print('warning: File {} contains no supernova spectra'.format(sf))
+					log.debug('File {} contains no supernova spectra'.format(sf))
 					if KeepOnlySpec: 
 						datadict.pop(s)
 					continue
@@ -181,7 +183,7 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 					speccount+=1
 
 			else:
-				print('SNID %s has no photometry so I\'m ignoring it'%s)
+				log.debug('SNID %s has no photometry so I\'m ignoring it'%s)
 
 	else:
 		for s,m,sf in zip(snid,mjd,specfiles):
@@ -253,11 +255,11 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 
 				
 			else:
-				print('SNID %s has no photometry so I\'m ignoring it'%s)
+				log.debug('SNID %s has no photometry so I\'m ignoring it'%s)
 
 	return datadict
 
-def rdAllData(snlists,estimate_tpk,kcordict,addwarning,
+def rdAllData(snlists,estimate_tpk,kcordict,
 			  dospec=False,KeepOnlySpec=False,peakmjdlist=None,waverange=[2000,9200],binspecres=None):
 	datadict = {}
 	if peakmjdlist:
@@ -268,7 +270,7 @@ def rdAllData(snlists,estimate_tpk,kcordict,addwarning,
 		tsn = time()
 		snlist = os.path.expandvars(snlist)
 		if not os.path.exists(snlist):
-			print('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
+			log.info('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
 			snlist = '%s/trainingdata/%s'%(data_rootdir,snlist)
 		if not os.path.exists(snlist):
 			raise RuntimeError('SN list file %s does not exist'%snlist)
@@ -287,7 +289,7 @@ def rdAllData(snlists,estimate_tpk,kcordict,addwarning,
 			rdtime += time()-rdstart
 			
 			if sn.SNID in datadict.keys():
-				addwarning('SNID %s is a duplicate!	 Skipping'%sn.SNID)
+				log.warning('SNID %s is a duplicate!	 Skipping'%sn.SNID)
 				continue
 
 			if not 'SURVEY' in sn.__dict__.keys():
@@ -316,8 +318,7 @@ def rdAllData(snlists,estimate_tpk,kcordict,addwarning,
 					if tpkerr < 2: tpkmsg = 'termination condition is satisfied'
 					else: tpkmsg = 'time of max uncertainty of +/- %.1f days is too uncertain!'%tpkerr
 				else:
-					tpkmsg = 'can\'t fint tmax in file %s'%peakmjdlist
-					addwarning(tpkmsg)
+					log.warning('can\'t fint tmax in file %s'%peakmjdlist)
 					#raise RuntimeError('SN ID %s not found in peak MJD list'%sn.SNID)
 			else:
 				tpk = sn.SEARCH_PEAKMJD
@@ -328,12 +329,12 @@ def rdAllData(snlists,estimate_tpk,kcordict,addwarning,
 			# at least one epoch 3 days before max
 			#try:
 			#	if not len(sn.MJD[sn.MJD < tpk-3]):
-			#		addwarning('skipping SN %s; no epochs 3 days pre-max'%sn.SNID)
+			#		log.warning('skipping SN %s; no epochs 3 days pre-max'%sn.SNID)
 			#		continue
 			#except: import pdb; pdb.set_trace()
 
 			if 'termination condition is satisfied' not in tpkmsg:
-				addwarning('skipping SN %s; can\'t estimate t_max'%sn.SNID)
+				log.warning('skipping SN %s; can\'t estimate t_max'%sn.SNID)
 				continue
 
 			if not (kcordict is None ) and sn.SURVEY not in kcordict.keys():
@@ -357,7 +358,7 @@ def rdAllData(snlists,estimate_tpk,kcordict,addwarning,
 				try: datadict[sn.SNID]['MWEBV'] = float(sn.MWEBV.split()[0])
 				except: datadict[sn.SNID]['MWEBV'] = float(sn.MWEBV)
 			elif 'RA' in sn.__dict__.keys() and 'DEC' in sn.__dict__.keys():
-				print('determining MW E(B-V) from IRSA for SN %s using RA/Dec in file'%sn.SNID)
+				log.warning('determining MW E(B-V) from IRSA for SN %s using RA/Dec in file'%sn.SNID)
 				sc = SkyCoord(sn.RA,sn.DEC,frame="fk5",unit=u.deg)
 				datadict[sn.SNID]['MWEBV'] = IrsaDust.get_query_table(sc)['ext SandF mean'][0]
 			else:
@@ -367,7 +368,7 @@ def rdAllData(snlists,estimate_tpk,kcordict,addwarning,
 			tspec = time()
 			datadict = rdSpecData(datadict,snlist,KeepOnlySpec=KeepOnlySpec,waverange=waverange,binspecres=binspecres)
 
-	print('reading data files took %.1f'%(rdtime))
+	log.info('reading data files took %.1f'%(rdtime))
 	if not len(datadict.keys()):
 		raise RuntimeError('no light curve data to train on!!')
 		

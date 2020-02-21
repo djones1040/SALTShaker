@@ -68,9 +68,9 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 	plt.close('all')
 	trd = time()
 	if base:
-		datadict=readutils.rdAllData(speclist,False,None,lambda x: None,speclist,KeepOnlySpec=True,peakmjdlist=base.options.tmaxlist)
+		datadict=readutils.rdAllData(speclist,False,None,speclist,KeepOnlySpec=True,peakmjdlist=base.options.tmaxlist)
 	else:
-		datadict=readutils.rdAllData(speclist,False,None,lambda x: None,speclist,KeepOnlySpec=True,peakmjdlist=None)
+		datadict=readutils.rdAllData(speclist,False,None,speclist,KeepOnlySpec=True,peakmjdlist=None)
 	print('reading data took %.1f seconds'%(time()-trd))
 	tc = time()
 	if base: datadict = base.mkcuts(datadict,KeepOnlySpec=True)
