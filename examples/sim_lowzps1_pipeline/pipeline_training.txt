@@ -27,23 +27,21 @@ outinput=pipeline/SALT_SNANA.conf
 set_key=
 
 [lcfitting]
-pro=snlc_fit.exe
+pro=split_and_fit.pl
 baseinput=lcfitting/snfit_base.nml
 outinput=pipeline/snfit_TEST.nml
-batch=False
+batch=True
 validplots=True
 prooptions=
 set_key=
 
 [biascorsim]
 pro=sim_SNmix.pl
-baseinput=simulation/MASTER_LOWZ_PS1.INPUT
+baseinput=biascorsim/MASTER_LOWZ_PS1.INPUT
 outinput=pipeline/MASTER_LOWZ_PS1_biascor.INPUT
 batch=True
 prooptions=
-set_key= GENVERSION AllSurveys_LOWZ_Biascor
-    GENVERSION AllSurveys_PS1_Biascor
-    GENOPT_GLOBAL NGENTOT_LC 10000
+set_key=
 
 [biascorlcfit]
 pro=split_and_fit.pl
@@ -52,8 +50,7 @@ outinput=pipeline/snfit_TEST_biascor.nml
 batch=True
 validplots=True
 prooptions=
-set_key= VERSION AllSurveys_LOWZ_Biascor
-    VERSION AllSurveys_PS1_Biascor
+set_key= 
 
 [getmu]
 pro=SALT2mu_fit.pl
