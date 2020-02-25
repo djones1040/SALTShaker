@@ -165,7 +165,7 @@ class SALTPriors:
 		
 	@prior
 	def m1prior(self,width,x,components):
-		"""M1 should have zero flux at t=0 in the B and V bands"""
+		"""M1 should have zero flux at t=0 in the B band"""
 		pbspl=(self.kcordict['default']['Bpbspl']*(self.wave[1]-self.wave[0])*self.fluxfactor['default']['B'])[np.newaxis,:]
 		int1d = interp1d(self.phase,components[1],axis=0,assume_sorted=True)
 		m1flux = np.sum(pbspl*int1d([0]), axis=1)
@@ -194,8 +194,17 @@ class SALTPriors:
 		
 		jacobian=fluxDeriv/ (bStdFlux* width)
 		
-		return residual,m1flux,jacobian
-		
+		return residual,m1flux/bStdFlux,jacobian
+	
+	@prior
+	def colormean(self,width,x,components):
+		"""Prior such that the mean of the color population is 0"""
+		mean=np.mean(x[self.ic])
+		residual = mean/width
+		jacobian=np.zeros(self.npar)
+		jacobian[self.ic] = 1/len(self.datadict.keys())/width
+		return residual,mean,jacobian
+
 	@prior
 	def x1mean(self,width,x,components):
 		"""Prior such that the mean of the x1 population is 0"""
@@ -214,7 +223,7 @@ class SALTPriors:
 		residual = (x1std-1)/width
 		jacobian=np.zeros(self.npar)
 		if x1std!=0:
-			jacobian[self.ix1] = (x1s-x1mean)/(len(self.datadict.keys())*x1std*width)
+			jacobian[self.ix1] = (x1s-x1mean)/(x1s.size*x1std*width)
 		return residual,x1std,jacobian
 
 	@prior
@@ -274,16 +283,19 @@ class SALTPriors:
 		
 	def priorResids(self,priors,widths,x):
 		"""Given a list of names of priors and widths returns a residuals vector, list of prior values, and Jacobian """
-
-		alllam_vals = range(0,self.im0.size)
 		components = self.SALTModel(x)
 		results=[]
+		debugstring='Prior values are '
 		for prior,width in zip(priors,widths):
 			try:
 				priorFunction=self.priors[prior]
 			except:
 				raise ValueError('Invalid prior supplied: {}'.format(prior)) 
 			results+=[priorFunction(width,x,components)]
+			if results[-1][0].size==1:
+				debugstring+='{}: {:.2e},'.format(prior,float(results[-1][1]))
+				#debugstring+=f'{prior}: '+' '.join(['{:.2e}'.format(val) for val in results[-1][1]])+','
+		log.debug(debugstring)
 		residuals,values,jacobian=zip(*results)
 		return np.concatenate([np.array([x]) if x.shape==() else x for x in residuals]),np.concatenate([np.array([x]) if x.shape==() else x for x in values]),np.concatenate([x if len(x.shape)==2 else x[np.newaxis,:] for x in jacobian])
 
@@ -296,10 +308,15 @@ class SALTPriors:
 		jacobian=np.zeros((self.numBoundResids,self.npar))
 		values=np.zeros(self.numBoundResids)
 		idx=0
+		debugstring='Values outside bounds: '
 		for bound,par in zip(bounds,boundparams):
 			result=self.boundedprior(bound[-1],(bound[0],bound[1]),x,par)
 			numResids=result[0].size
 			residuals[idx:idx+numResids],values[idx:idx+numResids],\
 				jacobian[idx:idx+numResids,:]=result
+			if result[0].any():
+				debugstring+='{} {}, '.format(par,np.nonzero(result[0])[0].size)
 			idx+=numResids
+		if residuals.any():
+			log.debug(debugstring[:-1])
 		return residuals,values,jacobian

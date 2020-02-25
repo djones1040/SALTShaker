@@ -436,9 +436,9 @@ class GaussNewton(saltresids.SALTResids):
 		super().__init__(guess,datadict,parlist,**kwargs)
 		self.lsqfit = False
 		
-		self.GN_iter = {'all':1,'all-grouped':1,'x0':1,'x1':1,'component0':1,'piecewisecomponents':1,'piecewisecomponent0':1,'piecewisecomponent1':1,
-						'component1':1,'color':2,'colorlaw':2,'spectralrecalibration':2,
-						'spectralrecalibration_norm':2,'spectralrecalibration_poly':2,
+		self.GN_iter = {'all':1,'components':1,'all-grouped':1,'x0':1,'x1':1,'component0':1,'piecewisecomponents':1,'piecewisecomponent0':1,'piecewisecomponent1':1,
+						'component1':1,'color':1,'colorlaw':1,'spectralrecalibration':1,
+						'spectralrecalibration_norm':1,'spectralrecalibration_poly':1,
 					    'tpk':1,'modelerr':1}
 
 		self._robustify = False
@@ -452,7 +452,7 @@ class GaussNewton(saltresids.SALTResids):
 
 		self.tryFittingAllParams=True
 		fitlist = [('all parameters','all'),('all parameters grouped','all-grouped'),
-				   (" x0",'x0'),('component 0 piecewise','piecewisecomponent0'),('principal component 0','component0'),('x1','x1'),
+				   (" x0",'x0'),('both components','components'),('component 0 piecewise','piecewisecomponent0'),('principal component 0','component0'),('x1','x1'),
 				   ('component 1 piecewise','piecewisecomponent1'),('principal component 1','component1'),('color','color'),('color law','colorlaw'),
 				   ('spectral recalibration const.','spectralrecalibration_norm'),('all spectral recalibration','spectralrecalibration'),
 				   ('spectral recalibration higher orders','spectralrecalibration_poly'),
@@ -500,11 +500,11 @@ class GaussNewton(saltresids.SALTResids):
 		self.fitlist = [('all'),#('all parameters grouped','all-grouped'),
 			#('piecewise both components','piecewisecomponents'),
 			('x0'),('component0'),
+			('component1'),('x1'),
 			('color'),('colorlaw'),
-			('x1'),('component1'),
 			('spectralrecalibration'),
 			
-			('tpk'),('modelerr')]
+			('tpk')]
 
 	def convergence_loop(self,guess,loop_niter=3):
 		lastResid = 1e20
@@ -528,12 +528,19 @@ class GaussNewton(saltresids.SALTResids):
 		log.info('Estimating supernova parameters x0,x1,c and spectral normalization')
 		for fit in ['x0','spectralrecalibration_norm','color','x1']:
 			X,chi2_init=self.process_fit(X,self.fitOptions[fit][1],uncertainties.copy(),fit=fit)
-		self.printChi2Contributions(X,uncertainties.copy())
+		chi2results=self.getChi2Contributions(X,uncertainties.copy())
+		for name,chi2component,dof in chi2results:
+			log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/chi2_init*100))
+
 		log.info('starting loop; %i iterations'%loop_niter)
 		for superloop in range(loop_niter):
 			try:
 				X,chi2,converged = self.robust_process_fit(X,uncertainties.copy(),chi2_init,superloop)
-				self.printChi2Contributions(X,uncertainties.copy())
+				chi2results=self.getChi2Contributions(X,uncertainties.copy())
+				for name,chi2component,dof in chi2results:
+					log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/chi2*100))
+					if name.lower()=='photometric':
+						photochi2perdof=chi2component/dof
 				if chi2_init-chi2 < -1.e-6:
 					log.warning("MESSAGE WARNING chi2 has increased")
 				elif np.abs(chi2_init-chi2) < self.chi2_diff_cutoff:
@@ -543,10 +550,11 @@ class GaussNewton(saltresids.SALTResids):
 					stepsizes = self.getstepsizes(X,Xlast)
 					return xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 						modelerr,clpars,clerr,clscat,SNParams,stepsizes
-				if self.fit_model_err and (superloop % 3 ==2 or superloop+1==loop_niter):
+				if self.fit_model_err and photochi2perdof<60:
 					log.info('Optimizing model error')
 					X,loglike=self.minuitOptimize(X,'modelerr')
-					uncertainties=self.getFixedUncertainties(X)
+					residuals = self.lsqwrap(X,storedResults)
+					uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
 
 				log.info('finished iteration %i, chi2 improved by %.1f'%(superloop+1,chi2_init-chi2))
 				if converged:
@@ -598,7 +606,7 @@ class GaussNewton(saltresids.SALTResids):
 		kwargs.update({'limit_'+params[i]: (0,100) for i in np.where(self.parlist[includePars] == 'modelerr_0')[0]})
 		kwargs.update({'limit_'+params[i]: (0,100) for i in np.where(self.parlist[includePars] == 'modelerr_1')[0]})
 		m=Minuit(fn,use_array_call=True,forced_parameters=params,grad=grad,errordef=1,**kwargs)
-		result,paramResults=m.migrad(1200)
+		result,paramResults=m.migrad(includePars.sum()*6)
 		X=X.copy()
 		
 		X[includePars]=np.array([x.value for x  in paramResults])
@@ -621,7 +629,7 @@ class GaussNewton(saltresids.SALTResids):
 		#import pdb; pdb.set_trace()
 		return stepsizes
 		
-	def printChi2Contributions(self,guess,storedResults):
+	def getChi2Contributions(self,guess,storedResults):
 		if self.n_colorpars:
 			if not 'colorLaw' in storedResults:
 				storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, guess[self.parlist == 'cl'])(self.wave)
@@ -670,9 +678,7 @@ class GaussNewton(saltresids.SALTResids):
 		for name,x in [('Photometric',photresids),('Spectroscopic',specresids),('Prior',priorResids)]:
 			x=np.concatenate(x)
 			chi2Results+=[(name,(x**2).sum(),x.size)]
-		totalChi2=sum([x[1] for x in chi2Results])
-		for name,chi2,dof in chi2Results:
-			log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2/dof,chi2/totalChi2*100))
+		return chi2Results
 	
 	def lsqwrap(self,guess,storedResults,varyParams=None,doPriors=True):
 		if varyParams is None:

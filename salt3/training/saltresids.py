@@ -1440,7 +1440,8 @@ class SALTResids:
 		self.plotEffectivePoints([-12.5,0.5,16.5,26],'neff.png')
 		#import pdb; pdb.set_trace()
 		self.plotEffectivePoints(None,'neff-heatmap.png')
-		self.neff=self.neffRaw
+		self.neff=self.neffRaw.copy()
+		#import pdb;pdb.set_trace()
 		self.neff[self.neff>self.neffMax]=np.inf		
 		self.neff/=self.neffMax
 		self.neff=np.clip(self.neff,self.neffFloor,None)
@@ -1528,8 +1529,12 @@ class SALTResids:
 			dnumerator=( self.regularizationDerivs[1][:,:,varyParams[indices]]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2][:,:,varyParams[indices]]* dfluxdphase[i][:,:,np.newaxis] - self.regularizationDerivs[3][:,:,varyParams[indices]]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0][:,:,varyParams[indices]]* d2fluxdphasedwave[i][:,:,np.newaxis] )			
 			resids += [normalization* (numerator / (scale[i]**2 * self.neff)).flatten()]
 			jacobian=np.zeros((resids[-1].size,varyParams.sum()))
+			
 			if boolIndex[varyParams].any():
 				jacobian[:,boolIndex[varyParams]]=((dnumerator*(scale[i]**2 )- scaleDeriv[i][np.newaxis,np.newaxis,varyParams[indices]]*2*scale[i]*numerator[:,:,np.newaxis])/self.neff[:,:,np.newaxis]*normalization / scale[i]**4  ).reshape(-1, varyParams[indices].sum())
+			if i==1:
+				resids*=10
+				jacobian*=10
 			jac += [jacobian]
 
 		return resids,jac
