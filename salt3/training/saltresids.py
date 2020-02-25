@@ -1532,9 +1532,6 @@ class SALTResids:
 			
 			if boolIndex[varyParams].any():
 				jacobian[:,boolIndex[varyParams]]=((dnumerator*(scale[i]**2 )- scaleDeriv[i][np.newaxis,np.newaxis,varyParams[indices]]*2*scale[i]*numerator[:,:,np.newaxis])/self.neff[:,:,np.newaxis]*normalization / scale[i]**4  ).reshape(-1, varyParams[indices].sum())
-			if i==1:
-				resids*=10
-				jacobian*=10
 			jac += [jacobian]
 
 		return resids,jac

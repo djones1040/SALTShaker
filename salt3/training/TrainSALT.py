@@ -36,6 +36,7 @@ import pylab as plt
 from salt3.validation import ValidateLightcurves
 from salt3.validation import ValidateSpectra
 from salt3.validation import ValidateModel
+from salt3.validation import CheckSALTParams
 from salt3.validation.figs import plotSALTModel
 from salt3.util.synphot import synphot
 from salt3.initfiles import init_rootdir as salt2dir
@@ -366,6 +367,17 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		plotSALTModel.mkModelPlot(outputdir,outfile='%s/SALTmodelcomp.pdf'%outputdir,
 								  xlimits=[self.options.waverange[0],self.options.waverange[1]])
 
+		snfiles_tot = np.array([])
+		for j,snlist in enumerate(self.options.snlists.split(',')):
+			snlist = os.path.expandvars(snlist)
+			snfiles = np.genfromtxt(snlist,dtype='str')
+			snfiles = np.atleast_1d(snfiles)
+			snfiles_tot = np.append(snfiles_tot,snfiles)
+		parlist,parameters = np.genfromtxt(
+			'%s/salt3_parameters.dat'%outputdir,unpack=True,dtype=str,skip_header=1)
+		parameters = parameters.astype(float)
+		CheckSALTParams.checkSALT(parameters,parlist,snfiles_tot,snlist,outputdir)
+		
 		# kcor files
 		kcordict = {}
 		for k in self.kcordict.keys():
@@ -443,7 +455,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 
 			tlc = time()
-			for l in snfiles:
+			for l in snfiles[0:2]:
 				if not i % 9:
 					fig = plt.figure()
 				try:
