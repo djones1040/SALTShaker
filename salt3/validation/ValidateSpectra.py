@@ -130,7 +130,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 				ax = plt.subplot(3,1,axcount % 3 + 1)
 			
 				if len(coeffs): ax.plot(restwave,modelflux,'r-',label='recalibrated model spectrum for z = %.3f, $x_1$ = %.3f'%(
-						snPars['z'],snPars['x1'])
+						snPars['z'],snPars['x1']))
 				ax.plot(restwave,specdata[k]['flux'],'b-',label='%s spectral data, phase = %.1f'%(sn,specdata[k]['tobs']-snPars['t0']))
 				ax.plot(restwave,unncalledModel,'g-',label='SALT3 Model spectrum\n(no calibration)')
 				ax.set_xlim(restwave.min(),restwave.max())
