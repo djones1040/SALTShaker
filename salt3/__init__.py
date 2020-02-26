@@ -1,5 +1,16 @@
 from . import *
+import logging
 
+logging.captureWarnings(True)
+for logName in ['py.warnings','salt3.default']:
+	logger=logging.getLogger(logName)
+	logger.setLevel(logging.INFO)
+	noFrills=logging.Formatter('%(message)s')
+	console=logging.StreamHandler()
+	console.setLevel(logging.INFO)
+	console.setFormatter(noFrills)
+	logger.addHandler(console)
+	
 def test(package=None, test_path=None, args=None, plugins=None,
          verbose=False, pastebin=None, remote_data=False, pep8=False,
          pdb=False, coverage=False, open_files=False, **kwargs):

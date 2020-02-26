@@ -2,7 +2,8 @@
 #import pysynphot
 import numpy as np
 from sncosmo.constants import HC_ERG_AA
-
+import logging
+log=logging.getLogger(__name__)
 def synphot(wave,flux,zpoff=0,filtfile=None,primarywave=[],primaryflux=[],
 			filtwave=[],filttp=[],
 			plot=False,oplot=False,allowneg=False):
@@ -38,17 +39,17 @@ def synflux(x,spc,pb=None,plot=False,oplot=False,allowneg=False,pbx=[],pby=[]):
 		
 	npbx = len(pbx)
 	if (len(pby) != npbx):
-		print(' pbs.wavelength and pbs.response have different sizes')
+		log.warning(' pbs.wavelength and pbs.response have different sizes')
 
 	if nx == 1 or npbx == 1:
-		print('warning! 1-element array passed, returning 0')
+		log.warning('warning! 1-element array passed, returning 0')
 		return(spc[0]-spc[0])
 
 	diffx = x[1:nx]-x[0:nx-1]
 	diffp = pbx[1:npbx]-pbx[0:npbx-1]
 
 	if (np.min(diffx) <= 0) or (np.min(diffp) <= 0):
-		print('passed non-increasing wavelength array')
+		log.warning('passed non-increasing wavelength array')
 
 	#if x[0] > pbx[0]:
 	#	print("spectrum doesn''t go blue enough for passband!")

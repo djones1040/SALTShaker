@@ -3,6 +3,9 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.optimize import least_squares
 
+import logging
+log=logging.getLogger(__name__)
+
 def bazin(time, A, B, t0, tfall, trise):
 	X = np.exp(-(time - t0) / tfall) / (1 + np.exp((time - t0) / trise))
 	return A * X + B

@@ -2,12 +2,14 @@
 # D. Jones, R. Kessler - 8/31/18
 from __future__ import print_function
 
-import os
 import argparse
 import configparser
 import numpy as np
 import sys
 import multiprocessing
+
+import os
+from os import path
 
 from scipy.linalg import lstsq
 from scipy.optimize import minimize, least_squares, differential_evolution
@@ -34,10 +36,15 @@ import pylab as plt
 from salt3.validation import ValidateLightcurves
 from salt3.validation import ValidateSpectra
 from salt3.validation import ValidateModel
+from salt3.validation import CheckSALTParams
 from salt3.validation.figs import plotSALTModel
 from salt3.util.synphot import synphot
 from salt3.initfiles import init_rootdir as salt2dir
 from time import time
+
+import logging
+log=logging.getLogger(__name__)
+
 
 class TrainSALT(TrainSALTBase):
 	def __init__(self):
@@ -120,49 +127,59 @@ class TrainSALT(TrainSALTBase):
 		# initial guesses
 		n_params=parlist.size
 		guess = np.zeros(parlist.size)
-		m0knots[m0knots == 0] = 1e-4
-		guess[parlist == 'm0'] = m0knots
-		for i in range(3): guess[parlist == 'modelerr_{}'.format(i)] = 1e-6 
-		if self.options.n_components == 2:
-			guess[parlist == 'm1'] = m1knots
-		if self.options.n_colorpars:
-			guess[parlist == 'cl'] = [0.]*self.options.n_colorpars #[-0.504294, 0.787691, -0.461715, 0.0815619]
-		if self.options.n_colorscatpars:
-			guess[parlist == 'clscat'] = [1e-6]*self.options.n_colorscatpars
-			guess[np.where(parlist == 'clscat')[0][-1]]=-10
-		guess[(parlist == 'm0') & (guess < 0)] = 1e-4
-
-		i=0
-		for k in datadict.keys():
-			guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36-10.635))
-			i+=1
-		if self.options.specrecal:
-			for sn in datadict.keys():
-				specdata=datadict[sn]['specdata']
-				photdata=datadict[sn]['photdata']
-				for k in specdata.keys():
-					init_scale,colordiffs = getScaleForSN(specdata[k],photdata,self.kcordict,datadict[sn]['survey'])
-					guess[np.where(parlist == 'specrecal_{}_{}'.format(sn,k))[0][-1]] = init_scale+np.log(guess[parlist == 'x0_%s'%sn][0])
 
 		if self.options.resume_from_outputdir:
-			try:
-				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.resume_from_outputdir,unpack=True,skiprows=1,dtype="U30,f8")
-			except:
-				names,pars = np.loadtxt('%s/salt3_parameters.dat'%self.options.outputdir,unpack=True,skiprows=1,dtype="U30,f8")
+			names=None
+			for possibleDir in [self.options.resume_from_outputdir,self.options.outputdir]:
+				for possibleFile in ['salt3_parameters_unscaled.dat','salt3_parameters.dat']:	
+					if names is None:
+						try:
+							names,pars = np.loadtxt(path.join(possibleDir,possibleFile),unpack=True,skiprows=1,dtype="U30,f8")
+							break
+						except:
+							continue
+						
 			for key in np.unique(parlist):
 				try:
 					#if 'specrecal' not in key: 
 					guess[parlist == key] = pars[names == key]
 					
 				except:
-					print ('Problem while initializing parameter ',key,' from previous training')
+					log.critical('Problem while initializing parameter ',key,' from previous training')
 					import pdb;pdb.set_trace()
 					sys.exit(1)
 					
+
+		else:
+			m0knots[m0knots == 0] = 1e-4
+			guess[parlist == 'm0'] = m0knots
+			for i in range(3): guess[parlist == 'modelerr_{}'.format(i)] = 1e-6 
+			if self.options.n_components == 2:
+				guess[parlist == 'm1'] = m1knots
+			if self.options.n_colorpars:
+				guess[parlist == 'cl'] = [0.]*self.options.n_colorpars
+			if self.options.n_colorscatpars:
+				guess[parlist == 'clscat'] = [1e-6]*self.options.n_colorscatpars
+				guess[np.where(parlist == 'clscat')[0][-1]]=-30
+			guess[(parlist == 'm0') & (guess < 0)] = 1e-4
+
+			i=0
+			for k in datadict.keys():
+				guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36-10.635))
+				i+=1
+			if self.options.specrecal:
+				for sn in datadict.keys():
+					specdata=datadict[sn]['specdata']
+					photdata=datadict[sn]['photdata']
+					for k in specdata.keys():
+						init_scale,colordiffs = getScaleForSN(specdata[k],photdata,self.kcordict,datadict[sn]['survey'])
+						guess[np.where(parlist == 'specrecal_{}_{}'.format(sn,k))[0][-1]] = init_scale
+
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
 	def fitSALTModel(self,datadict):
 		parlist,x_modelpars,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc = self.initialParameters(datadict)
+
 		saltfitkwargs = self.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
 		n_phaseknots,n_waveknots = len(phaseknotloc)-4,len(waveknotloc)-4
 		n_errphaseknots,n_errwaveknots = len(errphaseknotloc)-4,len(errwaveknotloc)-4
@@ -170,14 +187,14 @@ class TrainSALT(TrainSALTBase):
 		fitter = fitting(self.options.n_components,self.options.n_colorpars,
 						 n_phaseknots,n_waveknots,
 						 datadict)
-		print('training on %i SNe!'%len(datadict.keys()))
+		log.info('training on %i SNe!'%len(datadict.keys()))
 		for i in range(self.options.n_repeat):
 			if i == 0: laststepsize = None
 			
 			if self.options.do_mcmc:
 				saltfitkwargs['regularize'] = False
 				saltfitter = saltfit.mcmc(x_modelpars,datadict,parlist,**saltfitkwargs)
-				print('initial loglike: %.1f'%saltfitter.maxlikefit(x_modelpars,{},np.zeros(len(x_modelpars),dtype=bool)))
+				log.info('initial loglike: %.1f'%saltfitter.maxlikefit(x_modelpars,{},np.zeros(len(x_modelpars),dtype=bool)))
 				# do the fitting
 				x_modelpars,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 					modelerr,clpars,clerr,clscat,SNParams,message = fitter.mcmc(
@@ -189,7 +206,7 @@ class TrainSALT(TrainSALTBase):
 				saltfitkwargs['regularize'] = self.options.regularize
 				saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)			
 				# do the fitting
-				x_modelpars,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+				x_modelpars,x_unscaled,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 					modelerr,clpars,clerr,clscat,SNParams,laststepsize,message = fitter.gaussnewton(
 						saltfitter,x_modelpars,self.options.n_processes,
 						self.options.n_steps_mcmc,self.options.n_burnin_mcmc,
@@ -201,12 +218,12 @@ class TrainSALT(TrainSALTBase):
 				except:
 					SNParams[k]['t0'] = -99
 		
-		print('MCMC message: %s'%message)
+		log.info('MCMC message: %s'%message)
 		#print('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
 		#	  saltfitter.regularizationChi2(x_modelpars,0,1,0),saltfitter.regularizationChi2(x_modelpars,0,0,1))
-		print('Final loglike'); saltfitter.maxlikefit(x_modelpars)
+		log.info('Final loglike'); saltfitter.maxlikefit(x_unscaled)
 
-		print(x_modelpars.size)
+		log.info(x_modelpars.size)
 
 
 		#print('Finishing...To write files, hit c')
@@ -218,12 +235,12 @@ class TrainSALT(TrainSALTBase):
 		else: chain,loglikes = None,None
 
 		return phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-			modelerr,clpars,clerr,clscat,SNParams,x_modelpars,parlist,chain,loglikes
+			modelerr,clpars,clerr,clscat,SNParams,x_modelpars,x_unscaled,parlist,chain,loglikes
 
 	def wrtoutput(self,outdir,phase,wave,
 				  M0,M0err,M1,M1err,cov_M0_M1,
 				  modelerr,clpars,
-				  clerr,clscat,SNParams,pars,parlist,chain,loglikes):
+				  clerr,clscat,SNParams,pars,pars_unscaled,parlist,chain,loglikes):
 		if not os.path.exists(outdir):
 			raise RuntimeError('desired output directory %s doesn\'t exist'%outdir)
 
@@ -232,6 +249,12 @@ class TrainSALT(TrainSALTBase):
 		with  open('{}/salt3_parameters.dat'.format(outdir),'w') as foutpars:
 			foutpars.write('{: <30} {}\n'.format('Parameter Name','Value'))
 			for name,par in zip(parlist,pars):
+
+				foutpars.write('{: <30} {:.15e}\n'.format(name,par))
+
+		with  open('{}/salt3_parameters_unscaled.dat'.format(outdir),'w') as foutpars:
+			foutpars.write('{: <30} {}\n'.format('Parameter Name','Value'))
+			for name,par in zip(parlist,pars_unscaled):
 
 				foutpars.write('{: <30} {:.15e}\n'.format(name,par))
 		
@@ -289,7 +312,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		for snlist in self.options.snlists.split(','):
 			snlist = os.path.expandvars(snlist)
 			if not os.path.exists(snlist):
-				print('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
+				log.warning('SN list file %s does not exist.    Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
 				snlist = '%s/trainingdata/%s'%(data_rootdir,snlist)
 				if not os.path.exists(snlist):
 					raise RuntimeError('SN list file %s does not exist'%snlist)
@@ -326,7 +349,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			
 		return
 
-	def validate(self,outputdir):
+	def validate(self,outputdir,datadict):
 
 		# prelims
 		plt.subplots_adjust(left=None, bottom=None, right=None, top=0.85, wspace=0.025, hspace=0)
@@ -344,6 +367,17 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		plotSALTModel.mkModelPlot(outputdir,outfile='%s/SALTmodelcomp.pdf'%outputdir,
 								  xlimits=[self.options.waverange[0],self.options.waverange[1]])
 
+		snfiles_tot = np.array([])
+		for j,snlist in enumerate(self.options.snlists.split(',')):
+			snlist = os.path.expandvars(snlist)
+			snfiles = np.genfromtxt(snlist,dtype='str')
+			snfiles = np.atleast_1d(snfiles)
+			snfiles_tot = np.append(snfiles_tot,snfiles)
+		parlist,parameters = np.genfromtxt(
+			'%s/salt3_parameters.dat'%outputdir,unpack=True,dtype=str,skip_header=1)
+		parameters = parameters.astype(float)
+		CheckSALTParams.checkSALT(parameters,parlist,snfiles_tot,snlist,outputdir)
+		
 		# kcor files
 		kcordict = {}
 		for k in self.kcordict.keys():
@@ -408,7 +442,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			if self.options.dospec:
 				ValidateSpectra.compareSpectra(
 					snlist,self.options.outputdir,specfile='%s/speccomp_%i.pdf'%(self.options.outputdir,j),
-					maxspec=50,base=self,verbose=self.verbose)
+					maxspec=50,base=self,verbose=self.verbose,datadict=datadict)
 			print('plotting spectra took %.1f'%(time()-tspec))
 				
 			snfiles = np.genfromtxt(snlist,dtype='str')
@@ -421,7 +455,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 
 			tlc = time()
-			for l in snfiles:
+			for l in snfiles[0:2]:
 				if not i % 9:
 					fig = plt.figure()
 				try:
@@ -435,7 +469,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				sn.SNID = str(sn.SNID)
 
 				if sn.SNID not in snid:
-					self.addwarning('sn %s not in output files'%sn.SNID)
+					log.warning('sn %s not in output files'%sn.SNID)
 					continue
 				x0sn,x1sn,csn,t0sn = \
 					x0[snid == sn.SNID][0],x1[snid == sn.SNID][0],\
@@ -460,44 +494,45 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		if not i %9 ==0:
 			pdf_pages.savefig()
 		pdf_pages.close()
-		print('plotting light curves took %.1f'%(time()-tlc))
+		log.info('plotting light curves took %.1f'%(time()-tlc))
 		
 	def main(self):
 
 		if not len(self.surveylist):
 			raise RuntimeError('surveys are not defined - see documentation')
-		self.kcordict=readutils.rdkcor(self.surveylist,self.options,addwarning=self.addwarning)
+		self.kcordict=readutils.rdkcor(self.surveylist,self.options)
 		# TODO: ASCII filter files
 				
 		if not os.path.exists(self.options.outputdir):
 			os.makedirs(self.options.outputdir)
+		if self.options.binspec:
+			binspecres = self.options.binspecres
+		else:
+			binspecres = None
+
+		datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,self.kcordict,
+									   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
+									   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
+									   binspecres=binspecres)
+		datadict = self.mkcuts(datadict,KeepOnlySpec=self.options.keeponlyspec)
 
 		
 		# fit the model - initial pass
 		if self.options.stage == "all" or self.options.stage == "train":
 			# read the data
-			if self.options.binspec:
-				binspecres = self.options.binspecres
-			else:
-				binspecres = None
 				
-			datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,self.kcordict,
-										   self.addwarning,dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
-										   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
-										   binspecres=binspecres)
-			datadict = self.mkcuts(datadict,KeepOnlySpec=self.options.keeponlyspec)
 
 			phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-				modelerr,clpars,clerr,clscat,SNParams,pars,parlist,chain,loglikes = self.fitSALTModel(datadict)
+				modelerr,clpars,clerr,clscat,SNParams,pars,pars_unscaled,parlist,chain,loglikes = self.fitSALTModel(datadict)
 		
 			# write the output model - M0, M1, c
 			self.wrtoutput(self.options.outputdir,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,
 						   modelerr,clpars,clerr,clscat,SNParams,
-						   pars,parlist,chain,loglikes)
+						   pars,pars_unscaled,parlist,chain,loglikes)
 
 		if self.options.stage == "all" or self.options.stage == "validate":
-			self.validate(self.options.outputdir)
+			self.validate(self.options.outputdir,datadict)
 		
-		print('successful SALT2 training!  Output files written to %s'%self.options.outputdir)
+		log.info('successful SALT2 training!  Output files written to %s'%self.options.outputdir)
 		
 	
