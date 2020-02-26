@@ -7,6 +7,8 @@ import argparse
 import os
 import shlex
 import random
+import logging
+log=logging.getLogger(__name__)
 
 def _MyPipe(mypipe):
     # Write your own pipeline in a separate file  

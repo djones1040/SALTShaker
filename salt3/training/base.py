@@ -5,6 +5,9 @@ import numpy as np
 from salt3.config import config_rootdir
 from salt3.util.specSynPhot import getColorsForSN
 
+import logging
+log=logging.getLogger(__name__)
+
 def boolean_string(s):
 	if s not in {'False', 'True', 'false', 'true', '1', '0'}:
 		raise ValueError('Not a valid boolean string')
@@ -17,12 +20,8 @@ def nonetype_or_int(s):
 
 class TrainSALTBase:
 	def __init__(self):
-		self.warnings = []
 		self.verbose = False
 		
-	def addwarning(self,warning):
-		if self.verbose: print(warning)
-		self.warnings.append(warning)
 
 	def add_user_options(self, parser=None, usage=None, config=None):
 		if parser == None:
@@ -42,6 +41,8 @@ class TrainSALTBase:
 
 		
 		# input/output files
+		parser.add_argument('--loggingconfig', default=config.get('iodata','loggingconfig'), type=str,
+							help='logging config file')
 		parser.add_argument('--trainingconfig', default=config.get('iodata','trainingconfig'), type=str,
 							help='training config file')
 		parser.add_argument('--snlists', default=config.get('iodata','snlists'), type=str,
@@ -85,6 +86,8 @@ class TrainSALTBase:
 							help='repeat mcmc and/or gauss newton n times (default=%default)')
 		parser.add_argument('--fit_model_err', default=config.get('trainparams','fit_model_err'), type=boolean_string,
 							help='fit for model error if set (default=%default)')
+		parser.add_argument('--fit_tpkoff', default=config.get('trainparams','fit_tpkoff'), type=boolean_string,
+							help='fit for time of max in B-band if set (default=%default)')
 		parser.add_argument('--condition_number', default=config.get('trainparams','condition_number'), type=float,
 							help='Largest singular value not set to zero for least-squares solver (default=%default)')
 
@@ -136,7 +139,12 @@ class TrainSALTBase:
 							help='Number of additional spectral recalibration orders per lightcurve (default=%default)')
 		parser.add_argument('--regularizationScaleMethod', default=config.get('trainingparams','regularizationScaleMethod'), type=str,
 							help='Choose how scale for regularization is calculated (default=%default)')
-    
+		parser.add_argument('--binspec', default=config.get('trainingparams','binspec'), type=boolean_string,
+							help='bin the spectra if set (default=%default)')
+		parser.add_argument('--binspecres', default=config.get('trainingparams','binspecres'), type=int,
+							help='binning resolution (default=%default)')
+
+		
    		#neff parameters
 		parser.add_argument('--wavesmoothingneff', default=config.get('trainingparams','wavesmoothingneff'), type=float,
 							help='Smooth effective # of spectral points along wave axis (in units of waveoutres) (default=%default)')
@@ -278,7 +286,8 @@ class TrainSALTBase:
 						 'use_lsqfit':self.options.use_lsqfit,
 						 'regularize':self.options.regularize,
 						 'outputdir':self.options.outputdir,
-						 'fit_model_err':self.options.fit_model_err}
+						 'fit_model_err':self.options.fit_model_err,
+						 'fitTpkOff':self.options.fit_tpkoff}
 		for k in self.options.__dict__.keys():
 			if k.startswith('prior') or k.startswith('bound'):
 				saltfitkwargs[k] = self.options.__dict__[k]
@@ -291,7 +300,7 @@ class TrainSALTBase:
 		numPhotElimmed,numPhot=0,0
 		numSpecPoints=0
 		failedlist = []
-		print('hack! no spec color cut')
+		log.info('hack! no spec color cut')
 		for sn in list(datadict.keys()):
 			photdata = datadict[sn]['photdata']
 			specdata = datadict[sn]['specdata']
@@ -311,9 +320,8 @@ class TrainSALTBase:
 			if len(iEpochsCut) < 4 or not len(iPkCut) or not len(iShapeCut) or NFiltColorCut < 2:
 				datadict.pop(sn)
 				failedlist += [sn]
-				#print('SN %s fails cuts'%sn)
-				if self.verbose:
-					print('%i epochs, %i epochs near peak, %i epochs post-peak, %i filters near peak'%(
+				log.debug('SN %s fails cuts'%sn)
+				log.debug('%i epochs, %i epochs near peak, %i epochs post-peak, %i filters near peak'%(
 						len(iEpochsCut),len(iPkCut),len(iShapeCut),NFiltColorCut))
 				continue
 
@@ -371,8 +379,8 @@ class TrainSALTBase:
 			for i,sn in enumerate(list(datadict.keys())):
 				if i >= self.options.maxsn:
 					datadict.pop(sn)
-		print('{} spectra and {} photometric observations removed for being outside phase range'.format(numSpecElimmed,numPhotElimmed))
-		print('{} spectra and {} photometric observations remaining'.format(numSpec,numPhot))
-		print('{} total spectroscopic data points'.format(numSpecPoints))
-		print('Total number of supernovae: {}'.format(len(datadict)))
+		log.info('{} spectra and {} photometric observations removed for being outside phase range'.format(numSpecElimmed,numPhotElimmed))
+		log.info('{} spectra and {} photometric observations remaining'.format(numSpec,numPhot))
+		log.info('{} total spectroscopic data points'.format(numSpecPoints))
+		log.info('Total number of supernovae: {}'.format(len(datadict)))
 		return datadict

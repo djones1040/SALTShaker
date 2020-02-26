@@ -8,6 +8,9 @@ from scipy.interpolate import interp1d, interp2d
 from sncosmo.salt2utils import SALT2ColorLaw
 from salt3.initfiles import init_rootdir
 from argparse import ArgumentParser
+import logging
+log=logging.getLogger(__name__)
+
 def mkModelPlot(salt3dir='modelfiles/salt3',
 				xlimits=[2000,9200],outfile=None,plotErr=True):
 	
@@ -19,14 +22,26 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 	ax2 = plt.subplot(312)
 	ax3 = plt.subplot(313)
 
-	salt3m0phase,salt3m0wave,salt3m0flux = \
-		np.loadtxt('%s/salt3_template_0.dat'%salt3dir,unpack=True)
-	salt3m1phase,salt3m1wave,salt3m1flux = \
-		np.loadtxt('%s/salt3_template_1.dat'%salt3dir,unpack=True)
-	salt3m0errphase,salt3m0errwave,salt3m0fluxerr = \
-		np.loadtxt('%s/salt3_lc_relative_variance_0.dat'%salt3dir,unpack=True)
-	salt3m1errphase,salt3m1errwave,salt3m1fluxerr = \
-		np.loadtxt('%s/salt3_lc_relative_variance_1.dat'%salt3dir,unpack=True)
+	try:
+		salt3m0phase,salt3m0wave,salt3m0flux = \
+			np.loadtxt('%s/salt3_template_0.dat'%salt3dir,unpack=True)
+		salt3m1phase,salt3m1wave,salt3m1flux = \
+			np.loadtxt('%s/salt3_template_1.dat'%salt3dir,unpack=True)
+		salt3m0errphase,salt3m0errwave,salt3m0fluxerr = \
+			np.loadtxt('%s/salt3_lc_relative_variance_0.dat'%salt3dir,unpack=True)
+		salt3m1errphase,salt3m1errwave,salt3m1fluxerr = \
+			np.loadtxt('%s/salt3_lc_relative_variance_1.dat'%salt3dir,unpack=True)
+	except:
+		salt3m0phase,salt3m0wave,salt3m0flux = \
+			np.loadtxt('%s/salt2_template_0.dat'%salt3dir,unpack=True)
+		salt3m1phase,salt3m1wave,salt3m1flux = \
+			np.loadtxt('%s/salt2_template_1.dat'%salt3dir,unpack=True)
+		salt3m0errphase,salt3m0errwave,salt3m0fluxerr = salt3m0phase[:],salt3m0wave[:],np.zeros(np.shape(salt3m0phase))
+		salt3m1errphase,salt3m1errwave,salt3m1fluxerr = salt3m1phase[:],salt3m1wave[:],np.zeros(np.shape(salt3m1phase))
+		#salt3m0errphase,salt3m0errwave,salt3m0fluxerr = \
+		#	np.loadtxt('%s/salt2_lc_relative_variance_0.dat'%salt3dir,unpack=True)
+		#salt3m1errphase,salt3m1errwave,salt3m1fluxerr = \
+		#	np.loadtxt('%s/salt2_lc_relative_variance_1.dat'%salt3dir,unpack=True)
 
 	salt2m0phase,salt2m0wave,salt2m0flux = \
 		np.loadtxt('%s/salt2_template_0.dat'%init_rootdir,unpack=True)
@@ -43,9 +58,9 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 	salt2m1fluxerr = salt2m1fluxerr.reshape([len(np.unique(salt2m1errphase)),len(np.unique(salt2m1errwave))])
 	
 	salt3m0flux = salt3m0flux.reshape([len(np.unique(salt3m0phase)),len(np.unique(salt3m0wave))])
-	salt3m0fluxerr = salt3m0fluxerr.reshape([len(np.unique(salt3m0errphase)),len(np.unique(salt3m0errwave))])
+	salt3m0fluxerr = salt3m0fluxerr.reshape([len(np.unique(salt3m0phase)),len(np.unique(salt3m0wave))])
 	salt3m1flux = salt3m1flux.reshape([len(np.unique(salt3m1phase)),len(np.unique(salt3m1wave))])
-	salt3m1fluxerr = salt3m1fluxerr.reshape([len(np.unique(salt3m1errphase)),len(np.unique(salt3m1errwave))])
+	salt3m1fluxerr = salt3m1fluxerr.reshape([len(np.unique(salt3m1phase)),len(np.unique(salt3m1wave))])
 	#print('hack!')
 	#salt3m1flux *=-1
 
@@ -80,7 +95,7 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 	maxSalt2 = interp1d(salt2m1phase,salt2m1flux,axis=0)(40)
 	maxSalt3 = interp1d(salt3m1phase,salt3m1flux,axis=0)(40)
 	sgn=np.sign(maxSalt3.sum())*np.sign(maxSalt2.sum())
-	salt3m1flux*=-sgn
+	salt3m1flux*=sgn
 	spacing = 0.5
 	for plotphase,i,plotphasestr in zip([-5,0,10],range(3),['-5','+0','+10']):
 		int_salt2m0 = interp2d(salt2m0wave,salt2m0phase,salt2m0flux)
