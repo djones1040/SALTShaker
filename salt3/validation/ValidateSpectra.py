@@ -113,13 +113,15 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 		model.update(snPars)
 		#import pdb; pdb.set_trace()
 		for k in specdata.keys():
+			model.update({'x0':pars[parlist==f'specx0_{sn}_{k}'][0]})
 			if 'hi': #try:
-				coeffs=pars[parlist=='specrecal_{}_{}'.format(sn,k)]
-				pow=coeffs.size-1-np.arange(coeffs.size)
-				coeffs/=factorial(pow)
 				wave=specdata[k]['wavelength']
 				restwave=wave/(1+snPars['z'])
-				recalexp=np.exp(np.poly1d(coeffs)((wave-np.mean(wave))/2500))
+				coeffs=pars[parlist=='specrecal_{}_{}'.format(sn,k)]
+				pow=coeffs.size-np.arange(coeffs.size)
+				recalCoord=(wave-np.mean(wave))/2500
+				drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
+				recalexp=np.exp((drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1))
 				
 				unncalledModel = flux(salt3dir,specdata[k]['tobs']+snPars['t0'],specdata[k]['wavelength'],
 									  snPars['z'],snPars['x0'],snPars['x1'],snPars['c'],mwebv=datadict[sn]['MWEBV'])
