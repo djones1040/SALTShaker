@@ -10,7 +10,8 @@ from sncosmo.salt2utils import SALT2ColorLaw
 from scipy.interpolate import interp1d
 import extinction
 from time import time
-
+import logging;
+log=logging.getLogger(__name__)
 def flux(salt3dir,obsphase,obswave,z,x0,x1,c,mwebv):
 	m0phase,m0wave,m0flux = np.loadtxt('%s/salt3_template_0.dat'%salt3dir,unpack=True)
 	m1phase,m1wave,m1flux = np.loadtxt('%s/salt3_template_1.dat'%salt3dir,unpack=True)
@@ -63,15 +64,17 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 				   lcrv00file='salt3_lc_relative_variance_0.dat',
 				   lcrv11file='salt3_lc_relative_variance_1.dat',
 				   lcrv01file='salt3_lc_relative_covariance_01.dat',
-				   ax=None,maxspec=None,base=None,verbose=False):
+				   ax=None,maxspec=None,base=None,verbose=False,datadict=None):
 
 	plt.close('all')
 	trd = time()
-	if base:
-		datadict=readutils.rdAllData(speclist,False,None,speclist,KeepOnlySpec=True,peakmjdlist=base.options.tmaxlist)
-	else:
-		datadict=readutils.rdAllData(speclist,False,None,speclist,KeepOnlySpec=True,peakmjdlist=None)
-	print('reading data took %.1f seconds'%(time()-trd))
+	if datadict is None:
+		if base:
+			datadict=readutils.rdAllData(speclist,False,None,speclist,KeepOnlySpec=True,peakmjdlist=base.options.tmaxlist)
+		else:
+			datadict=readutils.rdAllData(speclist,False,None,speclist,KeepOnlySpec=True,peakmjdlist=None)
+		print('reading data took %.1f seconds'%(time()-trd))
+	
 	tc = time()
 	if base: datadict = base.mkcuts(datadict,KeepOnlySpec=True)
 	print('making cuts took %.1f seconds'%(time()-tc))
@@ -104,6 +107,9 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 		except:
 			if verbose: print('SN {} is not in parameters, skipping'.format(sn))
 			continue
+# 		if np.abs(snPars['x1'])<2.23: 
+# 			log.warning(f'Skipping {sn} because x1 is not extreme')
+# 			continue
 		model.update(snPars)
 		#import pdb; pdb.set_trace()
 		for k in specdata.keys():
@@ -112,6 +118,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 				pow=coeffs.size-1-np.arange(coeffs.size)
 				coeffs/=factorial(pow)
 				wave=specdata[k]['wavelength']
+				restwave=wave/(1+snPars['z'])
 				recalexp=np.exp(np.poly1d(coeffs)((wave-np.mean(wave))/2500))
 				
 				unncalledModel = flux(salt3dir,specdata[k]['tobs']+snPars['t0'],specdata[k]['wavelength'],
@@ -122,11 +129,11 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 					fig = plt.figure()
 				ax = plt.subplot(3,1,axcount % 3 + 1)
 			
-				if len(coeffs): ax.plot(wave,modelflux,'r-',label='recalibrated model spectrum for z = %.3f, $x_1$ = %.3f'%(
-						snPars['z'],snPars['x1'])
-				ax.plot(wave,specdata[k]['flux'],'b-',label='%s spectral data, phase = %.1f'%(sn,specdata[k]['tobs']-snPars['t0']))
-				ax.plot(wave,unncalledModel,'g-',label='SALT3 Model spectrum\n(no calibration)')
-				ax.set_xlim(wave.min(),wave.max())
+				if len(coeffs): ax.plot(restwave,modelflux,'r-',label='recalibrated model spectrum for z = %.3f, $x_1$ = %.3f'%(
+						snPars['z'],snPars['x1']))
+				ax.plot(restwave,specdata[k]['flux'],'b-',label='%s spectral data, phase = %.1f'%(sn,specdata[k]['tobs']-snPars['t0']))
+				ax.plot(restwave,unncalledModel,'g-',label='SALT3 Model spectrum\n(no calibration)')
+				ax.set_xlim(restwave.min(),restwave.max())
 
 				ax.set_ylim(0,specdata[k]['flux'].max()*1.25)
 				ax.set_xlabel('Wavelength $\AA$')
