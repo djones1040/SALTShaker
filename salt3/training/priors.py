@@ -289,6 +289,7 @@ class SALTPriors:
 		results=[]
 		debugstring='Prior values are '
 		for prior,width in zip(priors,widths):
+			
 			try:
 				priorFunction=self.priors[prior]
 			except:

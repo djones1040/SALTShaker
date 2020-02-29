@@ -458,7 +458,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 
 			tlc = time()
-			for l in snfiles[0:2]:
+			for l in snfiles:
 				if not i % 9:
 					fig = plt.figure()
 				try:
