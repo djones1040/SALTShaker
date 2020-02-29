@@ -64,17 +64,19 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 				   lcrv00file='salt3_lc_relative_variance_0.dat',
 				   lcrv11file='salt3_lc_relative_variance_1.dat',
 				   lcrv01file='salt3_lc_relative_covariance_01.dat',
-				   ax=None,maxspec=None,base=None,verbose=False,datadict=None):
+				   ax=None,maxspec=None,base=None,verbose=False,datadict=None,binspecres=None):
 
 	plt.close('all')
+	plt.rcParams['figure.figsize'] = (12,12)
 	trd = time()
+
 	if datadict is None:
 		if base:
-			datadict=readutils.rdAllData(speclist,False,None,speclist,KeepOnlySpec=True,peakmjdlist=base.options.tmaxlist)
+			datadict=readutils.rdAllData(speclist,False,None,speclist,KeepOnlySpec=True,peakmjdlist=base.options.tmaxlist,binspecres=binspecres)
 		else:
-			datadict=readutils.rdAllData(speclist,False,None,speclist,KeepOnlySpec=True,peakmjdlist=None)
+			datadict=readutils.rdAllData(speclist,False,None,speclist,KeepOnlySpec=True,peakmjdlist=None,binspecres=binspecres)
 		print('reading data took %.1f seconds'%(time()-trd))
-	
+		
 	tc = time()
 	if base: datadict = base.mkcuts(datadict,KeepOnlySpec=True)
 	print('making cuts took %.1f seconds'%(time()-tc))
@@ -104,6 +106,8 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 					snPars['t0']=pars[parlist=='tpkoff_{}'.format(sn)][0]
 				else:
 					snPars[par]=pars[parlist== '{}_{}'.format(par,sn)][0]
+				#if par == 'x1': print(sn,snPars['x1'], pars[np.where(parlist== '{}_{}'.format(par,sn))[0]])
+				
 		except:
 			if verbose: print('SN {} is not in parameters, skipping'.format(sn))
 			continue
@@ -117,12 +121,14 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 			if 'hi': #try:
 				wave=specdata[k]['wavelength']
 				restwave=wave/(1+snPars['z'])
+
 				coeffs=pars[parlist=='specrecal_{}_{}'.format(sn,k)]
 				pow=coeffs.size-np.arange(coeffs.size)
 				recalCoord=(wave-np.mean(wave))/2500
 				drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
 				recalexp=np.exp((drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1))
 				
+
 				unncalledModel = flux(salt3dir,specdata[k]['tobs']+snPars['t0'],specdata[k]['wavelength'],
 									  snPars['z'],snPars['x0'],snPars['x1'],snPars['c'],mwebv=datadict[sn]['MWEBV'])
 				modelflux = unncalledModel*recalexp
@@ -131,11 +137,11 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 					fig = plt.figure()
 				ax = plt.subplot(3,1,axcount % 3 + 1)
 			
-				if len(coeffs): ax.plot(restwave,modelflux,'r-',label='recalibrated model spectrum for z = %.3f, $x_1$ = %.3f'%(
+				if len(coeffs): ax.plot(wave,modelflux,'r-',label='recalibrated model spectrum for z = %.3f, $x_1$ = %.3f'%(
 						snPars['z'],snPars['x1']))
-				ax.plot(restwave,specdata[k]['flux'],'b-',label='%s spectral data, phase = %.1f'%(sn,specdata[k]['tobs']-snPars['t0']))
-				ax.plot(restwave,unncalledModel,'g-',label='SALT3 Model spectrum\n(no calibration)')
-				ax.set_xlim(restwave.min(),restwave.max())
+				ax.plot(wave,specdata[k]['flux'],'b-',label='%s spectral data, phase = %.1f'%(sn,specdata[k]['tobs']-snPars['t0']))
+				ax.plot(wave,unncalledModel,'g-',label='SALT3 Model spectrum\n(no calibration)')
+				ax.set_xlim(wave.min(),wave.max())
 
 				ax.set_ylim(0,specdata[k]['flux'].max()*1.25)
 				ax.set_xlabel('Wavelength $\AA$')

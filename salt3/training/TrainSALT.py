@@ -443,10 +443,15 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 			tspec = time()
 			if self.options.dospec:
+				if self.options.binspec:
+					binspecres = self.options.binspecres
+				else:
+					binspecres = None
+
 				ValidateSpectra.compareSpectra(
 					snlist,self.options.outputdir,specfile='%s/speccomp_%i.pdf'%(self.options.outputdir,j),
-					maxspec=50,base=self,verbose=self.verbose,datadict=datadict)
-			print('plotting spectra took %.1f'%(time()-tspec))
+					maxspec=50,base=self,verbose=self.verbose,datadict=datadict,binspecres=binspecres)
+			log.info('plotting spectra took %.1f'%(time()-tspec))
 				
 			snfiles = np.genfromtxt(snlist,dtype='str')
 			snfiles = np.atleast_1d(snfiles)
@@ -458,7 +463,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 
 			tlc = time()
-			for l in snfiles[0:2]:
+			for l in snfiles:
 				if not i % 9:
 					fig = plt.figure()
 				try:
