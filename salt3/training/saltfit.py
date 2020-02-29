@@ -522,6 +522,9 @@ class GaussNewton(saltresids.SALTResids):
 		chi2_init = (residuals**2.).sum()
 		X = copy.deepcopy(guess[:])
 		Xlast = copy.deepcopy(guess[:])
+		chi2results=self.getChi2Contributions(X,uncertainties.copy())
+		for name,chi2component,dof in chi2results:
+			log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/chi2_init*100))
 		log.info('Estimating supernova parameters x0,x1,c and spectral normalization')
 		for fit in ['x0','color','x1']:
 			X,chi2_init=self.process_fit(X,self.fitOptions[fit][1],uncertainties.copy(),fit=fit)
@@ -557,9 +560,11 @@ class GaussNewton(saltresids.SALTResids):
 				if converged:
 					log.info('Gauss-Newton optimizer could not further improve chi2')
 					break
-			except KeyboardInterrupt:
+			except KeyboardInterrupt as e:
 				if query_yes_no("Terminate optimization loop and begin writing output?"):
 					break
+				else:
+					raise e
 			chi2_init = chi2
 			stepsizes = self.getstepsizes(X,Xlast)
 			Xlast = copy.deepcopy(X)
@@ -658,7 +663,8 @@ class GaussNewton(saltresids.SALTResids):
 		BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
 			self.priors.BoundedPriorResids(self.bounds,self.boundedParams,guess)
 		priorResids+=[BoundedPriorResids]
-
+		
+		regResids=[]
 		if self.regularize:
 			for regularization, weight,regKey in [(self.phaseGradientRegularization, self.regulargradientphase,'regresult_phase'),
 										   (self.waveGradientRegularization,self.regulargradientwave,'regresult_wave' ),
@@ -666,13 +672,13 @@ class GaussNewton(saltresids.SALTResids):
 				if weight ==0:
 					continue
 				if regKey in storedResults:
-					priorResids += storedResults[regKey]
+					regResids += storedResults[regKey]
 				else:
-					for regResids,regJac in zip( *regularization(guess,storedResults,varyParams)):
-						priorResids += [regResids*np.sqrt(weight)]
+					for resids,regJac in zip( *regularization(guess,storedResults,varyParams)):
+						regResids += [resids*np.sqrt(weight)]
 					storedResults[regKey]=priorResids[-self.n_components:]
 		chi2Results=[]
-		for name,x in [('Photometric',photresids),('Spectroscopic',specresids),('Prior',priorResids)]:
+		for name,x in [('Photometric',photresids),('Spectroscopic',specresids),('Prior',priorResids),('Regularization',regResids)]:
 			x=np.concatenate(x)
 			chi2Results+=[(name,(x**2).sum(),x.size)]
 		return chi2Results
@@ -680,20 +686,7 @@ class GaussNewton(saltresids.SALTResids):
 	def lsqwrap(self,guess,storedResults,varyParams=None,doPriors=True):
 		if varyParams is None:
 			varyParams=np.zeros(self.npar,dtype=bool)
-		if self.n_colorpars:
-			if not 'colorLaw' in storedResults:
-				storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, guess[self.parlist == 'cl'])(self.wave)
-				storedResults['colorLawInterp']= interp1d(self.wave,storedResults['colorLaw'],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
-		else: storedResults['colorLaw'] = 1
-				
-		if not 'components' in storedResults:
-			storedResults['components'] =self.SALTModel(guess)
-		if not 'componentderivs' in storedResults:
-			storedResults['componentderivs'] = self.SALTModelDeriv(guess,1,0,self.phase,self.wave)
-		
-		if not all([('specvariances_{}'.format(sn) in storedResults) and ('photvariances_{}'.format(sn) in storedResults) for sn in self.datadict]):
-			storedResults['saltErr']=self.ErrModel(guess)
-			storedResults['saltCorr']=self.CorrelationModel(guess)
+		self.fillStoredResults(guess,storedResults)
 		if varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any() or varyParams[self.iclscat].any():
 			raise ValueError('lsqwrap not allowed to handle varying model uncertainties')
 		

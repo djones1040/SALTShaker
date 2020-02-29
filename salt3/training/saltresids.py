@@ -448,6 +448,7 @@ class SALTResids:
 		
 		if varyParams is None:
 			varyParams=np.zeros(self.npar,dtype=bool)
+		self.fillStoredResults(x,storedResults)	
 		photmodel,specmodel=self.modelvalsforSN(x,sn,storedResults,varyParams)
 		#Separate code for photometry and spectra now, since photometry has to handle a covariance matrix with off-diagonal elements
 
@@ -555,7 +556,7 @@ class SALTResids:
 		temporaryResults={}
 		x1Deriv= varyParams[self.parlist=='x1_{}'.format(sn)][0] 
 		tpkDerivs=varyParams[self.parlist=='tpkoff_{}'.format(sn)][0]
-
+		self.fillStoredResults(x,storedResults)
 		z = self.datadict[sn]['zHelio']
 		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
 		x1,c,tpkoff = x[self.parlist == 'x1_%s'%sn],\
@@ -622,10 +623,10 @@ class SALTResids:
 		x0,x1,c,tpkoff = x[self.parlist == 'x0_%s'%sn],x[self.parlist == 'x1_%s'%sn],\
 						 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
 		
-		x0Deriv=varyParams[self.parlist==f'x0_{sn}']
-		x1Deriv= varyParams[self.parlist=='x1_{}'.format(sn)][0] 
-		tpkDeriv=varyParams[self.parlist=='tpkoff_{}'.format(sn)][0]
-		cDeriv=varyParams[self.parlist=='c_{}'.format(sn)][0]
+		x0Deriv= varyParams[self.parlist==f'x0_{sn}']
+		x1Deriv= varyParams[self.parlist==f'x1_{sn}'][0] 
+		tpkDeriv=varyParams[self.parlist==f'tpkoff_{sn}'][0]
+		cDeriv=  varyParams[self.parlist==f'c_{sn}'][0]
 		requiredPCDerivs=varyParams[self.im0]|varyParams[self.im1]
 		
 		varyParList=self.parlist[varyParams]
@@ -1013,7 +1014,22 @@ class SALTResids:
 					
 		return photresultsdict
 		
+	def fillStoredResults(self,x,storedResults):
+		if self.n_colorpars:
+			if not 'colorLaw' in storedResults:
+				storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])(self.wave)
+				storedResults['colorLawInterp']= interp1d(self.wave,storedResults['colorLaw'],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
+		else: storedResults['colorLaw'] = 1
+				
+		if not 'components' in storedResults:
+			storedResults['components'] =self.SALTModel(x)
+		if not 'componentderivs' in storedResults:
+			storedResults['componentderivs'] = self.SALTModelDeriv(x,1,0,self.phase,self.wave)
 		
+		if not all([('specvariances_{}'.format(sn) in storedResults) and ('photvariances_{}'.format(sn) in storedResults) for sn in self.datadict]):
+			storedResults['saltErr']=self.ErrModel(x)
+			storedResults['saltCorr']=self.CorrelationModel(x)
+
 	
 	def loglikeforSN(self,sn,x,storedResults={},varyParams=None,debug=False,SpecErrScale=1.0):
 		
