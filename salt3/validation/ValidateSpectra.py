@@ -64,17 +64,19 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 				   lcrv00file='salt3_lc_relative_variance_0.dat',
 				   lcrv11file='salt3_lc_relative_variance_1.dat',
 				   lcrv01file='salt3_lc_relative_covariance_01.dat',
-				   ax=None,maxspec=None,base=None,verbose=False,datadict=None):
+				   ax=None,maxspec=None,base=None,verbose=False,datadict=None,binspecres=None):
 
 	plt.close('all')
+	plt.rcParams['figure.figsize'] = (12,12)
 	trd = time()
+
 	if datadict is None:
 		if base:
-			datadict=readutils.rdAllData(speclist,False,None,speclist,KeepOnlySpec=True,peakmjdlist=base.options.tmaxlist)
+			datadict=readutils.rdAllData(speclist,False,None,speclist,KeepOnlySpec=True,peakmjdlist=base.options.tmaxlist,binspecres=binspecres)
 		else:
-			datadict=readutils.rdAllData(speclist,False,None,speclist,KeepOnlySpec=True,peakmjdlist=None)
+			datadict=readutils.rdAllData(speclist,False,None,speclist,KeepOnlySpec=True,peakmjdlist=None,binspecres=binspecres)
 		print('reading data took %.1f seconds'%(time()-trd))
-	
+		
 	tc = time()
 	if base: datadict = base.mkcuts(datadict,KeepOnlySpec=True)
 	print('making cuts took %.1f seconds'%(time()-tc))
@@ -104,6 +106,8 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 					snPars['t0']=pars[parlist=='tpkoff_{}'.format(sn)][0]
 				else:
 					snPars[par]=pars[parlist== '{}_{}'.format(par,sn)][0]
+				#if par == 'x1': print(sn,snPars['x1'], pars[np.where(parlist== '{}_{}'.format(par,sn))[0]])
+				
 		except:
 			if verbose: print('SN {} is not in parameters, skipping'.format(sn))
 			continue
