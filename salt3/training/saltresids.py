@@ -538,7 +538,8 @@ class SALTResids:
 		# HACK
 		#uncertainty *= 0.01
 		#Suppress the effect of the spectra by multiplying chi^2 by number of photometric points over number of spectral points
-		spectralSuppression=np.sqrt(self.num_phot/self.num_spec	)			
+		#print('hack!')
+		spectralSuppression=np.sqrt(self.num_phot/self.num_spec	)
 		
 		specresids={'resid': spectralSuppression * (specmodel['modelflux']-specmodel['dataflux'])/uncertainty}
 		specresids['uncertainty'] = uncertainty
