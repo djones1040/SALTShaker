@@ -499,9 +499,11 @@ class GaussNewton(saltresids.SALTResids):
 			self.fitOptions[fit]=(message,includePars)
 		self.fitlist = [('all'),#('all parameters grouped','all-grouped'),
 			#('piecewise both components','piecewisecomponents'),
-			('x0'),('component0'),
+			('x0'),
+			('component0'),
 			('component1'),('x1'),
-			('color'),('colorlaw'),
+			('color'),
+			('colorlaw'),
 			('spectralrecalibration'),			
 			('tpk')]
 
