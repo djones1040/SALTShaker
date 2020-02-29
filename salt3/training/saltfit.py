@@ -455,7 +455,6 @@ class GaussNewton(saltresids.SALTResids):
 				   (" x0",'x0'),('both components','components'),('component 0 piecewise','piecewisecomponent0'),('principal component 0','component0'),('x1','x1'),
 				   ('component 1 piecewise','piecewisecomponent1'),('principal component 1','component1'),('color','color'),('color law','colorlaw'),
 				   ('spectral recalibration const.','spectralrecalibration_norm'),('all spectral recalibration','spectralrecalibration'),
-				   ('spectral recalibration higher orders','spectralrecalibration_poly'),
 				   ('time of max','tpk'),('error model','modelerr')]
 
 		for message,fit in fitlist:
@@ -487,8 +486,6 @@ class GaussNewton(saltresids.SALTResids):
 					includePars[self.ispcrcl]=True
 				elif fit=='spectralrecalibration_norm':
 					includePars[self.ispcrcl_norm]=True
-				elif fit=='spectralrecalibration_poly':
-					includePars[self.ispcrcl_poly]=True
 				elif fit=='modelerr':
 					includePars[self.imodelerr]=True
 					includePars[self.imodelcorr]=True
@@ -525,7 +522,7 @@ class GaussNewton(saltresids.SALTResids):
 		X = copy.deepcopy(guess[:])
 		Xlast = copy.deepcopy(guess[:])
 		log.info('Estimating supernova parameters x0,x1,c and spectral normalization')
-		for fit in ['x0','spectralrecalibration_norm','color','x1']:
+		for fit in ['x0','color','x1']:
 			X,chi2_init=self.process_fit(X,self.fitOptions[fit][1],uncertainties.copy(),fit=fit)
 		chi2results=self.getChi2Contributions(X,uncertainties.copy())
 		for name,chi2component,dof in chi2results:
