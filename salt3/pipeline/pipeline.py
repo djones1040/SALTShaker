@@ -118,7 +118,9 @@ class SALT3pipe():
                     for i in range(len(pipepro)):
                         df = m2df(setkeys)
                         if df is not None:
-                            pipepro[i].setkeys = setkeys.set_index('label').loc[i]
+                            pipepro[i].setkeys = df.set_index('label').loc[str(i)]
+                            if isinstance(pipepro[i].setkeys,pd.Series):
+                                pipepro[i].setkeys = pd.DataFrame([pipepro[i].setkeys])
                         else:
                             pipepro[i].setkeys = None
                 else:
