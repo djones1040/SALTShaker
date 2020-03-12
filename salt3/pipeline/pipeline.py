@@ -23,12 +23,14 @@ def boolean_string(s):
     return (s == 'True') | (s == '1')
 
 def finput_abspath(finput):
-    if not finput.replace(' ','').startswith('/') and not finput.startswith('$') and \
+    finput = finput.strip()
+    if not finput.startswith('/') and not finput.startswith('$') and \
        '/' in finput: finput = '%s/%s'%(cwd,finput)
     return finput
 
 def abspath_for_getmu(finput):
-    if not finput.replace(' ','').startswith('/') and not finput.startswith('$'): finput = '%s/%s'%(cwd,finput.replace(' ',''))
+    finput = finput.strip()
+    if not finput.startswith('/') and not finput.startswith('$'): finput = '%s/%s'%(cwd,finput)
     return finput
 
 def nmlval_to_abspath(key,value):
@@ -516,6 +518,9 @@ class Simulation(PipeProcedure):
         if not isinstance(pipepro,str):
             pipepro = type(pipepro).__name__
         df = self._get_output_info()
+        df_kcor = pd.DataFrame(self._get_kcor_location(),columns=['ind','value'])
+        df_kcor['key'] = 'KCOR_FILE'
+        df = pd.concat([df,df_kcor],ignore_index=True,sort=False)
         outdirs = self.get_outdirs(outinfo=df)
         for i,o in enumerate(outdirs):
             outdirs[i] = os.path.expandvars(outdirs[i])
@@ -547,6 +552,7 @@ class Simulation(PipeProcedure):
             #prefix = df.loc[df.key=='GENVERSION','value'].values[0]
             return ["{}/{}.LIST".format(res,prefix) for res,prefix in zip(outdirs,df.loc[df.key=='GENVERSION','value'].values)]
         elif pipepro.lower().startswith('lcfit'):
+#             print(df)
             return df.loc[df.key=='GENVERSION','value'].values
             # idx = res.find(simpath)
             # if idx !=0:
@@ -578,6 +584,27 @@ class Simulation(PipeProcedure):
                     outdirs += [os.sep.join(['$SNDATA_ROOT/SIM',
                                              genversion])]
         return [os.path.expandvars(x) for x in outdirs]
+    
+    
+    def _get_kcor_location(self):
+#         print(self.keys)
+        kcor_dict = {}
+        for key,value in self.keys.items():
+            if key.startswith('KCOR_FILE'):
+                label = key.split('[')[1].split(']')[0]
+                kcor_dict[label] = value
+
+        findkey = [key for key,value in self.keys.items() if key.startswith('SIMGEN_INFILE_Ia')]
+        for key in findkey:
+            label = key.split('[')[1].split(']')[0]
+            if label in kcor_dict.keys():
+                continue
+            else:
+                sim_input = self.keys[key]
+                config,delimiter = _read_simple_config_file(sim_input,sep=':')
+                kcorfile = config['KCOR_FILE'].strip()
+                kcor_dict[label] = kcorfile
+        return kcor_dict
 
 
 class Training(PyPipeProcedure):
@@ -922,8 +949,8 @@ def _run_batch_pro(pro,args,done_file=None):
         raise RuntimeError("Something went wrong...")
     if 'WARNING' in stdout:
         for line in stdout[stdout.find('WARNING'):].split('\n'):
+            warnings.warn("The following warning occured:")
             print(line)
-        raise RuntimeError("Something went wrong...")
     if 'FATAL ERROR' in stdout:
         for line in stdout[stdout.find('FATAL ERROR'):].split('\n'):
             print(line)
