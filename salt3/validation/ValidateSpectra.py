@@ -100,23 +100,27 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 	for sn in datadict.keys():
 		specdata=datadict[sn]['specdata']
 		snPars={'z':datadict[sn]['zHelio']}
-		try:
-			for par in ['x0','x1','c','t0']:
-				if par=='t0':
-					snPars['t0']=pars[parlist=='tpkoff_{}'.format(sn)][0]
-				else:
-					snPars[par]=pars[parlist== '{}_{}'.format(par,sn)][0]
-				#if par == 'x1': print(sn,snPars['x1'], pars[np.where(parlist== '{}_{}'.format(par,sn))[0]])
-				
-		except:
-			if verbose: print('SN {} is not in parameters, skipping'.format(sn))
-			continue
+
 # 		if np.abs(snPars['x1'])<2.23: 
 # 			log.warning(f'Skipping {sn} because x1 is not extreme')
 # 			continue
 		model.update(snPars)
-		#import pdb; pdb.set_trace()
 		for k in specdata.keys():
+			try:
+				for par in ['x0','x1','c','t0']:
+					if par=='t0':
+						snPars['t0']=pars[parlist=='tpkoff_{}'.format(sn)][0]
+					elif par=='x0':
+						snPars[par] = pars[parlist==f'specx0_{sn}_{k}'][0]
+					else:
+						snPars[par]=pars[parlist== '{}_{}'.format(par,sn)][0]
+					#if par == 'x1': print(sn,snPars['x1'], pars[np.where(parlist== '{}_{}'.format(par,sn))[0]])
+
+			except:
+				if verbose: print('SN {} is not in parameters, skipping'.format(sn))
+				continue
+
+
 			model.update({'x0':pars[parlist==f'specx0_{sn}_{k}'][0]})
 			if 'hi': #try:
 				wave=specdata[k]['wavelength']
@@ -127,7 +131,6 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 				recalCoord=(wave-np.mean(wave))/2500
 				drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
 				recalexp=np.exp((drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1))
-				
 
 				unncalledModel = flux(salt3dir,specdata[k]['tobs']+snPars['t0'],specdata[k]['wavelength'],
 									  snPars['z'],snPars['x0'],snPars['x1'],snPars['c'],mwebv=datadict[sn]['MWEBV'])
@@ -155,7 +158,6 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 				ax2.set_xlabel('Rest Wavelength $\AA$')
 				
 				axcount += 1
-
 				if not axcount % 3:
 					pdf_pages.savefig()
 				if maxspec and axcount >= maxspec:
