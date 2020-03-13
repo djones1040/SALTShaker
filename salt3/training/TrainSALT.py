@@ -121,8 +121,9 @@ class TrainSALT(TrainSALTBase):
 				order=self.options.n_min_specrecal+int(np.log((specdata[k]['wavelength'].max() - \
 					specdata[k]['wavelength'].min())/self.options.specrange_wavescale_specrecal) + \
 					np.unique(photdata['filt']).size* self.options.n_specrecal_per_lightcurve)
-				if self.options.specrecal:
-					parlist=np.append(parlist,['specrecal_{}_{}'.format(sn,k)]*order)
+				order-=1
+				recalParams=[f'specx0_{sn}_{k}']+['specrecal_{}_{}'.format(sn,k)]*order
+				parlist=np.append(parlist,recalParams)
 
 		# initial guesses
 		n_params=parlist.size
@@ -146,7 +147,7 @@ class TrainSALT(TrainSALTBase):
 					
 				except:
 					log.critical('Problem while initializing parameter ',key,' from previous training')
-					import pdb;pdb.set_trace()
+					#import pdb;pdb.set_trace()
 					sys.exit(1)
 					
 
@@ -164,8 +165,10 @@ class TrainSALT(TrainSALTBase):
 			guess[(parlist == 'm0') & (guess < 0)] = 1e-4
 
 			i=0
-			for k in datadict.keys():
-				guess[parlist == 'x0_%s'%k] = 10**(-0.4*(cosmo.distmod(datadict[k]['zHelio']).value-19.36-10.635))
+			for sn in datadict.keys():
+				guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn]['zHelio']).value-19.36-10.635))
+				for k in datadict[sn]['specdata'] : 
+					guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn] 
 				i+=1
 			if self.options.specrecal:
 				for sn in datadict.keys():
@@ -440,10 +443,15 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 			tspec = time()
 			if self.options.dospec:
+				if self.options.binspec:
+					binspecres = self.options.binspecres
+				else:
+					binspecres = None
+
 				ValidateSpectra.compareSpectra(
 					snlist,self.options.outputdir,specfile='%s/speccomp_%i.pdf'%(self.options.outputdir,j),
-					maxspec=50,base=self,verbose=self.verbose,datadict=datadict)
-			print('plotting spectra took %.1f'%(time()-tspec))
+					maxspec=50,base=self,verbose=self.verbose,datadict=datadict,binspecres=binspecres)
+			log.info('plotting spectra took %.1f'%(time()-tspec))
 				
 			snfiles = np.genfromtxt(snlist,dtype='str')
 			snfiles = np.atleast_1d(snfiles)
@@ -455,7 +463,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 
 			tlc = time()
-			for l in snfiles[0:2]:
+			for l in snfiles:
 				if not i % 9:
 					fig = plt.figure()
 				try:
