@@ -455,7 +455,6 @@ class GaussNewton(saltresids.SALTResids):
 				   (" x0",'x0'),('both components','components'),('component 0 piecewise','piecewisecomponent0'),('principal component 0','component0'),('x1','x1'),
 				   ('component 1 piecewise','piecewisecomponent1'),('principal component 1','component1'),('color','color'),('color law','colorlaw'),
 				   ('spectral recalibration const.','spectralrecalibration_norm'),('all spectral recalibration','spectralrecalibration'),
-				   ('spectral recalibration higher orders','spectralrecalibration_poly'),
 				   ('time of max','tpk'),('error model','modelerr')]
 
 		for message,fit in fitlist:
@@ -487,8 +486,6 @@ class GaussNewton(saltresids.SALTResids):
 					includePars[self.ispcrcl]=True
 				elif fit=='spectralrecalibration_norm':
 					includePars[self.ispcrcl_norm]=True
-				elif fit=='spectralrecalibration_poly':
-					includePars[self.ispcrcl_poly]=True
 				elif fit=='modelerr':
 					includePars[self.imodelerr]=True
 					includePars[self.imodelcorr]=True
@@ -499,11 +496,12 @@ class GaussNewton(saltresids.SALTResids):
 			self.fitOptions[fit]=(message,includePars)
 		self.fitlist = [('all'),#('all parameters grouped','all-grouped'),
 			#('piecewise both components','piecewisecomponents'),
-			('x0'),('component0'),
+			('x0'),
+			('component0'),
 			('component1'),('x1'),
-			('color'),('colorlaw'),
-			('spectralrecalibration'),
-			
+			('color'),
+			('colorlaw'),
+			('spectralrecalibration'),			
 			('tpk')]
 
 	def convergence_loop(self,guess,loop_niter=3):
@@ -526,7 +524,7 @@ class GaussNewton(saltresids.SALTResids):
 		X = copy.deepcopy(guess[:])
 		Xlast = copy.deepcopy(guess[:])
 		log.info('Estimating supernova parameters x0,x1,c and spectral normalization')
-		for fit in ['x0','spectralrecalibration_norm','color','x1']:
+		for fit in ['x0','color','x1']:
 			X,chi2_init=self.process_fit(X,self.fitOptions[fit][1],uncertainties.copy(),fit=fit)
 		chi2results=self.getChi2Contributions(X,uncertainties.copy())
 		for name,chi2component,dof in chi2results:
@@ -548,7 +546,7 @@ class GaussNewton(saltresids.SALTResids):
 						modelerr,clpars,clerr,clscat,SNParams = \
 						self.getParsGN(X)
 					stepsizes = self.getstepsizes(X,Xlast)
-					return xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+					return xfinal,X,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 						modelerr,clpars,clerr,clscat,SNParams,stepsizes
 				if self.fit_model_err and photochi2perdof<60:
 					log.info('Optimizing model error')
@@ -654,7 +652,6 @@ class GaussNewton(saltresids.SALTResids):
 			photresids+=[photresidsdict['resid']]
 			specresids+=[specresidsdict['resid']]
 
-
 		priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,guess)
 		priorResids=[priorResids]
 
@@ -680,7 +677,7 @@ class GaussNewton(saltresids.SALTResids):
 			chi2Results+=[(name,(x**2).sum(),x.size)]
 		return chi2Results
 	
-	def lsqwrap(self,guess,storedResults,varyParams=None,doPriors=True):
+	def lsqwrap(self,guess,storedResults,varyParams=None,doPriors=True,doSpecResids=True):
 		if varyParams is None:
 			varyParams=np.zeros(self.npar,dtype=bool)
 		if self.n_colorpars:
@@ -706,9 +703,12 @@ class GaussNewton(saltresids.SALTResids):
 		for sn in self.datadict.keys():
 			photresidsdict,specresidsdict=self.ResidsForSN(
 				guess,sn,storedResults,varyParams,fixUncertainty=True)
-			residuals+=[photresidsdict['resid'],specresidsdict['resid']]
-			jacobian+=[sparse.coo_matrix(photresidsdict['resid_jacobian']),sparse.coo_matrix(specresidsdict['resid_jacobian'])]
-			
+			if doSpecResids:
+				residuals+=[photresidsdict['resid'],specresidsdict['resid']]
+				jacobian+=[sparse.coo_matrix(photresidsdict['resid_jacobian']),sparse.coo_matrix(specresidsdict['resid_jacobian'])]
+			else:
+				residuals+=[photresidsdict['resid'],np.zeros(len(specresidsdict['resid']))]
+				jacobian+=[sparse.coo_matrix(photresidsdict['resid_jacobian']),sparse.coo_matrix(np.zeros(np.shape(specresidsdict['resid_jacobian'])))]
 
 		if doPriors:
 
@@ -820,9 +820,9 @@ class GaussNewton(saltresids.SALTResids):
 		#In this case GN optimizer can do no better
 		return X,chi2,(X is X_init)
 		 #_init
-	def linear_fit(self,X,gaussnewtonstep,uncertainties):
+	def linear_fit(self,X,gaussnewtonstep,uncertainties): #,doSpecResids):
 		def opFunc(x,stepdir):
-			return ((self.lsqwrap(X-(x*stepdir),uncertainties.copy(),None,True))**2).sum()
+			return ((self.lsqwrap(X-(x*stepdir),uncertainties.copy(),None,True))**2).sum() #doSpecResids
 		result,step,stepType=minimize_scalar(opFunc,args=(gaussnewtonstep,)),gaussnewtonstep,'Gauss-Newton'
 		log.info('Linear optimization factor is {:.2f} x {} step'.format(result.x,stepType))
 		log.info('Linear optimized chi2 is {:.2f}'.format(result.fun))
@@ -833,8 +833,10 @@ class GaussNewton(saltresids.SALTResids):
 		X=X.copy()
 		varyingParams=iFit&self.iModelParam
 		if not self.fitTpkOff: varyingParams[self.itpk]=False
-		
-		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors)
+
+		#if fit == 'x0': doSpecResids = False
+		#else: doSpecResids = True
+		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors) #,doSpecResids=doSpecResids)
 		oldChi=(residuals**2).sum()
 		
 		#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
@@ -873,10 +875,10 @@ class GaussNewton(saltresids.SALTResids):
 		gaussNewtonStep[varyingParams]=stepsize
 		uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
 		#Was trying a clip in linear_fit; may not be worth it with new, more stable algorithm
-		preclip=((self.lsqwrap(X-gaussNewtonStep,uncertainties.copy(),None,True))**2).sum()
+		preclip=((self.lsqwrap(X-gaussNewtonStep,uncertainties.copy(),None,True))**2).sum() #doSpecResids
 		log.info('After Gauss-Newton chi2 is {:.2f}'.format(preclip))
 	
-		linearStep,linearChi2=self.linear_fit(X,gaussNewtonStep,uncertainties)
+		linearStep,linearChi2=self.linear_fit(X,gaussNewtonStep,uncertainties) #,doSpecResids)
 		if linearChi2>preclip:
 			X-=gaussNewtonStep
 			chi2=preclip
