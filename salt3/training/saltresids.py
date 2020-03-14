@@ -406,7 +406,7 @@ class SALTResids:
 		chi2 = 0
 		#Construct arguments for maxlikeforSN method
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
-		args=[(sn,x,storedResults,varyParams,debug,SpecErrScale) for sn in self.datadict.keys()]
+		args=[(x,sn,storedResults,varyParams,debug,SpecErrScale) for sn in self.datadict.keys()]
 		#args2 = (x,components,componentderivs,salterr,saltcorr,colorLaw,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale)
 		mapFun=pool.map if pool else starmap
 
@@ -451,7 +451,6 @@ class SALTResids:
 		self.fillStoredResults(x,storedResults)	
 		photmodel,specmodel=self.modelvalsforSN(x,sn,storedResults,varyParams)
 		#Separate code for photometry and spectra now, since photometry has to handle a covariance matrix with off-diagonal elements
-
 		if not 'photCholesky_{}'.format(sn) in storedResults:
 			#Calculate cholesky matrix for each set of photometric measurements in each filter
 			if (photmodel['modelvariance']<0).any():
@@ -474,7 +473,7 @@ class SALTResids:
 		
 		if not fixUncertainty: 
 			photresids['lognorm']=0
-			photresids['lognorm_grad']=np.zeros(self.npar)
+			photresids['lognorm_grad']=np.zeros(varyParams.sum())
 		
 		for L,(selectFilter,clscat,dclscat) in zip(Ls,colorvar):
 			#More stable to solve by backsubstitution than to invert and multiply
@@ -492,7 +491,7 @@ class SALTResids:
 				if not fixUncertainty:
 					varyParlist=self.parlist[varyParams]
 					#Cut out zeroed jacobian entries to save time
-					nonzero=(~((photmodel['modelvariance_jacobian'][selectFilter]==0) & (photmodel['modelflux_jacobian'][selectFilter]==0)).all(axis=0)) | (self.parlist=='clscat')
+					nonzero=(~((photmodel['modelvariance_jacobian'][selectFilter]==0) & (photmodel['modelflux_jacobian'][selectFilter]==0)).all(axis=0)) | (self.parlist[varyParams]=='clscat')
 					reducedJac=photmodel['modelvariance_jacobian'][selectFilter][:,nonzero]
 					#import pdb;pdb.set_trace()
 					#Calculate L^-1 (necessary for the diagonal derivative)
@@ -1031,7 +1030,7 @@ class SALTResids:
 			storedResults['saltCorr']=self.CorrelationModel(x)
 
 	
-	def loglikeforSN(self,sn,x,storedResults={},varyParams=None,debug=False,SpecErrScale=1.0):
+	def loglikeforSN(self,x,sn,storedResults={},varyParams=None,debug=False,SpecErrScale=1.0):
 		
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic observations of a single SN 
@@ -1061,7 +1060,6 @@ class SALTResids:
 		chi2: float
 			Model chi2 relative to training data	
 		"""
-
 		photResidsDict,specResidsDict = self.ResidsForSN(x,sn,storedResults,varyParams,fixUncertainty=False,SpecErrScale=SpecErrScale)
 
 		

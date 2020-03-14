@@ -436,10 +436,7 @@ class GaussNewton(saltresids.SALTResids):
 		super().__init__(guess,datadict,parlist,**kwargs)
 		self.lsqfit = False
 		
-		self.GN_iter = {'all':1,'components':1,'all-grouped':1,'x0':1,'x1':1,'component0':1,'piecewisecomponents':1,'piecewisecomponent0':1,'piecewisecomponent1':1,
-						'component1':1,'color':1,'colorlaw':1,'spectralrecalibration':1,
-						'spectralrecalibration_norm':1,'spectralrecalibration_poly':1,
-					    'tpk':1,'modelerr':1}
+		self.GN_iter = {}
 
 		self._robustify = False
 		self._writetmp = False
@@ -451,18 +448,22 @@ class GaussNewton(saltresids.SALTResids):
 		self.iModelParam[self.iclscat]=False
 
 		self.tryFittingAllParams=True
-		fitlist = [('all parameters','all'),('all parameters grouped','all-grouped'),
+		fitlist = [('all parameters','all'),('all parameters grouped','all-grouped'),('supernova params','sn'),
 				   (" x0",'x0'),('both components','components'),('component 0 piecewise','piecewisecomponent0'),('principal component 0','component0'),('x1','x1'),
 				   ('component 1 piecewise','piecewisecomponent1'),('principal component 1','component1'),('color','color'),('color law','colorlaw'),
 				   ('spectral recalibration const.','spectralrecalibration_norm'),('all spectral recalibration','spectralrecalibration'),
-				   ('time of max','tpk'),('error model','modelerr')]
-
+				   ('time of max','tpk'),('error model','modelerr'),('params with largest residuals','highestresids')]+ [(f'sn {sn}',sn) for sn in self.datadict.keys()]
+		
 		for message,fit in fitlist:
-			if 'all' in fit:
+			self.GN_iter[fit]=1
+			if 'all' in fit or fit=='highestresids':
 				includePars=np.ones(self.npar,dtype=bool)
 			else:
 				includePars=np.zeros(self.npar,dtype=bool)
-				if 'components' in fit:
+				if fit in self.datadict:
+					includePars=np.array([ fit in name for name in self.parlist])
+					
+				elif 'components' in fit:
 					includePars[self.im0]=True
 					includePars[self.im1]=True
 				elif 'component0' in fit :
@@ -496,10 +497,12 @@ class GaussNewton(saltresids.SALTResids):
 			self.fitOptions[fit]=(message,includePars)
 		self.fitlist = [('all'),#('all parameters grouped','all-grouped'),
 			#('piecewise both components','piecewisecomponents'),
-			('x0'),('component0'),
-			('component1'),('x1'),
+			('x0'),('x1'),('component0'),
+			('sn'),
+			('component1'),('sn'),
 			('color'),('colorlaw'),
-			('spectralrecalibration'),			
+			('sn'),
+			('spectralrecalibration'),'highestresids',			
 			('tpk')]
 
 	def convergence_loop(self,guess,loop_niter=3):
@@ -525,12 +528,18 @@ class GaussNewton(saltresids.SALTResids):
 		for name,chi2component,dof in chi2results:
 			log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/chi2_init*100))
 		log.info('Estimating supernova parameters x0,x1,c and spectral normalization')
-		for fit in ['x0','color','x1']:
-			X,chi2_init=self.process_fit(X,self.fitOptions[fit][1],uncertainties.copy(),fit=fit)
-		chi2results=self.getChi2Contributions(X,uncertainties.copy())
+# 		for sn in self.datadict:
+# 			X,logval=self.fitOneSN(X,sn)
+		import pdb;pdb.set_trace()
+		for i in range(2):
+			for fit in ['x0','color','x1']:
+				X,chi2_init=self.process_fit(X,self.fitOptions[fit][1],{},fit=fit)
+		uncertainties={}
+		chi2results=self.getChi2Contributions(X,uncertainties)
+		chi2_init=sum([x[1] for x in chi2results])
 		for name,chi2component,dof in chi2results:
 			log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/chi2_init*100))
-
+		uncertainties={key:uncertainties[key] for key in self.uncertaintyKeys}
 		log.info('starting loop; %i iterations'%loop_niter)
 		for superloop in range(loop_niter):
 			try:
@@ -552,6 +561,7 @@ class GaussNewton(saltresids.SALTResids):
 				if self.fit_model_err and photochi2perdof<60:
 					log.info('Optimizing model error')
 					X,loglike=self.minuitOptimize(X,'modelerr')
+					storedResults={}
 					residuals = self.lsqwrap(X,storedResults)
 					uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
 
@@ -563,7 +573,10 @@ class GaussNewton(saltresids.SALTResids):
 				if query_yes_no("Terminate optimization loop and begin writing output?"):
 					break
 				else:
-					raise e
+					if query_yes_no("Enter pdb?"):
+						import pdb;pdb.set_trace()
+					else:
+						raise e
 			chi2_init = chi2
 			stepsizes = self.getstepsizes(X,Xlast)
 			Xlast = copy.deepcopy(X)
@@ -579,9 +592,72 @@ class GaussNewton(saltresids.SALTResids):
 			modelerr,clpars,clerr,clscat,SNParams,stepsizes
 		
 		#raise RuntimeError("convergence_loop reached 100000 iterations without convergence")
-	
+	def fitOneSN(self,X,sn):
+		X=X.copy()
+		includePars=self.fitOptions[sn][1] 
+		includePars[self.itpk]=False
+		#Estimate parameters first using GN method
+		for par in self.parlist[includePars]:
+			if 'specrecal' in par: continue
+			if 'specx0' in par:
+				result=self.ResidsForSN(X,sn,{},varyParams=self.parlist==par,fixUncertainty=True)[1]
+			else:
+				result=self.ResidsForSN(X,sn,{},varyParams=self.parlist==par,fixUncertainty=True)[0]
+			resid,grad=result['resid'],result['resid_jacobian'][:,0]
+			X[self.parlist==par]-=np.dot(grad,resid)/np.dot(grad,grad)
+
+		def fn(Y):
+			if len(Y[Y != Y]):
+				import pdb; pdb.set_trace()
+			Xnew=X.copy()
+			Xnew[includePars]=Y
+			return - self.loglikeforSN(Xnew,sn,{},varyParams=None)
+		def grad(Y):
+			if len(Y[Y != Y]):
+				import pdb; pdb.set_trace()
+			Xnew=X.copy()
+			Xnew[includePars]=Y
+			#log.info(self.maxlikefit(Xnew,computeDerivatives=True)[1])
+			#import pdb; pdb.set_trace()
+			return - self.loglikeforSN(Xnew,sn,{},varyParams=includePars)[1]
+		log.info('Initialized log likelihood: {:.2f}'.format(self.loglikeforSN(X,sn,{},varyParams=None)))
+		params=['x'+str(i) for i in range(includePars.sum())]
+		
+		#import pdb;pdb.set_trace()
+		initVals=X[includePars].copy()
+		kwargs={}
+		for i,parname in enumerate(self.parlist[includePars]):
+			if 'x1' in parname:
+				kwargs['limit_'+params[i]] = (-5,5)
+			elif 'x0' in parname:
+				kwargs['limit_'+params[i]] = (0,2)
+			elif 'c_' in parname:
+				kwargs['limit_'+params[i]] = (-0.5,1)
+			elif 'specrecal' in parname:
+				kwargs['limit_'+params[i]] = (-0.5,0.5)
+			else:
+				kwargs['limit_'+params[i]] = (-5,5)
+		if sn=='03D1co': import pdb;pdb.set_trace()
+		kwargs.update({params[i]: initVals[i] for i in range(includePars.sum())})
+		m=Minuit(fn,use_array_call=True,forced_parameters=params,grad=grad,errordef=1,**kwargs)
+		result,paramResults=m.migrad()#includePars.sum()*6)
+		#if np.allclose(np.array([x.value for x  in paramResults]),X[includePars]):
+		X=X.copy()
+		X[includePars]=np.array([x.value for x  in paramResults])
+
+		# 		if np.allclose(X[includePars],initVals):
+# 			import pdb;pdb.set_trace()
+		log.info('Final log likelihood: {:.2f}'.format( -result.fval))
+		
+		return X,-result.fval
+		 
+		 
+		 
+		 
 	def minuitOptimize(self,X,fit='all'):
 		includePars=self.fitOptions[fit][1] 
+		if not self.fitTpkOff: includePars[self.itpk]=False
+
 		def fn(Y):
 			if len(Y[Y != Y]):
 				import pdb; pdb.set_trace()
@@ -595,7 +671,7 @@ class GaussNewton(saltresids.SALTResids):
 			Xnew[includePars]=Y
 			#log.info(self.maxlikefit(Xnew,computeDerivatives=True)[1])
 			#import pdb; pdb.set_trace()
-			return - self.maxlikefit(Xnew,computeDerivatives=True)[1]
+			return - self.maxlikefit(Xnew,varyParams=includePars)[1]
 		log.info('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X)))
 		params=['x'+str(i) for i in range(includePars.sum())]
 		initVals=X[includePars].copy()
@@ -798,7 +874,7 @@ class GaussNewton(saltresids.SALTResids):
 					if chi2prop<chi2 :
 						X,chi2=Xprop,chi2prop
 					retainReg=(not ('all' in fit or 'component' in fit))
-					retainPCDerivs=('component' in fit)  or fit.startswith('x')
+					retainPCDerivs=('component' in fit)  or fit.startswith('x') or fit=='sn'
 					storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
 							(retainReg and key.startswith('regresult' )) or
 						   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
@@ -825,14 +901,18 @@ class GaussNewton(saltresids.SALTResids):
 		varyingParams=iFit&self.iModelParam
 		if not self.fitTpkOff: varyingParams[self.itpk]=False
 
-		#if fit == 'x0': doSpecResids = False
+		#if fit == 'x0': import pdb;pdb.set_trace()# doSpecResids = False
 		#else: doSpecResids = True
 		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors) #,doSpecResids=doSpecResids)
 		oldChi=(residuals**2).sum()
-		
-		#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
+
 		jacobian=jacobian.tocsc()
-		includePars= np.diff(jacobian.indptr) != 0
+		if fit=='highestresids':
+			#Fit only the parameters affecting the highest residual points
+			includePars=np.diff(jacobian[ (residuals**2 > np.percentile(residuals**2,100-1e-3)) ,:].indptr) != 0
+		else:
+			#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
+			includePars= np.diff(jacobian.indptr) != 0
 		if not includePars.all():
 			varyingParams[varyingParams]=varyingParams[varyingParams] & includePars
 			jacobian=jacobian[:,includePars]		
@@ -847,17 +927,21 @@ class GaussNewton(saltresids.SALTResids):
 		log.info('Initial chi2: {:.2f} '.format(oldChi))
 		isJacobianSparse=jacobian.nnz/(jacobian.shape[0]*jacobian.shape[1])<0.5
 		#If this is a sparse matrix, treat it as such, otherwise use standard linear algebra solver
+		preconditoningMatrix=sparse.diags(1/np.sqrt(np.asarray((jacobian.power(2)).sum(axis=0))),[0])
 		if isJacobianSparse:
 		
 			log.info('Using sparse linear algebra')
-			result=sprslinalg.lsmr(jacobian,residuals[includeResids],atol=1e-6,btol=1e-6,maxiter=2*min(jacobian.shape))
-			if result[1]==7: log.warning('Gauss-Newton solver reached max # of iterations')
-			stepsize=result[0]
+			stepsize,stopsignal,itn,normr,normar,norma,conda,normx=sprslinalg.lsmr(jacobian.dot(preconditoningMatrix),residuals[includeResids],maxiter=2*min(jacobian.shape))
+			
+			stopReasons=['x=0 solution','atol approx. solution','atol+btol approx. solution','ill conditioned','machine precision limit','machine precision limit','machine precision limit','max # of iteration']
+			log.debug('LSMR results: {}, norm r {:.2f}, norm J^T r {:.2f}, norm J {:.2f}, cond J {:.2f}, norm step {:.2f}'.format(stopReasons[stopsignal],normr,normar,norma,conda,normx ))
+			if stopsignal==7: log.warning('Gauss-Newton solver reached max # of iterations')
 		else:
 			log.info('Using dense linear algebra')
 			jacobian=jacobian.toarray()
-			stepsize=linalg.lstsq(jacobian,residuals[includeResids],cond=self.conditionNumber)[0]
 			
+			stepsize=linalg.lstsq(jacobian*preconditoningMatrix,residuals[includeResids],cond=self.conditionNumber)[0]
+		stepsize=(preconditoningMatrix*stepsize)
 		if np.any(np.isnan(stepsize)):
 			log.error('NaN detected in stepsize; exitting to debugger')
 			import pdb;pdb.set_trace()
@@ -865,6 +949,7 @@ class GaussNewton(saltresids.SALTResids):
 		gaussNewtonStep=np.zeros(X.size)
 		gaussNewtonStep[varyingParams]=stepsize
 		uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
+		
 		#Was trying a clip in linear_fit; may not be worth it with new, more stable algorithm
 		preclip=((self.lsqwrap(X-gaussNewtonStep,uncertainties.copy(),None,True))**2).sum() #doSpecResids
 		log.info('After Gauss-Newton chi2 is {:.2f}'.format(preclip))
