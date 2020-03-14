@@ -530,7 +530,6 @@ class GaussNewton(saltresids.SALTResids):
 		log.info('Estimating supernova parameters x0,x1,c and spectral normalization')
 # 		for sn in self.datadict:
 # 			X,logval=self.fitOneSN(X,sn)
-		import pdb;pdb.set_trace()
 		for i in range(2):
 			for fit in ['x0','color','x1']:
 				X,chi2_init=self.process_fit(X,self.fitOptions[fit][1],{},fit=fit)
