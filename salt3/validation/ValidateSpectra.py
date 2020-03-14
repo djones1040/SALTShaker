@@ -148,8 +148,8 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 			ax2 = ax.twiny()
 			#ax2.xaxis.tick_top()
 			lims = ax.get_xlim()
-			ax2.set_xlim([lims[0]/(1+snPars['z']),lims[1]/(1+snPars['z'])])
-			ax2.set_xlabel('Rest Wavelength $\AA$')
+			ax2.set_xlim([lims[0]*(1+snPars['z']),lims[1]*(1+snPars['z'])])
+			ax2.set_xlabel('Observer frame Wavelength $\AA$')
 			
 			axcount += 1
 
