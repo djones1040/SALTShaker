@@ -100,63 +100,70 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 	for sn in datadict.keys():
 		specdata=datadict[sn]['specdata']
 		snPars={'z':datadict[sn]['zHelio']}
-		try:
-			for par in ['x0','x1','c','t0']:
-				if par=='t0':
-					snPars['t0']=pars[parlist=='tpkoff_{}'.format(sn)][0]
-				else:
-					snPars[par]=pars[parlist== '{}_{}'.format(par,sn)][0]
-				#if par == 'x1': print(sn,snPars['x1'], pars[np.where(parlist== '{}_{}'.format(par,sn))[0]])
-				
-		except:
-			if verbose: print('SN {} is not in parameters, skipping'.format(sn))
-			continue
+
 # 		if np.abs(snPars['x1'])<2.23: 
 # 			log.warning(f'Skipping {sn} because x1 is not extreme')
 # 			continue
 		model.update(snPars)
-		#import pdb; pdb.set_trace()
 		for k in specdata.keys():
+			try:
+				for par in ['x0','x1','c','t0']:
+					if par=='t0':
+						snPars['t0']=pars[parlist=='tpkoff_{}'.format(sn)][0]
+					elif par=='x0':
+						snPars[par] = pars[parlist==f'specx0_{sn}_{k}'][0]
+					else:
+						snPars[par]=pars[parlist== '{}_{}'.format(par,sn)][0]
+					#if par == 'x1': print(sn,snPars['x1'], pars[np.where(parlist== '{}_{}'.format(par,sn))[0]])
+
+			except:
+				if verbose: print('SN {} is not in parameters, skipping'.format(sn))
+				continue
+
+
 			model.update({'x0':pars[parlist==f'specx0_{sn}_{k}'][0]})
-			wave=specdata[k]['wavelength']
-			restwave=wave/(1+snPars['z'])
-			coeffs=pars[parlist=='specrecal_{}_{}'.format(sn,k)]
-			pow=coeffs.size-np.arange(coeffs.size)
-			recalCoord=(wave-np.mean(wave))/2500
-			drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
-			recalexp=np.exp((drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1))
-			
-			unncalledModel = flux(salt3dir,specdata[k]['tobs']+snPars['t0'],specdata[k]['wavelength'],
-								  snPars['z'],snPars['x0'],snPars['x1'],snPars['c'],mwebv=datadict[sn]['MWEBV'])
-			modelflux = unncalledModel*recalexp
+			if 'hi': #try:
+				wave=specdata[k]['wavelength']
+				restwave=wave/(1+snPars['z'])
 
-			if not axcount % 3 and axcount != 0:
-				fig = plt.figure()
-			ax = plt.subplot(3,1,axcount % 3 + 1)
-		
-			if len(coeffs): ax.plot(restwave,modelflux,'r-',label='recalibrated model spectrum for z = %.3f, $x_1$ = %.3f'%(
-					snPars['z'],snPars['x1']))
-			ax.plot(restwave,specdata[k]['flux'],'b-',label='%s spectral data, phase = %.1f'%(sn,specdata[k]['tobs']-snPars['t0']))
-			ax.plot(restwave,unncalledModel,'g-',label='SALT3 Model spectrum\n(no calibration)')
-			ax.set_xlim(restwave.min(),restwave.max())
+				coeffs=pars[parlist=='specrecal_{}_{}'.format(sn,k)]
+				pow=coeffs.size-np.arange(coeffs.size)
+				recalCoord=(wave-np.mean(wave))/2500
+				drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
+				recalexp=np.exp((drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1))
 
-			ax.set_ylim(0,specdata[k]['flux'].max()*1.25)
-			ax.set_xlabel('Wavelength $\AA$')
-			ax.set_ylabel('Flux')
-			ax.legend(loc='upper right',prop={'size':8})
+				unncalledModel = flux(salt3dir,specdata[k]['tobs']+snPars['t0'],specdata[k]['wavelength'],
+									  snPars['z'],snPars['x0'],snPars['x1'],snPars['c'],mwebv=datadict[sn]['MWEBV'])
+				modelflux = unncalledModel*recalexp
+				if not axcount % 3 and axcount != 0:
+					fig = plt.figure()
+				ax = plt.subplot(3,1,axcount % 3 + 1)
+				
+				if len(coeffs): ax.plot(wave,modelflux,'r-',label='recalibrated model spectrum for z = %.3f, $x_1$ = %.3f'%(
+						snPars['z'],snPars['x1']))
+				ax.plot(wave,specdata[k]['flux'],'b-',label='%s spectral data, phase = %.1f'%(sn,specdata[k]['tobs']-snPars['t0']))
+				ax.plot(wave,unncalledModel,'g-',label='SALT3 Model spectrum\n(no calibration)')
+				ax.set_xlim(wave.min(),wave.max())
 
-			ax2 = ax.twiny()
-			#ax2.xaxis.tick_top()
-			lims = ax.get_xlim()
-			ax2.set_xlim([lims[0]*(1+snPars['z']),lims[1]*(1+snPars['z'])])
-			ax2.set_xlabel('Observer frame Wavelength $\AA$')
-			
-			axcount += 1
+				ax.set_ylim(0,specdata[k]['flux'].max()*1.25)
+				ax.set_xlabel('Wavelength $\AA$')
+				ax.set_ylabel('Flux')
+				ax.legend(loc='upper right',prop={'size':8})
 
-			if not axcount % 3:
-				pdf_pages.savefig()
-			if maxspec and axcount >= maxspec:
-				break
+				ax2 = ax.twiny()
+				#ax2.xaxis.tick_top()
+				lims = ax.get_xlim()
+				ax2.set_xlim([lims[0]/(1+snPars['z']),lims[1]/(1+snPars['z'])])
+				ax2.set_xlabel('Rest Wavelength $\AA$')
+				
+				axcount += 1
+				if not axcount % 3:
+					pdf_pages.savefig()
+				if maxspec and axcount >= maxspec:
+					break
+			else:
+				print(e)
+				continue
 
 	pdf_pages.savefig()
 	pdf_pages.close()
