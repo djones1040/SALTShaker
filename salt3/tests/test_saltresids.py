@@ -86,7 +86,7 @@ class TRAINING_Test(unittest.TestCase):
 		if defineInterpolations:
 			z = self.resids.datadict[sn]['zHelio']
 			obsphase = self.resids.datadict[sn]['obsphase'] #self.phase*(1+z)
-			x0,x1,c,tpkoff = guess[self.parlist == 'x0_%s'%sn],guess[self.parlist == 'x1_%s'%sn],\
+			x1,c,tpkoff = guess[self.parlist == 'x1_%s'%sn],\
 							 guess[self.parlist == 'c_%s'%sn],guess[self.parlist == 'tpkoff_%s'%sn]
 			colorexp = 10. ** (colorlaw * c)
 			M0,M1=components
@@ -102,28 +102,27 @@ class TRAINING_Test(unittest.TestCase):
 			M0 *= colorexp; M1 *= colorexp
 			M0 *= _SCALE_FACTOR/(1+z); M1 *= _SCALE_FACTOR/(1+z)
 
-			int1dM0 = interp1d(obsphase,M0,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
 			int1dM1 = interp1d(obsphase,M1,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
 
 			# derivs
 			M0deriv *= colorexp; M1deriv *= colorexp
 			M0deriv *= _SCALE_FACTOR/(1+z); M1deriv *= _SCALE_FACTOR/(1+z)
 		
-			mod = x0*(M0 + x1*M1)
+			mod = (M0 + x1*M1)
 			int1d = interp1d(obsphase,mod,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
 		
-			modderiv = x0*(M0deriv + x1*M1deriv)
+			modderiv = (M0deriv + x1*M1deriv)
 			int1dderiv = interp1d(obsphase,modderiv,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
 		
 			prefactor=(self.resids.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z))
 			interr1d = [interp1d(obsphase,err * prefactor ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for err in saltErr ]
 			intcorr1d= [interp1d(obsphase,corr ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True) for corr in saltCorr ]
 
-			modelUncertainty= x0**2 * prefactor**2 *(saltErr[0]**2  + 2*x1* saltCorr[0]*saltErr[0]*saltErr[1] + x1**2 *saltErr[1]**2)
+			modelUncertainty= prefactor**2 *(saltErr[0]**2  + 2*x1* saltCorr[0]*saltErr[0]*saltErr[1] + x1**2 *saltErr[1]**2)
 			uncertaintyInterp=interp1d(obsphase,modelUncertainty ,axis=0,kind=self.resids.interpMethod,bounds_error=True,assume_sorted=True)
 
 			temporaryResults['fluxInterp']=int1d
-			temporaryResults['componentsInterp']=int1dM0,int1dM1
+			temporaryResults['M1Interp']=int1dM1
 			temporaryResults['phaseDerivInterp']=int1dderiv
 			temporaryResults['colorexp']=colorexp
 			temporaryResults['uncertaintyComponentsInterp']=interr1d
@@ -251,7 +250,7 @@ class TRAINING_Test(unittest.TestCase):
 		for i in range(self.guess.size):
 			valsdict=incrementOneParam(i)
 			dValdX[:,i]=(valsdict['modelflux']-vals)/dx
-		
+
 		if not np.allclose(dValdX,jacobian,rtol,atol): print('Problems with model value derivatives: ',np.unique(self.parlist[np.where(~np.isclose(dValdX,jacobian,rtol,atol))[1]]))
 
 		self.assertTrue((np.isclose(dValdX,jacobian,rtol,atol).all(axis=0)|((self.parlist==f'tpkoff_{sn}'))).all())

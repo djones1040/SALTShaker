@@ -102,7 +102,9 @@ class SALTPriors:
 			(self.wave[1]-self.wave[0])*self.fluxfactor['default']['B']
 		ratio=m1Bflux/m0Bflux
 		#Define M1 to have no effect on B band at t=0
-		X[self.ix0]*=1+ratio*X[self.ix1]
+		for sn in self.datadict:
+			ix0=np.array([f'x0_{sn}' in x for x in self.parlist])
+			X[ix0]*=1+ratio*X[f'x1_{sn}'==self.parlist]
 		X[self.ix1]/=1+ratio*X[self.ix1]
 		X[self.im1]-=ratio*X[self.im0]
 		
