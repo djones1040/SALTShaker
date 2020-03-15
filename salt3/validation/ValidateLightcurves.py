@@ -208,7 +208,8 @@ def customfilt(outfile,lcfile,salt3dir,
 		if 'BD17' in bandpassdict.keys(): sys = 'bd17'
 		elif 'AB' in bandpassdict.keys(): sys = 'ab'
 		else: sys = 'vega'
-		if bandpassdict[sn.SURVEY][flt]['lambdaeff'] > 2800 and bandpassdict[sn.SURVEY][flt]['lambdaeff'] < 7000 and\
+		if bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) > 2800 and \
+		   bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) < 7000 and\
 		   '-u' not in bandpassdict[sn.SURVEY][flt]['fullname']:
 			data.add_row((m,flt,flx,flxe,
 						  27.5+bandpassdict[sn.SURVEY][flt]['zpoff'],sys))
