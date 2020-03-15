@@ -175,13 +175,6 @@ class TrainSALT(TrainSALTBase):
 				for k in datadict[sn]['specdata'] : 
 					guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn] 
 				i+=1
-			if self.options.specrecal:
-				for sn in datadict.keys():
-					specdata=datadict[sn]['specdata']
-					photdata=datadict[sn]['photdata']
-					for k in specdata.keys():
-						init_scale,colordiffs = getScaleForSN(specdata[k],photdata,self.kcordict,datadict[sn]['survey'])
-						guess[np.where(parlist == 'specrecal_{}_{}'.format(sn,k))[0][-1]] = init_scale
 
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
