@@ -82,6 +82,8 @@ class TrainSALTBase:
 							help='maximum iterations for Gauss-Newton (default=%default)')
 		parser.add_argument('--regularize', default=config.get('trainparams','regularize'), type=boolean_string,
 							help='turn on regularization if set (default=%default)')
+		parser.add_argument('--fitsalt2', default=config.get('trainparams','fitsalt2'), type=boolean_string,
+							help='fit SALT2 as a validation check (default=%default)')
 		parser.add_argument('--n_repeat', default=config.get('trainparams','n_repeat'), type=int,
 							help='repeat mcmc and/or gauss newton n times (default=%default)')
 		parser.add_argument('--fit_model_err', default=config.get('trainparams','fit_model_err'), type=boolean_string,
