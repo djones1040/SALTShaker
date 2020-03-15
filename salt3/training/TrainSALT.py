@@ -31,6 +31,11 @@ from salt3.data import data_rootdir
 from salt3.initfiles import init_rootdir
 from salt3.config import config_rootdir
 
+import astropy.units as u
+import sncosmo
+from astropy.table import Table
+from salt3.initfiles import init_rootdir as salt2dir
+
 # validation utils
 import pylab as plt
 from salt3.validation import ValidateLightcurves
@@ -243,7 +248,9 @@ class TrainSALT(TrainSALTBase):
 	def wrtoutput(self,outdir,phase,wave,
 				  M0,M0err,M1,M1err,cov_M0_M1,
 				  modelerr,clpars,
-				  clerr,clscat,SNParams,pars,pars_unscaled,parlist,chain,loglikes):
+				  clerr,clscat,SNParams,pars,
+				  pars_unscaled,parlist,chain,
+				  loglikes,datadict):
 		if not os.path.exists(outdir):
 			raise RuntimeError('desired output directory %s doesn\'t exist'%outdir)
 
@@ -311,7 +318,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		
 		# best-fit and simulated SN params
 		foutsn = open('%s/salt3train_snparams.txt'%outdir,'w')
-		print('# SN x0 x1 c t0 tpkoff SIM_x0 SIM_x1 SIM_c SIM_t0',file=foutsn)
+		print('# SN x0 x1 c t0 tpkoff SIM_x0 SIM_x1 SIM_c SIM_t0 SALT2_x0 SALT2_x1 SALT2_c SALT2_t0',file=foutsn)
 		for snlist in self.options.snlists.split(','):
 			snlist = os.path.expandvars(snlist)
 			if not os.path.exists(snlist):
@@ -341,17 +348,61 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 					else: SIM_c = -99
 					if 'SIM_PEAKMJD' in sn.__dict__.keys(): SIM_PEAKMJD = float(sn.SIM_PEAKMJD.split()[0])
 					else: SIM_PEAKMJD = -99
-				if not foundfile: SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD = -99,-99,-99,-99
-
+				if not foundfile:
+					SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD,salt2x0,salt2x1,salt2c,salt2t0 = -99,-99,-99,-99,-99,-99,-99,-99
+				elif self.options.fitsalt2:
+					salt2x0,salt2x1,salt2c,salt2t0 = self.salt2fit(sn,datadict)
+				else:
+					salt2x0,salt2x1,salt2c,salt2t0 = -99,-99,-99,-99
+					
 				if 't0' not in SNParams[k].keys():
 					SNParams[k]['t0'] = 0.0
-				print('%s %8.10e %.10f %.10f %.10f %.10f %8.10e %.10f %.10f %.2f'%(
+				print('%s %8.10e %.10f %.10f %.10f %.10f %8.10e %.10f %.10f %.2f %8.10e %.10f %.10f %.10f'%(
 					k,SNParams[k]['x0'],SNParams[k]['x1'],SNParams[k]['c'],SNParams[k]['t0'],
-					SNParams[k]['tpkoff'],SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD),file=foutsn)
+					SNParams[k]['tpkoff'],SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD,salt2x0,salt2x1,salt2c,salt2t0),file=foutsn)
 		foutsn.close()
 			
 		return
 
+	def salt2fit(self,sn,datadict):
+
+		for flt in np.unique(sn.FLT):
+			filtwave = self.kcordict[sn.SURVEY]['filtwave']
+			filttrans = self.kcordict[sn.SURVEY][flt]['filttrans']
+
+			band = sncosmo.Bandpass(
+				filtwave,
+				filttrans,
+				wave_unit=u.angstrom,name=flt)
+			sncosmo.register(band, force=True)
+
+		data = Table(rows=None,names=['mjd','band','flux','fluxerr','zp','zpsys'],
+					 dtype=('f8','S1','f8','f8','f8','U5'),
+					 meta={'t0':sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]})
+
+		sysdict = {}
+		for m,flt,flx,flxe in zip(sn.MJD,sn.FLT,sn.FLUXCAL,sn.FLUXCALERR):
+			if 'BD17' in self.kcordict.keys(): sys = 'bd17'
+			elif 'AB' in self.kcordict.keys(): sys = 'ab'
+			else: sys = 'vega'
+			if self.kcordict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) > 2800 and \
+			   self.kcordict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) < 7000 and\
+			   '-u' not in self.kcordict[sn.SURVEY][flt]['fullname']:
+				data.add_row((m,flt,flx,flxe,
+							  27.5+self.kcordict[sn.SURVEY][flt]['zpoff'],sys))
+			sysdict[flt] = sys
+		
+		flux = sn.FLUXCAL
+		salt2model = sncosmo.Model(source='salt2')
+		salt2model.set(z=float(sn.REDSHIFT_HELIO.split()[0]))
+		fitparams = ['t0', 'x0', 'x1', 'c']
+		result, fitted_model = sncosmo.fit_lc(
+			data, salt2model, fitparams,
+			bounds={'t0':(sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]-10, sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]+10),
+					'z':(0.0,0.7),'x1':(-3,3),'c':(-0.3,0.3)})
+
+		return result['parameters'][2],result['parameters'][3],result['parameters'][4],result['parameters'][1]
+	
 	def validate(self,outputdir,datadict):
 
 		# prelims
@@ -537,7 +588,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				# write the output model - M0, M1, c
 				self.wrtoutput(self.options.outputdir,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,
 							   modelerr,clpars,clerr,clscat,SNParams,
-							   pars,pars_unscaled,parlist,chain,loglikes)
+							   pars,pars_unscaled,parlist,chain,loglikes,datadict)
 			log.info('successful SALT2 training!  Output files written to %s'%self.options.outputdir)
 			if self.options.stage == "all" or self.options.stage == "validate":
 				stage='validation'
