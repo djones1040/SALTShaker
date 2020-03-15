@@ -103,7 +103,7 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 			if not os.path.exists(sf):
 				raise RuntimeError('specfile %s does not exist'%sf)
 			sn=snana.SuperNova(sf)
-			s=sn.name
+			s=str(sn.name)
 			if s in datadict.keys():
 				tpk=datadict[s]['tpk']
 				if 'specdata' not in datadict[s].keys():
@@ -288,7 +288,7 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 			rdstart = time()
 			sn = snana.SuperNova(f)
 			rdtime += time()-rdstart
-			
+			sn.SNID=str(sn.SNID)
 			if sn.SNID in datadict.keys():
 				log.warning('SNID %s is a duplicate!	 Skipping'%sn.SNID)
 				continue

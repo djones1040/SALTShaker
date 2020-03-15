@@ -406,7 +406,7 @@ class SALTResids:
 		chi2 = 0
 		#Construct arguments for maxlikeforSN method
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
-		args=[(sn,x,storedResults,varyParams,debug,SpecErrScale) for sn in self.datadict.keys()]
+		args=[(x,sn,storedResults,varyParams,debug,SpecErrScale) for sn in self.datadict.keys()]
 		#args2 = (x,components,componentderivs,salterr,saltcorr,colorLaw,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale)
 		mapFun=pool.map if pool else starmap
 
@@ -448,9 +448,9 @@ class SALTResids:
 		
 		if varyParams is None:
 			varyParams=np.zeros(self.npar,dtype=bool)
+		self.fillStoredResults(x,storedResults)	
 		photmodel,specmodel=self.modelvalsforSN(x,sn,storedResults,varyParams)
 		#Separate code for photometry and spectra now, since photometry has to handle a covariance matrix with off-diagonal elements
-
 		if not 'photCholesky_{}'.format(sn) in storedResults:
 			#Calculate cholesky matrix for each set of photometric measurements in each filter
 			if (photmodel['modelvariance']<0).any():
@@ -473,7 +473,7 @@ class SALTResids:
 		
 		if not fixUncertainty: 
 			photresids['lognorm']=0
-			photresids['lognorm_grad']=np.zeros(self.npar)
+			photresids['lognorm_grad']=np.zeros(varyParams.sum())
 		
 		for L,(selectFilter,clscat,dclscat) in zip(Ls,colorvar):
 			#More stable to solve by backsubstitution than to invert and multiply
@@ -491,7 +491,7 @@ class SALTResids:
 				if not fixUncertainty:
 					varyParlist=self.parlist[varyParams]
 					#Cut out zeroed jacobian entries to save time
-					nonzero=(~((photmodel['modelvariance_jacobian'][selectFilter]==0) & (photmodel['modelflux_jacobian'][selectFilter]==0)).all(axis=0)) | (self.parlist=='clscat')
+					nonzero=(~((photmodel['modelvariance_jacobian'][selectFilter]==0) & (photmodel['modelflux_jacobian'][selectFilter]==0)).all(axis=0)) | (self.parlist[varyParams]=='clscat')
 					reducedJac=photmodel['modelvariance_jacobian'][selectFilter][:,nonzero]
 					#import pdb;pdb.set_trace()
 					#Calculate L^-1 (necessary for the diagonal derivative)
@@ -556,7 +556,7 @@ class SALTResids:
 		temporaryResults={}
 		x1Deriv= varyParams[self.parlist=='x1_{}'.format(sn)][0] 
 		tpkDerivs=varyParams[self.parlist=='tpkoff_{}'.format(sn)][0]
-
+		self.fillStoredResults(x,storedResults)
 		z = self.datadict[sn]['zHelio']
 		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
 		x1,c,tpkoff = x[self.parlist == 'x1_%s'%sn],\
@@ -628,10 +628,10 @@ class SALTResids:
 		x0,x1,c,tpkoff = x[self.parlist == 'x0_%s'%sn],x[self.parlist == 'x1_%s'%sn],\
 						 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
 		
-		x0Deriv=varyParams[self.parlist==f'x0_{sn}']
-		x1Deriv= varyParams[self.parlist=='x1_{}'.format(sn)][0] 
-		tpkDeriv=varyParams[self.parlist=='tpkoff_{}'.format(sn)][0]
-		cDeriv=varyParams[self.parlist=='c_{}'.format(sn)][0]
+		x0Deriv= varyParams[self.parlist==f'x0_{sn}']
+		x1Deriv= varyParams[self.parlist==f'x1_{sn}'][0] 
+		tpkDeriv=varyParams[self.parlist==f'tpkoff_{sn}'][0]
+		cDeriv=  varyParams[self.parlist==f'c_{sn}'][0]
 		requiredPCDerivs=varyParams[self.im0]|varyParams[self.im1]
 		
 		varyParList=self.parlist[varyParams]
@@ -1019,9 +1019,24 @@ class SALTResids:
 					
 		return photresultsdict
 		
+	def fillStoredResults(self,x,storedResults):
+		if self.n_colorpars:
+			if not 'colorLaw' in storedResults:
+				storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])(self.wave)
+				storedResults['colorLawInterp']= interp1d(self.wave,storedResults['colorLaw'],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
+		else: storedResults['colorLaw'] = 1
+				
+		if not 'components' in storedResults:
+			storedResults['components'] =self.SALTModel(x)
+		if not 'componentderivs' in storedResults:
+			storedResults['componentderivs'] = self.SALTModelDeriv(x,1,0,self.phase,self.wave)
 		
+		if not all([('specvariances_{}'.format(sn) in storedResults) and ('photvariances_{}'.format(sn) in storedResults) for sn in self.datadict]):
+			storedResults['saltErr']=self.ErrModel(x)
+			storedResults['saltCorr']=self.CorrelationModel(x)
+
 	
-	def loglikeforSN(self,sn,x,storedResults={},varyParams=None,debug=False,SpecErrScale=1.0):
+	def loglikeforSN(self,x,sn,storedResults={},varyParams=None,debug=False,SpecErrScale=1.0):
 		
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic observations of a single SN 
@@ -1051,7 +1066,6 @@ class SALTResids:
 		chi2: float
 			Model chi2 relative to training data	
 		"""
-
 		photResidsDict,specResidsDict = self.ResidsForSN(x,sn,storedResults,varyParams,fixUncertainty=False,SpecErrScale=SpecErrScale)
 
 		
@@ -1507,7 +1521,8 @@ class SALTResids:
 			normalization=np.sqrt(1/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))**2.
 			#0 if model is locally separable in phase and wavelength i.e. flux=g(phase)* h(wavelength) for arbitrary functions g and h
 			numerator=(dfluxdphase[i] *dfluxdwave[i] -d2fluxdphasedwave[i] *fluxes[i] )
-			dnumerator=( self.regularizationDerivs[1][:,:,varyParams[indices]]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2][:,:,varyParams[indices]]* dfluxdphase[i][:,:,np.newaxis] - self.regularizationDerivs[3][:,:,varyParams[indices]]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0][:,:,varyParams[indices]]* d2fluxdphasedwave[i][:,:,np.newaxis] )			
+			dnumerator=( self.regularizationDerivs[1][:,:,varyParams[indices]]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2][:,:,varyParams[indices]]* dfluxdphase[i][:,:,np.newaxis] 
+				- self.regularizationDerivs[3][:,:,varyParams[indices]]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0][:,:,varyParams[indices]]* d2fluxdphasedwave[i][:,:,np.newaxis] )			
 			resids += [normalization* (numerator / (scale[i]**2 * self.neff)).flatten()]
 			jacobian=np.zeros((resids[-1].size,varyParams.sum()))
 			
@@ -1537,7 +1552,8 @@ class SALTResids:
 			normalization=361838973.6
 			#0 if model is locally separable in phase and wavelength i.e. flux=g(phase)* h(wavelength) for arbitrary functions g and h
 			numerator=(dfluxdphase[i] *dfluxdwave[i] -d2fluxdphasedwave[i] *fluxes[i] )
-			dnumerator=( self.regularizationDerivs[1][:,:,varyParams[indices]]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2][:,:,varyParams[indices]]* dfluxdphase[i][:,:,np.newaxis] - self.regularizationDerivs[3][:,:,varyParams[indices]]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0][:,:,varyParams[indices]]* d2fluxdphasedwave[i][:,:,np.newaxis] )			
+			dnumerator=( self.regularizationDerivs[1][:,:,varyParams[indices]]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2][:,:,varyParams[indices]]* dfluxdphase[i][:,:,np.newaxis] 
+				- self.regularizationDerivs[3][:,:,varyParams[indices]]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0][:,:,varyParams[indices]]* d2fluxdphasedwave[i][:,:,np.newaxis] )			
 			resids += [normalization* (numerator).flatten()]
 			jacobian=np.zeros((resids[-1].size,varyParams.sum()))
 			if boolIndex[varyParams].any():
