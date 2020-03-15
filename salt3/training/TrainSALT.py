@@ -175,13 +175,6 @@ class TrainSALT(TrainSALTBase):
 				for k in datadict[sn]['specdata'] : 
 					guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn] 
 				i+=1
-			if self.options.specrecal:
-				for sn in datadict.keys():
-					specdata=datadict[sn]['specdata']
-					photdata=datadict[sn]['photdata']
-					for k in specdata.keys():
-						init_scale,colordiffs = getScaleForSN(specdata[k],photdata,self.kcordict,datadict[sn]['survey'])
-						guess[np.where(parlist == 'specrecal_{}_{}'.format(sn,k))[0][-1]] = init_scale
 
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
@@ -556,42 +549,44 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		log.info('plotting light curves took %.1f'%(time()-tlc))
 		
 	def main(self):
-
-		if not len(self.surveylist):
-			raise RuntimeError('surveys are not defined - see documentation')
-		self.kcordict=readutils.rdkcor(self.surveylist,self.options)
-		# TODO: ASCII filter files
+		try:
+			stage='initialization'
+			if not len(self.surveylist):
+				raise RuntimeError('surveys are not defined - see documentation')
+			self.kcordict=readutils.rdkcor(self.surveylist,self.options)
+			# TODO: ASCII filter files
 				
-		if not os.path.exists(self.options.outputdir):
-			os.makedirs(self.options.outputdir)
-		if self.options.binspec:
-			binspecres = self.options.binspecres
-		else:
-			binspecres = None
+			if not os.path.exists(self.options.outputdir):
+				os.makedirs(self.options.outputdir)
+			if self.options.binspec:
+				binspecres = self.options.binspecres
+			else:
+				binspecres = None
 
-		datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,self.kcordict,
-									   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
-									   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
-									   binspecres=binspecres)
-		datadict = self.mkcuts(datadict,KeepOnlySpec=self.options.keeponlyspec)
+			datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,self.kcordict,
+										   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
+										   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
+										   binspecres=binspecres)
+			datadict = self.mkcuts(datadict,KeepOnlySpec=self.options.keeponlyspec)
 
 		
-		# fit the model - initial pass
-		if self.options.stage == "all" or self.options.stage == "train":
-			# read the data
-				
+			# fit the model - initial pass
+			if self.options.stage == "all" or self.options.stage == "train":
+				# read the data
+				stage='training'
 
-			phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-				modelerr,clpars,clerr,clscat,SNParams,pars,pars_unscaled,parlist,chain,loglikes = self.fitSALTModel(datadict)
-		
-			# write the output model - M0, M1, c
-			self.wrtoutput(self.options.outputdir,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,
-						   modelerr,clpars,clerr,clscat,SNParams,
-						   pars,pars_unscaled,parlist,chain,loglikes,datadict)
-
-		if self.options.stage == "all" or self.options.stage == "validate":
-			self.validate(self.options.outputdir,datadict)
-		
-		log.info('successful SALT2 training!  Output files written to %s'%self.options.outputdir)
+				phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+					modelerr,clpars,clerr,clscat,SNParams,pars,pars_unscaled,parlist,chain,loglikes = self.fitSALTModel(datadict)
+				stage='output'
+				# write the output model - M0, M1, c
+				self.wrtoutput(self.options.outputdir,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,
+							   modelerr,clpars,clerr,clscat,SNParams,
+							   pars,pars_unscaled,parlist,chain,loglikes,datadict)
+			log.info('successful SALT2 training!  Output files written to %s'%self.options.outputdir)
+			if self.options.stage == "all" or self.options.stage == "validate":
+				stage='validation'
+				self.validate(self.options.outputdir,datadict)
+		except:
+			log.exception(f'Exception raised during {stage}')
 		
 	
