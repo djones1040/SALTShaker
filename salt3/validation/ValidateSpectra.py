@@ -135,11 +135,10 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 				unncalledModel = flux(salt3dir,specdata[k]['tobs']+snPars['t0'],specdata[k]['wavelength'],
 									  snPars['z'],snPars['x0'],snPars['x1'],snPars['c'],mwebv=datadict[sn]['MWEBV'])
 				modelflux = unncalledModel*recalexp
-
 				if not axcount % 3 and axcount != 0:
 					fig = plt.figure()
 				ax = plt.subplot(3,1,axcount % 3 + 1)
-			
+				
 				if len(coeffs): ax.plot(wave,modelflux,'r-',label='recalibrated model spectrum for z = %.3f, $x_1$ = %.3f'%(
 						snPars['z'],snPars['x1']))
 				ax.plot(wave,specdata[k]['flux'],'b-',label='%s spectral data, phase = %.1f'%(sn,specdata[k]['tobs']-snPars['t0']))
