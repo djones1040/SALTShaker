@@ -389,9 +389,10 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		salt2model = sncosmo.Model(source='salt2')
 		salt2model.set(z=float(sn.REDSHIFT_HELIO.split()[0]))
 		fitparams = ['t0', 'x0', 'x1', 'c']
+
 		result, fitted_model = sncosmo.fit_lc(
 			data, salt2model, fitparams,
-			bounds={'t0':(sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]-10, sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)]+10),
+			bounds={'t0':(sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)][0]-10, sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)][0]+10),
 					'z':(0.0,0.7),'x1':(-3,3),'c':(-0.3,0.3)})
 
 		return result['parameters'][2],result['parameters'][3],result['parameters'][4],result['parameters'][1]
