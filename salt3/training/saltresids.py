@@ -606,7 +606,12 @@ class SALTResids:
 			if not varkey in storedResults:
 				storedResults[varkey]=uncertaintyfun(x,sn,storedResults,temporaryResults,varyParams)
 			uncertaintydict=storedResults[varkey]
-			
+			#if name == 'spec' and sn == '03D1au' and len(storedResults['specfluxes_03D1au']['modelflux']):
+			#	import pylab as plt
+			#	plt.ion()
+			#	plt.plot(storedResults['specfluxes_03D1au']['modelflux'])
+			#	plt.plot(storedResults['specfluxes_03D1au']['dataflux'])
+			#	import pdb; pdb.set_trace()
 			returndicts+=[{**valdict ,**uncertaintydict}]
 		return returndicts		
 	
