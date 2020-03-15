@@ -524,6 +524,7 @@ class GaussNewton(saltresids.SALTResids):
 		chi2_init = (residuals**2.).sum()
 		X = copy.deepcopy(guess[:])
 		Xlast = copy.deepcopy(guess[:])
+		
 		chi2results=self.getChi2Contributions(X,uncertainties.copy())
 		for name,chi2component,dof in chi2results:
 			log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/chi2_init*100))
@@ -532,7 +533,7 @@ class GaussNewton(saltresids.SALTResids):
 # 			X,logval=self.fitOneSN(X,sn)
 		for i in range(2):
 			for fit in ['x0','color','x1']:
-				X,chi2_init=self.process_fit(X,self.fitOptions[fit][1],{},fit=fit)
+				X,chi2_init,_=self.process_fit(X,self.fitOptions[fit][1],{},fit=fit)
 		uncertainties={}
 		chi2results=self.getChi2Contributions(X,uncertainties)
 		chi2_init=sum([x[1] for x in chi2results])
@@ -821,7 +822,7 @@ class GaussNewton(saltresids.SALTResids):
 
 			if (fit=='all'):
 				if self.tryFittingAllParams:
-					Xprop,chi2prop = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
+					Xprop,chi2prop,chi2 = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
 					if (chi2prop/chi2 < 0.9):
 						log.info('Terminating iteration {}, continuing with all parameter fit'.format(niter+1))
 						return Xprop,chi2prop,False
@@ -829,7 +830,7 @@ class GaussNewton(saltresids.SALTResids):
 						if chi2prop>chi2*(1-1e-3):
 							self.tryFittingAllParams=False
 							log.info('Discontinuing all parameter fit')
-						X,chi2=Xprop,chi2prop
+						X,chi2=Xprop[:],chi2prop
 						storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys)}
 					else:
 						retainReg=True
@@ -850,7 +851,7 @@ class GaussNewton(saltresids.SALTResids):
 							includeParsPhase[self.im1[iFit]]=True
 						else:
 							includeParsPhase[self.__dict__['im%s'%fit[-1]][iFit]] = True
-						Xprop,chi2prop = self.process_fit(Xprop,includeParsPhase,storedResults,fit=fit)
+						Xprop,chi2prop,chi2 = self.process_fit(Xprop,includeParsPhase,storedResults,fit=fit)
 
 						#includeParsPhase[self.__dict__['im%s'%fit[-1]][iFit]] = True
 						#Xprop,chi2prop = self.process_fit(X,includeParsPhase,storedResults,fit=fit)
@@ -859,19 +860,19 @@ class GaussNewton(saltresids.SALTResids):
 							log.error('NaN detected, breaking out of loop')
 							break;
 						if chi2prop<chi2 :
-							X,chi2=Xprop,chi2prop
+							X,chi2=Xprop[:],chi2prop
 						retainPCDerivs=True
 						storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
 							   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
 
 			else:
 				for i in range(self.GN_iter[fit]):
-					Xprop,chi2prop = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
+					Xprop,chi2prop,chi2 = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
 					if np.isnan(Xprop).any() or (~np.isfinite(Xprop)).any() or np.isnan(chi2prop) or ~np.isfinite(chi2prop):
 						log.error('NaN detected, breaking out of loop')
 						break;
 					if chi2prop<chi2 :
-						X,chi2=Xprop,chi2prop
+						X,chi2=Xprop.copy(),chi2prop
 					retainReg=(not ('all' in fit or 'component' in fit))
 					retainPCDerivs=('component' in fit)  or fit.startswith('x') or fit=='sn'
 					storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
@@ -886,9 +887,9 @@ class GaussNewton(saltresids.SALTResids):
 		#In this case GN optimizer can do no better
 		return X,chi2,(X is X_init)
 		 #_init
-	def linear_fit(self,X,gaussnewtonstep,uncertainties): #,doSpecResids):
+	def linear_fit(self,X,gaussnewtonstep,uncertainties,doSpecResids):
 		def opFunc(x,stepdir):
-			return ((self.lsqwrap(X-(x*stepdir),uncertainties.copy(),None,True))**2).sum() #doSpecResids
+			return ((self.lsqwrap(X-(x*stepdir),uncertainties.copy(),None,True,doSpecResids))**2).sum()
 		result,step,stepType=minimize_scalar(opFunc,args=(gaussnewtonstep,)),gaussnewtonstep,'Gauss-Newton'
 		log.info('Linear optimization factor is {:.2f} x {} step'.format(result.x,stepType))
 		log.info('Linear optimized chi2 is {:.2f}'.format(result.fun))
@@ -900,9 +901,9 @@ class GaussNewton(saltresids.SALTResids):
 		varyingParams=iFit&self.iModelParam
 		if not self.fitTpkOff: varyingParams[self.itpk]=False
 
-		#if fit == 'x0': import pdb;pdb.set_trace()# doSpecResids = False
-		#else: doSpecResids = True
-		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors) #,doSpecResids=doSpecResids)
+		if fit in ['color','colorlaw']: doSpecResids = False
+		else: doSpecResids = True
+		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors,doSpecResids=doSpecResids)
 		oldChi=(residuals**2).sum()
 
 		jacobian=jacobian.tocsc()
@@ -950,10 +951,10 @@ class GaussNewton(saltresids.SALTResids):
 		uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
 		
 		#Was trying a clip in linear_fit; may not be worth it with new, more stable algorithm
-		preclip=((self.lsqwrap(X-gaussNewtonStep,uncertainties.copy(),None,True))**2).sum() #doSpecResids
+		preclip=((self.lsqwrap(X-gaussNewtonStep,uncertainties.copy(),None,True,doSpecResids))**2).sum() #
 		log.info('After Gauss-Newton chi2 is {:.2f}'.format(preclip))
 	
-		linearStep,linearChi2=self.linear_fit(X,gaussNewtonStep,uncertainties) #,doSpecResids)
+		linearStep,linearChi2=self.linear_fit(X,gaussNewtonStep,uncertainties,doSpecResids) #)
 		if linearChi2>preclip:
 			X-=gaussNewtonStep
 			chi2=preclip
@@ -964,5 +965,5 @@ class GaussNewton(saltresids.SALTResids):
 		log.info(' '.join(['{:.2f}'.format(x) for x in [oldChi-chi2,(100*(oldChi-chi2)/oldChi)] ]))
 		print('')
 		#import pdb; pdb.set_trace()
-		return X,chi2
+		return X,chi2,oldChi
 
