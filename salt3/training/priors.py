@@ -3,6 +3,7 @@ from salt3.training import saltresids
 from inspect import signature
 from functools import partial
 from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
+from sncosmo.salt2utils import SALT2ColorLaw
 import logging
 log=logging.getLogger(__name__)
 
@@ -25,6 +26,8 @@ class SALTPriors:
 			self.__dict__[k] = SALTResidsObj.__dict__[k]
 		self.SALTModel = SALTResidsObj.SALTModel
 		self.SALTModelDeriv = SALTResidsObj.SALTModelDeriv
+		self.regularizationScale=SALTResidsObj.regularizationScale
+		
 		self.priors={ key: partial(__priors__[key],self) for key in __priors__}
 		for prior in self.usePriors:
 			result=self.priors[prior](1,self.guess,self.SALTModel(self.guess))
@@ -35,20 +38,29 @@ class SALTPriors:
 			self.numBoundResids += result[0].size
 	@prior
 	def m0m1prior(self,width,x,components):
-		"""M1 should have no outer product with M0"""
+		"""M1 should have no inner product with the effect of reddening on M0"""
 		phase=self.phaseRegularizationPoints
 		wave=self.waveRegularizationPoints
-		components=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
+		componentsatreg=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
+		scale,scaleDeriv=self.regularizationScale(components,componentsatreg)
+		components=componentsatreg
 		
-		m0sqr=(components[0]**2).sum()
-		m1sqr=(components[1]**2).sum()
-		m0m1=(components[0]*components[1]).sum()
 		
-		corr=np.array([m0m1/np.sqrt(m1sqr*m0sqr)])
+		
+		
+		colorlaw= -0.4 * SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])(wave)
+		coloreffect=(np.exp(0.4*colorlaw)[np.newaxis,:]-1)
+		reddenedM0= components[0]* coloreffect
+		m0m1=(reddenedM0*components[1]).sum()
+		m0m1scale=np.sqrt(scale[0]*scale[1])
+		corr=np.array([m0m1/m0m1scale])
 		#Derivative with respect to m0
+		
+		
 		jacobian=np.zeros((1,self.npar))
-		jacobian[:,self.im0]= ((components[1]* m1sqr*m0sqr - m0m1*m1sqr*components[0] )[:,:,np.newaxis]*self.regularizationDerivs[0]).sum(axis=(0,1))/np.sqrt((m0sqr*m1sqr)**3)
-		jacobian[:,self.im1]= ((components[0]* m1sqr*m0sqr - m0m1*m0sqr*components[1] )[:,:,np.newaxis]*self.regularizationDerivs[0]).sum(axis=(0,1))/np.sqrt((m0sqr*m1sqr)**3)
+		jacobian[:,self.im0]= (((components[1] * coloreffect )[:,:,np.newaxis]*self.regularizationDerivs[0]).sum(axis=(0,1)) -corr*scaleDeriv[0]*0.5*scale[1]/m0m1scale)/m0m1scale
+		jacobian[:,self.im1]=  (((reddenedM0)[:,:,np.newaxis]*self.regularizationDerivs[0]).sum(axis=(0,1))-corr*scaleDeriv[1]*0.5*scale[0]/m0m1scale)/m0m1scale
+		jacobian[:,self.iCL]= (( components[1]*reddenedM0)[:,:,np.newaxis]* 0.4*self.colorLawDerivInterp(wave)[np.newaxis,:,:]).sum(axis=(0,1))/m0m1scale
 		residual=corr/width
 		
 		return corr/width,corr,jacobian/width	

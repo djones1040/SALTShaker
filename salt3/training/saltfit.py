@@ -497,12 +497,12 @@ class GaussNewton(saltresids.SALTResids):
 			self.fitOptions[fit]=(message,includePars)
 		self.fitlist = [('all'),#('all parameters grouped','all-grouped'),
 			#('piecewise both components','piecewisecomponents'),
-			('x0'),('x1'),('component0'),
+			('sn'),('component0'),
 			('sn'),
 			('component1'),('sn'),
 			('color'),('colorlaw'),
 			('sn'),
-			('spectralrecalibration'),'highestresids',			
+			('spectralrecalibration'),		
 			('tpk')]
 
 	def convergence_loop(self,guess,loop_niter=3):
@@ -530,9 +530,8 @@ class GaussNewton(saltresids.SALTResids):
 		log.info('Estimating supernova parameters x0,x1,c and spectral normalization')
 # 		for sn in self.datadict:
 # 			X,logval=self.fitOneSN(X,sn)
-		for i in range(2):
-			for fit in ['x0','color','x1']:
-				X,chi2_init=self.process_fit(X,self.fitOptions[fit][1],{},fit=fit)
+		for fit in ['x0','color','x0','color','x1']:
+			X,chi2_init=self.process_fit(X,self.fitOptions[fit][1],{},fit=fit)
 		uncertainties={}
 		chi2results=self.getChi2Contributions(X,uncertainties)
 		chi2_init=sum([x[1] for x in chi2results])
@@ -818,17 +817,17 @@ class GaussNewton(saltresids.SALTResids):
 			
 
 			Xprop = X.copy()
-
+			difffromall=None
 			if (fit=='all'):
 				if self.tryFittingAllParams:
 					Xprop,chi2prop = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
-					if (chi2prop/chi2 < 0.9):
+					if (chi2prop/chi2 < 0.95):
 						log.info('Terminating iteration {}, continuing with all parameter fit'.format(niter+1))
 						return Xprop,chi2prop,False
 					elif (chi2prop<chi2):
 						if chi2prop>chi2*(1-1e-3):
-							self.tryFittingAllParams=False
-							log.info('Discontinuing all parameter fit')
+							#Begin checking whether it's worth it to keep doing allparam fits
+							difffromall=chi2-chi2prop
 						X,chi2=Xprop,chi2prop
 						storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys)}
 					else:
@@ -881,7 +880,10 @@ class GaussNewton(saltresids.SALTResids):
 					if chi2 != chi2 or chi2 == np.inf:
 						break
 						
-
+		if difffromall :
+			if difffromall < (chi2_init-chi)/4:
+				self.tryFittingAllParams=False
+				log.info('Discontinuing all parameter fit')
 
 		#In this case GN optimizer can do no better
 		return X,chi2,(X is X_init)
@@ -930,7 +932,7 @@ class GaussNewton(saltresids.SALTResids):
 		if isJacobianSparse:
 		
 			log.info('Using sparse linear algebra')
-			stepsize,stopsignal,itn,normr,normar,norma,conda,normx=sprslinalg.lsmr(jacobian.dot(preconditoningMatrix),residuals[includeResids],maxiter=2*min(jacobian.shape))
+			stepsize,stopsignal,itn,normr,normar,norma,conda,normx=sprslinalg.lsmr(jacobian.dot(preconditoningMatrix),residuals[includeResids],damp=0.1 if fit=='all' else 0,maxiter=2*min(jacobian.shape))
 			
 			stopReasons=['x=0 solution','atol approx. solution','atol+btol approx. solution','ill conditioned','machine precision limit','machine precision limit','machine precision limit','max # of iteration']
 			log.debug('LSMR results: {}, norm r {:.2f}, norm J^T r {:.2f}, norm J {:.2f}, cond J {:.2f}, norm step {:.2f}'.format(stopReasons[stopsignal],normr,normar,norma,conda,normx ))
