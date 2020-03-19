@@ -7,6 +7,8 @@ def dictconfigfromYAML(filename,outputdir):
 		print(f"warning: logger config file {user_options.loggingconfig} doesn't exist, default logger configuration will be used (everything above debug to console)")
 		return False
 	else:
+		if not os.path.exists(outputdir):
+			os.makedirs(outputdir)
 		with open(filename,'r') as logConfigFile:
 			configdictionary=yaml.safe_load(logConfigFile.read())
 			for handler in configdictionary['handlers']:
