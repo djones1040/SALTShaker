@@ -164,11 +164,12 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 							"""
 							average = np.average(flux[values], weights=weights[values])
 							variance = np.average((flux[values]-average)**2, weights=weights[values])  # Fast and numerically precise
-							return np.sqrt(variance)/np.sqrt(len(values))
+							return np.sqrt(variance) #/np.sqrt(len(values))
 
 
 						
-						wavebins = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/binspecres)
+						#wavebins = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/binspecres)
+						wavebins = np.linspace(np.min(wavelength),np.max(wavelength),(np.max(wavelength)-np.min(wavelength))/binspecres)
 						binned_flux = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_avg).statistic
 						binned_fluxerr = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_err).statistic
 						iGood = binned_flux == binned_flux
@@ -318,7 +319,8 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 					if tpkerr < 2: tpkmsg = 'termination condition is satisfied'
 					else: tpkmsg = 'time of max uncertainty of +/- %.1f days is too uncertain!'%tpkerr
 				else:
-					log.warning('can\'t fint tmax in file %s'%peakmjdlist)
+					log.warning('can\'t find tmax in file %s'%peakmjdlist)
+					tpkmsg = 'can\'t find tmax in file %s'%peakmjdlist
 					#raise RuntimeError('SN ID %s not found in peak MJD list'%sn.SNID)
 			else:
 				tpk = sn.SEARCH_PEAKMJD
@@ -345,15 +347,19 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 								 'survey':sn.SURVEY,
 								 'tpk':tpk}
 			#datadict[snid]['zHelio'] = zHel
+			iGood = np.array([],dtype=int)
+			for i,f in enumerate(sn.FLT):
+				if '-u' not in kcordict[sn.SURVEY][f]['fullname']:
+					iGood = np.append(iGood,i)
 
 			# TODO: flux errors
-			datadict[sn.SNID]['specdata'] = {}				
+			datadict[sn.SNID]['specdata'] = {}
 			datadict[sn.SNID]['photdata'] = {}
-			datadict[sn.SNID]['photdata']['tobs'] = sn.MJD - tpk
-			datadict[sn.SNID]['photdata']['mjd'] = sn.MJD
-			datadict[sn.SNID]['photdata']['fluxcal'] = sn.FLUXCAL
-			datadict[sn.SNID]['photdata']['fluxcalerr'] = sn.FLUXCALERR
-			datadict[sn.SNID]['photdata']['filt'] = sn.FLT
+			datadict[sn.SNID]['photdata']['tobs'] = sn.MJD[iGood] - tpk
+			datadict[sn.SNID]['photdata']['mjd'] = sn.MJD[iGood]
+			datadict[sn.SNID]['photdata']['fluxcal'] = sn.FLUXCAL[iGood]
+			datadict[sn.SNID]['photdata']['fluxcalerr'] = sn.FLUXCALERR[iGood]
+			datadict[sn.SNID]['photdata']['filt'] = sn.FLT[iGood]
 			if 'MWEBV' in sn.__dict__.keys():
 				try: datadict[sn.SNID]['MWEBV'] = float(sn.MWEBV.split()[0])
 				except: datadict[sn.SNID]['MWEBV'] = float(sn.MWEBV)
