@@ -577,12 +577,7 @@ class GaussNewton(saltresids.SALTResids):
 
 		X = copy.deepcopy(guess[:])
 		Xlast = copy.deepcopy(guess[:])
-		uncertainties={}
-		chi2results=self.getChi2Contributions(X,uncertainties)
-		self.uncertaintyKeys={key for key in uncertainties if key.startswith('photvariances_') or key.startswith('specvariances_') or key.startswith('photCholesky_') }
 
-# 		for sn in self.datadict:
-# 			X,logval=self.fitOneSN(X,sn)
 		if np.all(X[self.ix1]==0) or np.all(X[self.ic]==0):
 			#If snparams are totally uninitialized
 			log.info('Estimating supernova parameters x0,x1,c and spectral normalization')
@@ -877,7 +872,7 @@ class GaussNewton(saltresids.SALTResids):
 			Xprop = X.copy()
 			if (fit=='all'):
 				if self.tryFittingAllParams:
-					Xprop,chi2prop = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
+					Xprop,chi2prop,chi2 = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
 					if (chi2prop/chi2 < 0.95):
 						log.info('Terminating iteration {}, continuing with all parameter fit'.format(niter+1))
 						return Xprop,chi2prop,False
@@ -903,7 +898,7 @@ class GaussNewton(saltresids.SALTResids):
 							includeParsPhase[self.im1[iFit]]=True
 						else:
 							includeParsPhase[self.__dict__['im%s'%fit[-1]][iFit]] = True
-						Xprop,chi2prop = self.process_fit(Xprop,includeParsPhase,storedResults,fit=fit)
+						Xprop,chi2prop,chi2 = self.process_fit(Xprop,includeParsPhase,storedResults,fit=fit)
 
 						#includeParsPhase[self.__dict__['im%s'%fit[-1]][iFit]] = True
 						#Xprop,chi2prop = self.process_fit(X,includeParsPhase,storedResults,fit=fit)
@@ -912,15 +907,14 @@ class GaussNewton(saltresids.SALTResids):
 							log.error('NaN detected, breaking out of loop')
 							break;
 						if chi2prop<chi2 :
-							X,chi2=Xprop,chi2prop
+							X,chi2=Xprop[:],chi2prop
 						retainPCDerivs=True
 						storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
 							   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
 
 			else:
 				for i in range(self.GN_iter[fit]):
-					Xprop,chi2prop = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
-					
+					Xprop,chi2prop,chi2 = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
 					if np.isnan(Xprop).any() or (~np.isfinite(Xprop)).any() or np.isnan(chi2prop) or ~np.isfinite(chi2prop):
 						log.error('NaN detected, breaking out of loop')
 						break;
@@ -940,9 +934,9 @@ class GaussNewton(saltresids.SALTResids):
 		#In this case GN optimizer can do no better
 		return X,chi2,(X is X_init)
 		 #_init
-	def linear_fit(self,X,gaussnewtonstep,uncertainties): #,doSpecResids):
+	def linear_fit(self,X,gaussnewtonstep,uncertainties,doSpecResids):
 		def opFunc(x,stepdir):
-			return ((self.lsqwrap(X-(x*stepdir),uncertainties.copy(),None,True))**2).sum() #doSpecResids
+			return ((self.lsqwrap(X-(x*stepdir),uncertainties.copy(),None,True,doSpecResids=doSpecResids))**2).sum()
 		result,step,stepType=minimize_scalar(opFunc,args=(gaussnewtonstep,)),gaussnewtonstep,'Gauss-Newton'
 		log.info('Linear optimization factor is {:.2f} x {} step'.format(result.x,stepType))
 		log.info('Linear optimized chi2 is {:.2f}'.format(result.fun))
@@ -953,9 +947,11 @@ class GaussNewton(saltresids.SALTResids):
 		X=X.copy()
 		varyingParams=iFit&self.iModelParam
 		if not self.fitTpkOff: varyingParams[self.itpk]=False
-		
-		#Calculate residuals and jacobian
-		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors) #,doSpecResids=doSpecResids)
+
+		if fit in ['color','colorlaw']: doSpecResids = False
+		else: doSpecResids = True
+		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors,doSpecResids=doSpecResids)
+
 		oldChi=(residuals**2).sum()
 
 		jacobian=jacobian.tocsc()
@@ -996,7 +992,7 @@ class GaussNewton(saltresids.SALTResids):
 			result=sprslinalg.lsmr(precondjac,residuals[includeResids],damp=damping,maxiter=2*min(jacobian.shape))
 			gaussNewtonStep=np.zeros(X.size)
 			gaussNewtonStep[varyingParams]=preconditoningMatrix*result[0]
-			postGN=((self.lsqwrap(X-gaussNewtonStep,uncertainties.copy(),None,True))**2).sum() #doSpecResids
+			postGN=((self.lsqwrap(X-gaussNewtonStep,uncertainties.copy(),None,True,doSpecResids=doSpecResids))**2).sum() #
 			return result,postGN,gaussNewtonStep,damping
 			
 				
@@ -1030,14 +1026,14 @@ class GaussNewton(saltresids.SALTResids):
 		log.info('After Gauss-Newton chi2 is {:.2f}'.format(postGN))
 		if self.nonlinearcorrection=='geodesic':
 			#Fancypants cubic correction to the Gauss-Newton step based on fun differential geometry! See https://arxiv.org/abs/1207.4999 for derivation
-			#Second directional derivative of the residuals as found with second order central difference method. Might be worth dynamically finding dx
-			directionalSecondDeriv,tol=	ridders(lambda dx: self.lsqwrap(X+dx*gaussNewtonStep,uncertainties.copy(),None,True) ,residuals,.5,5,1e-8)
+			# Right now, doesn't seem worth it compared to directional fit; maybe worth trying both?
+						
+			directionalSecondDeriv,tol=	ridders(lambda dx: self.lsqwrap(X+dx*gaussNewtonStep,uncertainties.copy(),None,True,doSpecResids=doSpecResids) ,residuals,.5,5,1e-8)
 			accelerationdir,stopsignal,itn,normr,normar,norma,conda,normx=sprslinalg.lsmr(precondjac,directionalSecondDeriv[includeResids],damp=self.damping[fit],maxiter=2*min(jacobian.shape))
 			secondStep=np.zeros(X.size)
 			secondStep[varyingParams]=0.5*preconditoningMatrix*accelerationdir
-			postgeodesic=((self.lsqwrap(X-gaussNewtonStep-secondStep,uncertainties.copy(),None,True))**2).sum() #doSpecResids
+			postgeodesic=(self.lsqwrap(X-gaussNewtonStep-secondStep,uncertainties.copy(),None,True,doSpecResids=doSpecResids)**2).sum() #doSpecResids
 			log.info('After geodesic acceleration correction chi2 is {:.2f}'.format(postgeodesic))
-		
 			if postgeodesic<postGN:
 				chi2=postgeodesic
 				X-=gaussNewtonStep+secondStep
@@ -1045,7 +1041,7 @@ class GaussNewton(saltresids.SALTResids):
 				chi2=postGN
 				X-=gaussNewtonStep
 		elif self.nonlinearcorrection=='directional':
-			linearstep,chi2=self.linear_fit(X,gaussNewtonStep,uncertainties) #,doSpecResids)	
+			linearstep,chi2=self.linear_fit(X,gaussNewtonStep,uncertainties,doSpecResids)	
 			X-=linearstep		
 		else:
 			X-=gaussNewtonStep
@@ -1055,5 +1051,5 @@ class GaussNewton(saltresids.SALTResids):
 		log.info(' '.join(['{:.2f}'.format(x) for x in [oldChi-chi2,(100*(oldChi-chi2)/oldChi)] ]))
 		print('')
 		#import pdb; pdb.set_trace()
-		return X,chi2
+		return X,chi2,oldChi
 
