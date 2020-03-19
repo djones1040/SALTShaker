@@ -577,18 +577,17 @@ class GaussNewton(saltresids.SALTResids):
 
 		X = copy.deepcopy(guess[:])
 		Xlast = copy.deepcopy(guess[:])
-
+		self.uncertaintyKeys=['photvariances_' +sn for sn in self.datadict]+['specvariances_' +sn for sn in self.datadict]+['photCholesky_' +sn for sn in self.datadict]
 		if np.all(X[self.ix1]==0) or np.all(X[self.ic]==0):
 			#If snparams are totally uninitialized
 			log.info('Estimating supernova parameters x0,x1,c and spectral normalization')
 			for fit in ['x0','color','x0','color','x1']:
-				X,chi2_init=self.process_fit(X,self.fitOptions[fit][1],{},fit=fit)
+				X,chi2_init,chi2=self.process_fit(X,self.fitOptions[fit][1],{},fit=fit,doSpecResids=  (fit=='x0'))
 		uncertainties={}
 		chi2results=self.getChi2Contributions(X,uncertainties)
 		chi2_init=sum([x[1] for x in chi2results])
 		for name,chi2component,dof in chi2results:
 			log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/chi2_init*100))
-		self.uncertaintyKeys={key for key in uncertainties if key.startswith('photvariances_') or key.startswith('specvariances_') or key.startswith('photCholesky_') }
 		uncertainties={key:uncertainties[key] for key in self.uncertaintyKeys}
 		log.info('starting loop; %i iterations'%loop_niter)
 		for superloop in range(loop_niter):
@@ -943,7 +942,7 @@ class GaussNewton(saltresids.SALTResids):
 		return result.x*gaussnewtonstep,result.fun
 		
 		
-	def process_fit(self,X,iFit,storedResults,fit='all',doPriors=True):
+	def process_fit(self,X,iFit,storedResults,fit='all',doPriors=True,doSpecResids=True):
 		X=X.copy()
 		varyingParams=iFit&self.iModelParam
 		if not self.fitTpkOff: varyingParams[self.itpk]=False
