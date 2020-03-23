@@ -463,7 +463,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			parlist,parameters = np.genfromtxt(
 				'%s/salt3_parameters.dat'%outputdir,unpack=True,dtype=str,skip_header=1)
 			parameters = parameters.astype(float)
-			CheckSALTParams.checkSALT(parameters,parlist,snfiles_tot,snlist,outputdir,idx=j)
+			CheckSALTParams.checkSALT(parameters,parlist,snfiles,snlist,outputdir,idx=j)
 		
 		# kcor files
 		kcordict = {}
