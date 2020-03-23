@@ -1,0 +1,176 @@
+
+	 Start program SALT2mu.exe 
+
+  Initialize uniqueOverlap for SALT2mu-input file
+Reading SALT2mu parameter-input file '/home/midai/salt3_local/SALT3/examples/batchtest/pipelinetest/test_BBC.input' : 
+ Parse 'surveygroup_biascor='PS1_LOWZ_COMBINED(zbin=0.01)'' 
+ Parse 'snrmin_sigint_biascor=30 # SNRMIN to compute siginit_biascor' 
+ Parse 'file=/home/midai/salt3_local/SALT3/examples/batchtest/SNFIT_BYOSED' 
+ Parse 'simfile_biascor=/project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/batchtest/lcfitting_biascor/SNFIT_BYOSED_BIASCOR/BYOSED_BIASCOR/FITOPT000.FITRES' 
+ Parse 'nlogzbin=25' 
+ Parse 'blindflag=0' 
+ Parse 'opt_biascor=240' 
+ Parse 'prefix=SALT2mu_FoundPS1' 
+ Parse 'vpecerr=250' 
+ Parse 'lensing_zpar=0.055' 
+ Parse 'min_per_zbin=1' 
+ Parse 'varname_pIa=PIa' 
+ Parse 'redchi2_tol=.01' 
+ Parse 'fitflag_sigmb=2' 
+ Parse 'iflag_duplicate=2 # 0=ignore, 1=abort, 2=merge' 
+ Parse 'sig1=0.11' 
+ Parse 'zmin=0.01' 
+ Parse 'zmax=0.7' 
+ Parse 'x1min=-3.0' 
+ Parse 'x1max=+3.0' 
+ Parse 'cmax=+0.3' 
+ Parse 'cmin=-0.3' 
+ Parse 'errmask_write=0' 
+ Parse 'p1=0.14635' 
+ Parse 'p2=3.10805' 
+ Parse 'p3=0.0 # alpha evolution' 
+ Parse 'p4=0.0 # beta evolution' 
+ Parse 'p5=0.0 # host mass' 
+ Parse 'p6=0.0 # host mass evolution' 
+ Parse 'p7=10.0 # mass step split' 
+ Parse 'p8=0.01 # step widthx' 
+ Parse 'p9=0.70' 
+ Parse 'p10=0.0' 
+ Parse 'p11=-1.0' 
+ Parse 'p12=0.0' 
+ Parse 'p13=1.0' 
+ Parse 'u1=1' 
+ Parse 'u2=1' 
+ Parse 'u3=0' 
+ Parse 'u4=0' 
+ Parse 'u5=1' 
+ Parse 'u6=0' 
+ Parse 'u7=0' 
+ Parse 'u8=0' 
+ Parse 'u9=0' 
+ Parse 'u10=0' 
+ Parse 'u11=0' 
+ Parse 'u12=0' 
+ Parse 'u13=1' 
+ Parse 'h0=70.0' 
+ Parse 'mag0=-30.00' 
+ Parse 'uave=1' 
+ Parse 'hgtype=-1 # uave = use average magnitude from cosmology (not nommag0)' 
+
+
+ Parse command-line options: 
+  Initialize uniqueOverlap for SALT2mu command-line override
+ Parse 'datafile=FITOPT000.FITRES' 
+ Parse 'prefix=SALT2mu_FITOPT000_MUOPT000' 
+
+zmin =0.010000 zmax =0.700000 bins=25 
+SN selection type=ALL
+x1min/x1max = -3.000 / 3.000 
+cmin/cmax   = -0.300 / 0.300 
+logmass_min/max = -20.000/20.000 
+H0=70.000000 
+Nominal M0=-30.000000 
+zpecerr = 0.0008 
+dsigint/dz(lensing) =0.055000 
+Use average M0.
+Will fit for sig1 such that chi2/N ~ 1.0
+Will use sig1tol=0.010000 . 
+Will allow max sigmb iterations=20 .
+uM0=1 --> M0 floated in each z bin. 
+blank  fixed   starting value=   0.000  (step=0.000)
+alpha0        varied  starting value=   0.146  (step=0.010)
+beta0         varied  starting value=   3.108  (step=0.300)
+alpha1        fixed   starting value=   0.000  (step=0.020)
+beta1         fixed   starting value=   0.000  (step=0.100)
+gamma0        varied  starting value=   0.000  (step=0.010)
+gamma1        fixed   starting value=   0.000  (step=0.010)
+logmass_cen   fixed   starting value=  10.000  (step=0.100)
+logmass_tau   fixed   starting value=   0.010  (step=0.010)
+Omega_L       fixed   starting value=   0.700  (step=0.050)
+Omega_k       fixed   starting value=   0.000  (step=0.050)
+w0            fixed   starting value=  -1.000  (step=0.100)
+wa            fixed   starting value=   0.000  (step=0.500)
+scalePCC      fixed   starting value=   1.000  (step=0.050)
+sigint        fixed   starting value=   0.100  (step=0.010)
+alphaHost     fixed   starting value=   0.000  (step=0.020)
+betaHost      fixed   starting value=   0.000  (step=0.100)
+H11mucc0      fixed   starting value=   1.200  (step=0.100)
+H11mucc1      fixed   starting value=   3.000  (step=0.200)
+H11mucc2      fixed   starting value=  -2.000  (step=0.500)
+H11sigcc0     fixed   starting value=   0.300  (step=0.050)
+H11sigcc1     fixed   starting value=   0.000  (step=0.050)
+H11sigcc2     fixed   starting value=   0.000  (step=0.050)
+blank4        fixed   starting value=   0.000  (step=0.000)
+
+ prep_gamma_input: set USE_GAMMA0 flag 
+	 Append HOST_LOGMASS to CUTWIN list. 
+
+
+ ****************************************************************** 
+   read_data  
+	 Found 107 events in FITOPT000.FITRES. 
+	 malloc_INFO_DATA:  0.143 MB 
+   OPEN_TEXTFILE: FITOPT000.FITRES 
+   Read 53 table varNames from TEXT table=FITRES 
+	 Prepare read-variable 'CID' (ivar=0, CAST=C) 
+	 Prepare read-variable 'IDSURVEY' (ivar=1, CAST=S) 
+	 Prepare read-variable 'TYPE' (ivar=2, CAST=S) 
+	 Prepare read-variable 'zHD' (ivar=9, CAST=F) 
+	 Prepare read-variable 'zHDERR' (ivar=10, CAST=F) 
+	 Prepare read-variable 'zHEL' (ivar=5, CAST=F) 
+	 Prepare read-variable 'zHELERR' (ivar=6, CAST=F) 
+	 Prepare read-variable 'VPEC' (ivar=11, CAST=F) 
+	 Prepare read-variable 'VPECERR' (ivar=12, CAST=F) 
+	 Prepare read-variable 'SNRMAX1' (ivar=18, CAST=F) 
+	 Prepare read-variable 'x0' (ivar=29, CAST=F) 
+	 Prepare read-variable 'x0ERR' (ivar=30, CAST=F) 
+	 Prepare read-variable 'x1' (ivar=23, CAST=F) 
+	 Prepare read-variable 'x1ERR' (ivar=24, CAST=F) 
+	 Prepare read-variable 'c' (ivar=25, CAST=F) 
+	 Prepare read-variable 'cERR' (ivar=26, CAST=F) 
+	 Prepare read-variable 'COV_x1_x0' (ivar=32, CAST=F) 
+	 Prepare read-variable 'COV_c_x0' (ivar=33, CAST=F) 
+	 Prepare read-variable 'COV_x1_c' (ivar=31, CAST=F) 
+	 Prepare read-variable 'HOST_LOGMASS' (ivar=13, CAST=F) 
+	 Prepare read-variable 'SIM_TEMPLATE_INDEX' (ivar=38, CAST=S) 
+	 Prepare read-variable 'SIM_x0' (ivar=50, CAST=F) 
+	 Prepare read-variable 'SIM_mB' (ivar=51, CAST=F) 
+	 Prepare read-variable 'SIM_x1' (ivar=46, CAST=F) 
+	 Prepare read-variable 'SIM_c' (ivar=47, CAST=F) 
+	 Prepare read-variable 'SIM_alpha' (ivar=48, CAST=F) 
+	 Prepare read-variable 'SIM_beta' (ivar=49, CAST=F) 
+	 Prepare read-variable 'SIM_ZCMB' (ivar=41, CAST=F) 
+	 Prepare read-variable 'SIM_DLMAG' (ivar=44, CAST=F) 
+	 Prepare read-variable 'SIM_VPEC' (ivar=43, CAST=F) 
+	 ==> Finished reading 30 of 53 variables with 107 entries
+
+ ****************************************************************** 
+   Begin check_duplicate_SNID  
+	 No duplicates found. 
+
+ ****************************************************************** 
+   Begin setup_BININFO_logz   
+	 nlogzbin = 25 -> logz binsize = 0.0738 
+
+ ****************************************************************** 
+   Begin prepare_IDSAMPLE_biasCor  
+  SAMPLE_INFO DUMP for DATA: 
+  IDSAMPLE= 0 --> CFA3S                 (NDATA   =   107, 0.022<z<0.100)
+
+ ****************************************************************** 
+   prepare_biasCor  
+
+ FATAL[SNTABLE_NEVT_TEXT]: 
+	 BIASCOR/BYOSED_BIASCOR/FITOPT000.FITRES'  
+	 '/project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/batchtest/lcfitting_biascor/SNFIT_BYOSED_BIASCOR/BYOSED_BIASCOR/FITOPT000.FITRES' 
+
+
+
+   `|```````|`    
+   <| o\ /o |>    
+    | ' ; ' |     
+    |  ___  |     ABORT program on Fatal Error. 
+    | |' '| |     
+    | `---' |     
+    \_______/    
+

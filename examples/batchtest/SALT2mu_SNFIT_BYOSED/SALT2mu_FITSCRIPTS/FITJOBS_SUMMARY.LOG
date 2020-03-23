@@ -1,0 +1,14 @@
+		 SUMMARY of 2 SALT2mu FITS 
+
+ MUOPT: 000 [DEFAULT] NONE 
+ MUOPT: 001 [MASS_G10_HIGHER] p7=10.15 
+
+
+ INPDIR: /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/batchtest/SNFIT_BYOSED 
+ OUTDIR: /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/batchtest/SALT2mu_SNFIT_BYOSED 
+   VERSION  		   FITOPT MUOPT    chi2/dof   alpha  beta   sigint M0avg
+ DJ_SALT3_PIPETEST/SALT2mu_FITOPT000_MUOPT000.FITRES  not  found ??? 
+ DJ_SALT3_PIPETEST/SALT2mu_FITOPT000_MUOPT001.FITRES  not  found ??? 
+
+ Total wall time: 0.8 minutes. 
+

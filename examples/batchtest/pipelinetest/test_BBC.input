@@ -1,0 +1,58 @@
+BATCH_INFO: sbatch	$SBATCH_TEMPLATES/SBATCH_Midway2_short.TEMPLATE 30
+INPDIR: /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/batchtest/SNFIT_BYOSED
+DONE_STAMP: /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/batchtest/pipelinetest/GetMu.DONE
+MUOPT:	[MASS_G10_HIGHER] p7=10.15
+surveygroup_biascor='PS1_LOWZ_COMBINED(zbin=0.01)'
+snrmin_sigint_biascor=30 # SNRMIN to compute siginit_biascor
+file=/project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/batchtest/SNFIT_BYOSED
+simfile_biascor=/project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/batchtest/lcfitting_biascor/SNFIT_BYOSED_BIASCOR/BYOSED_BIASCOR/FITOPT000.FITRES
+FITOPT000_ONLY: 1   # process only default FITOPT000
+nlogzbin=25
+blindflag=0
+opt_biascor=240
+prefix=SALT2mu_FoundPS1
+vpecerr=250
+lensing_zpar=0.055
+min_per_zbin=1
+varname_pIa=PIa
+redchi2_tol=.01
+fitflag_sigmb=2
+iflag_duplicate=2 # 0=ignore, 1=abort, 2=merge
+sig1=0.11
+zmin=0.01
+zmax=0.7
+x1min=-3.0
+x1max=+3.0
+cmax=+0.3
+cmin=-0.3
+errmask_write=0
+p1=0.14635
+p2=3.10805
+p3=0.0 # alpha evolution
+p4=0.0 # beta evolution
+p5=0.0 # host mass
+p6=0.0 # host mass evolution
+p7=10.0 # mass step split
+p8=0.01 # step widthx
+p9=0.70
+p10=0.0
+p11=-1.0
+p12=0.0
+p13=1.0
+u1=1
+u2=1
+u3=0
+u4=0
+u5=1
+u6=0
+u7=0
+u8=0
+u9=0
+u10=0
+u11=0
+u12=0
+u13=1
+h0=70.0
+mag0=-30.00
+uave=1
+hgtype=-1 # uave = use average magnitude from cosmology (not nommag0)

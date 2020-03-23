@@ -19,9 +19,9 @@ CLEARPROMPT:  0
 RANSEED:      28473   # random number seed
 FORMAT_MASK:  2        # 2=text  32=FITS
 
-CIDOFF:     5999386
-NGENTOT_LC:    1000
-#NGEN_LC: 1000
+CIDOFF:     0
+NGENTOT_LC:    30
+#NGEN_LC: 10
 
 GENVERSION: BYOSEDTEST
 #GENVERSION: TEST
@@ -47,7 +47,7 @@ GENRANGE_TREST:   -19.0  49.0     # rest epoch relative to peak (days)
 
 OPT_MWEBV:      1
 GENSIGMA_MWEBV_RATIO: 0.16
-
+SEARCHEFF_SPEC_FILE: simulation/SEARCHEFF_LOWZ_TWEAK.DAT
 
 SMEARFLAG_FLUX:    1   # photo-stat smearing of signal, sky, etc ...
 SMEARFLAG_ZEROPT:  1   # smear zero-point with zptsig
@@ -89,7 +89,7 @@ GENPEAK_SALT2ALPHA: 0.165 0.165
 GENPEAK_SALT2BETA: 3.032 3.032
 
 # -------------------------------
-APPLY_SEARCHEFF_OPT:  3
+APPLY_SEARCHEFF_OPT:  0
 #APPLY_SEARCHEFF_OPT:  1
 APPLY_CUTWIN_OPT:     1
 CUTWIN_NEPOCH:   5 3.              # require 5 epochs (no S/N requirement)
