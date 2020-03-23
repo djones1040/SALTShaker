@@ -21,6 +21,7 @@ from salt3.util import snana,readutils
 from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
 from salt3.util.txtobj import txtobj
 from salt3.util.specSynPhot import getScaleForSN
+from salt3.util.specrecal import SpecRecal
 
 from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs, init_errs_fromfile
 from salt3.training.base import TrainSALTBase
@@ -84,7 +85,7 @@ class TrainSALT(TrainSALTBase):
 		if self.options.initm0modelfile:
 			phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_kaepora(
 				self.options.initm0modelfile,self.options.initm1modelfile,self.options.initbfilt,flatnu,**init_options)
-		#import pdb; pdb.set_trace()
+
 			
 		init_options['phasesplineres'] = self.options.error_snake_phase_binsize
 		init_options['wavesplineres'] = self.options.error_snake_wave_binsize
@@ -129,11 +130,9 @@ class TrainSALT(TrainSALTBase):
 				order-=1
 				recalParams=[f'specx0_{sn}_{k}']+['specrecal_{}_{}'.format(sn,k)]*order
 				parlist=np.append(parlist,recalParams)
-
 		# initial guesses
 		n_params=parlist.size
 		guess = np.zeros(parlist.size)
-
 		if self.options.resume_from_outputdir:
 			names=None
 			for possibleDir in [self.options.resume_from_outputdir,self.options.outputdir]:
@@ -152,7 +151,6 @@ class TrainSALT(TrainSALTBase):
 					
 				except:
 					log.critical('Problem while initializing parameter ',key,' from previous training')
-					#import pdb;pdb.set_trace()
 					sys.exit(1)
 					
 
@@ -173,9 +171,27 @@ class TrainSALT(TrainSALTBase):
 			for sn in datadict.keys():
 				guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn]['zHelio']).value-19.36-10.635))
 				for k in datadict[sn]['specdata'] : 
-					guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn] 
+					guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]
 				i+=1
 
+
+			# spectral params
+			for sn in datadict.keys():
+				specdata=datadict[sn]['specdata']
+				photdata=datadict[sn]['photdata']
+				for k in specdata.keys():
+					order=self.options.n_min_specrecal+int(np.log((specdata[k]['wavelength'].max() - \
+						specdata[k]['wavelength'].min())/self.options.specrange_wavescale_specrecal) + \
+						np.unique(photdata['filt']).size* self.options.n_specrecal_per_lightcurve)
+					order-=1
+
+					specpars_init = SpecRecal(datadict[sn]['photdata'],datadict[sn]['specdata'][k],self.kcordict,
+											  datadict[sn]['survey'],self.options.specrange_wavescale_specrecal,
+											  nrecalpars=order)
+
+					guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]/specpars_init[0]
+					guess[parlist == 'specrecal_{}_{}'.format(sn,k)] = specpars_init[1:]
+				
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
 	def fitSALTModel(self,datadict):
@@ -421,10 +437,10 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			snfiles = np.genfromtxt(snlist,dtype='str')
 			snfiles = np.atleast_1d(snfiles)
 			snfiles_tot = np.append(snfiles_tot,snfiles)
-		parlist,parameters = np.genfromtxt(
-			'%s/salt3_parameters.dat'%outputdir,unpack=True,dtype=str,skip_header=1)
-		parameters = parameters.astype(float)
-		CheckSALTParams.checkSALT(parameters,parlist,snfiles_tot,snlist,outputdir)
+			parlist,parameters = np.genfromtxt(
+				'%s/salt3_parameters.dat'%outputdir,unpack=True,dtype=str,skip_header=1)
+			parameters = parameters.astype(float)
+			CheckSALTParams.checkSALT(parameters,parlist,snfiles_tot,snlist,outputdir,idx=j)
 		
 		# kcor files
 		kcordict = {}
