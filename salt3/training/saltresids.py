@@ -213,7 +213,7 @@ class SALTResids:
 		self.guessScale=[np.sqrt(np.mean(f**2)) for f in fluxes]
 		# HACK
 		self.guessScale=[1.0 for f in fluxes]
-		#import pdb; pdb.set_trace()
+
 		self.colorLawDeriv=np.empty((self.wave.size,self.n_colorpars))
 		for i in range(self.n_colorpars):
 			self.colorLawDeriv[:,i]=SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(self.wave)-SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(self.wave)
@@ -477,10 +477,13 @@ class SALTResids:
 		
 		for L,(selectFilter,clscat,dclscat) in zip(Ls,colorvar):
 			#More stable to solve by backsubstitution than to invert and multiply
-			#import pdb;pdb.set_trace()
-			fluxdiff=photmodel['modelflux'][selectFilter]-photmodel['dataflux'][selectFilter]
-			photresids['resid'][selectFilter]=linalg.solve_triangular(L, fluxdiff,lower=True)
-
+			
+			try:
+				fluxdiff=photmodel['modelflux'][selectFilter]-photmodel['dataflux'][selectFilter]
+				photresids['resid'][selectFilter]=linalg.solve_triangular(L, fluxdiff,lower=True)
+			except:
+				import pdb;pdb.set_trace()
+				
 			if not fixUncertainty:
 				photresids['lognorm']-= (np.log(np.diag(L)).sum())
 			if varyParams.any():
@@ -760,7 +763,6 @@ class SALTResids:
 			recalCoord=(specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal
 			drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
 			recalexp=np.exp((drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1))
-			
 
 			modinterp = temporaryResults['fluxInterp'](phase)
 			dmodelfluxdx0 = interp1d(obswave,modinterp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(specdata[k]['wavelength'])*recalexp
@@ -789,7 +791,6 @@ class SALTResids:
 				varySpecRecal=varyParams[self.parlist == 'specrecal_{}_{}'.format(sn,k)]
 				specresultsdict['modelflux_jacobian'][specSlice,(varyParList == 'specrecal_{}_{}'.format(sn,k))]  = modulatedFlux[:,np.newaxis] * drecaltermdrecal[:,varySpecRecal]
 
-			#import pdb; pdb.set_trace()
 			# derivatives....
 			if cDeriv or varyParams[self.iCL].any() or requiredPCDerivs.any():
 				colorlawinterp=storedResults['colorLawInterp'](specdata[k]['wavelength']/(1+z))
@@ -1428,20 +1429,15 @@ class SALTResids:
 		# D. Jones - just testing this out
 		#for j,p in enumerate(self.phaseBinCenters):
 		#	if np.max(self.neffRaw[j,:]) > 0: self.neffRaw[j,:] /= np.max(self.neffRaw[j,:])
-		#import pdb; pdb.set_trace()
 		#self.neffRaw[self.neffRaw > 1] = 1
 		#self.neffRaw[self.neffRaw < 1e-6] = 1e-6
 
 		self.plotEffectivePoints([-12.5,0.5,16.5,26],'neff.png')
-		#import pdb; pdb.set_trace()
 		self.plotEffectivePoints(None,'neff-heatmap.png')
 		self.neff=self.neffRaw.copy()
-		#import pdb;pdb.set_trace()
 		self.neff[self.neff>self.neffMax]=np.inf		
 		self.neff/=self.neffMax
 		self.neff=np.clip(self.neff,self.neffFloor,None)
-	
-		#import pdb;pdb.set_trace()
 		
 	def plotEffectivePoints(self,phases=None,output=None):
 		import matplotlib.pyplot as plt
@@ -1462,7 +1458,7 @@ class SALTResids:
 			plt.xlabel('$\lambda (\AA)$')
 			plt.xlim(self.waveRegularizationPoints.min(),self.waveRegularizationPoints.max())
 			plt.legend()
-		#import pdb; pdb.set_trace()
+
 		if output is None:
 			plt.show()
 		else:
