@@ -10,6 +10,7 @@ import time
 import glob
 import warnings
 import copy
+import shutil
 cwd = os.getcwd()
 
 def config_error():
@@ -695,7 +696,9 @@ class Training(PyPipeProcedure):
 #             modeldir = 'lcfitting/SALT3.test'
             modeldir = outdir
             #self.__transfer_model_files(outdir,modeldir,rename=False)
+            self.__copy_salt2info(modeldir,template_file='lcfitting/SALT2.INFO')
             self._set_output_info(modeldir)
+            os.environ['SNANA_MODELPATH'] = os.path.join(os.getcwd(),'lcfitting')
             return modeldir
         else:
             raise ValueError("training can only glue to lcfit")
@@ -746,6 +749,14 @@ class Training(PyPipeProcedure):
         df['value'] = value
         self.keys[section][key] = value
         return pd.DataFrame([df])
+    
+    def __copy_salt2info(self,modeldir,template_file='lcfitting/SALT2.INFO'):
+        # temporarily copy SALT2.INFO to model folder, remove when SALT2.INFO can be created by training
+        if not os.path.isdir(modeldir):
+            os.mkdir(modeldir)
+        if not os.path.isfile(os.path.join(modeldir,'SALT2.INFO')):
+            shutil.copy(template_file, modeldir)        
+            print("SALT2.INFO does not exist. Copying {} to {}".format(template_file,modeldir))
     
     def __transfer_model_files(self,outdir,modeldir,write_info=True,rename=True):
         modelfiles = glob.glob('{}/*.dat'.format(outdir))
