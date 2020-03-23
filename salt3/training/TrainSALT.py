@@ -188,9 +188,9 @@ class TrainSALT(TrainSALTBase):
 					specpars_init = SpecRecal(datadict[sn]['photdata'],datadict[sn]['specdata'][k],self.kcordict,
 											  datadict[sn]['survey'],self.options.specrange_wavescale_specrecal,
 											  nrecalpars=order)
-
-					guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]/specpars_init[0]
-					guess[parlist == 'specrecal_{}_{}'.format(sn,k)] = specpars_init[1:]
+					if specpars_init[0] != 0:
+						guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]/specpars_init[0]
+						guess[parlist == 'specrecal_{}_{}'.format(sn,k)] = specpars_init[1:]
 				
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
@@ -290,7 +290,8 @@ class TrainSALT(TrainSALTBase):
 		fouterrmod = open('%s/salt3_lc_dispersion_scaling.dat'%outdir,'w')
 		foutcov = open('%s/salt3_lc_relative_covariance_01.dat'%outdir,'w')
 		foutcl = open('%s/salt3_color_correction.dat'%outdir,'w')
-
+		foutinfo = open('%s/SALT2.INFO'%outdir,'w')
+		
 		for p,i in zip(phase,range(len(phase))):
 			for w,j in zip(wave,range(len(wave))):
 				print('%.1f %.2f %8.15e'%(p,w,M0[i,j]),file=foutm0)
@@ -304,14 +305,36 @@ class TrainSALT(TrainSALTBase):
 		for w,j in zip(wave,range(len(wave))):
 			print('%.2f %8.15e'%(w,clscat[j]),file=foutclscat)
 		foutclscat.close()
-				
+
+		foutinfotext = """RESTLAMBDA_RANGE: %i %s
+COLORLAW_VERSION: 1
+COLORCOR_PARAMS: %i %i  %i  %s
+
+COLOR_OFFSET:  0.0
+
+MAG_OFFSET:  0.27  # to get B-band mag from cosmology fit (Nov 23, 2011)
+
+SEDFLUX_INTERP_OPT: 2  # 1=>linear,    2=>spline
+ERRMAP_INTERP_OPT:  1  # 1  # 0=snake off;  1=>linear  2=>spline
+ERRMAP_KCOR_OPT:    1  # 1/0 => on/off
+
+MAGERR_FLOOR:   0.005            # don;t allow smaller error than this
+MAGERR_LAMOBS:  0.0  2000  4000  # magerr minlam maxlam
+MAGERR_LAMREST: 0.1   100   200  # magerr minlam maxlam
+
+SIGMA_INT: 0.106  # used in simulation"""%(
+	self.options.colorwaverange[0],self.options.colorwaverange[1],
+	self.options.colorwaverange[0],self.options.colorwaverange[1],
+	len(clpars),' '.join(['%8.10e'%cl for cl in clpars]))
+		print(foutinfotext,file=foutinfo)
+		
 		foutm0.close()
 		foutm1.close()
 		foutm0err.close()
 		foutm1err.close()
 		foutcov.close()
 		fouterrmod.close()
-		
+		foutinfo.close()
 		print('%i'%len(clpars),file=foutcl)
 		for c in clpars:
 			print('%8.10e'%c,file=foutcl)
