@@ -5,7 +5,7 @@ import pylab as plt
 from salt3.util import snana
 import os
 
-def checkSALT(parameters,parlist,lcfiles,snlist,outdir):
+def checkSALT(parameters,parlist,lcfiles,snlist,outdir,idx=0):
 
 	plt.close('all')
 	plt.rcParams['figure.figsize'] = (12,4)
@@ -44,7 +44,7 @@ def checkSALT(parameters,parlist,lcfiles,snlist,outdir):
 	ax2.set_xlabel('$\Delta x_1$')
 	ax3.set_xlabel('$\Delta c$')
 	
-	plt.savefig('%s/saltparcomp.png'%outdir)
+	plt.savefig('%s/saltparcomp_%i.png'%(outdir,idx))
 	print(np.mean(x1_salt3),np.mean(x1_salt2))
 	print(np.mean(c_salt3),np.mean(c_salt2))	
 	return
