@@ -11,6 +11,7 @@ import glob
 import warnings
 import copy
 import shutil
+import psutil
 cwd = os.getcwd()
 
 def config_error():
@@ -1168,7 +1169,7 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
     if not os.path.isfile(basefilename):
         raise ValueError("basefilename cannot be None")
     print("Load base sim input file..",basefilename)
-    basefile = open(basefilename,"r")
+    basefile = _open_shared_file(basefilename)
     lines = basefile.readlines()
     basekws = []
     basevals = []
@@ -1300,7 +1301,7 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
     if not os.path.isfile(basefilename):
         raise ValueError("basefilename cannot be None")
     print("Load base fit input file..",basefilename)
-    basefile = open(basefilename,"r")
+    basefile = _open_shared_file(basefilename)
     lines = basefile.readlines()
     basekws = []
 
@@ -1379,7 +1380,7 @@ def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_
 
 def _read_simple_config_file(filename,sep='='):
     config,delimiter = {},{}
-    f = open(filename,"r")
+    f = _open_shared_file(filename)
     lines = f.readlines()
 
     # sighhhh so many SNANA inputs with multiple key/value separators
@@ -1483,7 +1484,8 @@ def _write_nml_to_file(nml,filename,headerlines=[],append=False):
 def _parse_simlib(simlib_file, key='SURVEY'):
     if simlib_file.strip().startswith('$'):
         simlib_file = os.path.expandvars(simlib_file)
-    f = open(simlib_file, "r")
+    
+    f = _open_shared_file(simlib_file)
     lines = f.readlines()
     for line in lines:
         while len(line.split(':')) > 2:
@@ -1497,3 +1499,27 @@ def _parse_simlib(simlib_file, key='SURVEY'):
         if line.split(':')[0].strip() == key:
             return line.split(':')[1].strip()
     
+def _has_handle(fpath):
+    for proc in psutil.process_iter():
+        try:
+            for item in proc.open_files():
+                if fpath == item.path:
+                    return True
+        except Exception:
+            pass
+
+    return False
+
+def _open_shared_file(filename,max_time=100):
+    status = False
+    total_time = 0
+    while status is False and total_time < max_time:
+        if not _has_handle(finput_abspath(filename)):        
+            f = open(filename, "r")
+            status = True
+            return f
+        else:
+            time.sleep(5)
+            total_time += 5
+    if status is False:
+        raise RuntimeError('File {} is opened by another process'.format(filename))
