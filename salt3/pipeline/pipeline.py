@@ -1039,7 +1039,7 @@ def _run_external_pro(pro,args):
         args = [args]
 
     print("Running",' '.join([pro] + args))
-    res = subprocess.run(args = list([pro] + args))
+    res = subprocess.run(args = list([pro] + args),capture_output=True)
     
     if res.returncode == 0:
         print("{} finished successfully.".format(pro.strip()))
