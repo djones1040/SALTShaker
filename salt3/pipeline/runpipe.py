@@ -31,8 +31,8 @@ def _MyPipe(mypipe):
 
 
 class RunPipe():
-    def __init__(self, pipeinput, mypipe=False, batch_mode=False,batch_script=None,randseed=None,
-                 fseeds=None,num=None,norun=None):
+    def __init__(self, pipeinput, mypipe=False, batch_mode=False,batch_script=None,start_id=None,
+                 randseed=None,fseeds=None,num=None,norun=None):
         if mypipe is None:
             self.pipedef = self.__DefaultPipe
         else:
@@ -46,7 +46,10 @@ class RunPipe():
             self.randseed = random.sample(range(100000),1)[0]
             print("No randseed was given, auto-generated randseed={}".format(self.randseed))
         self.fseeds = fseeds
+        self.start_id = start_id
         self.num = num
+        if num is not None:
+            self.num += start_id
         self.norun = norun
  
     def __DefaultPipe(self):
@@ -167,11 +170,11 @@ class RunPipe():
             pypro = os.path.expandvars('$MY_SALT3_DIR/SALT3/salt3/pipeline/runpipe.py')
             pycommand_base = 'python {} -c {} --mypipe {} --batch_mode 0'.format(pypro,self.pipeinput,self.mypipe)
             for i in range(self.batch_mode):
-                pycommand = pycommand_base + ' --randseed {} --num {}'.format(self.randseeds[i],i)
+                pycommand = pycommand_base + ' --randseed {} --num {}'.format(self.randseeds[i],i+self.start_id)
                 if self.norun:
                     pycommand += ' --norun'
                 cwd = os.getcwd()
-                outfname = os.path.join(cwd,'test_pipeline_batch_script_{:03d}'.format(i))
+                outfname = os.path.join(cwd,'test_pipeline_batch_script_{:03d}'.format(i+self.start_id))
                 outf = open(outfname,'w')
                 outf.write(lines)
                 outf.write('\n')
@@ -194,6 +197,8 @@ def main(**kwargs):
                         help='>0 to specify how many batch jobs to submit')
     parser.add_argument('--batch_script',dest='batch_script',default=None,
                         help='base batch submission script')
+    parser.add_argument('--start_id',dest='start_id',default=0,type=int,
+                        help='starting id for naming suffix')
     parser.add_argument('--randseed',dest='randseed',default=None,type=int,
                         help='[internal use] specify randseed for single simulation')
     parser.add_argument('--fseeds',dest='fseeds',default=None,
@@ -206,7 +211,7 @@ def main(**kwargs):
     p = parser.parse_args()
     
     pipe = RunPipe(p.pipeinput,mypipe=p.mypipe,batch_mode=p.batch_mode,batch_script=p.batch_script,
-                   randseed=p.randseed,fseeds=p.fseeds,num=p.num,norun=p.norun)
+                   start_id=p.start_id,randseed=p.randseed,fseeds=p.fseeds,num=p.num,norun=p.norun)
     pipe.run()
     
     
