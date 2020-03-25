@@ -1137,7 +1137,7 @@ def _gen_general_python_input(basefilename=None,setkeys=None,
                 print("Adding/modifying key {}={} in [{}]".format(key,value,sec))
                 config[sec][key] = config[sec][key] + '%s,'%value
             config[sec][key] = config[sec][key][:-1]
-        with open(outname, 'w') as f:
+        with _open_shared_file(outname, 'w') as f:
             config.write(f)
 
         print("input file saved as:",outname)
@@ -1169,8 +1169,8 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
     if not os.path.isfile(basefilename):
         raise ValueError("basefilename cannot be None")
     print("Load base sim input file..",basefilename)
-    basefile = _open_shared_file(basefilename)
-    lines = basefile.readlines()
+    with _open_shared_file(basefilename) as basefile:
+        lines = basefile.readlines()
     basekws = []
     basevals = []
     linenum = []
@@ -1260,16 +1260,15 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
                 lines.insert(lineloc+1,newline)
                 config[key] = valuestr.strip()
 
-        outfile = open(outname,"w")
-        for line in lines:
-            outfile.write(line)
-        outfile.close()
+        with _open_shared_file(outname,"w") as outfile:
+            for line in lines:
+                outfile.write(line)
         print("Write sim input to file:",outname)
 
-    with open(outname) as fin:
+    with _open_shared_file(outname) as fin:
         lines = fin.readlines()
 
-    with open(outname,'w') as fout:
+    with _open_shared_file(outname,'w') as fout:
         for line in lines:
             if 'DONE_STAMP' in line:
                 continue
@@ -1301,8 +1300,8 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
     if not os.path.isfile(basefilename):
         raise ValueError("basefilename cannot be None")
     print("Load base fit input file..",basefilename)
-    basefile = _open_shared_file(basefilename)
-    lines = basefile.readlines()
+    with _open_shared_file(basefilename) as basefile:
+        lines = basefile.readlines()
     basekws = []
 
     #if setkeys is None:
@@ -1380,8 +1379,8 @@ def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_
 
 def _read_simple_config_file(filename,sep='='):
     config,delimiter = {},{}
-    f = _open_shared_file(filename)
-    lines = f.readlines()
+    with _open_shared_file(filename) as f:
+        lines = f.readlines()
 
     # sighhhh so many SNANA inputs with multiple key/value separators
     if isinstance(sep,str):
@@ -1409,24 +1408,23 @@ def _read_simple_config_file(filename,sep='='):
     return config,delimiter
 
 def _write_simple_config_file(config,filename,delimiter,sep='='):
-    outfile = open(filename,"w")
-    replace_keys = []
-    for key in config.keys():
-        if '[' in key:
-            replace_keys.append(key.split('[')[0]) 
-    for key in config.keys():
-        if '[' in key:
-            key_to_print = key.split('[')[0]
-        else:
-            key_to_print = key
-        if key in replace_keys:
-            continue
-        values = config[key]
-        if not isinstance(values,list) and not isinstance(values,np.ndarray): values = [values]
-        for value in values:
-            if not key in delimiter.keys(): outfile.write("{}={}\n".format(key_to_print,value))
-            else: outfile.write("{}{}{}\n".format(key_to_print,delimiter[key],value))
-    outfile.close()
+    with _open_shared_file(filename,"w") as outfile:
+        replace_keys = []
+        for key in config.keys():
+            if '[' in key:
+                replace_keys.append(key.split('[')[0]) 
+        for key in config.keys():
+            if '[' in key:
+                key_to_print = key.split('[')[0]
+            else:
+                key_to_print = key
+            if key in replace_keys:
+                continue
+            values = config[key]
+            if not isinstance(values,list) and not isinstance(values,np.ndarray): values = [values]
+            for value in values:
+                if not key in delimiter.keys(): outfile.write("{}={}\n".format(key_to_print,value))
+                else: outfile.write("{}{}{}\n".format(key_to_print,delimiter[key],value))
 
     return
 
@@ -1475,9 +1473,9 @@ def _write_nml_to_file(nml,filename,headerlines=[],append=False):
             # outfile.write('&END\n\n')
             lines.append('&END\n\n')
 
-    outfile = open(filename,"w")
-    for line in lines:
-        outfile.write(line)
+    with _open_shared_file(filename,"w") as outfile:
+        for line in lines:
+            outfile.write(line)
 
     return
 
@@ -1485,8 +1483,8 @@ def _parse_simlib(simlib_file, key='SURVEY'):
     if simlib_file.strip().startswith('$'):
         simlib_file = os.path.expandvars(simlib_file)
     
-    f = _open_shared_file(simlib_file)
-    lines = f.readlines()
+    with _open_shared_file(simlib_file,"r") as f:
+        lines = f.readlines()
     for line in lines:
         while len(line.split(':')) > 2:
             keysplit = line.split(':',maxsplit=1)
@@ -1504,22 +1502,23 @@ def _has_handle(fpath):
         try:
             for item in proc.open_files():
                 if fpath == item.path:
+                    print(proc.open_files())
                     return True
         except Exception:
             pass
 
     return False
 
-def _open_shared_file(filename,max_time=100):
+def _open_shared_file(filename,flag="r",max_time=100):
     status = False
     total_time = 0
     while status is False and total_time < max_time:
         if not _has_handle(finput_abspath(filename)):        
-            f = open(filename, "r")
+            f = open(filename, flag)
             status = True
             return f
         else:
             time.sleep(5)
             total_time += 5
     if status is False:
-        raise RuntimeError('File {} is opened by another process'.format(filename))
+        raise RuntimeError('File %s is opened by another process' %filename)
