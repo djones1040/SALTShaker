@@ -22,7 +22,7 @@ RESET_CIDOFF:  2  # uniqe random CID among all versions
 
 # Define required global items to ensure uniformity among all jobs
 SIMGEN_INFILE_Ia: simulation/ps1_spec/SIMGEN_PS1SPEC.INPUT
-GENOPT_GLOBAL: NGENTOT_LC 10000
+GENOPT_GLOBAL: NGENTOT_LC 1000
 GENPREFIX:   SIMULATEED_SPEC_SURVEY_DMS_BIASCOR
 FORMAT_MASK: 48          # 2=TERSE    16=RanCID  32=FITS-FORMAT
 RANSEED_REPEAT: 20 123459
