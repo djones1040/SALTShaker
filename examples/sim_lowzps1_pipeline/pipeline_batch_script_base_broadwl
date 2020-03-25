@@ -14,5 +14,5 @@ echo "python:"
 which python
 echo "python3:"
 which python3
-MY_SALT3_DIR=/home/midai/salt3_local
-
+export MY_SALT3_DIR=/home/midai/salt3_local
+export PYTHONUNBUFFERED=1
