@@ -146,7 +146,8 @@ class RunPipe():
                             self.pipe.glue(['lcfit','getmu'])
                         if ['biascorlcfit','getmu'] in self.pipe.gluepairs:
                             self.pipe.glue(['biascorlcfit','getmu'])
-                        self._reconfig_w_suffix(self.pipe.GetMu,None,self.num)
+                        done_file = "{}_{:03d}".format(self.pipe.GetMu.done_file.strip(),self.num)
+                        self._reconfig_w_suffix(self.pipe.GetMu,None,self.num,done_file=done_file)
 
             if not self.norun:
                 self.pipe.run()

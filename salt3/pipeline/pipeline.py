@@ -960,8 +960,9 @@ class GetMu(PipeProcedure):
         super().__init__()
         
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
-                  batch=False,validplots=False,outname="pipeline_getmu_input.input",**kwargs):
-        self.done_file = finput_abspath('%s/GetMu.DONE'%os.path.dirname(baseinput))
+                  batch=False,validplots=False,outname="pipeline_getmu_input.input",
+                  done_file='GetMu.DONE',**kwargs):
+        self.done_file = finput_abspath('%s/%s'%(os.path.dirname(baseinput),os.path.split(done_file)[1]))
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
