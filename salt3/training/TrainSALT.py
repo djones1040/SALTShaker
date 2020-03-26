@@ -290,7 +290,7 @@ class TrainSALT(TrainSALTBase):
 		fouterrmod = open('%s/salt3_lc_dispersion_scaling.dat'%outdir,'w')
 		foutcov = open('%s/salt3_lc_relative_covariance_01.dat'%outdir,'w')
 		foutcl = open('%s/salt3_color_correction.dat'%outdir,'w')
-		foutinfo = open('%s/SALT2.INFO'%outdir,'w')
+		foutinfo = open('%s/SALT3.INFO'%outdir,'w')
 		
 		for p,i in zip(phase,range(len(phase))):
 			for w,j in zip(wave,range(len(wave))):
