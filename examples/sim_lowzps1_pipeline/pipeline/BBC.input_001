@@ -1,31 +1,13 @@
 BATCH_INFO: sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 30
-INPDIR+: /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/batchtest/SNFIT_BYOSED
-DONE_STAMP: BBC.DONE
-STRINGMATCH_IGNORE: IGNORE
-
-# systematics list
-#MUOPT:	[MASS_G10_HIGHER] p7=10.15
-
+DONE_STAMP: /home/midai/salt3_local/SALT3/examples/sim_lowzps1_pipeline/pipeline/GetMu.DONE
+#MUOPT:	=10.15
 surveygroup_biascor='PS1_LOWZ_COMBINED(zbin=0.01)'
 snrmin_sigint_biascor=30 # SNRMIN to compute siginit_biascor
-
 file=blah
-simfile_biascor=PS1_LOWZ_Biascor.FITRES
-
 FITOPT000_ONLY: 1   # process only default FITOPT000
-
 nlogzbin=25
 blindflag=0
-#opt_biascor=240
-opt_biascor=2
-# these bits are set
-#define MASK_BIASCOR_5D		 16		// bit4: 5D map of biasCor
-#define MASK_BIASCOR_MUCOV	 32		// bit5: apply MUCOVSCALE vs. z
-#define MASK_BIASCOR_SAMPLE	 64		// bit6: biasCor vs. IDSAMPLE
-#define MASK_BIASCOR_2x2ab	128		// bit7: force 2x2 ab grid (min,max ab)
-# this bit gives 1D biascor?
-#define MASK_BIASCOR_1DZAVG	  1		// bit0: interp MUBIAS vs. z (1D), WGT=1
-
+opt_biascor=240
 prefix=SALT2mu_FoundPS1
 vpecerr=250
 lensing_zpar=0.055
@@ -33,7 +15,6 @@ min_per_zbin=1
 varname_pIa=PIa
 redchi2_tol=.01
 fitflag_sigmb=2
-
 iflag_duplicate=2 # 0=ignore, 1=abort, 2=merge
 sig1=0.11
 zmin=0.01
@@ -73,3 +54,8 @@ h0=70.0
 mag0=-30.00
 uave=1
 hgtype=-1 # uave = use average magnitude from cosmology (not nommag0)
+INPDIR+: /home/midai/salt3_local/SALT3/examples/sim_lowzps1_pipeline/SIM_LOWZPS1_001
+INPDIR+: /home/midai/salt3_local/SALT3/examples/sim_lowzps1_pipeline/SIM_LOWZPS1_2_001
+STRINGMATCH_IGNORE: _2
+STRINGMATCH: SIM_LOWZPS1_001
+simfile_biascor=/home/midai/salt3_local/SALT3/examples/sim_lowzps1_pipeline/SIM_LOWZPS1_BIASCOR_001/AllSurveys_LOWZ_BIASCOR_001/FITOPT000.FITRES,/home/midai/salt3_local/SALT3/examples/sim_lowzps1_pipeline/SIM_LOWZPS1_BIASCOR_2_001/ALLSurveys_PS1_BIASCOR_001/FITOPT000.FITRES
