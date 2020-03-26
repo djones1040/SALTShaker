@@ -189,74 +189,137 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 	plt.tight_layout()
 	if not outfile is None:
 		plt.savefig(outfile)
-def mkModelErrPlot(salt3dir='modelfiles/salt3',xlimits=[2000,9200]):
-	plt.rcParams['figure.figsize'] = (9,3)
+
+
+def mkModelErrPlot(salt3dir='modelfiles/salt3',outfile=None,xlimits=[2000,9200]):
+	plt.figure(figsize=(5,11))
 	plt.subplots_adjust(left=None, bottom=None, right=None, top=None,
 						wspace=0, hspace=0)
 	plt.clf()
-	ax1 = plt.subplot(211)
-	ax2 = plt.subplot(212)
+	ax1 = plt.subplot(411)
+	ax2 = plt.subplot(412)
+	ax3 = plt.subplot(413)
+	ax4 = plt.subplot(414)
 
-	salt3scalephase,salt3scalewave,salt3scaleflux = \
-		np.loadtxt('%s/salt3_lc_dispersion_scaling.dat'%salt3dir,unpack=True)
-	salt3cdispphase,salt3cdispwave,salt3cdispflux = \
-		np.loadtxt('%s/salt3_color_dispersion.dat'%salt3dir,unpack=True)
+	salt3m0errphase,salt3m0errwave,salt3m0fluxerr = \
+		np.loadtxt('%s/salt3_lc_relative_variance_0.dat'%salt3dir,unpack=True)
+	salt3m1errphase,salt3m1errwave,salt3m1fluxerr = \
+		np.loadtxt('%s/salt3_lc_relative_variance_1.dat'%salt3dir,unpack=True)
+	salt3m0m1errphase,salt3m0m1errwave,salt3m0m1fluxerr = \
+		np.loadtxt('%s/salt3_lc_relative_covariance_01.dat'%salt3dir,unpack=True)
+		#salt3m0errphase,salt3m0errwave,salt3m0fluxerr = \
+		#	np.loadtxt('%s/salt2_lc_relative_variance_0.dat'%salt3dir,unpack=True)
+		#salt3m1errphase,salt3m1errwave,salt3m1fluxerr = \
+		#	np.loadtxt('%s/salt2_lc_relative_variance_1.dat'%salt3dir,unpack=True)
 
-	salt2scalephase,salt2scalewave,salt2scaleflux = \
-		np.loadtxt('modelfiles/salt2/salt2_lc_dispersion_scaling.dat',unpack=True)
-	salt2cdispphase,salt2cdispwave,saltscdispflux = \
-		np.loadtxt('modelfiles/salt2/salt2_color_dispersion.dat',unpack=True)
+	salt2m0errphase,salt2m0errwave,salt2m0fluxerr = \
+		np.loadtxt('%s/salt2_lc_relative_variance_0.dat'%init_rootdir,unpack=True)
+	salt2m1errphase,salt2m1errwave,salt2m1fluxerr = \
+		np.loadtxt('%s/salt2_lc_relative_variance_1.dat'%init_rootdir,unpack=True)
+	salt2m0m1errphase,salt2m0m1errwave,salt2m0m1fluxerr = \
+		np.loadtxt('%s/salt2_lc_relative_covariance_01.dat'%init_rootdir,unpack=True)
 
-	salt2scaleflux = salt2scaleflux.reshape([len(np.unique(salt2scalephase)),len(np.unique(salt2scalewave))])
-	salt2cdispflux = salt2cdispflux.reshape([len(np.unique(salt2cdispphase)),len(np.unique(salt2cdispwave))])
+	salt2m0fluxerr = salt2m0fluxerr.reshape([len(np.unique(salt2m0errphase)),len(np.unique(salt2m0errwave))])
+	salt2m1fluxerr = salt2m1fluxerr.reshape([len(np.unique(salt2m1errphase)),len(np.unique(salt2m1errwave))])
+	salt2m0m1fluxerr = salt2m0m1fluxerr.reshape([len(np.unique(salt2m0m1errphase)),len(np.unique(salt2m0m1errwave))])
+	
+	
+	salt3m0fluxerr = salt3m0fluxerr.reshape([len(np.unique(salt3m0errphase)),len(np.unique(salt3m0errwave))])
+	salt3m1fluxerr = salt3m1fluxerr.reshape([len(np.unique(salt3m1errphase)),len(np.unique(salt3m1errwave))])
+	salt3m0m1fluxerr = salt3m0m1fluxerr.reshape([len(np.unique(salt3m0m1errphase)),len(np.unique(salt3m0m1errwave))])
+	#print('hack!')
+	#salt3m1flux *=-1
 
-	salt3scaleflux = salt3scaleflux.reshape([len(np.unique(salt3scalephase)),len(np.unique(salt3scalewave))])
-	salt3cdispflux = salt3cdispflux.reshape([len(np.unique(salt3cdispphase)),len(np.unique(salt3cdispwave))])
 
-	salt2scalephase = np.unique(salt2scalephase)
-	salt2scalewave = np.unique(salt2scalewave)
-	salt2cdispphase = np.unique(salt2cdispphase)
-	salt2cdispwave = np.unique(salt2cdispwave)
+	salt2m0errphase = np.unique(salt2m0errphase)
+	salt2m0errwave = np.unique(salt2m0errwave)
+	salt2m1errphase = np.unique(salt2m1errphase)
+	salt2m1errwave = np.unique(salt2m1errwave)
+	salt2m0m1errphase = np.unique(salt2m0m1errphase)
+	salt2m0m1errwave = np.unique(salt2m0m1errwave)
 
-	salt3scalephase = np.unique(salt3scalephase)
-	salt3scalewave = np.unique(salt3scalewave)
-	salt3cdispphase = np.unique(salt3cdispphase)
-	salt3cdispwave = np.unique(salt3cdispwave)
+	salt3m0errphase = np.unique(salt3m0errphase)
+	salt3m0errwave = np.unique(salt3m0errwave)
+	salt3m1errphase = np.unique(salt3m1errphase)
+	salt3m1errwave = np.unique(salt3m1errwave)
+	salt3m0m1errphase = np.unique(salt3m0m1errphase)
+	salt3m0m1errwave = np.unique(salt3m0m1errwave)
 
 	spacing = 0.5
+	plotwave=np.linspace(2000,9200,720)
+	scale=100
 	for plotphase,i,plotphasestr in zip([-5,0,10],range(3),['-5','+0','+10']):
-		int_salt2scale = interp2d(salt2scalewave,salt2scalephase,salt2scaleflux)
-		salt2scaleflux_0 = int_salt2scale(salt2scalewave,plotphase)
+		int_salt2m0err = interp2d(salt2m0errwave,salt2m0errphase,salt2m0fluxerr)
+		salt2m0fluxerr_0 = int_salt2m0err(plotwave,plotphase)
 
-		int_salt3scale = interp2d(salt3scalewave,salt3scalephase,salt3scaleflux)
-		salt3scaleflux_0 = int_salt3scale(salt3scalewave,plotphase)
+		int_salt3m0err = interp2d(salt3m0errwave,salt3m0errphase,salt3m0fluxerr)
+		salt3m0fluxerr_0 = int_salt3m0err(plotwave,plotphase)
 
-		ax1.plot(salt2scalewave,salt2scaleflux_0+spacing*i,color='b',label='SALT2')
-		ax1.plot(salt3scalewave,salt3scaleflux_0+spacing*i,color='r',label='SALT3')
+		ax1.plot(plotwave,salt2m0fluxerr_0*scale+spacing*i,color='b',label='SALT2')
+		ax1.plot(plotwave,salt3m0fluxerr_0*scale+spacing*i,color='r',label='SALT3')
 		ax1.set_xlim(xlimits)
 		ax1.set_ylim([0,1.35])
 
 		ax1.text(xlimits[1]-100,spacing*(i+0.2),'%s'%plotphasestr,ha='right')
-
+		
+	spacing = 0.15		
 	for plotphase,i,plotphasestr in zip([-5,0,10],range(3),['-5','+0','+10']):
-		int_salt2cdisp = interp2d(salt2cdispwave,salt2cdispphase,salt2cdispflux)
-		salt2cdispflux_0 = int_salt2cdisp(salt2cdispwave,plotphase)
+		int_salt2m1err = interp2d(salt2m1errwave,salt2m1errphase,salt2m1fluxerr)
+		salt2m1fluxerr_0 = int_salt2m1err(plotwave,plotphase)
 
-		int_salt3cdisp = interp2d(salt3cdispwave,salt3cdispphase,salt3cdispflux)
-		salt3cdispflux_0 = int_salt3cdisp(salt3cdispwave,plotphase)
-
-		ax2.plot(salt2cdispwave,salt2cdispflux_0+spacing*i,color='b',label='SALT2')
-		ax2.plot(salt3cdispwave,salt3cdispflux_0+spacing*i,color='r',label='SALT3')
+		int_salt3m1err = interp2d(salt3m1errwave,salt3m1errphase,salt3m1fluxerr)
+		salt3m1fluxerr_0 = int_salt3m1err(plotwave,plotphase)
+		ax2.plot(plotwave,salt2m1fluxerr_0*scale+spacing*i,color='b',label='SALT2')
+		ax2.plot(plotwave,salt3m1fluxerr_0*scale+spacing*i,color='r',label='SALT3')
 		ax2.set_xlim(xlimits)
-		ax2.set_ylim([0,1.35])
+		ax2.set_ylim([-0.05,0.39])
 
 		ax2.text(xlimits[1]-100,spacing*(i+0.2),'%s'%plotphasestr,ha='right')
+	scale=100
+
+	for plotphase,i,plotphasestr in zip([-5,0,10],range(3),['-5','+0','+10']):
+		int_salt2m0m1err = interp2d(salt2m0m1errwave,salt2m0m1errphase,salt2m0m1fluxerr)
+		salt2m0m1fluxerr_0 = int_salt2m0m1err(plotwave,plotphase)
+
+		int_salt3m0m1err = interp2d(salt3m0m1errwave,salt3m0m1errphase,salt3m0m1fluxerr)
+		salt3m0m1fluxerr_0 = int_salt3m0m1err(plotwave,plotphase)
+		ax3.plot(plotwave,salt2m0m1fluxerr_0*scale+spacing*i,color='b',label='SALT2')
+		ax3.plot(plotwave,salt3m0m1fluxerr_0*scale+spacing*i,color='r',label='SALT3')
+		ax3.set_xlim(xlimits)
+		ax3.set_ylim([-0.05,0.39])
+
+		ax3.text(xlimits[1]-100,spacing*(i+0.2),'%s'%plotphasestr,ha='right')
+
+		
+		#import pdb; pdb.set_trace()
+		
+	salt2clscatwave,salt2clscat=np.genfromtxt('%s/salt2_color_dispersion.dat'%init_rootdir).T
+	ax4.plot(salt2clscatwave,salt2clscat,color='b',label='SALT2')
+
+	
+	salt3clscatwave,salt3clscat=np.genfromtxt('%s/salt3_color_dispersion.dat'%salt3dir).T
+	ax4.plot(salt3clscatwave,salt3clscat,color='r',label='SALT3')
+	ax4.legend(prop={'size':13})
+	ax1.set_ylabel('M0 dispersion',fontsize=15)
+	ax2.set_ylabel('M1 dispersion',fontsize=15)
+	ax3.set_ylabel('M0-M1 covariance',fontsize=15)
+	ax4.set_ylabel('Color Scatter',fontsize=15)
+	for ax in [ax1,ax2,ax3,ax4]:
+		ax.set_xlim(xlimits)
+	ax1.xaxis.set_ticklabels([])
+	ax2.xaxis.set_ticklabels([])
+	ax4.set_xlabel('Wavelength ($\AA$)',fontsize=15)
+	plt.tight_layout()
+	if not outfile is None:
+		plt.savefig(outfile)
 		
 	
 if __name__ == "__main__":
 	parser=ArgumentParser(description='Plot SALT model components at peak and color law as compared to SALT2')
 	parser.add_argument('modeldir',type=str,help='SALT3 model directory',default='model/salt3',nargs='?')
-	parser.add_argument('outfile',type=str,help='File to save plots to',default=None,nargs='?')
+	parser.add_argument('modelplot',type=str,help='File to save plots to',default=None,nargs='?')
+	parser.add_argument('errplot',type=str,help='File to save plots to',default=None,nargs='?')
 	parser.add_argument('--noErr',dest='plotErr',help='Flag to choose whether or not to show model uncertainties on plot',action='store_const',const=False,default=True)
 	parser=parser.parse_args()
-	mkModelPlot(parser.modeldir ,outfile= '{}/SALTmodelcomp.pdf'.format(parser.modeldir) if parser.outfile is None else parser.outfile,plotErr=parser.plotErr)
+	mkModelPlot(parser.modeldir ,outfile= '{}/SALTmodelcomp.pdf'.format(parser.modeldir) if parser.modelplot is None else parser.modelplot,plotErr=parser.plotErr)
+	mkModelErrPlot(parser.modeldir ,outfile= '{}/SALTmodelerrcomp.pdf'.format(parser.modeldir) if parser.errplot is None else parser.errplot)

@@ -356,7 +356,7 @@ class SALTResids:
 		pbspl /= denom*HC_ERG_AA
 		self.kcordict['default']['Vpbspl'] = pbspl
 
-	def maxlikefit(self,x,storedResults={},varyParams=None,pool=None,debug=False,SpecErrScale=1.0):
+	def maxlikefit(self,x,storedResults=None,varyParams=None,pool=None,debug=False,SpecErrScale=1.0,fixFluxes=False,dospec=True):
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic data given during initialization
 		
@@ -377,36 +377,19 @@ class SALTResids:
 		chi2: float
 			Goodness of fit of model to training data	
 		"""
+		if storedResults is None: storedResults={}
 		if varyParams is None:
 			varyParams=np.zeros(self.npar,dtype=bool)
 		computeDerivatives=np.any(varyParams)
 		#Set up SALT model
 		# HACK
-		if self.n_colorpars:
-			if not 'colorLaw' in storedResults:
-				storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])(self.wave)
-				storedResults['colorLawInterp']= interp1d(self.wave,storedResults['colorLaw'],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
-		else: storedResults['colorLaw'] = 1
-
-		if not all([('specfluxes_{}'.format(sn) in storedResults) and ('photfluxes_{}'.format(sn) in storedResults) for sn in self.datadict]):
-				
-			if not 'components' in storedResults:
-				storedResults['components'] =self.SALTModel(x)
-			if not 'componentderivs' in storedResults:
-				storedResults['componentderivs'] = self.SALTModelDeriv(x,1,0,self.phase,self.wave)
-		
-		if not all([('specvariances_{}'.format(sn) in storedResults) and ('photvariances_{}'.format(sn) in storedResults) for sn in self.datadict]):
-			storedResults['saltErr']=self.ErrModel(x)
-			storedResults['saltCorr']=self.CorrelationModel(x)
-
-
-		
+		self.fillStoredResults(x,storedResults)	
 		# timing stuff
 		
 		chi2 = 0
 		#Construct arguments for maxlikeforSN method
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
-		args=[(x,sn,storedResults,varyParams,debug,SpecErrScale) for sn in self.datadict.keys()]
+		args=[(x,sn,storedResults,varyParams,debug,SpecErrScale,fixFluxes,dospec) for sn in self.datadict.keys()]
 		#args2 = (x,components,componentderivs,salterr,saltcorr,colorLaw,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale)
 		mapFun=pool.map if pool else starmap
 
@@ -422,7 +405,7 @@ class SALTResids:
 			priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,x)	
 			logp -=(priorResids**2).sum()/2
 			if computeDerivatives:
-				grad-= (priorResids [:,np.newaxis] * priorJac).sum(axis=0)
+				grad-= (priorResids [:,np.newaxis] * priorJac[:,varyParams]).sum(axis=0)
 		
 		if self.regularize:
 			for regularization, weight in [(self.phaseGradientRegularization, self.regulargradientphase),(self.waveGradientRegularization,self.regulargradientwave ),(self.dyadicRegularization,self.regulardyad)]:
@@ -434,14 +417,13 @@ class SALTResids:
 					for res,jac in zip(regResids,regJac):
 						grad -= (res[:,np.newaxis]*jac ).sum(axis=0)
 		self.nstep += 1
-		log.info(logp.sum()*-2)
 
 		if computeDerivatives:
 			return logp,grad
 		else:
 			return logp
 					
-	def ResidsForSN(self,x,sn,storedResults,varyParams=None,fixUncertainty=False,SpecErrScale=1.):
+	def ResidsForSN(self,x,sn,storedResults,varyParams=None,fixUncertainty=False,SpecErrScale=1.,fixFluxes=False):
 		""" This method should be the only one required for any fitter to process the supernova data. 
 		Find the residuals of a set of parameters to the photometric and spectroscopic data of a given supernova. 
 		Photometric residuals are first decorrelated to diagonalize color scatter"""
@@ -484,34 +466,32 @@ class SALTResids:
 			if not fixUncertainty:
 				photresids['lognorm']-= (np.log(np.diag(L)).sum())
 			if varyParams.any():
-				try:
-					photresids['resid_jacobian'][selectFilter]=linalg.solve_triangular(L,photmodel['modelflux_jacobian'][selectFilter],lower=True)
-				except:
-					import pdb;pdb.set_trace()
+				if not fixFluxes: photresids['resid_jacobian'][selectFilter]=linalg.solve_triangular(L,photmodel['modelflux_jacobian'][selectFilter],lower=True)
 				if not fixUncertainty:
 					varyParlist=self.parlist[varyParams]
 					#Cut out zeroed jacobian entries to save time
-					nonzero=(~((photmodel['modelvariance_jacobian'][selectFilter]==0) & (photmodel['modelflux_jacobian'][selectFilter]==0)).all(axis=0)) | (self.parlist[varyParams]=='clscat')
+					nonzero=(~((photmodel['modelvariance_jacobian'][selectFilter]==0) & (photmodel['modelflux_jacobian'][selectFilter]==0 if not fixFluxes else True)).all(axis=0)) | (self.parlist[varyParams]=='clscat')
 					reducedJac=photmodel['modelvariance_jacobian'][selectFilter][:,nonzero]
 					#import pdb;pdb.set_trace()
 					#Calculate L^-1 (necessary for the diagonal derivative)
 					invL=linalg.solve_triangular(L,np.diag(np.ones(fluxdiff.size)),lower=True)
-					
+				
 					# Calculate the fractional derivative of L w.r.t model parameters
 					# L^-1 dL/dx = {L^-1 x d Sigma / dx x L^-T, with the upper triangular part zeroed and the diagonal halved}
-					
+				
 					#First calculating diagonal part
 					fractionalLDeriv=np.dot(invL,np.swapaxes(reducedJac[:,np.newaxis,:]* invL.T[:,:,np.newaxis],0,1))
-					
+			
 					fluxPrime= linalg.solve_triangular(L,photmodel['modelflux'][selectFilter])
-					jacPrime = linalg.solve_triangular(L,photmodel['modelflux_jacobian'][selectFilter][:,nonzero])
-					#Derivative w.r.t  color scatter 
 					fractionalLDeriv[:,:,varyParlist[nonzero]=='clscat']+= 2*clscat*dclscat[np.newaxis,np.newaxis,:]* np.outer(fluxPrime,fluxPrime)[:,:,np.newaxis]
-					#Derivative w.r.t model flux
-					dfluxSquared = jacPrime[:,np.newaxis,:]*fluxPrime[np.newaxis,:,np.newaxis]
-					#Symmetrize
-					dfluxSquared = np.swapaxes(dfluxSquared,0,1)+dfluxSquared
-					fractionalLDeriv +=clscat**2 * dfluxSquared
+					if not fixFluxes:
+						jacPrime = linalg.solve_triangular(L,photmodel['modelflux_jacobian'][selectFilter][:,nonzero])
+						#Derivative w.r.t  color scatter 
+						#Derivative w.r.t model flux
+						dfluxSquared = jacPrime[:,np.newaxis,:]*fluxPrime[np.newaxis,:,np.newaxis]
+						#Symmetrize
+						dfluxSquared = np.swapaxes(dfluxSquared,0,1)+dfluxSquared
+						fractionalLDeriv +=clscat**2 * dfluxSquared
 					
 					fractionalLDeriv[np.triu(np.ones((fluxdiff.size,fluxdiff.size),dtype=bool),1),:]=0
 					fractionalLDeriv[np.diag(np.ones((fluxdiff.size),dtype=bool)),:]/=2
@@ -542,8 +522,9 @@ class SALTResids:
 		specresids['uncertainty'] = uncertainty
 		if not fixUncertainty:
 			specresids['lognorm']=-np.log((np.sqrt(2*np.pi)*uncertainty)).sum()
+		specresids['resid_jacobian']=np.zeros((specmodel['modelflux'].size,varyParams.sum()))
 		
-		specresids['resid_jacobian']=spectralSuppression * specmodel['modelflux_jacobian']/(uncertainty[:,np.newaxis])
+		if not fixFluxes: specresids['resid_jacobian']=spectralSuppression * specmodel['modelflux_jacobian']/(uncertainty[:,np.newaxis])
 		if not fixUncertainty:
 			#Calculate jacobian of total spectral uncertainty including reported uncertainties
 			uncertainty_jac=  specmodel['modelvariance_jacobian'] / (2*uncertainty[:,np.newaxis])
@@ -1036,7 +1017,7 @@ class SALTResids:
 			storedResults['saltCorr']=self.CorrelationModel(x)
 
 	
-	def loglikeforSN(self,x,sn,storedResults={},varyParams=None,debug=False,SpecErrScale=1.0):
+	def loglikeforSN(self,x,sn,storedResults,varyParams=None,debug=False,SpecErrScale=1.0,fixFluxes=False,dospec=True):
 		
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic observations of a single SN 
@@ -1066,12 +1047,14 @@ class SALTResids:
 		chi2: float
 			Model chi2 relative to training data	
 		"""
-		photResidsDict,specResidsDict = self.ResidsForSN(x,sn,storedResults,varyParams,fixUncertainty=False,SpecErrScale=SpecErrScale)
+		photResidsDict,specResidsDict = self.ResidsForSN(x,sn,storedResults,varyParams,fixUncertainty=False,fixFluxes=True,SpecErrScale=SpecErrScale)
 
 		
-		loglike= - (photResidsDict['resid']**2).sum() / 2.   -(specResidsDict['resid']**2).sum()/2.+photResidsDict['lognorm']+specResidsDict['lognorm']
+		loglike= - (photResidsDict['resid']**2).sum() / 2.  +photResidsDict['lognorm']
+		if dospec: loglike+=specResidsDict['lognorm']  -(specResidsDict['resid']**2).sum()/2.
 		if (not varyParams is None) and np.any(varyParams):
-			grad_loglike=  - (photResidsDict['resid'][:,np.newaxis] * photResidsDict['resid_jacobian']).sum(axis=0) - (specResidsDict['resid'][:,np.newaxis] * specResidsDict['resid_jacobian']).sum(axis=0) + photResidsDict['lognorm_grad'] +specResidsDict['lognorm_grad']
+			grad_loglike=  - (photResidsDict['resid'][:,np.newaxis] * photResidsDict['resid_jacobian']).sum(axis=0)  +photResidsDict['lognorm_grad'] 
+			if dospec: grad_loglike+= specResidsDict['lognorm_grad']- (specResidsDict['resid'][:,np.newaxis] * specResidsDict['resid_jacobian']).sum(axis=0) 
 			return loglike,grad_loglike
 		else:
 			return loglike
@@ -1162,12 +1145,6 @@ class SALTResids:
 		m1pars = x[self.parlist == 'm1']
 		#m1err = np.zeros(len(x[self.parlist == 'm1']))
 		
-		# covmat (diagonals only?)
-		m0_m1_cov = np.zeros(len(m0pars))
-
-		modelerrpars = x[self.parlist == 'modelerr']
-		#modelerrerr = np.zeros(len(x[self.parlist == 'modelerr']))
-
 		clpars = x[self.parlist == 'cl']
 		clerr = np.zeros(len(x[self.parlist == 'cl']))
 		
@@ -1203,16 +1180,13 @@ class SALTResids:
 			m1 = np.zeros(np.shape(m0))
 			#m1err = np.zeros(np.shape(m0))
 
-		#cov_m0_m1 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0_m1_cov,self.bsorder,self.bsorder))
-		modelerr = bisplev(self.phase,self.wave,(self.errphaseknotloc,self.errwaveknotloc,modelerrpars,self.bsorder,self.bsorder))
-		modelerr[:] = 0.0
 		#clscat = splev(self.wave,(self.errwaveknotloc,clscatpars,3))
 		if not len(clpars): clpars = []
 
 		# model errors
 		m0err,m1err = self.ErrModel(x)
 		cov_m0_m1 = self.CorrelationModel(x)[0]*m0err*m1err
-		
+		modelerr=np.ones(m0err.shape)
 		return(x,self.phase,self.wave,m0,m0err,m1,m1err,cov_m0_m1,modelerr,
 			   clpars,clerr,clscat,resultsdict)
 
