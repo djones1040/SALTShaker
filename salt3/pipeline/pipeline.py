@@ -9,6 +9,9 @@ import numpy as np
 import time
 import glob
 import warnings
+import copy
+import shutil
+import psutil
 cwd = os.getcwd()
 
 def config_error():
@@ -22,12 +25,14 @@ def boolean_string(s):
     return (s == 'True') | (s == '1')
 
 def finput_abspath(finput):
-    if not finput.replace(' ','').startswith('/') and not finput.startswith('$') and \
+    finput = finput.strip()
+    if not finput.startswith('/') and not finput.startswith('$') and \
        '/' in finput: finput = '%s/%s'%(cwd,finput)
     return finput
 
 def abspath_for_getmu(finput):
-    if not finput.replace(' ','').startswith('/') and not finput.startswith('$'): finput = '%s/%s'%(cwd,finput.replace(' ',''))
+    finput = finput.strip()
+    if not finput.startswith('/') and not finput.startswith('$'): finput = '%s/%s'%(cwd,finput)
     return finput
 
 def nmlval_to_abspath(key,value):
@@ -48,8 +53,8 @@ class SALT3pipe():
         self.GetMu = GetMu()
         self.CosmoFit = CosmoFit()
         self.Data = Data()
-        self.BiascorSim = Simulation()
-        self.BiascorLCFit = LCFitting()
+        self.BiascorSim = Simulation(biascor=True)
+        self.BiascorLCFit = LCFitting(biascor=True)
 
         self.build_flag = False
         self.config_flag = False
@@ -90,9 +95,21 @@ class SALT3pipe():
         config = configparser.ConfigParser()
         config.read(self.finput)
         m2df = self._multivalues_to_df
-
+        
         if not hasattr(self, 'pipepros'):
             raise ValueError("Pipeline stages are not specified, call self.build() first.")
+        
+        n_lcfit = self._get_config_option(config,'pipeline','n_lcfit',dtype=int)
+        n_biascorlcfit = self._get_config_option(config,'pipeline','n_biascorlcfit',dtype=int)
+        self.n_lcfit = n_lcfit
+        self.n_biascorlcfit = n_biascorlcfit
+        self.genversion_split = self._get_config_option(config,'pipeline','genversion_split')
+        self.genversion_split_biascor = self._get_config_option(config,'pipeline','genversion_split_biascor')
+
+        if n_lcfit > 1:
+            self.LCFitting = [LCFitting() for i in range(n_lcfit)]
+        if n_biascorlcfit > 1:
+            self.BiascorLCFit = [LCFitting(biascor=True) for i in range(n_biascorlcfit)]
         
         for prostr in self.pipepros:
             sectionname = [x for x in config.sections() if x.startswith(prostr)]
@@ -101,27 +118,53 @@ class SALT3pipe():
             pipepro = self._get_pipepro_from_string(prostr)
             setkeys = self._get_config_option(config,prostr,'set_key')
             if setkeys is not None:
-                pipepro.setkeys = m2df(setkeys)
+                if isinstance(pipepro,list):
+                    for i in range(len(pipepro)):
+                        df = m2df(setkeys)
+                        if df is not None:
+                            pipepro[i].setkeys = df.set_index('label').loc[str(i)]
+                            if isinstance(pipepro[i].setkeys,pd.Series):
+                                pipepro[i].setkeys = pd.DataFrame([pipepro[i].setkeys])
+                        else:
+                            pipepro[i].setkeys = None
+                else:
+                    pipepro.setkeys = m2df(setkeys)
             else:
                 pipepro.setkeys = None
-            baseinput = self._get_config_option(config,prostr,'baseinput')
-            outname = self._get_config_option(config,prostr,'outinput')
-            pro = self._get_config_option(config,prostr,'pro')
-            batch = self._get_config_option(config,prostr,'batch',dtype=boolean_string)
-            validplots = self._get_config_option(config,prostr,'validplots',dtype=boolean_string)
-            proargs = self._get_config_option(config,prostr,'proargs')
-            prooptions = self._get_config_option(config,prostr,'prooptions')
-            snlists = self._get_config_option(config,prostr,'snlists')
-            pipepro.configure(baseinput=baseinput,
-                              setkeys=pipepro.setkeys,
-                              outname=outname,
-                              pro=pro,
-                              proargs=proargs,
-                              prooptions=prooptions,
-                              snlists=snlists,
-                              batch=batch,
-                              validplots=validplots)
-
+                
+            if prostr.startswith('lcfit'):
+                niter = n_lcfit
+            elif prostr.startswith('biascorlcfit'):
+                niter = n_biascorlcfit
+            else:
+                niter = 1
+            if not isinstance(pipepro,list):
+                pipepro = [pipepro]
+            for i in range(niter):
+                pipepro[i] = pipepro[i]
+                baseinput = self._get_config_option(config,prostr,'baseinput').split(',')[i]
+                outname = self._get_config_option(config,prostr,'outinput').split(',')[i]
+                pro = self._get_config_option(config,prostr,'pro')
+                batch = self._get_config_option(config,prostr,'batch',dtype=boolean_string)
+                validplots = self._get_config_option(config,prostr,'validplots',dtype=boolean_string)
+                proargs = self._get_config_option(config,prostr,'proargs')
+                prooptions = self._get_config_option(config,prostr,'prooptions')
+                snlists = self._get_config_option(config,prostr,'snlists')
+                pipepro[i].configure(baseinput=baseinput,
+                                     setkeys=pipepro[i].setkeys,
+                                     outname=outname,
+                                     pro=pro,
+                                     proargs=proargs,
+                                     prooptions=prooptions,
+                                     snlists=snlists,
+                                     batch=batch,
+                                     validplots=validplots)
+                if hasattr(pipepro[i], 'biascor') and pipepro[i].biascor:
+                    pipepro[i].done_file = "{}_{}".format(pipepro[i].done_file,'biascor')
+                if niter > 1:
+                    pipepro[i].done_file = "{}_{}".format(pipepro[i].done_file,i)
+                
+            
     def run(self,onlyrun=None):
         if not self.build_flag: build_error()
         if not self.config_flag: config_error()
@@ -135,7 +178,11 @@ class SALT3pipe():
                 continue
             
             pipepro = self._get_pipepro_from_string(prostr)
-            pipepro.run(batch=pipepro.batch)
+            if not isinstance(pipepro,list):
+                pipepro.run(batch=pipepro.batch)
+            else:
+                for i in range(len(pipepro)):
+                    pipepro[i].run(batch=pipepro[i].batch)
 
     def glue(self,pipepros=None,on='phot'):
         if not self.build_flag: build_error()
@@ -150,49 +197,107 @@ class SALT3pipe():
             
         
         print("Connecting ",pipepros)
-        
+              
         pro1 = self._get_pipepro_from_string(pipepros[0])
+        if not isinstance(pro1,list):
+            pro1list = [pro1]
+        else:
+            pro1list = pro1
         pro2 = self._get_pipepro_from_string(pipepros[1])
-        pro1_out = pro1.glueto(pro2)
-        if 'lcfit' in pipepros[1].lower():
-            pro2_in = pro2._get_input_info().loc[on]
-            if isinstance(pro1_out,list) or isinstance(pro1_out,np.ndarray): pro2_in['value'] = ', '.join(pro1_out)
-            else:
-                pro2_in['value'] = pro1_out
+        if not isinstance(pro2,list):
+            pro2list = [pro2]
         else:
-            pro2_in = pro2._get_input_info().loc[0]
-            pro2_in['value'] = pro1_out
-        if isinstance(pro2_in,pd.DataFrame):
-            setkeys = pro2_in
-        else:
-            setkeys = pd.DataFrame([pro2_in])
+            pro2list = pro2
+            
+        for i,pro1 in enumerate(pro1list):
+            for j,pro2 in enumerate(pro2list):
+                pro1_out = pro1.glueto(pro2)
 
-        if isinstance(pro1,Training):
-            # need to define the output directory *before* running training
-            pro1.configure(setkeys = pd.DataFrame([pro1._get_output_info().loc[0]]),
-                           pro=pro1.pro,
-                           proargs=pro1.proargs,
-                           baseinput=pro1.outname,
-                           prooptions=pro1.prooptions,
-                           outname=pro1.outname,
-                           batch=pro1.batch,
-                           validplots=pro1.validplots)
-        
-        if not pipepros[1].lower().startswith('cosmofit'):
-            pro2.configure(setkeys = setkeys,
-                           pro=pro2.pro,
-                           proargs=pro2.proargs,
-                           baseinput=pro2.outname,
-                           prooptions=pro2.prooptions,
-                           outname=pro2.outname,
-                           batch=pro2.batch,
-                           validplots=pro2.validplots)
-        else:
-            pro2.configure(pro=pro2.pro,
-                           prooptions=pro2.prooptions,
-                           outname=setkeys['value'].values[0],
-                           batch=pro2.batch,
-                           validplots=pro2.validplots)
+                if isinstance(pro1, Simulation):
+                    pro1_out_dict = pro1_out.copy()
+                    if isinstance(pro2, LCFitting):
+                        pro2_in = pro2._get_input_info().loc[on]
+                        if pro1.biascor:
+                            split_arr = self.genversion_split.split(',')
+                        else:
+                            split_arr = self.genversion_split_biascor.split(',')
+                        split_idx = [int(x) for x in split_arr]
+                        for label in ['io','kcor']:     
+                            pro1_out = pro1_out_dict[label][split_idx[j]:split_idx[j+1]] 
+                            if isinstance(pro1_out,list) or isinstance(pro1_out,np.ndarray): 
+                                pro2_in.loc[pro2_in['label']==label,'value'] = ', '.join(pro1_out)
+                            else:
+                                pro2_in.loc[pro2_in['label']==label,'value'] = pro1_out
+                    elif isinstance(pro2, Training):
+                        pro2_in = pro2._get_input_info()
+                        for label in ['io','kcor']:     
+                            pro1_out = pro1_out_dict[label]    
+                            if isinstance(pro1_out,list) or isinstance(pro1_out,np.ndarray): 
+                                if label == 'io':
+                                    pro2_in.loc[pro2_in['label']==label,'value'] = ','.join(pro1_out)
+                                elif label == 'kcor':
+                                    for i,survey in zip(pro1_out_dict['ind'],pro1_out_dict['survey']):
+                                        section = 'survey_{}'.format(survey.strip())
+                                        pro2_in.loc[(pro2_in['label']==label) & (pro2_in['section']==section),'value'] = pro1_out[int(i)]
+                            else:
+                                pro2_in.loc[pro2_in['label']==label,'value'] = pro1_out
+
+                elif isinstance(pro1, Training) and isinstance(pro2, LCFitting):
+                    pro2_in = pro2._get_input_info().loc[on]
+                    pro2_in['value'] = pro1_out
+                    
+                elif isinstance(pro2, GetMu):
+                    if pro1.biascor:
+#                         pro2_in = pro2._get_input_info().loc['biascor']
+#                         pro2_in['value'] = pro1_out
+                        if i == 0:
+                            pro2_in = pro2._get_input_info().loc['biascor']
+                            pro2_in['value'] = [pro1_out]
+                            continue
+                        else:
+                            pro2_in['value'] += [pro1_out]
+                    else:
+                        if i == 0:
+                            pro2_in = pro2._get_input_info().loc['normal']
+                            pro2_in['value'] = [pro1_out]
+                            continue
+                        else:
+                            pro2_in['value'] += [pro1_out]
+                else:
+                    pro2_in = pro2._get_input_info().loc[0]
+                    pro2_in['value'] = pro1_out
+                if isinstance(pro2_in,pd.DataFrame):
+                    setkeys = pro2_in
+                else:
+                    setkeys = pd.DataFrame([pro2_in])
+                    
+                if isinstance(pro1,Training):
+                    # need to define the output directory *before* running training
+                    pro1.configure(setkeys = pd.DataFrame([pro1._get_output_info().loc[0]]),
+                                   pro=pro1.pro,
+                                   proargs=pro1.proargs,
+                                   baseinput=pro1.outname,
+                                   prooptions=pro1.prooptions,
+                                   outname=pro1.outname,
+                                   batch=pro1.batch,
+                                   validplots=pro1.validplots)
+
+                if not pipepros[1].lower().startswith('cosmofit'):
+                    pro2.configure(setkeys = setkeys,
+                                   pro=pro2.pro,
+                                   proargs=pro2.proargs,
+                                   baseinput=pro2.outname,
+                                   prooptions=pro2.prooptions,
+                                   outname=pro2.outname,
+                                   batch=pro2.batch,
+                                   validplots=pro2.validplots,
+                                   done_file=pro2.done_file)
+                else:
+                    pro2.configure(pro=pro2.pro,
+                                   prooptions=pro2.prooptions,
+                                   outname=setkeys['value'].values[0],
+                                   batch=pro2.batch,
+                                   validplots=pro2.validplots)
 
         self.gluepairs.append(pipepros)
 
@@ -240,8 +345,10 @@ class SALT3pipe():
                 colnames = ['key','value']
             elif ncol == 3:
                 colnames = ['section','key','value']
+            elif ncol == 4:
+                colnames = ['label','section','key','value']
             else:
-                raise ValueError("column number for set_key must be 2 or 3")
+                raise ValueError("column number for set_key must be between 2 and 4")
             if df.shape[1] > ncol:
                 stackvalues = True
             # if df.shape[1] == 2:
@@ -387,6 +494,10 @@ class BYOSED(PyPipeProcedure):
         pass
 
 class Simulation(PipeProcedure):
+    
+    def __init__(self,biascor=False):
+        self.biascor = biascor
+        super().__init__()
 
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
                   batch=False,validplots=False,
@@ -435,7 +546,14 @@ class Simulation(PipeProcedure):
         if not isinstance(pipepro,str):
             pipepro = type(pipepro).__name__
         df = self._get_output_info()
+        df_kcor = pd.DataFrame.from_dict(self._get_kcor_location(), orient='index',columns=['value'])
+        df_kcor['key'] = 'KCOR_FILE'
+        df_kcor = df_kcor.reset_index().rename(columns={'index':'ind'})
+        df = pd.concat([df,df_kcor],ignore_index=True,sort=False)
+        df = df.sort_values('ind')
         outdirs = self.get_outdirs(outinfo=df)
+        simlibs = self._get_simlibs()
+        surveynames = self._get_survey_names(simlibs)
         for i,o in enumerate(outdirs):
             outdirs[i] = os.path.expandvars(outdirs[i])
         #res = os.path.expandvars(outdir)
@@ -464,9 +582,19 @@ class Simulation(PipeProcedure):
 
             # D. Jones - uncomment this line if this doesn't work....
             #prefix = df.loc[df.key=='GENVERSION','value'].values[0]
-            return ["{}/{}.LIST".format(res,prefix) for res,prefix in zip(outdirs,df.loc[df.key=='GENVERSION','value'].values)]
+            ind = df.loc[df.key=='GENVERSION','ind'].values
+            output = ["{}/{}.LIST".format(res,prefix) for res,prefix in zip(outdirs,df.loc[df.key=='GENVERSION','value'].values)]
+            kcor = df.loc[df.key=='KCOR_FILE'].set_index('ind').loc[ind,'value'].values
+            survey = [surveynames[str(i)]['SURVEY'] for i in ind]
+            subsurvey_list = [surveynames[str(i)]['SUBSURVEY_LIST'] for i in ind]
+            return {'io':output,'kcor':kcor,'ind':ind,'survey':survey,'subsurvey_list':subsurvey_list}
+#             return ["{}/{}.LIST".format(res,prefix) for res,prefix in zip(outdirs,df.loc[df.key=='GENVERSION','value'].values)]
         elif pipepro.lower().startswith('lcfit'):
-            return df.loc[df.key=='GENVERSION','value'].values
+#             print(df)
+            ind = df.loc[df.key=='GENVERSION','ind'].values
+            output = df.loc[df.key=='GENVERSION','value'].values
+            kcor = df.loc[df.key=='KCOR_FILE'].set_index('ind').loc[ind,'value'].values
+            return {'io':output,'kcor':kcor,'ind':ind}
             # idx = res.find(simpath)
             # if idx !=0:
             #     raise ValueError("photometry must be in $SNDATA_ROOT/SIM")
@@ -497,6 +625,56 @@ class Simulation(PipeProcedure):
                     outdirs += [os.sep.join(['$SNDATA_ROOT/SIM',
                                              genversion])]
         return [os.path.expandvars(x) for x in outdirs]
+    
+    
+    def _get_kcor_location(self):
+        kcor_dict = {}
+        for key,value in self.keys.items():
+            if key.startswith('KCOR_FILE'):
+                label = key.split('[')[1].split(']')[0]
+                kcor_dict[label] = value
+
+        findkey = [key for key,value in self.keys.items() if key.startswith('SIMGEN_INFILE_Ia')]
+        for key in findkey:
+            label = key.split('[')[1].split(']')[0]
+            if label in kcor_dict.keys():
+                continue
+            else:
+                sim_input = self.keys[key]
+                config,delimiter = _read_simple_config_file(sim_input,sep=':')
+                kcorfile = config['KCOR_FILE'].strip()
+                kcor_dict[label] = kcorfile
+        return kcor_dict
+    
+    
+    def _get_simlibs(self):
+#         print(self.keys)
+        simlib_dict = {}
+        for key,value in self.keys.items():
+            if key.startswith('SIMLIB_FILE'):
+                label = key.split('[')[1].split(']')[0]
+                simlib_dict[label] = value
+
+        findkey = [key for key,value in self.keys.items() if key.startswith('SIMGEN_INFILE_Ia')]
+        for key in findkey:
+            label = key.split('[')[1].split(']')[0]
+            if label in simlib_dict.keys():
+                continue
+            else:
+                sim_input = self.keys[key]
+                config,delimiter = _read_simple_config_file(sim_input,sep=':')
+                simlib_file = config['SIMLIB_FILE'].strip()
+                simlib_dict[label] = simlib_file
+        return simlib_dict
+    
+    def _get_survey_names(self,simlib_dict):
+        result_dict = {}
+        for key,simlib_file in simlib_dict.items():
+            result_dict[key] = {}
+            for findkey in ['SURVEY','SUBSURVEY_LIST']:
+                value = _parse_simlib(simlib_file, key=findkey)
+                result_dict[key][findkey] = value
+        return result_dict
 
 
 class Training(PyPipeProcedure):
@@ -516,21 +694,43 @@ class Training(PyPipeProcedure):
         if pipepro.lower().startswith('lcfit'):
             outdir = self._get_output_info().value.values[0]
             ##copy necessary files to a model folder in SNDATA_ROOT
-            modeldir = 'lcfitting/SALT3.test'
+#             modeldir = 'lcfitting/SALT3.test'
+            modeldir = outdir
             #self.__transfer_model_files(outdir,modeldir,rename=False)
+            self.__copy_salt2info(modeldir,template_file='lcfitting/SALT2.INFO')
             self._set_output_info(modeldir)
+            os.environ['SNANA_MODELPATH'] = os.path.join(os.getcwd(),'lcfitting')
             return modeldir
         else:
             raise ValueError("training can only glue to lcfit")
 
     def _get_input_info(self):
-        df = {}
-        section = 'iodata'
-        key = 'snlists'
-        df['section'] = section
-        df['key'] = key
-        df['value'] = self.keys[section][key]
-        return pd.DataFrame([df])
+        section_key_pair = [['iodata','snlists','io']]
+        survey_sections = [x for x in self.keys.sections() if x.strip().lower().startswith('survey')]
+        for s in survey_sections:
+            section_key_pair.append([s,'kcorfile','kcor'])
+
+        dflist = []
+        for p in section_key_pair:
+            df = {}
+            section = p[0]
+            key = p[1]
+            label = p[2]
+            df['section'] = section
+            df['key'] = key
+            df['value'] = self.keys[section][key]
+            df['label'] = label
+            dflist.append(df)
+        df2 = pd.DataFrame(dflist)
+        return df2
+        
+#         df = {}
+#         section = 'iodata'
+#         key = 'snlists'
+#         df['section'] = section
+#         df['key'] = key
+#         df['value'] = self.keys[section][key]
+#         return pd.DataFrame([df])
     
     def _get_output_info(self):
         df = {}
@@ -550,6 +750,14 @@ class Training(PyPipeProcedure):
         df['value'] = value
         self.keys[section][key] = value
         return pd.DataFrame([df])
+    
+    def __copy_salt2info(self,modeldir,template_file='lcfitting/SALT2.INFO'):
+        # temporarily copy SALT2.INFO to model folder, remove when SALT2.INFO can be created by training
+        if not os.path.isdir(modeldir):
+            os.mkdir(modeldir)
+        if not os.path.isfile(os.path.join(modeldir,'SALT2.INFO')):
+            shutil.copy(template_file, modeldir)        
+            print("SALT2.INFO does not exist. Copying {} to {}".format(template_file,modeldir))
     
     def __transfer_model_files(self,outdir,modeldir,write_info=True,rename=True):
         modelfiles = glob.glob('{}/*.dat'.format(outdir))
@@ -632,10 +840,16 @@ class Training(PyPipeProcedure):
 
 
 class LCFitting(PipeProcedure):
-
+            
+    def __init__(self,biascor=False):
+        self.biascor = biascor
+        super().__init__()
+        
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
-                  batch=False,validplots=False,outname="pipeline_lcfit_input.input",**kwargs):
-        self.done_file = 'ALL.DONE'
+                  batch=False,validplots=False,outname="pipeline_lcfit_input.input",
+                  done_file='LCFit.DONE',**kwargs):
+#         self.done_file = 'ALL.DONE'
+        self.done_file = '%s/%s'%(os.path.dirname(baseinput),os.path.split(done_file)[1])
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
@@ -653,9 +867,16 @@ class LCFitting(PipeProcedure):
         if not isinstance(pipepro,str):
             pipepro = type(pipepro).__name__
         if pipepro.lower().startswith('getmu'):
-            outprefix = abspath_for_getmu(self._get_output_info().value.values[0])
-            if self.batch: return str(outprefix)
-            else: return str(outprefix)+'.FITRES.TEXT'
+            output_df = self._get_output_info().set_index('key')
+            if self.batch: 
+                outprefix = str(output_df.loc['OUTDIR','value'])
+                if self.biascor:
+                    outprefix += '/{}/FITOPT000.FITRES'.format(str(output_df.loc['VERSION','value']))
+                output_abspath = abspath_for_getmu(outprefix) 
+                return(str(output_abspath))
+            else:
+                outprefix = abspath_for_getmu(str(output_df.loc['TEXTFILE_PREFIX','value']))
+                return str(outprefix)+'.FITRES.TEXT'
         else:
             raise ValueError("lcfitting can only glue to getmu")
 
@@ -664,22 +885,40 @@ class LCFitting(PipeProcedure):
 
 
     def _get_input_info(self):
-        df = {}       
-        section = 'SNLCINP'
-        key = 'VERSION_PHOTOMETRY'
-        df['section'] = section
-        df['key'] = key
-        df['value'] = self.keys[section][key]
-        df['type'] = 'phot'
+        section_key_pair = [['SNLCINP','VERSION_PHOTOMETRY','phot','io'],
+                            ['FITINP','FITMODEL_NAME','model','io'],
+                            ['SNLCINP','KCOR_FILE','phot','kcor']]
+        dflist = []
+        for p in section_key_pair:
+            df = {}
+            section = p[0]
+            key = p[1]
+            t = p[2]
+            label = p[3]
+            df['section'] = section
+            df['key'] = key
+            df['value'] = self.keys[section][key]
+            df['type'] = t
+            df['label'] = label
+            dflist.append(df)
+        df2 = pd.DataFrame(dflist)
         
-        df2 = {}
-        section2 = 'FITINP'
-        key2 = 'FITMODEL_NAME'
-        df2['section'] = section2
-        df2['key'] = key2
-        df2['value'] = self.keys[section2][key2]
-        df2['type'] = 'model'
-        df2 = pd.DataFrame([df,df2])
+#         df = {}       
+#         section = 'SNLCINP'
+#         key = 'VERSION_PHOTOMETRY'
+#         df['section'] = section
+#         df['key'] = key
+#         df['value'] = self.keys[section][key]
+#         df['type'] = 'phot'
+        
+#         df2 = {}
+#         section2 = 'FITINP'
+#         key2 = 'FITMODEL_NAME'
+#         df2['section'] = section2
+#         df2['key'] = key2
+#         df2['value'] = self.keys[section2][key2]
+#         df2['type'] = 'model'
+#         df2 = pd.DataFrame([df,df2])
 
         if not self.batch:
             return df2.set_index('type')
@@ -690,26 +929,40 @@ class LCFitting(PipeProcedure):
             df['key'] = key
             df['value'] = self.keys[section][key]
             df['type'] = 'phot'
+            df['label'] = 'io'
             df2 = df2.append(df,ignore_index=True)
             return df2.set_index('type')
 
     def _get_output_info(self):
-        df = {}
         if self.batch:
             section = 'HEADER'
-            key = 'OUTDIR'
+            keys = ['OUTDIR']
+            if self.biascor:
+                keys.append('VERSION')
         else:
             section = 'SNLCINP'
-            key = 'TEXTFILE_PREFIX'
-        df['section'] = section
-        df['key'] = key
-        df['value'] = self.keys[section][key]
-        return pd.DataFrame([df])
- 
+            keys = ['TEXTFILE_PREFIX']
+
+        df_list = []
+        for key in keys:
+            df = {}
+            df['section'] = section
+            df['key'] = key
+            df['value'] = self.keys[section][key]
+            df_list.append(df)
+        return pd.DataFrame(df_list)
+
+            
 class GetMu(PipeProcedure):
+            
+    def __init__(self,bbc=True):
+        self.bbc = bbc
+        super().__init__()
+        
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
-                  batch=False,validplots=False,outname="pipeline_getmu_input.input",**kwargs):
-        self.done_file = finput_abspath('%s/GetMu.DONE'%os.path.dirname(baseinput))
+                  batch=False,validplots=False,outname="pipeline_getmu_input.input",
+                  done_file='GetMu.DONE',**kwargs):
+        self.done_file = finput_abspath('%s/%s'%(os.path.dirname(baseinput),os.path.split(done_file)[1]))
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
@@ -746,8 +999,17 @@ class GetMu(PipeProcedure):
                 df['key'] = key
                 df['value'] = self.keys[key]
                 df['delimiter'] = self.delimiter[key]
-
-        return pd.DataFrame([df])
+            df['tag'] = 'normal'
+            if self.bbc:
+                df2 = {}
+                key = 'simfile_biascor'
+                df2['key'] = key
+                df2['value'] = self.keys[key].strip()
+                df2['tag'] = 'biascor' 
+            else:
+                df2 = {}
+                
+        return pd.DataFrame([df,df2]).set_index('tag')
 
     def _get_output_info(self):
         df = {}
@@ -779,7 +1041,7 @@ def _run_external_pro(pro,args):
         args = [args]
 
     print("Running",' '.join([pro] + args))
-    res = subprocess.run(args = list([pro] + args))
+    res = subprocess.run(args = list([pro] + args),capture_output=True)
     
     if res.returncode == 0:
         print("{} finished successfully.".format(pro.strip()))
@@ -808,8 +1070,8 @@ def _run_batch_pro(pro,args,done_file=None):
         raise RuntimeError("Something went wrong...")
     if 'WARNING' in stdout:
         for line in stdout[stdout.find('WARNING'):].split('\n'):
+            warnings.warn("The following warning occured:")
             print(line)
-        raise RuntimeError("Something went wrong...")
     if 'FATAL ERROR' in stdout:
         for line in stdout[stdout.find('FATAL ERROR'):].split('\n'):
             print(line)
@@ -876,7 +1138,7 @@ def _gen_general_python_input(basefilename=None,setkeys=None,
                 print("Adding/modifying key {}={} in [{}]".format(key,value,sec))
                 config[sec][key] = config[sec][key] + '%s,'%value
             config[sec][key] = config[sec][key][:-1]
-        with open(outname, 'w') as f:
+        with _open_shared_file(outname, 'w') as f:
             config.write(f)
 
         print("input file saved as:",outname)
@@ -908,8 +1170,8 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
     if not os.path.isfile(basefilename):
         raise ValueError("basefilename cannot be None")
     print("Load base sim input file..",basefilename)
-    basefile = open(basefilename,"r")
-    lines = basefile.readlines()
+    with _open_shared_file(basefilename) as basefile:
+        lines = basefile.readlines()
     basekws = []
     basevals = []
     linenum = []
@@ -999,17 +1261,18 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
                 lines.insert(lineloc+1,newline)
                 config[key] = valuestr.strip()
 
-        outfile = open(outname,"w")
-        for line in lines:
-            outfile.write(line)
-        outfile.close()
+        with _open_shared_file(outname,"w") as outfile:
+            for line in lines:
+                outfile.write(line)
         print("Write sim input to file:",outname)
 
-    with open(outname) as fin:
+    with _open_shared_file(outname) as fin:
         lines = fin.readlines()
 
-    with open(outname,'w') as fout:
+    with _open_shared_file(outname,'w') as fout:
         for line in lines:
+            if 'DONE_STAMP' in line:
+                continue
             print(line.replace('\n',''),file=fout)
             if 'ENDLIST_GENVERSION' in line:
                 print('',file=fout)
@@ -1038,8 +1301,8 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
     if not os.path.isfile(basefilename):
         raise ValueError("basefilename cannot be None")
     print("Load base fit input file..",basefilename)
-    basefile = open(basefilename,"r")
-    lines = basefile.readlines()
+    with _open_shared_file(basefilename) as basefile:
+        lines = basefile.readlines()
     basekws = []
 
     #if setkeys is None:
@@ -1095,10 +1358,14 @@ def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_
         for index, row in setkeys.iterrows():
             key = row['key']
             values = row['value']
-            if not isinstance(values,list) and not isinstance(values,np.ndarray): values = [values]
-            for value in values:
+            if delimiter[key] == '=' and isinstance(values,(list,np.ndarray)):
+                values = [','.join(values)]
+            else:
+                values = [values]
+            for i,value in enumerate(values):
                 print("Adding/modifying key {}={}".format(key,value))
-                config[key] = value
+                config['{}[{}]'.format(key,i)] = value
+                delimiter['{}[{}]'.format(key,i)] = delimiter[key]
     if done_file:
         key = 'DONE_STAMP'
         v = done_file
@@ -1113,8 +1380,8 @@ def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_
 
 def _read_simple_config_file(filename,sep='='):
     config,delimiter = {},{}
-    f = open(filename,"r")
-    lines = f.readlines()
+    with _open_shared_file(filename) as f:
+        lines = f.readlines()
 
     # sighhhh so many SNANA inputs with multiple key/value separators
     if isinstance(sep,str):
@@ -1142,14 +1409,23 @@ def _read_simple_config_file(filename,sep='='):
     return config,delimiter
 
 def _write_simple_config_file(config,filename,delimiter,sep='='):
-    outfile = open(filename,"w")
-    for key in config.keys():
-        values = config[key]
-        if not isinstance(values,list) and not isinstance(values,np.ndarray): values = [values]
-        for value in values:
-            if not key in delimiter.keys(): outfile.write("{}={}\n".format(key,value))
-            else: outfile.write("{}{}{}\n".format(key,delimiter[key],value))
-    outfile.close()
+    with _open_shared_file(filename,"w") as outfile:
+        replace_keys = []
+        for key in config.keys():
+            if '[' in key:
+                replace_keys.append(key.split('[')[0]) 
+        for key in config.keys():
+            if '[' in key:
+                key_to_print = key.split('[')[0]
+            else:
+                key_to_print = key
+            if key in replace_keys:
+                continue
+            values = config[key]
+            if not isinstance(values,list) and not isinstance(values,np.ndarray): values = [values]
+            for value in values:
+                if not key in delimiter.keys(): outfile.write("{}={}\n".format(key_to_print,value))
+                else: outfile.write("{}{}{}\n".format(key_to_print,delimiter[key],value))
 
     return
 
@@ -1198,8 +1474,52 @@ def _write_nml_to_file(nml,filename,headerlines=[],append=False):
             # outfile.write('&END\n\n')
             lines.append('&END\n\n')
 
-    outfile = open(filename,"w")
-    for line in lines:
-        outfile.write(line)
+    with _open_shared_file(filename,"w") as outfile:
+        for line in lines:
+            outfile.write(line)
 
     return
+
+def _parse_simlib(simlib_file, key='SURVEY'):
+    if simlib_file.strip().startswith('$'):
+        simlib_file = os.path.expandvars(simlib_file)
+    
+    with _open_shared_file(simlib_file,"r") as f:
+        lines = f.readlines()
+    for line in lines:
+        while len(line.split(':')) > 2:
+            keysplit = line.split(':',maxsplit=1)
+            keystring = keysplit[0].strip()
+            value = keysplit[1].strip().split()[0]
+            if key == keystring:
+                return value
+            else:
+                line = line[line.find(value)+len(value):]
+        if line.split(':')[0].strip() == key:
+            return line.split(':')[1].strip()
+    
+def _has_handle(fpath):
+    for proc in psutil.process_iter():
+        try:
+            for item in proc.open_files():
+                if fpath == item.path:
+                    print(proc.open_files())
+                    return True
+        except Exception:
+            pass
+
+    return False
+
+def _open_shared_file(filename,flag="r",max_time=100):
+    status = False
+    total_time = 0
+    while status is False and total_time < max_time:
+        if not _has_handle(finput_abspath(filename)):        
+            f = open(filename, flag)
+            status = True
+            return f
+        else:
+            time.sleep(5)
+            total_time += 5
+    if status is False:
+        raise RuntimeError('File %s is opened by another process' %filename)
