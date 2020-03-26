@@ -27,6 +27,8 @@ from functools import partial
 from itertools import starmap
 
 import time
+import matplotlib as mpl
+mpl.use('agg')
 import pylab as plt
 import extinction
 import copy

@@ -38,6 +38,8 @@ from astropy.table import Table
 from salt3.initfiles import init_rootdir as salt2dir
 
 # validation utils
+import matplotlib as mpl
+mpl.use('agg')
 import pylab as plt
 from salt3.validation import ValidateLightcurves
 from salt3.validation import ValidateSpectra
