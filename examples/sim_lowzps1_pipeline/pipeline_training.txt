@@ -20,7 +20,8 @@ baseinput=simulation/MASTER_LOWZ_PS1.INPUT
 outinput=pipeline/MASTER_LOWZ_PS1.INPUT
 batch=True
 prooptions=
-set_key= 
+set_key=2
+        NGENTOT_LC[1] 40
 
 [training]
 pro=trainsalt
@@ -43,9 +44,10 @@ batch=True
 validplots=True
 prooptions=NOPROMPT
 set_key=4
-        0 HEADER OUTDIR SIM_LOWZPS1 
-        1 HEADER OUTDIR SIM_LOWZPS1_2 
+        0 HEADER OUTDIR SIM_LOWZPS1_LOWZ 
+        1 HEADER OUTDIR SIM_LOWZPS1_PS1
         1 FITINP FILTLIST_FIT griz
+        1 SNLCINP CUTWIN_REDSHIFT 0.01 0.8
 
 [biascorsim]
 pro=sim_SNmix.pl
@@ -63,8 +65,13 @@ batch=True
 validplots=True
 prooptions=
 set_key=4
-        0 HEADER OUTDIR SIM_LOWZPS1_BIASCOR 
-        1 HEADER OUTDIR SIM_LOWZPS1_BIASCOR_2 
+        0 HEADER OUTDIR SIM_LOWZPS1_BIASCOR_LOWZ
+        1 HEADER OUTDIR SIM_LOWZPS1_BIASCOR_PS1
+        1 FITINP FILTLIST_FIT griz
+        0 FITINP FITMODEL_NAME SALT2.JLA-B14
+        1 FITINP FITMODEL_NAME SALT2.JLA-B14
+        1 SNLCINP CUTWIN_REDSHIFT 0.01 0.8
+        
 [getmu]
 pro=SALT2mu_fit.pl
 baseinput=getmu/BBC_LOWZ_PS1.input
