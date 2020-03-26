@@ -1296,7 +1296,9 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
     import f90nml
     from f90nml.namelist import Namelist
     nml = f90nml.read(basefilename)
-
+    if 'fitinp' in nml.keys() and 'fitmodel_name' in nml['fitinp'] and isinstance(nml['fitinp']['fitmodel_name'],list):
+        nml['fitinp']['fitmodel_name'] = ''.join(nml['fitinp']['fitmodel_name'])
+    
     # first write the header info
     if not os.path.isfile(basefilename):
         raise ValueError("basefilename cannot be None")
