@@ -871,11 +871,11 @@ class LCFitting(PipeProcedure):
             if self.batch: 
                 outprefix = str(output_df.loc['OUTDIR','value'])
                 if self.biascor:
-                    outprefix += '/{}/FITOPT000.FITRES'.format(str(output_df.loc['VERSION','value']))
+                    outprefix += '/{}/FITOPT000.FITRES'.format(str(output_df.loc['VERSION','value']).strip())
                 output_abspath = abspath_for_getmu(outprefix) 
                 return(str(output_abspath))
             else:
-                outprefix = abspath_for_getmu(str(output_df.loc['TEXTFILE_PREFIX','value']))
+                outprefix = abspath_for_getmu(str(output_df.loc['TEXTFILE_PREFIX','value']).strip())
                 return str(outprefix)+'.FITRES.TEXT'
         else:
             raise ValueError("lcfitting can only glue to getmu")
@@ -1231,7 +1231,7 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
                 basevals[i] = val
                 keystr = kw.split('[')[0]
                 if "[" in kw and 'GENVERSION' not in kw:
-                    lines[linenum[i]] = "GENOPT:{} {}\n".format(keystr,val)
+                    lines[linenum[i]] = "GENOPT: {} {}\n".format(keystr,val)
                 else:
                     lines[linenum[i]] = "{}: {}\n".format(keystr,val)
                 print("Setting {} = {}".format(keystr,val.strip()))
@@ -1250,7 +1250,7 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
                 if "[" in key and 'GENVERSION' not in key:
                     keystr = key.split('[')[0]
                     numstr = key.split('[')[1].split(']')[0]
-                    newline = "GENOPT:{} {}\n".format(keystr,valuestr)
+                    newline = "GENOPT: {} {}\n".format(keystr,valuestr)
                     lineloc = [i for i,line in enumerate(lines) if "GENVERSION".format(numstr) in line][int(numstr)]            
                     print("Adding key {} = {} for GENVERSION[{}]".format(keystr,valuestr,numstr))
                 else:
