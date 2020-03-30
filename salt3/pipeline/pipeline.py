@@ -5,6 +5,7 @@ import subprocess
 import configparser
 import pandas as pd
 import os
+import sys
 import numpy as np
 import time
 import glob
@@ -988,6 +989,8 @@ class GetMu(PipeProcedure):
             key = 'file'
             df['key'] = key
             df['value'] = self.keys[key]
+            df['tag'] = 'normal'
+            return pd.DataFrame([df]).set_index('tag')
         else:
             if 'INPDIR' in self.keys:
                 key = 'INPDIR'
@@ -1009,7 +1012,7 @@ class GetMu(PipeProcedure):
             else:
                 df2 = {}
                 
-        return pd.DataFrame([df,df2]).set_index('tag')
+            return pd.DataFrame([df,df2]).set_index('tag')
 
     def _get_output_info(self):
         df = {}
@@ -1041,8 +1044,11 @@ def _run_external_pro(pro,args):
         args = [args]
 
     print("Running",' '.join([pro] + args))
-    res = subprocess.run(args = list([pro] + args),capture_output=True)
-    
+    if sys.version_info[1] > 6:
+        res = subprocess.run(args = list([pro] + args),capture_output=True)
+    else:
+        res = subprocess.run(args = list([pro] + args))    
+
     if res.returncode == 0:
         print("{} finished successfully.".format(pro.strip()))
     else:
