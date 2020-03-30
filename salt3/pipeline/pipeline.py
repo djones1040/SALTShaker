@@ -254,14 +254,16 @@ class SALT3pipe():
                         if i == 0:
                             pro2_in = pro2._get_input_info().loc['biascor']
                             pro2_in['value'] = [pro1_out]
-                            continue
+                            if len(pro1list)>1:
+                                continue
                         else:
                             pro2_in['value'] += [pro1_out]
                     else:
                         if i == 0:
                             pro2_in = pro2._get_input_info().loc['normal']
                             pro2_in['value'] = [pro1_out]
-                            continue
+                            if len(pro1list)>1:
+                                continue                            
                         else:
                             pro2_in['value'] += [pro1_out]
                 else:
