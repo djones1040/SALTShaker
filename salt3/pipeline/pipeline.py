@@ -5,6 +5,7 @@ import subprocess
 import configparser
 import pandas as pd
 import os
+import sys
 import numpy as np
 import time
 import glob
@@ -253,14 +254,16 @@ class SALT3pipe():
                         if i == 0:
                             pro2_in = pro2._get_input_info().loc['biascor']
                             pro2_in['value'] = [pro1_out]
-                            continue
+                            if len(pro1list)>1:
+                                continue
                         else:
                             pro2_in['value'] += [pro1_out]
                     else:
                         if i == 0:
                             pro2_in = pro2._get_input_info().loc['normal']
                             pro2_in['value'] = [pro1_out]
-                            continue
+                            if len(pro1list)>1:
+                                continue                            
                         else:
                             pro2_in['value'] += [pro1_out]
                 else:
@@ -871,11 +874,11 @@ class LCFitting(PipeProcedure):
             if self.batch: 
                 outprefix = str(output_df.loc['OUTDIR','value'])
                 if self.biascor:
-                    outprefix += '/{}/FITOPT000.FITRES'.format(str(output_df.loc['VERSION','value']))
+                    outprefix += '/{}/FITOPT000.FITRES'.format(str(output_df.loc['VERSION','value']).strip())
                 output_abspath = abspath_for_getmu(outprefix) 
                 return(str(output_abspath))
             else:
-                outprefix = abspath_for_getmu(str(output_df.loc['TEXTFILE_PREFIX','value']))
+                outprefix = abspath_for_getmu(str(output_df.loc['TEXTFILE_PREFIX','value']).strip())
                 return str(outprefix)+'.FITRES.TEXT'
         else:
             raise ValueError("lcfitting can only glue to getmu")
@@ -988,6 +991,8 @@ class GetMu(PipeProcedure):
             key = 'file'
             df['key'] = key
             df['value'] = self.keys[key]
+            df['tag'] = 'normal'
+            return pd.DataFrame([df]).set_index('tag')
         else:
             if 'INPDIR' in self.keys:
                 key = 'INPDIR'
@@ -1009,7 +1014,7 @@ class GetMu(PipeProcedure):
             else:
                 df2 = {}
                 
-        return pd.DataFrame([df,df2]).set_index('tag')
+            return pd.DataFrame([df,df2]).set_index('tag')
 
     def _get_output_info(self):
         df = {}
@@ -1041,8 +1046,11 @@ def _run_external_pro(pro,args):
         args = [args]
 
     print("Running",' '.join([pro] + args))
-    res = subprocess.run(args = list([pro] + args),capture_output=True)
-    
+    if sys.version_info[1] > 6:
+        res = subprocess.run(args = list([pro] + args),capture_output=True)
+    else:
+        res = subprocess.run(args = list([pro] + args))    
+
     if res.returncode == 0:
         print("{} finished successfully.".format(pro.strip()))
     else:
@@ -1231,7 +1239,7 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
                 basevals[i] = val
                 keystr = kw.split('[')[0]
                 if "[" in kw and 'GENVERSION' not in kw:
-                    lines[linenum[i]] = "GENOPT:{} {}\n".format(keystr,val)
+                    lines[linenum[i]] = "GENOPT: {} {}\n".format(keystr,val)
                 else:
                     lines[linenum[i]] = "{}: {}\n".format(keystr,val)
                 print("Setting {} = {}".format(keystr,val.strip()))
@@ -1250,7 +1258,7 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
                 if "[" in key and 'GENVERSION' not in key:
                     keystr = key.split('[')[0]
                     numstr = key.split('[')[1].split(']')[0]
-                    newline = "GENOPT:{} {}\n".format(keystr,valuestr)
+                    newline = "GENOPT: {} {}\n".format(keystr,valuestr)
                     lineloc = [i for i,line in enumerate(lines) if "GENVERSION".format(numstr) in line][int(numstr)]            
                     print("Adding key {} = {} for GENVERSION[{}]".format(keystr,valuestr,numstr))
                 else:
@@ -1296,7 +1304,9 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
     import f90nml
     from f90nml.namelist import Namelist
     nml = f90nml.read(basefilename)
-
+    if 'fitinp' in nml.keys() and 'fitmodel_name' in nml['fitinp'] and isinstance(nml['fitinp']['fitmodel_name'],list):
+        nml['fitinp']['fitmodel_name'] = ''.join(nml['fitinp']['fitmodel_name'])
+    
     # first write the header info
     if not os.path.isfile(basefilename):
         raise ValueError("basefilename cannot be None")
