@@ -8,6 +8,7 @@ def MyPipe(finput,**kwargs):
     pipe.glue(['train','lcfit'],on='model')
     pipe.glue(['sim','lcfit'],on='phot')
     pipe.glue(['lcfit','getmu'])
+    pipe.glue(['train','biascorlcfit'],on='model')
     pipe.glue(['biascorsim','biascorlcfit'])
     pipe.glue(['biascorlcfit','getmu'])
 

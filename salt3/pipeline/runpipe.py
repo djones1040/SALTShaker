@@ -141,6 +141,8 @@ class RunPipe():
 #                             self._reconfig_w_suffix(self.pipe.BiascorLCFit[i],None,self.num)
                         if ['biascorsim','biascorlcfit'] in self.pipe.gluepairs:
                             self.pipe.glue(['biascorsim','biascorlcfit'],on='phot')
+                        if ['train','biascorlcfit'] in self.pipe.gluepairs:
+                            self.pipe.glue(['train','biascorlcfit'],on='model')
                     if any([p.startswith('getmu') for p in self.pipe.pipepros]):       
                         if ['lcfit','getmu'] in self.pipe.gluepairs:
                             self.pipe.glue(['lcfit','getmu'])
