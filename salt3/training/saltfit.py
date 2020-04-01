@@ -900,8 +900,9 @@ class GaussNewton(saltresids.SALTResids):
 		varyingParams=iFit&self.iModelParam
 		if not self.fitTpkOff: varyingParams[self.itpk]=False
 
-		if fit in ['color','colorlaw']: doSpecResids = False
-		else: doSpecResids = True
+		#if fit in ['color','colorlaw']: doSpecResids = False
+		#else: 
+		doSpecResids = True
 		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors,doSpecResids=doSpecResids)
 		oldChi=(residuals**2).sum()
 
