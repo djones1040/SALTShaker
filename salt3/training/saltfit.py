@@ -2,14 +2,13 @@
 
 import numpy as np
 from numpy.random import standard_normal
-from numpy.linalg import inv,pinv
+from numpy.linalg import inv,pinv,norm
 
 import time,copy,extinction
 
 from scipy.interpolate import splprep,splev,BSpline,griddata,bisplev,bisplrep,interp1d,interp2d
 from scipy.integrate import trapz, simps
 from scipy.optimize import minimize, least_squares,minimize_scalar,lsq_linear
-from scipy.stats import norm
 from scipy.ndimage import gaussian_filter1d
 from scipy.special import factorial
 from scipy import linalg,sparse
@@ -26,14 +25,59 @@ from salt3.util.synphot import synphot
 from salt3.util.query import query_yes_no
 from salt3.training import saltresids #_master as saltresids
 
-
 from multiprocessing import Pool, get_context
 from emcee.interruptible_pool import InterruptiblePool
 from iminuit import Minuit
-import iminuit,warnings
+from datetime import datetime
 
+import iminuit,warnings
 import logging
 log=logging.getLogger(__name__)
+
+#Which integer code corresponds to which reason for LSMR terminating
+stopReasons=['x=0 solution','atol approx. solution','atol+btol approx. solution','ill conditioned','machine precision limit','machine precision limit','machine precision limit','max # of iteration']
+
+
+def ridders(f,central,h,maxn,tol):
+	"""Iterative method to evaluate the second derivative of a function f based on a stepsize h and a relative tolerance tol"""
+	lookup={}
+	def A(n,m):
+		if (n,m) in lookup: return lookup[n,m]
+		if n==1:
+			result=(f((h/2**(m-1)))-2*central+f((-h/2**(m-1))))/(h/2**(m-1))**2
+		elif n<1:
+			return 0
+		else:
+			result =(4**(n-1)*A(n-1,m+1)-A(n-1,m))/(4**(n-1)-1)
+		lookup[(n,m)]=result
+		return result
+	def AwithErr(n):
+		diff=A(n,1)-A(n-1,1)
+		return A(n,1),  norm(diff)/ min(norm(A(n,1)),norm(A(n-1,1)))
+	best=AwithErr(2)
+	prev=best[1]
+	diverging=0
+	errs=[prev]
+	for n in range(3,maxn+1):
+		result,err=AwithErr(n)
+		errs+=[err]
+		if err<tol:
+			log.debug(f'Second directional derivative found to tolerance {tol} after {n} iterations')
+			best= result,err
+			break
+		elif err>prev:
+			diverging+=1
+			if diverging>2:
+				log.warning(f'Second directional derivative diverging after {n} iterations, tolerance is {best[1]}')
+				break
+		else:
+			diverging=0
+			if err<best[1]:
+				best=result,err
+				diverging=0
+		prev=err
+	
+	return best
 
 class fitting:
 	def __init__(self,n_components,n_colorpars,
@@ -436,7 +480,9 @@ class GaussNewton(saltresids.SALTResids):
 		self.lsqfit = False
 		
 		self.GN_iter = {}
-
+		self.damping={}
+		self.nonlinearcorrection='directional'
+		
 		self._robustify = False
 		self._writetmp = False
 		self.chi2_diff_cutoff = 1
@@ -451,32 +497,44 @@ class GaussNewton(saltresids.SALTResids):
 				   (" x0",'x0'),('both components','components'),('component 0 piecewise','piecewisecomponent0'),('principal component 0','component0'),('x1','x1'),
 				   ('component 1 piecewise','piecewisecomponent1'),('principal component 1','component1'),('color','color'),('color law','colorlaw'),
 				   ('spectral recalibration const.','spectralrecalibration_norm'),('all spectral recalibration','spectralrecalibration'),
-				   ('time of max','tpk'),('error model','modelerr'),('params with largest residuals','highestresids')]+ [(f'sn {sn}',sn) for sn in self.datadict.keys()]
-		
+				   ('time of max','tpk'),('error model','modelerr'),('params with largest residuals','highestresids'),('pca parameters only','pcaparams')]+ [(f'sn {sn}',sn) for sn in self.datadict.keys()]
+
 		for message,fit in fitlist:
 			self.GN_iter[fit]=1
+			self.damping[fit]=0.1
 			if 'all' in fit or fit=='highestresids':
 				includePars=np.ones(self.npar,dtype=bool)
 			else:
 				includePars=np.zeros(self.npar,dtype=bool)
 				if fit in self.datadict:
 					includePars=np.array([ fit in name for name in self.parlist])
-					
+				elif 'pcaparams' in fit:
+					self.GN_iter[fit]=4
+					includePars[self.im0]=True
+					includePars[self.im1]=True		
+					includePars[self.ix0]=True
+					includePars[self.ix1]=True	
 				elif 'components' in fit:
 					includePars[self.im0]=True
 					includePars[self.im1]=True
 				elif 'component0' in fit :
+					self.damping[fit]=1e-3
 					includePars[self.im0]=True
 				elif 'component1' in fit:
+					self.damping[fit]=1e-3
 					includePars[self.im1]=True
 				elif fit=='sn':
+					self.damping[fit]=1e-3
 					includePars[self.ix0]=True
 					includePars[self.ix1]=True
 				elif fit=='x0':
+					self.damping[fit]=0
 					includePars[self.ix0]=True
 				elif fit=='x1':
+					self.damping[fit]=1e-3
 					includePars[self.ix1]=True
 				elif fit=='color':
+					self.damping[fit]=1e-3
 					includePars[self.ic]=True
 				elif fit=='colorlaw':
 					includePars[self.iCL]=True
@@ -494,20 +552,18 @@ class GaussNewton(saltresids.SALTResids):
 					raise NotImplementedError("""This option for a Gauss-Newton fit with a 
 	restricted parameter set has not been implemented: {}""".format(fit))
 			self.fitOptions[fit]=(message,includePars)
-		self.fitlist = [('all'),#('all parameters grouped','all-grouped'),
-			#('piecewise both components','piecewisecomponents'),
-			('x0'),('x1'),('component0'),
-			('sn'),
-			('component1'),('sn'),
+		self.fitlist = [('all'),
+			('pcaparams'),
 			('color'),('colorlaw'),
 			('sn'),
-			('spectralrecalibration'),'highestresids',			
+			('spectralrecalibration'),		
+			('sn'),
 			('tpk')]
 
 	def convergence_loop(self,guess,loop_niter=3):
 		lastResid = 1e20
 		log.info('Initializing')
-		
+		start=datetime.now()
 
 		#if self.fit_model_err: fixUncertainty = False
 		#else: fixUncertainty = True
@@ -516,23 +572,16 @@ class GaussNewton(saltresids.SALTResids):
 			raise RuntimeError('length of priors does not equal length of prior widths!')
 		stepsizes=None
 		#residuals = self.lsqwrap(guess,uncertainties,False,False,doPriors=False)
-		storedResults={}
-		residuals = self.lsqwrap(guess,storedResults)
-		self.uncertaintyKeys={key for key in storedResults if key.startswith('photvariances_') or key.startswith('specvariances_') or key.startswith('photCholesky_') }
-		uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
-		chi2_init = (residuals**2.).sum()
+		
+
 		X = copy.deepcopy(guess[:])
 		Xlast = copy.deepcopy(guess[:])
-		
-		chi2results=self.getChi2Contributions(X,uncertainties.copy())
-		for name,chi2component,dof in chi2results:
-			log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/chi2_init*100))
-		log.info('Estimating supernova parameters x0,x1,c and spectral normalization')
-# 		for sn in self.datadict:
-# 			X,logval=self.fitOneSN(X,sn)
-		for i in range(2):
-			for fit in ['x0','color','x1']:
-				X,chi2_init,_=self.process_fit(X,self.fitOptions[fit][1],{},fit=fit)
+		self.uncertaintyKeys=['photvariances_' +sn for sn in self.datadict]+['specvariances_' +sn for sn in self.datadict]+['photCholesky_' +sn for sn in self.datadict]
+		if np.all(X[self.ix1]==0) or np.all(X[self.ic]==0):
+			#If snparams are totally uninitialized
+			log.info('Estimating supernova parameters x0,x1,c and spectral normalization')
+			for fit in ['x0','color','x0','color','x1']:
+				X,chi2_init,chi2=self.process_fit(X,self.fitOptions[fit][1],{},fit=fit,doSpecResids=  (fit=='x0'))
 		uncertainties={}
 		chi2results=self.getChi2Contributions(X,uncertainties)
 		chi2_init=sum([x[1] for x in chi2results])
@@ -585,7 +634,8 @@ class GaussNewton(saltresids.SALTResids):
 		xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams = \
 			self.getParsGN(Xredefined)
-
+		
+		log.info('Total time spent in convergence loop: {}'.format(datetime.now()-start))
 
 		return xfinal,X,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams,stepsizes
@@ -818,18 +868,14 @@ class GaussNewton(saltresids.SALTResids):
 			
 
 			Xprop = X.copy()
-
 			if (fit=='all'):
 				if self.tryFittingAllParams:
 					Xprop,chi2prop,chi2 = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
-					if (chi2prop/chi2 < 0.9):
+					if (chi2prop/chi2 < 0.95):
 						log.info('Terminating iteration {}, continuing with all parameter fit'.format(niter+1))
 						return Xprop,chi2prop,False
 					elif (chi2prop<chi2):
-						if chi2prop>chi2*(1-1e-3):
-							self.tryFittingAllParams=False
-							log.info('Discontinuing all parameter fit')
-						X,chi2=Xprop[:],chi2prop
+						X,chi2=Xprop,chi2prop
 						storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys)}
 					else:
 						retainReg=True
@@ -871,9 +917,10 @@ class GaussNewton(saltresids.SALTResids):
 						log.error('NaN detected, breaking out of loop')
 						break;
 					if chi2prop<chi2 :
-						X,chi2=Xprop.copy(),chi2prop
-					retainReg=(not ('all' in fit or 'component' in fit))
-					retainPCDerivs=('component' in fit)  or fit.startswith('x') or fit=='sn'
+						X,chi2=Xprop,chi2prop
+					varyParams=self.fitOptions[fit][1]
+					retainReg=( ~ np.any(varyParams[self.im0]) and ~ np.any(varyParams[self.im1]) )
+					retainPCDerivs=( ~ np.any(varyParams[self.ic]) and ~ np.any(varyParams[self.iCL]) and ~ np.any(varyParams[self.ispcrcl]) and ~ np.any(varyParams[self.itpk])  ) 
 					storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
 							(retainReg and key.startswith('regresult' )) or
 						   (retainPCDerivs and key.startswith('pcDeriv_'   )) }
@@ -882,20 +929,19 @@ class GaussNewton(saltresids.SALTResids):
 						break
 						
 
-
 		#In this case GN optimizer can do no better
 		return X,chi2,(X is X_init)
 		 #_init
 	def linear_fit(self,X,gaussnewtonstep,uncertainties,doSpecResids):
 		def opFunc(x,stepdir):
-			return ((self.lsqwrap(X-(x*stepdir),uncertainties.copy(),None,True,doSpecResids))**2).sum()
+			return ((self.lsqwrap(X-(x*stepdir),uncertainties.copy(),None,True,doSpecResids=doSpecResids))**2).sum()
 		result,step,stepType=minimize_scalar(opFunc,args=(gaussnewtonstep,)),gaussnewtonstep,'Gauss-Newton'
 		log.info('Linear optimization factor is {:.2f} x {} step'.format(result.x,stepType))
 		log.info('Linear optimized chi2 is {:.2f}'.format(result.fun))
 		return result.x*gaussnewtonstep,result.fun
 		
 		
-	def process_fit(self,X,iFit,storedResults,fit='all',doPriors=True):
+	def process_fit(self,X,iFit,storedResults,fit='all',doPriors=True,doSpecResids=True):
 		X=X.copy()
 		varyingParams=iFit&self.iModelParam
 		if not self.fitTpkOff: varyingParams[self.itpk]=False
@@ -904,6 +950,7 @@ class GaussNewton(saltresids.SALTResids):
 		#else: 
 		doSpecResids = True
 		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors,doSpecResids=doSpecResids)
+
 		oldChi=(residuals**2).sum()
 
 		jacobian=jacobian.tocsc()
@@ -925,42 +972,80 @@ class GaussNewton(saltresids.SALTResids):
 
 		log.info('Number of parameters fit this round: {}'.format(includePars.sum()))
 		log.info('Initial chi2: {:.2f} '.format(oldChi))
-		isJacobianSparse=jacobian.nnz/(jacobian.shape[0]*jacobian.shape[1])<0.5
-		#If this is a sparse matrix, treat it as such, otherwise use standard linear algebra solver
+		#Simple diagonal preconditioning matrix designed to make the jacobian better conditioned. Seems to do well enough! If output is showing significant condition number in J, consider improving this
 		preconditoningMatrix=sparse.diags(1/np.sqrt(np.asarray((jacobian.power(2)).sum(axis=0))),[0])
+		#If this is a sparse matrix, treat it as such, otherwise convert to a standard array
+		isJacobianSparse=jacobian.nnz/(jacobian.shape[0]*jacobian.shape[1])<0.5
 		if isJacobianSparse:
-		
-			log.info('Using sparse linear algebra')
-			stepsize,stopsignal,itn,normr,normar,norma,conda,normx=sprslinalg.lsmr(jacobian.dot(preconditoningMatrix),residuals[includeResids],maxiter=2*min(jacobian.shape))
-			
-			stopReasons=['x=0 solution','atol approx. solution','atol+btol approx. solution','ill conditioned','machine precision limit','machine precision limit','machine precision limit','max # of iteration']
-			log.debug('LSMR results: {}, norm r {:.2f}, norm J^T r {:.2f}, norm J {:.2f}, cond J {:.2f}, norm step {:.2f}'.format(stopReasons[stopsignal],normr,normar,norma,conda,normx ))
-			if stopsignal==7: log.warning('Gauss-Newton solver reached max # of iterations')
+			precondjac=jacobian.dot(preconditoningMatrix)
 		else:
-			log.info('Using dense linear algebra')
 			jacobian=jacobian.toarray()
+			precondjac=jacobian*preconditoningMatrix
+
+		uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
+		scale=1.5
+		
+		
+		#Convenience function to encapsulate the code to calculate LSMR results with varying damping
+		def gaussNewtonFit(damping):
+			result=sprslinalg.lsmr(precondjac,residuals[includeResids],damp=damping,maxiter=2*min(jacobian.shape))
+			gaussNewtonStep=np.zeros(X.size)
+			gaussNewtonStep[varyingParams]=preconditoningMatrix*result[0]
+			postGN=((self.lsqwrap(X-gaussNewtonStep,uncertainties.copy(),None,True,doSpecResids=doSpecResids))**2).sum() #
+			return result,postGN,gaussNewtonStep,damping
 			
-			stepsize=linalg.lstsq(jacobian*preconditoningMatrix,residuals[includeResids],cond=self.conditionNumber)[0]
-		stepsize=(preconditoningMatrix*stepsize)
-		if np.any(np.isnan(stepsize)):
+				
+		if self.damping[fit]!=0 :
+			results=[]
+			#Try increasing, decreasing, or keeping the same damping to see which does best
+			for dampingFactor in [1/scale,1,scale*11/9] :
+					results+=[(gaussNewtonFit(self.damping[fit]*dampingFactor))]
+			result,postGN,gaussNewtonStep,damping=min(results,key=lambda x:x[1])
+			precondstep,stopsignal,itn,normr,normar,norma,conda,normx=result
+			self.damping[fit]=damping
+			#If the new position is worse, need to increase the damping until the new position is better
+			while oldChi<postGN:
+				self.damping[fit]*=scale*11/9
+				result,postGN,gaussNewtonStep,dampingFactor=gaussNewtonFit(self.damping[fit])
+				precondstep,stopsignal,itn,normr,normar,norma,conda,normx=result
+		else:
+			result,postGN,gaussNewtonStep,dampingFactor=gaussNewtonFit(0)
+			precondstep,stopsignal,itn,normr,normar,norma,conda,normx=result
+
+		#Ratio of actual improvement in chi2 to how well the optimizer thinks it did
+		reductionratio= (oldChi-postGN)/(oldChi-(normr**2+(normx*self.damping[fit])**2))
+		
+		log.debug('LSMR results with damping factor {:.2e}: {}, norm r {:.2f}, norm J^T r {:.2f}, norm J {:.2f}, cond J {:.2f}, norm step {:.2f}, reduction ratio {:.2f}'.format(self.damping[fit],stopReasons[stopsignal],normr,normar,norma,conda,normx,reductionratio ))
+		if stopsignal==7: log.warning('Gauss-Newton solver reached max # of iterations')
+
+		if np.any(np.isnan(gaussNewtonStep)):
 			log.error('NaN detected in stepsize; exitting to debugger')
 			import pdb;pdb.set_trace()
 		
-		gaussNewtonStep=np.zeros(X.size)
-		gaussNewtonStep[varyingParams]=stepsize
-		uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
-		
-		#Was trying a clip in linear_fit; may not be worth it with new, more stable algorithm
-		preclip=((self.lsqwrap(X-gaussNewtonStep,uncertainties.copy(),None,True,doSpecResids))**2).sum() #
-		log.info('After Gauss-Newton chi2 is {:.2f}'.format(preclip))
-	
-		linearStep,linearChi2=self.linear_fit(X,gaussNewtonStep,uncertainties,doSpecResids) #)
-		if linearChi2>preclip:
-			X-=gaussNewtonStep
-			chi2=preclip
+		log.info('After Gauss-Newton chi2 is {:.2f}'.format(postGN))
+		if self.nonlinearcorrection=='geodesic':
+			#Fancypants cubic correction to the Gauss-Newton step based on fun differential geometry! See https://arxiv.org/abs/1207.4999 for derivation
+			# Right now, doesn't seem worth it compared to directional fit; maybe worth trying both?
+						
+			directionalSecondDeriv,tol=	ridders(lambda dx: self.lsqwrap(X+dx*gaussNewtonStep,uncertainties.copy(),None,True,doSpecResids=doSpecResids) ,residuals,.5,5,1e-8)
+			accelerationdir,stopsignal,itn,normr,normar,norma,conda,normx=sprslinalg.lsmr(precondjac,directionalSecondDeriv[includeResids],damp=self.damping[fit],maxiter=2*min(jacobian.shape))
+			secondStep=np.zeros(X.size)
+			secondStep[varyingParams]=0.5*preconditoningMatrix*accelerationdir
+			postgeodesic=(self.lsqwrap(X-gaussNewtonStep-secondStep,uncertainties.copy(),None,True,doSpecResids=doSpecResids)**2).sum() #doSpecResids
+			log.info('After geodesic acceleration correction chi2 is {:.2f}'.format(postgeodesic))
+			if postgeodesic<postGN:
+				chi2=postgeodesic
+				X-=gaussNewtonStep+secondStep
+			else:
+				chi2=postGN
+				X-=gaussNewtonStep
+		elif self.nonlinearcorrection=='directional':
+			linearstep,chi2=self.linear_fit(X,gaussNewtonStep,uncertainties,doSpecResids)	
+			X-=linearstep		
 		else:
-			X-=linearStep
-			chi2=linearChi2
+			X-=gaussNewtonStep
+			chi2=postGN
+			
 		log.info('Chi2 diff, % diff')
 		log.info(' '.join(['{:.2f}'.format(x) for x in [oldChi-chi2,(100*(oldChi-chi2)/oldChi)] ]))
 		print('')

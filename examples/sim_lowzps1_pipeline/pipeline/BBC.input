@@ -1,11 +1,8 @@
-BATCH_INFO: sbatch	$SBATCH_TEMPLATES/SBATCH_Midway2_short.TEMPLATE 30
-INPDIR: /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/batchtest/SNFIT_BYOSED
-DONE_STAMP: /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/sim_lowzps1_pipeline/getmu/GetMu.DONE
-MUOPT:	[MASS_G10_HIGHER] p7=10.15
+BATCH_INFO: sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 30
+DONE_STAMP: /home/midai/salt3_local/SALT3/examples/sim_lowzps1_pipeline/pipeline/GetMu.DONE
 surveygroup_biascor='PS1_LOWZ_COMBINED(zbin=0.01)'
 snrmin_sigint_biascor=30 # SNRMIN to compute siginit_biascor
 file=blah
-simfile_biascor=PS1_LOWZ_Biascor.FITRES
 FITOPT000_ONLY: 1   # process only default FITOPT000
 nlogzbin=25
 blindflag=0
@@ -56,3 +53,6 @@ h0=70.0
 mag0=-30.00
 uave=1
 hgtype=-1 # uave = use average magnitude from cosmology (not nommag0)
+INPDIR+: /home/midai/salt3_local/SALT3/examples/sim_lowzps1_pipeline/SIM_LOWZPS1_000
+INPDIR+: /home/midai/salt3_local/SALT3/examples/sim_lowzps1_pipeline/SIM_LOWZPS1_2_000
+simfile_biascor=/home/midai/salt3_local/SALT3/examples/sim_lowzps1_pipeline/SIM_LOWZPS1_BIASCOR/AllSurveys_LOWZ_BIASCOR/FITOPT000.FITRES,/home/midai/salt3_local/SALT3/examples/sim_lowzps1_pipeline/SIM_LOWZPS1_BIASCOR_2/ALLSurveys_PS1_BIASCOR/FITOPT000.FITRES
