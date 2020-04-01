@@ -1,8 +1,8 @@
 [iodata]
-snlists = /scratch/midway2/rkessler/SNDATA_ROOT/SIM/AllSurveys_LOWZ/AllSurveys_LOWZ.LIST,/scratch/midway2/rkessler/SNDATA_ROOT/SIM/ALLSurveys_PS1/ALLSurveys_PS1.LIST
+snlists = /scratch/midway2/rkessler/SNDATA_ROOT/SIM/AllSurveys_LOWZ_001/AllSurveys_LOWZ_001.LIST,/scratch/midway2/rkessler/SNDATA_ROOT/SIM/ALLSurveys_PS1_001/ALLSurveys_PS1_001.LIST
 dospec = 1
 maxsn = 25
-outputdir = lcfitting/SALT3.test
+outputdir = lcfitting/SALT3.test_001
 keeponlyspec = True
 initm0modelfile = 
 initm1modelfile = 
