@@ -610,6 +610,10 @@ class SALTResids:
 			varkey= name+'variances_{}'.format(sn)
 			if not varkey in storedResults:
 				storedResults[varkey]=uncertaintyfun(x,sn,storedResults,temporaryResults,varyParams)
+				if len(np.where((storedResults[varkey] != storedResults[varkey]) |
+								(storedResults[varkey] == np.inf))[0]):
+					raise RuntimeError('error!  %s array has issues'%varkey)
+				
 			uncertaintydict=storedResults[varkey]
 			#if name == 'spec' and sn == '03D1au' and len(storedResults['specfluxes_03D1au']['modelflux']):
 			#	import pylab as plt
@@ -618,6 +622,7 @@ class SALTResids:
 			#	plt.plot(storedResults['specfluxes_03D1au']['dataflux'])
 			#	import pdb; pdb.set_trace()
 			returndicts+=[{**valdict ,**uncertaintydict}]
+		
 		return returndicts		
 	
 	def photValsForSN(self,x,sn,storedResults,temporaryResults,varyParams):
@@ -716,6 +721,10 @@ class SALTResids:
 			photresultsdict['modelflux'][selectFilter]=modelflux
 		if requiredPCDerivs.all() and not 'pcDeriv_phot_%s'%sn in storedResults :
 			storedResults['pcDeriv_phot_%s'%sn]=summationCache
+		if len(np.where((photresultsdict['modelflux'] != photresultsdict['modelflux']) |
+						(photresultsdict['modelflux'] == np.inf))[0]):
+			raise RuntimeError('phot model fluxes are nonsensical')
+		
 		return photresultsdict
 			
 	def specValsForSN(self,x,sn,storedResults,temporaryResults,varyParams):
@@ -765,7 +774,9 @@ class SALTResids:
 			recalCoord=(specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal
 			drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
 			recalexp=np.exp((drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1))
-
+			if len(np.where((recalexp != recalexp) | (recalexp == np.inf))[0]):
+				raise RuntimeError('error....spec recalibration problem for SN %s!'%sn)
+			
 			modinterp = temporaryResults['fluxInterp'](phase)
 			dmodelfluxdx0 = interp1d(obswave,modinterp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(specdata[k]['wavelength'])*recalexp
 
@@ -835,8 +846,13 @@ class SALTResids:
 # 						self.__dict__['dmodelflux_dM0_spec_%s'%sn][specSlice,:] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
 # 						#if computePCDerivs != 1:
 			iSpecStart += SpecLen
+
 		if requiredPCDerivs.all() and not 'pcDeriv_spec_%s'%sn in storedResults: 
 			storedResults['pcDeriv_spec_%s'%sn]=interpCache
+		if len(np.where((specresultsdict['modelflux'] != specresultsdict['modelflux']) |
+						(specresultsdict['modelflux'] == np.inf))[0]):
+			raise RuntimeError('spec model flux nonsensical for SN %s'%sn)
+
 		return specresultsdict
 
 	def specVarianceForSN(self,x,sn,storedResults,temporaryResults,varyParams):
@@ -923,7 +939,7 @@ class SALTResids:
 				specresultsdict['modelvariance_jacobian'][specSlice,(varyParlist=='modelcorr_01')] = 2* x0**2  * (modelerrnox[1]*modelerrnox[0]*x1)[:,np.newaxis]  * interpresult[:,varyParams[self.parlist=='modelcorr_01']]
 
 			iSpecStart += SpecLen
-		
+			
 		return specresultsdict
 
 	def photVarianceForSN(self,x,sn,storedResults,temporaryResults,varyParams):
@@ -1024,9 +1040,9 @@ class SALTResids:
 		
 	def fillStoredResults(self,x,storedResults):
 		if self.n_colorpars:
-			if not 'colorLaw' in storedResults:
-				storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])(self.wave)
-				storedResults['colorLawInterp']= interp1d(self.wave,storedResults['colorLaw'],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
+			#if not 'colorLaw' in storedResults:
+			storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])(self.wave)
+			storedResults['colorLawInterp']= interp1d(self.wave,storedResults['colorLaw'],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
 		else: storedResults['colorLaw'] = 1
 				
 		if not 'components' in storedResults:
