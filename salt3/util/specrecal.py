@@ -11,7 +11,7 @@ from sncosmo.constants import HC_ERG_AA
 from scipy.special import factorial
 import pylab as plt
 
-def SpecRecal(photdata,specdata,kcordict,survey,specrange_wavescale_specrecal,nrecalpars=0,doplot=False):
+def SpecRecal(photdata,specdata,kcordict,survey,specrange_wavescale_specrecal,nrecalpars=0,doplot=False,sn=None):
 
 	# from photdata, find all obs w/i two days of phase
 	# of those, choose the closest in each filter
@@ -89,7 +89,7 @@ def SpecRecal(photdata,specdata,kcordict,survey,specrange_wavescale_specrecal,nr
 
 	md = minimize(chifunc,np.array([0.]*(nrecalpars+1)),args=(
 		photflux,specflux,photfluxerr,specfluxerr,photwave,specrange_wavescale_specrecal))
-	if doplot:
+	if doplot: # or sn == '5999409':
 		plt.plot(specdata['wavelength'],specdata['flux']/recalfunc(md.x,specdata['wavelength'],specrange_wavescale_specrecal),
 				 label='recalibrated spec.')
 		plt.errorbar(photwave,photflux/photcorr/md.x[0],yerr=photfluxerr/photcorr/md.x[0],fmt='D',label='original phot. (scaled)')
@@ -100,7 +100,8 @@ def SpecRecal(photdata,specdata,kcordict,survey,specrange_wavescale_specrecal,nr
 					 fmt='o',label='warped phot.')
 		plt.legend()
 		import pdb; pdb.set_trace()
-	return md.x
+	if md.success: return md.x
+	else: return [0.]*(nrecalpars+1)
 	
 	# if nothing exists after that, we're boned
 	# could consider cutting the whole spectrum,
