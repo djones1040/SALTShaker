@@ -4,6 +4,7 @@ n_lcfit = 2
 n_biascorlcfit = 2
 genversion_split = 0,1,2
 genversion_split_biascor = 0,1,2
+plotdir = figs
 
 [data]
 snlists=/home/midai/salt3_local/SALT3/examples/pipelinetest/training/data/SALT3TEST_SIMPLE.LIST
