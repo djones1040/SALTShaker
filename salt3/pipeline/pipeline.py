@@ -397,7 +397,7 @@ class PipeProcedure():
             self.pro = os.path.expandvars(pro)
         else:
             self.pro = pro
-        self.baseinput = baseinput
+        self.baseinput = os.path.expandvars(baseinput)
         self.setkeys = setkeys
         self.proargs = proargs
         self.prooptions = prooptions
