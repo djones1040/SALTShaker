@@ -38,6 +38,8 @@ from astropy.table import Table
 from salt3.initfiles import init_rootdir as salt2dir
 
 # validation utils
+import matplotlib as mpl
+mpl.use('agg')
 import pylab as plt
 from salt3.validation import ValidateLightcurves
 from salt3.validation import ValidateSpectra
@@ -187,11 +189,11 @@ class TrainSALT(TrainSALTBase):
 
 					specpars_init = SpecRecal(datadict[sn]['photdata'],datadict[sn]['specdata'][k],self.kcordict,
 											  datadict[sn]['survey'],self.options.specrange_wavescale_specrecal,
-											  nrecalpars=order)
+											  nrecalpars=order,sn=sn)
 					if specpars_init[0] != 0:
 						guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]/specpars_init[0]
 						guess[parlist == 'specrecal_{}_{}'.format(sn,k)] = specpars_init[1:]
-				
+
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
 	def fitSALTModel(self,datadict):
