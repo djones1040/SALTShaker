@@ -5,6 +5,7 @@ import subprocess
 import configparser
 import pandas as pd
 import os
+import sys
 import numpy as np
 import time
 import glob
@@ -12,6 +13,7 @@ import warnings
 import copy
 import shutil
 import psutil
+from salt3.pipeline.validplot import ValidPlots
 cwd = os.getcwd()
 
 def config_error():
@@ -101,8 +103,11 @@ class SALT3pipe():
         
         n_lcfit = self._get_config_option(config,'pipeline','n_lcfit',dtype=int)
         n_biascorlcfit = self._get_config_option(config,'pipeline','n_biascorlcfit',dtype=int)
+        plotdir = self._get_config_option(config,'pipeline','plotdir',dtype=str)
         self.n_lcfit = n_lcfit
         self.n_biascorlcfit = n_biascorlcfit
+        self.plotdir = plotdir
+        if not os.path.exists(plotdir): os.mkdir(plotdir)
         self.genversion_split = self._get_config_option(config,'pipeline','genversion_split')
         self.genversion_split_biascor = self._get_config_option(config,'pipeline','genversion_split_biascor')
 
@@ -158,13 +163,13 @@ class SALT3pipe():
                                      prooptions=prooptions,
                                      snlists=snlists,
                                      batch=batch,
-                                     validplots=validplots)
+                                     validplots=validplots,
+                                     plotdir=self.plotdir)
                 if hasattr(pipepro[i], 'biascor') and pipepro[i].biascor:
                     pipepro[i].done_file = "{}_{}".format(pipepro[i].done_file,'biascor')
                 if niter > 1:
                     pipepro[i].done_file = "{}_{}".format(pipepro[i].done_file,i)
-                
-            
+
     def run(self,onlyrun=None):
         if not self.build_flag: build_error()
         if not self.config_flag: config_error()
@@ -183,7 +188,9 @@ class SALT3pipe():
             else:
                 for i in range(len(pipepro)):
                     pipepro[i].run(batch=pipepro[i].batch)
-
+            print('making validation plots in %s/'%self.plotdir)
+            pipepro.validplot_run()
+                    
     def glue(self,pipepros=None,on='phot'):
         if not self.build_flag: build_error()
         if not self.config_flag: config_error()
@@ -222,8 +229,8 @@ class SALT3pipe():
                         else:
                             split_arr = self.genversion_split_biascor.split(',')
                         split_idx = [int(x) for x in split_arr]
-                        for label in ['io','kcor']:     
-                            pro1_out = pro1_out_dict[label][split_idx[j]:split_idx[j+1]] 
+                        for label in ['io','kcor']:
+                            pro1_out = pro1_out_dict[label][split_idx[j:j+1]] #:split_idx[j+1]] 
                             if isinstance(pro1_out,list) or isinstance(pro1_out,np.ndarray): 
                                 pro2_in.loc[pro2_in['label']==label,'value'] = ', '.join(pro1_out)
                             else:
@@ -253,14 +260,16 @@ class SALT3pipe():
                         if i == 0:
                             pro2_in = pro2._get_input_info().loc['biascor']
                             pro2_in['value'] = [pro1_out]
-                            continue
+                            if len(pro1list)>1:
+                                continue
                         else:
                             pro2_in['value'] += [pro1_out]
                     else:
                         if i == 0:
                             pro2_in = pro2._get_input_info().loc['normal']
                             pro2_in['value'] = [pro1_out]
-                            continue
+                            if len(pro1list)>1:
+                                continue                            
                         else:
                             pro2_in['value'] += [pro1_out]
                 else:
@@ -280,7 +289,8 @@ class SALT3pipe():
                                    prooptions=pro1.prooptions,
                                    outname=pro1.outname,
                                    batch=pro1.batch,
-                                   validplots=pro1.validplots)
+                                   validplots=pro1.validplots,
+                                   plotdir=pro1.plotdir)
 
                 if not pipepros[1].lower().startswith('cosmofit'):
                     pro2.configure(setkeys = setkeys,
@@ -291,13 +301,15 @@ class SALT3pipe():
                                    outname=pro2.outname,
                                    batch=pro2.batch,
                                    validplots=pro2.validplots,
-                                   done_file=pro2.done_file)
+                                   done_file=pro2.done_file,
+                                   plotdir=pro2.plotdir)
                 else:
                     pro2.configure(pro=pro2.pro,
                                    prooptions=pro2.prooptions,
                                    outname=setkeys['value'].values[0],
                                    batch=pro2.batch,
-                                   validplots=pro2.validplots)
+                                   validplots=pro2.validplots,
+                                   plotdir=pro2.plotdir)
 
         self.gluepairs.append(pipepros)
 
@@ -380,7 +392,7 @@ class PipeProcedure():
 
     def configure(self,pro=None,baseinput=None,setkeys=None,
                   proargs=None,prooptions=None,batch=False,
-                  validplots=False,**kwargs):  
+                  validplots=False,plotdir=None,**kwargs):  
         if pro is not None and "$" in pro:
             self.pro = os.path.expandvars(pro)
         else:
@@ -391,6 +403,7 @@ class PipeProcedure():
         self.prooptions = prooptions
         self.batch = batch
         self.validplots = validplots
+        self.plotdir = plotdir
 
         self.gen_input(outname=self.outname)
 
@@ -409,6 +422,9 @@ class PipeProcedure():
         if batch: _run_batch_pro(self.pro, args, done_file=self.done_file)
         else: _run_external_pro(self.pro, args)
 
+    def validplot_run(self):
+        pass
+        
     def _get_input_info(self):
         pass
     
@@ -583,15 +599,22 @@ class Simulation(PipeProcedure):
             # D. Jones - uncomment this line if this doesn't work....
             #prefix = df.loc[df.key=='GENVERSION','value'].values[0]
             ind = df.loc[df.key=='GENVERSION','ind'].values
+            if ind[0] is None: ind[0] = 0
             output = ["{}/{}.LIST".format(res,prefix) for res,prefix in zip(outdirs,df.loc[df.key=='GENVERSION','value'].values)]
             kcor = df.loc[df.key=='KCOR_FILE'].set_index('ind').loc[ind,'value'].values
-            survey = [surveynames[str(i)]['SURVEY'] for i in ind]
-            subsurvey_list = [surveynames[str(i)]['SUBSURVEY_LIST'] for i in ind]
+            try:
+                survey = [surveynames[str(i)]['SURVEY'] for i in ind]
+                subsurvey_list = [surveynames[str(i)]['SUBSURVEY_LIST'] for i in ind]
+            except KeyError:
+                survey = [surveynames[i]['SURVEY'] for i in ind]
+                subsurvey_list = [surveynames[i]['SUBSURVEY_LIST'] for i in ind]
+                
             return {'io':output,'kcor':kcor,'ind':ind,'survey':survey,'subsurvey_list':subsurvey_list}
 #             return ["{}/{}.LIST".format(res,prefix) for res,prefix in zip(outdirs,df.loc[df.key=='GENVERSION','value'].values)]
         elif pipepro.lower().startswith('lcfit'):
 #             print(df)
             ind = df.loc[df.key=='GENVERSION','ind'].values
+            if ind[0] is None: ind[0] = 0
             output = df.loc[df.key=='GENVERSION','value'].values
             kcor = df.loc[df.key=='KCOR_FILE'].set_index('ind').loc[ind,'value'].values
             return {'io':output,'kcor':kcor,'ind':ind}
@@ -631,7 +654,8 @@ class Simulation(PipeProcedure):
         kcor_dict = {}
         for key,value in self.keys.items():
             if key.startswith('KCOR_FILE'):
-                label = key.split('[')[1].split(']')[0]
+                if '[' in key: label = key.split('[')[1].split(']')[0]
+                else: label = 0
                 kcor_dict[label] = value
 
         findkey = [key for key,value in self.keys.items() if key.startswith('SIMGEN_INFILE_Ia')]
@@ -652,7 +676,8 @@ class Simulation(PipeProcedure):
         simlib_dict = {}
         for key,value in self.keys.items():
             if key.startswith('SIMLIB_FILE'):
-                label = key.split('[')[1].split(']')[0]
+                if '[' in key: label = key.split('[')[1].split(']')[0]
+                else: label = 0
                 simlib_dict[label] = value
 
         findkey = [key for key,value in self.keys.items() if key.startswith('SIMGEN_INFILE_Ia')]
@@ -847,16 +872,18 @@ class LCFitting(PipeProcedure):
         
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
                   batch=False,validplots=False,outname="pipeline_lcfit_input.input",
-                  done_file='LCFit.DONE',**kwargs):
+                  done_file='LCFit.DONE',plotdir=None,**kwargs):
 #         self.done_file = 'ALL.DONE'
         self.done_file = '%s/%s'%(os.path.dirname(baseinput),os.path.split(done_file)[1])
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
         self.validplots = validplots
+        self.plotdir = plotdir
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
-                          prooptions=prooptions,batch=batch,validplots=validplots)
-
+                          prooptions=prooptions,batch=batch,
+                          validplots=validplots,plotdir=plotdir)
+        
     def gen_input(self,outname="pipeline_lcfit_input.input"):
         self.outname = outname
         self.finput,self.keys = _gen_snana_fit_input(basefilename=self.baseinput,setkeys=self.setkeys,
@@ -871,11 +898,11 @@ class LCFitting(PipeProcedure):
             if self.batch: 
                 outprefix = str(output_df.loc['OUTDIR','value'])
                 if self.biascor:
-                    outprefix += '/{}/FITOPT000.FITRES'.format(str(output_df.loc['VERSION','value']))
+                    outprefix += '/{}/FITOPT000.FITRES'.format(str(output_df.loc['VERSION','value']).strip())
                 output_abspath = abspath_for_getmu(outprefix) 
                 return(str(output_abspath))
             else:
-                outprefix = abspath_for_getmu(str(output_df.loc['TEXTFILE_PREFIX','value']))
+                outprefix = abspath_for_getmu(str(output_df.loc['TEXTFILE_PREFIX','value']).strip())
                 return str(outprefix)+'.FITRES.TEXT'
         else:
             raise ValueError("lcfitting can only glue to getmu")
@@ -952,6 +979,23 @@ class LCFitting(PipeProcedure):
             df_list.append(df)
         return pd.DataFrame(df_list)
 
+    def validplot_run(self):
+        from salt3.pipeline.validplot import lcfitting_validplots
+        self.validplots = lcfitting_validplots()
+
+        if not self.batch and os.path.exists('%s.FITRES.TEXT'%self.keys['snlcinp']['textfile_prefix']):
+            inputfiles = ['%s.FITRES.TEXT'%self.keys['snlcinp']['textfile_prefix']]
+            inputbases = [self.keys['snlcinp']['textfile_prefix']]
+        elif self.batch and os.path.exists(self.keys['header']['outdir']):
+            inputfiles = glob.glob('%s/*/FITOPT000.FITRES')
+            inputbases = [inpf.split('/')[-2] for inpf in inputfiles]
+        else: raise RuntimeError('Error in validplot_run - could not find the FITRES files created in LCFitting stage')
+        if not len(inputfiles): raise RuntimeError('Error in validplot_run - could not find the FITRES files created in LCFitting stage')
+
+        for inputfile,inputbase in zip(inputfiles,inputbases):
+            self.validplots.input(inputfile)
+            self.validplots.output(outputdir=self.plotdir,prefix='valid_lcfitting_%s'%inputbase)
+            self.validplots.run()
             
 class GetMu(PipeProcedure):
             
@@ -960,15 +1004,17 @@ class GetMu(PipeProcedure):
         super().__init__()
         
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
-                  batch=False,validplots=False,outname="pipeline_getmu_input.input",
+                  batch=False,validplots=False,plotdir=None,outname="pipeline_getmu_input.input",
                   done_file='GetMu.DONE',**kwargs):
         self.done_file = finput_abspath('%s/%s'%(os.path.dirname(baseinput),os.path.split(done_file)[1]))
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
         self.validplots = validplots
+        self.plotdir = plotdir
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
-                          prooptions=prooptions,batch=batch,validplots=validplots,done_file=self.done_file)
+                          prooptions=prooptions,batch=batch,validplots=validplots,
+                          done_file=self.done_file,plotdir=plotdir)
 
     def gen_input(self,outname="pipeline_getmu_input.input"):
         self.outname = outname
@@ -988,6 +1034,8 @@ class GetMu(PipeProcedure):
             key = 'file'
             df['key'] = key
             df['value'] = self.keys[key]
+            df['tag'] = 'normal'
+            return pd.DataFrame([df]).set_index('tag')
         else:
             if 'INPDIR' in self.keys:
                 key = 'INPDIR'
@@ -1009,7 +1057,7 @@ class GetMu(PipeProcedure):
             else:
                 df2 = {}
                 
-        return pd.DataFrame([df,df2]).set_index('tag')
+            return pd.DataFrame([df,df2]).set_index('tag')
 
     def _get_output_info(self):
         df = {}
@@ -1020,7 +1068,7 @@ class GetMu(PipeProcedure):
 
 class CosmoFit(PipeProcedure):
     def configure(self,setkeys=None,pro=None,outname=None,prooptions=None,batch=False,
-                  validplots=False,**kwargs):
+                  validplots=False,plotdir=None,**kwargs):
         self.done_file = None
         if setkeys is not None:
             outname = setkeys.value.values[0]
@@ -1028,7 +1076,8 @@ class CosmoFit(PipeProcedure):
         self.finput = outname
         self.batch = batch
         self.validplots = validplots
-        super().configure(pro=pro,outname=outname,prooptions=prooptions,batch=batch,validplots=validplots)
+        self.plotdir = plotdir
+        super().configure(pro=pro,outname=outname,prooptions=prooptions,batch=batch,validplots=validplots,plotdir=plotdir)
 
     def _get_input_info(self):
         df = {}
@@ -1041,8 +1090,11 @@ def _run_external_pro(pro,args):
         args = [args]
 
     print("Running",' '.join([pro] + args))
-    res = subprocess.run(args = list([pro] + args),capture_output=True)
-    
+    if sys.version_info[1] > 6:
+        res = subprocess.run(args = list([pro] + args),capture_output=True)
+    else:
+        res = subprocess.run(args = list([pro] + args))    
+
     if res.returncode == 0:
         print("{} finished successfully.".format(pro.strip()))
     else:
@@ -1231,7 +1283,7 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
                 basevals[i] = val
                 keystr = kw.split('[')[0]
                 if "[" in kw and 'GENVERSION' not in kw:
-                    lines[linenum[i]] = "GENOPT:{} {}\n".format(keystr,val)
+                    lines[linenum[i]] = "GENOPT: {} {}\n".format(keystr,val)
                 else:
                     lines[linenum[i]] = "{}: {}\n".format(keystr,val)
                 print("Setting {} = {}".format(keystr,val.strip()))
@@ -1250,7 +1302,7 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
                 if "[" in key and 'GENVERSION' not in key:
                     keystr = key.split('[')[0]
                     numstr = key.split('[')[1].split(']')[0]
-                    newline = "GENOPT:{} {}\n".format(keystr,valuestr)
+                    newline = "GENOPT: {} {}\n".format(keystr,valuestr)
                     lineloc = [i for i,line in enumerate(lines) if "GENVERSION".format(numstr) in line][int(numstr)]            
                     print("Adding key {} = {} for GENVERSION[{}]".format(keystr,valuestr,numstr))
                 else:
@@ -1296,7 +1348,9 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
     import f90nml
     from f90nml.namelist import Namelist
     nml = f90nml.read(basefilename)
-
+    if 'fitinp' in nml.keys() and 'fitmodel_name' in nml['fitinp'] and isinstance(nml['fitinp']['fitmodel_name'],list):
+        nml['fitinp']['fitmodel_name'] = ''.join(nml['fitinp']['fitmodel_name'])
+    
     # first write the header info
     if not os.path.isfile(basefilename):
         raise ValueError("basefilename cannot be None")

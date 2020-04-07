@@ -825,6 +825,9 @@ class GaussNewton(saltresids.SALTResids):
 			else:
 				residuals+=[photresidsdict['resid'],np.zeros(len(specresidsdict['resid']))]
 				jacobian+=[sparse.coo_matrix(photresidsdict['resid_jacobian']),sparse.coo_matrix(np.zeros(np.shape(specresidsdict['resid_jacobian'])))]
+			if len(np.where(photresidsdict['resid'] != photresidsdict['resid'])[0]) or len(np.where(specresidsdict['resid'] != specresidsdict['resid'])[0]):
+				print('there was a problem!  entering debugger...')
+				import pdb; pdb.set_trace()
 
 		if doPriors:
 
@@ -946,8 +949,9 @@ class GaussNewton(saltresids.SALTResids):
 		varyingParams=iFit&self.iModelParam
 		if not self.fitTpkOff: varyingParams[self.itpk]=False
 
-		if fit in ['color','colorlaw']: doSpecResids = False
-		else: doSpecResids = True
+		#if fit in ['color','colorlaw']: doSpecResids = False
+		#else: 
+		doSpecResids = True
 		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors,doSpecResids=doSpecResids)
 
 		oldChi=(residuals**2).sum()
@@ -1048,6 +1052,6 @@ class GaussNewton(saltresids.SALTResids):
 		log.info('Chi2 diff, % diff')
 		log.info(' '.join(['{:.2f}'.format(x) for x in [oldChi-chi2,(100*(oldChi-chi2)/oldChi)] ]))
 		print('')
-		#import pdb; pdb.set_trace()
+		#if fit == 'colorlaw': import pdb; pdb.set_trace()
 		return X,chi2,oldChi
 

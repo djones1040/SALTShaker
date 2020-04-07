@@ -163,7 +163,8 @@ class TrainSALT(TrainSALTBase):
 			if self.options.n_components == 2:
 				guess[parlist == 'm1'] = m1knots
 			if self.options.n_colorpars:
-				guess[parlist == 'cl'] = [0.]*self.options.n_colorpars
+				log.warning('BAD CL HACK')
+				guess[parlist == 'cl'] = [-0.504294,0.787691,-0.461715,0.0815619] #[0.]*self.options.n_colorpars
 			if self.options.n_colorscatpars:
 				guess[parlist == 'clscat'] = [1e-6]*self.options.n_colorscatpars
 				guess[np.where(parlist == 'clscat')[0][-1]]=-30
@@ -189,11 +190,11 @@ class TrainSALT(TrainSALTBase):
 
 					specpars_init = SpecRecal(datadict[sn]['photdata'],datadict[sn]['specdata'][k],self.kcordict,
 											  datadict[sn]['survey'],self.options.specrange_wavescale_specrecal,
-											  nrecalpars=order)
+											  nrecalpars=order,sn=sn)
 					if specpars_init[0] != 0:
 						guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]/specpars_init[0]
 						guess[parlist == 'specrecal_{}_{}'.format(sn,k)] = specpars_init[1:]
-				
+
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
 	def fitSALTModel(self,datadict):
