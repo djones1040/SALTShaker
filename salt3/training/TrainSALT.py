@@ -48,6 +48,7 @@ from salt3.validation import CheckSALTParams
 from salt3.validation.figs import plotSALTModel
 from salt3.util.synphot import synphot
 from salt3.initfiles import init_rootdir as salt2dir
+from salt3.validation import SynPhotPlot
 from time import time
 
 import logging
@@ -456,7 +457,11 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 		plotSALTModel.mkModelPlot(outputdir,outfile='%s/SALTmodelcomp.pdf'%outputdir,
 								  xlimits=[self.options.waverange[0],self.options.waverange[1]])
-
+		SynPhotPlot.plotSynthPhotOverStretchRange(
+			'{}/synthphotrange.pdf'.format(outputdir),outputdir,'SDSS')
+		SynPhotPlot.overPlotSynthPhotByComponent(
+			'{}/synthphotoverplot.pdf'.format(outputdir),outputdir,'SDSS')		
+		
 		snfiles_tot = np.array([])
 		for j,snlist in enumerate(self.options.snlists.split(',')):
 			snlist = os.path.expandvars(snlist)
