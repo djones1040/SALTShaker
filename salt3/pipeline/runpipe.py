@@ -89,7 +89,7 @@ class RunPipe():
         proname.outname = '{}_{:03d}'.format(proname.outname,self.num)
         proname.configure(pro=proname.pro,baseinput=outname_orig,setkeys=df,prooptions=proname.prooptions,
                           batch=proname.batch,validplots=proname.validplots,outname=proname.outname,
-                          proargs=proname.proargs,**kwargs)  
+                          proargs=proname.proargs,plotdir=proname.plotdir,**kwargs)  
     
     def run(self):
         if self.batch_mode == 0:
@@ -150,7 +150,7 @@ class RunPipe():
                             self.pipe.glue(['biascorlcfit','getmu'])
                         done_file = "{}_{:03d}".format(self.pipe.GetMu.done_file.strip(),self.num)
                         self._reconfig_w_suffix(self.pipe.GetMu,None,self.num,done_file=done_file)
-
+                        
             if not self.norun:
                 self.pipe.run()
         else:
