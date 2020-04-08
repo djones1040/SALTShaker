@@ -185,11 +185,15 @@ class SALT3pipe():
             pipepro = self._get_pipepro_from_string(prostr)
             if not isinstance(pipepro,list):
                 pipepro.run(batch=pipepro.batch)
+                if pipepro.validplots:
+                    print('making validation plots in %s/'%self.plotdir)
+                    pipepro.validplot_run()
             else:
                 for i in range(len(pipepro)):
                     pipepro[i].run(batch=pipepro[i].batch)
-            print('making validation plots in %s/'%self.plotdir)
-            pipepro.validplot_run()
+                    if pipepro[i].validplots:
+                        print('making validation plots in %s/'%self.plotdir)
+                        pipepro[i].validplot_run()
                     
     def glue(self,pipepros=None,on='phot'):
         if not self.build_flag: build_error()
@@ -981,21 +985,21 @@ class LCFitting(PipeProcedure):
 
     def validplot_run(self):
         from salt3.pipeline.validplot import lcfitting_validplots
-        self.validplots = lcfitting_validplots()
+        self.validplot_func = lcfitting_validplots()
 
-        if not self.batch and os.path.exists('%s.FITRES.TEXT'%self.keys['snlcinp']['textfile_prefix']):
-            inputfiles = ['%s.FITRES.TEXT'%self.keys['snlcinp']['textfile_prefix']]
-            inputbases = [self.keys['snlcinp']['textfile_prefix']]
-        elif self.batch and os.path.exists(self.keys['header']['outdir']):
-            inputfiles = glob.glob('%s/*/FITOPT000.FITRES')
+        if not self.batch and os.path.exists('%s.FITRES.TEXT'%self.keys['snlcinp']['textfile_prefix'].strip()):
+            inputfiles = ['%s.FITRES.TEXT'%self.keys['snlcinp']['textfile_prefix'].strip()]
+            inputbases = [self.keys['snlcinp']['textfile_prefix'].strip()]
+        elif self.batch and os.path.exists(self.keys['header']['outdir'].strip()):
+            inputfiles = glob.glob('%s/*/FITOPT000.FITRES'%self.keys['header']['outdir'].strip())
             inputbases = [inpf.split('/')[-2] for inpf in inputfiles]
         else: raise RuntimeError('Error in validplot_run - could not find the FITRES files created in LCFitting stage')
         if not len(inputfiles): raise RuntimeError('Error in validplot_run - could not find the FITRES files created in LCFitting stage')
 
         for inputfile,inputbase in zip(inputfiles,inputbases):
-            self.validplots.input(inputfile)
-            self.validplots.output(outputdir=self.plotdir,prefix='valid_lcfitting_%s'%inputbase)
-            self.validplots.run()
+            self.validplot_func.input(inputfile)
+            self.validplot_func.output(outputdir=self.plotdir,prefix='valid_lcfitting_%s'%inputbase)
+            self.validplot_func.run()
             
 class GetMu(PipeProcedure):
             
