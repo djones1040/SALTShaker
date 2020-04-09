@@ -17,3 +17,4 @@ v
 *LOG
 *.gz
 *.pdf
+*ROOT
