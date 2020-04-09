@@ -18,3 +18,5 @@ v
 *.gz
 *.pdf
 *ROOT
+*.err
+*.out
