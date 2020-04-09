@@ -1,4 +1,4 @@
-from pipeline import SALT3pipe
+from SALT3.pipeline.pipeline import SALT3pipe
 
 def MyPipe(finput,**kwargs):
     pipe = SALT3pipe(finput=finput)
