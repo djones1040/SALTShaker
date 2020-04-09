@@ -52,6 +52,7 @@ class RunPipe():
         if num is not None:
             self.num += start_id
         self.norun = norun
+        self.debug = False
  
     def __DefaultPipe(self):
         pipe = SALT3pipe(finput=self.pipeinput)
@@ -172,7 +173,10 @@ class RunPipe():
                     self.randseeds=[int(x) for x in seeds[0:self.batch_mode]]
                     print('randseeds = ',self.randseeds)
             pypro = os.path.expandvars('$MY_SALT3_DIR/SALT3/salt3/pipeline/runpipe.py')
-            pycommand_base = 'python {} -c {} --mypipe {} --batch_mode 0'.format(pypro,self.pipeinput,self.mypipe)
+            if self.debug:
+                pycommand_base = 'python {} -c {} --mypipe {} --batch_mode 0'.format(pypro,self.pipeinput,self.mypipe)
+            else:
+                pycommand_base = 'python runpipe -c {} --mypipe {} --batch_mode 0'.format(self.pipeinput,self.mypipe)
             for i in range(self.batch_mode):
                 pycommand = pycommand_base + ' --randseed {} --num {}'.format(self.randseeds[i],i+self.start_id)
                 if self.norun:
