@@ -1,7 +1,9 @@
- MERGED   Foundation_BBC  FITOPT000  (N=857)    
+ MERGED   Foundation_BBC  FITOPT000  (N=0)    
 
-	   20 of   20 jobs finished with success.
-	    0 of   20 jobs ABORTED. 
+	    0 of   50 jobs finished with success.
+	   50 of   50 jobs ABORTED. 
+ WARNING: some jobs did not finish properly.
+	 (NGRACE=0  NEXPECT=50) 
 
- Total elapsed wall time: 0.011 hr. 
+ Total elapsed wall time: 0.05 hr. 
  Done. 

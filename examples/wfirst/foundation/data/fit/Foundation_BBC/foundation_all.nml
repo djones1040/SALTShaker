@@ -1,13 +1,13 @@
 BATCH_MEM:     8000
 OUTDIR:     $WFIRST_ROOT/SALT3/examples/wfirst/foundation/data/fit/Foundation_BBC
-BATCH_INFO:     sbatch $SBATCH_TEMPLATES/SNANA.TEMPLATE 20
-DONE_STAMP: pipeline/LCFit.DONE
+BATCH_INFO: sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 50
+DONE_STAMP: pipeline/LCFit.DONE_1
 VERSION: Foundation_BBC
 
 
 &SNLCINP
   VERSION_PHOTOMETRY = 'Foundation_BBC'
-  KCOR_FILE = '$PS1_ROOT/kcor/PS1/PS1_DS18/kcor_PS1_none.fits'
+  KCOR_FILE = '$PS1_ROOT/kcor/PS1/PS1_DS15/kcor_PS1_none.fits'
   NFIT_ITERATION = 3
   INTERP_OPT = 1
   SNTABLE_LIST = 'SNANA FITRES LCPLOT(text:col)'
