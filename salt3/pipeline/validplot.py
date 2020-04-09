@@ -1,3 +1,5 @@
+import matplotlib as mpl
+mpl.use('agg')
 import pylab as plt
 import numpy as np
 from salt3.util.txtobj import txtobj
@@ -110,4 +112,19 @@ class getmu_validplots(ValidPlots):
 
 	@validfunction
 	def nuisancebias(self):
-		pass
+		with open(self.inputfile) as fin:
+			for line in fin:
+				if line.startswith('#') and 'sigint' in line:
+					sigint = line.split()[3]
+				elif line.startswith('#') and 'alpha0' in line:
+					alpha = line.split()[3]
+				elif line.startswith('#') and 'beta0' in line:
+					beta = line.split()[3]
+		
+		fr = txtobj(self.inputfile,fitresheader=True)
+		ax = plt.axes()
+		ax.set_ylabel('Nuisance Parameters',fontsize=15)
+		ax.xaxis.set_ticks([1,2,3])
+		ax.xaxis.set_ticklabels(['alpha','beta',r'$\sigma_{\mathrm{int}}$'],rotation=30)
+		
+		plt.savefig('%s%s_nuisancebias.png'%(self.outputdir,self.prefix))

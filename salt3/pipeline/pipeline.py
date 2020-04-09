@@ -1070,6 +1070,22 @@ class GetMu(PipeProcedure):
         df['value'] = self.keys[key].strip()+'.M0DIF'
         return pd.DataFrame([df])
 
+    def validplot_run(self):
+        from salt3.pipeline.validplot import lcfitting_validplots
+        self.validplot_func = getmu_validplots()
+        import pdb; pdb.set_trace()
+
+        for i in self.keys['INPDIR']:
+            pass
+
+        inputfiles = glob.glob('SALT2mu_%s/*/SALT2mu_FITOPT000_MUOPT000.FITRES'%inpstr)
+        for inputfile in inputfiles:
+            inputbase = inputfile.split('/')[-1]
+            self.validplot_func.input(inputfile)
+            self.validplot_func.output(outputdir=self.plotdir,prefix='valid_lcfitting_%s'%inputbase)
+            self.validplot_func.run()
+
+
 class CosmoFit(PipeProcedure):
     def configure(self,setkeys=None,pro=None,outname=None,prooptions=None,batch=False,
                   validplots=False,plotdir=None,**kwargs):
