@@ -1,5 +1,5 @@
 DONE_STAMP: pipeline/LCFit.DONE_0
-OUTDIR:   SIM_LOWZPS1
+OUTDIR:   SIM_LOWZPS1_LOWZ
 BATCH_INFO:         sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 20
 VERSION: AllSurveys_LOWZ
 
@@ -10,7 +10,7 @@ VERSION: AllSurveys_LOWZ
   PHOTFLAG_MSKREJ = 0,0
   SNTABLE_LIST = 'FITRES LCPLOT(text:key)'
   TEXTFILE_PREFIX = 'snfit_test'
-  KCOR_FILE = '/home/midai/salt3_local/SALT3/examples/sim_lowzps1_pipeline/kcor/kcor_SPEC_PS1_LOWZ_COMBINED.fits'
+  KCOR_FILE = '/project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/sim_lowzps1_pipeline/kcor/kcor_SPEC_PS1_LOWZ_COMBINED.fits'
   NFIT_ITERATION = 3
   INTERP_OPT = 1
   H0_REF = 70.0

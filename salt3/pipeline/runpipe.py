@@ -9,6 +9,7 @@ import shlex
 import random
 import f90nml
 import logging
+import configparser
 from salt3.pipeline.pipeline import SALT3pipe
 log=logging.getLogger(__name__)
 

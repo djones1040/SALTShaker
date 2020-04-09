@@ -20,3 +20,5 @@ v
 *ROOT
 *.err
 *.out
+*.BATCH
+#*#

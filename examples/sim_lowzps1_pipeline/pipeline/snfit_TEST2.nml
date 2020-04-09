@@ -1,5 +1,5 @@
 DONE_STAMP: pipeline/LCFit.DONE_1
-OUTDIR:   SIM_LOWZPS1_2
+OUTDIR:   SIM_LOWZPS1_PS1
 BATCH_INFO:         sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 20
 VERSION: ALLSurveys_PS1
 
@@ -10,7 +10,7 @@ VERSION: ALLSurveys_PS1
   PHOTFLAG_MSKREJ = 0,0
   SNTABLE_LIST = 'FITRES LCPLOT(text:key)'
   TEXTFILE_PREFIX = 'snfit_test'
-  KCOR_FILE = '/home/midai/salt3_local/SALT3/examples/sim_lowzps1_pipeline/kcor/kcor_PS1_PS1MD_SPEC.fits'
+  KCOR_FILE = '/project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/sim_lowzps1_pipeline/kcor/kcor_PS1_PS1MD_SPEC.fits'
   NFIT_ITERATION = 3
   INTERP_OPT = 1
   H0_REF = 70.0
@@ -25,7 +25,7 @@ VERSION: ALLSurveys_PS1
   ABORT_ON_TRESTCUT = False
   ABORT_ON_DUPLCID = False
   CUTWIN_NEPOCH = 5
-  CUTWIN_REDSHIFT = 0.01,0.1
+  CUTWIN_REDSHIFT = 0.01,0.8
   CUTWIN_REDSHIFT_ERR = 0.0,0.01
   CUTWIN_TREST = -20.0,60.0
   CUTWIN_TRESTMIN = -200.0,10.0
