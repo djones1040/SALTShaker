@@ -34,7 +34,7 @@ def _MyPipe(mypipe):
 
 class RunPipe():
     def __init__(self, pipeinput, mypipe=False, batch_mode=False,batch_script=None,start_id=None,
-                 randseed=None,fseeds=None,num=None,norun=None):
+                 randseed=None,fseeds=None,num=None,norun=None,debug=False):
         if mypipe is None:
             self.pipedef = self.__DefaultPipe
         else:
@@ -53,7 +53,7 @@ class RunPipe():
         if num is not None:
             self.num += start_id
         self.norun = norun
-        self.debug = False
+        self.debug = debug
  
     def __DefaultPipe(self):
         pipe = SALT3pipe(finput=self.pipeinput)
@@ -216,11 +216,14 @@ def main(**kwargs):
                         help='[internal use] suffix for multiple batch jobs')   
     parser.add_argument('--norun',dest='norun', action='store_true',
                         help='set to only check configurations without launch jobs')   
+    parser.add_argument('--debug',dest='debug', action='store_true',
+                        help='use $MY_SALT3_DIR instead of installed runpipe for debugging')  
     
     p = parser.parse_args()
     
     pipe = RunPipe(p.pipeinput,mypipe=p.mypipe,batch_mode=p.batch_mode,batch_script=p.batch_script,
-                   start_id=p.start_id,randseed=p.randseed,fseeds=p.fseeds,num=p.num,norun=p.norun)
+                   start_id=p.start_id,randseed=p.randseed,fseeds=p.fseeds,num=p.num,norun=p.norun,
+                   debug=p.debug)
     pipe.run()
     
     
