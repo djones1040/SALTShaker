@@ -28,18 +28,15 @@ GENOPT: SOLID_ANGLE 0.12754026749049702
 SIMGEN_INFILE_Ia: foundation/data/Foundation/sim_found.input
 
 
-
 ENDLIST_GENVERSION:
 
 DONE_STAMP: /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/SIMLOGS_SIMULATEED_SPEC_SURVEY_DMS/Sim.DONE
-
 
 NGEN_UNIT  .004  SURVEY
 SIMGEN_INFILE_Ia: foundation/data/Foundation/sim_found.input
 
 RESET_CIDOFF:  2  # uniqe random CID among all versions
 # specify sim-input files for snlc_sim.exe
-
 
 
 # Define required global items to ensure uniformity among all jobs

@@ -1,0 +1,25 @@
+#!/bin/bash
+
+#SBATCH --partition=broadwl-lc
+#SBATCH --account=pi-rkessler
+#SBATCH --job-name=WFIRST_ALLSURVEYS.NML-00010
+#SBATCH --output=FITSPLIT_00010.BATCH-LOG
+#SBATCH --time=36:00:00
+#SBATCH --nodes=1
+#SBATCH --mem-per-cpu=8000
+#SxxxxBATCH --exclusive
+#SxxxxBATCH --ntasks-per-node=1
+
+echo $SLURM_JOB_ID starting execution `date` on `hostname`
+
+
+cd /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/A1_SHALLOW/SPLIT_JOBS_LCFIT 
+
+wait_for_files.pl 1 /project2/rkessler/SURVEYS/WFIRST/ROOT/BYOSED_dev/SNANA/bin/snlc_fit.exe NOSTAMP 
+
+snlc_fit.exe /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/pipeline/WFIRST_ALLSURVEYS.NML VERSION_PHOTOMETRY ALLSurveys_Spec_DMS_SALT2   TEXTFILE_PREFIX  ALLSurveys_Spec_DMS_SALT2_FITOPT000_SPLIT010  JOBSPLIT 10 10 MXLC_PLOT 3  >& ALLSurveys_Spec_DMS_SALT2_FITOPT000_SPLIT010.LOG 
+
+touch  ALLSurveys_Spec_DMS_SALT2_FITOPT000_SPLIT010.DONE 
+
+rm     FITSPLIT_00010.BUSY
+
