@@ -1,0 +1,129 @@
+65236858 starting execution Thu Jan 23 10:07:38 CST 2020 on midway2-0204.rcc.local
+
+ ###################################### 
+ ############### BEGIN ################ 
+ ###################################### 
+
+ Process SIMJOB(s) for nodeindx 23 
+
+ Parse master input file: 
+	 /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/pipeline/WFIRST_MASTER.INPUT 
+
+ Read/store contents of /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/pipeline/WFIRST_MASTER.INPUT 
+ Read/store contents of /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/pipeline/WFIRST_MASTER.INPUT 
+ DONE_STAMP  = /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/SIMLOGS_SIMULATEED_SPEC_SURVEY_DMS/Sim.DONE 
+ BATCH_COMMAND: sbatch /project2/rkessler/PRODUCTS/SNANA/SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE (100 cores) 
+ SSH_NODELIST(100) = Chosen by batch 
+ CPULIST_INDX(100) = 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 
+ SIMGEN_INFILE_Ia     = simulation/SIMGEN_WFIRST_SALT2_Specz.INPUT  
+ Read/store contents of simulation/SIMGEN_WFIRST_SALT2_Specz.INPUT 
+ GENOPT_GLOBAL  = '  GENRANGE_REDSHIFT 0.6 1.5' 
+
+	 ***** GENVERSION SUMMARY ***** 
+ GENVERSION      = 'AllSurveys_Spec_DMS_BYO' 
+   GENOPT(simulation/SIMGEN_WFIRST_SALT2_Specz.INPUT) = GENMODEL $WFIRST_ROOT/SALT3/examples/wfirst/byosed/BYOSED.TEST    GENRANGE_REDSHIFT 0.6 1.5  (SNIa) 
+ GENVERSION      = 'ALLSurveys_Spec_DMS_SALT2' 
+   GENOPT(simulation/SIMGEN_WFIRST_SALT2_Specz.INPUT) = GENMODEL SALT2.P18_UV2IR  GENMAG_SMEAR 0.1    GENRANGE_REDSHIFT 0.6 1.5  (SNIa) 
+
+	  RANSEED 123459    (1) 
+	  RANSEED 123459    (2) 
+	  RANSEED 123459    (3) 
+	  RANSEED 123459    (4) 
+	  RANSEED 123459    (5) 
+	  RANSEED 123459    (6) 
+	  RANSEED 123459    (7) 
+	  RANSEED 123459    (8) 
+	  RANSEED 123459    (9) 
+	  RANSEED 123459    (10) 
+	  RANSEED 123459    (11) 
+	  RANSEED 123459    (12) 
+	  RANSEED 123459    (13) 
+	  RANSEED 123459    (14) 
+	  RANSEED 123459    (15) 
+	  RANSEED 123459    (16) 
+	  RANSEED 123459    (17) 
+	  RANSEED 123459    (18) 
+	  RANSEED 123459    (19) 
+	  RANSEED 123459    (20) 
+ FORMAT_MASK = 48   (FITS)  
+ NGEN_UNIT  = .05 SURVEY   
+ GENPREFIX = SIMULATEED_SPEC_SURVEY_DMS  
+	 Getting optional info from sim-input file ... 
+ Read/store contents of simulation/SIMGEN_WFIRST_SALT2_Specz.INPUT 
+ DOGEN[SNIa,NONIa] = 1,0 
+ NCLASS_SIMGEN_DUMP,ALL = 0, 1 
+ PATH_SNDATA_SIM ($SNDATA_ROOT/SIM) -> /scratch/midway2/rkessler/SNDATA_ROOT/SIM 
+
+
+ Check for duplicate sim jobs: 
+  Norm-STATUS(AllSurveys_Spec_DMS_BYO) = 1 
+	 Norm-log file already exists:
+	 SIMnorm_AllSurveys_Spec_DMS_BYO_SNIa.LOG . 
+   Get SNIa normalization ... NGENTOT_LC(SNIa)/season = 2.170e+04 
+	 NGENTOT_LC =   1085 for SNIa 
+
+  Norm-STATUS(ALLSurveys_Spec_DMS_SALT2) = 1 
+	 Norm-log file already exists:
+	 SIMnorm_ALLSurveys_Spec_DMS_SALT2_SNIa.LOG . 
+   Get SNIa normalization ... NGENTOT_LC(SNIa)/season = 2.170e+04 
+	 NGENTOT_LC =   1085 for SNIa 
+
+
+  --> CIDRAN_MAX(sum over GENVERSIONS) = 48238 
+
+
+ ############################################# 
+ Begin Simulations for AllSurveys_Spec_DMS_BYO ... 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 1) 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 2) 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 3) 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 4) 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 5) 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 6) 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 7) 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 8) 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 9) 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 10) 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 11) 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 12) 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 13) 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 14) 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 15) 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 16) 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 17) 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 18) 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 19) 
+	 ==> SKIP  GENVERSION AllSurveys_Spec_DMS_BYO  (JOBID 20) 
+
+ ############################################# 
+ Begin Simulations for ALLSurveys_Spec_DMS_SALT2 ... 
+	 ==> SKIP  GENVERSION ALLSurveys_Spec_DMS_SALT2  (JOBID 1) 
+	 ==> SKIP  GENVERSION ALLSurveys_Spec_DMS_SALT2  (JOBID 2) 
+   VERSION[TEMP->FINAL] = TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0003_36320 -> TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0003 
+   Copy input  files to /scratch/midway2/rkessler/SNDATA_ROOT/SIM/TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0003/misc 
+    Sim-0003  NGEN= 1085  CIDOFF(MAX)= 2170(48238)  MODEL=simulation/SIMGEN_WFIRST_SALT2_Specz.INPUT 
+   Create AUXILIARY IGNORE file for TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0003 
+   Create AUXILIARY README file for TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0003 
+   Create AUXILIARY LIST   file for TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0003 
+	 Finished Generating 1085 SNe. 
+	 Wrote 689 passing trigger and cuts.
+ 0002  SUMMARY for TMP_jpie_ALLSurveys_Spec_DMS_SALT2-0003 -> wrote 689 (689) of 1085    
+	 ==> SKIP  GENVERSION ALLSurveys_Spec_DMS_SALT2  (JOBID 4) 
+	 ==> SKIP  GENVERSION ALLSurveys_Spec_DMS_SALT2  (JOBID 5) 
+	 ==> SKIP  GENVERSION ALLSurveys_Spec_DMS_SALT2  (JOBID 6) 
+	 ==> SKIP  GENVERSION ALLSurveys_Spec_DMS_SALT2  (JOBID 7) 
+	 ==> SKIP  GENVERSION ALLSurveys_Spec_DMS_SALT2  (JOBID 8) 
+	 ==> SKIP  GENVERSION ALLSurveys_Spec_DMS_SALT2  (JOBID 9) 
+	 ==> SKIP  GENVERSION ALLSurveys_Spec_DMS_SALT2  (JOBID 10) 
+	 ==> SKIP  GENVERSION ALLSurveys_Spec_DMS_SALT2  (JOBID 11) 
+	 ==> SKIP  GENVERSION ALLSurveys_Spec_DMS_SALT2  (JOBID 12) 
+	 ==> SKIP  GENVERSION ALLSurveys_Spec_DMS_SALT2  (JOBID 13) 
+	 ==> SKIP  GENVERSION ALLSurveys_Spec_DMS_SALT2  (JOBID 14) 
+	 ==> SKIP  GENVERSION ALLSurveys_Spec_DMS_SALT2  (JOBID 15) 
+	 ==> SKIP  GENVERSION ALLSurveys_Spec_DMS_SALT2  (JOBID 16) 
+	 ==> SKIP  GENVERSION ALLSurveys_Spec_DMS_SALT2  (JOBID 17) 
+	 ==> SKIP  GENVERSION ALLSurveys_Spec_DMS_SALT2  (JOBID 18) 
+	 ==> SKIP  GENVERSION ALLSurveys_Spec_DMS_SALT2  (JOBID 19) 
+	 ==> SKIP  GENVERSION ALLSurveys_Spec_DMS_SALT2  (JOBID 20) 
+
+ Done. 
