@@ -176,7 +176,7 @@ class RunPipe():
             if self.debug:
                 pycommand_base = 'python {} -c {} --mypipe {} --batch_mode 0'.format(pypro,self.pipeinput,self.mypipe)
             else:
-                pycommand_base = 'python runpipe -c {} --mypipe {} --batch_mode 0'.format(self.pipeinput,self.mypipe)
+                pycommand_base = 'runpipe -c {} --mypipe {} --batch_mode 0'.format(self.pipeinput,self.mypipe)
             for i in range(self.batch_mode):
                 pycommand = pycommand_base + ' --randseed {} --num {}'.format(self.randseeds[i],i+self.start_id)
                 if self.norun:
