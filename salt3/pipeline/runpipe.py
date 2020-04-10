@@ -95,6 +95,7 @@ class RunPipe():
                           proargs=proname.proargs,plotdir=proname.plotdir,**kwargs)  
     
     def run(self):
+
         if self.batch_mode == 0:
             self.pipe = self.pipedef()
             if self.randseed is not None:
@@ -156,6 +157,8 @@ class RunPipe():
                         
             if not self.norun:
                 self.pipe.run()
+            print('hack!')
+            self.pipe.GetMu.validplot_run()
         else:
             if self.batch_script is None:
                 raise RuntimeError("batch script is None")
