@@ -308,9 +308,12 @@ class SALT3pipe():
                                    done_file=pro2.done_file,
                                    plotdir=pro2.plotdir)
                 else:
+                    version_photometry = '/'+self.LCFitting[0].keys['SNLCINP']['VERSION_PHOTOMETRY']+'/'
+                    vinput = version_photometry.strip().join(setkeys['value'].values[0])
+                    print("cosmofit input file = ",vinput)
                     pro2.configure(pro=pro2.pro,
                                    prooptions=pro2.prooptions,
-                                   outname=setkeys['value'].values[0],
+                                   outname=vinput,
                                    batch=pro2.batch,
                                    validplots=pro2.validplots,
                                    plotdir=pro2.plotdir)
@@ -401,7 +404,10 @@ class PipeProcedure():
             self.pro = os.path.expandvars(pro)
         else:
             self.pro = pro
-        self.baseinput = os.path.expandvars(baseinput)
+        if baseinput is not None and '$' in baseinput:
+            self.baseinput = os.path.expandvars(baseinput)
+        else:
+            self.baseinput = baseinput
         self.setkeys = setkeys
         self.proargs = proargs
         self.prooptions = prooptions
@@ -1074,7 +1080,7 @@ class GetMu(PipeProcedure):
             return pd.DataFrame([df])
         else:
             df = {'key':None,
-                  'value':glob.glob('%s/*/SALT2mu_FITOPT000_MUOPT000.M0DIF'%self.keys['OUTDIR'])}
+                  'value':[self.keys['OUTDIR'],'SALT2mu_FITOPT000_MUOPT000.M0DIF']}
             return pd.DataFrame([df])          
         
     def validplot_run(self):

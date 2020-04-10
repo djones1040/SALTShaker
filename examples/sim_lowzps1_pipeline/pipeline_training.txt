@@ -72,8 +72,6 @@ set_key=4
         0 HEADER OUTDIR SIM_LOWZPS1_BIASCOR_LOWZ
         1 HEADER OUTDIR SIM_LOWZPS1_BIASCOR_PS1
         1 FITINP FILTLIST_FIT griz
-        0 FITINP FITMODEL_NAME SALT2.JLA-B14
-        1 FITINP FITMODEL_NAME SALT2.JLA-B14
         1 SNLCINP CUTWIN_REDSHIFT 0.01 0.8
         
 [getmu]
@@ -87,5 +85,8 @@ set_key=
 
 [cosmofit]
 pro=wfit.exe
-outinput=cosmofit/test.M0DIF
-prooptions= -ompri 0.3 -dompri 0.01
+outinput=SALT2mu_FITOPT000_MUOPT000.M0DIF
+prooptions= -dompri 0.007
+baseinput=
+batch=False
+validplots=True

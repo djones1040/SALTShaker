@@ -147,14 +147,17 @@ class RunPipe():
                             self.pipe.glue(['biascorsim','biascorlcfit'],on='phot')
                         if ['train','biascorlcfit'] in self.pipe.gluepairs:
                             self.pipe.glue(['train','biascorlcfit'],on='model')
-                    if any([p.startswith('getmu') for p in self.pipe.pipepros]):       
+                    if any([p.startswith('getmu') for p in self.pipe.pipepros]): 
+                        df_getmu = self._add_suffix(self.pipe.GetMu,['OUTDIR'],self.num)
+                        done_file = "{}_{:03d}".format(self.pipe.GetMu.done_file.strip(),self.num)
+                        self._reconfig_w_suffix(self.pipe.GetMu,df_getmu,self.num,done_file=done_file)
                         if ['lcfit','getmu'] in self.pipe.gluepairs:
                             self.pipe.glue(['lcfit','getmu'])
                         if ['biascorlcfit','getmu'] in self.pipe.gluepairs:
                             self.pipe.glue(['biascorlcfit','getmu'])
-                        done_file = "{}_{:03d}".format(self.pipe.GetMu.done_file.strip(),self.num)
-                        self._reconfig_w_suffix(self.pipe.GetMu,None,self.num,done_file=done_file)
-                        
+                        if ['getmu','cosmofit'] in self.pipe.gluepairs:
+                            self.pipe.glue(['getmu','cosmofit'])
+                                                
             if not self.norun:
                 self.pipe.run()
             #self.pipe.GetMu.validplot_run()
