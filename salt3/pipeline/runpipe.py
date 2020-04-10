@@ -157,8 +157,7 @@ class RunPipe():
                         
             if not self.norun:
                 self.pipe.run()
-            print('hack!')
-            self.pipe.GetMu.validplot_run()
+            #self.pipe.GetMu.validplot_run()
         else:
             if self.batch_script is None:
                 raise RuntimeError("batch script is None")

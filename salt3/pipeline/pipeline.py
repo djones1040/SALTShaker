@@ -1024,7 +1024,7 @@ class GetMu(PipeProcedure):
         self.outname = outname
         self.finput,self.keys,self.delimiter = _gen_general_input(basefilename=self.baseinput,setkeys=self.setkeys,
                                                                   outname=outname,sep=['=',': '],done_file=self.done_file,
-                                                                  outdir='GetMu')
+                                                                  outdir='Run_GetMu')
         
     def glueto(self,pipepro):
         if not isinstance(pipepro,str):
@@ -1076,7 +1076,7 @@ class GetMu(PipeProcedure):
         from salt3.pipeline.validplot import getmu_validplots
         self.validplot_func = getmu_validplots()
             
-        inputfiles = glob.glob('SALT2mu_%s/*/SALT2mu_FITOPT000_MUOPT000.FITRES'%self.keys['OUTDIR'])
+        inputfiles = glob.glob('%s/*/SALT2mu_FITOPT000_MUOPT000.FITRES'%self.keys['OUTDIR'])
         for inputfile in inputfiles:
             inputbase = inputfile.split('/')[-1]
             self.validplot_func.input(inputfile)
