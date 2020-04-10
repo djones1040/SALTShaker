@@ -1023,7 +1023,9 @@ class GetMu(PipeProcedure):
     def gen_input(self,outname="pipeline_getmu_input.input"):
         self.outname = outname
         self.finput,self.keys,self.delimiter = _gen_general_input(basefilename=self.baseinput,setkeys=self.setkeys,
-                                                                  outname=outname,sep=['=',': '],done_file=self.done_file)
+                                                                  outname=outname,sep=['=',': '],done_file=self.done_file,
+                                                                  outdir='Run_GetMu')
+        
     def glueto(self,pipepro):
         if not isinstance(pipepro,str):
             pipepro = type(pipepro).__name__
@@ -1075,6 +1077,17 @@ class GetMu(PipeProcedure):
                   'value':glob.glob('%s/*/SALT2mu_FITOPT000_MUOPT000.M0DIF'%self.keys['OUTDIR'])}
             return pd.DataFrame([df])          
         
+    def validplot_run(self):
+        from salt3.pipeline.validplot import getmu_validplots
+        self.validplot_func = getmu_validplots()
+            
+        inputfiles = glob.glob('%s/*/SALT2mu_FITOPT000_MUOPT000.FITRES'%self.keys['OUTDIR'])
+        for inputfile in inputfiles:
+            inputbase = inputfile.split('/')[-1]
+            self.validplot_func.input(inputfile)
+            self.validplot_func.output(outputdir=self.plotdir,prefix='valid_lcfitting_%s'%inputbase)
+            self.validplot_func.run()
+
 class CosmoFit(PipeProcedure):
     def configure(self,setkeys=None,pro=None,outname=None,prooptions=None,batch=False,
                   validplots=False,plotdir=None,**kwargs):
@@ -1412,7 +1425,7 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
 
     return outname,nml
 
-def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_file=None):
+def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_file=None,outdir=None):
 
     config,delimiter = _read_simple_config_file(basefilename,sep=sep)
     #if setkeys is None:
@@ -1434,7 +1447,10 @@ def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_
         v = done_file
         config[key] = v
         if len(delimiter.keys()): delimiter[key] = ': '
-
+    if outdir is not None and 'OUTDIR' not in config.keys():
+        config['OUTDIR'] = outdir
+        delimiter['OUTDIR'] = ': '
+		
     print("input file saved as:",outname)
     _write_simple_config_file(config,outname,delimiter)
 

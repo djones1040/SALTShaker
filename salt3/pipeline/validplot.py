@@ -1,9 +1,12 @@
+import matplotlib as mpl
+mpl.use('agg')
 import pylab as plt
 import numpy as np
 from salt3.util.txtobj import txtobj
 from salt3.util import getmu
 from functools import partial
 from scipy.stats import binned_statistic
+from astropy.cosmology import Planck15 as cosmo
 #from salt3.pipeline.pipeline import LCFitting
 
 __validfunctions__=dict()
@@ -106,8 +109,73 @@ class getmu_validplots(ValidPlots):
 
 	@validfunction		
 	def hubble(self):
-		pass
+
+		plt.clf()
+		plt.rcParams['figure.figsize'] = (12,4)
+		plt.subplots_adjust(
+			left=None, bottom=0.2, right=None, top=None, wspace=0, hspace=0)
+		fr = txtobj(self.inputfile,fitresheader=True)
+		ax = plt.axes()
+		fr.MURES = fr.MU - cosmo.distmod(fr.zCMB).value
+
+		def errfnc(x):
+			return(np.std(x)/np.sqrt(len(x)))
+		
+		zbins = np.logspace(np.log10(0.01),np.log10(1.0),25)
+		mubins = binned_statistic(
+			fr.zCMB,fr.MURES,bins=zbins,statistic='mean').statistic
+		mubinerr = binned_statistic(
+			fr.zCMB,fr.MU,bins=zbins,statistic=errfnc).statistic
+		ax.errorbar(fr.zCMB,fr.MURES,yerr=fr.MUERR,alpha=0.2,fmt='o')
+		ax.errorbar(
+			(zbins[1:]+zbins[:-1])/2.,mubins,yerr=mubinerr,fmt='o-')
+
+		ax.axhline(0,color='k',lw=2)
+		ax.set_xscale('log')
+		ax.xaxis.set_major_formatter(plt.NullFormatter())
+		ax.xaxis.set_minor_formatter(plt.NullFormatter())
+		ax.set_ylabel('SNe',fontsize=11,labelpad=0)
+		ax.set_xlim([0.01,1.0])
+		ax.xaxis.set_ticks([0.01,0.02,0.05,0.1,0.2,0.3,0.5,1.0])
+		ax.xaxis.set_ticklabels(['0.01','0.02','0.05','0.1','0.2','0.3','0.5','1.0'])
+
+		ax.set_xlabel('$z_{CMB}$',fontsize=15)
+		ax.set_ylabel('$\mu - \mu_{\Lambda CDM}$',fontsize=15)
+		
+		plt.savefig('%s%s_BBC_hubble_prelim.png'%(self.outputdir,self.prefix))
+
 
 	@validfunction
 	def nuisancebias(self):
-		pass
+		with open(self.inputfile) as fin:
+			for line in fin:
+				if line.startswith('#') and 'sigint' in line and '=' in line:
+					sigint = float(line.split()[3])
+				elif line.startswith('#') and 'alpha0' in line and '=' in line:
+					alpha,alphaerr = float(line.split()[3]),float(line.split()[5])
+				elif line.startswith('#') and 'beta0' in line and '=' in line:
+					beta,betaerr = float(line.split()[3]),float(line.split()[5])
+
+		fr = txtobj(self.inputfile,fitresheader=True)
+		plt.clf()
+		ax = plt.axes()
+		ax.set_ylabel('Nuisance Parameters',fontsize=15)
+		ax.xaxis.set_ticks([1,2,3])
+		ax.xaxis.set_ticklabels(['alpha','beta',r'$\sigma_{\mathrm{int}}$'],rotation=30)
+
+		ax.errorbar(1,alpha-fr.SIM_alpha[0],yerr=alphaerr,fmt='o',color='C0',label='fit')
+		ax.errorbar(2,beta-fr.SIM_beta[0],yerr=betaerr,fmt='o',color='C0')
+		ax.errorbar(3,sigint-0.1,fmt='o',color='C0')
+		ax.axhline(0,color='k',lw=2)
+		
+		ax.text(0.17,0.9,r"""$\alpha_{sim} = %.3f$
+$\alpha_{fit} = %.3f \pm %.3f$"""%(
+	fr.SIM_alpha[0],alpha,alphaerr),transform=ax.transAxes,ha='center',va='center')
+		ax.text(0.5,0.9,r"""$\beta_{sim} = %.3f$
+$\beta_{fit} = %.3f \pm %.3f$"""%(
+	fr.SIM_beta[0],beta,betaerr),transform=ax.transAxes,ha='center',va='center')
+		ax.text(0.83,0.9,"""$\sigma_{int} = %.3f$"""%(
+			sigint),transform=ax.transAxes,ha='center',va='center')
+
+		ax.set_xlim([0.5,3.5])
+		plt.savefig('%s%s_nuisancebias.png'%(self.outputdir,self.prefix))
