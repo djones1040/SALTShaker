@@ -1064,12 +1064,17 @@ class GetMu(PipeProcedure):
             return pd.DataFrame([df,df2]).set_index('tag')
 
     def _get_output_info(self):
-        df = {}
-        key = 'prefix'
-        df['key'] = key
-        df['value'] = self.keys[key].strip()+'.M0DIF'
-        return pd.DataFrame([df])
-
+        if not self.batch:
+            df = {}
+            key = 'prefix'
+            df['key'] = key
+            df['value'] = self.keys[key].strip()+'.M0DIF'
+            return pd.DataFrame([df])
+        else:
+            df = {'key':None,
+                  'value':glob.glob('%s/*/SALT2mu_FITOPT000_MUOPT000.M0DIF'%self.keys['OUTDIR'])}
+            return pd.DataFrame([df])          
+        
 class CosmoFit(PipeProcedure):
     def configure(self,setkeys=None,pro=None,outname=None,prooptions=None,batch=False,
                   validplots=False,plotdir=None,**kwargs):
