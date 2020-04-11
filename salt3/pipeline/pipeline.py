@@ -308,9 +308,12 @@ class SALT3pipe():
                                    done_file=pro2.done_file,
                                    plotdir=pro2.plotdir)
                 else:
+                    version_photometry = '/'+self.LCFitting[0].keys['SNLCINP']['VERSION_PHOTOMETRY']+'/'
+                    vinput = version_photometry.strip().join(setkeys['value'].values[0])
+                    print("cosmofit input file = ",vinput)
                     pro2.configure(pro=pro2.pro,
                                    prooptions=pro2.prooptions,
-                                   outname=setkeys['value'].values[0],
+                                   outname=vinput,
                                    batch=pro2.batch,
                                    validplots=pro2.validplots,
                                    plotdir=pro2.plotdir)
@@ -401,7 +404,10 @@ class PipeProcedure():
             self.pro = os.path.expandvars(pro)
         else:
             self.pro = pro
-        self.baseinput = os.path.expandvars(baseinput)
+        if baseinput is not None and '$' in baseinput:
+            self.baseinput = os.path.expandvars(baseinput)
+        else:
+            self.baseinput = baseinput
         self.setkeys = setkeys
         self.proargs = proargs
         self.prooptions = prooptions
@@ -1066,23 +1072,27 @@ class GetMu(PipeProcedure):
             return pd.DataFrame([df,df2]).set_index('tag')
 
     def _get_output_info(self):
-        df = {}
-        key = 'prefix'
-        df['key'] = key
-        df['value'] = self.keys[key].strip()+'.M0DIF'
-        return pd.DataFrame([df])
-
+        if not self.batch:
+            df = {}
+            key = 'prefix'
+            df['key'] = key
+            df['value'] = self.keys[key].strip()+'.M0DIF'
+            return pd.DataFrame([df])
+        else:
+            df = {'key':None,
+                  'value':[self.keys['OUTDIR_OVERRIDE'],'SALT2mu_FITOPT000_MUOPT000.M0DIF']}
+            return pd.DataFrame([df])          
+        
     def validplot_run(self):
         from salt3.pipeline.validplot import getmu_validplots
         self.validplot_func = getmu_validplots()
             
-        inputfiles = glob.glob('%s/*/SALT2mu_FITOPT000_MUOPT000.FITRES'%self.keys['OUTDIR'])
+        inputfiles = glob.glob('%s/*/SALT2mu_FITOPT000_MUOPT000.FITRES'%self.keys['OUTDIR_OVERRIDE'])
         for inputfile in inputfiles:
             inputbase = inputfile.split('/')[-1]
             self.validplot_func.input(inputfile)
             self.validplot_func.output(outputdir=self.plotdir,prefix='valid_lcfitting_%s'%inputbase)
             self.validplot_func.run()
-		
 
 class CosmoFit(PipeProcedure):
     def configure(self,setkeys=None,pro=None,outname=None,prooptions=None,batch=False,
@@ -1443,9 +1453,9 @@ def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_
         v = done_file
         config[key] = v
         if len(delimiter.keys()): delimiter[key] = ': '
-    if outdir is not None and 'OUTDIR' not in config.keys():
-        config['OUTDIR'] = outdir
-        delimiter['OUTDIR'] = ': '
+    if outdir is not None and 'OUTDIR_OVERRIDE' not in config.keys():
+        config['OUTDIR_OVERRIDE'] = outdir
+        delimiter['OUTDIR_OVERRIDE'] = ': '
 		
     print("input file saved as:",outname)
     _write_simple_config_file(config,outname,delimiter)
