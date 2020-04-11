@@ -1118,7 +1118,7 @@ class CosmoFit(PipeProcedure):
 
         inputfile = '%s.cospar'%self.finput
         
-        inputbase = inputfile.split('/')[-1]
+        inputbase = inputfile.split('/')[-1].split('.')[0]
         self.validplot_func.input(inputfile)
         self.validplot_func.output(
             outputdir=self.plotdir,prefix='valid_lcfitting_%s'%inputbase)
