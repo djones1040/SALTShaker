@@ -1112,6 +1112,19 @@ class CosmoFit(PipeProcedure):
         df['value'] = 'test'
         return pd.DataFrame([df])
 
+    def validplot_run(self):
+        from salt3.pipeline.validplot import cosmofit_validplots
+        self.validplot_func = cosmofit_validplots()
+
+        inputfile = '%s.cospar'%self.finput
+        
+        inputbase = inputfile.split('/')[-1]
+        self.validplot_func.input(inputfile)
+        self.validplot_func.output(
+            outputdir=self.plotdir,prefix='valid_lcfitting_%s'%inputbase)
+        self.validplot_func.run()
+
+    
 def _run_external_pro(pro,args):
 
     if isinstance(args, str):
@@ -1456,7 +1469,7 @@ def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_
     if outdir is not None and 'OUTDIR_OVERRIDE' not in config.keys():
         config['OUTDIR_OVERRIDE'] = outdir
         delimiter['OUTDIR_OVERRIDE'] = ': '
-		
+        
     print("input file saved as:",outname)
     _write_simple_config_file(config,outname,delimiter)
 
