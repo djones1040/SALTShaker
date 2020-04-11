@@ -34,7 +34,7 @@ def _MyPipe(mypipe):
 
 class RunPipe():
     def __init__(self, pipeinput, mypipe=False, batch_mode=False,batch_script=None,start_id=None,
-                 randseed=None,fseeds=None,num=None,norun=None):
+                 randseed=None,fseeds=None,num=None,norun=None,debug=False):
         if mypipe is None:
             self.pipedef = self.__DefaultPipe
         else:
@@ -53,7 +53,7 @@ class RunPipe():
         if num is not None:
             self.num += start_id
         self.norun = norun
-        self.debug = False
+        self.debug = debug
  
     def __DefaultPipe(self):
         pipe = SALT3pipe(finput=self.pipeinput)
@@ -147,14 +147,17 @@ class RunPipe():
                             self.pipe.glue(['biascorsim','biascorlcfit'],on='phot')
                         if ['train','biascorlcfit'] in self.pipe.gluepairs:
                             self.pipe.glue(['train','biascorlcfit'],on='model')
-                    if any([p.startswith('getmu') for p in self.pipe.pipepros]):       
+                    if any([p.startswith('getmu') for p in self.pipe.pipepros]): 
+                        df_getmu = self._add_suffix(self.pipe.GetMu,['OUTDIR_OVERRIDE'],self.num)
+                        done_file = "{}_{:03d}".format(self.pipe.GetMu.done_file.strip(),self.num)
+                        self._reconfig_w_suffix(self.pipe.GetMu,df_getmu,self.num,done_file=done_file)
                         if ['lcfit','getmu'] in self.pipe.gluepairs:
                             self.pipe.glue(['lcfit','getmu'])
                         if ['biascorlcfit','getmu'] in self.pipe.gluepairs:
                             self.pipe.glue(['biascorlcfit','getmu'])
-                        done_file = "{}_{:03d}".format(self.pipe.GetMu.done_file.strip(),self.num)
-                        self._reconfig_w_suffix(self.pipe.GetMu,None,self.num,done_file=done_file)
-                        
+                        if ['getmu','cosmofit'] in self.pipe.gluepairs:
+                            self.pipe.glue(['getmu','cosmofit'])
+                                                
             if not self.norun:
                 self.pipe.run()
             self.pipe.GetMu.validplot_run()
@@ -218,11 +221,14 @@ def main(**kwargs):
                         help='[internal use] suffix for multiple batch jobs')   
     parser.add_argument('--norun',dest='norun', action='store_true',
                         help='set to only check configurations without launch jobs')   
+    parser.add_argument('--debug',dest='debug', action='store_true',
+                        help='use $MY_SALT3_DIR instead of installed runpipe for debugging')  
     
     p = parser.parse_args()
     
     pipe = RunPipe(p.pipeinput,mypipe=p.mypipe,batch_mode=p.batch_mode,batch_script=p.batch_script,
-                   start_id=p.start_id,randseed=p.randseed,fseeds=p.fseeds,num=p.num,norun=p.norun)
+                   start_id=p.start_id,randseed=p.randseed,fseeds=p.fseeds,num=p.num,norun=p.norun,
+                   debug=p.debug)
     pipe.run()
     
     

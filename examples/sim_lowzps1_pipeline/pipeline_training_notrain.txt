@@ -24,6 +24,8 @@ prooptions=
 set_key=2
         NGENTOT_LC[0] 100
         NGENTOT_LC[1] 4000
+        GENMODEL[0] SALT2.JLA-B14
+        GENMODEL[1] SALT2.JLA-B14
 
 [training]
 pro=trainsalt
@@ -43,13 +45,15 @@ pro=split_and_fit.pl
 baseinput=lcfitting/snfit_base.nml,lcfitting/snfit_base.nml
 outinput=pipeline/snfit_TEST.nml,pipeline/snfit_TEST2.nml
 batch=True
-validplots=True
+validplots=False
 prooptions=NOPROMPT
 set_key=4
         0 HEADER OUTDIR SIM_LOWZPS1_LOWZ 
         1 HEADER OUTDIR SIM_LOWZPS1_PS1
         1 FITINP FILTLIST_FIT griz
         1 SNLCINP CUTWIN_REDSHIFT 0.01 0.8
+        0 FITINP FITMODEL_NAME SALT2.JLA-B14
+        1 FITINP FITMODEL_NAME SALT2.JLA-B14
 
 [biascorsim]
 pro=sim_SNmix.pl
@@ -60,18 +64,22 @@ prooptions=
 set_key=2
         NGENTOT_LC[0] 100
         NGENTOT_LC[1] 4000
+        GENMODEL[0] SALT2.JLA-B14
+        GENMODEL[1] SALT2.JLA-B14
 
 [biascorlcfit]
 pro=split_and_fit.pl
 baseinput=lcfitting/snfit_base.nml,lcfitting/snfit_base.nml
 outinput=pipeline/snfit_TEST_biascor.nml,pipeline/snfit_TEST_biascor2.nml
 batch=True
-validplots=True
+validplots=False
 prooptions=
 set_key=4
         0 HEADER OUTDIR SIM_LOWZPS1_BIASCOR_LOWZ
         1 HEADER OUTDIR SIM_LOWZPS1_BIASCOR_PS1
         1 FITINP FILTLIST_FIT griz
+        0 FITINP FITMODEL_NAME SALT2.JLA-B14
+        1 FITINP FITMODEL_NAME SALT2.JLA-B14
         1 SNLCINP CUTWIN_REDSHIFT 0.01 0.8
         
 [getmu]
@@ -79,7 +87,7 @@ pro=SALT2mu_fit.pl
 baseinput=getmu/BBC_LOWZ_PS1.input
 outinput=pipeline/BBC.input
 batch=True
-validplots=True
+validplots=False
 prooptions=
 set_key=
 
@@ -89,4 +97,4 @@ outinput=SALT2mu_FITOPT000_MUOPT000.M0DIF
 prooptions= -dompri 0.007
 baseinput=
 batch=False
-validplots=True
+validplots=False
