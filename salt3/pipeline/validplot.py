@@ -182,3 +182,32 @@ $\beta_{fit} = %.3f \pm %.3f$"""%(
 
 		ax.set_xlim([0.5,3.5])
 		plt.savefig('%s%s_nuisancebias.png'%(self.outputdir,self.prefix))
+
+class cosmofit_validplots(ValidPlots):
+	
+	@validfunction		
+	def cosmopar(self):
+		# plot w, Om numbers and biases
+		# could make a tex table also
+		Om_Planck = 0.315
+		w_Planck = -1
+		
+		data = at.Table.read(self.inputfile,format='ascii')
+		
+		plt.clf()
+		ax = plt.axes()
+		ax.set_ylabel('Nuisance Parameters',fontsize=15)
+		ax.xaxis.set_ticks([1,2])
+		ax.xaxis.set_ticklabels(['alpha','beta',r'$\sigma_{\mathrm{int}}$'],rotation=30)
+
+		ax.errorbar(1,data['w']-w_Planck,yerr=data['wsig_marg'],fmt='o',color='C0',label='fit')
+		ax.errorbar(2,data['OM']-Om_Planck,yerr=data['OM_sig'],fmt='o',color='C0')
+		ax.axhline(0,color='k',lw=2)
+		
+		ax.text(0.17,0.9,r"""$w = %.3f \pm %.3f$"""%(
+			data['w'],data['wsig_marg']),transform=ax.transAxes,ha='center',va='center')
+		ax.text(0.5,0.9,r"""$\Omega_M = %.3f \pm %.3f$"""%(
+			data['OM'],data['OM_sig']),transform=ax.transAxes,ha='center',va='center')
+
+		ax.set_xlim([0.5,2.5])
+		plt.savefig('%s%s_cosmopar.png'%(self.outputdir,self.prefix))
