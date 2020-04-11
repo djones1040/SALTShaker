@@ -1080,14 +1080,14 @@ class GetMu(PipeProcedure):
             return pd.DataFrame([df])
         else:
             df = {'key':None,
-                  'value':[self.keys['OUTDIR'],'SALT2mu_FITOPT000_MUOPT000.M0DIF']}
+                  'value':[self.keys['OUTDIR_OVERRIDE'],'SALT2mu_FITOPT000_MUOPT000.M0DIF']}
             return pd.DataFrame([df])          
         
     def validplot_run(self):
         from salt3.pipeline.validplot import getmu_validplots
         self.validplot_func = getmu_validplots()
             
-        inputfiles = glob.glob('%s/*/SALT2mu_FITOPT000_MUOPT000.FITRES'%self.keys['OUTDIR'])
+        inputfiles = glob.glob('%s/*/SALT2mu_FITOPT000_MUOPT000.FITRES'%self.keys['OUTDIR_OVERRIDE'])
         for inputfile in inputfiles:
             inputbase = inputfile.split('/')[-1]
             self.validplot_func.input(inputfile)
@@ -1453,9 +1453,9 @@ def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_
         v = done_file
         config[key] = v
         if len(delimiter.keys()): delimiter[key] = ': '
-    if outdir is not None and 'OUTDIR' not in config.keys():
-        config['OUTDIR'] = outdir
-        delimiter['OUTDIR'] = ': '
+    if outdir is not None and 'OUTDIR_OVERRIDE' not in config.keys():
+        config['OUTDIR_OVERRIDE'] = outdir
+        delimiter['OUTDIR_OVERRIDE'] = ': '
 		
     print("input file saved as:",outname)
     _write_simple_config_file(config,outname,delimiter)
