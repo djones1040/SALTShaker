@@ -11,14 +11,18 @@ from astropy.cosmology import Planck15 as cosmo
 
 __validfunctions__=dict()
 def validfunction(validfunction):
-    """Decorator to register a given function as a valid prior"""
-    __validfunctions__[validfunction.__name__]=validfunction
-    return validfunction
+	"""Decorator to register a given function as a plotting function"""
+	__validfunctions__[validfunction.__name__]=validfunction
+	return validfunction
 
 class ValidPlots:
 	def __init__(self):
-		self.validfunctions={ key: partial(__validfunctions__[key],self) \
-			for key in __validfunctions__}
+
+		self.validfunctions = {}
+		for key in __validfunctions__:
+			if __validfunctions__[key].__qualname__.split('.')[0] == \
+			   type(self).__name__:
+				self.validfunctions[key] = partial(__validfunctions__[key],self)
 
 	def input(self,inputfile=None):
 		self.inputfile = inputfile
@@ -28,15 +32,14 @@ class ValidPlots:
 			self.outputdir = '%s/'%outputdir
 		else: self.outputdir = outputdir
 		self.prefix=prefix
-		
+
 	def run(self,*args):
 		validfunctions = self.validfunctions
 		for k in validfunctions.keys():
 			validfunctions[k](*args)
 
-
 class lcfitting_validplots(ValidPlots):
-
+	
 	@validfunction		
 	def simvfit(self):
 
@@ -106,10 +109,10 @@ class lcfitting_validplots(ValidPlots):
 		return
 
 class getmu_validplots(ValidPlots):
-
+	
 	@validfunction		
 	def hubble(self):
-
+		
 		plt.clf()
 		plt.rcParams['figure.figsize'] = (12,4)
 		plt.subplots_adjust(
