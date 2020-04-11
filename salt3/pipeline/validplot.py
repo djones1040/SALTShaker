@@ -7,6 +7,7 @@ from salt3.util import getmu
 from functools import partial
 from scipy.stats import binned_statistic
 from astropy.cosmology import Planck15 as cosmo
+import astropy.table as at
 #from salt3.pipeline.pipeline import LCFitting
 
 __validfunctions__=dict()
@@ -198,7 +199,7 @@ class cosmofit_validplots(ValidPlots):
 		ax = plt.axes()
 		ax.set_ylabel('Nuisance Parameters',fontsize=15)
 		ax.xaxis.set_ticks([1,2])
-		ax.xaxis.set_ticklabels(['alpha','beta',r'$\sigma_{\mathrm{int}}$'],rotation=30)
+		ax.xaxis.set_ticklabels(['$w$','$\Omega_M$'],rotation=30)
 
 		ax.errorbar(1,data['w']-w_Planck,yerr=data['wsig_marg'],fmt='o',color='C0',label='fit')
 		ax.errorbar(2,data['OM']-Om_Planck,yerr=data['OM_sig'],fmt='o',color='C0')

@@ -35,7 +35,7 @@ outinput=pipeline/SALT_SNANA.conf
 set_key=3
         trainparams fitsalt2 False
         trainparams fit_tpkoff False
-        trainparams gaussnewton_maxiter 2
+        trainparams gaussnewton_maxiter 15
         iodata maxsn 25
 
 [lcfitting]
