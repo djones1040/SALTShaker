@@ -1091,7 +1091,7 @@ class GetMu(PipeProcedure):
         for inputfile in inputfiles:
             inputbase = inputfile.split('/')[-1]
             self.validplot_func.input(inputfile)
-            self.validplot_func.output(outputdir=self.plotdir,prefix='valid_lcfitting_%s'%inputbase)
+            self.validplot_func.output(outputdir=self.plotdir,prefix='valid_getmu_%s'%self.keys['OUTDIR_OVERRIDE'])
             self.validplot_func.run()
 
 class CosmoFit(PipeProcedure):
@@ -1117,11 +1117,11 @@ class CosmoFit(PipeProcedure):
         self.validplot_func = cosmofit_validplots()
 
         inputfile = '%s.cospar'%self.finput
-        
-        inputbase = inputfile.split('/')[-1].split('.')[0]
+        #inputbase = inputfile.split('/')[-1].split('.')[0]
+        inputbase = inputfile.split('/')[0]
         self.validplot_func.input(inputfile)
         self.validplot_func.output(
-            outputdir=self.plotdir,prefix='valid_lcfitting_%s'%inputbase)
+            outputdir=self.plotdir,prefix='valid_cosmofit_%s'%inputbase)
         self.validplot_func.run()
 
     
