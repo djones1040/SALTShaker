@@ -38,13 +38,31 @@ def abspath_for_getmu(finput):
     return finput
 
 def nmlval_to_abspath(key,value):
-    if key.lower() in ['kcor_file','vpec_file'] and not value.startswith('/') and not value.startswith('$') and '/' in value:
-        if key.lower() == 'kcor_file' and os.path.exists(os.path.expandvars('$SNDATA_ROOT/kcor/%s'%value)):
-            return value
+    if not isinstance(value,list):
+        valuelist = [value]
+    else:
+        valuelist = value
+    newvlist = []
+    for value in valuelist:
+        if isinstance(value,str) and key.lower() in ['kcor_file','vpec_file'] and is_not_abspath(value.replace("'","")):               
+            if key.lower() == 'kcor_file' and os.path.exists(os.path.expandvars('$SNDATA_ROOT/kcor/%s'%value)):
+                newvlist.append(value)
+            else:
+                value = '%s/%s'%(cwd,value)
+                newvlist.append(value)
         else:
-            value = '%s/%s'%(cwd,value)
-    return value
+            newvlist.append(value)
+    if len(newvlist) == 1:
+        return newvlist[0]
+    else:
+        return newvlist
 
+def is_not_abspath(value):
+    if not value.startswith('/') and not value.startswith('$') and '/' in value:
+        return True
+    else:
+        return False
+    
 class SALT3pipe():
     def __init__(self,finput=None):
         self.finput = finput
@@ -1561,10 +1579,11 @@ def _write_nml_to_file(nml,filename,headerlines=[],append=False):
             lines.append('&'+key.upper()+'\n')
             for key2 in nml[key].keys():
                 value = nmlval_to_abspath(key2,nml[key][key2])
-                if isinstance(value,str):
-                    value = "'{}'".format(value)
+                if isinstance(value,str) and not value.replace(".","").isdigit():
+                    value = "'{}'".format(value.replace("'",""))
                 elif isinstance(value,list):
-                    value = ','.join([str(x) for x in value if x is not None])
+                    vlist_to_join = [x for x in value if x is not None]
+                    value = ','.join(["'{}'".format(str(x.replace("'",""))) if isinstance(x,str) and not x.replace(".","").isdigit() else str(x) for x in vlist_to_join])
                 # outfile.write("  {} = {}".format(key2.upper(),value))
                 # outfile.write("\n")
                 valstr = "  {} = {}\n".format(key2.upper(),value)
