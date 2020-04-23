@@ -162,7 +162,7 @@ class RunPipe():
                                                 
             if not self.norun:
                 self.pipe.run()
-            self.pipe.CosmoFit.validplot_run()
+#             self.pipe.CosmoFit.validplot_run()
         else:
             if self.batch_script is None:
                 raise RuntimeError("batch script is None")
