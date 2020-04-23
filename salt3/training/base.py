@@ -58,6 +58,10 @@ class TrainSALTBase:
 		parser.add_argument('--outputdir', default=config.get('iodata','outputdir'), type=str,
 							help="""data directory for spectroscopy, format should be ASCII 
 							with columns wavelength, flux, fluxerr (optional) (default=%default)""")
+		parser.add_argument('--initsalt2model', default=config.get('iodata','initsalt2model'), type=boolean_string,
+							help="""If true, initialize model parameters from prior SALT2 model""")
+		parser.add_argument('--initsalt2var', default=config.get('iodata','initsalt2var'), type=boolean_string,
+							help="""If true, initialize model uncertainty parameters from prior SALT2 model""")
 		parser.add_argument('--initm0modelfile', default=config.get('iodata','initm0modelfile'), type=str,
 							help="""initial M0 model to begin training, ASCII with columns
 							phase, wavelength, flux (default=%default)""")
@@ -90,8 +94,6 @@ class TrainSALTBase:
 							help='fit for model error if set (default=%default)')
 		parser.add_argument('--fit_tpkoff', default=config.get('trainparams','fit_tpkoff'), type=boolean_string,
 							help='fit for time of max in B-band if set (default=%default)')
-		parser.add_argument('--condition_number', default=config.get('trainparams','condition_number'), type=float,
-							help='Largest singular value not set to zero for least-squares solver (default=%default)')
 
 		# mcmc parameters
 		parser.add_argument('--n_steps_mcmc', default=config.get('mcmcparams','n_steps_mcmc'), type=int,
@@ -164,8 +166,10 @@ class TrainSALTBase:
 							help='wavelength range over which the color law is fit to data (default=%default)')
 		parser.add_argument('--interpfunc', default=config.get('modelparams','interpfunc'), type=str,
 							help='function to interpolate between control points in the fitting (default=%default)')
+		parser.add_argument('--errinterporder', default=config.get('modelparams','errinterporder'), type=int,
+							help='for model uncertainty splines/polynomial funcs, order of the function (default=%default)')
 		parser.add_argument('--interporder', default=config.get('modelparams','interporder'), type=int,
-							help='for splines/polynomial funcs, order of the function (default=%default)')
+							help='for model splines/polynomial funcs, order of the function (default=%default)')
 		parser.add_argument('--wavesplineres', default=config.get('modelparams','wavesplineres'), type=float,
 							help='number of angstroms between each wavelength spline knot (default=%default)')
 		parser.add_argument('--phasesplineres', default=config.get('modelparams','phasesplineres'), type=float,
@@ -248,10 +252,11 @@ class TrainSALTBase:
 	def get_saltkw(self,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc):
 
 
-		saltfitkwargs = {'waveSmoothingNeff':self.options.wavesmoothingneff,'phaseSmoothingNeff':self.options.phasesmoothingneff,
+		saltfitkwargs = {'bsorder':self.options.interporder,'errbsorder':self.options.errinterporder,
+						 'waveSmoothingNeff':self.options.wavesmoothingneff,'phaseSmoothingNeff':self.options.phasesmoothingneff,
 						 'neffFloor':self.options.nefffloor, 'neffMax':self.options.neffmax,
 						 'specrecal':self.options.specrecal, 'regularizationScaleMethod':self.options.regularizationScaleMethod,
-						 'conditionNumber':self.options.condition_number,'phaseknotloc':phaseknotloc,'waveknotloc':waveknotloc,
+						 'phaseknotloc':phaseknotloc,'waveknotloc':waveknotloc,
 						 'errphaseknotloc':errphaseknotloc,'errwaveknotloc':errwaveknotloc,
 						 'phaserange':self.options.phaserange,
 						 'waverange':self.options.waverange,'phaseres':self.options.phasesplineres,
