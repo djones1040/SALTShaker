@@ -38,35 +38,31 @@ def abspath_for_getmu(finput):
     return finput
 
 def nmlval_to_abspath(key,value):
-
-    if isinstance(value,list):
-        values_out = []
-        for v in value:
-            if v is None:
-                values_out += [v]
-            elif key.lower() in ['kcor_file','vpec_file'] and not v.startswith('/') and not v.startswith('$') and '/' in v:
-                if key.lower() == 'kcor_file' and os.path.exists(os.path.expandvars('$SNDATA_ROOT/kcor/%s'%v)):
-                    values_out += [v]
-                else:
-                    values_out += ['%s/%s'%(cwd,v)]
-            else: values_out += [v]
-        values_out2 = []
-        for v in values_out2:
-
-            if isinstance(v,str): values_out2 += ["'{}'".format(v.replace("'",""))]
-            else: values_out2 += [v]
-        return values_out2
-
-    elif value is not None and key.lower() in ['kcor_file','vpec_file'] and not value.startswith('/') and not value.startswith('$') and '/' in value:
-        if key.lower() == 'kcor_file' and os.path.exists(os.path.expandvars('$SNDATA_ROOT/kcor/%s'%value)):
-            return value
+    if not isinstance(value,list):
+        valuelist = [value]
+    else:
+        valuelist = value
+    newvlist = []
+    for value in valuelist:
+        if isinstance(value,str) and key.lower() in ['kcor_file','vpec_file'] and is_not_abspath(value.replace("'","")):               
+            if key.lower() == 'kcor_file' and os.path.exists(os.path.expandvars('$SNDATA_ROOT/kcor/%s'%value)):
+                newvlist.append(value)
+            else:
+                value = '%s/%s'%(cwd,value)
+                newvlist.append(value)
         else:
-            value = '%s/%s'%(cwd,value)
-    if isinstance(value,str):
-        return "'{}'".format(value.replace("'",""))
-    else: return value
-    #except Exception as ex: import pdb; pdb.set_trace()
+            newvlist.append(value)
+    if len(newvlist) == 1:
+        return newvlist[0]
+    else:
+        return newvlist
 
+def is_not_abspath(value):
+    if not value.startswith('/') and not value.startswith('$') and '/' in value:
+        return True
+    else:
+        return False
+    
 class SALT3pipe():
     def __init__(self,finput=None):
         self.finput = finput
@@ -700,7 +696,6 @@ class Simulation(PipeProcedure):
                 config,delimiter = _read_simple_config_file(sim_input,sep=':')
                 kcorfile = config['KCOR_FILE'].strip()
                 kcor_dict[label] = kcorfile
-
         return kcor_dict
     
     
@@ -1411,7 +1406,6 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
 
     import f90nml
     from f90nml.namelist import Namelist
-
     nml = f90nml.read(basefilename)
     if 'fitinp' in nml.keys() and 'fitmodel_name' in nml['fitinp'] and isinstance(nml['fitinp']['fitmodel_name'],list):
         nml['fitinp']['fitmodel_name'] = ''.join(nml['fitinp']['fitmodel_name'])
@@ -1457,13 +1451,8 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
             if key in nml[sec]:
                 print("Setting key {}={} in &{}".format(key,v,sec))
             else:
-                print("Addding key {}={} in &{}".format(key,v,sec))
-
-            if isinstance(v,list) and sec.lower() in ['snlcinp','fitinp'] and key == 'KCOR_FILE':
-                nml[sec][key] = "'{}'".format(v[0])
-            elif isinstance(v,str) and sec.lower() in ['snlcinp','fitinp'] and key == 'KCOR_FILE':
-                nml[sec][key] = "'{}'".format(v)
-            else: nml[sec][key] = v
+                print("Addding key {}={} in &{}".format(key,v,sec))               
+            nml[sec][key] = v
     if nml['header']['version'].lstrip().startswith(','):
         nml['header']['version'] = nml['header']['version'].split(',',maxsplit=1)[1]
     # a bit clumsy, but need to make sure these are the same for now:
@@ -1590,13 +1579,13 @@ def _write_nml_to_file(nml,filename,headerlines=[],append=False):
             lines.append('&'+key.upper()+'\n')
             for key2 in nml[key].keys():
                 value = nmlval_to_abspath(key2,nml[key][key2])
-                if isinstance(value,str):
+                if isinstance(value,str) and not value.replace(".","").isdigit():
                     value = "'{}'".format(value.replace("'",""))
                 elif isinstance(value,list):
-                    value = ','.join([str(x) for x in value if x is not None])
+                    vlist_to_join = [x for x in value if x is not None]
+                    value = ','.join(["'{}'".format(str(x.replace("'",""))) if isinstance(x,str) and not x.replace(".","").isdigit() else str(x) for x in vlist_to_join])
                 # outfile.write("  {} = {}".format(key2.upper(),value))
                 # outfile.write("\n")
-
                 valstr = "  {} = {}\n".format(key2.upper(),value)
                 lines.append(valstr)
             # outfile.write('&END\n\n')
