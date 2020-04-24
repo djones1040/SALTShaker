@@ -325,6 +325,7 @@ class SALTPriors:
 		idx=0
 		debugstring='Values outside bounds: '
 		for bound,par in zip(bounds,boundparams):
+
 			result=self.boundedprior(bound[-1],(bound[0],bound[1]),x,par)
 			numResids=result[0].size
 			residuals[idx:idx+numResids],values[idx:idx+numResids],\
