@@ -1,4 +1,10 @@
 ##SALT3 INPUT
+[pipeline]
+n_lcfit = 2
+n_biascorlcfit = 2
+genversion_split = 0,1,2
+genversion_split_biascor = 0,1,2
+plotdir = figs
 
 [data]
 snlists=/home/midai/salt3_local/SALT3/examples/pipelinetest/training/data/SALT3TEST_SIMPLE.LIST
@@ -15,7 +21,9 @@ baseinput=simulation/MASTER_LOWZ_PS1.INPUT
 outinput=pipeline/MASTER_LOWZ_PS1.INPUT
 batch=True
 prooptions=
-set_key=
+set_key=2
+        NGENTOT_LC[0] 100
+        NGENTOT_LC[1] 4000
 
 [training]
 pro=trainsalt
@@ -24,16 +32,24 @@ baseinput=training/SALT_SNANA.conf
 prooptions = 
 #--stage validate
 outinput=pipeline/SALT_SNANA.conf
-set_key=
+set_key=3
+        trainparams fitsalt2 False
+        trainparams fit_tpkoff False
+        trainparams gaussnewton_maxiter 2
+        iodata maxsn 25
 
 [lcfitting]
 pro=split_and_fit.pl
-baseinput=lcfitting/snfit_base.nml
-outinput=pipeline/snfit_TEST.nml
+baseinput=lcfitting/snfit_base.nml,lcfitting/snfit_base.nml
+outinput=pipeline/snfit_TEST.nml,pipeline/snfit_TEST2.nml
 batch=True
 validplots=True
-prooptions=
-set_key=
+prooptions=NOPROMPT
+set_key=4
+        0 HEADER OUTDIR SIM_LOWZPS1_LOWZ 
+        1 HEADER OUTDIR SIM_LOWZPS1_PS1
+        1 FITINP FILTLIST_FIT griz
+        1 SNLCINP CUTWIN_REDSHIFT 0.01 0.8
 
 [biascorsim]
 pro=sim_SNmix.pl
@@ -41,17 +57,23 @@ baseinput=biascorsim/MASTER_LOWZ_PS1.INPUT
 outinput=pipeline/MASTER_LOWZ_PS1_biascor.INPUT
 batch=True
 prooptions=
-set_key=
+set_key=2
+        NGENTOT_LC[0] 100
+        NGENTOT_LC[1] 4000
 
 [biascorlcfit]
 pro=split_and_fit.pl
-baseinput=lcfitting/snfit_base.nml
-outinput=pipeline/snfit_TEST_biascor.nml
+baseinput=lcfitting/snfit_base.nml,lcfitting/snfit_base.nml
+outinput=pipeline/snfit_TEST_biascor.nml,pipeline/snfit_TEST_biascor2.nml
 batch=True
 validplots=True
 prooptions=
-set_key= 
-
+set_key=4
+        0 HEADER OUTDIR SIM_LOWZPS1_BIASCOR_LOWZ
+        1 HEADER OUTDIR SIM_LOWZPS1_BIASCOR_PS1
+        1 FITINP FILTLIST_FIT griz
+        1 SNLCINP CUTWIN_REDSHIFT 0.01 0.8
+        
 [getmu]
 pro=SALT2mu_fit.pl
 baseinput=getmu/BBC_LOWZ_PS1.input
@@ -63,5 +85,8 @@ set_key=
 
 [cosmofit]
 pro=wfit.exe
-outinput=cosmofit/test.M0DIF
-prooptions= -ompri 0.3 -dompri 0.01
+outinput=SALT2mu_FITOPT000_MUOPT000.M0DIF
+prooptions= -dompri 0.007
+baseinput=
+batch=False
+validplots=True

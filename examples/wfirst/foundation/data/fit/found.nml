@@ -1,0 +1,61 @@
+BATCH_MEM:   8000
+OUTDIR:   A1_SHALLOW
+BATCH_INFO:   sbatch $SBATCH_TEMPLATES/SNANA.TEMPLATE 20
+DONE_STAMP: ALL.DONE
+VERSION: Foundation_simup
+
+APPEND_FITRES: FITRES RA DECL zHEL zHELERR TrestMIN
+
+FITOPT: FUDGE_MAG_ERROR 'g .015 r .015 i .015 z .015'
+FITOPT: FUDGE_MAG_ERROR 'g .015 r .015 i .015 z .015' FILTLIST_FIT 'gr'
+
+   &SNLCINP
+     VERSION_PHOTOMETRY = 'Foundation_simup'
+     !ROOTFILE_OUT = 'Found.root'
+     KCOR_FILE         = '$PS1_ROOT/kcor/PS1/PS1_DS15/kcor_PS1_none.fits'
+     
+     SNTABLE_LIST = 'SNANA FITRES+RESIDUALS LCPLOT(text:col)'
+     TEXTFILE_PREFIX  = 'Found_MF15'
+     CUTWIN_RESTLAM = 2800. 13000.
+     MXLC_PLOT = 300
+     NFIT_ITERATION = 2
+     INTERP_OPT     = 1
+     USE_MWCOR = F
+     H0_REF   = 70.0
+     OLAM_REF =  0.70
+     OMAT_REF =  0.30
+     W0_REF   = -1.00
+     CUTWIN_REDSHIFT=0.001 1.0
+     CUTWIN_MJD = 0, 57882
+     
+     LDMP_SNFAIL =  F
+
+
+     ABORT_ON_NOEPOCHS = F
+
+
+     EPCUT_SNRMIN = 'g  -8.00  r  -8.00  i  -8.00  z  -8.00'
+     VPEC_FILE= '/project/rkessler/mfoley7/Codes/Flow_Corrections_found.txt'
+
+  &END
+ 
+ 
+  &FITINP
+
+    LFIXPAR_ALL     = F
+
+    FITMODEL_NAME  = 'SALT2.JLA-B14'
+   
+    OPT_COVAR = 1
+    OPT_XTMW_ERR = 1
+    FUDGEALL_ITER1_MAXFRAC = 0.02
+    PRIOR_MJDSIG        = 3.0
+    PRIOR_LUMIPAR_RANGE = -5.0, 5.0
+    PRIOR_LUMIPAR_SIGMA = 0.1
+
+    NGRID_PDF     = 0 
+   
+    FILTLIST_FIT = 'gri'
+    FILTLIST_DMPFUN = ''
+
+  &END
