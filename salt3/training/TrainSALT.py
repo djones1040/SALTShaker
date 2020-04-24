@@ -23,7 +23,7 @@ from salt3.util.txtobj import txtobj
 from salt3.util.specSynPhot import getScaleForSN
 from salt3.util.specrecal import SpecRecal
 
-from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs, init_errs_fromfile
+from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs,init_salt2
 from salt3.training.base import TrainSALTBase
 from salt3.training.saltfit import fitting
 from salt3.training import saltfit as saltfit
@@ -77,31 +77,39 @@ class TrainSALT(TrainSALTBase):
 		init_options = {'phaserange':self.options.phaserange,'waverange':self.options.waverange,
 						'phasesplineres':self.options.phasesplineres,'wavesplineres':self.options.wavesplineres,
 						'phaseinterpres':self.options.phaseoutres,'waveinterpres':self.options.waveoutres,
-						'normalize':True}
+						'normalize':True,'order':self.options.interporder}
 				
 		phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
 			self.options.inithsiaofile,self.options.initbfilt,flatnu,**init_options)
-		if self.options.initm1modelfile:
-			phase,wave,m1,mtemp,phaseknotloc,waveknotloc,m1knots,m1tmpknots = init_hsiao(
-				self.options.initm1modelfile,
-				self.options.initbfilt,flatnu,**init_options)
-		if self.options.initm0modelfile:
-			phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_kaepora(
-				self.options.initm0modelfile,self.options.initm1modelfile,self.options.initbfilt,flatnu,**init_options)
+
+		if self.options.initsalt2model:
+			if self.options.initm0modelfile =='':
+				self.options.initm0modelfile='%s/%s'%(init_rootdir,'salt2_template_0.dat')
+			if self.options.initm1modelfile  =='':
+				self.options.initm1modelfile='%s/%s'%(init_rootdir,'salt2_template_1.dat')
+
+		if self.options.initm0modelfile and self.options.initm1modelfile:
+			if self.options.initsalt2model:
+				phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_salt2(
+					self.options.initm0modelfile,self.options.initm1modelfile,self.options.initbfilt,flatnu,**init_options)
+			else:
+				phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_kaepora(
+					self.options.initm0modelfile,self.options.initm1modelfile,self.options.initbfilt,flatnu,**init_options)
+		#import pdb; pdb.set_trace()
 
 			
 		init_options['phasesplineres'] = self.options.error_snake_phase_binsize
 		init_options['wavesplineres'] = self.options.error_snake_wave_binsize
+		init_options['order']=self.options.errinterporder
+		if self.options.initsalt2var:
+			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots=init_errs(
+				 *['%s/%s'%(init_rootdir,x) for x in ['salt2_lc_relative_variance_0.dat','salt2_spec_covariance_01.dat','salt2_lc_relative_variance_1.dat']],**init_options)
+		else:
+			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots=init_errs(**init_options)
 		
-		errphaseknotloc = np.array([-20., -20., -20., -20.,-3.52941176, 0.58823529,   4.70588235,   8.82352941,
-									12.94117647,  17.05882353,  21.17647059,  25.29411765,        29.41176471,
-									85.        ,  85.        ,  85.        ,85.]) 
-		errwaveknotloc = np.array([ 1000.,  1000.,  1000.,  1000.,  3600.,  4000.,  4400.,  4800.,
-									5200.,  5600.,  6000.,  6400.,  6800.,  7200., 25000., 25000.,
-									25000., 25000.])
 		# number of parameters
-		n_phaseknots,n_waveknots = len(phaseknotloc)-4,len(waveknotloc)-4
-		n_errphaseknots,n_errwaveknots = len(errphaseknotloc)-4,len(errwaveknotloc)-4
+		n_phaseknots,n_waveknots = len(phaseknotloc)-self.options.interporder-1,len(waveknotloc)-self.options.interporder-1
+		n_errphaseknots,n_errwaveknots = len(errphaseknotloc)-self.options.errinterporder-1,len(errwaveknotloc)-self.options.errinterporder-1
 		n_sn = len(datadict.keys())
 
 		# set up the list of parameters
@@ -168,9 +176,13 @@ class TrainSALT(TrainSALTBase):
 				guess[parlist == 'cl'] = [-0.504294,0.787691,-0.461715,0.0815619] #[0.]*self.options.n_colorpars
 			if self.options.n_colorscatpars:
 				guess[parlist == 'clscat'] = [1e-6]*self.options.n_colorscatpars
-				guess[np.where(parlist == 'clscat')[0][-1]]=-30
+				guess[np.where(parlist == 'clscat')[0][-1]]=-np.inf
 			guess[(parlist == 'm0') & (guess < 0)] = 1e-4
-
+			
+			guess[parlist=='modelerr_0']=m0varknots
+			guess[parlist=='modelerr_1']=m1varknots
+			guess[parlist=='modelcorr_01']=m0m1corrknots
+			
 			i=0
 			for sn in datadict.keys():
 				guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn]['zHelio']).value-19.36-10.635))
@@ -300,8 +312,8 @@ class TrainSALT(TrainSALTBase):
 			for w,j in zip(wave,range(len(wave))):
 				print('%.1f %.2f %8.15e'%(p,w,M0[i,j]),file=foutm0)
 				print('%.1f %.2f %8.15e'%(p,w,M1[i,j]),file=foutm1)
-				print('%.1f %.2f %8.15e'%(p,w,M0err[i,j]**2.),file=foutm0err)
-				print('%.1f %.2f %8.15e'%(p,w,M1err[i,j]**2.),file=foutm1err)
+				print('%.1f %.2f %8.15e'%(p,w,M0err[i,j]),file=foutm0err)
+				print('%.1f %.2f %8.15e'%(p,w,M1err[i,j]),file=foutm1err)
 				print('%.1f %.2f %8.15e'%(p,w,cov_M0_M1[i,j]),file=foutcov)
 				print('%.1f %.2f %8.15e'%(p,w,modelerr[i,j]),file=fouterrmod)
 
