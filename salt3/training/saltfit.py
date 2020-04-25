@@ -594,7 +594,7 @@ class GaussNewton(saltresids.SALTResids):
 		log.info('starting loop; %i iterations'%loop_niter)
 		for superloop in range(loop_niter):
 			try:
-				if self.fit_model_err and photochi2perdof<65:
+				if self.fit_model_err and photochi2perdof<65 and not superloop % 3 and not superloop == 0:
 					log.info('Optimizing model error')
 					X=self.iterativelyfiterrmodel(X)
 					storedResults={}
@@ -717,6 +717,9 @@ class GaussNewton(saltresids.SALTResids):
 
 		X0=X.copy()
 		mapFun= starmap
+
+		store_priors = self.usePriors.copy()
+		self.usePriors = ()
 		
 		storedResults={}
 		print('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X,storedResults)))
@@ -742,6 +745,8 @@ class GaussNewton(saltresids.SALTResids):
 		includePars=np.zeros(self.parlist.size,dtype=bool)
 		includePars[self.iclscat]=True
 		X=self.minuitoptimize(X,includePars,fluxes,rescaleerrs=True,fixFluxes=True,dospec=False)
+
+		self.usePriors = store_priors
 		return X
  
 		 
@@ -785,7 +790,7 @@ class GaussNewton(saltresids.SALTResids):
 			minuitkwargs['limit_'+extrapar]=(0,2)
 		
 		m=Minuit(fn,use_array_call=True,forced_parameters=params,errordef=.5,**minuitkwargs)
-		result,paramResults=m.migrad()
+		result,paramResults=m.migrad(ncall=4)
 		X=X.copy()
 		paramresults=np.array([x.value for x  in paramResults])
 		if rescaleerrs:
@@ -793,7 +798,7 @@ class GaussNewton(saltresids.SALTResids):
 			X[self.imodelerr]*=paramresults[-1]
 		else:
 			X[includePars]=paramresults
-		
+		#import pdb; pdb.set_trace()
 		return X
 
 
