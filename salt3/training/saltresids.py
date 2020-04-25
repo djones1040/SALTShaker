@@ -453,10 +453,7 @@ class SALTResids:
 		if varyParams is None:
 			varyParams=np.zeros(self.npar,dtype=bool)
 		self.fillStoredResults(x,storedResults)	
-		time1 = time.time()
 		photmodel,specmodel=self.modelvalsforSN(x,sn,storedResults,varyParams)
-		time2 = time.time()
-		#print(f"modelvals took {time2-time1}")
 		#Separate code for photometry and spectra now, since photometry has to handle a covariance matrix with off-diagonal elements
 		if not 'photCholesky_{}'.format(sn) in storedResults:
 			#Calculate cholesky matrix for each set of photometric measurements in each filter
@@ -571,15 +568,13 @@ class SALTResids:
 			uncertainty_jac=  specmodel['modelvariance_jacobian'] / (2*uncertainty[:,np.newaxis])
 			specresids['lognorm_grad']= - (uncertainty_jac/uncertainty[:,np.newaxis]).sum(axis=0)
 			specresids['resid_jacobian']-=   uncertainty_jac*(specresids['resid'] /uncertainty)[:,np.newaxis]
-		#time3 = time.time()
-		#print(f"other stuff took {time3-time2}")
 		return photresids,specresids
 	
 	def modelvalsforSN(self,x,sn,storedResults,varyParams):		
-		time1 = time.time()
+
 		temporaryResults={}
 		x1Deriv= varyParams[self.parlist=='x1_{}'.format(sn)][0] 
-		#self.fillStoredResults(x,storedResults)
+		self.fillStoredResults(x,storedResults)
 
 		fluxphotkey='phot'+'fluxes_{}'.format(sn)
 		varphotkey= 'phot'+'variances_{}'.format(sn)
@@ -592,8 +587,7 @@ class SALTResids:
 						 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
 		colorexp= 10. ** (storedResults['colorLaw'] * c)
 		temporaryResults['colorexp'] =colorexp
-		#time2 = time.time()
-		#print(f"time 2-1 is {time2-time1}")
+		
 		calculateFluxes= not ('photfluxes_{}'.format(sn) in storedResults  and  'specfluxes_{}'.format(sn) in storedResults)
 		calculateVariances= not ('photvariances_{}'.format(sn) in storedResults and  'specvariances_{}'.format(sn) in storedResults)
 		if calculateFluxes and not fluxphotkey in storedResults and not fluxspeckey in storedResults:
@@ -613,8 +607,7 @@ class SALTResids:
 				M0phasederiv,M1phasederiv = storedResults['componentderivs']
 				phaseDeriv=prefactor*(M0phasederiv +x1*M1phasederiv)
 				temporaryResults['phaseDerivInterp'] = interp1d(obsphase,phaseDeriv,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
-		#time3=time.time()
-		#print(f"time 2-3 is {time3-time2}")
+				
 		if calculateVariances and not varphotkey in storedResults and not varspeckey in storedResults:
 			prefactor=(self.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z))
 			if x1Deriv or varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any():
@@ -629,8 +622,7 @@ class SALTResids:
 			#interr1d=interp1d(obsphase,modelUncertainty ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
 			#temporaryResults['modelUncertaintyInterp']=interr1d
 			temporaryResults['modelUncertainty']=modelUncertainty
-			#time4=time.time()
-		#print(f"time 3-4 is {time4-time3}")
+		
 		returndicts=[]
 		for valfun,uncertaintyfun,name in [(self.photValsForSN,self.photVarianceForSN,'phot'),(self.specValsForSN,self.specVarianceForSN, 'spec')]:
 			fluxkey=name+'fluxes_{}'.format(sn)
@@ -646,9 +638,7 @@ class SALTResids:
 					raise RuntimeError('error!  %s array has issues'%varkey)
 			uncertaintydict=storedResults[varkey]
 			returndicts+=[{**valdict ,**uncertaintydict}]
-		#time5=time.time()
-		#print(f"time 4-5 is {time5-time4}")
-		#print(f"total time is {time5-time1}")
+		
 		return returndicts		
 	
 	def photValsForSN(self,x,sn,storedResults,temporaryResults,varyParams):
@@ -1536,8 +1526,6 @@ class SALTResids:
 		#Clean out array
 		self.neffRaw=np.zeros((self.phaseRegularizationPoints.size,self.waveRegularizationPoints.size))
 
-	# 		start=time.time()
-	# 		spectime,phottime=0,0
 		for sn in (self.datadict.keys()):
 			tpkoff=x[self.parlist == 'tpkoff_%s'%sn]
 			photdata = self.datadict[sn]['photdata']
