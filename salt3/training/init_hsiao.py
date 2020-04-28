@@ -46,7 +46,7 @@ def init_salt2(m0file,m1file,
 		plt.legend()
 		plt.plot(intwave,m0test,label='interp')
 		bspltmp = bspl[2].reshape([len(splinephase)-4,len(splinewave)-4])
-	#import pdb; pdb.set_trace()
+
 	return intphase,intwave,m0,m1,bspl[0],bspl[1],bspl[2],bsplm1[2]
 
 
@@ -92,12 +92,9 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 	stretch=(1.07+0.069-0.015+0.00067)/1.07
 	stretchedPhase=np.clip(intphase*stretch,phaserange[0],phaserange[1])
 	m1fluxguess = (m0-bisplev(stretchedPhase,intwave,bspl)).flatten()
-	
-	#m1fluxguess -= 2.0933145e-5
-	#m1fluxadj = synphotBflux(wave[phase==0],m1fluxguess[phase==0],0,0,Bfilt)
-	#import pdb; pdb.set_trace()
-	#m1fluxguess -= m1fluxadj
-	bsplm1 = bisplrep(phase,wave,
+	intphasetmp,intwavetmp = np.meshgrid(intphase,intwave)
+
+	bsplm1 = bisplrep(intphasetmp.flatten(),intwavetmp.flatten(),
 					  m1fluxguess,kx=order,ky=order,
 					  tx=splinephase,ty=splinewave,task=-1)
 	m1 = bisplev(intphase,intwave,bsplm1)
@@ -110,7 +107,7 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 		plt.legend()
 		plt.plot(intwave,m0test,label='interp')
 		bspltmp = bspl[2].reshape([len(splinephase)-4,len(splinewave)-4])
-	#import pdb; pdb.set_trace()
+
 	return intphase,intwave,m0,m1,bspl[0],bspl[1],bspl[2],bsplm1[2]
 
 def init_kaepora(x10file='initfiles/Kaepora_dm15_1.1.txt',
