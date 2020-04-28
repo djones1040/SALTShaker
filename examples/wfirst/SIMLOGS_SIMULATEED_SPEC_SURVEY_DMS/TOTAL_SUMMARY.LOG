@@ -1,0 +1,14 @@
+                                                SUM-SNIa  : 
+  GENVERSION                                  NGEN     NWRITE  NSPEC   
+# ----------------------------------------------------------------- 
+BYO_BBC                                      75000   42717  42717
+Foundation_BBC                               27500     796    796
+
+
+                                                SUM-NONIa : 
+  GENVERSION                                  NGEN     NWRITE  NSPEC   
+# ----------------------------------------------------------------- 
+BYO_BBC                                          0       0      0
+Foundation_BBC                                   0       0      0
+
+

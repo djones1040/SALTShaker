@@ -14,7 +14,7 @@ def runpipe():
 #    pipe.glue(['lcfit','getmu'])
 #    import pdb; pdb.set_trace()
 
-#    pipe.run(onlyrun=['sim','lcfit'])
+    pipe.run(onlyrun=['sim','train','lcfit'])
 
 if __name__ == "__main__":
 	runpipe()

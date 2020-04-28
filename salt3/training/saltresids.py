@@ -27,6 +27,8 @@ from functools import partial
 from itertools import starmap
 
 import time
+import matplotlib as mpl
+mpl.use('agg')
 import pylab as plt
 import extinction
 import copy
@@ -215,7 +217,7 @@ class SALTResids:
 		self.guessScale=[np.sqrt(np.mean(f**2)) for f in fluxes]
 		# HACK
 		self.guessScale=[1.0 for f in fluxes]
-		#import pdb; pdb.set_trace()
+
 		self.colorLawDeriv=np.empty((self.wave.size,self.n_colorpars))
 		for i in range(self.n_colorpars):
 			self.colorLawDeriv[:,i]=SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(self.wave)-SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(self.wave)
@@ -471,12 +473,12 @@ class SALTResids:
 		
 		for L,(selectFilter,clscat,dclscat) in zip(Ls,colorvar):
 			#More stable to solve by backsubstitution than to invert and multiply
-			#import pdb;pdb.set_trace()
 			fluxdiff=photmodel['modelflux'][selectFilter]-photmodel['dataflux'][selectFilter]
 			if L.ndim==2:
 				photresids['resid'][selectFilter]=linalg.solve_triangular(L, fluxdiff,lower=True)
 			else:
 				photresids['resid'][selectFilter]=fluxdiff/L
+
 			if not fixUncertainty:
 
 				if L.ndim==2:
@@ -613,6 +615,10 @@ class SALTResids:
 			varkey= name+'variances_{}'.format(sn)
 			if not varkey in storedResults:
 				storedResults[varkey]=uncertaintyfun(x,sn,storedResults,temporaryResults,varyParams)
+				if len(np.where((storedResults[varkey] != storedResults[varkey]) |
+								(storedResults[varkey] == np.inf))[0]):
+					raise RuntimeError('error!  %s array has issues'%varkey)
+				
 			uncertaintydict=storedResults[varkey]
 			#if name == 'spec' and sn == '03D1au' and len(storedResults['specfluxes_03D1au']['modelflux']):
 			#	import pylab as plt
@@ -621,6 +627,7 @@ class SALTResids:
 			#	plt.plot(storedResults['specfluxes_03D1au']['dataflux'])
 			#	import pdb; pdb.set_trace()
 			returndicts+=[{**valdict ,**uncertaintydict}]
+		
 		return returndicts		
 	
 	def photValsForSN(self,x,sn,storedResults,temporaryResults,varyParams):
@@ -719,6 +726,10 @@ class SALTResids:
 			photresultsdict['modelflux'][selectFilter]=modelflux
 		if requiredPCDerivs.all() and not 'pcDeriv_phot_%s'%sn in storedResults :
 			storedResults['pcDeriv_phot_%s'%sn]=summationCache
+		if len(np.where((photresultsdict['modelflux'] != photresultsdict['modelflux']) |
+						(photresultsdict['modelflux'] == np.inf))[0]):
+			raise RuntimeError('phot model fluxes are nonsensical')
+		
 		return photresultsdict
 			
 	def specValsForSN(self,x,sn,storedResults,temporaryResults,varyParams):
@@ -768,8 +779,9 @@ class SALTResids:
 			recalCoord=(specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal
 			drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
 			recalexp=np.exp((drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1))
+			if len(np.where((recalexp != recalexp) | (recalexp == np.inf))[0]):
+				raise RuntimeError('error....spec recalibration problem for SN %s!'%sn)
 			
-
 			modinterp = temporaryResults['fluxInterp'](phase)
 			dmodelfluxdx0 = interp1d(obswave,modinterp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(specdata[k]['wavelength'])*recalexp
 
@@ -797,7 +809,6 @@ class SALTResids:
 				varySpecRecal=varyParams[self.parlist == 'specrecal_{}_{}'.format(sn,k)]
 				specresultsdict['modelflux_jacobian'][specSlice,(varyParList == 'specrecal_{}_{}'.format(sn,k))]  = modulatedFlux[:,np.newaxis] * drecaltermdrecal[:,varySpecRecal]
 
-			#import pdb; pdb.set_trace()
 			# derivatives....
 			if cDeriv or varyParams[self.iCL].any() or requiredPCDerivs.any():
 				colorlawinterp=storedResults['colorLawInterp'](specdata[k]['wavelength']/(1+z))
@@ -840,8 +851,13 @@ class SALTResids:
 # 						self.__dict__['dmodelflux_dM0_spec_%s'%sn][specSlice,:] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
 # 						#if computePCDerivs != 1:
 			iSpecStart += SpecLen
+
 		if requiredPCDerivs.all() and not 'pcDeriv_spec_%s'%sn in storedResults: 
 			storedResults['pcDeriv_spec_%s'%sn]=interpCache
+		if len(np.where((specresultsdict['modelflux'] != specresultsdict['modelflux']) |
+						(specresultsdict['modelflux'] == np.inf))[0]):
+			raise RuntimeError('spec model flux nonsensical for SN %s'%sn)
+
 		return specresultsdict
 
 	def specVarianceForSN(self,x,sn,storedResults,temporaryResults,varyParams):
@@ -928,7 +944,7 @@ class SALTResids:
 				specresultsdict['modelvariance_jacobian'][specSlice,(varyParlist=='modelcorr_01')] = 2* x0**2  * (modelerrnox[1]*modelerrnox[0]*x1)[:,np.newaxis]  * interpresult[:,varyParams[self.parlist=='modelcorr_01']]
 
 			iSpecStart += SpecLen
-		
+			
 		return specresultsdict
 
 	def photVarianceForSN(self,x,sn,storedResults,temporaryResults,varyParams):
@@ -1031,9 +1047,9 @@ class SALTResids:
 		
 	def fillStoredResults(self,x,storedResults):
 		if self.n_colorpars:
-			if not 'colorLaw' in storedResults:
-				storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])(self.wave)
-				storedResults['colorLawInterp']= interp1d(self.wave,storedResults['colorLaw'],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
+			#if not 'colorLaw' in storedResults:
+			storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])(self.wave)
+			storedResults['colorLawInterp']= interp1d(self.wave,storedResults['colorLaw'],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
 		else: storedResults['colorLaw'] = 1
 				
 		if not 'components' in storedResults:
@@ -1459,20 +1475,15 @@ class SALTResids:
 		# D. Jones - just testing this out
 		#for j,p in enumerate(self.phaseBinCenters):
 		#	if np.max(self.neffRaw[j,:]) > 0: self.neffRaw[j,:] /= np.max(self.neffRaw[j,:])
-		#import pdb; pdb.set_trace()
 		#self.neffRaw[self.neffRaw > 1] = 1
 		#self.neffRaw[self.neffRaw < 1e-6] = 1e-6
 
 		self.plotEffectivePoints([-12.5,0.5,16.5,26],'neff.png')
-		#import pdb; pdb.set_trace()
 		self.plotEffectivePoints(None,'neff-heatmap.png')
 		self.neff=self.neffRaw.copy()
-		#import pdb;pdb.set_trace()
 		self.neff[self.neff>self.neffMax]=np.inf		
 		self.neff/=self.neffMax
 		self.neff=np.clip(self.neff,self.neffFloor,None)
-	
-		#import pdb;pdb.set_trace()
 		
 	def plotEffectivePoints(self,phases=None,output=None):
 		import matplotlib.pyplot as plt
@@ -1493,7 +1504,7 @@ class SALTResids:
 			plt.xlabel('$\lambda (\AA)$')
 			plt.xlim(self.waveRegularizationPoints.min(),self.waveRegularizationPoints.max())
 			plt.legend()
-		#import pdb; pdb.set_trace()
+
 		if output is None:
 			plt.show()
 		else:

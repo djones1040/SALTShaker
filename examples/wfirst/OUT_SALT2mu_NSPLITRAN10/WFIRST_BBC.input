@@ -1,0 +1,60 @@
+BATCH_INFO: sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 1
+INPDIR+: /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/BYO_BBC
+STRINGMATCH_IGNORE: Shallow_Spec Medium_Spec Deep_Spec BYO_ Foundation_
+STRINGMATCH: _BBC
+VERSION_EXCLUDE_STRING:  BIASCOR
+dumpflag_nobiascor=1  # added by RK, 4/18/2017
+fieldgroup_biascor='SHALLOW,MEDIUM,DEEP'
+blindflag=0
+opt_biascor=2
+file=SALT2mu_SHALLOW+MEDIUM+DEEP/DMS/FITOPT000.FITRES
+simfile_biascor=$WFIRST_USERS/rhounsell/CYCLE8/PHOTO_Z/Dan/BIASCOR.FITRES, $WFIRST_ROOT/SALT3/examples/wfirst/foundation/biascor/FITOPT000.FITRES
+prefix=SALT2mu_fitopt
+vpecerr=150
+min_per_zbin=1
+varname_pIa=NN_PROB_IA
+redchi2_tol=.01
+fitflag_sigmb=1
+iflag_duplicate=2
+sig1=0.05
+zmin=0.01
+zmax=2.99
+powzbin=0.0 #dan added
+bins=50 #dan changed
+x1min=-3.0
+x1max=+3.0
+cmax=+0.3
+cmin=-0.3
+errmask_write=0
+p1=0.14
+p2=3.1
+p3=0.0
+p4=0.0
+p5=0.0
+p6=0.0
+p7=10.0
+p8=0.01
+p9=0.70
+p10=0.0
+p11=-1.0
+p12=0.0
+p13=0.0
+u1=1
+u2=1
+u3=0
+u4=0
+u5=0
+u6=0
+u7=0
+u8=0
+u9=0
+u10=0
+u11=0
+u12=0
+u13=0
+h0=70.0
+mag0=-30.00
+uave=1
+hgtype=-1
+lensing_zpar=0.055
+DONE_STAMP: /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/pipeline/GetMu.DONE

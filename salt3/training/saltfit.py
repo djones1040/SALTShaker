@@ -445,7 +445,6 @@ class mcmc(saltresids.SALTResids):
 				#elif self.adjust_modelpars and 'M2_modelpars' in self.__dict__.keys(): M2_recent = copy.deepcopy(self.M2_modelpars)
 				#elif self.adjust_modelpars and 'M2_modelpars' not in self.__dict__.keys(): M2_recent = copy.deepcopy(self.M2_allpars)
 				#else:
-					#import pdb; pdb.set_trace()
 				
 				self.M2_recent = np.empty_like(self.M2)
 				self.M2_recent[:] = self.M2
@@ -680,7 +679,7 @@ class GaussNewton(saltresids.SALTResids):
 		log.info('Initialized log likelihood: {:.2f}'.format(self.loglikeforSN(X,sn,{},varyParams=None)))
 		params=['x'+str(i) for i in range(includePars.sum())]
 		
-		#import pdb;pdb.set_trace()
+
 		initVals=X[includePars].copy()
 		kwargs={}
 		for i,parname in enumerate(self.parlist[includePars]):
@@ -694,7 +693,7 @@ class GaussNewton(saltresids.SALTResids):
 				kwargs['limit_'+params[i]] = (-0.5,0.5)
 			else:
 				kwargs['limit_'+params[i]] = (-5,5)
-		if sn=='03D1co': import pdb;pdb.set_trace()
+
 		kwargs.update({params[i]: initVals[i] for i in range(includePars.sum())})
 		m=Minuit(fn,use_array_call=True,forced_parameters=params,grad=grad,errordef=1,**kwargs)
 		result,paramResults=m.migrad()#includePars.sum()*6)
@@ -703,7 +702,7 @@ class GaussNewton(saltresids.SALTResids):
 		X[includePars]=np.array([x.value for x  in paramResults])
 
 		# 		if np.allclose(X[includePars],initVals):
-# 			import pdb;pdb.set_trace()
+
 		log.info('Final log likelihood: {:.2f}'.format( -result.fval))
 		
 		return X,-result.fval
@@ -766,7 +765,7 @@ class GaussNewton(saltresids.SALTResids):
 			
 		params=['x'+str(i) for i in range(includePars.sum())]
 		initVals=X[includePars].copy()
-		#import pdb;pdb.set_trace()
+
 		#kwargs={'limit_'+params[i] : self.bounds[np.where(includePars)[0][i]] for i in range(includePars.sum()) if }
 		minuitkwargs=({params[i]: initVals[i] for i in range(includePars.sum())})
 		minuitkwargs.update({'error_'+params[i]: 1e-2 for i in range(includePars.sum())})
@@ -794,9 +793,6 @@ class GaussNewton(saltresids.SALTResids):
 			X[self.imodelerr]*=paramresults[-1]
 		else:
 			X[includePars]=paramresults
-
-		# 		if np.allclose(X[includePars],initVals):
-# 			import pdb;pdb.set_trace()
 		
 		return X
 
@@ -875,12 +871,14 @@ class GaussNewton(saltresids.SALTResids):
 
 		for sn in self.datadict.keys():
 			photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,storedResults,varyParams,fixUncertainty=True)
+
 			if doSpecResids:
 				residuals+=[photresidsdict['resid'],specresidsdict['resid']]
 				jacobian+=[sparse.coo_matrix(photresidsdict['resid_jacobian']),sparse.coo_matrix(specresidsdict['resid_jacobian'])]
 			else:
 				residuals+=[photresidsdict['resid'],np.zeros(len(specresidsdict['resid']))]
 				jacobian+=[sparse.coo_matrix(photresidsdict['resid_jacobian']),sparse.coo_matrix((specresidsdict['resid'].size,varyParams.sum()))]
+
 
 		if doPriors:
 
@@ -1008,6 +1006,7 @@ class GaussNewton(saltresids.SALTResids):
 		if doSpecResids is None:
 			if fit in ['color','colorlaw']: doSpecResids = False
 			else: doSpecResids = True
+
 		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors,doSpecResids=doSpecResids)
 
 		oldChi=(residuals**2).sum()
@@ -1108,6 +1107,6 @@ class GaussNewton(saltresids.SALTResids):
 		log.info('Chi2 diff, % diff')
 		log.info(' '.join(['{:.2f}'.format(x) for x in [oldChi-chi2,(100*(oldChi-chi2)/oldChi)] ]))
 		print('')
-		#import pdb; pdb.set_trace()
+		#if fit == 'colorlaw': import pdb; pdb.set_trace()
 		return X,chi2,oldChi
 

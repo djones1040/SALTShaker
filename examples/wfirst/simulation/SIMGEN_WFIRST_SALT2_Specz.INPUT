@@ -1,9 +1,10 @@
 SIMLIB_FILE: simulation/3tier_Survey.SIMLIB 
 
-NGENTOT_LC: 100
-GENVERSION: RAH
+NGENTOT_LC: 3000
+GENVERSION: BYOSED_HOST_MASS
+PATH_SNDATA_SIM:  $SCRATCH_SIMDIR
 RANSEED: 12945
-CIDOFF: 100
+CIDOFF: 0
 
 # SN models, rates, and intrinsic scatter
 GENSOURCE:   RANDOM
@@ -11,7 +12,8 @@ GENSOURCE:   RANDOM
 GENMODEL: $WFIRST_ROOT/SALT3/examples/wfirst/byosed/BYOSED.TEST
 #GENMAG_SMEAR_MODELNAME:  G10
 
-GENRANGE_REDSHIFT:  .03  1
+#GENRANGE_REDSHIFT:  .5 .55
+GENRANGE_REDSHIFT:  .5 1.25
 GENSIGMA_REDSHIFT:  1E-5
 # Powerlaws from Lou
 DNDZ: POWERLAW2 2.5E-5 1.5 0.0 1.0
@@ -28,7 +30,7 @@ KCOR_FILE: $WFIRST_ROOT/kcor/H19_cut/kcor_WFIRST_CYCLE8_IMG.fits
 SOLID_ANGLE: 0.012754026749049702
 GENRANGE_PEAKMJD:  54930.0 55775.0
 GENSIGMA_SEARCH_PEAKMJD:  1.0     # sigma-smearing for  SEARCH_PEAKMJD (days)
-GENRANGE_TREST:   -12.0     45.0     # rest epoch relative to peak (days)
+GENRANGE_TREST:   -10.0     30.0     # rest epoch relative to peak (days)
 
 # Lensing properties
 LENSING_PROBMAP_FILE: $SNDATA_ROOT/models/lensing/LENSING_PROBMAP_LogNormal+MICECATv1.DAT
@@ -42,10 +44,10 @@ APPLY_SEARCHEFF_OPT: 1
 
 
 # Apply selection cuts
-CUTWIN_TRESTMIN: -19 -5         #at least 1 epoch before -5 d (rest-frame)
-CUTWIN_TRESTMAX: +25 +80        #at least 1 epoch past +30 d
-#CUTWIN_TRESTMIN: -5 -0
-#CUTWIN_TRESTMAX: +10 +25
+#CUTWIN_TRESTMIN: -19 -5         #at least 1 epoch before -5 d (rest-frame)
+#CUTWIN_TRESTMAX: +25 +80        #at least 1 epoch past +30 d
+CUTWIN_TRESTMIN: -5 -0
+CUTWIN_TRESTMAX: +10 +25
 CUTWIN_TGAPMAX:  0   20         #largest Trest gap (days)
 CUTWIN_T0GAPMAX: 0   10         #largest Trest gap near peak (days)
 APPLY_CUTWIN_OPT: 1

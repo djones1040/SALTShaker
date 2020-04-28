@@ -33,7 +33,7 @@ setup(
 			  'salt3.training','salt3.util','salt3.initfiles',
 			  'salt3.validation','salt3.pipeline','salt3.config'],
 	cmdclass={'test': SALT3Test},
-	scripts=['bin/trainsalt','salt3/validation/SynPhotPlot.py','salt3/validation/ValidateLightcurves.py','salt3/validation/ValidateModel.py','salt3/validation/ValidateSpectra.py','salt3/validation/figs/plotSALTModel.py'],
+	scripts=['bin/trainsalt','bin/runpipe','salt3/validation/SynPhotPlot.py','salt3/validation/ValidateLightcurves.py','salt3/validation/ValidateModel.py','salt3/validation/ValidateSpectra.py','salt3/validation/figs/plotSALTModel.py'],
 	package_data={'': ['initfiles/*.dat','initfiles/*.txt','data/kcor/*.fits','config/*conf']},
 	include_package_data=True,
 	author=AUTHOR,

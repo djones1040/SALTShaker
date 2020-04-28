@@ -6,12 +6,14 @@
 BATCH_INFO: sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 1
 
 
-INPDIR+:  /project2/rkessler/SURVEYS/WFIRST/USERS/rhounsell/CYCLE8/PHOTO_Z/Dan/A1_SHALLOW
-INPDIR+:  /project2/rkessler/SURVEYS/WFIRST/USERS/rhounsell/CYCLE8/PHOTO_Z/Dan/A1_MEDIUM
-INPDIR+:  /project2/rkessler/SURVEYS/WFIRST/USERS/rhounsell/CYCLE8/PHOTO_Z/Dan/A1_DEEP
+INPDIR+:  $WFIRST_USERS/rhounsell/CYCLE8/PHOTO_Z/Dan/A1_SHALLOW
+INPDIR+:  $WFIRST_USERS/rhounsell/CYCLE8/PHOTO_Z/Dan/A1_MEDIUM
+INPDIR+:  $WFIRST_USERS/rhounsell/CYCLE8/PHOTO_Z/Dan/A1_DEEP
+INPDIR+:  $WFIRST_ROOT/SALT3/examples/wfirst/foundation/data/fit/A1_SHALLOW/Foundation_BBC
 #INPDIR+:  /project2/rkessler/SURVEYS/WFIRST/USERS/rhounsell/CYCLE8/PHOTO_Z/FOUND/FOUND_2019
 
-STRINGMATCH_IGNORE: Shallow_Spec Medium_Spec Deep_Spec
+STRINGMATCH_IGNORE: Shallow_Spec Medium_Spec Deep_Spec BYO_ Foundation_
+STRINGMATCH: _BBC
 VERSION_EXCLUDE_STRING:  BIASCOR 
 
 
@@ -29,8 +31,8 @@ blindflag=0
 opt_biascor=2
 file=SALT2mu_SHALLOW+MEDIUM+DEEP/DMS/FITOPT000.FITRES
 #Info for WFIRST survey
-#simfile_biascor=/project2/rkessler/SURVEYS/WFIRST/USERS/rhounsell/CYCLE8/PHOTO_Z/Dan/BIASCOR.FITRES #My analysis file
-simfile_biascor=/project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/wfirst/biascor_output/BIASCOR_Spec_DMS/FITOPT000.FITRES
+simfile_biascor=$WFIRST_USERS/rhounsell/CYCLE8/PHOTO_Z/Dan/BIASCOR.FITRES, $WFIRST_ROOT/SALT3/examples/wfirst/foundation/biascor/FITOPT000.FITRES
+#simfile_biascor=$WFIRST_ROOT/SALT3/examples/wfirst/biascor_output/BIASCOR_Spec_DMS/FITOPT000.FITRES
 prefix=SALT2mu_fitopt
 vpecerr=150
 min_per_zbin=1

@@ -1,0 +1,40 @@
+ Input table file : FITOPT000.ROOT 
+ Input table ID   : FITRES 
+ List of variables to dump: RA DECL zHEL zHELERR TrestMIN 
+ Output text file : sntable_dump_FITOPT000.fitres 
+ Append variables to : FITOPT000.FITRES 
+
+ SNANA_DIR:  /project/rkessler/PRODUCTS/SNANA/SNANA_CURRENT 
+ DUMP COMMAND: 
+    sntable_dump.exe  FITOPT000.ROOT  FITRES   --v CCID RA DECL zHEL zHELERR TrestMIN --o sntable_dump_FITOPT000.fitres 
+ Begin sntable_dump.exe 
+ Table File : FITOPT000.ROOT 
+ Table ID   : FITRES 
+ Table VARNAME(0) : CCID 
+ Table VARNAME(1) : RA 
+ Table VARNAME(2) : DECL 
+ Table VARNAME(3) : zHEL 
+ Table VARNAME(4) : zHELERR 
+ Table VARNAME(5) : TrestMIN 
+
+ ****************************************************************** 
+   OPEN_ROOTFILE: use  READ  mode:  
+   Opened FITOPT000.ROOT
+   Read 191 table varNames from ROOT table=FITRES 
+	 Prepare read-variable 'CCID' (ivar=1, CAST=C) 
+	 Prepare read-variable 'RA' (ivar=9, CAST=D) 
+
+ FATAL[SNTABLE_READPREP_VARDEF]: 
+	 Could not find variable among VARLIST='DECL' 
+	 Check variables in table = FITRES
+
+
+
+   `|```````|`    
+   <| o\ /o |>    
+    | ' ; ' |     
+    |  ___  |     ABORT program on Fatal Error. 
+    | |' '| |     
+    | `---' |     
+    \_______/    
+

@@ -21,6 +21,7 @@ from salt3.util import snana,readutils
 from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
 from salt3.util.txtobj import txtobj
 from salt3.util.specSynPhot import getScaleForSN
+from salt3.util.specrecal import SpecRecal
 
 from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs,init_salt2
 from salt3.training.base import TrainSALTBase
@@ -37,6 +38,8 @@ from astropy.table import Table
 from salt3.initfiles import init_rootdir as salt2dir
 
 # validation utils
+import matplotlib as mpl
+mpl.use('agg')
 import pylab as plt
 from salt3.validation import ValidateLightcurves
 from salt3.validation import ValidateSpectra
@@ -45,6 +48,7 @@ from salt3.validation import CheckSALTParams
 from salt3.validation.figs import plotSALTModel
 from salt3.util.synphot import synphot
 from salt3.initfiles import init_rootdir as salt2dir
+from salt3.validation import SynPhotPlot
 from time import time
 
 import logging
@@ -77,6 +81,7 @@ class TrainSALT(TrainSALTBase):
 				
 		phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
 			self.options.inithsiaofile,self.options.initbfilt,flatnu,**init_options)
+
 		if self.options.initsalt2model:
 			if self.options.initm0modelfile =='':
 				self.options.initm0modelfile='%s/%s'%(init_rootdir,'salt2_template_0.dat')
@@ -91,6 +96,7 @@ class TrainSALT(TrainSALTBase):
 				phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_kaepora(
 					self.options.initm0modelfile,self.options.initm1modelfile,self.options.initbfilt,flatnu,**init_options)
 		#import pdb; pdb.set_trace()
+
 			
 		init_options['phasesplineres'] = self.options.error_snake_phase_binsize
 		init_options['wavesplineres'] = self.options.error_snake_wave_binsize
@@ -135,11 +141,9 @@ class TrainSALT(TrainSALTBase):
 				order-=1
 				recalParams=[f'specx0_{sn}_{k}']+['specrecal_{}_{}'.format(sn,k)]*order
 				parlist=np.append(parlist,recalParams)
-
 		# initial guesses
 		n_params=parlist.size
 		guess = np.zeros(parlist.size)
-
 		if self.options.resume_from_outputdir:
 			names=None
 			for possibleDir in [self.options.resume_from_outputdir,self.options.outputdir]:
@@ -158,7 +162,6 @@ class TrainSALT(TrainSALTBase):
 					
 				except:
 					log.critical('Problem while initializing parameter ',key,' from previous training')
-					#import pdb;pdb.set_trace()
 					sys.exit(1)
 					
 
@@ -169,7 +172,8 @@ class TrainSALT(TrainSALTBase):
 			if self.options.n_components == 2:
 				guess[parlist == 'm1'] = m1knots
 			if self.options.n_colorpars:
-				guess[parlist == 'cl'] = [0.]*self.options.n_colorpars
+				log.warning('BAD CL HACK')
+				guess[parlist == 'cl'] = [-0.504294,0.787691,-0.461715,0.0815619] #[0.]*self.options.n_colorpars
 			if self.options.n_colorscatpars:
 				guess[parlist == 'clscat'] = [1e-6]*self.options.n_colorscatpars
 				guess[np.where(parlist == 'clscat')[0][-1]]=-np.inf
@@ -183,8 +187,26 @@ class TrainSALT(TrainSALTBase):
 			for sn in datadict.keys():
 				guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn]['zHelio']).value-19.36-10.635))
 				for k in datadict[sn]['specdata'] : 
-					guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn] 
+					guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]
 				i+=1
+
+
+			# spectral params
+			for sn in datadict.keys():
+				specdata=datadict[sn]['specdata']
+				photdata=datadict[sn]['photdata']
+				for k in specdata.keys():
+					order=self.options.n_min_specrecal+int(np.log((specdata[k]['wavelength'].max() - \
+						specdata[k]['wavelength'].min())/self.options.specrange_wavescale_specrecal) + \
+						np.unique(photdata['filt']).size* self.options.n_specrecal_per_lightcurve)
+					order-=1
+
+					specpars_init = SpecRecal(datadict[sn]['photdata'],datadict[sn]['specdata'][k],self.kcordict,
+											  datadict[sn]['survey'],self.options.specrange_wavescale_specrecal,
+											  nrecalpars=order,sn=sn)
+					if specpars_init[0] != 0:
+						guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]/specpars_init[0]
+						guess[parlist == 'specrecal_{}_{}'.format(sn,k)] = specpars_init[1:]
 
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
@@ -284,7 +306,8 @@ class TrainSALT(TrainSALTBase):
 		fouterrmod = open('%s/salt3_lc_dispersion_scaling.dat'%outdir,'w')
 		foutcov = open('%s/salt3_lc_relative_covariance_01.dat'%outdir,'w')
 		foutcl = open('%s/salt3_color_correction.dat'%outdir,'w')
-
+		foutinfo = open('%s/SALT3.INFO'%outdir,'w')
+		
 		for p,i in zip(phase,range(len(phase))):
 			for w,j in zip(wave,range(len(wave))):
 				print('%.1f %.2f %8.15e'%(p,w,M0[i,j]),file=foutm0)
@@ -298,14 +321,36 @@ class TrainSALT(TrainSALTBase):
 		for w,j in zip(wave,range(len(wave))):
 			print('%.2f %8.15e'%(w,clscat[j]),file=foutclscat)
 		foutclscat.close()
-				
+
+		foutinfotext = """RESTLAMBDA_RANGE: %i %s
+COLORLAW_VERSION: 1
+COLORCOR_PARAMS: %i %i  %i  %s
+
+COLOR_OFFSET:  0.0
+
+MAG_OFFSET:  0.27  # to get B-band mag from cosmology fit (Nov 23, 2011)
+
+SEDFLUX_INTERP_OPT: 2  # 1=>linear,    2=>spline
+ERRMAP_INTERP_OPT:  1  # 1  # 0=snake off;  1=>linear  2=>spline
+ERRMAP_KCOR_OPT:    1  # 1/0 => on/off
+
+MAGERR_FLOOR:   0.005            # don;t allow smaller error than this
+MAGERR_LAMOBS:  0.0  2000  4000  # magerr minlam maxlam
+MAGERR_LAMREST: 0.1   100   200  # magerr minlam maxlam
+
+SIGMA_INT: 0.106  # used in simulation"""%(
+	self.options.colorwaverange[0],self.options.colorwaverange[1],
+	self.options.colorwaverange[0],self.options.colorwaverange[1],
+	len(clpars),' '.join(['%8.10e'%cl for cl in clpars]))
+		print(foutinfotext,file=foutinfo)
+		
 		foutm0.close()
 		foutm1.close()
 		foutm0err.close()
 		foutm1err.close()
 		foutcov.close()
 		fouterrmod.close()
-		
+		foutinfo.close()
 		print('%i'%len(clpars),file=foutcl)
 		for c in clpars:
 			print('%8.10e'%c,file=foutcl)
@@ -424,17 +469,21 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 		plotSALTModel.mkModelPlot(outputdir,outfile='%s/SALTmodelcomp.pdf'%outputdir,
 								  xlimits=[self.options.waverange[0],self.options.waverange[1]])
-
+		SynPhotPlot.plotSynthPhotOverStretchRange(
+			'{}/synthphotrange.pdf'.format(outputdir),outputdir,'SDSS')
+		SynPhotPlot.overPlotSynthPhotByComponent(
+			'{}/synthphotoverplot.pdf'.format(outputdir),outputdir,'SDSS')		
+		
 		snfiles_tot = np.array([])
 		for j,snlist in enumerate(self.options.snlists.split(',')):
 			snlist = os.path.expandvars(snlist)
 			snfiles = np.genfromtxt(snlist,dtype='str')
 			snfiles = np.atleast_1d(snfiles)
 			snfiles_tot = np.append(snfiles_tot,snfiles)
-		parlist,parameters = np.genfromtxt(
-			'%s/salt3_parameters.dat'%outputdir,unpack=True,dtype=str,skip_header=1)
-		parameters = parameters.astype(float)
-		CheckSALTParams.checkSALT(parameters,parlist,snfiles_tot,snlist,outputdir)
+			parlist,parameters = np.genfromtxt(
+				'%s/salt3_parameters.dat'%outputdir,unpack=True,dtype=str,skip_header=1)
+			parameters = parameters.astype(float)
+			CheckSALTParams.checkSALT(parameters,parlist,snfiles,snlist,outputdir,idx=j)
 		
 		# kcor files
 		kcordict = {}
