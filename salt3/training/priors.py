@@ -65,6 +65,31 @@ class SALTPriors:
 		
 		return corr/width,corr,jacobian/width	
 
+	@prior
+	def m0m1nocprior(self,width,x,components):
+		"""M1 should have no inner product with M0"""
+		phase=self.phaseRegularizationPoints
+		wave=self.waveRegularizationPoints
+		componentsatreg=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
+		scale,scaleDeriv=self.regularizationScale(components,componentsatreg)
+		components=componentsatreg
+		
+		
+		
+		
+		m0m1=(components[0]*components[1]).sum()
+		m0m1scale=np.sqrt(scale[0]*scale[1])
+		corr=np.array([m0m1/m0m1scale])
+		#Derivative with respect to m0
+		
+		
+		jacobian=np.zeros((1,self.npar))
+		jacobian[:,self.im0]= (((components[1] )[:,:,np.newaxis]*self.regularizationDerivs[0]).sum(axis=(0,1)) -corr*scaleDeriv[0]*0.5*scale[1]/m0m1scale)/m0m1scale
+		jacobian[:,self.im1]=  ((components[0][:,:,np.newaxis]*self.regularizationDerivs[0]).sum(axis=(0,1))-corr*scaleDeriv[1]*0.5*scale[0]/m0m1scale)/m0m1scale
+		residual=corr/width
+		
+		return corr/width,corr,jacobian/width	
+
 
 	@prior
 	def peakprior(self,width,x,components):

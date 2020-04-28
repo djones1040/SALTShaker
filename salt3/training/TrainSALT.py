@@ -172,8 +172,8 @@ class TrainSALT(TrainSALTBase):
 			if self.options.n_components == 2:
 				guess[parlist == 'm1'] = m1knots
 			if self.options.n_colorpars:
-				log.warning('BAD CL HACK')
-				guess[parlist == 'cl'] = [-0.504294,0.787691,-0.461715,0.0815619] #[0.]*self.options.n_colorpars
+				#log.warning('BAD CL HACK')
+				guess[parlist == 'cl'] = [0.]*self.options.n_colorpars #[-0.504294,0.787691,-0.461715,0.0815619]
 			if self.options.n_colorscatpars:
 				guess[parlist == 'clscat'] = [1e-6]*self.options.n_colorscatpars
 				guess[np.where(parlist == 'clscat')[0][-1]]=-np.inf
@@ -312,8 +312,8 @@ class TrainSALT(TrainSALTBase):
 			for w,j in zip(wave,range(len(wave))):
 				print('%.1f %.2f %8.15e'%(p,w,M0[i,j]),file=foutm0)
 				print('%.1f %.2f %8.15e'%(p,w,M1[i,j]),file=foutm1)
-				print('%.1f %.2f %8.15e'%(p,w,M0err[i,j]),file=foutm0err)
-				print('%.1f %.2f %8.15e'%(p,w,M1err[i,j]),file=foutm1err)
+				print('%.1f %.2f %8.15e'%(p,w,M0err[i,j]**2.),file=foutm0err)
+				print('%.1f %.2f %8.15e'%(p,w,M1err[i,j]**2.),file=foutm1err)
 				print('%.1f %.2f %8.15e'%(p,w,cov_M0_M1[i,j]),file=foutcov)
 				print('%.1f %.2f %8.15e'%(p,w,modelerr[i,j]),file=fouterrmod)
 

@@ -1,7 +1,7 @@
 import sys
 import pandas as pd
-import pipeline
-from pipeline import *
+from salt3.pipeline import pipeline
+from salt3.pipeline.pipeline import *
 import subprocess
 import argparse
 import os
@@ -26,6 +26,8 @@ def _MyPipe(mypipe):
     #     return pipe
     # -------------------------------------------
     # and set --mypipe mypipetest
+
+    sys.path.append(os.getcwd())
     import importlib
     mymod = importlib.import_module(mypipe.split('.py')[0])
     print("Using user defined pipeline: {}.py".format(mypipe.split('.py')[0]))
@@ -160,7 +162,7 @@ class RunPipe():
                                                 
             if not self.norun:
                 self.pipe.run()
-            #self.pipe.CosmoFit.validplot_run()
+            self.pipe.CosmoFit.validplot_run()
         else:
             if self.batch_script is None:
                 raise RuntimeError("batch script is None")
