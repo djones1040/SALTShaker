@@ -1298,7 +1298,9 @@ class SALTResids:
 				binwavecenter =((self.errwaveknotloc)[1:]+(self.errwaveknotloc)[:-1])/2
 				interp=RegularGridInterpolator((binphasecenter,binwavecenter),errpars.reshape(binphasecenter.size,binwavecenter.size),'nearest',False,0)
 				gridwave,gridphase=np.meshgrid(wave,phase)
-				components+=[interp((gridphase.flatten(),gridwave.flatten())).reshape((phase.size,wave.size))]
+				clipinterp=lambda x,y: interp((np.clip(x,binphasecenter.min(),binphasecenter.max()),np.clip(y,binwavecenter.min(),binwavecenter.max())))
+				result=clipinterp(gridphase.flatten(),gridwave.flatten()).reshape((phase.size,wave.size))
+				components+=[result]
 			else:
 				components+=[  bisplev(phase,
 								   wave,
@@ -1316,30 +1318,12 @@ class SALTResids:
 			except: import pdb; pdb.set_trace()
 			if self.errbsorder == 0:
 				binphasecenter=((self.errphaseknotloc)[1:]+(self.errphaseknotloc)[:-1])/2
-				phaseinterp=np.zeros(self.errphaseknotloc.size+1)
-				phaseinterp[1:-1]=binphasecenter
-				phaseinterp[0]=self.errphaseknotloc[0]
-				phaseinterp[-1]=self.errphaseknotloc[-1]
 				binwavecenter =((self.errwaveknotloc)[1:]+(self.errwaveknotloc)[:-1])/2
-				waveinterp=np.zeros(self.errwaveknotloc.size+1)
-				waveinterp[1:-1]=binwavecenter
-				waveinterp[0]=self.errwaveknotloc[0]
-				waveinterp[-1]=self.errwaveknotloc[-1]
 				
-				valinterp=np.zeros((phaseinterp.size,waveinterp.size))
-				valinterp[1:-1,1:-1]=errpars.reshape(binphasecenter.size,binwavecenter.size)
-				valinterp[0,0]=valinterp[1,1]
-				valinterp[-1,-1]=valinterp[-2,-2]
-				valinterp[0,-1]=valinterp[1,-2]
-				valinterp[-1,0]=valinterp[-2,1]
-				valinterp[1:-1,0]=valinterp[1:-1,1]
-				valinterp[1:-1,-1]=valinterp[1:-1,-2]
-				valinterp[0,1:-1]=valinterp[1,1:-1]
-				valinterp[-1,1:-1]=valinterp[-2,1:-1]
-				
-				interp=RegularGridInterpolator((phaseinterp,waveinterp),valinterp,'nearest',False,0)
+				interp=RegularGridInterpolator((binphasecenter,binwavecenter),errpars.reshape(binphasecenter.size,binwavecenter.size),'nearest',False,0)
+				clipinterp=lambda x,y: interp((np.clip(x,binphasecenter.min(),binphasecenter.max()),np.clip(y,binwavecenter.min(),binwavecenter.max())))
 				gridwave,gridphase=np.meshgrid(wave,phase)
-				result=interp((gridphase.flatten(),gridwave.flatten())).reshape((phase.size,wave.size))
+				result=clipinterp(gridphase.flatten(),gridwave.flatten()).reshape((phase.size,wave.size))
 				components+=[result]
 			else:
 				components+=[  bisplev(phase,
