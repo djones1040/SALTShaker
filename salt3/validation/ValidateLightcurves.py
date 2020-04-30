@@ -384,7 +384,7 @@ def customfilt(outfile,lcfile,salt3dir,
 					flt, plotmjd, zp=27.5,zpsys=sysdict[flt]),color='C1',
 						label='SALT2; $x_1 = %.2f$, $c = %.2f$,\n$\chi_{red}^2 = %.1f$'%(
 							result['parameters'][3],result['parameters'][4],chi2red))
-				print(result['parameters'])
+				#print(result['parameters'])
 		ax.errorbar(sn.MJD[sn.FLT == flt]-t0,sn.FLUXCAL[sn.FLT == flt],
 					yerr=sn.FLUXCALERR[sn.FLT == flt],
 					fmt='.',color='k')
