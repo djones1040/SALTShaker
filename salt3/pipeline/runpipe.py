@@ -101,15 +101,16 @@ class RunPipe():
         if self.batch_mode == 0:
             self.pipe = self.pipedef()
             if self.randseed is not None:
-                if not any([p.startswith('sim') for p in self.pipe.pipepros]):
-                    raise RuntimeError("randseed was given but sim is not defined in the pipeline")
-                print('randseed = {}'.format(self.randseed))                   
-                sim = self.pipe.Simulation
-                randseed_old = sim.keys['RANSEED_REPEAT']
-                randseed_new = [randseed_old.split(' ')[0],str(self.randseed)]
-                df = pd.DataFrame([{'key':'RANSEED_REPEAT','value':randseed_new}])
-                sim.configure(pro=sim.pro,baseinput=sim.outname,setkeys=df,prooptions=sim.prooptions,
-                              batch=sim.batch,validplots=sim.validplots,outname=sim.outname)    
+                if not any([p.startswith('sim') or p.startswith('biascorsim') for p in self.pipe.pipepros]):
+                    raise RuntimeError("randseed was given but sim/biascorsim is not defined in the pipeline")
+                print('randseed = {}'.format(self.randseed)) 
+                if any([p.startswith('sim') for p in self.pipe.pipepros]):
+                    sim = self.pipe.Simulation
+                    randseed_old = sim.keys['RANSEED_REPEAT']
+                    randseed_new = [randseed_old.split(' ')[0],str(self.randseed)]
+                    df = pd.DataFrame([{'key':'RANSEED_REPEAT','value':randseed_new}])
+                    sim.configure(pro=sim.pro,baseinput=sim.outname,setkeys=df,prooptions=sim.prooptions,
+                                  batch=sim.batch,validplots=sim.validplots,outname=sim.outname)    
                 if any([p.startswith('biascorsim') for p in self.pipe.pipepros]):
                     sim_biascor = self.pipe.BiascorSim
                     randseed_old = sim_biascor.keys['RANSEED_REPEAT']
@@ -119,8 +120,9 @@ class RunPipe():
                                           batch=sim_biascor.batch,validplots=sim_biascor.validplots,outname=sim_biascor.outname)    
                     
                 if self.num is not None:
-                    df_sim = self._add_suffix(sim,['GENVERSION','GENPREFIX'],self.num)
-                    self._reconfig_w_suffix(sim,df_sim,self.num)
+                    if any([p.startswith('sim') for p in self.pipe.pipepros]):
+                        df_sim = self._add_suffix(sim,['GENVERSION','GENPREFIX'],self.num)
+                        self._reconfig_w_suffix(sim,df_sim,self.num)
                     if any([p.startswith('biascorsim') for p in self.pipe.pipepros]):
                         df_sim_biascor = self._add_suffix(sim_biascor,['GENVERSION','GENPREFIX'],self.num)
                         self._reconfig_w_suffix(sim_biascor,df_sim_biascor,self.num)
