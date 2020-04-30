@@ -1047,17 +1047,10 @@ class SALTResids:
 			
 			#Calculate color scatter
 			if self.iclscat.size:
-				coeffs=x[self.parlist=='clscat']
-				pow=coeffs.size-1-np.arange(coeffs.size)
-				coeffs/=factorial(pow)
-				lameffPrime=lameff/(1+z)/1000
-				colorscat=np.exp(np.poly1d(coeffs)(lameffPrime))
+				colorscat,dcolorscatdx=self.colorscatter(x,lameff/(1+z),varyParams)
 				if colorscat == np.inf:
 					log.error('infinite color scatter!')
 					import pdb; pdb.set_trace()
-				
-				pow=pow[varyParams[self.parlist=='clscat']]
-				dcolorscatdx= colorscat*((lameffPrime) ** (pow) )/ factorial(pow)
 			else:
 				colorscat=0
 				dcolorscatdx=np.array([])
@@ -1306,7 +1299,19 @@ class SALTResids:
 								   wave,
 								   (self.errphaseknotloc,self.errwaveknotloc,errpars,self.errbsorder,self.errbsorder))]
 		return components
-
+	
+	def colorscatter(self,x,wave,varyParams=None):
+		clscatpars = x[self.parlist == 'clscat']
+		pow=clscatpars.size-1-np.arange(clscatpars.size)
+		coeffs=clscatpars/factorial(pow)
+		clscat=np.exp(np.poly1d(coeffs)(wave/1000))
+		if varyParams is None:
+			return clscat
+		else:
+			pow=pow[varyParams[self.parlist=='clscat']]
+			dcolorscatdx= clscat*((wave/1000) ** (pow) )/ factorial(pow)
+			return clscat,dcolorscatdx
+		
 	
 	def ErrModel(self,x,evaluatePhase=None,evaluateWave=None):
 		"""Returns modeled variance of SALT model components as a function of phase and wavelength"""
@@ -1342,12 +1347,9 @@ class SALTResids:
 		clpars = x[self.parlist == 'cl']
 		clerr = np.zeros(len(x[self.parlist == 'cl']))
 		
-		clscatpars = x[self.parlist == 'clscat']
-		clscat=np.exp(np.poly1d(clscatpars)(self.wave/1000))
 
 		#clscaterr = x[self.parlist == 'clscaterr']
-		
-
+		clscat=self.colorscatter(x,self.wave)
 		resultsdict = {}
 		n_sn = len(self.datadict.keys())
 		for k in self.datadict.keys():
@@ -1492,7 +1494,7 @@ class SALTResids:
 		#modelerr2 = bisplev(self.phase,self.wave,bspl)
 		#plt.plot(self.wave,modelerr[self.phase == 0,:].flatten())
 		#plt.plot(self.wave,modelerr2[self.phase == 0,:].flatten())
-		clscat = splev(self.wave,(self.errwaveknotloc,clscatpars,3))
+		clscat = self.colorscatter(np.mean(x[:,nburn:],axis=1),self.wave)
 		if not len(clpars): clpars = []
 
 		for snpar in ['x0','x1','c','tpkoff']:

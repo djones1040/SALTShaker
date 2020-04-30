@@ -3,6 +3,8 @@ import numpy as np
 from scipy.interpolate import bisplrep,bisplev,RegularGridInterpolator
 from scipy.interpolate import interp1d
 from sncosmo.constants import HC_ERG_AA
+from scipy.special import factorial
+
 
 import logging
 log=logging.getLogger(__name__)
@@ -160,10 +162,10 @@ def init_kaepora(x10file='initfiles/Kaepora_dm15_1.1.txt',
 	#import pdb; pdb.set_trace()
 	return intphase,intwave,m0,m1,bspl[0],bspl[1],bspl[2],bsplm1[2]
 
-def init_errs(m0varfile=None,m0m1file=None,m1varfile=None,scalefile=None,
+def init_errs(m0varfile=None,m0m1file=None,m1varfile=None,scalefile=None,clscatfile=None,
 			  Bfilt='initfiles/Bessell90_B.dat',
 			  phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
-			  waveinterpres=10.0,phasesplineres=6,wavesplineres=1200,
+			  waveinterpres=10.0,phasesplineres=6,wavesplineres=1200,n_colorscatpars=4,
 			  order=3,normalize=True):
 	splinephase = np.linspace(phaserange[0],phaserange[1],int((phaserange[1]-phaserange[0])/phasesplineres)+1,True)
 	splinewave  = np.linspace(waverange[0],waverange[1],int((waverange[1]-waverange[0])/wavesplineres)+1,True)
@@ -215,7 +217,18 @@ def init_errs(m0varfile=None,m0m1file=None,m1varfile=None,scalefile=None,
 	corr=m0m1covar*clipinterp(phase,wave)**2/(m0var*m1var)
 	corr[np.isnan(corr)]=0
 	m0m1corrbspl = initbsplwithzeroth(phase,wave,corr,kx=order,ky=order, tx=splinephase,ty=splinewave)
-	return m0varbspl[0],m0varbspl[1],m0varbspl[2],m1varbspl[2],m0m1corrbspl[2]
+	
+	if n_colorscatpars>0:
+		if clscatfile is None:
+			clscatcoeffs=np.zeros(n_colorscatpars)
+			clscatcoeffs[-1]=-np.inf
+		else:
+			wave,clscat=np.loadtxt(clscatfile,unpack=True)
+			wave,clscat=wave[wave<9200],clscat[wave<9200]
+			pow=n_colorscatpars-1-np.arange(n_colorscatpars)
+			clscatpars=np.polyfit(wave/1000,np.log(clscat),n_colorscatpars-1)*factorial(pow)#guess[resids.iclscat]
+
+	return m0varbspl[0],m0varbspl[1],m0varbspl[2],m1varbspl[2],m0m1corrbspl[2],clscatpars
 
 
 def get_hsiao(hsiaofile='initfiles/Hsiao07.dat',

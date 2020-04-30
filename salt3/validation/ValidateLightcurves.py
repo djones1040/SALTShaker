@@ -376,7 +376,7 @@ def customfilt(outfile,lcfile,salt3dir,
 			ax.plot(plotmjd-t0,salt2synflux,color='C1',
 					label='SALT2')
 		else:
-			if bandpassdict[sn.SURVEY][flt]['lambdaeff'] > 2800 and bandpassdict[sn.SURVEY][flt]['lambdaeff'] < 7000 and\
+			if bandpassdict[sn.SURVEY][flt]['lambdaeff'] > 2000 and bandpassdict[sn.SURVEY][flt]['lambdaeff'] < 9200 and\
 			   '-u' not in bandpassdict[sn.SURVEY][flt]['fullname']:
 				chi2 = np.sum((sn.FLUXCAL[sn.FLT == flt]-fitted_model.bandflux(flt, sn.MJD[sn.FLT == flt], zp=27.5,zpsys=sysdict[flt]))**2./sn.FLUXCALERR[sn.FLT == flt]**2.)
 				chi2red = chi2/len(sn.FLUXCAL[sn.FLT == flt]-3)
