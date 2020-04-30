@@ -960,51 +960,6 @@ class SALTResids:
 			iSpecStart += SpecLen
 			
 		return specresultsdict
-
-	def specVarianceForSNForErr(self,x,sn,storedResults,temporaryResults,varyParams):
-		survey = self.datadict[sn]['survey']
-		obswave = self.datadict[sn]['obswave'] #self.wave*(1+z)
-		obsdelt = obswave[1]-obswave[0]
-		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
-		phasedelt = obsphase[1]-obsphase[0]
-		specdata = self.datadict[sn]['specdata']
-		tpkoff = x[self.parlist == 'tpkoff_%s'%sn]
-		
-		nspecdata = sum([specdata[key]['flux'].size for key in specdata])
-		if sn not in self.specresultsdict.keys():
-			self.specresultsdict[sn]={}
-			self.specresultsdict[sn]['fluxvariance'] =  np.zeros(nspecdata)
-			self.specresultsdict[sn]['modelvariance'] =  np.zeros(nspecdata)
-			self.specresultsdict[sn]['modelvariance_jacobian']=np.zeros([nspecdata,varyParams.sum()])
-		
-		iSpecStart = 0
-		for k in specdata.keys():
-			x0=x[self.parlist==f'specx0_{sn}_{k}']
-
-			SpecLen = specdata[k]['flux'].size
-			phase=specdata[k]['tobs']+tpkoff
-
-			specSlice=slice(iSpecStart,iSpecStart+SpecLen)
-			
-			#Define recalibration factor
-			if self.specrecal:
-				coeffs=x[self.parlist=='specrecal_{}_{}'.format(sn,k)]
-				pow=coeffs.size-np.arange(coeffs.size)
-				recalCoord=(specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal
-				drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
-				recalexp=np.exp((drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1))
-			else:
-				recalexp=1
-								
-			uncertaintyNoX0 = recalexp**2. * temporaryResults['modelUncertainty'][int((phase-obsphase[0])/phasedelt),((specdata[k]['wavelength']-obswave[0])/obsdelt).astype(int)]
-			modelUncertainty=uncertaintyNoX0*x0**2
-			self.specresultsdict[sn]['fluxvariance'][specSlice] = specdata[k]['fluxerr']**2
-			self.specresultsdict[sn]['modelvariance'][specSlice] = modelUncertainty
-
-			iSpecStart += SpecLen
-			
-		return self.specresultsdict[sn]
-
 	
 	def photVarianceForSN(self,x,sn,storedResults,temporaryResults,varyParams):
 		"""Currently calculated only at the effective wavelength of the filter, not integrated over."""
@@ -1099,69 +1054,6 @@ class SALTResids:
 				photresultsdict['modelvariance_jacobian'][np.outer(selectFilter,(varyParList=='modelcorr_01'))]  =( 2*fluxfactor* x0**2 *x1) * ((modelerrnox[1]*modelerrnox[0])[:,np.newaxis]  * interpresult[:,varyParams[self.parlist=='modelcorr_01']]).flatten()
 
 		return photresultsdict
-
-	def photVarianceForSNForErr(self,x,sn,storedResults,temporaryResults,varyParams):
-		"""Currently calculated only at the effective wavelength of the filter, not integrated over."""
-		z = self.datadict[sn]['zHelio']
-		survey = self.datadict[sn]['survey']
-		obswave = self.datadict[sn]['obswave'] #self.wave*(1+z)
-		obsdelt = obswave[1]-obswave[0]
-		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
-		phasedelt=obsphase[1]-obsphase[0]
-		photdata = self.datadict[sn]['photdata']
-		pbspl = self.datadict[sn]['pbspl']
-		dwave = self.datadict[sn]['dwave']
-		x0,tpkoff = x[self.parlist == 'x0_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
-		
-		varyParList=self.parlist[varyParams]
-		
-		
-		if sn not in self.photresultsdict.keys():
-			self.photresultsdict[sn]={}
-			self.photresultsdict[sn]['fluxvariance'] =  np.zeros(len(photdata['filt']))
-			self.photresultsdict[sn]['modelvariance'] =  np.zeros(len(photdata['filt']))
-			self.photresultsdict[sn]['colorvariance'] = [(None,None,None)]*len(np.unique(photdata['filt']))
-			self.photresultsdict[sn]['modelvariance_jacobian']=np.zeros([photdata['filt'].size,varyParList.size])
-		
-		for i,flt in enumerate(np.unique(photdata['filt'])):
-			lameff= self.datadict[sn]['lambdaeff'][flt]
-			#Select data from the appropriate filter
-			selectFilter=(photdata['filt']==flt)
-			phase=photdata['tobs']+tpkoff
-			phase=phase[selectFilter]
-			selectFilter=(photdata['filt']==flt)
-			clippedPhase=np.clip(phase,obsphase.min(),obsphase.max())
-			
-			#Calculate color scatter
-			if self.iclscat.size:
-				coeffs=x[self.parlist=='clscat']
-				pow=coeffs.size-1-np.arange(coeffs.size)
-				coeffs/=factorial(pow)
-				lameffPrime=lameff/(1+z)/1000
-				colorscat=np.exp(np.poly1d(coeffs)(lameffPrime))
-				if colorscat == np.inf:
-					log.error('infinite color scatter!')
-					import pdb; pdb.set_trace()
-				
-				pow=pow[varyParams[self.parlist=='clscat']]
-				dcolorscatdx= colorscat*((lameffPrime) ** (pow) )/ factorial(pow)
-			else:
-				colorscat=0
-				dcolorscatdx=np.array([])
-
-			self.photresultsdict[sn]['colorvariance'][i] = (selectFilter,colorscat,dcolorscatdx)
-
-			fluxfactor=(self.fluxfactor[survey][flt]*(pbspl[flt].sum())*dwave)**2
-			
-			modelErrInt = temporaryResults['modelUncertainty'][((clippedPhase-obsphase[0])/phasedelt).astype(int),int((lameff-obswave[0])/obsdelt)]
-			uncertaintyNoX0= fluxfactor *  modelErrInt
-			modelUncertainty=uncertaintyNoX0*x0**2
-			negativevariance=modelUncertainty<0
-			modelUncertainty[negativevariance]=0
-			self.photresultsdict[sn]['fluxvariance'][selectFilter] = photdata['fluxcalerr'][selectFilter]**2
-			self.photresultsdict[sn]['modelvariance'][selectFilter]=  modelUncertainty
-			
-		return self.photresultsdict[sn]
 
 	
 	def fillStoredResults(self,x,storedResults):
