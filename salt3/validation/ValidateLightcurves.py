@@ -278,7 +278,7 @@ def customfilt(outfile,lcfile,salt3dir,
 		pass
 	salt2colorlaw = SALT2ColorLaw([2800,7000], [-0.504294,0.787691,-0.461715,0.0815619])
 
-	print(np.sum(salt2flux_tmp[20,:]),np.sum(salt3flux[20,:]))
+	#print(np.sum(salt2flux_tmp[20,:]),np.sum(salt3flux[20,:]))
 	if n_components == 1: salt3flux = x0*salt3flux
 	elif n_components == 2: salt3flux = x0*(salt3flux + x1*salt3m1flux)
 	if c:
