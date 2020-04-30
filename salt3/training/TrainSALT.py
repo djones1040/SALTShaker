@@ -103,7 +103,7 @@ class TrainSALT(TrainSALTBase):
 		init_options['order']=self.options.errinterporder
 		if self.options.initsalt2var:
 			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots=init_errs(
-				 *['%s/%s'%(init_rootdir,x) for x in ['salt2_lc_relative_variance_0.dat','salt2_spec_covariance_01.dat','salt2_lc_relative_variance_1.dat']],**init_options)
+				 *['%s/%s'%(init_rootdir,x) for x in ['salt2_lc_relative_variance_0.dat','salt2_lc_relative_covariance_01.dat','salt2_lc_relative_variance_1.dat','salt2_lc_dispersion_scaling.dat']],**init_options)
 		else:
 			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots=init_errs(**init_options)
 		
@@ -467,6 +467,9 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		#ValidateModel.m0m1_chi2(
 		#	'%s/spectralcomp_chi2.png'%outputdir,
 		#	outputdir)
+
+		plotSALTModel.mkModelErrPlot(outputdir,outfile='%s/SALTmodelerrcomp.pdf'%outputdir,
+								  xlimits=[self.options.waverange[0],self.options.waverange[1]])
 
 		plotSALTModel.mkModelPlot(outputdir,outfile='%s/SALTmodelcomp.pdf'%outputdir,
 								  xlimits=[self.options.waverange[0],self.options.waverange[1]])

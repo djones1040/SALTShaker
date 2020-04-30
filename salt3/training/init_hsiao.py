@@ -160,7 +160,7 @@ def init_kaepora(x10file='initfiles/Kaepora_dm15_1.1.txt',
 	#import pdb; pdb.set_trace()
 	return intphase,intwave,m0,m1,bspl[0],bspl[1],bspl[2],bsplm1[2]
 
-def init_errs(m0varfile=None,m0m1file=None,m1varfile=None,
+def init_errs(m0varfile=None,m0m1file=None,m1varfile=None,scalefile=None,
 			  Bfilt='initfiles/Bessell90_B.dat',
 			  phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
 			  waveinterpres=10.0,phasesplineres=6,wavesplineres=1200,
@@ -168,10 +168,10 @@ def init_errs(m0varfile=None,m0m1file=None,m1varfile=None,
 	splinephase = np.linspace(phaserange[0],phaserange[1],int((phaserange[1]-phaserange[0])/phasesplineres)+1,True)
 	splinewave  = np.linspace(waverange[0],waverange[1],int((waverange[1]-waverange[0])/wavesplineres)+1,True)
 
-	def loadfilewithdefault(filename):
+	def loadfilewithdefault(filename,fillval=0):
 		if filename is None:
 			phase,wave=np.meshgrid(np.linspace(phaserange[0],phaserange[1],int((phaserange[1]-phaserange[0])/phaseinterpres)+1,True), np.linspace(waverange[0],waverange[1],int((waverange[1]-waverange[0])/waveinterpres)+1,True))
-			return phase.flatten(),wave.flatten(),0*phase.flatten()
+			return phase.flatten(),wave.flatten(),fillval*np.ones(phase.size)
 		else:
 			return np.loadtxt(filename,unpack=True)
 	def initbsplwithzeroth(phase,wave,flux,kx=order,ky=order, tx=splinephase,ty=splinewave):
@@ -184,31 +184,37 @@ def init_errs(m0varfile=None,m0m1file=None,m1varfile=None,
 					phasebin=(phase<phaseup)&(phase>=phaselow)
 					wavebin= (wave <waveup)&(wave>=wavelow)
 					fluxmeans[i][j]=np.mean(flux[wavebin&phasebin])
-			interp=RegularGridInterpolator((binphasecenter,binwavecenter),fluxmeans,'nearest',False,0)
 			return splinephase,splinewave,fluxmeans.flatten(),0,0
 		else:
 			return bisplrep(phase,wave,m0var,kx=order,ky=order, tx=splinephase,ty=splinewave,task=-1)
-				
+	scalephase,scalewave,scale=loadfilewithdefault(scalefile,1)
+	
+	#Subtract out statistical error from SALT2
+	scale=np.sqrt(scale**2-1)
+	scalephase,scalewave=np.unique(scalephase),np.unique(scalewave)
+	scaleinterp=RegularGridInterpolator((scalephase,scalewave),scale.reshape(scalephase.size,scalewave.size),'nearest')
+	clipinterp=lambda x,y: scaleinterp((np.clip(x,scalephase.min(),scalephase.max()),np.clip(y,scalewave.min(),scalewave.max())))
 	phase,wave,m0var = loadfilewithdefault(m0varfile)
 	iGood = np.where((phase >= phaserange[0]-phasesplineres*0) & (phase <= phaserange[1]+phasesplineres*0) &
 					 (wave >= waverange[0]-wavesplineres*0) & (wave <= waverange[1]+wavesplineres*0))[0]
 	phase,wave,m0var = phase[iGood],wave[iGood],np.sqrt(m0var[iGood])
+	m0var*=clipinterp(phase,wave)
 	m0varbspl = initbsplwithzeroth(phase,wave,m0var,kx=order,ky=order, tx=splinephase,ty=splinewave)
 
 	phase,wave,m1var = loadfilewithdefault(m1varfile)
 	iGood = np.where((phase >= phaserange[0]-phasesplineres*0) & (phase <= phaserange[1]+phasesplineres*0) &
 					 (wave >= waverange[0]-wavesplineres*0) & (wave <= waverange[1]+wavesplineres*0))[0]
 	phase,wave,m1var = phase[iGood],wave[iGood],np.sqrt(m1var[iGood])
+	m1var*=clipinterp(phase,wave)
 	m1varbspl = initbsplwithzeroth(phase,wave,m1var,kx=order,ky=order, tx=splinephase,ty=splinewave)
 	
 	phase,wave,m0m1covar = loadfilewithdefault(m0m1file)
 	iGood = np.where((phase >= phaserange[0]-phasesplineres*0) & (phase <= phaserange[1]+phasesplineres*0) &
 					 (wave >= waverange[0]-wavesplineres*0) & (wave <= waverange[1]+wavesplineres*0))[0]
 	phase,wave,m0m1covar = phase[iGood],wave[iGood],m0m1covar[iGood]
-	corr=m0m1covar/np.sqrt(m0var,m1var)
+	corr=m0m1covar*clipinterp(phase,wave)**2/(m0var*m1var)
 	corr[np.isnan(corr)]=0
 	m0m1corrbspl = initbsplwithzeroth(phase,wave,corr,kx=order,ky=order, tx=splinephase,ty=splinewave)
-
 	return m0varbspl[0],m0varbspl[1],m0varbspl[2],m1varbspl[2],m0m1corrbspl[2]
 
 
