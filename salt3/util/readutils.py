@@ -349,7 +349,7 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 			#datadict[snid]['zHelio'] = zHel
 			iGood = np.array([],dtype=int)
 			for i,f in enumerate(sn.FLT):
-				if '-u' not in kcordict[sn.SURVEY][f]['fullname']:
+				if '-u' not in kcordict[sn.SURVEY][f]['fullname'] and sn.MJD[i]-tpk > -19 and sn.MJD[i]-tpk < 49:
 					iGood = np.append(iGood,i)
 
 			# TODO: flux errors

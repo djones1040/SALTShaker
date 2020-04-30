@@ -141,6 +141,7 @@ class TrainSALT(TrainSALTBase):
 				order-=1
 				recalParams=[f'specx0_{sn}_{k}']+['specrecal_{}_{}'.format(sn,k)]*order
 				parlist=np.append(parlist,recalParams)
+
 		# initial guesses
 		n_params=parlist.size
 		guess = np.zeros(parlist.size)
@@ -173,7 +174,7 @@ class TrainSALT(TrainSALTBase):
 				guess[parlist == 'm1'] = m1knots
 			if self.options.n_colorpars:
 				#log.warning('BAD CL HACK')
-				guess[parlist == 'cl'] = [0.]*self.options.n_colorpars #[-0.504294,0.787691,-0.461715,0.0815619]
+				guess[parlist == 'cl'] = [0.]*self.options.n_colorpars #[-0.504294,0.787691,-0.461715,0.0815619] #
 			if self.options.n_colorscatpars:
 				guess[parlist == 'clscat'] = [1e-6]*self.options.n_colorscatpars
 				guess[np.where(parlist == 'clscat')[0][-1]]=-np.inf
@@ -430,8 +431,8 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 		sysdict = {}
 		for m,flt,flx,flxe in zip(sn.MJD,sn.FLT,sn.FLUXCAL,sn.FLUXCALERR):
-			if 'BD17' in self.kcordict.keys(): sys = 'bd17'
-			elif 'AB' in self.kcordict.keys(): sys = 'ab'
+			if self.kcordict[sn.SURVEY][flt]['magsys'] == 'BD17': sys = 'bd17'
+			elif self.kcordict[sn.SURVEY][flt]['magsys'] == 'AB': sys = 'ab'
 			else: sys = 'vega'
 			if self.kcordict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) > 2800 and \
 			   self.kcordict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) < 7000 and\
@@ -510,7 +511,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 		pdf_pages = PdfPages('%s/lcfits.pdf'%outputdir)
 		import matplotlib.gridspec as gridspec
-		gs1 = gridspec.GridSpec(3, 3)
+		gs1 = gridspec.GridSpec(3, 4)
 		gs1.update(wspace=0.0)
 		i = 0
 		
@@ -568,10 +569,10 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 			tlc = time()
 			for l in snfiles:
-				if not i % 9:
+				if not i % 12:
 					fig = plt.figure()
 				try:
-					ax1 = plt.subplot(gs1[i % 9]); ax2 = plt.subplot(gs1[(i+1) % 9]); ax3 = plt.subplot(gs1[(i+2) % 9])
+					ax1 = plt.subplot(gs1[i % 12]); ax2 = plt.subplot(gs1[(i+1) % 12]); ax3 = plt.subplot(gs1[(i+2) % 12]); ax4 = plt.subplot(gs1[(i+3) % 12])
 				except:
 					import pdb; pdb.set_trace()
 
@@ -593,15 +594,15 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 					'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,outputdir,
 					t0=t0sn,x0=x0sn,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc,
 					bandpassdict=self.kcordict,n_components=self.options.n_components,
-					ax1=ax1,ax2=ax2,ax3=ax3,saltdict=saltdict)
-				if i % 9 == 6:
+					ax1=ax1,ax2=ax2,ax3=ax3,ax4=ax4,saltdict=saltdict)
+				if i % 12 == 8:
 					pdf_pages.savefig()
 					plt.close('all')
 				else:
-					for ax in [ax1,ax2,ax3]:
+					for ax in [ax1,ax2,ax3,ax4]:
 						ax.xaxis.set_ticklabels([])
 						ax.set_xlabel(None)
-				i += 3
+				i += 4
 
 		if not i %9 ==0:
 			pdf_pages.savefig()
