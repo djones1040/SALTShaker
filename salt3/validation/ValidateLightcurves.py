@@ -208,8 +208,6 @@ def customfilt(outfile,lcfile,salt3dir,
 		if bandpassdict[sn.SURVEY][flt]['magsys'] == 'BD17': sys = 'bd17'
 		elif bandpassdict[sn.SURVEY][flt]['magsys'] == 'AB': sys = 'ab'
 		else: sys = 'vega'
-		# hack!
-		sys = 'ab'
 		if bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) > 2800 and \
 		   bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) < 9000 and\
 		   '-u' not in bandpassdict[sn.SURVEY][flt]['fullname']:
