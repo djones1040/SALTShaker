@@ -607,7 +607,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 						ax.set_xlabel(None)
 				i += 4
 
-		if not i %9 ==0:
+		if not i %12 ==0:
 			pdf_pages.savefig()
 		pdf_pages.close()
 		log.info('plotting light curves took %.1f'%(time()-tlc))

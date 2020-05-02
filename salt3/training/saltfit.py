@@ -544,9 +544,15 @@ class GaussNewton(saltresids.SALTResids):
 				elif fit=='tpk':
 					includePars[self.itpk]=True
 				elif fit=='spectralrecalibration':
-					includePars[self.ispcrcl]=True
+					if len(self.ispcrcl):
+						includePars[self.ispcrcl]=True
+					else:
+						self.ispcrcl = []
 				elif fit=='spectralrecalibration_norm':
-					includePars[self.ispcrcl_norm]=True
+					if len(self.ispcrcl_norm):
+						includePars[self.ispcrcl_norm]=True
+					else:
+						self.ispcrcl = []
 				elif fit=='modelerr':
 					includePars[self.imodelerr]=True
 					includePars[self.imodelcorr]=True
@@ -561,6 +567,12 @@ class GaussNewton(saltresids.SALTResids):
 			('spectralrecalibration'),		
 			('sn'),
 			('tpk')]
+		#self.fitlist = [#('all'),
+			#('pcaparams'),
+		#	('color'),('colorlaw'),
+			#('spectralrecalibration'),		
+		#	('sn')]#,
+			#('tpk')]
 
 	def convergence_loop(self,guess,loop_niter=3):
 		lastResid = 1e20
@@ -593,6 +605,7 @@ class GaussNewton(saltresids.SALTResids):
 		uncertainties={key:uncertainties[key] for key in self.uncertaintyKeys}
 		log.info('starting loop; %i iterations'%loop_niter)
 		for superloop in range(loop_niter):
+			tstartloop = time.time()
 			try:
 				if self.fit_model_err and photochi2perdof<65 and not superloop % 3 and not superloop == 0:
 					log.info('Optimizing model error')
@@ -620,6 +633,8 @@ class GaussNewton(saltresids.SALTResids):
 						modelerr,clpars,clerr,clscat,SNParams,stepsizes
 
 				log.info('finished iteration %i, chi2 improved by %.1f'%(superloop+1,chi2_init-chi2))
+				log.info(f'iteration {superloop+1} took {time.time()-tstartloop} seconds')
+
 				if converged:
 					log.info('Gauss-Newton optimizer could not further improve chi2')
 					break
@@ -635,9 +650,10 @@ class GaussNewton(saltresids.SALTResids):
 						import pdb;pdb.set_trace()
 					else:
 						raise e
+		Xredefined = X.copy()
 		#Retranslate x1, M1, x0, M0 to obey definitions
-		Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
-		
+		#Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
+	
 		xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams = \
 			self.getParsGN(Xredefined)
@@ -860,7 +876,9 @@ class GaussNewton(saltresids.SALTResids):
 					storedResults[regKey]=priorResids[-self.n_components:]
 		chi2Results=[]
 		for name,x in [('Photometric',photresids),('Spectroscopic',specresids),('Prior',priorResids),('Regularization',regResids)]:
-			x=np.concatenate(x)
+			if (len(regResids) and name == 'Regularization') or name != 'Regularization':
+				x=np.concatenate(x)
+			else: x=np.array([0.0])
 			chi2Results+=[(name,(x**2).sum(),x.size)]
 		return chi2Results
 	
@@ -1013,7 +1031,6 @@ class GaussNewton(saltresids.SALTResids):
 			else: doSpecResids = True
 
 		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors,doSpecResids=doSpecResids)
-
 		oldChi=(residuals**2).sum()
 
 		jacobian=jacobian.tocsc()
