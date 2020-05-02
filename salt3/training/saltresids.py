@@ -569,7 +569,6 @@ class SALTResids:
 			specresids['lognorm_grad']= - (uncertainty_jac/uncertainty[:,np.newaxis]).sum(axis=0)
 			specresids['resid_jacobian']-=   uncertainty_jac*(specresids['resid'] /uncertainty)[:,np.newaxis]
 
-		#03D1co
 		return photresids,specresids
 	
 	def modelvalsforSN(self,x,sn,storedResults,varyParams):		
@@ -745,7 +744,6 @@ class SALTResids:
 			storedResults['pcDeriv_phot_%s'%sn]=summationCache
 		if len(np.where((photresultsdict['modelflux'] != photresultsdict['modelflux']) |
 						(photresultsdict['modelflux'] == np.inf))[0]):
-			import pdb; pdb.set_trace()
 			raise RuntimeError(f'phot model fluxes are nonsensical for SN {sn}')
 
 		return photresultsdict
