@@ -651,9 +651,9 @@ class GaussNewton(saltresids.SALTResids):
 						import pdb;pdb.set_trace()
 					else:
 						raise e
-		Xredefined = X.copy()
+		#Xredefined = X.copy()
 		#Retranslate x1, M1, x0, M0 to obey definitions
-		#Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
+		Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
 	
 		xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams = \
