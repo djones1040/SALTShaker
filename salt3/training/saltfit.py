@@ -569,9 +569,10 @@ class GaussNewton(saltresids.SALTResids):
 			('tpk')]
 		#self.fitlist = [#('all'),
 			#('pcaparams'),
-		#	('color'),('colorlaw'),
+			#('color'),
+		#	('colorlaw')]#,
 			#('spectralrecalibration'),		
-		#	('sn')]#,
+			#('sn')]#,
 			#('tpk')]
 
 	def convergence_loop(self,guess,loop_niter=3):
@@ -632,8 +633,8 @@ class GaussNewton(saltresids.SALTResids):
 					return xfinal,X,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 						modelerr,clpars,clerr,clscat,SNParams,stepsizes
 
-				log.info('finished iteration %i, chi2 improved by %.1f'%(superloop+1,chi2_init-chi2))
-				log.info(f'iteration {superloop+1} took {time.time()-tstartloop} seconds')
+				log.info(f'finished iteration {superloop+1}, chi2 improved by {chi2_init-chi2:.1f}')
+				log.info(f'iteration {superloop+1} took {time.time()-tstartloop:.3f} seconds')
 
 				if converged:
 					log.info('Gauss-Newton optimizer could not further improve chi2')
@@ -650,9 +651,9 @@ class GaussNewton(saltresids.SALTResids):
 						import pdb;pdb.set_trace()
 					else:
 						raise e
-		#Xredefined = X.copy()
+		Xredefined = X.copy()
 		#Retranslate x1, M1, x0, M0 to obey definitions
-		Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
+		#Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
 	
 		xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 			modelerr,clpars,clerr,clscat,SNParams = \

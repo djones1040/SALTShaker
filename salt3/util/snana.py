@@ -139,7 +139,7 @@ class SuperNova( object ) :
 		or from a SNANA-style .DAT file
 	"""
 	
-	def __init__( self, datfile=None, simname=None, snid=None, verbose=False, simdir=None ) : 
+	def __init__( self, datfile=None, simname=None, snid=None, verbose=False, simdir=None, readspec=True ) : 
 		""" Read in header info (z,type,etc) and full light curve data.
 		For simulated SNe stored in fits tables, user must provide the simname and snid,
 		and the data are collected from binary fits tables, assumed to exist 
@@ -167,7 +167,7 @@ class SuperNova( object ) :
 					print("Unable to read in data for %s %s.  No sim product .fits files found."%(simname, str(snid)))
 		elif datfile :	
 			if verbose : print("Reading in data from light curve file %s"%(datfile))
-			self.readdatfile( datfile ) 
+			self.readdatfile( datfile, readspec=readspec ) 
 
 	@property
 	def name(self):
@@ -424,7 +424,7 @@ class SuperNova( object ) :
 		else : 
 			return( 0 ) 
 
-	def readdatfile(self, datfile ):
+	def readdatfile(self, datfile, readspec=True ):
 		""" read the light curve data from the SNANA-style .dat file.
 		Metadata in the header are in "key: value" pairs
 		Observation data lines are marked with OBS: 
@@ -473,7 +473,7 @@ class SuperNova( object ) :
 		for col in colnames : 
 			self.__dict__[col] = array( self.__dict__[col] )
 
-		self.readspecfromlcfile(datfile)
+		if readspec: self.readspecfromlcfile(datfile)
 		
 		return( None )
 

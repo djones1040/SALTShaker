@@ -209,7 +209,7 @@ def customfilt(outfile,lcfile,salt3dir,
 		elif bandpassdict[sn.SURVEY][flt]['magsys'] == 'AB': sys = 'ab'
 		else: sys = 'vega'
 		if bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) > 2800 and \
-		   bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) < 9000 and\
+		   bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) < 7800 and\
 		   '-u' not in bandpassdict[sn.SURVEY][flt]['fullname']:
 			data.add_row((m,flt,flx,flxe,
 						  27.5+bandpassdict[sn.SURVEY][flt]['zpoff'],sys))
@@ -374,14 +374,16 @@ def customfilt(outfile,lcfile,salt3dir,
 					label='SALT2')
 		else:
 			if bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split()[0])) > 2800 and \
-			   bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split()[0])) < 9000 and\
-			   '-u' not in bandpassdict[sn.SURVEY][flt]['fullname']:
-				chi2 = np.sum((sn.FLUXCAL[iFLT]-fitted_model.bandflux(flt, sn.MJD[iFLT], zp=27.5,zpsys=sysdict[flt]))**2./sn.FLUXCALERR[iFLT]**2.)
-				chi2red = chi2/(len(sn.FLUXCAL[iFLT])-3)
-				ax.plot(plotmjd-t0,fitted_model.bandflux(
-					flt, plotmjd, zp=27.5,zpsys=sysdict[flt]),color='C1',
-						label='SALT2; $x_1 = %.2f$, $c = %.2f$,\n$\chi_{red}^2 = %.1f$'%(
-							result['parameters'][3],result['parameters'][4],chi2red))
+			   bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split()[0])) < 9000: # and\
+			   #'-u' not in bandpassdict[sn.SURVEY][flt]['fullname']:
+				try:
+					chi2 = np.sum((sn.FLUXCAL[iFLT]-fitted_model.bandflux(flt, sn.MJD[iFLT], zp=27.5,zpsys=sysdict[flt]))**2./sn.FLUXCALERR[iFLT]**2.)
+					chi2red = chi2/(len(sn.FLUXCAL[iFLT])-3)
+					ax.plot(plotmjd-t0,fitted_model.bandflux(
+						flt, plotmjd, zp=27.5,zpsys=sysdict[flt]),color='C1',
+							label='SALT2; $x_1 = %.2f$, $c = %.2f$,\n$\chi_{red}^2 = %.1f$'%(
+								result['parameters'][3],result['parameters'][4],chi2red))
+				except ValueError: continue
 				#print(result['parameters'])
 		ax.errorbar(sn.MJD[sn.FLT == flt]-t0,sn.FLUXCAL[sn.FLT == flt],
 					yerr=sn.FLUXCALERR[sn.FLT == flt],

@@ -47,6 +47,8 @@ class TrainSALTBase:
 							help='training config file')
 		parser.add_argument('--snlists', default=config.get('iodata','snlists'), type=str,
 							help="""list of SNANA-formatted SN data files, including both photometry and spectroscopy. Can be multiple comma-separated lists. (default=%default)""")
+		parser.add_argument('--snparlist', default=config.get('iodata','snparlist'), type=str,
+							help="""optional list of initial SN parameters.  Needs columns SNID, zHelio, x0, x1, c""")
 		parser.add_argument('--tmaxlist', default=config.get('iodata','tmaxlist'), type=str,
 							help="""optional space-delimited list with SN ID, tmax, tmaxerr (default=%default)""")
 		parser.add_argument('--dospec', default=config.get('iodata','dospec'), type=boolean_string,
