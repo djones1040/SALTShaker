@@ -1,0 +1,39 @@
+SN_SED: Hsiao07.dat
+BD17_SED:    bd17_stisnic_005.dat
+MAGSYSTEM:  AB
+FILTSYSTEM: COUNT
+FILTPATH:   PS1/Pantheon//SDSS_Doi2010/CCDAVG
+FILTER: SDSS-u U.dat 0.00000
+FILTER: SDSS-g G.dat -0.0073-0.0029473880
+FILTER: SDSS-r R.dat -0.0088+0.0044133478
+FILTER: SDSS-i I.dat -0.0090+0.00072395845
+FILTER: SDSS-z Z.dat -0.0094-0.0083579659
+
+FILTER: SDSS-U U.dat 0.00000
+FILTER: SDSS-G G.dat -0.0073-0.0029473880
+FILTER: SDSS-R R.dat -0.0088+0.0044133478
+FILTER: SDSS-I I.dat -0.0090+0.00072395845
+FILTER: SDSS-Z Z.dat -0.0094-0.0083579659
+
+
+DUPLICATE_LAMSHIFT_GLOBAL: 10
+
+# 1st filter is rest-frame. 
+# 2nd filter is observer-frame. 
+# 3rd arg is short-hand name for table storage. 
+
+
+# Define generation grids. 
+REDSHIFT_RANGE:    0.0  0.46 
+REDSHIFT_BINSIZE:  0.02      
+
+# define AV grid. 
+RV:          3.1   A(V)/E(B-V) in LMC 
+AV_RANGE:   -6.0  6.0  
+AV_BINSIZE:  0.5  
+AV_OPTION:   2   
+
+LAMBDA_RANGE: 2100 12500  # for SN templates
+
+
+OUTFILE: kcor_SDSS.fits
