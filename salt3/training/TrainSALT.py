@@ -174,7 +174,10 @@ class TrainSALT(TrainSALTBase):
 				guess[parlist == 'm1'] = m1knots
 			if self.options.n_colorpars:
 				#log.warning('BAD CL HACK')
-				guess[parlist == 'cl'] = [0.]*self.options.n_colorpars #[-0.504294,0.787691,-0.461715,0.0815619]
+				if self.options.initsalt2model:
+					guess[parlist == 'cl'] = [-0.504294,0.787691,-0.461715,0.0815619]
+				else: 
+					guess[parlist == 'cl'] =[0.]*self.options.n_colorpars 
 			if self.options.n_colorscatpars:
 				guess[parlist == 'clscat'] = clscatcoeffs
 			guess[(parlist == 'm0') & (guess < 0)] = 1e-4
@@ -473,9 +476,9 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		plotSALTModel.mkModelPlot(outputdir,outfile='%s/SALTmodelcomp.pdf'%outputdir,
 								  xlimits=[self.options.waverange[0],self.options.waverange[1]])
 		SynPhotPlot.plotSynthPhotOverStretchRange(
-			'{}/synthphotrange.pdf'.format(outputdir),outputdir,'SDSS')
+			'{}/synthphotrange.pdf'.format(outputdir),outputdir,'Bessell')
 		SynPhotPlot.overPlotSynthPhotByComponent(
-			'{}/synthphotoverplot.pdf'.format(outputdir),outputdir,'SDSS')		
+			'{}/synthphotoverplot.pdf'.format(outputdir),outputdir,'Bessell')		
 		
 		snfiles_tot = np.array([])
 		for j,snlist in enumerate(self.options.snlists.split(',')):
@@ -571,6 +574,11 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 			tlc = time()
 			for l in snfiles:
+				if '/' not in l:
+					l = '%s/%s'%(os.path.dirname(snlist),l)
+				sn = snana.SuperNova(l)
+				sn.SNID = str(sn.SNID)
+				if not sn.SNID in datadict: continue
 				if not i % 9:
 					fig = plt.figure()
 				try:
@@ -578,11 +586,6 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				except:
 					import pdb; pdb.set_trace()
 
-				if '/' not in l:
-					l = '%s/%s'%(os.path.dirname(snlist),l)
-				sn = snana.SuperNova(l)
-				if not sn in datadict: continue
-				sn.SNID = str(sn.SNID)
 
 				if sn.SNID not in snid:
 					log.warning('sn %s not in output files'%sn.SNID)

@@ -261,7 +261,9 @@ class SALTResids:
 		self.ic	 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('c_')])
 		self.itpk = np.array([i for i, si in enumerate(self.parlist) if si.startswith('tpkoff')])
 		self.ispcrcl_norm = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specx0')])
+		if self.ispcrcl_norm.size==0: self.ispcrcl_norm=np.zeros(self.npar,dtype=bool)
 		self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specrecal')])
+		if self.ispcrcl.size==0: self.ispcrcl=np.zeros(self.npar,dtype=bool)
 		self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr')])
 		self.imodelcorr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelcorr')])
 		self.iclscat = np.where(self.parlist=='clscat')[0]
@@ -571,7 +573,7 @@ class SALTResids:
 		return photresids,specresids
 	
 	def modelvalsforSN(self,x,sn,storedResults,varyParams):		
-
+		
 		temporaryResults={}
 		x1Deriv= varyParams[self.parlist=='x1_{}'.format(sn)][0] 
 		self.fillStoredResults(x,storedResults)
@@ -1485,6 +1487,7 @@ class SALTResids:
 		self.neff=self.neffRaw.copy()
 		self.neff[self.neff>self.neffMax]=np.inf		
 		self.neff/=self.neffMax
+		if not np.any(np.isinf(self.neff)): log.warning('Regularization is being applied to the entire phase/wavelength space: consider lowering neffmax (currently {:.2e})'.format(self.neffMax))
 		self.neff=np.clip(self.neff,self.neffFloor,None)
 		
 	def plotEffectivePoints(self,phases=None,output=None):

@@ -512,7 +512,7 @@ class GaussNewton(saltresids.SALTResids):
 				if fit in self.datadict:
 					includePars=np.array([ fit in name for name in self.parlist])
 				elif 'pcaparams' in fit:
-					self.GN_iter[fit]=4
+					self.GN_iter[fit]=2
 					includePars[self.im0]=True
 					includePars[self.im1]=True		
 					includePars[self.ix0]=True
@@ -561,7 +561,7 @@ class GaussNewton(saltresids.SALTResids):
 			('spectralrecalibration'),		
 			('sn'),
 			('tpk')]
-
+		
 	def convergence_loop(self,guess,loop_niter=3):
 		lastResid = 1e20
 		log.info('Initializing')

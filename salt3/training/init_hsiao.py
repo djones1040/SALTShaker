@@ -192,7 +192,7 @@ def init_errs(m0varfile=None,m0m1file=None,m1varfile=None,scalefile=None,clscatf
 	scalephase,scalewave,scale=loadfilewithdefault(scalefile,1)
 	
 	#Subtract out statistical error from SALT2
-	scale=np.sqrt(scale**2-1)
+	#scale=np.sqrt(scale**2-1)
 	scalephase,scalewave=np.unique(scalephase),np.unique(scalewave)
 	scaleinterp=RegularGridInterpolator((scalephase,scalewave),scale.reshape(scalephase.size,scalewave.size),'nearest')
 	clipinterp=lambda x,y: scaleinterp((np.clip(x,scalephase.min(),scalephase.max()),np.clip(y,scalewave.min(),scalewave.max())))
