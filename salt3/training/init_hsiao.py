@@ -172,7 +172,8 @@ def init_errs(m0varfile=None,m0m1file=None,m1varfile=None,scalefile=None,clscatf
 
 	def loadfilewithdefault(filename,fillval=0):
 		if filename is None:
-			phase,wave=np.meshgrid(np.linspace(phaserange[0],phaserange[1],int((phaserange[1]-phaserange[0])/phaseinterpres)+1,True), np.linspace(waverange[0],waverange[1],int((waverange[1]-waverange[0])/waveinterpres)+1,True))
+			phase,wave=np.meshgrid(np.linspace(phaserange[0],phaserange[1],int((phaserange[1]-phaserange[0])/phaseinterpres)+1,True), 
+								   np.linspace(waverange[0],waverange[1],int((waverange[1]-waverange[0])/waveinterpres)+1,True))
 			return phase.flatten(),wave.flatten(),fillval*np.ones(phase.size)
 		else:
 			return np.loadtxt(filename,unpack=True)
@@ -192,18 +193,18 @@ def init_errs(m0varfile=None,m0m1file=None,m1varfile=None,scalefile=None,clscatf
 	scalephase,scalewave,scale=loadfilewithdefault(scalefile,1)
 	
 	#Subtract out statistical error from SALT2
-	#scale=np.sqrt(scale**2-1)
+	if m0varfile is not None: scale=np.sqrt(scale**2-1)
 	scalephase,scalewave=np.unique(scalephase),np.unique(scalewave)
 	scaleinterp=RegularGridInterpolator((scalephase,scalewave),scale.reshape(scalephase.size,scalewave.size),'nearest')
 	clipinterp=lambda x,y: scaleinterp((np.clip(x,scalephase.min(),scalephase.max()),np.clip(y,scalewave.min(),scalewave.max())))
-	phase,wave,m0var = loadfilewithdefault(m0varfile)
+	phase,wave,m0var = loadfilewithdefault(m0varfile,fillval=1e-6)
 	iGood = np.where((phase >= phaserange[0]-phasesplineres*0) & (phase <= phaserange[1]+phasesplineres*0) &
 					 (wave >= waverange[0]-wavesplineres*0) & (wave <= waverange[1]+wavesplineres*0))[0]
 	phase,wave,m0var = phase[iGood],wave[iGood],np.sqrt(m0var[iGood])
 	m0var*=clipinterp(phase,wave)
 	m0varbspl = initbsplwithzeroth(phase,wave,m0var,kx=order,ky=order, tx=splinephase,ty=splinewave)
 
-	phase,wave,m1var = loadfilewithdefault(m1varfile)
+	phase,wave,m1var = loadfilewithdefault(m1varfile,fillval=1e-6)
 	iGood = np.where((phase >= phaserange[0]-phasesplineres*0) & (phase <= phaserange[1]+phasesplineres*0) &
 					 (wave >= waverange[0]-wavesplineres*0) & (wave <= waverange[1]+wavesplineres*0))[0]
 	phase,wave,m1var = phase[iGood],wave[iGood],np.sqrt(m1var[iGood])
@@ -214,10 +215,9 @@ def init_errs(m0varfile=None,m0m1file=None,m1varfile=None,scalefile=None,clscatf
 	iGood = np.where((phase >= phaserange[0]-phasesplineres*0) & (phase <= phaserange[1]+phasesplineres*0) &
 					 (wave >= waverange[0]-wavesplineres*0) & (wave <= waverange[1]+wavesplineres*0))[0]
 	phase,wave,m0m1covar = phase[iGood],wave[iGood],m0m1covar[iGood]
-	corr=m0m1covar*clipinterp(phase,wave)**2/(m0var*m1var)
+	corr=m0m1covar/(m0var*m1var)*clipinterp(phase,wave)**2
 	corr[np.isnan(corr)]=0
 	m0m1corrbspl = initbsplwithzeroth(phase,wave,corr,kx=order,ky=order, tx=splinephase,ty=splinewave)
-	
 	if n_colorscatpars>0:
 		if clscatfile is None:
 			clscatcoeffs=np.zeros(n_colorscatpars)

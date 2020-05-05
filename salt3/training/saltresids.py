@@ -570,6 +570,7 @@ class SALTResids:
 			uncertainty_jac=  specmodel['modelvariance_jacobian'] / (2*uncertainty[:,np.newaxis])
 			specresids['lognorm_grad']= - (uncertainty_jac/uncertainty[:,np.newaxis]).sum(axis=0)
 			specresids['resid_jacobian']-=   uncertainty_jac*(specresids['resid'] /uncertainty)[:,np.newaxis]
+
 		return photresids,specresids
 	
 	def modelvalsforSN(self,x,sn,storedResults,varyParams):		
@@ -600,7 +601,8 @@ class SALTResids:
 					
 			prefactor=_SCALE_FACTOR/(1+z)*(colorexp*self.datadict[sn]['mwextcurve'][np.newaxis,:])
 			mod = prefactor*(M0 + x1*M1)
-			temporaryResults['fluxInterp'] = interp1d(obsphase,mod,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
+			#temporaryResults['fluxInterp'] = interp1d(obsphase,mod,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
+			temporaryResults['fluxInterp'] = mod #interp1d(obsphase,mod,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
 			if x1Deriv:
 				int1dM1 = interp1d(obsphase,prefactor*M1,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
 				temporaryResults['M1Interp']=int1dM1
@@ -621,6 +623,7 @@ class SALTResids:
 			saltErr=storedResults['saltErr']
 			saltCorr=storedResults['saltCorr'] 
 			modelUncertainty= prefactor**2 *(saltErr[0]**2  + 2*x1* saltCorr[0]*saltErr[0]*saltErr[1] + x1**2 *saltErr[1]**2)
+
 			#interr1d=interp1d(obsphase,modelUncertainty ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
 			#temporaryResults['modelUncertaintyInterp']=interr1d
 			temporaryResults['modelUncertainty']=modelUncertainty
@@ -640,7 +643,7 @@ class SALTResids:
 					raise RuntimeError('error!  %s array has issues'%varkey)
 			uncertaintydict=storedResults[varkey]
 			returndicts+=[{**valdict ,**uncertaintydict}]
-		
+
 		return returndicts		
 	
 	def photValsForSN(self,x,sn,storedResults,temporaryResults,varyParams):
@@ -649,6 +652,8 @@ class SALTResids:
 		filtwave = self.kcordict[survey]['filtwave']
 		obswave = self.datadict[sn]['obswave'] #self.wave*(1+z)
 		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
+		wavedelt = obswave[1]-obswave[0]
+		phasedelt = obsphase[1]-obsphase[0]
 		photdata = self.datadict[sn]['photdata']
 		pbspl = self.datadict[sn]['pbspl']
 		dwave = self.datadict[sn]['dwave']
@@ -681,7 +686,7 @@ class SALTResids:
 			clippedPhase=np.clip(phase,obsphase.min(),obsphase.max())
 			nphase = len(phase)
 			#Array output indices match time along 0th axis, wavelength along 1st axis
-			modulatedFlux = pbspl[flt]*temporaryResults['fluxInterp'](clippedPhase)[:,idx[flt]]
+			modulatedFlux = pbspl[flt]*temporaryResults['fluxInterp'][np.round((clippedPhase-obsphase[0])/phasedelt).astype(int),:][:,idx[flt]]
 			if ( (phase>obsphase.max())).any():
 				decayFactor=10**(-0.4*self.extrapolateDecline*(phase[phase>obsphase.max()]-obsphase.max()))
 				modulatedFlux[np.where(phase>obsphase.max())[0]] *= decayFactor[:,np.newaxis]
@@ -741,8 +746,8 @@ class SALTResids:
 			storedResults['pcDeriv_phot_%s'%sn]=summationCache
 		if len(np.where((photresultsdict['modelflux'] != photresultsdict['modelflux']) |
 						(photresultsdict['modelflux'] == np.inf))[0]):
-			raise RuntimeError('phot model fluxes are nonsensical')
-		
+			raise RuntimeError(f'phot model fluxes are nonsensical for SN {sn}')
+
 		return photresultsdict
 			
 	def specValsForSN(self,x,sn,storedResults,temporaryResults,varyParams):
@@ -751,6 +756,8 @@ class SALTResids:
 		filtwave = self.kcordict[survey]['filtwave']
 		obswave = self.datadict[sn]['obswave'] #self.wave*(1+z)
 		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
+		wavedelt = obswave[1]-obswave[0]
+		phasedelt = obsphase[1]-obsphase[0]
 		specdata = self.datadict[sn]['specdata']
 		pbspl = self.datadict[sn]['pbspl']
 		dwave = self.datadict[sn]['dwave']
@@ -794,10 +801,12 @@ class SALTResids:
 			recalexp=np.exp((drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1))
 			if len(np.where((recalexp != recalexp) | (recalexp == np.inf))[0]):
 				raise RuntimeError('error....spec recalibration problem for SN %s!'%sn)
-			
-			modinterp = temporaryResults['fluxInterp'](phase)
-			dmodelfluxdx0 = interp1d(obswave,modinterp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(specdata[k]['wavelength'])*recalexp
 
+			dmodelfluxdx0 = recalexp*temporaryResults['fluxInterp'][int(np.round((phase-obsphase[0])/phasedelt)),
+																	(np.round((specdata[k]['wavelength']-obswave[0])/wavedelt)).astype(int)]
+			#modinterp = temporaryResults['fluxInterp'](phase)
+			#dmodelfluxdx0 = interp1d(obswave,modinterp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(specdata[k]['wavelength'])*recalexp
+			
 			modulatedFlux = dmodelfluxdx0*x0
 			specresultsdict['modelflux'][specSlice] = modulatedFlux
 			if x0Deriv:
@@ -878,7 +887,7 @@ class SALTResids:
 		survey = self.datadict[sn]['survey']
 		filtwave = self.kcordict[survey]['filtwave']
 		obswave = self.datadict[sn]['obswave'] #self.wave*(1+z)
-		obsdelt = obswave[1]-obswave[0]
+		wavedelt = obswave[1]-obswave[0]
 		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
 		phasedelt = obsphase[1]-obsphase[0]
 		specdata = self.datadict[sn]['specdata']
@@ -926,7 +935,9 @@ class SALTResids:
 				modelerrnox = [  interr( specdata[k]['wavelength']) *recalexp for interr in (modelErrInt)]
 				corr=  [intcorr(specdata[k]['wavelength']) for intcorr in modelCorrInt]
 				
-			uncertaintyNoX0 = recalexp**2. * temporaryResults['modelUncertainty'][int((phase-obsphase[0])/phasedelt),((specdata[k]['wavelength']-obswave[0])/obsdelt).astype(int)]
+			uncertaintyNoX0 = recalexp**2. * temporaryResults['modelUncertainty'][
+				int(np.round((phase-obsphase[0])/phasedelt)),
+				(np.round((specdata[k]['wavelength']-obswave[0])/wavedelt)).astype(int)]
 			#uncertaintyNoX0=  recalexp**2 *  interp1d( obswave, temporaryResults['modelUncertaintyInterp'](phase)[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(specdata[k]['wavelength'])
 			modelUncertainty=uncertaintyNoX0*x0**2
 
@@ -955,21 +966,24 @@ class SALTResids:
 			if varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any():
 				interpresult=  self.errorspline_deriv_interp((phase[0]/(1+z),specdata[k]['wavelength']/(1+z)),method=self.interpMethod) 
 				extinctionexp=(recalexp*colorexpinterp* _SCALE_FACTOR/(1+z)*self.datadict[sn]['mwextcurveint'](specdata[k]['wavelength']))
-				specresultsdict['modelvariance_jacobian'][specSlice,(varyParlist=='modelerr_0'  )]   = 2* x0**2  * (extinctionexp *( modelerrnox[0] + corr[0]*modelerrnox[1]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_0']]
-				specresultsdict['modelvariance_jacobian'][specSlice,(varyParlist=='modelerr_1'  )]   = 2* x0**2  * (extinctionexp *(modelerrnox[1]*x1**2 + corr[0]*modelerrnox[0]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_1']]
-				specresultsdict['modelvariance_jacobian'][specSlice,(varyParlist=='modelcorr_01')] = 2* x0**2  * (modelerrnox[1]*modelerrnox[0]*x1)[:,np.newaxis]  * interpresult[:,varyParams[self.parlist=='modelcorr_01']]
+				specresultsdict['modelvariance_jacobian'][specSlice,(varyParlist=='modelerr_0'  )]   = \
+					2* x0**2  * (extinctionexp *( modelerrnox[0] + corr[0]*modelerrnox[1]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_0']]
+				specresultsdict['modelvariance_jacobian'][specSlice,(varyParlist=='modelerr_1'  )]   = \
+					2* x0**2  * (extinctionexp *(modelerrnox[1]*x1**2 + corr[0]*modelerrnox[0]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_1']]
+				specresultsdict['modelvariance_jacobian'][specSlice,(varyParlist=='modelcorr_01')] = \
+					2* x0**2  * (modelerrnox[1]*modelerrnox[0]*x1)[:,np.newaxis]  * interpresult[:,varyParams[self.parlist=='modelcorr_01']]
 
 			iSpecStart += SpecLen
 			
 		return specresultsdict
-	
+
 	def photVarianceForSN(self,x,sn,storedResults,temporaryResults,varyParams):
 		"""Currently calculated only at the effective wavelength of the filter, not integrated over."""
 		z = self.datadict[sn]['zHelio']
 		survey = self.datadict[sn]['survey']
 		filtwave = self.kcordict[survey]['filtwave']
 		obswave = self.datadict[sn]['obswave'] #self.wave*(1+z)
-		obsdelt = obswave[1]-obswave[0]
+		wavedelt = obswave[1]-obswave[0]
 		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
 		phasedelt=obsphase[1]-obsphase[0]
 		photdata = self.datadict[sn]['photdata']
@@ -1022,9 +1036,9 @@ class SALTResids:
 				
 				modelerrnox = [  interr( lameff)  for interr in (modelErrInt)]
 				corr=  [intcorr(lameff) for intcorr in modelCorrInt]
-				
+			
 			#modelErrInt = interp1d( obswave, temporaryResults['modelUncertaintyInterp'](clippedPhase),kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(lameff)
-			modelErrInt = temporaryResults['modelUncertainty'][((clippedPhase-obsphase[0])/phasedelt).astype(int),int((lameff-obswave[0])/obsdelt)]
+			modelErrInt = temporaryResults['modelUncertainty'][np.round((clippedPhase-obsphase[0])/phasedelt).astype(int),int(np.round((lameff-obswave[0])/wavedelt))]
 			uncertaintyNoX0= fluxfactor *  modelErrInt
 			modelUncertainty=uncertaintyNoX0*x0**2
 			negativevariance=modelUncertainty<0
@@ -1051,9 +1065,12 @@ class SALTResids:
 				extinctionexp=(colorexpinterp* _SCALE_FACTOR/(1+z)*self.datadict[sn]['mwextcurveint'](lameff))
 			
 				interpresult =  self.errorspline_deriv_interp((clippedPhase/(1+z),lameff/(1+z)),method=self.interpMethod) 
-				photresultsdict['modelvariance_jacobian'][np.outer(selectFilter,(varyParList=='modelerr_0')  )]  =( 2* fluxfactor* x0**2  * extinctionexp) *((( modelerrnox[0] + corr[0]*modelerrnox[1]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_0']]).flatten()
-				photresultsdict['modelvariance_jacobian'][np.outer(selectFilter,(varyParList=='modelerr_1')  )]  =( 2* fluxfactor* x0**2  * extinctionexp )*(((modelerrnox[1]*x1**2 + corr[0]*modelerrnox[0]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_1']]).flatten()
-				photresultsdict['modelvariance_jacobian'][np.outer(selectFilter,(varyParList=='modelcorr_01'))]  =( 2*fluxfactor* x0**2 *x1) * ((modelerrnox[1]*modelerrnox[0])[:,np.newaxis]  * interpresult[:,varyParams[self.parlist=='modelcorr_01']]).flatten()
+				photresultsdict['modelvariance_jacobian'][np.outer(selectFilter,(varyParList=='modelerr_0')  )]  =\
+					( 2* fluxfactor* x0**2  * extinctionexp) *((( modelerrnox[0] + corr[0]*modelerrnox[1]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_0']]).flatten()
+				photresultsdict['modelvariance_jacobian'][np.outer(selectFilter,(varyParList=='modelerr_1')  )]  =\
+					( 2* fluxfactor* x0**2  * extinctionexp )*(((modelerrnox[1]*x1**2 + corr[0]*modelerrnox[0]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_1']]).flatten()
+				photresultsdict['modelvariance_jacobian'][np.outer(selectFilter,(varyParList=='modelcorr_01'))]  =\
+					( 2*fluxfactor* x0**2 *x1) * ((modelerrnox[1]*modelerrnox[0])[:,np.newaxis]  * interpresult[:,varyParams[self.parlist=='modelcorr_01']]).flatten()
 
 		return photresultsdict
 

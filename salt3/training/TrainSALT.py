@@ -142,6 +142,7 @@ class TrainSALT(TrainSALTBase):
 				order-=1
 				recalParams=[f'specx0_{sn}_{k}']+['specrecal_{}_{}'.format(sn,k)]*order
 				parlist=np.append(parlist,recalParams)
+
 		# initial guesses
 		n_params=parlist.size
 		guess = np.zeros(parlist.size)
@@ -185,10 +186,28 @@ class TrainSALT(TrainSALTBase):
 			guess[parlist=='modelerr_0']=m0varknots
 			guess[parlist=='modelerr_1']=m1varknots
 			guess[parlist=='modelcorr_01']=m0m1corrknots
+
+			# if SN param list is provided, initialize with these params
+			if self.options.snparlist:
+				snpar = Table.read(self.options.snparlist,format='ascii')
 			
 			i=0
 			for sn in datadict.keys():
-				guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn]['zHelio']).value-19.36-10.635))
+				if self.options.snparlist:
+					# hacky matching, but SN names are a mess as usual
+					iSN = ((sn == snpar['SNID']) | ('sn'+sn == snpar['SNID']) |
+						   ('sn'+sn.lower() == snpar['SNID']) | (sn+'.0' == snpar['SNID']))
+					if len(snpar[iSN]):
+						guess[parlist == 'x0_%s'%sn] = snpar['x0'][iSN]
+						guess[parlist == 'x1_%s'%sn] = snpar['x1'][iSN]
+						guess[parlist == 'c_%s'%sn] = snpar['c'][iSN]
+					else:
+						log.warning(f'SN {sn} not found in SN par list {self.options.snparlist}')
+						guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn]['zHelio']).value-19.36-10.635))
+
+				else:
+					guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn]['zHelio']).value-19.36-10.635))
+				
 				for k in datadict[sn]['specdata'] : 
 					guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]
 				i+=1
@@ -433,8 +452,8 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 		sysdict = {}
 		for m,flt,flx,flxe in zip(sn.MJD,sn.FLT,sn.FLUXCAL,sn.FLUXCALERR):
-			if 'BD17' in self.kcordict.keys(): sys = 'bd17'
-			elif 'AB' in self.kcordict.keys(): sys = 'ab'
+			if self.kcordict[sn.SURVEY][flt]['magsys'] == 'BD17': sys = 'bd17'
+			elif self.kcordict[sn.SURVEY][flt]['magsys'] == 'AB': sys = 'ab'
 			else: sys = 'vega'
 			if self.kcordict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) > 2000 and \
 			   self.kcordict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) < 9200 and\
@@ -459,8 +478,8 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 		# prelims
 		plt.subplots_adjust(left=None, bottom=None, right=None, top=0.85, wspace=0.025, hspace=0)
-		x0,x1,c,t0 = np.loadtxt('%s/salt3train_snparams.txt'%outputdir,unpack=True,usecols=[1,2,3,4])
-		snid = np.genfromtxt('%s/salt3train_snparams.txt'%outputdir,unpack=True,dtype='str',usecols=[0])
+		x0,x1,c,t0 = np.loadtxt(f'{outputdir}/salt3train_snparams.txt',unpack=True,usecols=[1,2,3,4])
+		snid = np.genfromtxt(f'{outputdir}/salt3train_snparams.txt',unpack=True,dtype='str',usecols=[0])
 
 		# have stopped really looking at these for now
 		#ValidateModel.main(
@@ -470,10 +489,14 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		#	'%s/spectralcomp_chi2.png'%outputdir,
 		#	outputdir)
 
-		plotSALTModel.mkModelErrPlot(outputdir,outfile='%s/SALTmodelerrcomp.pdf'%outputdir,
+		if self.options.fitsalt2:
+			from salt3.validation import ValidateParams
+			ValidateParams.main(f'{outputdir}/salt3train_snparams.txt',f'{outputdir}/saltparcomp.png')
+		
+		plotSALTModel.mkModelErrPlot(outputdir,outfile=f'{outputdir}/SALTmodelerrcomp.pdf',
 								  xlimits=[self.options.waverange[0],self.options.waverange[1]])
 
-		plotSALTModel.mkModelPlot(outputdir,outfile='%s/SALTmodelcomp.pdf'%outputdir,
+		plotSALTModel.mkModelPlot(outputdir,outfile=f'{outputdir}/SALTmodelcomp.pdf',
 								  xlimits=[self.options.waverange[0],self.options.waverange[1]])
 		SynPhotPlot.plotSynthPhotOverStretchRange(
 			'{}/synthphotrange.pdf'.format(outputdir),outputdir,'Bessell')
@@ -516,7 +539,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 		pdf_pages = PdfPages('%s/lcfits.pdf'%outputdir)
 		import matplotlib.gridspec as gridspec
-		gs1 = gridspec.GridSpec(3, 3)
+		gs1 = gridspec.GridSpec(3, 4)
 		gs1.update(wspace=0.0)
 		i = 0
 		
@@ -579,10 +602,10 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				sn = snana.SuperNova(l)
 				sn.SNID = str(sn.SNID)
 				if not sn.SNID in datadict: continue
-				if not i % 9:
+				if not i % 12:
 					fig = plt.figure()
 				try:
-					ax1 = plt.subplot(gs1[i % 9]); ax2 = plt.subplot(gs1[(i+1) % 9]); ax3 = plt.subplot(gs1[(i+2) % 9])
+					ax1 = plt.subplot(gs1[i % 12]); ax2 = plt.subplot(gs1[(i+1) % 12]); ax3 = plt.subplot(gs1[(i+2) % 12]); ax4 = plt.subplot(gs1[(i+3) % 12])
 				except:
 					import pdb; pdb.set_trace()
 
@@ -600,17 +623,17 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 					'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,outputdir,
 					t0=t0sn,x0=x0sn,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc,
 					bandpassdict=self.kcordict,n_components=self.options.n_components,
-					ax1=ax1,ax2=ax2,ax3=ax3,saltdict=saltdict)
-				if i % 9 == 6:
+					ax1=ax1,ax2=ax2,ax3=ax3,ax4=ax4,saltdict=saltdict)
+				if i % 12 == 8:
 					pdf_pages.savefig()
 					plt.close('all')
 				else:
-					for ax in [ax1,ax2,ax3]:
+					for ax in [ax1,ax2,ax3,ax4]:
 						ax.xaxis.set_ticklabels([])
 						ax.set_xlabel(None)
-				i += 3
+				i += 4
 
-		if not i %9 ==0:
+		if not i %12 ==0:
 			pdf_pages.savefig()
 		pdf_pages.close()
 		log.info('plotting light curves took %.1f'%(time()-tlc))
@@ -620,7 +643,9 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			stage='initialization'
 			if not len(self.surveylist):
 				raise RuntimeError('surveys are not defined - see documentation')
+			tkstart = time()
 			self.kcordict=readutils.rdkcor(self.surveylist,self.options)
+			log.info(f'took {time()-tkstart:.3f} to read in kcor files')
 			# TODO: ASCII filter files
 				
 			if not os.path.exists(self.options.outputdir):
@@ -630,12 +655,15 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			else:
 				binspecres = None
 
+			tdstart = time()
 			datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,self.kcordict,
 										   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
 										   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
 										   binspecres=binspecres)
+			log.info(f'took {time()-tdstart:.3f} to read in data files')
+			tcstart = time()
 			datadict = self.mkcuts(datadict,KeepOnlySpec=self.options.keeponlyspec)
-
+			log.info(f'took {time()-tcstart:.3f} to apply cuts')
 		
 			# fit the model - initial pass
 			if self.options.stage == "all" or self.options.stage == "train":
