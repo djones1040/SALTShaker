@@ -231,7 +231,7 @@ class SALTResids:
 		self.colorLawDerivInterp=interp1d(self.wave,self.colorLawDeriv,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
 		
 		
-		log.info('Time to calculate spline_derivs: %.2f'%(time.time()-starttime))
+		log.info(f'Time to calculate spline_derivs: {time.time()-starttime:.2f}')
 		
 		
 		self.getobswave()
@@ -255,6 +255,14 @@ class SALTResids:
 		self.corrmax = tuple([np.max(np.where(self.parlist == 'modelcorr_{}{}'.format(i,j))[0]) for i,j in self.corrcombinations]) 
 		self.im0 = np.where(self.parlist == 'm0')[0]
 		self.im1 = np.where(self.parlist == 'm1')[0]
+
+		wavemin = []
+		for i in range(self.im0.size):
+			wavemin += [self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),
+										  i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]][0]]
+		self.im0new = np.where(self.parlist == 'm0')[0][np.array(wavemin) > 8500]
+		self.im1new = np.where(self.parlist == 'm1')[0][np.array(wavemin) > 8500]
+		
 		self.iCL = np.where(self.parlist == 'cl')[0]
 		self.ix1 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x1')])
 		self.ix0 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x0') or si.startswith('specx0')])
@@ -285,7 +293,7 @@ class SALTResids:
 			specdata=self.datadict[sn]['specdata']
 			photdata = self.datadict[sn]['photdata']
 			idx = self.datadict[sn]['idx']
-			tpkoff=X[self.parlist == 'tpkoff_%s'%sn]
+			tpkoff=X[self.parlist == f'tpkoff_{sn}']
 			obsphase = self.datadict[sn]['obsphase'] 
 			for k in specdata.keys():
 				
@@ -584,8 +592,8 @@ class SALTResids:
 		
 		z = self.datadict[sn]['zHelio']
 		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
-		x1,c,tpkoff = x[self.parlist == 'x1_%s'%sn],\
-						 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
+		x1,c,tpkoff = x[self.parlist == f'x1_{sn}'],\
+						 x[self.parlist == f'c_{sn}'],x[self.parlist == f'tpkoff_{sn}']
 		colorexp= 10. ** (storedResults['colorLaw'] * c)
 		temporaryResults['colorexp'] =colorexp
 		
@@ -638,7 +646,7 @@ class SALTResids:
 				storedResults[varkey]=uncertaintyfun(x,sn,storedResults,temporaryResults,varyParams)
 				if len(np.where((storedResults[varkey] != storedResults[varkey]) |
 								(storedResults[varkey] == np.inf))[0]):
-					raise RuntimeError('error!  %s array has issues'%varkey)
+					raise RuntimeError(f'error!  {varkey} array has issues')
 			uncertaintydict=storedResults[varkey]
 			returndicts+=[{**valdict ,**uncertaintydict}]
 
@@ -656,8 +664,8 @@ class SALTResids:
 		pbspl = self.datadict[sn]['pbspl']
 		dwave = self.datadict[sn]['dwave']
 		idx = self.datadict[sn]['idx']
-		x0,x1,c,tpkoff = x[self.parlist == 'x0_%s'%sn],x[self.parlist == 'x1_%s'%sn],\
-						 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
+		x0,x1,c,tpkoff = x[self.parlist == f'x0_{sn}'],x[self.parlist == f'x1_{sn}'],\
+						 x[self.parlist == f'c_{sn}'],x[self.parlist == f'tpkoff_{sn}']
 		
 		x0Deriv= varyParams[self.parlist==f'x0_{sn}']
 		x1Deriv= varyParams[self.parlist==f'x1_{sn}'][0] 
@@ -673,7 +681,7 @@ class SALTResids:
 		photresultsdict['modelflux'] = np.zeros(len(photdata['filt']))
 		photresultsdict['dataflux'] = photdata['fluxcal']
 		photresultsdict['modelflux_jacobian'] = np.zeros((photdata['filt'].size,varyParams.sum()))
-		if requiredPCDerivs.all() and not 'pcDeriv_phot_%s'%sn in storedResults:
+		if requiredPCDerivs.all() and not f'pcDeriv_phot_{sn}' in storedResults:
 			summationCache=np.zeros((photdata['filt'].size,self.im0.size))
 		for flt in np.unique(photdata['filt']):
 			intmult = dwave*self.fluxfactor[survey][flt]*_SCALE_FACTOR/(1+z)*x0
@@ -719,8 +727,8 @@ class SALTResids:
 			if requiredPCDerivs.any():
 					passbandColorExp=pbspl[flt]*colorexp[idx[flt]]*self.datadict[sn]['mwextcurve'][idx[flt]]
 					for pdx,p in enumerate(np.where(selectFilter)[0]):
-						if 'pcDeriv_phot_%s'%sn in storedResults:
-							summation=storedResults['pcDeriv_phot_%s'%sn][p,requiredPCDerivs]
+						if f'pcDeriv_phot_{sn}' in storedResults:
+							summation=storedResults[f'pcDeriv_phot_{sn}'][p,requiredPCDerivs]
 						else:
 							if self.fitTpkOff:
 								derivInterp = self.spline_deriv_interp(
@@ -740,8 +748,8 @@ class SALTResids:
 						photresultsdict['modelflux_jacobian'][p,(varyParList=='m1')]=summation[varyParams[self.im1][requiredPCDerivs]]*intmult*x1
 					
 			photresultsdict['modelflux'][selectFilter]=modelflux
-		if requiredPCDerivs.all() and not 'pcDeriv_phot_%s'%sn in storedResults :
-			storedResults['pcDeriv_phot_%s'%sn]=summationCache
+		if requiredPCDerivs.all() and not f'pcDeriv_phot_{sn}' in storedResults :
+			storedResults[f'pcDeriv_phot_{sn}']=summationCache
 		if len(np.where((photresultsdict['modelflux'] != photresultsdict['modelflux']) |
 						(photresultsdict['modelflux'] == np.inf))[0]):
 			raise RuntimeError(f'phot model fluxes are nonsensical for SN {sn}')
@@ -760,8 +768,8 @@ class SALTResids:
 		pbspl = self.datadict[sn]['pbspl']
 		dwave = self.datadict[sn]['dwave']
 		idx = self.datadict[sn]['idx']
-		x1,c,tpkoff = x[self.parlist == 'x1_%s'%sn],\
-						 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
+		x1,c,tpkoff = x[self.parlist == f'x1_{sn}'],\
+						 x[self.parlist == f'c_{sn}'],x[self.parlist == f'tpkoff_{sn}']
 
 		x1Deriv= varyParams[self.parlist=='x1_{}'.format(sn)][0] 
 		tpkDeriv=varyParams[self.parlist=='tpkoff_{}'.format(sn)][0]
@@ -776,7 +784,7 @@ class SALTResids:
 		specresultsdict['dataflux'] = np.zeros(nspecdata)
 		specresultsdict['modelflux_jacobian'] = np.zeros((nspecdata,varyParams.sum()))
 		
-		if requiredPCDerivs.all() and not 'pcDeriv_spec_%s'%sn in storedResults:
+		if requiredPCDerivs.all() and not f'pcDeriv_spec_{sn}' in storedResults:
 			if self.fitTpkOff:
 				interpCache=np.zeros((nspecdata,self.im0.size))
 			else:
@@ -798,10 +806,12 @@ class SALTResids:
 			drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
 			recalexp=np.exp((drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1))
 			if len(np.where((recalexp != recalexp) | (recalexp == np.inf))[0]):
-				raise RuntimeError('error....spec recalibration problem for SN %s!'%sn)
+				raise RuntimeError(f'error....spec recalibration problem for SN {sn}!')
 
-			dmodelfluxdx0 = recalexp*temporaryResults['fluxInterp'][int(np.round((phase-obsphase[0])/phasedelt)),
-																	(np.round((specdata[k]['wavelength']-obswave[0])/wavedelt)).astype(int)]
+			try: dmodelfluxdx0 = recalexp*temporaryResults['fluxInterp'][int(np.round((phase-obsphase[0])/phasedelt)),
+																		 (np.round((specdata[k]['wavelength']-obswave[0])/wavedelt)).astype(int)]
+			except:
+				import pdb; pdb.set_trace()
 			#modinterp = temporaryResults['fluxInterp'](phase)
 			#dmodelfluxdx0 = interp1d(obswave,modinterp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(specdata[k]['wavelength'])*recalexp
 			
@@ -846,17 +856,17 @@ class SALTResids:
 			if (requiredPCDerivs).any():
 				intmult = _SCALE_FACTOR/(1+z)*recalexp*colorexpinterp*self.datadict[sn]['mwextcurveint'](specdata[k]['wavelength'])
 				if self.fitTpkOff:
-					if 'pcDeriv_spec_%s'%sn in storedResults:
-						derivInterp= storedResults['pcDeriv_spec_%s'%sn][specSlice,:]
+					if f'pcDeriv_spec_{sn}' in storedResults:
+						derivInterp= storedResults[f'pcDeriv_spec_{sn}'][specSlice,:]
 					else:
 						derivInterp=self.spline_deriv_interp((phase[0]/(1+z),specdata[k]['wavelength']/(1+z)),method=self.interpMethod)*intmult[:,np.newaxis]
 					specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='m0')]  = derivInterp[:,varyParams[self.im0]]*(x0)
 					specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='m1')] =  derivInterp[:,varyParams[self.im1]]*(x1*x0)
-					if requiredPCDerivs.all() and not 'pcDeriv_spec_%s'%sn in storedResults:
+					if requiredPCDerivs.all() and not f'pcDeriv_spec_{sn}' in storedResults:
 						interpCache[specSlice,:] = derivInterp
 				else:
-					if 'pcDeriv_spec_%s'%sn in storedResults:
-						derivInterp=storedResults['pcDeriv_spec_%s'%sn][k]
+					if f'pcDeriv_spec_{sn}' in storedResults:
+						derivInterp=storedResults[f'pcDeriv_spec_{sn}'][k]
 					else:
 						derivInterp=self.pcderivsparse[f'derivInterp_spec_{sn}_{k}'].multiply(intmult[:,np.newaxis]).tocsc()
 						interpCache[k]=derivInterp
@@ -868,15 +878,15 @@ class SALTResids:
 # 						specresultsdict['modelflux_jacobian'][specSlice,self.im0] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
 # 						specresultsdict['modelflux_jacobian'][specSlice,self.im1] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
 # 
-# 						self.__dict__['dmodelflux_dM0_spec_%s'%sn][specSlice,:] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
+# 						self.__dict__[f'dmodelflux_dM0_spec_{sn}'][specSlice,:] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
 # 						#if computePCDerivs != 1:
 			iSpecStart += SpecLen
 
-		if requiredPCDerivs.all() and not 'pcDeriv_spec_%s'%sn in storedResults: 
-			storedResults['pcDeriv_spec_%s'%sn]=interpCache
+		if requiredPCDerivs.all() and not f'pcDeriv_spec_{sn}' in storedResults: 
+			storedResults[f'pcDeriv_spec_{sn}']=interpCache
 		if len(np.where((specresultsdict['modelflux'] != specresultsdict['modelflux']) |
 						(specresultsdict['modelflux'] == np.inf))[0]):
-			raise RuntimeError('spec model flux nonsensical for SN %s'%sn)
+			raise RuntimeError(f'spec model flux nonsensical for SN {sn}')
 
 		return specresultsdict
 
@@ -892,8 +902,8 @@ class SALTResids:
 		pbspl = self.datadict[sn]['pbspl']
 		dwave = self.datadict[sn]['dwave']
 		idx = self.datadict[sn]['idx']
-		x1,c,tpkoff = x[self.parlist == 'x1_%s'%sn],\
-						 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
+		x1,c,tpkoff = x[self.parlist == f'x1_{sn}'],\
+						 x[self.parlist == f'c_{sn}'],x[self.parlist == f'tpkoff_{sn}']
 
 		x1Deriv= varyParams[self.parlist=='x1_{}'.format(sn)][0] 
 		tpkDeriv=varyParams[self.parlist=='tpkoff_{}'.format(sn)][0]
@@ -989,8 +999,8 @@ class SALTResids:
 		pbspl = self.datadict[sn]['pbspl']
 		dwave = self.datadict[sn]['dwave']
 		idx = self.datadict[sn]['idx']
-		x0,x1,c,tpkoff = x[self.parlist == 'x0_%s'%sn],x[self.parlist == 'x1_%s'%sn],\
-						 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
+		x0,x1,c,tpkoff = x[self.parlist == f'x0_{sn}'],x[self.parlist == f'x1_{sn}'],\
+						 x[self.parlist == f'c_{sn}'],x[self.parlist == f'tpkoff_{sn}']
 		
 		x0Deriv= varyParams[self.parlist=='x0_{}'.format(sn)][0] 
 		x1Deriv= varyParams[self.parlist=='x1_{}'.format(sn)][0] 
@@ -1261,14 +1271,14 @@ class SALTResids:
 		resultsdict = {}
 		n_sn = len(self.datadict.keys())
 		for k in self.datadict.keys():
-			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k],
-							  'x1':x[self.parlist == 'x1_%s'%k],# - np.mean(x[self.ix1]),
-							  'c':x[self.parlist == 'c_%s'%k],
-							  'tpkoff':x[self.parlist == 'tpkoff_%s'%k],
-							  'x0err':x[self.parlist == 'x0_%s'%k],
-							  'x1err':x[self.parlist == 'x1_%s'%k],
-							  'cerr':x[self.parlist == 'c_%s'%k],
-							  'tpkofferr':x[self.parlist == 'tpkoff_%s'%k]}
+			resultsdict[k] = {'x0':x[self.parlist == f'x0_{k}'],
+							  'x1':x[self.parlist == f'x1_{k}'],# - np.mean(x[self.ix1]),
+							  'c':x[self.parlist == f'c_{k}'],
+							  'tpkoff':x[self.parlist == f'tpkoff_{k}'],
+							  'x0err':x[self.parlist == f'x0_{k}'],
+							  'x1err':x[self.parlist == f'x1_{k}'],
+							  'cerr':x[self.parlist == f'c_{k}'],
+							  'tpkofferr':x[self.parlist == f'tpkoff_{k}']}
 
 
 		m0,m1=self.SALTModel(x)
@@ -1287,7 +1297,7 @@ class SALTResids:
 
 		axcount = 0; parcount = 0
 		from matplotlib.backends.backend_pdf import PdfPages
-		pdf_pages = PdfPages('%s/MCMC_hist.pdf'%self.outputdir)
+		pdf_pages = PdfPages(f'{self.outputdir}/MCMC_hist.pdf')
 		fig = plt.figure()
 
 		m0pars = np.array([])
@@ -1367,14 +1377,14 @@ class SALTResids:
 		resultsdict = {}
 		n_sn = len(self.datadict.keys())
 		for k in self.datadict.keys():
-			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k,nburn:].mean(),
-							  'x1':x[self.parlist == 'x1_%s'%k,nburn:].mean(),# - x[self.ix1,nburn:].mean(),
-							  'c':x[self.parlist == 'c_%s'%k,nburn:].mean(),
-							  'tpkoff':x[self.parlist == 'tpkoff_%s'%k,nburn:].mean(),
-							  'x0err':x[self.parlist == 'x0_%s'%k,nburn:].std(),
-							  'x1err':x[self.parlist == 'x1_%s'%k,nburn:].std(),
-							  'cerr':x[self.parlist == 'c_%s'%k,nburn:].std(),
-							  'tpkofferr':x[self.parlist == 'tpkoff_%s'%k,nburn:].std()}
+			resultsdict[k] = {'x0':x[self.parlist == f'x0_{k}',nburn:].mean(),
+							  'x1':x[self.parlist == f'x1_{k}',nburn:].mean(),# - x[self.ix1,nburn:].mean(),
+							  'c':x[self.parlist == f'c_{k}',nburn:].mean(),
+							  'tpkoff':x[self.parlist == f'tpkoff_{k}',nburn:].mean(),
+							  'x0err':x[self.parlist == f'x0_{k}',nburn:].std(),
+							  'x1err':x[self.parlist == f'x1_{k}',nburn:].std(),
+							  'cerr':x[self.parlist == f'c_{k}',nburn:].std(),
+							  'tpkofferr':x[self.parlist == f'tpkoff_{k}',nburn:].std()}
 
 
 		m0 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars,self.bsorder,self.bsorder))
@@ -1409,11 +1419,11 @@ class SALTResids:
 			subnum = axcount%9+1
 			ax = plt.subplot(3,3,subnum)
 			axcount += 1
-			md = np.mean(x[self.parlist == '%s_%s'%(snpar,k),nburn:])
-			std = np.std(x[self.parlist == '%s_%s'%(snpar,k),nburn:])
+			md = np.mean(x[self.parlist == f'{snpar}_{k}',nburn:])
+			std = np.std(x[self.parlist == f'{snpar}_{k}',nburn:])
 			histbins = np.linspace(md-3*std,md+3*std,50)
-			ax.hist(x[self.parlist == '%s_%s'%(snpar,k),nburn:],bins=histbins)
-			ax.set_title('%s_%s'%(snpar,k))
+			ax.hist(x[self.parlist == f'{snpar}_{k}',nburn:],bins=histbins)
+			ax.set_title(f'{snpar}_{k}')
 			if axcount % 9 == 8:
 				pdf_pages.savefig(fig)
 				fig = plt.figure()
@@ -1442,7 +1452,7 @@ class SALTResids:
 		self.neffRaw=np.zeros((self.phaseRegularizationPoints.size,self.waveRegularizationPoints.size))
 
 		for sn in (self.datadict.keys()):
-			tpkoff=x[self.parlist == 'tpkoff_%s'%sn]
+			tpkoff=x[self.parlist == f'tpkoff_{sn}']
 			photdata = self.datadict[sn]['photdata']
 			specdata = self.datadict[sn]['specdata']
 			survey = self.datadict[sn]['survey']

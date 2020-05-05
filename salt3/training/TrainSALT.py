@@ -256,6 +256,8 @@ class TrainSALT(TrainSALTBase):
 
 			if self.options.do_gaussnewton:
 				saltfitkwargs['regularize'] = self.options.regularize
+				saltfitkwargs['fitting_sequence'] = self.options.fitting_sequence
+				saltfitkwargs['fix_salt2modelpars'] = self.options.fix_salt2modelpars
 				saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)			
 				# do the fitting
 				x_modelpars,x_unscaled,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
@@ -595,6 +597,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 			tlc = time()
 			for l in snfiles:
+				if 'Foundation' not in l: continue
 				if not i % 12:
 					fig = plt.figure()
 				try:

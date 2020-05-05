@@ -78,6 +78,8 @@ class TrainSALTBase:
 							help='Mass of filter transmission allowed outside of model wavelength range (default=%default)')
 		parser.add_argument('--trainingconfig', default=config.get('iodata','trainingconfig'), type=str,
 							help='config file for the detailed training params')
+		parser.add_argument('--fix_salt2modelpars', default=config.get('iodata','fix_salt2modelpars'), type=boolean_string,
+							help="""if set, fix M0/M1 for wavelength/phase range of original SALT2 model (default=%default)""")
 
 
 		parser.add_argument('--do_mcmc', default=config.get('trainparams','do_mcmc'), type=boolean_string,
@@ -149,7 +151,8 @@ class TrainSALTBase:
 							help='bin the spectra if set (default=%default)')
 		parser.add_argument('--binspecres', default=config.get('trainingparams','binspecres'), type=int,
 							help='binning resolution (default=%default)')
-
+		parser.add_argument('--fitting_sequence', default=config.get('trainingparams','fitting_sequence'), type=str,
+							help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn, tpk (default=%default)")
 		
    		#neff parameters
 		parser.add_argument('--wavesmoothingneff', default=config.get('trainingparams','wavesmoothingneff'), type=float,
@@ -310,6 +313,8 @@ class TrainSALTBase:
 		numSpecPoints=0
 		failedlist = []
 		log.info('hack! no spec color cut')
+		log.info('hack!  no cuts at all')
+		return datadict
 		for sn in list(datadict.keys()):
 			photdata = datadict[sn]['photdata']
 			specdata = datadict[sn]['specdata']

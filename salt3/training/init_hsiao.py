@@ -3,6 +3,7 @@ import numpy as np
 from scipy.interpolate import bisplrep,bisplev,RegularGridInterpolator
 from scipy.interpolate import interp1d
 from sncosmo.constants import HC_ERG_AA
+from salt3.initfiles import init_rootdir
 
 import logging
 log=logging.getLogger(__name__)
@@ -12,6 +13,7 @@ _SCALE_FACTOR = 1e-12
 def init_salt2(m0file,m1file,
 			   Bfilt='initfiles/Bessell90_B.dat',
 			   flatnu='initfiles/flatnu.dat',
+			   hsiaofile=f'{init_rootdir}/Hsiao07.dat',
 			   phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
 			   waveinterpres=2.0,phasesplineres=3.2,wavesplineres=72,
 			   days_interp=5,debug=False,normalize=True,order=3):
@@ -25,10 +27,45 @@ def init_salt2(m0file,m1file,
 	splinephase = np.linspace(phaserange[0],phaserange[1],int((phaserange[1]-phaserange[0])/phasesplineres)+1,True)
 	splinewave  = np.linspace(waverange[0],waverange[1],int((waverange[1]-waverange[0])/wavesplineres)+1,True)
 
-	bspl = bisplrep(phase,wave,m0flux,kx=order,ky=order, tx=splinephase,ty=splinewave,task=-1)
-	bsplm1 = bisplrep(phase,wave,
-					  m1flux,kx=order,ky=order,
-					  tx=splinephase,ty=splinewave,task=-1)
+	# extend the wavelength range using the hsiao model
+	# and a bunch of zeros for M1
+	if waverange[1] > 9200:
+		delwave = wave[1]-wave[0]
+		delphase = np.unique(phase)[1]-np.unique(phase)[0]
+		new_wave_grid = np.arange(waverange[0],waverange[1],delwave)
+		new_phase_grid = np.arange(phaserange[0],phaserange[1],delphase)
+		
+		hphase,hwave,hflux = np.loadtxt(hsiaofile,unpack=True)
+
+		# scale hsiao to match end of SALT spectrum
+		m0_out,m1_out = np.zeros([len(new_phase_grid),len(new_wave_grid)]),\
+						np.zeros([len(new_phase_grid),len(new_wave_grid)])
+		phase_new, wave_new = np.array([]),np.array([])
+		for i,p in enumerate(new_phase_grid):
+			hscale = np.median(m0flux[(phase == p) & (wave > 9100)])/\
+					 np.median(hflux[(hphase == p) & (hwave > 9100) & (hwave < 9200)])
+			m0_p = np.zeros(len(new_wave_grid))
+			m1_p = np.zeros(len(new_wave_grid))
+			idx = np.where(new_wave_grid==9200)[0][0]
+
+			#import pdb; pdb.set_trace()
+			m0_p[:idx+1] = m0flux[phase == p]; m1_p[:idx+1] = m1flux[phase == p]
+			m0_p[idx:] = np.interp(new_wave_grid,hwave[hphase == p],hflux[hphase == p])[idx:]*hscale; m1_p[idx:] = 0.0
+			m0_out[i,:] = m0_p
+			m1_out[i,:] = m1_p
+			phase_new = np.append(phase_new,[p]*len(new_wave_grid))
+			wave_new = np.append(wave_new,new_wave_grid)
+
+		bspl = bisplrep(phase_new,wave_new,m0_out.flatten(),kx=order,ky=order, tx=splinephase,ty=splinewave,task=-1)
+		bsplm1 = bisplrep(phase_new,wave_new,
+						  m1_out.flatten(),kx=order,ky=order,
+						  tx=splinephase,ty=splinewave,task=-1)
+	
+	else:
+		bspl = bisplrep(phase,wave,m0flux,kx=order,ky=order, tx=splinephase,ty=splinewave,task=-1)
+		bsplm1 = bisplrep(phase,wave,
+						  m1flux,kx=order,ky=order,
+						  tx=splinephase,ty=splinewave,task=-1)
 
 	intphase = np.linspace(phaserange[0],phaserange[1]+phaseinterpres,
 						   int((phaserange[1]-phaserange[0])/phaseinterpres)+1,False)
