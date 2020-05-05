@@ -597,7 +597,6 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 			tlc = time()
 			for l in snfiles:
-				if 'Foundation' not in l: continue
 				if not i % 12:
 					fig = plt.figure()
 				try:
