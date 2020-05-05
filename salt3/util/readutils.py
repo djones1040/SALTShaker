@@ -122,6 +122,8 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 				for k in sn.SPECTRA:
 					spec=sn.SPECTRA[k]
 					m=spec['SPECTRUM_MJD']
+					if m-tpk < -19 or m-tpk > 49: continue
+
 					datadict[s]['specdata'][speccount] = {}
 					datadict[s]['specdata'][speccount]['fluxerr'] = spec['FLAMERR']
 					if 'LAMAVG' in spec.keys():
@@ -265,8 +267,8 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 			  dospec=False,KeepOnlySpec=False,peakmjdlist=None,waverange=[2000,9200],binspecres=None):
 	datadict = {}
 	if peakmjdlist:
-		pksnid,pkmjd,pkmjderr = np.loadtxt(peakmjdlist,unpack=True,dtype=str)
-		pkmjd,pkmjderr = pkmjd.astype('float'),pkmjderr.astype('float')
+		pksnid,pkmjd = np.loadtxt(peakmjdlist,unpack=True,dtype=str,usecols=[0,1])
+		pkmjd = pkmjd.astype('float')
 	rdtime = 0
 	for snlist in snlists.split(','):
 		tsn = time()
@@ -316,9 +318,10 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 			elif peakmjdlist:
 				if str(sn.SNID) in pksnid:
 					tpk = pkmjd[str(sn.SNID) == pksnid][0]
-					tpkerr = pkmjderr[str(sn.SNID) == pksnid][0]
-					if tpkerr < 2: tpkmsg = 'termination condition is satisfied'
-					else: tpkmsg = 'time of max uncertainty of +/- %.1f days is too uncertain!'%tpkerr
+					tpkmsg = 'termination condition is satisfied'
+					#tpkerr = pkmjderr[str(sn.SNID) == pksnid][0]
+					#if tpkerr < 2: tpkmsg = 'termination condition is satisfied'
+					#else: tpkmsg = 'time of max uncertainty of +/- %.1f days is too uncertain!'%tpkerr
 				else:
 					log.warning('can\'t find tmax in file %s'%peakmjdlist)
 					tpkmsg = 'can\'t find tmax in file %s'%peakmjdlist
@@ -352,7 +355,8 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 			for i,f in enumerate(sn.FLT):
 				if sn.MJD[i]-tpk > -19 and sn.MJD[i]-tpk < 49:
 					iGood = np.append(iGood,i)
-				#'-u' not in kcordict[sn.SURVEY][f]['fullname'] and
+				#try: kcordict[sn.SURVEY][f]['fullname']
+				#except: import pdb; pdb.set_trace()
 			
 			# TODO: flux errors
 			datadict[sn.SNID]['specdata'] = {}
