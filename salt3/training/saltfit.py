@@ -353,7 +353,7 @@ class GaussNewton(saltresids.SALTResids):
 				if fit in self.datadict:
 					includePars=np.array([ fit in name for name in self.parlist])
 				elif 'pcaparams' in fit:
-					self.GN_iter[fit]=4
+					self.GN_iter[fit]=1
 					includePars[self.im0]=True
 					includePars[self.im1]=True		
 					includePars[self.ix0]=True
@@ -451,7 +451,7 @@ class GaussNewton(saltresids.SALTResids):
 		for superloop in range(loop_niter):
 			tstartloop = time.time()
 			try:
-				if self.fit_model_err and photochi2perdof<65 and not superloop % 3 and not superloop == 0:
+				if self.fit_model_err and photochi2perdof<65 and superloop == 0: #not superloop % 3 and not
 					log.info('Optimizing model error')
 					X=self.iterativelyfiterrmodel(X)
 					storedResults={}

@@ -23,7 +23,7 @@ from salt3.util.txtobj import txtobj
 from salt3.util.specSynPhot import getScaleForSN
 from salt3.util.specrecal import SpecRecal
 
-from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs,init_salt2
+from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs,init_salt2,init_salt2_cdisp
 from salt3.training.base import TrainSALTBase
 from salt3.training.saltfit import fitting
 from salt3.training import saltfit as saltfit
@@ -106,6 +106,7 @@ class TrainSALT(TrainSALTBase):
 				 *['%s/%s'%(init_rootdir,x) for x in ['salt2_lc_relative_variance_0.dat','salt2_lc_relative_covariance_01.dat','salt2_lc_relative_variance_1.dat','salt2_lc_dispersion_scaling.dat']],**init_options)
 		else:
 			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots=init_errs(**init_options)
+		cdisp_coeffs = init_salt2_cdisp(f'{init_rootdir}/salt2_color_dispersion.dat',order=self.options.n_colorscatpars)
 		
 		# number of parameters
 		n_phaseknots,n_waveknots = len(phaseknotloc)-self.options.interporder-1,len(waveknotloc)-self.options.interporder-1
@@ -176,8 +177,8 @@ class TrainSALT(TrainSALTBase):
 				#log.warning('BAD CL HACK')
 				guess[parlist == 'cl'] = [0.]*self.options.n_colorpars #[-0.504294,0.787691,-0.461715,0.0815619] #
 			if self.options.n_colorscatpars:
-				guess[parlist == 'clscat'] = [1e-6]*self.options.n_colorscatpars
-				guess[np.where(parlist == 'clscat')[0][-1]]=-np.inf
+				guess[parlist == 'clscat'] = cdisp_coeffs #[1e-6]*self.options.n_colorscatpars
+				#guess[np.where(parlist == 'clscat')[0][-1]]=-np.inf
 			guess[(parlist == 'm0') & (guess < 0)] = 1e-4
 			
 			guess[parlist=='modelerr_0']=m0varknots
@@ -597,6 +598,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 			tlc = time()
 			for l in snfiles:
+				if 'Foundation' not in l: continue
 				if not i % 12:
 					fig = plt.figure()
 				try:
