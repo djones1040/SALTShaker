@@ -36,6 +36,21 @@ class SALTPriors:
 			#width,bound,x,par
 			result=self.boundedprior(0.1,(0,1),self.guess,boundedparam)
 			self.numBoundResids += result[0].size
+	
+	
+	@prior
+	def colorstretchcorr(self,width,x,components):
+		"""x1 should have no inner product with c"""
+		x1=x[self.ix1]
+		x1-=np.mean(x1)
+		c=x[self.ic]
+		c-=-np.mean(c)
+		corr=(x1*c).sum()/x1.size
+		jacobian=np.zeros((1,self.npar))
+		jacobian[0,self.ix1]=c*(c.size-1)/c.size/x1.size
+		jacobian[0,self.ic]=x1*(x1.size-1)/x1.size**2
+		return corr/width,corr,jacobian/width
+				
 	@prior
 	def m0m1prior(self,width,x,components):
 		"""M1 should have no inner product with the effect of reddening on M0"""
@@ -296,7 +311,7 @@ class SALTPriors:
 		lbound,ubound = bound
 		
 		iPar = self.__dict__['i%s'%par]
-		
+		if iPar.dtype==bool and iPar.sum() ==0: return np.zeros(0),np.zeros(0),np.zeros((0,self.npar))
 		iOut = (x[iPar] < lbound) | (x[iPar] > ubound)
 		iLow = (x[iPar] < lbound)
 		iHigh = (x[iPar] > ubound)
@@ -326,12 +341,12 @@ class SALTPriors:
 		results=[]
 		debugstring='Prior values are '
 		for prior,width in zip(priors,widths):
-			
 			try:
 				priorFunction=self.priors[prior]
 			except:
 				raise ValueError('Invalid prior supplied: {}'.format(prior)) 
 			results+=[priorFunction(width,x,components)]
+			if results[-1][0].size==0: continue
 			if results[-1][0].size==1:
 				debugstring+='{}: {:.2e},'.format(prior,float(results[-1][1]))
 				#debugstring+=f'{prior}: '+' '.join(['{:.2e}'.format(val) for val in results[-1][1]])+','
@@ -353,8 +368,12 @@ class SALTPriors:
 
 			result=self.boundedprior(bound[-1],(bound[0],bound[1]),x,par)
 			numResids=result[0].size
-			residuals[idx:idx+numResids],values[idx:idx+numResids],\
+			if numResids==0: continue
+			try:
+				residuals[idx:idx+numResids],values[idx:idx+numResids],\
 				jacobian[idx:idx+numResids,:]=result
+			except:
+				import pdb;pdb.set_trace()
 			if result[0].any():
 				debugstring+='{} {}, '.format(par,np.nonzero(result[0])[0].size)
 			idx+=numResids

@@ -353,7 +353,7 @@ class GaussNewton(saltresids.SALTResids):
 				if fit in self.datadict:
 					includePars=np.array([ fit in name for name in self.parlist])
 				elif 'pcaparams' in fit:
-					self.GN_iter[fit]=1
+					self.GN_iter[fit]=2
 					includePars[self.im0]=True
 					includePars[self.im1]=True		
 					includePars[self.ix0]=True

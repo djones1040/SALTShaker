@@ -101,12 +101,12 @@ class TrainSALT(TrainSALTBase):
 		init_options['phasesplineres'] = self.options.error_snake_phase_binsize
 		init_options['wavesplineres'] = self.options.error_snake_wave_binsize
 		init_options['order']=self.options.errinterporder
+		init_options['n_colorscatpars']=self.options.n_colorscatpars
 		if self.options.initsalt2var:
-			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots=init_errs(
-				 *['%s/%s'%(init_rootdir,x) for x in ['salt2_lc_relative_variance_0.dat','salt2_lc_relative_covariance_01.dat','salt2_lc_relative_variance_1.dat','salt2_lc_dispersion_scaling.dat']],**init_options)
+			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs(
+				 *['%s/%s'%(init_rootdir,x) for x in ['salt2_lc_relative_variance_0.dat','salt2_lc_relative_covariance_01.dat','salt2_lc_relative_variance_1.dat','salt2_lc_dispersion_scaling.dat','salt2_color_dispersion.dat']],**init_options)
 		else:
-			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots=init_errs(**init_options)
-		cdisp_coeffs = init_salt2_cdisp(f'{init_rootdir}/salt2_color_dispersion.dat',order=self.options.n_colorscatpars)
+			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs(**init_options)
 		
 		# number of parameters
 		n_phaseknots,n_waveknots = len(phaseknotloc)-self.options.interporder-1,len(waveknotloc)-self.options.interporder-1
@@ -175,10 +175,16 @@ class TrainSALT(TrainSALTBase):
 				guess[parlist == 'm1'] = m1knots
 			if self.options.n_colorpars:
 				#log.warning('BAD CL HACK')
-				guess[parlist == 'cl'] = [0.]*self.options.n_colorpars #[-0.504294,0.787691,-0.461715,0.0815619] #
+				if self.options.initsalt2model:
+					guess[parlist == 'cl'] = [-0.504294,0.787691,-0.461715,0.0815619]
+				else: 
+					guess[parlist == 'cl'] =[0.]*self.options.n_colorpars 
 			if self.options.n_colorscatpars:
-				guess[parlist == 'clscat'] = cdisp_coeffs #[1e-6]*self.options.n_colorscatpars
+
+				#guess[parlist == 'clscat'] = cdisp_coeffs #[1e-6]*self.options.n_colorscatpars
 				#guess[np.where(parlist == 'clscat')[0][-1]]=-np.inf
+				guess[parlist == 'clscat'] = clscatcoeffs
+
 			guess[(parlist == 'm0') & (guess < 0)] = 1e-4
 			
 			guess[parlist=='modelerr_0']=m0varknots
@@ -455,8 +461,8 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			if self.kcordict[sn.SURVEY][flt]['magsys'] == 'BD17': sys = 'bd17'
 			elif self.kcordict[sn.SURVEY][flt]['magsys'] == 'AB': sys = 'ab'
 			else: sys = 'vega'
-			if self.kcordict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) > 2800 and \
-			   self.kcordict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) < 7000 and\
+			if self.kcordict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) > 2000 and \
+			   self.kcordict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) < 9200 and\
 			   '-u' not in self.kcordict[sn.SURVEY][flt]['fullname']:
 				data.add_row((m,flt,flx,flxe,
 							  27.5+self.kcordict[sn.SURVEY][flt]['zpoff'],sys))
@@ -500,11 +506,10 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 								  xlimits=[self.options.waverange[0],self.options.waverange[1]],
 								  n_colorpars=self.options.n_colorpars)
 		SynPhotPlot.plotSynthPhotOverStretchRange(
-			'{}/synthphotrange.pdf'.format(outputdir),outputdir,'SDSS')
+			'{}/synthphotrange.pdf'.format(outputdir),outputdir,'Bessell')
 		SynPhotPlot.overPlotSynthPhotByComponent(
-			'{}/synthphotoverplot.pdf'.format(outputdir),outputdir,'SDSS')		
-
-			
+			'{}/synthphotoverplot.pdf'.format(outputdir),outputdir,'Bessell')		
+		
 		snfiles_tot = np.array([])
 		for j,snlist in enumerate(self.options.snlists.split(',')):
 			snlist = os.path.expandvars(snlist)
@@ -600,6 +605,12 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			tlc = time()
 			for l in snfiles:
 				#if 'Foundation' not in l: continue
+				if '/' not in l:
+					l = '%s/%s'%(os.path.dirname(snlist),l)
+				sn = snana.SuperNova(l)
+				sn.SNID = str(sn.SNID)
+				if not sn.SNID in datadict: continue
+
 				if not i % 12:
 					fig = plt.figure()
 				try:
@@ -607,10 +618,6 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				except:
 					import pdb; pdb.set_trace()
 
-				if '/' not in l:
-					l = '%s/%s'%(os.path.dirname(snlist),l)
-				sn = snana.SuperNova(l)
-				sn.SNID = str(sn.SNID)
 
 				if sn.SNID not in snid:
 					log.warning('sn %s not in output files'%sn.SNID)
