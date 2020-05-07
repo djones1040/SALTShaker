@@ -220,8 +220,8 @@ def init_errs(m0varfile=None,m0m1file=None,m1varfile=None,scalefile=None,clscatf
 	m0m1corrbspl = initbsplwithzeroth(phase,wave,corr,kx=order,ky=order, tx=splinephase,ty=splinewave)
 	if n_colorscatpars>0:
 		if clscatfile is None:
-			clscatcoeffs=np.zeros(n_colorscatpars)
-			clscatcoeffs[-1]=-np.inf
+			clscatpars=np.zeros(n_colorscatpars)
+			clscatpars[-1]=-np.inf
 		else:
 			wave,clscat=np.loadtxt(clscatfile,unpack=True)
 			wave,clscat=wave[wave<9200],clscat[wave<9200]

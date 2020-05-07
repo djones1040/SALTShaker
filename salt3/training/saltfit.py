@@ -562,7 +562,7 @@ class GaussNewton(saltresids.SALTResids):
 	restricted parameter set has not been implemented: {}""".format(fit))
 			self.fitOptions[fit]=(message,includePars)
 		self.fitlist = [('all'),
-			('pcaparams'),
+			#('pcaparams'),
 			('color'),('colorlaw'),
 			('spectralrecalibration'),		
 			('sn'),

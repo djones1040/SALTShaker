@@ -265,8 +265,9 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 			  dospec=False,KeepOnlySpec=False,peakmjdlist=None,waverange=[2000,9200],binspecres=None):
 	datadict = {}
 	if peakmjdlist:
-		pksnid,pkmjd,pkmjderr = np.loadtxt(peakmjdlist,unpack=True,dtype=str)
-		pkmjd,pkmjderr = pkmjd.astype('float'),pkmjderr.astype('float')
+		pksnid,pkmjd = np.loadtxt(peakmjdlist,unpack=True,dtype=str)
+		pkmjd = pkmjd.astype('float')
+		pkmjderr=np.zeros(pkmjd.size)
 	rdtime = 0
 	for snlist in snlists.split(','):
 		tsn = time()
