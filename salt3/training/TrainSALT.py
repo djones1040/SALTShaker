@@ -494,10 +494,11 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			ValidateParams.main(f'{outputdir}/salt3train_snparams.txt',f'{outputdir}/saltparcomp.png')
 		
 		plotSALTModel.mkModelErrPlot(outputdir,outfile=f'{outputdir}/SALTmodelerrcomp.pdf',
-								  xlimits=[self.options.waverange[0],self.options.waverange[1]])
+									 xlimits=[self.options.waverange[0],self.options.waverange[1]])
 
 		plotSALTModel.mkModelPlot(outputdir,outfile=f'{outputdir}/SALTmodelcomp.pdf',
-								  xlimits=[self.options.waverange[0],self.options.waverange[1]])
+								  xlimits=[self.options.waverange[0],self.options.waverange[1]],
+								  n_colorpars=self.options.n_colorpars)
 		SynPhotPlot.plotSynthPhotOverStretchRange(
 			'{}/synthphotrange.pdf'.format(outputdir),outputdir,'SDSS')
 		SynPhotPlot.overPlotSynthPhotByComponent(
@@ -624,7 +625,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 					'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,outputdir,
 					t0=t0sn,x0=x0sn,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc,
 					bandpassdict=self.kcordict,n_components=self.options.n_components,
-					ax1=ax1,ax2=ax2,ax3=ax3,ax4=ax4,saltdict=saltdict)
+					ax1=ax1,ax2=ax2,ax3=ax3,ax4=ax4,saltdict=saltdict,n_colorpars=self.options.n_colorpars)
 				if i % 12 == 8:
 					pdf_pages.savefig()
 					plt.close('all')
