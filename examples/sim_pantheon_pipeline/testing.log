@@ -1,0 +1,380 @@
+2020-04-17 16:26:45,028 - INFO - KeepOnlySpec (debug) flag is set, removing any supernova without spectra
+2020-04-17 16:27:05,362 - INFO - KeepOnlySpec (debug) flag is set, removing any supernova without spectra
+2020-04-17 16:27:15,097 - INFO - reading data files took 23.4
+2020-04-17 16:27:15,097 - INFO - hack! no spec color cut
+2020-04-17 16:27:15,104 - DEBUG - SN 454 fails cuts
+2020-04-17 16:27:15,104 - DEBUG - 33 epochs, 0 epochs near peak, 22 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,104 - DEBUG - SN 683 fails cuts
+2020-04-17 16:27:15,104 - DEBUG - 44 epochs, 0 epochs near peak, 32 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,104 - DEBUG - SN 705 fails cuts
+2020-04-17 16:27:15,104 - DEBUG - 19 epochs, 0 epochs near peak, 13 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,139 - DEBUG - SN 1364 fails cuts
+2020-04-17 16:27:15,139 - DEBUG - 11 epochs, 3 epochs near peak, 0 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,207 - DEBUG - SN 2109 fails cuts
+2020-04-17 16:27:15,207 - DEBUG - 34 epochs, 0 epochs near peak, 11 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,224 - DEBUG - SN 2328 fails cuts
+2020-04-17 16:27:15,224 - DEBUG - 23 epochs, 0 epochs near peak, 17 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,237 - DEBUG - SN 2806 fails cuts
+2020-04-17 16:27:15,237 - DEBUG - 16 epochs, 12 epochs near peak, 0 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,285 - DEBUG - SN 3032 fails cuts
+2020-04-17 16:27:15,285 - DEBUG - 27 epochs, 0 epochs near peak, 17 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,356 - DEBUG - SN 3262 fails cuts
+2020-04-17 16:27:15,356 - DEBUG - 9 epochs, 0 epochs near peak, 3 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,430 - DEBUG - SN 3836 fails cuts
+2020-04-17 16:27:15,430 - DEBUG - 23 epochs, 0 epochs near peak, 13 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,462 - DEBUG - SN 4506 fails cuts
+2020-04-17 16:27:15,462 - DEBUG - 19 epochs, 0 epochs near peak, 4 epochs post-peak, 2 filters near peak
+2020-04-17 16:27:15,470 - DEBUG - SN 4649 fails cuts
+2020-04-17 16:27:15,470 - DEBUG - 29 epochs, 0 epochs near peak, 19 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,571 - DEBUG - SN 5790 fails cuts
+2020-04-17 16:27:15,571 - DEBUG - 9 epochs, 3 epochs near peak, 0 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,672 - DEBUG - SN 7504 fails cuts
+2020-04-17 16:27:15,672 - DEBUG - 37 epochs, 0 epochs near peak, 15 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,768 - DEBUG - SN 9140 fails cuts
+2020-04-17 16:27:15,769 - DEBUG - 7 epochs, 4 epochs near peak, 0 epochs post-peak, 0 filters near peak
+2020-04-17 16:27:15,769 - DEBUG - SN 9458 fails cuts
+2020-04-17 16:27:15,769 - DEBUG - 18 epochs, 0 epochs near peak, 9 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,769 - DEBUG - SN 9677 fails cuts
+2020-04-17 16:27:15,769 - DEBUG - 7 epochs, 4 epochs near peak, 0 epochs post-peak, 2 filters near peak
+2020-04-17 16:27:15,769 - DEBUG - SN 9703 fails cuts
+2020-04-17 16:27:15,769 - DEBUG - 15 epochs, 0 epochs near peak, 12 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,808 - DEBUG - SN 10310 fails cuts
+2020-04-17 16:27:15,808 - DEBUG - 37 epochs, 0 epochs near peak, 28 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,808 - DEBUG - SN 10593 fails cuts
+2020-04-17 16:27:15,809 - DEBUG - 28 epochs, 0 epochs near peak, 15 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,848 - DEBUG - SN 11246 fails cuts
+2020-04-17 16:27:15,848 - DEBUG - 5 epochs, 0 epochs near peak, 2 epochs post-peak, 2 filters near peak
+2020-04-17 16:27:15,848 - DEBUG - SN 11538 fails cuts
+2020-04-17 16:27:15,848 - DEBUG - 14 epochs, 6 epochs near peak, 0 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,878 - DEBUG - SN 11924 fails cuts
+2020-04-17 16:27:15,878 - DEBUG - 9 epochs, 0 epochs near peak, 6 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,905 - DEBUG - SN 12441 fails cuts
+2020-04-17 16:27:15,905 - DEBUG - 12 epochs, 12 epochs near peak, 0 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,982 - DEBUG - SN 12993 fails cuts
+2020-04-17 16:27:15,982 - DEBUG - 20 epochs, 0 epochs near peak, 18 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:15,982 - DEBUG - SN 13110 fails cuts
+2020-04-17 16:27:15,982 - DEBUG - 14 epochs, 0 epochs near peak, 12 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:16,004 - DEBUG - SN 13359 fails cuts
+2020-04-17 16:27:16,004 - DEBUG - 10 epochs, 1 epochs near peak, 6 epochs post-peak, 1 filters near peak
+2020-04-17 16:27:16,045 - DEBUG - SN 13824 fails cuts
+2020-04-17 16:27:16,045 - DEBUG - 7 epochs, 0 epochs near peak, 4 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:16,085 - DEBUG - SN 14445 fails cuts
+2020-04-17 16:27:16,085 - DEBUG - 5 epochs, 0 epochs near peak, 5 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:16,201 - DEBUG - SN 16275 fails cuts
+2020-04-17 16:27:16,201 - DEBUG - 12 epochs, 9 epochs near peak, 0 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:16,209 - DEBUG - SN 16411 fails cuts
+2020-04-17 16:27:16,210 - DEBUG - 9 epochs, 0 epochs near peak, 6 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:16,256 - DEBUG - SN 17248 fails cuts
+2020-04-17 16:27:16,256 - DEBUG - 9 epochs, 0 epochs near peak, 8 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:16,300 - DEBUG - SN 17537 fails cuts
+2020-04-17 16:27:16,300 - DEBUG - 26 epochs, 0 epochs near peak, 19 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:16,341 - DEBUG - SN 51 fails cuts
+2020-04-17 16:27:16,341 - DEBUG - 35 epochs, 16 epochs near peak, 0 epochs post-peak, 4 filters near peak
+2020-04-17 16:27:16,409 - DEBUG - SN 599 fails cuts
+2020-04-17 16:27:16,409 - DEBUG - 21 epochs, 0 epochs near peak, 14 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:16,477 - DEBUG - SN 887 fails cuts
+2020-04-17 16:27:16,477 - DEBUG - 15 epochs, 0 epochs near peak, 3 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:16,594 - DEBUG - SN 1935 fails cuts
+2020-04-17 16:27:16,594 - DEBUG - 14 epochs, 0 epochs near peak, 12 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:16,610 - DEBUG - SN 2248 fails cuts
+2020-04-17 16:27:16,610 - DEBUG - 42 epochs, 0 epochs near peak, 23 epochs post-peak, 4 filters near peak
+2020-04-17 16:27:16,622 - DEBUG - SN 2622 fails cuts
+2020-04-17 16:27:16,622 - DEBUG - 39 epochs, 0 epochs near peak, 24 epochs post-peak, 4 filters near peak
+2020-04-17 16:27:16,688 - DEBUG - SN 3720 fails cuts
+2020-04-17 16:27:16,688 - DEBUG - 15 epochs, 0 epochs near peak, 12 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:16,699 - DEBUG - SN 3753 fails cuts
+2020-04-17 16:27:16,699 - DEBUG - 15 epochs, 6 epochs near peak, 0 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:16,719 - DEBUG - SN 3933 fails cuts
+2020-04-17 16:27:16,719 - DEBUG - 64 epochs, 0 epochs near peak, 43 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:16,746 - DEBUG - SN 4148 fails cuts
+2020-04-17 16:27:16,746 - DEBUG - 27 epochs, 0 epochs near peak, 15 epochs post-peak, 4 filters near peak
+2020-04-17 16:27:16,773 - DEBUG - SN 4349 fails cuts
+2020-04-17 16:27:16,773 - DEBUG - 22 epochs, 16 epochs near peak, 0 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:16,866 - DEBUG - SN 5580 fails cuts
+2020-04-17 16:27:16,866 - DEBUG - 12 epochs, 0 epochs near peak, 9 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:16,894 - DEBUG - SN 5842 fails cuts
+2020-04-17 16:27:16,894 - DEBUG - 15 epochs, 0 epochs near peak, 3 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:16,996 - DEBUG - SN 6295 fails cuts
+2020-04-17 16:27:16,997 - DEBUG - 9 epochs, 0 epochs near peak, 9 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:17,224 - DEBUG - SN 8272 fails cuts
+2020-04-17 16:27:17,224 - DEBUG - 32 epochs, 0 epochs near peak, 16 epochs post-peak, 4 filters near peak
+2020-04-17 16:27:17,246 - DEBUG - SN 8343 fails cuts
+2020-04-17 16:27:17,246 - DEBUG - 11 epochs, 0 epochs near peak, 11 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:17,298 - DEBUG - SN 8797 fails cuts
+2020-04-17 16:27:17,298 - DEBUG - 24 epochs, 0 epochs near peak, 12 epochs post-peak, 4 filters near peak
+2020-04-17 16:27:17,523 - DEBUG - SN 11019 fails cuts
+2020-04-17 16:27:17,523 - DEBUG - 12 epochs, 9 epochs near peak, 0 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:17,760 - DEBUG - SN 12625 fails cuts
+2020-04-17 16:27:17,760 - DEBUG - 6 epochs, 0 epochs near peak, 6 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:17,818 - DEBUG - SN 12944 fails cuts
+2020-04-17 16:27:17,818 - DEBUG - 17 epochs, 0 epochs near peak, 17 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:17,899 - DEBUG - SN 13957 fails cuts
+2020-04-17 16:27:17,899 - DEBUG - 8 epochs, 5 epochs near peak, 0 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:17,939 - DEBUG - SN 14607 fails cuts
+2020-04-17 16:27:17,939 - DEBUG - 15 epochs, 12 epochs near peak, 0 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:17,981 - DEBUG - SN 14836 fails cuts
+2020-04-17 16:27:17,981 - DEBUG - 13 epochs, 5 epochs near peak, 5 epochs post-peak, 1 filters near peak
+2020-04-17 16:27:18,140 - DEBUG - SN 16558 fails cuts
+2020-04-17 16:27:18,140 - DEBUG - 24 epochs, 0 epochs near peak, 15 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:18,161 - DEBUG - SN 17207 fails cuts
+2020-04-17 16:27:18,161 - DEBUG - 50 epochs, 0 epochs near peak, 28 epochs post-peak, 4 filters near peak
+2020-04-17 16:27:18,296 - DEBUG - SN 560 fails cuts
+2020-04-17 16:27:18,297 - DEBUG - 7 epochs, 0 epochs near peak, 4 epochs post-peak, 2 filters near peak
+2020-04-17 16:27:18,454 - DEBUG - SN 1881 fails cuts
+2020-04-17 16:27:18,454 - DEBUG - 11 epochs, 3 epochs near peak, 3 epochs post-peak, 1 filters near peak
+2020-04-17 16:27:18,578 - DEBUG - SN 2866 fails cuts
+2020-04-17 16:27:18,578 - DEBUG - 12 epochs, 1 epochs near peak, 10 epochs post-peak, 1 filters near peak
+2020-04-17 16:27:18,663 - DEBUG - SN 3857 fails cuts
+2020-04-17 16:27:18,663 - DEBUG - 6 epochs, 1 epochs near peak, 5 epochs post-peak, 1 filters near peak
+2020-04-17 16:27:18,664 - DEBUG - SN 3991 fails cuts
+2020-04-17 16:27:18,664 - DEBUG - 1 epochs, 1 epochs near peak, 0 epochs post-peak, 1 filters near peak
+2020-04-17 16:27:18,703 - DEBUG - SN 4427 fails cuts
+2020-04-17 16:27:18,703 - DEBUG - 27 epochs, 0 epochs near peak, 9 epochs post-peak, 1 filters near peak
+2020-04-17 16:27:18,896 - DEBUG - SN 6529 fails cuts
+2020-04-17 16:27:18,896 - DEBUG - 10 epochs, 6 epochs near peak, 0 epochs post-peak, 4 filters near peak
+2020-04-17 16:27:19,008 - DEBUG - SN 7626 fails cuts
+2020-04-17 16:27:19,008 - DEBUG - 3 epochs, 2 epochs near peak, 1 epochs post-peak, 2 filters near peak
+2020-04-17 16:27:19,109 - DEBUG - SN 8285 fails cuts
+2020-04-17 16:27:19,109 - DEBUG - 10 epochs, 0 epochs near peak, 8 epochs post-peak, 0 filters near peak
+2020-04-17 16:27:19,214 - DEBUG - SN 9508 fails cuts
+2020-04-17 16:27:19,214 - DEBUG - 32 epochs, 2 epochs near peak, 15 epochs post-peak, 0 filters near peak
+2020-04-17 16:27:19,546 - DEBUG - SN 12002 fails cuts
+2020-04-17 16:27:19,546 - DEBUG - 2 epochs, 0 epochs near peak, 0 epochs post-peak, 0 filters near peak
+2020-04-17 16:27:19,976 - DEBUG - SN 15414 fails cuts
+2020-04-17 16:27:19,976 - DEBUG - 15 epochs, 15 epochs near peak, 0 epochs post-peak, 4 filters near peak
+2020-04-17 16:27:20,237 - DEBUG - SN 17035 fails cuts
+2020-04-17 16:27:20,237 - DEBUG - 3 epochs, 0 epochs near peak, 3 epochs post-peak, 1 filters near peak
+2020-04-17 16:27:20,580 - DEBUG - SN 1915 fails cuts
+2020-04-17 16:27:20,580 - DEBUG - 5 epochs, 2 epochs near peak, 0 epochs post-peak, 0 filters near peak
+2020-04-17 16:27:20,776 - DEBUG - SN 3861 fails cuts
+2020-04-17 16:27:20,776 - DEBUG - 7 epochs, 5 epochs near peak, 2 epochs post-peak, 1 filters near peak
+2020-04-17 16:27:20,860 - DEBUG - SN 4500 fails cuts
+2020-04-17 16:27:20,860 - DEBUG - 15 epochs, 1 epochs near peak, 1 epochs post-peak, 1 filters near peak
+2020-04-17 16:27:20,874 - DEBUG - SN 4593 fails cuts
+2020-04-17 16:27:20,874 - DEBUG - 9 epochs, 3 epochs near peak, 0 epochs post-peak, 1 filters near peak
+2020-04-17 16:27:21,182 - DEBUG - SN 7479 fails cuts
+2020-04-17 16:27:21,182 - DEBUG - 11 epochs, 11 epochs near peak, 0 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:21,228 - DEBUG - SN 7543 fails cuts
+2020-04-17 16:27:21,228 - DEBUG - 8 epochs, 1 epochs near peak, 2 epochs post-peak, 1 filters near peak
+2020-04-17 16:27:21,271 - DEBUG - SN 7784 fails cuts
+2020-04-17 16:27:21,271 - DEBUG - 15 epochs, 4 epochs near peak, 8 epochs post-peak, 1 filters near peak
+2020-04-17 16:27:21,294 - DEBUG - SN 7934 fails cuts
+2020-04-17 16:27:21,294 - DEBUG - 0 epochs, 0 epochs near peak, 0 epochs post-peak, 0 filters near peak
+2020-04-17 16:27:21,393 - DEBUG - SN 8530 fails cuts
+2020-04-17 16:27:21,393 - DEBUG - 12 epochs, 1 epochs near peak, 10 epochs post-peak, 1 filters near peak
+2020-04-17 16:27:21,419 - DEBUG - SN 8816 fails cuts
+2020-04-17 16:27:21,419 - DEBUG - 18 epochs, 2 epochs near peak, 4 epochs post-peak, 1 filters near peak
+2020-04-17 16:27:21,486 - DEBUG - SN 9378 fails cuts
+2020-04-17 16:27:21,486 - DEBUG - 28 epochs, 2 epochs near peak, 2 epochs post-peak, 1 filters near peak
+2020-04-17 16:27:21,679 - DEBUG - SN 11020 fails cuts
+2020-04-17 16:27:21,679 - DEBUG - 2 epochs, 1 epochs near peak, 1 epochs post-peak, 1 filters near peak
+2020-04-17 16:27:21,775 - DEBUG - SN 12044 fails cuts
+2020-04-17 16:27:21,775 - DEBUG - 15 epochs, 0 epochs near peak, 1 epochs post-peak, 0 filters near peak
+2020-04-17 16:27:21,924 - DEBUG - SN 13328 fails cuts
+2020-04-17 16:27:21,924 - DEBUG - 6 epochs, 1 epochs near peak, 3 epochs post-peak, 0 filters near peak
+2020-04-17 16:27:22,009 - DEBUG - SN 13901 fails cuts
+2020-04-17 16:27:22,009 - DEBUG - 13 epochs, 0 epochs near peak, 0 epochs post-peak, 0 filters near peak
+2020-04-17 16:27:22,118 - DEBUG - SN 15622 fails cuts
+2020-04-17 16:27:22,118 - DEBUG - 18 epochs, 0 epochs near peak, 10 epochs post-peak, 3 filters near peak
+2020-04-17 16:27:22,162 - DEBUG - SN 16867 fails cuts
+2020-04-17 16:27:22,162 - DEBUG - 2 epochs, 2 epochs near peak, 0 epochs post-peak, 0 filters near peak
+2020-04-17 16:27:22,242 - DEBUG - SN 17437 fails cuts
+2020-04-17 16:27:22,242 - DEBUG - 10 epochs, 0 epochs near peak, 0 epochs post-peak, 0 filters near peak
+2020-04-17 16:27:22,311 - INFO - 225 spectra and 1534 photometric observations removed for being outside phase range
+2020-04-17 16:27:22,311 - INFO - 1758 spectra and 30186 photometric observations remaining
+2020-04-17 16:27:22,311 - INFO - 1132433 total spectroscopic data points
+2020-04-17 16:27:22,311 - INFO - Total number of supernovae: 200
+2020-04-17 16:27:24,406 - WARNING - BAD CL HACK
+2020-04-17 16:27:32,329 - INFO - training on 200 SNe!
+2020-04-17 16:27:38,757 - INFO - Time to calculate spline_derivs: 6.31
+2020-04-17 16:28:17,395 - INFO - Time required to calculate all PC derivatives as sparse matrices 36.6s
+2020-04-17 16:28:17,814 - INFO - Initializing
+2020-04-17 16:28:17,814 - INFO - Estimating supernova parameters x0,x1,c and spectral normalization
+2020-04-17 16:28:26,614 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:26,963 - INFO - Number of parameters fit this round: 715
+2020-04-17 16:28:26,964 - INFO - Initial chi2: 557572695939.33 
+2020-04-17 16:28:28,137 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:28,196 - DEBUG - LSMR results with damping factor 0.00e+00: atol+btol approx. solution, norm r 65379.30, norm J^T r 0.00, norm J 1.00, cond J 1.00, norm step 562285.67, reduction ratio 0.57
+2020-04-17 16:28:28,196 - INFO - After Gauss-Newton chi2 is 241407526801.35
+2020-04-17 16:28:29,327 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:30,520 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:31,711 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:32,901 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:34,089 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:35,280 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:36,468 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:37,658 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:37,716 - INFO - Linear optimization factor is 1.00 x Gauss-Newton step
+2020-04-17 16:28:37,716 - INFO - Linear optimized chi2 is 241407526801.35
+2020-04-17 16:28:37,716 - INFO - Chi2 diff, % diff
+2020-04-17 16:28:37,716 - INFO - 316165169137.98 56.70
+2020-04-17 16:28:42,157 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:42,289 - INFO - Number of parameters fit this round: 200
+2020-04-17 16:28:42,290 - INFO - Initial chi2: 241522821810.04 
+2020-04-17 16:28:43,321 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:44,365 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:45,413 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:45,439 - DEBUG - LSMR results with damping factor 1.83e-03: atol+btol approx. solution, norm r 59443.10, norm J^T r 0.00, norm J 1.00, cond J 1.00, norm step 29261.96, reduction ratio 0.00
+2020-04-17 16:28:45,439 - INFO - After Gauss-Newton chi2 is 240715860656.98
+2020-04-17 16:28:46,448 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:47,487 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:48,529 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:49,568 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:50,614 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:51,652 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:52,692 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:53,731 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:54,767 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:55,805 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:56,843 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:57,885 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:58,921 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:28:59,959 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:00,997 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:02,035 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:03,074 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:04,110 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:04,136 - INFO - Linear optimization factor is 0.88 x Gauss-Newton step
+2020-04-17 16:29:04,136 - INFO - Linear optimized chi2 is 240696827751.27
+2020-04-17 16:29:04,136 - INFO - Chi2 diff, % diff
+2020-04-17 16:29:04,136 - INFO - 825994058.77 0.34
+2020-04-17 16:29:11,562 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:11,908 - INFO - Number of parameters fit this round: 715
+2020-04-17 16:29:11,908 - INFO - Initial chi2: 240687038092.51 
+2020-04-17 16:29:13,062 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:13,120 - DEBUG - LSMR results with damping factor 0.00e+00: atol+btol approx. solution, norm r 56916.03, norm J^T r 0.00, norm J 1.00, cond J 1.00, norm step 17734.96, reduction ratio 0.00
+2020-04-17 16:29:13,120 - INFO - After Gauss-Newton chi2 is 240372509237.35
+2020-04-17 16:29:14,259 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:15,455 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:16,652 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:17,847 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:19,048 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:20,250 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:21,447 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:22,645 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:23,840 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:25,039 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:26,235 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:27,430 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:28,627 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:29,823 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:31,019 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:32,216 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:33,429 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:34,627 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:35,828 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:37,040 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:38,254 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:39,448 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:40,646 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:41,841 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:43,039 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:44,236 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:45,432 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:46,628 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:46,686 - INFO - Linear optimization factor is 1.00 x Gauss-Newton step
+2020-04-17 16:29:46,687 - INFO - Linear optimized chi2 is 240372509237.35
+2020-04-17 16:29:46,687 - INFO - Chi2 diff, % diff
+2020-04-17 16:29:46,687 - INFO - 314528855.16 0.13
+2020-04-17 16:29:51,148 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:51,278 - INFO - Number of parameters fit this round: 200
+2020-04-17 16:29:51,279 - INFO - Initial chi2: 240378770850.60 
+2020-04-17 16:29:52,310 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:53,357 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:54,413 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:54,438 - DEBUG - LSMR results with damping factor 3.36e-03: atol+btol approx. solution, norm r 55230.02, norm J^T r 0.00, norm J 1.00, cond J 1.00, norm step 13976.40, reduction ratio 0.00
+2020-04-17 16:29:54,439 - INFO - After Gauss-Newton chi2 is 240186494282.41
+2020-04-17 16:29:55,497 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:56,537 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:57,578 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:58,618 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:29:59,657 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:00,700 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:01,738 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:02,775 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:03,813 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:04,851 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:05,890 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:06,926 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:07,964 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:09,004 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:09,030 - INFO - Linear optimization factor is 0.96 x Gauss-Newton step
+2020-04-17 16:30:09,030 - INFO - Linear optimized chi2 is 240186036497.07
+2020-04-17 16:30:09,030 - INFO - Chi2 diff, % diff
+2020-04-17 16:30:09,030 - INFO - 192734353.53 0.08
+2020-04-17 16:30:14,054 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:14,185 - INFO - Number of parameters fit this round: 200
+2020-04-17 16:30:14,185 - INFO - Initial chi2: 240180405270.20 
+2020-04-17 16:30:15,219 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:16,275 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:17,329 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:17,355 - DEBUG - LSMR results with damping factor 6.67e-04: atol+btol approx. solution, norm r 46437.60, norm J^T r 0.00, norm J 1.41, cond J 1.00, norm step 29847.61, reduction ratio 0.00
+2020-04-17 16:30:17,355 - INFO - After Gauss-Newton chi2 is 239289524315.72
+2020-04-17 16:30:18,377 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: 0.00e+00,x1std: 0.00e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:19,423 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:20,466 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -2.55e+00,x1std: 4.13e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:21,507 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:22,549 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -1.57e+00,x1std: 2.55e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:23,589 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -6.01e-01,x1std: 9.74e-01,m0m1prior: -4.87e-02,
+2020-04-17 16:30:24,630 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:25,673 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:26,713 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:27,750 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -1.20e+00,x1std: 1.95e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:28,780 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -1.06e+00,x1std: 1.72e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:29,812 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -1.01e+00,x1std: 1.63e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:30,842 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.85e-01,x1std: 1.60e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:31,870 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.77e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:32,897 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.74e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:33,934 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.73e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:34,965 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.73e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:36,003 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:37,006 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:38,016 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:39,024 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:40,031 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:41,034 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:42,035 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:43,050 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:44,054 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:45,064 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:46,069 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:47,071 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:47,097 - INFO - Linear optimization factor is 1.00 x Gauss-Newton step
+2020-04-17 16:30:47,098 - INFO - Linear optimized chi2 is 239289524315.72
+2020-04-17 16:30:47,098 - INFO - Chi2 diff, % diff
+2020-04-17 16:30:47,098 - INFO - 890880954.48 0.37
+2020-04-17 16:30:50,136 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:30:50,161 - INFO - Photometric chi2/dof is 153233.5 (0.53% of total chi2)
+2020-04-17 16:30:50,161 - INFO - Spectroscopic chi2/dof is 2292.1 (0.31% of total chi2)
+2020-04-17 16:30:50,161 - INFO - Prior chi2/dof is 163875834.9 (99.16% of total chi2)
+2020-04-17 16:30:50,161 - INFO - Regularization chi2/dof is 160.8 (0.00% of total chi2)
+2020-04-17 16:30:50,162 - INFO - starting loop; 15 iterations
+2020-04-17 16:30:50,162 - INFO - fitting all parameters
+2020-04-17 16:31:43,785 - DEBUG - Prior values are m0prior: -1.95e+01,m1prior: -1.05e-03,x1mean: -9.72e-01,x1std: 1.58e+00,m0m1prior: -4.87e-02,
+2020-04-17 16:31:52,348 - INFO - Number of parameters fit this round: 5590
+2020-04-17 16:31:52,349 - INFO - Initial chi2: 239142156218.08 
+2020-04-17 16:32:05,155 - ERROR - Exception raised during training
+Traceback (most recent call last):
+  File "/project2/rkessler/PRODUCTS/miniconda/envs/salt3/lib/python3.7/site-packages/SALT3-0.1.dev0-py3.7.egg/salt3/training/TrainSALT.py", line 627, in main
+    modelerr,clpars,clerr,clscat,SNParams,pars,pars_unscaled,parlist,chain,loglikes = self.fitSALTModel(datadict)
+  File "/project2/rkessler/PRODUCTS/miniconda/envs/salt3/lib/python3.7/site-packages/SALT3-0.1.dev0-py3.7.egg/salt3/training/TrainSALT.py", line 234, in fitSALTModel
+    self.options.gaussnewton_maxiter)
+  File "/project2/rkessler/PRODUCTS/miniconda/envs/salt3/lib/python3.7/site-packages/SALT3-0.1.dev0-py3.7.egg/salt3/training/saltfit.py", line 101, in gaussnewton
+    guess,loop_niter=gaussnewton_maxiter)
+  File "/project2/rkessler/PRODUCTS/miniconda/envs/salt3/lib/python3.7/site-packages/SALT3-0.1.dev0-py3.7.egg/salt3/training/saltfit.py", line 594, in convergence_loop
+    X,chi2,converged = self.robust_process_fit(X,uncertainties.copy(),chi2_init,superloop)
+  File "/project2/rkessler/PRODUCTS/miniconda/envs/salt3/lib/python3.7/site-packages/SALT3-0.1.dev0-py3.7.egg/salt3/training/saltfit.py", line 876, in robust_process_fit
+    Xprop,chi2prop,chi2 = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit)
+  File "/project2/rkessler/PRODUCTS/miniconda/envs/salt3/lib/python3.7/site-packages/SALT3-0.1.dev0-py3.7.egg/salt3/training/saltfit.py", line 1005, in process_fit
+    results+=[(gaussNewtonFit(self.damping[fit]*dampingFactor))]
+  File "/project2/rkessler/PRODUCTS/miniconda/envs/salt3/lib/python3.7/site-packages/SALT3-0.1.dev0-py3.7.egg/salt3/training/saltfit.py", line 997, in gaussNewtonFit
+    postGN=((self.lsqwrap(X-gaussNewtonStep,uncertainties.copy(),None,True,doSpecResids=doSpecResids))**2).sum() #
+  File "/project2/rkessler/PRODUCTS/miniconda/envs/salt3/lib/python3.7/site-packages/SALT3-0.1.dev0-py3.7.egg/salt3/training/saltfit.py", line 820, in lsqwrap
+    guess,sn,storedResults,varyParams,fixUncertainty=True)
+  File "/project2/rkessler/PRODUCTS/miniconda/envs/salt3/lib/python3.7/site-packages/SALT3-0.1.dev0-py3.7.egg/salt3/training/saltresids.py", line 454, in ResidsForSN
+    photmodel,specmodel=self.modelvalsforSN(x,sn,storedResults,varyParams)
+  File "/project2/rkessler/PRODUCTS/miniconda/envs/salt3/lib/python3.7/site-packages/SALT3-0.1.dev0-py3.7.egg/salt3/training/saltresids.py", line 607, in modelvalsforSN
+    storedResults[fluxkey]=valfun(x,sn, storedResults,temporaryResults,varyParams)
+  File "/project2/rkessler/PRODUCTS/miniconda/envs/salt3/lib/python3.7/site-packages/SALT3-0.1.dev0-py3.7.egg/salt3/training/saltresids.py", line 778, in specValsForSN
+    raise RuntimeError('error....spec recalibration problem for SN %s!'%sn)
+RuntimeError: error....spec recalibration problem for SN 6986!

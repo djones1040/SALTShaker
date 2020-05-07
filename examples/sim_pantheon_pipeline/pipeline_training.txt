@@ -1,0 +1,110 @@
+##SALT3 INPUT
+[pipeline]
+n_lcfit = 4
+n_biascorlcfit = 4
+genversion_split = 0,1,2,3
+genversion_split_biascor = 0,1,2,3
+plotdir = figs
+
+[data]
+snlists=/home/midai/salt3_local/SALT3/examples/pipelinetest/training/data/SALT3TEST_SIMPLE.LIST
+
+[byosed]
+baseinput=byosed/BYOSED_base.params
+outinput=pipelinetest/TEST_BYOSED.params
+set_key= FLAGS COLOR False
+    FLAGS STRETCH False
+    
+[simulation]
+pro=sim_SNmix.pl
+baseinput=simulation/MASTER_PANTHEON_FOUND.INPUT
+outinput=pipeline/MASTER_PANTHEON_FOUND.INPUT
+batch=True
+prooptions=
+set_key=2
+        NGENTOT_LC[0] 200
+        NGENTOT_LC[1] 8000
+        NGENTOT_LC[2] 2000
+        NGENTOT_LC[3] 1000
+
+[training]
+pro=trainsalt
+proargs = -c 
+baseinput=training/SALT_SNANA.conf
+prooptions = 
+#--stage validate
+outinput=pipeline/SALT_SNANA.conf
+set_key=3
+        trainparams fitsalt2 False
+        trainparams fit_tpkoff False
+        trainparams gaussnewton_maxiter 15
+        iodata maxsn 200
+
+[lcfitting]
+pro=split_and_fit.pl
+baseinput=lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml
+outinput=pipeline/snfit_TEST.nml,pipeline/snfit_TEST2.nml,pipeline/snfit_TEST3.nml,pipeline/snfit_TEST4.nml
+batch=True
+validplots=True
+prooptions=NOPROMPT
+set_key=4
+        0 HEADER OUTDIR SALT3pipe_LOWZ
+        1 HEADER OUTDIR SALT3pipe_PS1
+        1 FITINP FILTLIST_FIT griz
+        1 SNLCINP CUTWIN_REDSHIFT 0.01 0.8
+        2 HEADER OUTDIR SALT3pipe_Foundation
+        2 FITINP FILTLIST_FIT griz
+        2 SNLCINP CUTWIN_REDSHIFT 0.01 0.08
+        3 HEADER OUTDIR SALT3pipe_DES
+        3 FITINP FILTLIST_FIT griz
+        3 SNLCINP CUTWIN_REDSHIFT 0.05 1.0
+	3 SNLCINP KCOR_FILE $DES_ROOT/kcor/SpecIa_3yr/DES_Y3A2_noOOB.fits
+
+[biascorsim]
+pro=sim_SNmix.pl
+baseinput=biascorsim/MASTER_PANTHEON_FOUND.INPUT
+outinput=pipeline/MASTER_PANTHEON_FOUND.INPUT
+batch=True
+prooptions=
+set_key=2
+        NGENTOT_LC[0] 200
+        NGENTOT_LC[1] 8000
+        NGENTOT_LC[2] 2000
+        NGENTOT_LC[2] 1000
+
+[biascorlcfit]
+pro=split_and_fit.pl
+baseinput=lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml
+outinput=pipeline/snfit_TEST_biascor.nml,pipeline/snfit_TEST_biascor2.nml,pipeline/snfit_TEST_biascor3.nml,pipeline/snfit_TEST_biascor4.nml
+batch=True
+validplots=True
+prooptions=
+set_key=4
+        0 HEADER OUTDIR SALT3pipe_LOWZ
+        1 HEADER OUTDIR SALT3pipe_PS1
+        1 FITINP FILTLIST_FIT griz
+        1 SNLCINP CUTWIN_REDSHIFT 0.01 0.8
+        2 HEADER OUTDIR SALT3pipe_Foundation
+        2 FITINP FILTLIST_FIT griz
+        2 SNLCINP CUTWIN_REDSHIFT 0.01 0.08
+        3 HEADER OUTDIR SALT3pipe_DES
+        3 FITINP FILTLIST_FIT griz
+        3 SNLCINP CUTWIN_REDSHIFT 0.05 1.0
+	3 SNLCINP KCOR_FILE $DES_ROOT/kcor/SpecIa_3yr/DES_Y3A2_noOOB.fits
+        
+[getmu]
+pro=SALT2mu_fit.pl
+baseinput=getmu/BBC_Pantheon.input
+outinput=pipeline/BBC.input
+batch=True
+validplots=True
+prooptions=
+set_key=
+
+[cosmofit]
+pro=wfit.exe
+outinput=SALT2mu_FITOPT000_MUOPT000.M0DIF
+prooptions= -dompri 0.007
+baseinput=
+batch=False
+validplots=True
