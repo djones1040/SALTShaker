@@ -23,7 +23,7 @@ from salt3.util.txtobj import txtobj
 from salt3.util.specSynPhot import getScaleForSN
 from salt3.util.specrecal import SpecRecal
 
-from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs,init_salt2
+from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs,init_salt2,init_salt2_cdisp
 from salt3.training.base import TrainSALTBase
 from salt3.training.saltfit import fitting
 from salt3.training import saltfit as saltfit
@@ -180,7 +180,11 @@ class TrainSALT(TrainSALTBase):
 				else: 
 					guess[parlist == 'cl'] =[0.]*self.options.n_colorpars 
 			if self.options.n_colorscatpars:
+
+				#guess[parlist == 'clscat'] = cdisp_coeffs #[1e-6]*self.options.n_colorscatpars
+				#guess[np.where(parlist == 'clscat')[0][-1]]=-np.inf
 				guess[parlist == 'clscat'] = clscatcoeffs
+
 			guess[(parlist == 'm0') & (guess < 0)] = 1e-4
 			
 			guess[parlist=='modelerr_0']=m0varknots
@@ -259,6 +263,8 @@ class TrainSALT(TrainSALTBase):
 
 			if self.options.do_gaussnewton:
 				saltfitkwargs['regularize'] = self.options.regularize
+				saltfitkwargs['fitting_sequence'] = self.options.fitting_sequence
+				saltfitkwargs['fix_salt2modelpars'] = self.options.fix_salt2modelpars
 				saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)			
 				# do the fitting
 				x_modelpars,x_unscaled,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
@@ -494,10 +500,11 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			ValidateParams.main(f'{outputdir}/salt3train_snparams.txt',f'{outputdir}/saltparcomp.png')
 		
 		plotSALTModel.mkModelErrPlot(outputdir,outfile=f'{outputdir}/SALTmodelerrcomp.pdf',
-								  xlimits=[self.options.waverange[0],self.options.waverange[1]])
+									 xlimits=[self.options.waverange[0],self.options.waverange[1]])
 
 		plotSALTModel.mkModelPlot(outputdir,outfile=f'{outputdir}/SALTmodelcomp.pdf',
-								  xlimits=[self.options.waverange[0],self.options.waverange[1]])
+								  xlimits=[self.options.waverange[0],self.options.waverange[1]],
+								  n_colorpars=self.options.n_colorpars)
 		SynPhotPlot.plotSynthPhotOverStretchRange(
 			'{}/synthphotrange.pdf'.format(outputdir),outputdir,'Bessell')
 		SynPhotPlot.overPlotSynthPhotByComponent(
@@ -597,11 +604,13 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 			tlc = time()
 			for l in snfiles:
+				#if 'Foundation' not in l: continue
 				if '/' not in l:
 					l = '%s/%s'%(os.path.dirname(snlist),l)
 				sn = snana.SuperNova(l)
 				sn.SNID = str(sn.SNID)
 				if not sn.SNID in datadict: continue
+
 				if not i % 12:
 					fig = plt.figure()
 				try:
@@ -623,7 +632,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 					'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,outputdir,
 					t0=t0sn,x0=x0sn,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc,
 					bandpassdict=self.kcordict,n_components=self.options.n_components,
-					ax1=ax1,ax2=ax2,ax3=ax3,ax4=ax4,saltdict=saltdict)
+					ax1=ax1,ax2=ax2,ax3=ax3,ax4=ax4,saltdict=saltdict,n_colorpars=self.options.n_colorpars)
 				if i % 12 == 8:
 					pdf_pages.savefig()
 					plt.close('all')

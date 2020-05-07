@@ -335,10 +335,11 @@ def mkModelErrPlot(salt3dir='modelfiles/salt3',outfile=None,xlimits=[2000,9200])
 	ax1.xaxis.set_ticklabels([])
 	ax2.xaxis.set_ticklabels([])
 	ax4.set_xlabel('Wavelength ($\AA$)',fontsize=15)
+	ax4.set_ylim([np.min(salt2clscat),np.max(salt2clscat)])
 	plt.tight_layout()
 	if not outfile is None:
 		plt.savefig(outfile)
-		
+	log.info('finished plotting model errors')
 	
 if __name__ == "__main__":
 	parser=ArgumentParser(description='Plot SALT model components at peak and color law as compared to SALT2')

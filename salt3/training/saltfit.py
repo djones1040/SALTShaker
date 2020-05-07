@@ -164,165 +164,6 @@ class mcmc(saltresids.SALTResids):
 					pass
 		return candidate
 		
-	def lsqguess(self, current, snpars=False, M0=False, M1=False, doMangle=False):
-
-		candidate = copy.deepcopy(current)
-		
-		#salterr = self.ErrModel(candidate)
-		if self.n_colorpars:
-			colorLaw = SALT2ColorLaw(self.colorwaverange, candidate[self.parlist == 'cl'])
-		else: colorLaw = None
-		if self.n_colorscatpars:
-			colorScat = True
-		else: colorScat = None
-
-		if snpars:
-			log.info('using scipy minimizer to find SN params...')		
-			components = self.SALTModel(candidate)
-			log.info('error hack!')
-			for sn in self.datadict.keys():
-			
-				def lsqwrap(guess):
-
-					candidate[self.parlist == 'x0_%s'%sn] = guess[0]
-					candidate[self.parlist == 'x1_%s'%sn] = guess[1]
-					candidate[self.parlist == 'c_%s'%sn] = guess[2]
-					candidate[self.parlist == 'tpkoff_%s'%sn] = guess[3]
-
-					args = (None,sn,candidate,components,self.salterr,colorLaw,colorScat,False)
-					return -self.loglikeforSN(args)
-
-
-				guess = np.array([candidate[self.parlist == 'x0_%s'%sn][0],candidate[self.parlist == 'x1_%s'%sn][0],
-								  candidate[self.parlist == 'c_%s'%sn][0],candidate[self.parlist == 'tpkoff_%s'%sn][0]])
-			
-				result = minimize(lsqwrap,guess)
-				#self.blah = True
-				candidate[self.parlist == 'x0_%s'%sn] = result.x[0]
-				candidate[self.parlist == 'x1_%s'%sn] = result.x[1]
-				candidate[self.parlist == 'c_%s'%sn] = result.x[2]
-				candidate[self.parlist == 'tpkoff_%s'%sn] = result.x[3]
-
-		elif M0:
-			log.info('using scipy minimizer to find M0...')
-				
-			self.lsqfit = True
-			def lsqwrap(guess):
-				
-				candidate[self.parlist == 'm0'] = guess
-				components = self.SALTModel(candidate)
-
-				logmin = np.array([])
-				for sn in self.datadict.keys():
-					args = (None,sn,candidate,components,salterr,colorLaw,colorScat,False)
-					logmin = np.append(logmin,self.loglikeforSN(args))
-				logmin *= -1
-				logmin -= self.m0prior(components) + self.m1prior(candidate[self.ix1]) + self.endprior(components)
-				if colorLaw:
-					logmin -= self.EBVprior(colorLaw)
-				
-				log.info(np.sum(logmin*2))
-				return logmin
-
-			guess = candidate[self.parlist == 'm0']
-			result = least_squares(lsqwrap,guess,max_nfev=6)
-			candidate[self.parlist == 'm0'] = result.x
-			self.lsqfit = False
-			
-		elif M1:
-			log.info('using scipy minimizer to find M1...')
-			
-			self.lsqfit = True
-			def lsqwrap(guess):
-
-				candidate[self.parlist == 'm0'] = guess
-				components = self.SALTModel(candidate)
-
-				logmin = np.array([])
-				for sn in self.datadict.keys():
-					args = (None,sn,candidate,components,salterr,colorLaw,colorScat,False)
-					logmin = np.append(logmin,self.loglikeforSN(args))
-				logmin *= -1
-				logmin -= self.m0prior(components) + self.m1prior(candidate[self.ix1]) + self.endprior(components)
-				if colorLaw:
-					logmin -= self.EBVprior(colorLaw)
-				
-				log.info(np.sum(logmin*2))
-				return logmin
-
-			guess = candidate[self.parlist == 'm0']
-			result = least_squares(lsqwrap,guess,max_nfev=6)
-			candidate[self.parlist == 'm0'] = result.x
-			self.lsqfit = False
-
-		elif doMangle:
-			log.info('mangling!')
-			if self.n_colorpars:
-				colorLaw = SALT2ColorLaw(self.colorwaverange, current[self.parlist == 'cl'])
-			else: colorLaw = None
-				
-			from mangle import mangle
-			mgl = mangle(self.phase,self.wave,self.kcordict,self.datadict,
-						 self.n_components,colorLaw,self.fluxfactor,
-						 self.phaseknotloc,self.waveknotloc)
-			components = self.SALTModel(candidate)
-
-			guess = np.array([1.,1.,0.,1.,0.,0.,1.,0.])
-			guess = np.append(guess,np.ones(16))
-			
-			def manglewrap(guess,returnRat=False):
-				loglike = 0
-				rat,swff,spff = np.array([]),np.array([]),np.array([])
-				for sn in self.datadict.keys():
-					x0,x1,c,tpkoff = \
-						current[self.parlist == 'x0_%s'%sn][0],current[self.parlist == 'x1_%s'%sn][0],\
-						current[self.parlist == 'c_%s'%sn][0],current[self.parlist == 'tpkoff_%s'%sn][0]
-
-					if returnRat:
-						loglikesingle,ratsingle,swf,spf = \
-							mgl.mangle(guess,components,sn,(x0,x1,c,tpkoff),returnRat=returnRat)
-						loglike += loglikesingle
-						rat = np.append(rat,ratsingle)
-						swff = np.append(swff,swf)
-						spff = np.append(spff,spf)
-					else:
-						loglike += mgl.mangle(guess,components,sn,(x0,x1,c,tpkoff),returnRat=returnRat)
-
-				if returnRat:
-					log.info(-2*loglike)
-					return rat,swff,spff
-				else:
-					log.info(-2*loglike)
-					return -1*loglike
-
-
-			result = minimize(manglewrap,guess,options={'maxiter':15})
-			rat,swf,spf = manglewrap(result.x,returnRat=True)
-			M0,M1 = mgl.getmodel(result.x,components,
-								 #current[self.parlist == 'm0'],
-								 #current[self.parlist == 'm1'],
-								 np.array(rat),np.array(swf),np.array(spf))
-
-			fullphase = np.zeros(len(self.phase)*len(self.wave))
-			fullwave = np.zeros(len(self.phase)*len(self.wave))
-			nwave = len(self.wave)
-			count = 0
-			for p in range(len(self.phase)):
-				for w in range(nwave):
-					fullphase[count] = self.phase[p]
-					fullwave[count] = self.wave[w]
-					count += 1
-					
-			bsplM0 = bisplrep(fullphase,fullwave,M0.flatten(),kx=3,ky=3,
-							  tx=self.phaseknotloc,ty=self.waveknotloc,task=-1)
-			bsplM1 = bisplrep(fullphase,fullwave,M1.flatten(),kx=3,ky=3,
-							  tx=self.phaseknotloc,ty=self.waveknotloc,task=-1)
-			candidate[self.parlist == 'm0'] = bsplM0[2]
-			candidate[self.parlist == 'm1'] = bsplM1[2]
-
-			
-		return candidate
-
 	def get_propcov_init(self,x,stepsizes=None):
 		C_0 = np.zeros([len(x),len(x)])
 		if stepsizes is not None:
@@ -516,16 +357,16 @@ class GaussNewton(saltresids.SALTResids):
 					includePars[self.im0]=True
 					includePars[self.im1]=True		
 					includePars[self.ix0]=True
-					includePars[self.ix1]=True	
+					includePars[self.ix1]=True
 				elif 'components' in fit:
 					includePars[self.im0]=True
-					includePars[self.im1]=True
+					includePars[self.im1]=True		
 				elif 'component0' in fit :
 					self.damping[fit]=1e-3
 					includePars[self.im0]=True
 				elif 'component1' in fit:
 					self.damping[fit]=1e-3
-					includePars[self.im1]=True
+					includePars[self.im1]=True		
 				elif fit=='sn':
 					self.damping[fit]=1e-3
 					includePars[self.ix0]=True
@@ -560,14 +401,23 @@ class GaussNewton(saltresids.SALTResids):
 				else:
 					raise NotImplementedError("""This option for a Gauss-Newton fit with a 
 	restricted parameter set has not been implemented: {}""".format(fit))
+			if self.fix_salt2modelpars:
+				includePars[self.im0]=False
+				includePars[self.im1]=False		
+				includePars[self.im0new]=True
+				includePars[self.im1new]=True
 			self.fitOptions[fit]=(message,includePars)
-		self.fitlist = [('all'),
-			#('pcaparams'),
-			('color'),('colorlaw'),
-			('spectralrecalibration'),		
-			('sn'),
-			('tpk')]
 
+		if kwargs['fitting_sequence'].lower() == 'default' or not kwargs['fitting_sequence']:
+			self.fitlist = [('all'),
+							('pcaparams'),
+							('color'),('colorlaw'),
+							('spectralrecalibration'),		
+							('sn'),
+							('tpk')]
+		else:
+			self.fitlist = [f for f in kwargs['fitting_sequence'].split(',')]
+			
 	def convergence_loop(self,guess,loop_niter=3):
 		lastResid = 1e20
 		log.info('Initializing')
@@ -597,11 +447,11 @@ class GaussNewton(saltresids.SALTResids):
 			if name.lower()=='photometric':
 				photochi2perdof=chi2component/dof
 		uncertainties={key:uncertainties[key] for key in self.uncertaintyKeys}
-		log.info('starting loop; %i iterations'%loop_niter)
+		log.info(f'starting loop; {loop_niter} iterations')
 		for superloop in range(loop_niter):
 			tstartloop = time.time()
 			try:
-				if self.fit_model_err and photochi2perdof<65 and not superloop % 3 and not superloop == 0:
+				if self.fit_model_err and photochi2perdof<65 and superloop == 0: #not superloop % 3 and not superloop == 0: 
 					log.info('Optimizing model error')
 					X=self.iterativelyfiterrmodel(X)
 					storedResults={}
@@ -957,7 +807,7 @@ class GaussNewton(saltresids.SALTResids):
 			elif fit.startswith('piecewisecomponent'):
 				for i in range(self.GN_iter[fit]):
 					for i,p in enumerate(self.phaseBinCenters):
-						log.info('fitting phase %.1f'%p)
+						log.info(f'fitting phase {p:.1f}')
 						indices=np.arange((self.waveknotloc.size-4)*(self.phaseknotloc.size-4))
 						iFit= (((i-1)*(self.waveknotloc.size-4)) <= indices) & (indices <((i+2)*(self.waveknotloc.size-4)))
 						includeParsPhase=np.zeros(self.npar,dtype=bool)
@@ -966,7 +816,7 @@ class GaussNewton(saltresids.SALTResids):
 							includeParsPhase[self.im0[iFit]]=True
 							includeParsPhase[self.im1[iFit]]=True
 						else:
-							includeParsPhase[self.__dict__['im%s'%fit[-1]][iFit]] = True
+							includeParsPhase[self.__dict__[f'im{fit[-1]}'][iFit]] = True
 						Xprop,chi2prop,chi2 = self.process_fit(Xprop,includeParsPhase,storedResults,fit=fit)
 
 						#includeParsPhase[self.__dict__['im%s'%fit[-1]][iFit]] = True
