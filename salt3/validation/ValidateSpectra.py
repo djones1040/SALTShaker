@@ -132,17 +132,17 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 				drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
 				recalexp=np.exp((drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1))
 
-				unncalledModel = flux(salt3dir,specdata[k]['tobs']+snPars['t0'],specdata[k]['wavelength'],
+				uncalledModel = flux(salt3dir,specdata[k]['tobs']+snPars['t0'],specdata[k]['wavelength'],
 									  snPars['z'],snPars['x0'],snPars['x1'],snPars['c'],mwebv=datadict[sn]['MWEBV'])
-				modelflux = unncalledModel*recalexp
+				modelflux = uncalledModel*recalexp
 				if not axcount % 3 and axcount != 0:
 					fig = plt.figure()
 				ax = plt.subplot(3,1,axcount % 3 + 1)
 				
 				if len(coeffs): ax.plot(wave,modelflux,'r-',label='recalibrated model spectrum for z = %.3f, $x_1$ = %.3f'%(
-						snPars['z'],snPars['x1']))
+						snPars['z'],snPars['x1']),zorder=500)
 				ax.plot(wave,specdata[k]['flux'],'b-',label='%s spectral data, phase = %.1f'%(sn,specdata[k]['tobs']-snPars['t0']))
-				ax.plot(wave,unncalledModel,'g-',label='SALT3 Model spectrum\n(no calibration)')
+				ax.plot(wave,uncalledModel,'g-',label='SALT3 Model spectrum\n(no calibration)')
 				ax.set_xlim(wave.min(),wave.max())
 
 				ax.set_ylim(0,specdata[k]['flux'].max()*1.25)
