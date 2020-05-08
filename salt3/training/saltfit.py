@@ -589,18 +589,17 @@ class GaussNewton(saltresids.SALTResids):
 		result0=np.array(list(mapFun(self.loglikeforSN,args)))
 		partriplets= list(zip(np.where(self.parlist=='modelerr_0')[0],np.where(self.parlist=='modelerr_1')[0],np.where(self.parlist=='modelcorr_01')[0]))
 
-		if not 'hi':
-			for parindices in tqdm(partriplets):
-				includePars=np.zeros(self.parlist.size,dtype=bool)
-				includePars[list(parindices)]=True
+		for parindices in tqdm(partriplets):
+			includePars=np.zeros(self.parlist.size,dtype=bool)
+			includePars[list(parindices)]=True
 
-				storedResults=fluxes.copy()
-				args=[(X0+includePars*.5,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
-				result=np.array(list(mapFun(self.loglikeforSN,args)))
+			storedResults=fluxes.copy()
+			args=[(X0+includePars*.5,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
+			result=np.array(list(mapFun(self.loglikeforSN,args)))
 
-				usesns=np.array(list(self.datadict.keys()))[result!=result0]
+			usesns=np.array(list(self.datadict.keys()))[result!=result0]
 
-				X=self.minuitoptimize(X,includePars,fluxes,fixFluxes=True,dospec=False,usesns=usesns)
+			X=self.minuitoptimize(X,includePars,fluxes,fixFluxes=True,dospec=False,usesns=usesns)
 		if X[self.iclscat[-1]]==-np.inf:
 			X[self.iclscat[-1]]=-8
 		includePars=np.zeros(self.parlist.size,dtype=bool)
