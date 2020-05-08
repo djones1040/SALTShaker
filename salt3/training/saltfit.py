@@ -589,17 +589,18 @@ class GaussNewton(saltresids.SALTResids):
 		result0=np.array(list(mapFun(self.loglikeforSN,args)))
 		partriplets= list(zip(np.where(self.parlist=='modelerr_0')[0],np.where(self.parlist=='modelerr_1')[0],np.where(self.parlist=='modelcorr_01')[0]))
 
-		for parindices in tqdm(partriplets):
-			includePars=np.zeros(self.parlist.size,dtype=bool)
-			includePars[list(parindices)]=True
+		if not 'hi':
+			for parindices in tqdm(partriplets):
+				includePars=np.zeros(self.parlist.size,dtype=bool)
+				includePars[list(parindices)]=True
 
-			storedResults=fluxes.copy()
-			args=[(X0+includePars*.5,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
-			result=np.array(list(mapFun(self.loglikeforSN,args)))
+				storedResults=fluxes.copy()
+				args=[(X0+includePars*.5,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
+				result=np.array(list(mapFun(self.loglikeforSN,args)))
 
-			usesns=np.array(list(self.datadict.keys()))[result!=result0]
+				usesns=np.array(list(self.datadict.keys()))[result!=result0]
 
-			X=self.minuitoptimize(X,includePars,fluxes,fixFluxes=True,dospec=False,usesns=usesns)
+				X=self.minuitoptimize(X,includePars,fluxes,fixFluxes=True,dospec=False,usesns=usesns)
 		if X[self.iclscat[-1]]==-np.inf:
 			X[self.iclscat[-1]]=-8
 		includePars=np.zeros(self.parlist.size,dtype=bool)
@@ -636,7 +637,8 @@ class GaussNewton(saltresids.SALTResids):
 		minuitkwargs.update({'error_'+params[i]: 1e-2 for i in range(includePars.sum())})
 		clscatindices=np.where(self.parlist[includePars] == 'clscat')[0]
 		if clscatindices.size>0:
-			minuitkwargs.update({'limit_'+params[i]: (-.4,.4) for i in clscatindices[:-1]})
+			minuitkwargs.update({'limit_'+params[i]: (-1e-4,1e-4) for i in [clscatindices[0]]})
+			minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in clscatindices[1:-1]})
 			minuitkwargs.update({'limit_'+params[i]: (-10,2) for i in [clscatindices[-1]]})
 		minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelerr_0')[0]})
 		minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelerr_1')[0]})
@@ -650,7 +652,8 @@ class GaussNewton(saltresids.SALTResids):
 			minuitkwargs['limit_'+extrapar]=(0,2)
 		
 		m=Minuit(fn,use_array_call=True,forced_parameters=params,errordef=.5,**minuitkwargs)
-		result,paramResults=m.migrad(ncall=4)
+		#m.tol = 1e-4
+		result,paramResults=m.migrad()#ncall=4)
 		X=X.copy()
 		paramresults=np.array([x.value for x  in paramResults])
 		if rescaleerrs:
@@ -658,7 +661,7 @@ class GaussNewton(saltresids.SALTResids):
 			X[self.imodelerr]*=paramresults[-1]
 		else:
 			X[includePars]=paramresults
-		#import pdb; pdb.set_trace()
+		
 		return X
 
 
