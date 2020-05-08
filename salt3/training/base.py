@@ -98,6 +98,8 @@ class TrainSALTBase:
 							help='fit for model error if set (default=%default)')
 		parser.add_argument('--fit_tpkoff', default=config.get('trainparams','fit_tpkoff'), type=boolean_string,
 							help='fit for time of max in B-band if set (default=%default)')
+		parser.add_argument('--fitting_sequence', default=config.get('trainparams','fitting_sequence'), type=str,
+							help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn, tpk (default=%default)")
 
 		# mcmc parameters
 		parser.add_argument('--n_steps_mcmc', default=config.get('mcmcparams','n_steps_mcmc'), type=int,
@@ -151,8 +153,6 @@ class TrainSALTBase:
 							help='bin the spectra if set (default=%default)')
 		parser.add_argument('--binspecres', default=config.get('trainingparams','binspecres'), type=int,
 							help='binning resolution (default=%default)')
-		parser.add_argument('--fitting_sequence', default=config.get('trainingparams','fitting_sequence'), type=str,
-							help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn, tpk (default=%default)")
 		
    		#neff parameters
 		parser.add_argument('--wavesmoothingneff', default=config.get('trainingparams','wavesmoothingneff'), type=float,

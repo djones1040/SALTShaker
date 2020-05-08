@@ -451,7 +451,7 @@ class GaussNewton(saltresids.SALTResids):
 		for superloop in range(loop_niter):
 			tstartloop = time.time()
 			try:
-				if self.fit_model_err and photochi2perdof<65 and superloop == 0: #not superloop % 3 and not superloop == 0: 
+				if self.fit_model_err and photochi2perdof<65 and not superloop % 3 and not superloop == 0: 
 					log.info('Optimizing model error')
 					X=self.iterativelyfiterrmodel(X)
 					storedResults={}
@@ -650,7 +650,7 @@ class GaussNewton(saltresids.SALTResids):
 			minuitkwargs['limit_'+extrapar]=(0,2)
 		
 		m=Minuit(fn,use_array_call=True,forced_parameters=params,errordef=.5,**minuitkwargs)
-		result,paramResults=m.migrad(ncall=4)
+		result,paramResults=m.migrad(ncall=10)
 		X=X.copy()
 		paramresults=np.array([x.value for x  in paramResults])
 		if rescaleerrs:
