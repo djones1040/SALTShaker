@@ -49,15 +49,15 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 	salt2m1errphase,salt2m1errwave,salt2m1fluxerr = \
 		np.loadtxt('%s/salt2_lc_relative_variance_1.dat'%init_rootdir,unpack=True)
 
-	if not 'hi':
-		salt2scalephase,salt2scalewave,salt2errscale=np.loadtxt('%s/salt2_lc_dispersion_scaling.dat'%init_rootdir,unpack=True)
-		#Subtract out statistical error from SALT2
-		salt2varscale=(salt2errscale**2-1)
-		salt2scalephase,salt2scalewave=np.unique(salt2scalephase),np.unique(salt2scalewave)
-		scaleinterp=RegularGridInterpolator((salt2scalephase,salt2scalewave),salt2varscale.reshape(salt2scalephase.size,salt2scalewave.size),'nearest')
-		salt2varscaleclipinterp=lambda x,y: scaleinterp((np.clip(x,salt2scalephase.min(),salt2scalephase.max()),np.clip(y,salt2scalewave.min(),salt2scalewave.max())))
-		salt2m0fluxerr*=salt2varscaleclipinterp(salt2m0errphase,salt2m0errwave)
-		salt2m1fluxerr*=salt2varscaleclipinterp(salt2m1errphase,salt2m1errwave)
+	#if not 'hi':
+	salt2scalephase,salt2scalewave,salt2errscale=np.loadtxt('%s/salt2_lc_dispersion_scaling.dat'%init_rootdir,unpack=True)
+	#Subtract out statistical error from SALT2
+	salt2varscale=(salt2errscale**2-1)
+	salt2scalephase,salt2scalewave=np.unique(salt2scalephase),np.unique(salt2scalewave)
+	scaleinterp=RegularGridInterpolator((salt2scalephase,salt2scalewave),salt2varscale.reshape(salt2scalephase.size,salt2scalewave.size),'nearest')
+	salt2varscaleclipinterp=lambda x,y: scaleinterp((np.clip(x,salt2scalephase.min(),salt2scalephase.max()),np.clip(y,salt2scalewave.min(),salt2scalewave.max())))
+	salt2m0fluxerr*=salt2varscaleclipinterp(salt2m0errphase,salt2m0errwave)
+	salt2m1fluxerr*=salt2varscaleclipinterp(salt2m1errphase,salt2m1errwave)
 
 	salt2m0flux = salt2m0flux.reshape([len(np.unique(salt2m0phase)),len(np.unique(salt2m0wave))])
 	salt2m0fluxerr = salt2m0fluxerr.reshape([len(np.unique(salt2m0errphase)),len(np.unique(salt2m0errwave))])
