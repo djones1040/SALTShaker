@@ -92,17 +92,26 @@ class fitting:
 		self.datadict = datadict
 
 	def gaussnewton(self,gn,guess,
-					n_processes,n_mcmc_steps,
-					n_burnin_mcmc,
-					gaussnewton_maxiter):
+					gaussnewton_maxiter,
+					only_data_errs=False):
 
-		gn.debug = False
-		xfinal,xunscaled,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-			modelerr,clpars,clerr,clscat,SNParams,stepsizes = \
-			gn.convergence_loop(
-				guess,loop_niter=gaussnewton_maxiter)
-
-		return xfinal,xunscaled,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+		if only_data_errs:
+			log.info("using Minuit to determine the uncertainties on M0 and M1")
+			if gn.fit_model_err:
+				log.info('Optimizing model error')
+				m0var,m1var,m0m1cov=gn.iterativelyfitdataerrmodel(guess)
+			else:
+				m0var = m1var = m0m1cov = np.zeros(len(M0))
+			M0dataerr,M1dataerr,cov_M0_M1_data = gn.getErrsGN(m0var,m1var,m0m1cov)
+			return M0dataerr,M1dataerr,cov_M0_M1_data
+		else:
+			gn.debug = False
+			xfinal,xunscaled,phase,wave,M0,M0modelerr,M1,M1modelerr,cov_M0_M1_model,\
+				modelerr,clpars,clerr,clscat,SNParams,stepsizes = \
+				gn.convergence_loop(
+					guess,loop_niter=gaussnewton_maxiter)
+			
+		return xfinal,xunscaled,phase,wave,M0,M0modelerr,M1,M1modelerr,cov_M0_M1_model,\
 			modelerr,clpars,clerr,clscat,SNParams,stepsizes,\
 			'Gauss-Newton MCMC was successful'
 
@@ -451,7 +460,7 @@ class GaussNewton(saltresids.SALTResids):
 		for superloop in range(loop_niter):
 			tstartloop = time.time()
 			try:
-				if self.fit_model_err and photochi2perdof<65 and superloop == 0: #not superloop % 3 and not superloop == 0: 
+				if not 'hi': #self.fit_model_err and photochi2perdof<65 and superloop == 0: #not superloop % 3 and not superloop == 0: 
 					log.info('Optimizing model error')
 					X=self.iterativelyfiterrmodel(X)
 					storedResults={}
@@ -494,17 +503,26 @@ class GaussNewton(saltresids.SALTResids):
 						import pdb;pdb.set_trace()
 					else:
 						raise e
+		
 		#Xredefined = X.copy()
 		#Retranslate x1, M1, x0, M0 to obey definitions
 		Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
 	
-		xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+		xfinal,phase,wave,M0,M0modelerr,M1,M1modelerr,cov_M0_M1_model,\
 			modelerr,clpars,clerr,clscat,SNParams = \
 			self.getParsGN(Xredefined)
-		
+
+		#log.info("using Minuit to determine the uncertainties on M0 and M1")
+		#if self.fit_model_err:
+		#	log.info('Optimizing model error')
+		#	m0var,m1var,m0m1cov=self.iterativelyfitdataerrmodel(X)
+		#else:
+		#	m0var = m1var = m0m1cov = np.zeros(len(M0))
+		#M0dataerr,M1dataerr,cov_M0_M1_data = self.getErrsGN(m0var,m1var,m0m1cov)
+
 		log.info('Total time spent in convergence loop: {}'.format(datetime.now()-start))
 
-		return xfinal,X,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+		return xfinal,X,phase,wave,M0,M0modelerr,M1,M1modelerr,cov_M0_M1_model,\
 			modelerr,clpars,clerr,clscat,SNParams,stepsizes
 		
 		#raise RuntimeError("convergence_loop reached 100000 iterations without convergence")
@@ -608,8 +626,7 @@ class GaussNewton(saltresids.SALTResids):
 
 		self.usePriors = store_priors
 		return X
- 
-		 
+
 	def minuitoptimize(self,X,includePars,storedResults=None,rescaleerrs=False,**kwargs):
 		X=X.copy()
 		if not self.fitTpkOff: includePars[self.itpk]=False
@@ -662,8 +679,133 @@ class GaussNewton(saltresids.SALTResids):
 			X[includePars]=paramresults
 		
 		return X
+	
+	#def iterativelyfitdataerrmodel(self,X):
+	#
+	#	X0=X.copy()
+	#	mapFun= starmap
+	#
+	#	storedResults={}
+	#	print('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X,storedResults)))
+	#	fluxes={key:storedResults[key] for key in storedResults if 'fluxes' in key }
+	#	storedResults=fluxes.copy()
+	#	args=[(X0,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
+	#	result0=np.array(list(mapFun(self.loglikeforSN,args)))
+	#	pardoublets= list(zip(np.where(self.parlist=='m0')[0],np.where(self.parlist=='m1')[0]))
+	#
+	#	m0var,m1var,m01cov = np.zeros(len(pardoublets)),np.zeros(len(pardoublets)),np.zeros(len(pardoublets))
+	#	for i,parindices in enumerate(tqdm(pardoublets)):
+	#		waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+	#		phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+	#		if phaserange[0] < 0 and phaserange[1] > 0 and waverange[0] < 5000 and waverange[1] > 5000:
+	#			includePars=np.zeros(self.parlist.size,dtype=bool)
+	#			includePars[list(parindices)]=True
+	#			
+	#			storedResults=fluxes.copy()
+	#			args=[(X0+includePars*.5,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
+	#			result=np.array(list(mapFun(self.loglikeforSN,args)))
+	#
+	#			m0var[i],m1var[i],m01cov[i] = self.minuitoptimize_components(X,includePars,fluxes,fixFluxes=False,dospec=True)
+	#
+	#	return m0var,m1var,m01cov
+			 
+	#def minuitoptimize_components(self,X,includePars,storedResults=None,**kwargs):
+	#
+	#	X=X.copy()
+	#	if storedResults is None: storedResults={}
+	#	def fn(Y):
+	#		Xnew=X.copy()
+	#		Xnew[includePars]=Y
+	#		result=-self.maxlikefit(Xnew,{},**kwargs) #storedResults.copy(),**kwargs)
+	#		return 1e10 if np.isnan(result) else result
+	#
+	#	params=['x'+str(i) for i in range(includePars.sum())]
+	#	initVals=X[includePars].copy()
+	#
+	#	minuitkwargs=({params[i]: initVals[i] for i in range(includePars.sum())})
+	#	minuitkwargs.update({'error_'+params[i]: 1e-2 for i in range(includePars.sum())})
+	#
+	#	m=Minuit(fn,use_array_call=True,forced_parameters=params,errordef=.5,**minuitkwargs)
+	#	result,paramResults=m.migrad()
+	#	paramerr=np.array([x.value for x  in paramResults])
+	#
+	#	if m.covariance:
+	#		return paramResults[0].error**2.,paramResults[1].error**2.,m.covariance[('x0', 'x1')]
+	#	else:
+	#		return paramResults[0].error**2.,paramResults[1].error**2.,0.0
 
+	def iterativelyfitdataerrmodel(self,X):
 
+		X0=X.copy()
+		mapFun= starmap
+
+		storedResults={}
+		print('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X,storedResults)))
+		fluxes={key:storedResults[key] for key in storedResults if 'fluxes' in key }
+		storedResults=fluxes.copy()
+		args=[(X0,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
+		result0=np.array(list(mapFun(self.loglikeforSN,args)))
+		pars = np.where(self.parlist=='modelerr_0')[0]
+		
+		m0var,m1var,m01cov = np.zeros(self.im0.size),np.zeros(self.im0.size),np.zeros(self.im0.size)
+		for i,parindices in enumerate(tqdm(pars)):
+			waverange=self.errwaveknotloc[[i%(self.errwaveknotloc.size-self.errbsorder-1),i%(self.errwaveknotloc.size-self.errbsorder-1)+self.errbsorder+1]]
+			phaserange=self.errphaseknotloc[[i//(self.errwaveknotloc.size-self.errbsorder-1),i//(self.errwaveknotloc.size-self.errbsorder-1)+self.errbsorder+1]]
+			#if phaserange[0] < 0 and phaserange[1] > 0 and waverange[0] <= 5000 and waverange[1] > 5000:
+			includeM0Pars=np.zeros(self.parlist.size,dtype=bool)
+			includeM1Pars=np.zeros(self.parlist.size,dtype=bool)
+			# could be slow (and ugly), but should work.....
+			m0idx = np.array([],dtype=int)
+			for j in range(self.im0.size):
+				m0waverange=self.waveknotloc[[j%(self.waveknotloc.size-self.bsorder-1),j%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+				m0phaserange=self.phaseknotloc[[j//(self.waveknotloc.size-self.bsorder-1),j//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+				if (waverange[0] <= m0waverange[0] and waverange[1] >= m0waverange[0] and \
+				   phaserange[0] <= m0phaserange[0] and phaserange[1] >= m0phaserange[0]) or \
+				(waverange[0] <= m0waverange[1] and waverange[1] >= m0waverange[1] and \
+				 phaserange[0] <= m0phaserange[1] and phaserange[1] >= m0phaserange[1]):
+					includeM0Pars[self.im0[j]] = True
+					includeM1Pars[self.im1[j]] = True
+					m0idx = np.append(m0idx,j)
+			varyParams = includeM0Pars | includeM1Pars
+			#storedResults=fluxes.copy()
+
+			m0var_single,m1var_single,m01cov_single = self.minuitoptimize_components(
+				X,includeM0Pars,includeM1Pars,fluxes,fixFluxes=False,dospec=True,varyParams=varyParams)
+			m0var[m0idx] = m0var_single*len(m0idx)
+			m1var[m0idx] = m1var_single*len(m0idx)
+			m01cov[m0idx] = m01cov_single*len(m0idx)
+			#if m0var > 0: 
+		return m0var,m1var,m01cov
+
+	def minuitoptimize_components(self,X,includeM0Pars,includeM1Pars,storedResults=None,varyParams=None,**kwargs):
+
+		X=X.copy()
+		if storedResults is None: storedResults={}
+		def fn(Y):
+			Xnew=X.copy()
+			Xnew[includeM0Pars] += Y[0]
+			Xnew[includeM1Pars] += Y[1]
+			storedCopy = storedResults.copy()
+			if 'components' in storedCopy.keys():
+				storedCopy.pop('components')
+			result=-self.maxlikefit(Xnew,{})#storedCopy)#,**kwargs)
+			return 1e10 if np.isnan(result) else result
+			
+		params=['x0','x1']
+		minuitkwargs=({'x0':0,'x1':1})
+		minuitkwargs.update({'error_x0': 1e-2,'error_x1': 1e-2})
+		minuitkwargs.update({'limit_x0': (-3,3),'limit_x1': (-3,3)})
+
+		
+		m=Minuit(fn,use_array_call=True,forced_parameters=params,errordef=.5,**minuitkwargs)
+		result,paramResults=m.migrad()
+
+		if m.covariance:
+			return paramResults[0].error**2.,paramResults[1].error**2.,m.covariance[('x0', 'x1')]
+		else:
+			return paramResults[0].error**2.,paramResults[1].error**2.,0.0
+
+	
 	def getstepsizes(self,X,Xlast):
 		stepsizes = X-Xlast
 		#stepsizes[self.parlist == 'm0'] = \

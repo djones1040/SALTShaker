@@ -12,7 +12,7 @@ log=logging.getLogger(__name__)
 
 _SCALE_FACTOR = 1e-12
 
-def init_salt2(m0file,m1file,
+def init_salt2(m0file=None,m1file=None,M0triplet=None,M1triplet=None,
 			   Bfilt='initfiles/Bessell90_B.dat',
 			   flatnu='initfiles/flatnu.dat',
 			   hsiaofile=f'{init_rootdir}/Hsiao07.dat',
@@ -20,14 +20,18 @@ def init_salt2(m0file,m1file,
 			   waveinterpres=2.0,phasesplineres=3.2,wavesplineres=72,
 			   days_interp=5,debug=False,normalize=True,order=3):
 
-	phase,wave,m0flux = np.loadtxt(m0file,unpack=True)
+	if m0file:
+		phase,wave,m0flux = np.loadtxt(m0file,unpack=True)
+	else: phase,wave,m0flux = M0triplet
 	iGood = np.where((phase >= phaserange[0]-phasesplineres*0) & (phase <= phaserange[1]+phasesplineres*0) &
 					 (wave >= waverange[0]-wavesplineres*0) & (wave <= waverange[1]+wavesplineres*0))[0]
 	phase,wave,m0flux = phase[iGood],wave[iGood],m0flux[iGood]	
-	m1flux = np.loadtxt(m1file,unpack=True)[2][iGood]
 	
 	splinephase = np.linspace(phaserange[0],phaserange[1],int((phaserange[1]-phaserange[0])/phasesplineres)+1,True)
 	splinewave	= np.linspace(waverange[0],waverange[1],int((waverange[1]-waverange[0])/wavesplineres)+1,True)
+	if m1file is not None:
+			m1flux = np.loadtxt(m1file,unpack=True)[2][iGood]
+	else: m1flux = M1triplet[2]
 
 	# extend the wavelength range using the hsiao model
 	# and a bunch of zeros for M1
@@ -263,9 +267,51 @@ def init_errs(m0varfile=None,m0m1file=None,m1varfile=None,scalefile=None,clscatf
 			wave,clscat=np.loadtxt(clscatfile,unpack=True)
 			wave,clscat=wave[wave<9200],clscat[wave<9200]
 			pow=n_colorscatpars-1-np.arange(n_colorscatpars)
-			clscatpars=np.polyfit(wave/1000,np.log(clscat),n_colorscatpars-1)*factorial(pow)#guess[resids.iclscat]
+			clscatpars=np.polyfit((wave-5500)/1000,np.log(clscat),n_colorscatpars-1)*factorial(pow)#guess[resids.iclscat]
 
 	return m0varbspl[0],m0varbspl[1],m0varbspl[2],m1varbspl[2],m0m1corrbspl[2],clscatpars
+
+def init_custom(M0,M1,
+				Bfilt='initfiles/Bessell90_B.dat',
+				phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
+				waveinterpres=10.0,phasesplineres=6,wavesplineres=1200,n_colorscatpars=4,
+				order=3,normalize=True):
+	splinephase = np.linspace(phaserange[0],phaserange[1],int((phaserange[1]-phaserange[0])/phasesplineres)+1,True)
+	splinewave	= np.linspace(waverange[0],waverange[1],int((waverange[1]-waverange[0])/wavesplineres)+1,True)
+
+	def load(M):
+		phase,wave=np.meshgrid(np.linspace(phaserange[0],phaserange[1],int((phaserange[1]-phaserange[0])/phaseinterpres)+1,True), 
+							   np.linspace(waverange[0],waverange[1],int((waverange[1]-waverange[0])/waveinterpres)+1,True))
+		return phase.flatten(),wave.flatten(),M.flatten()
+		
+	def initbsplwithzeroth(phase,wave,flux,kx=order,ky=order, tx=splinephase,ty=splinewave):
+		if order==0:
+			binphasecenter=((splinephase)[1:]+(splinephase)[:-1])/2
+			binwavecenter =((splinewave)[1:]+(splinewave)[:-1])/2
+			fluxmeans= np.empty((binphasecenter.size,binwavecenter.size))
+			for i,phaseup,phaselow in zip(range(splinephase.size-1),(splinephase)[1:],(splinephase)[:-1]):
+				for j,waveup,wavelow in zip(range(splinewave.size-1),(splinewave)[1:], (splinewave)[:-1]):
+					phasebin=(phase<phaseup)&(phase>=phaselow)
+					wavebin= (wave <waveup)&(wave>=wavelow)
+					fluxmeans[i][j]=np.mean(flux[wavebin&phasebin])
+			return splinephase,splinewave,fluxmeans.flatten(),0,0
+		else:
+			return bisplrep(phase,wave,flux,kx=order,ky=order, tx=splinephase,ty=splinewave,task=-1)
+	
+	phase,wave,m0 = load(M0)
+	iGood = np.where((phase >= phaserange[0]-phasesplineres*0) & (phase <= phaserange[1]+phasesplineres*0) &
+					 (wave >= waverange[0]-wavesplineres*0) & (wave <= waverange[1]+wavesplineres*0))[0]
+	phase,wave,m0 = phase[iGood],wave[iGood],m0[iGood]
+	m0bspl = initbsplwithzeroth(phase,wave,m0,kx=order,ky=order, tx=splinephase,ty=splinewave)
+
+	phase,wave,m1 = load(M1)
+	iGood = np.where((phase >= phaserange[0]-phasesplineres*0) & (phase <= phaserange[1]+phasesplineres*0) &
+					 (wave >= waverange[0]-wavesplineres*0) & (wave <= waverange[1]+wavesplineres*0))[0]
+	phase,wave,m1 = phase[iGood],wave[iGood],m1[iGood]
+	m1bspl = initbsplwithzeroth(phase,wave,m1,kx=order,ky=order, tx=splinephase,ty=splinewave)
+	
+	return m0bspl[0],m0bspl[1],m0bspl[2],m1bspl[2]
+
 
 def init_salt2_cdisp(cdfile=None,order=4):
 

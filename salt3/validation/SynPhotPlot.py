@@ -21,9 +21,9 @@ def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
 		 clfile='salt3_color_correction.dat',
 		 cdfile='salt3_color_dispersion.dat',
 		 errscalefile='salt3_lc_dispersion_scaling.dat',
-		 lcrv00file='salt3_lc_relative_variance_0.dat',
-		 lcrv11file='salt3_lc_relative_variance_1.dat',
-		 lcrv01file='salt3_lc_relative_covariance_01.dat'):
+		 lcrv00file='salt3_lc_variance_0.dat',
+		 lcrv11file='salt3_lc_variance_1.dat',
+		 lcrv01file='salt3_lc_covariance_01.dat'):
 	
 	plt.clf()
 
@@ -97,9 +97,9 @@ def plotSynthPhotOverStretchRange(outfile,salt3dir,filterset='SDSS',
 		 clfile='salt3_color_correction.dat',
 		 cdfile='salt3_color_dispersion.dat',
 		 errscalefile='salt3_lc_dispersion_scaling.dat',
-		 lcrv00file='salt3_lc_relative_variance_0.dat',
-		 lcrv11file='salt3_lc_relative_variance_1.dat',
-		 lcrv01file='salt3_lc_relative_covariance_01.dat'):
+		 lcrv00file='salt3_lc_variance_0.dat',
+		 lcrv11file='salt3_lc_variance_1.dat',
+		 lcrv01file='salt3_lc_covariance_01.dat'):
 	
 	plt.clf()
 
