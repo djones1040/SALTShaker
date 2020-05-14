@@ -487,7 +487,7 @@ class SALTResids:
 		Ls,colorvar=storedResults['photCholesky_{}'.format(sn)]
 		
 		photresids={'resid':np.zeros(photmodel['modelflux'].size)}
-		photresids['resid_jacobian']=np.zeros((photmodel['modelflux'].size,varyParams.sum()))
+		photresids['resid_jacobian']=sparse.lil_matrix((photmodel['modelflux'].size,varyParams.sum()))
 		
 		if not fixUncertainty: 
 			photresids['lognorm']=0
@@ -512,12 +512,11 @@ class SALTResids:
 			if varyParams.any():
 				if not fixFluxes: 
 					if L.ndim==2:
-						photresids['resid_jacobian'][selectFilter]=linalg.solve_triangular(L,photmodel['modelflux_jacobian'][selectFilter],lower=True)
+						invL=sparse.csr_matrix(linalg.solve_triangular(L,np.diag(np.ones(L.shape[0])),lower=True))
+						photresids['resid_jacobian'][selectFilter]=invL.dot(photmodel['modelflux_jacobian'][selectFilter])
+						#photresids['resid_jacobian'][selectFilter]=linalg.solve_triangular(L,photmodel['modelflux_jacobian'][selectFilter],lower=True)
 					else:
-						try:
-							photresids['resid_jacobian'][selectFilter]=photmodel['modelflux_jacobian'][selectFilter]/L[:,np.newaxis]	
-						except:
-							import pdb;pdb.set_trace()			
+						photresids['resid_jacobian'][selectFilter]=photmodel['modelflux_jacobian'][selectFilter]/L[:,np.newaxis]	
 				if not fixUncertainty:
 					varyParlist=self.parlist[varyParams]
 					#Cut out zeroed jacobian entries to save time
@@ -555,7 +554,7 @@ class SALTResids:
 					photresids['lognorm_grad'][nonzero]-= np.trace(fractionalLDeriv)
 				
 		#Handle spectra
-		
+		photresids['resid_jacobian']=photresids['resid_jacobian'].tocsr()
 		variance=specmodel['fluxvariance'] + specmodel['modelvariance']
 		if (specmodel['modelvariance']<0).any():
 			warnings.warn('Negative variance in spectra',RuntimeWarning)
@@ -570,7 +569,7 @@ class SALTResids:
 		specresids['uncertainty'] = uncertainty
 		if not fixUncertainty:
 			specresids['lognorm']=-np.log((np.sqrt(2*np.pi)*uncertainty)).sum()
-		specresids['resid_jacobian']=np.zeros((specmodel['modelflux'].size,varyParams.sum()))
+		specresids['resid_jacobian']=sparse.csr_matrix((specmodel['modelflux'].size,varyParams.sum()))
 		
 		if not fixFluxes: specresids['resid_jacobian']=spectralSuppression * specmodel['modelflux_jacobian']/(uncertainty[:,np.newaxis])
 		if not fixUncertainty:
@@ -755,7 +754,7 @@ class SALTResids:
 		if len(np.where((photresultsdict['modelflux'] != photresultsdict['modelflux']) |
 						(photresultsdict['modelflux'] == np.inf))[0]):
 			raise RuntimeError(f'phot model fluxes are nonsensical for SN {sn}')
-
+		photresultsdict['modelflux_jacobian']=sparse.csr_matrix(photresultsdict['modelflux_jacobian'])
 		return photresultsdict
 			
 	def specValsForSN(self,x,sn,storedResults,temporaryResults,varyParams):
@@ -889,7 +888,7 @@ class SALTResids:
 		if len(np.where((specresultsdict['modelflux'] != specresultsdict['modelflux']) |
 						(specresultsdict['modelflux'] == np.inf))[0]):
 			raise RuntimeError(f'spec model flux nonsensical for SN {sn}')
-
+		specresultsdict['modelflux_jacobian']=sparse.csr_matrix(specresultsdict['modelflux_jacobian'])
 		return specresultsdict
 
 	def specVarianceForSN(self,x,sn,storedResults,temporaryResults,varyParams):

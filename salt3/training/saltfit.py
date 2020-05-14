@@ -451,7 +451,7 @@ class GaussNewton(saltresids.SALTResids):
 		for superloop in range(loop_niter):
 			tstartloop = time.time()
 			try:
-				if self.fit_model_err and photochi2perdof<65 and superloop == 0: #not superloop % 3 and not superloop == 0: 
+				if self.fit_model_err and photochi2perdof<65 and not superloop % 3 and not superloop == 0: 
 					log.info('Optimizing model error')
 					X=self.iterativelyfiterrmodel(X)
 					storedResults={}
@@ -651,8 +651,7 @@ class GaussNewton(saltresids.SALTResids):
 			minuitkwargs['limit_'+extrapar]=(0,2)
 		
 		m=Minuit(fn,use_array_call=True,forced_parameters=params,errordef=.5,**minuitkwargs)
-		#m.tol = 1e-4
-		result,paramResults=m.migrad()#ncall=4)
+		result,paramResults=m.migrad(ncall=10)
 		X=X.copy()
 		paramresults=np.array([x.value for x  in paramResults])
 		if rescaleerrs:
@@ -743,10 +742,10 @@ class GaussNewton(saltresids.SALTResids):
 
 			if doSpecResids:
 				residuals+=[photresidsdict['resid'],specresidsdict['resid']]
-				jacobian+=[sparse.coo_matrix(photresidsdict['resid_jacobian']),sparse.coo_matrix(specresidsdict['resid_jacobian'])]
+				jacobian+=[(photresidsdict['resid_jacobian']),(specresidsdict['resid_jacobian'])]
 			else:
 				residuals+=[photresidsdict['resid'],np.zeros(len(specresidsdict['resid']))]
-				jacobian+=[sparse.coo_matrix(photresidsdict['resid_jacobian']),sparse.coo_matrix((specresidsdict['resid'].size,varyParams.sum()))]
+				jacobian+=[(photresidsdict['resid_jacobian']),((specresidsdict['resid'].size,varyParams.sum()))]
 
 
 		if doPriors:
@@ -768,7 +767,7 @@ class GaussNewton(saltresids.SALTResids):
 					continue
 				if regKey in storedResults and not (varyParams[self.im0].any() or varyParams[self.im1].any()):
 					residuals += storedResults[regKey]
-					jacobian +=  [sparse.coo_matrix(np.zeros((r.size,varyParams.sum())) )for r in storedResults[regKey]]
+					jacobian +=  [sparse.coo_matrix((r.size,varyParams.sum())) for r in storedResults[regKey]]
 				else:
 					for regResids,regJac in zip( *regularization(guess,storedResults,varyParams)):
 						residuals += [regResids*np.sqrt(weight)]
