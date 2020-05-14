@@ -61,9 +61,9 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 				   clfile='salt3_color_correction.dat',
 				   cdfile='salt3_color_dispersion.dat',
 				   errscalefile='salt3_lc_dispersion_scaling.dat',
-				   lcrv00file='salt3_lc_relative_variance_0.dat',
-				   lcrv11file='salt3_lc_relative_variance_1.dat',
-				   lcrv01file='salt3_lc_relative_covariance_01.dat',
+				   lcrv00file='salt3_lc_variance_0.dat',
+				   lcrv11file='salt3_lc_variance_1.dat',
+				   lcrv01file='salt3_lc_covariance_01.dat',
 				   ax=None,maxspec=None,base=None,verbose=False,datadict=None,binspecres=None):
 
 	plt.close('all')

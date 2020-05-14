@@ -161,14 +161,14 @@ def customfilt(outfile,lcfile,salt3dir,
 			   clfile='salt3_color_correction.dat',
 			   cdfile='salt3_color_dispersion.dat',
 			   errscalefile='salt3_lc_dispersion_scaling.dat',
-			   lcrv00file='salt3_lc_relative_variance_0.dat',
-			   lcrv11file='salt3_lc_relative_variance_1.dat',
-			   lcrv01file='salt3_lc_relative_covariance_01.dat',
+			   lcrv00file='salt3_lc_variance_0.dat',
+			   lcrv11file='salt3_lc_variance_1.dat',
+			   lcrv01file='salt3_lc_covariance_01.dat',
 			   flatnu='flatnu.dat',
 			   x0 = None, x1 = None, c = None, t0 = None,
 			   fitx1=False,fitc=False,bandpassdict=None,
 			   n_components=1, ax1=None, ax2=None, ax3=None, ax4=None,
-			   saltdict={}):
+			   saltdict={},n_colorpars=4):
 
 	if not ax1:
 		plt.clf()
@@ -267,9 +267,9 @@ def customfilt(outfile,lcfile,salt3dir,
 		if len(lines):
 			for i in range(len(lines)):
 				lines[i] = lines[i].replace('\n','')
-			colorlaw_salt3_coeffs = np.array(lines[1:5]).astype('float')
-			salt3_colormin = float(lines[6].split()[1])
-			salt3_colormax = float(lines[7].split()[1])
+			colorlaw_salt3_coeffs = np.array(lines[1:n_colorpars+1]).astype('float')
+			salt3_colormin = float(lines[n_colorpars+2].split()[1])
+			salt3_colormax = float(lines[n_colorpars+3].split()[1])
 
 			salt3colorlaw = SALT2ColorLaw([2800,7000],colorlaw_salt3_coeffs)
 	except:

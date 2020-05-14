@@ -182,6 +182,7 @@ class SALTResids:
 		#Store derivatives of a spline with fixed knot locations with respect to each knot value
 		self.spline_derivs = np.zeros([len(self.phase),len(self.wave),self.im0.size])
 		for i in range(self.im0.size):
+			if self.bsorder == 0: continue
 			self.spline_derivs[:,:,i]=bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
 		nonzero=np.nonzero(self.spline_derivs)
 		self.spline_deriv_interp= RegularGridInterpolator((self.phase,self.wave),self.spline_derivs,self.interpMethod,False,0)
@@ -216,6 +217,7 @@ class SALTResids:
 		self.regularizationDerivs=[np.zeros((self.phaseRegularizationPoints.size,self.waveRegularizationPoints.size,self.im0.size)) for i in range(4)]
 		for i in range(len(self.im0)):
 			for j,derivs in enumerate([(0,0),(1,0),(0,1),(1,1)]):
+				if self.bsorder == 0: continue
 				self.regularizationDerivs[j][:,:,i]=bisplev(self.phaseRegularizationPoints,self.waveRegularizationPoints,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder),dx=derivs[0],dy=derivs[1])
 
 		phase=self.phaseRegularizationPoints
@@ -1094,7 +1096,7 @@ class SALTResids:
 		if not 'components' in storedResults:
 			storedResults['components'] =self.SALTModel(x)
 		if not 'componentderivs' in storedResults:
-			storedResults['componentderivs'] = self.SALTModelDeriv(x,1,0,self.phase,self.wave)
+			if self.bsorder != 0: storedResults['componentderivs'] = self.SALTModelDeriv(x,1,0,self.phase,self.wave)
 		
 		if 'saltErr' not in storedResults:
 			storedResults['saltErr']=self.ErrModel(x)
@@ -1153,23 +1155,38 @@ class SALTResids:
 		try: m0pars = x[self.m0min:self.m0max+1]
 		except: import pdb; pdb.set_trace()
 		try:
-			m0 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
-						 self.wave if evaluateWave is None else evaluateWave,
-						 (self.phaseknotloc,self.waveknotloc,m0pars,self.bsorder,self.bsorder))
+			if self.bsorder != 0:
+				m0 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
+							 self.wave if evaluateWave is None else evaluateWave,
+							 (self.phaseknotloc,self.waveknotloc,m0pars,self.bsorder,self.bsorder))
+			else:
+				phase = self.phase if evaluatePhase is None else evaluatePhase
+				wave = self.wave if evaluateWave is None else evaluateWave
+				n_repeat_phase = int(phase.size/(self.phaseknotloc.size-1))+1
+				n_repeat_phase_extra = -1*(n_repeat_phase*(self.phaseknotloc.size-1) % phase.size)
+				if n_repeat_phase_extra == 0: n_repeat_phase_extra = None
+				n_repeat_wave = int(wave.size/(self.waveknotloc.size-1))+1
+				n_repeat_wave_extra = -1*(n_repeat_wave*(self.waveknotloc.size-1) % wave.size)
+				if n_repeat_wave_extra == 0: n_repeat_wave_extra = None
+				m0 = np.repeat(np.repeat(m0pars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),n_repeat_phase,axis=0),n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]
 		except:
 			import pdb; pdb.set_trace()
 			
 		if self.n_components == 2:
 			m1pars = x[self.im1]
-			m1 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
-						 self.wave if evaluateWave is None else evaluateWave,
-						 (self.phaseknotloc,self.waveknotloc,m1pars,self.bsorder,self.bsorder))
+			if self.bsorder != 0:
+				m1 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
+							 self.wave if evaluateWave is None else evaluateWave,
+							 (self.phaseknotloc,self.waveknotloc,m1pars,self.bsorder,self.bsorder))
+			else:
+				m1 = np.repeat(np.repeat(m1pars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),n_repeat_phase,axis=0),n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]
+
 			components = (m0,m1)
 		elif self.n_components == 1:
 			components = (m0,)
 		else:
 			raise RuntimeError('A maximum of two principal components is allowed')
-			
+		#if self.bsorder == 0: import pdb; pdb.set_trace()
 		return components
 
 	def SALTModelDeriv(self,x,dx,dy,evaluatePhase=None,evaluateWave=None):
@@ -1224,12 +1241,12 @@ class SALTResids:
 		clscatpars = x[self.parlist == 'clscat']
 		pow=clscatpars.size-1-np.arange(clscatpars.size)
 		coeffs=clscatpars/factorial(pow)
-		clscat=np.exp(np.poly1d(coeffs)(wave/1000))
+		clscat=np.exp(np.poly1d(coeffs)((wave-5500)/1000))
 		if varyParams is None:
 			return clscat
 		else:
 			pow=pow[varyParams[self.parlist=='clscat']]
-			dcolorscatdx= clscat*((wave/1000) ** (pow) )/ factorial(pow)
+			dcolorscatdx= clscat*(((wave-5500)/1000) ** (pow) )/ factorial(pow)
 			return clscat,dcolorscatdx
 		
 	
@@ -1257,6 +1274,13 @@ class SALTResids:
 			
 		return components
 
+	def CustomErrModel(self,m0var,m1var,m01cov,evaluatePhase=None,evaluateWave=None):
+		"""Returns modeled variance of SALT model components as a function of phase and wavelength"""
+
+				
+		return components
+
+	
 	def getParsGN(self,x):
 
 		m0pars = x[self.parlist == 'm0']
@@ -1295,6 +1319,27 @@ class SALTResids:
 		return(x,self.phase,self.wave,m0,m0err,m1,m1err,cov_m0_m1,modelerr,
 			   clpars,clerr,clscat,resultsdict)
 
+	def getErrsGN(self,m0var,m1var,m0m1cov):
+
+		errs=[]
+		for errpars in [m0var,m1var,m0m1cov]:
+			if self.bsorder != 0:
+				errs+=[  bisplev(self.phase,
+								 self.wave,
+								 (self.phaseknotloc,self.waveknotloc,errpars,self.bsorder,self.bsorder))]
+			else:
+				n_repeat_phase = int(self.phase.size/(self.phaseknotloc.size-1))+1
+				n_repeat_phase_extra = -1*(n_repeat_phase*(self.phaseknotloc.size-1) % self.phase.size)
+				if n_repeat_phase_extra == 0: n_repeat_phase_extra = None
+				n_repeat_wave = int(self.wave.size/(self.waveknotloc.size-1))+1
+				n_repeat_wave_extra = -1*(n_repeat_wave*(self.waveknotloc.size-1) % self.wave.size)
+				if n_repeat_wave_extra == 0: n_repeat_wave_extra = None
+				errs += [np.repeat(np.repeat(errpars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),n_repeat_phase,axis=0),n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]]
+
+
+		return(np.sqrt(errs[0]),np.sqrt(errs[1]),errs[2])
+
+	
 	def getPars(self,loglikes,x,nburn=500,mkplots=False):
 
 		axcount = 0; parcount = 0
