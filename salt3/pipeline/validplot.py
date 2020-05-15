@@ -151,6 +151,7 @@ class getmu_validplots(ValidPlots):
 
 	@validfunction
 	def nuisancebias(self):
+		sigint,alpha,beta = np.nan,np.nan,np.nan
 		with open(self.inputfile) as fin:
 			for line in fin:
 				if line.startswith('#') and 'sigint' in line and '=' in line:
@@ -160,6 +161,9 @@ class getmu_validplots(ValidPlots):
 				elif line.startswith('#') and 'beta0' in line and '=' in line:
 					beta,betaerr = float(line.split()[3]),float(line.split()[5])
 
+		if np.any(np.isnan([sigint,alpha,beta])):
+			return
+        
 		fr = txtobj(self.inputfile,fitresheader=True)
 		plt.clf()
 		ax = plt.axes()
@@ -194,21 +198,22 @@ class cosmofit_validplots(ValidPlots):
 		w_Planck = -1
 		
 		data = at.Table.read(self.inputfile,format='ascii')
+		print(data)
 		
 		plt.clf()
 		ax = plt.axes()
-		ax.set_ylabel('Nuisance Parameters',fontsize=15)
+		ax.set_ylabel('Cosmo Parameters',fontsize=15)
 		ax.xaxis.set_ticks([1,2])
 		ax.xaxis.set_ticklabels(['$w$','$\Omega_M$'],rotation=30)
 
-		ax.errorbar(1,data['w']-w_Planck,yerr=data['wsig_marg'],fmt='o',color='C0',label='fit')
-		ax.errorbar(2,data['OM']-Om_Planck,yerr=data['OM_sig'],fmt='o',color='C0')
+		ax.errorbar(1,np.mean(data['w'])-w_Planck,yerr=np.sqrt(np.sum(data['wsig_marg']**2)/len(data['wsig_marg'])),fmt='o',color='C0',label='fit')
+		ax.errorbar(2,np.mean(data['OM'])-Om_Planck,yerr=np.sqrt(np.sum(data['OM_sig']**2)/len(data['OM_sig'])),fmt='o',color='C0')
 		ax.axhline(0,color='k',lw=2)
 		
 		ax.text(0.17,0.9,r"""$w = %.3f \pm %.3f$"""%(
-			data['w'],data['wsig_marg']),transform=ax.transAxes,ha='center',va='center')
+			np.mean(data['w']),np.sqrt(np.sum(data['wsig_marg']**2)/len(data['wsig_marg']))),transform=ax.transAxes,ha='center',va='center')
 		ax.text(0.5,0.9,r"""$\Omega_M = %.3f \pm %.3f$"""%(
-			data['OM'],data['OM_sig']),transform=ax.transAxes,ha='center',va='center')
+			np.mean(data['OM']),np.sqrt(np.sum(data['OM_sig']**2)/len(data['OM_sig']))),transform=ax.transAxes,ha='center',va='center')
 
 		ax.set_xlim([0.5,2.5])
 		plt.savefig('%s%s_cosmopar.png'%(self.outputdir,self.prefix))

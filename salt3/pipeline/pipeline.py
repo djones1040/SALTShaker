@@ -212,6 +212,12 @@ class SALT3pipe():
                     if pipepro[i].validplots:
                         print('making validation plots in %s/'%self.plotdir)
                         pipepro[i].validplot_run()
+        
+        lastpipepro = self._get_pipepro_from_string(self.pipepros[-1])
+        if not isinstance(lastpipepro,list):
+            self.success = lastpipepro.success
+        else:
+            self.success = lastpipepro[-1].success
                     
     def glue(self,pipepros=None,on='phot'):
         if not self.build_flag: build_error()
@@ -447,7 +453,7 @@ class PipeProcedure():
                 for argitem in arg.split(' '):
                     args.append(argitem)
 
-        if batch: _run_batch_pro(self.pro, args, done_file=self.done_file)
+        if batch: self.success = _run_batch_pro(self.pro, args, done_file=self.done_file)
         else: _run_external_pro(self.pro, args)
 
     def validplot_run(self):
@@ -1011,6 +1017,14 @@ class LCFitting(PipeProcedure):
         from salt3.pipeline.validplot import lcfitting_validplots
         self.validplot_func = lcfitting_validplots()
 
+        self.get_validplot_inputs()
+
+        for inputfile,inputbase in zip(self.validplot_inputfiles,self.validplot_inputbases):
+            self.validplot_func.input(inputfile)
+            self.validplot_func.output(outputdir=self.plotdir,prefix='valid_lcfitting_%s'%inputbase)
+            self.validplot_func.run()
+            
+    def get_validplot_inputs(self,outname=None):
         if not self.batch and os.path.exists('%s.FITRES.TEXT'%self.keys['snlcinp']['textfile_prefix'].strip()):
             inputfiles = ['%s.FITRES.TEXT'%self.keys['snlcinp']['textfile_prefix'].strip()]
             inputbases = [self.keys['snlcinp']['textfile_prefix'].strip()]
@@ -1019,11 +1033,14 @@ class LCFitting(PipeProcedure):
             inputbases = [inpf.split('/')[-2] for inpf in inputfiles]
         else: raise RuntimeError('Error in validplot_run - could not find the FITRES files created in LCFitting stage')
         if not len(inputfiles): raise RuntimeError('Error in validplot_run - could not find the FITRES files created in LCFitting stage')
-
-        for inputfile,inputbase in zip(inputfiles,inputbases):
-            self.validplot_func.input(inputfile)
-            self.validplot_func.output(outputdir=self.plotdir,prefix='valid_lcfitting_%s'%inputbase)
-            self.validplot_func.run()
+            
+        self.validplot_inputfiles = inputfiles
+        self.validplot_inputbases = inputbases
+        
+        if isinstance(outname,str):
+            with open(outname,'w') as f:
+                f.write("INPUTFILES: {}\n".format(','.join(self.validplot_inputfiles)))
+                f.write("INPUTBASES: {}\n".format(','.join(self.validplot_inputbases)))
             
 class GetMu(PipeProcedure):
             
@@ -1105,12 +1122,24 @@ class GetMu(PipeProcedure):
         from salt3.pipeline.validplot import getmu_validplots
         self.validplot_func = getmu_validplots()
             
-        inputfiles = glob.glob('%s/*/SALT2mu_FITOPT000_MUOPT000.FITRES'%self.keys['OUTDIR_OVERRIDE'])
-        for inputfile in inputfiles:
-            inputbase = inputfile.split('/')[-1]
+        self.get_validplot_inputs()
+        for inputfile,inputbase in zip(self.validplot_inputfiles,self.validplot_inputbases):
             self.validplot_func.input(inputfile)
             self.validplot_func.output(outputdir=self.plotdir,prefix='valid_getmu_%s'%self.keys['OUTDIR_OVERRIDE'])
             self.validplot_func.run()
+            
+    def get_validplot_inputs(self,outname=None):
+        inputfiles = glob.glob('%s/*/SALT2mu_FITOPT000_MUOPT000.FITRES'%self.keys['OUTDIR_OVERRIDE'])
+        inputbases = [inputfile.split('/')[-1] for inputfile in inputfiles]
+        
+        self.validplot_inputfiles = inputfiles
+        self.validplot_inputbases = inputbases
+
+        if isinstance(outname,str):
+            with open(outname,'w') as f:
+                f.write("INPUTFILES: {}\n".format(','.join(self.validplot_inputfiles)))
+                f.write("INPUTBASES: {}\n".format(','.join(self.validplot_inputbases)))
+        
 
 class CosmoFit(PipeProcedure):
     def configure(self,setkeys=None,pro=None,outname=None,prooptions=None,batch=False,
@@ -1134,14 +1163,25 @@ class CosmoFit(PipeProcedure):
         from salt3.pipeline.validplot import cosmofit_validplots
         self.validplot_func = cosmofit_validplots()
 
+        self.get_validplot_inputs()
+        for inputfile,inputbase in zip(self.validplot_inputfiles,self.validplot_inputbases):
+            self.validplot_func.input(inputfile)
+            self.validplot_func.output(outputdir=self.plotdir,prefix='valid_cosmofit_%s'%inputbase)
+            self.validplot_func.run()
+
+    def get_validplot_inputs(self,outname=None):
         inputfile = '%s.cospar'%self.finput
         #inputbase = inputfile.split('/')[-1].split('.')[0]
-        inputbase = inputfile.split('/')[0]
-        self.validplot_func.input(inputfile)
-        self.validplot_func.output(
-            outputdir=self.plotdir,prefix='valid_cosmofit_%s'%inputbase)
-        self.validplot_func.run()
-
+        inputbase = inputfile.split('/')[0]      
+        
+        self.validplot_inputfiles = [inputfile]
+        self.validplot_inputbases = [inputbase]
+        
+        if isinstance(outname,str):
+            with open(outname,'w') as f:
+                f.write("INPUTFILES: {}\n".format(','.join(self.validplot_inputfiles)))
+                f.write("INPUTBASES: {}\n".format(','.join(self.validplot_inputbases)))
+                
     
 def _run_external_pro(pro,args):
 
@@ -1219,7 +1259,7 @@ def _run_batch_pro(pro,args,done_file=None):
     else:
         raise ValueError("Something went wrong..") ##possible to pass the error msg from the program?
 
-    return
+    return success
 
 
 def _gen_general_python_input(basefilename=None,setkeys=None,
