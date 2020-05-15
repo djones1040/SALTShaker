@@ -269,17 +269,17 @@ class TrainSALT(TrainSALTBase):
 				saltfitkwargs['fix_salt2modelpars'] = self.options.fix_salt2modelpars
 				saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)
 				# do the fitting
-				x_modelpars,x_unscaled,phase,wave,M0,M0modelerr,M1,M1modelerr,cov_M0_M1_model,\
+				x_modelpars,x_unscaled,phase,wave,M0,M0modelerr,M0dataerr,M1,M1modelerr,M1dataerr,cov_M0_M1_model,cov_M0_M1_data,\
 					modelerr,clpars,clerr,clscat,SNParams,laststepsize,message = fitter.gaussnewton(
 						saltfitter,x_modelpars,
 						self.options.gaussnewton_maxiter)
 
-				if not 'hi': #self.options.fit_model_err:
-					M0dataerr,M1dataerr,cov_M0_M1_data = fitter.gaussnewton(
-						saltfitter,x_modelpars,
-						self.options.gaussnewton_maxiter,only_data_errs=True)
-				else:
-					M0dataerr = M1dataerr = cov_M0_M1_data = np.zeros(len(M0))
+				#if not 'hi': #self.options.fit_model_err:
+				#	M0dataerr,M1dataerr,cov_M0_M1_data = fitter.gaussnewton(
+				#		saltfitter,x_modelpars,
+				#		self.options.gaussnewton_maxiter,only_data_errs=True)
+				#else:
+				#	M0dataerr = M1dataerr = cov_M0_M1_data = np.zeros(len(M0))
 					
 			for k in datadict.keys():
 				try:
@@ -650,7 +650,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 		if not i %12 ==0:
 			pdf_pages.savefig()
 		pdf_pages.close()
-		log.info(f'plotting light curves took {time()-tlc:%.1f}')
+		log.info(f'plotting light curves took {time()-tlc:.1f}')
 		
 	def main(self):
 		try:
