@@ -343,7 +343,7 @@ class GaussNewton(saltresids.SALTResids):
 		self.iModelParam[self.imodelerr]=False
 		self.iModelParam[self.imodelcorr]=False
 		self.iModelParam[self.iclscat]=False
-		self.uncertaintyKeys=set(['photvariances_' +sn for sn in self.datadict]+['specvariances_' +sn for sn in self.datadict]+['photCholesky_' +sn for sn in self.datadict])
+		self.uncertaintyKeys=set(['photvariances_' +sn for sn in self.datadict]+['specvariances_' +sn for sn in self.datadict]+sum([[f'photCholesky_{sn}_{flt}' for flt in np.unique(self.datadict[sn]['photdata']['filt'])] for sn in self.datadict],[]))
 
 		self.tryFittingAllParams=True
 		fitlist = [('all parameters','all'),('all parameters grouped','all-grouped'),('supernova params','sn'),
@@ -460,7 +460,7 @@ class GaussNewton(saltresids.SALTResids):
 		for superloop in range(loop_niter):
 			tstartloop = time.time()
 			try:
-				if self.fit_model_err and photochi2perdof<65 and superloop == 0: #not superloop % 3 and not superloop == 0: 
+				if self.fit_model_err and photochi2perdof<65 and not superloop % 3 and not superloop == 0: 
 					log.info('Optimizing model error')
 					X=self.iterativelyfiterrmodel(X)
 					storedResults={}
@@ -668,8 +668,7 @@ class GaussNewton(saltresids.SALTResids):
 			minuitkwargs['limit_'+extrapar]=(0,2)
 		
 		m=Minuit(fn,use_array_call=True,forced_parameters=params,errordef=.5,**minuitkwargs)
-		#m.tol = 1e-4
-		result,paramResults=m.migrad()#ncall=4)
+		result,paramResults=m.migrad(ncall=10)
 		X=X.copy()
 		paramresults=np.array([x.value for x  in paramResults])
 		if rescaleerrs:
@@ -839,8 +838,8 @@ class GaussNewton(saltresids.SALTResids):
 		for sn in self.datadict.keys():
 			photresidsdict,specresidsdict=self.ResidsForSN(
 				guess,sn,storedResults,varyParams,fixUncertainty=True)
-			photresids+=[photresidsdict['resid']]
-			specresids+=[specresidsdict['resid']]
+			photresids+=[photresidsdict[k]['resid'] for k in photresidsdict]
+			specresids+=[specresidsdict[k]['resid'] for k in specresidsdict]
 
 		priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,guess)
 		priorResids=[priorResids]
@@ -882,14 +881,9 @@ class GaussNewton(saltresids.SALTResids):
 
 		for sn in self.datadict.keys():
 			photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,storedResults,varyParams,fixUncertainty=True)
-
-			if doSpecResids:
-				residuals+=[photresidsdict['resid'],specresidsdict['resid']]
-				jacobian+=[sparse.coo_matrix(photresidsdict['resid_jacobian']),sparse.coo_matrix(specresidsdict['resid_jacobian'])]
-			else:
-				residuals+=[photresidsdict['resid'],np.zeros(len(specresidsdict['resid']))]
-				jacobian+=[sparse.coo_matrix(photresidsdict['resid_jacobian']),sparse.coo_matrix((specresidsdict['resid'].size,varyParams.sum()))]
-
+			for residsdict in ([photresidsdict,specresidsdict] if doSpecResids else [photresidsdict]):
+				residuals+=[residsdict[k]['resid'] for k in residsdict]
+				jacobian+=[residsdict[k]['resid_jacobian'] for k in residsdict]
 
 		if doPriors:
 
@@ -900,7 +894,7 @@ class GaussNewton(saltresids.SALTResids):
 			BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
 				self.priors.BoundedPriorResids(self.bounds,self.boundedParams,guess)
 			residuals+=[BoundedPriorResids]
-			jacobian+=[sparse.coo_matrix(BoundedPriorJac[:,varyParams])]
+			jacobian+=[sparse.csr_matrix(BoundedPriorJac[:,varyParams])]
 
 		if self.regularize:
 			for regularization, weight,regKey in [(self.phaseGradientRegularization, self.regulargradientphase,'regresult_phase'),
@@ -910,11 +904,11 @@ class GaussNewton(saltresids.SALTResids):
 					continue
 				if regKey in storedResults and not (varyParams[self.im0].any() or varyParams[self.im1].any()):
 					residuals += storedResults[regKey]
-					jacobian +=  [sparse.coo_matrix(np.zeros((r.size,varyParams.sum())) )for r in storedResults[regKey]]
+					jacobian +=  [sparse.csr_matrix((r.size,varyParams.sum())) for r in storedResults[regKey]]
 				else:
 					for regResids,regJac in zip( *regularization(guess,storedResults,varyParams)):
 						residuals += [regResids*np.sqrt(weight)]
-						jacobian+=[sparse.coo_matrix(regJac)*np.sqrt(weight)]
+						jacobian+=[sparse.csr_matrix(regJac)*np.sqrt(weight)]
 					storedResults[regKey]=residuals[-self.n_components:]
 
 		if varyParams.any():

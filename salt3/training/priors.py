@@ -347,17 +347,17 @@ class SALTPriors:
 		lbound,ubound = bound
 		
 		iPar = self.__dict__['i%s'%par]
-		if iPar.dtype==bool and iPar.sum() ==0: return np.zeros(0),np.zeros(0),np.zeros((0,self.npar))
+		if iPar.dtype==bool and iPar.sum() ==0: return np.zeros(0),np.zeros(0),sparse.csr_matrix((0,self.npar))
 		iOut = (x[iPar] < lbound) | (x[iPar] > ubound)
 		iLow = (x[iPar] < lbound)
 		iHigh = (x[iPar] > ubound)
 		residual = np.zeros(iPar.size)
-		residual[iLow] = (x[iPar][iLow]-lbound)**2./(2*width**2.)
-		residual[iHigh] = (x[iPar][iHigh]-ubound)**2./(2*width**2.)
+		residual[iLow] = (x[iPar][iLow]-lbound)/(width)
+		residual[iHigh] = (x[iPar][iHigh]-ubound)/(width)
 
 		jacobian = np.zeros((x[iPar].size,self.npar))
-		jacobian[iLow,iPar[iLow]] = (x[iPar][iLow]-lbound)/(width**2.)
-		jacobian[iHigh,iPar[iHigh]] = (x[iPar][iHigh]-ubound)/(width**2.)
+		jacobian[iLow,iPar[iLow]] = 1/(width)
+		jacobian[iHigh,iPar[iHigh]] = 1/(width)
 		
 		return residual,x[iPar],jacobian	
 
@@ -398,24 +398,18 @@ class SALTPriors:
 		"""Given a list of names of priors and widths returns a residuals vector, list of prior values, and Jacobian """
 
 		components = self.SALTModel(x)
-		residuals=np.zeros(self.numBoundResids)
-		jacobian=np.zeros((self.numBoundResids,self.npar))
-		values=np.zeros(self.numBoundResids)
-		idx=0
 		debugstring='Values outside bounds: '
+		results=[]
 		for bound,par in zip(bounds,boundparams):
 
 			result=self.boundedprior(bound[-1],(bound[0],bound[1]),x,par)
+			results+=[result]
 			numResids=result[0].size
 			if numResids==0: continue
-			try:
-				residuals[idx:idx+numResids],values[idx:idx+numResids],\
-				jacobian[idx:idx+numResids,:]=result
-			except:
-				import pdb;pdb.set_trace()
 			if result[0].any():
 				debugstring+='{} {}, '.format(par,np.nonzero(result[0])[0].size)
-			idx+=numResids
+		residuals,values,jacobian=zip(*results)
+		residuals,values,jacobian=np.concatenate([np.array([x]) if x.shape==() else x for x in residuals]),np.concatenate([np.array([x]) if x.shape==() else x for x in values]),np.concatenate([x if len(x.shape)==2 else x[np.newaxis,:] for x in jacobian])
 		if residuals.any():
 			log.debug(debugstring[:-1])
 		return residuals,values,jacobian
