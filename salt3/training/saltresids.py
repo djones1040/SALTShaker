@@ -1539,15 +1539,19 @@ class SALTResids:
 		# D. Jones - just testing this out
 		#for j,p in enumerate(self.phaseBinCenters):
 		#	if np.max(self.neffRaw[j,:]) > 0: self.neffRaw[j,:] /= np.max(self.neffRaw[j,:])
+		# HACK
 		#self.neffRaw[self.neffRaw > 1] = 1
 		#self.neffRaw[self.neffRaw < 1e-6] = 1e-6
 
 		self.plotEffectivePoints([-12.5,0.5,16.5,26],'neff.png')
 		self.plotEffectivePoints(None,'neff-heatmap.png')
 		self.neff=self.neffRaw.copy()
-		self.neff[self.neff>self.neffMax]=np.inf		
-		self.neff/=self.neffMax
+		self.neff[self.neff>self.neffMax]=np.inf
+		# HACK!
+		self.neff[self.neff<self.neffMax]=1e-6 #self.nefffloor
+		#self.neff/=self.neffMax
 		if not np.any(np.isinf(self.neff)): log.warning('Regularization is being applied to the entire phase/wavelength space: consider lowering neffmax (currently {:.2e})'.format(self.neffMax))
+
 		self.neff=np.clip(self.neff,self.neffFloor,None)
 		
 	def plotEffectivePoints(self,phases=None,output=None):

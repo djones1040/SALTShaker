@@ -95,26 +95,15 @@ class fitting:
 					gaussnewton_maxiter,
 					only_data_errs=False):
 
-		if only_data_errs:
-			log.info("using Minuit to determine the uncertainties on M0 and M1")
-			if gn.fit_model_err:
-				log.info('Optimizing model error')
-				m0var,m1var,m0m1cov=gn.iterativelyfitdataerrmodel(guess)
-			else:
-				m0var = m1var = m0m1cov = np.zeros(len(M0))
-			M0dataerr,M1dataerr,cov_M0_M1_data = gn.getErrsGN(m0var,m1var,m0m1cov)
-			return M0dataerr,M1dataerr,cov_M0_M1_data
-		else:
-			gn.debug = False
-			xfinal,xunscaled,phase,wave,M0,M0modelerr,M1,M1modelerr,cov_M0_M1_model,\
-				modelerr,clpars,clerr,clscat,SNParams,stepsizes = \
+		gn.debug = False
+		xfinal,xunscaled,phase,wave,M0,M0modelerr,M0dataerr,M1,M1modelerr,M1dataerr,cov_M0_M1_model,cov_M0_M1_data,\
+			modelerr,clpars,clerr,clscat,SNParams,stepsizes = \
 				gn.convergence_loop(
-					guess,loop_niter=gaussnewton_maxiter)
+				guess,loop_niter=gaussnewton_maxiter)
 			
-		return xfinal,xunscaled,phase,wave,M0,M0modelerr,M1,M1modelerr,cov_M0_M1_model,\
+		return xfinal,xunscaled,phase,wave,M0,M0modelerr,M0dataerr,M1,M1modelerr,M1dataerr,cov_M0_M1_model,cov_M0_M1_data,\
 			modelerr,clpars,clerr,clscat,SNParams,stepsizes,\
 			'Gauss-Newton MCMC was successful'
-
 		
 	def mcmc(self,saltfitter,guess,
 			 n_processes,n_mcmc_steps,
@@ -503,7 +492,22 @@ class GaussNewton(saltresids.SALTResids):
 						import pdb;pdb.set_trace()
 					else:
 						raise e
-		
+
+		# M0/M1 errors
+		log.info("determining M0/M1 errors")
+		varyingParams=self.fitOptions['all'][1]&self.iModelParam
+		varyingParams[self.ix0] = False
+		residuals,J=self.lsqwrap(X,{},varyingParams,True,doSpecResids=True)
+		from numpy.linalg import inv,pinv,norm
+		var = inv((J.T*J).todense())
+		spline_derivs_2d = self.spline_derivs.reshape([self.phase.size*self.wave.size,self.im0.size])
+		first_dot_M0 = np.dot(spline_derivs_2d,var[:self.im0.size,:self.im0.size])
+		M0dataerr = np.sqrt(np.sum(np.array(first_dot_M0)*np.array(spline_derivs_2d),axis=1).reshape([self.phase.size,self.wave.size]))
+		first_dot_M1 = np.dot(spline_derivs_2d,var[self.im0.size:2*self.im0.size,self.im0.size:2*self.im0.size])
+		M1dataerr = np.sqrt(np.sum(np.array(first_dot_M1)*np.array(spline_derivs_2d),axis=1).reshape([self.phase.size,self.wave.size]))
+		first_dot_cov = np.dot(spline_derivs_2d,var[:self.im0.size,self.im0.size:2*self.im0.size])
+		cov_M0_M1_data = np.sum(np.array(first_dot_cov)*np.array(spline_derivs_2d),axis=1).reshape([self.phase.size,self.wave.size])
+					
 		#Xredefined = X.copy()
 		#Retranslate x1, M1, x0, M0 to obey definitions
 		Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
@@ -522,7 +526,7 @@ class GaussNewton(saltresids.SALTResids):
 
 		log.info('Total time spent in convergence loop: {}'.format(datetime.now()-start))
 
-		return xfinal,X,phase,wave,M0,M0modelerr,M1,M1modelerr,cov_M0_M1_model,\
+		return xfinal,X,phase,wave,M0,M0modelerr,M0dataerr,M1,M1modelerr,M1dataerr,cov_M0_M1_model,cov_M0_M1_data,\
 			modelerr,clpars,clerr,clscat,SNParams,stepsizes
 		
 		#raise RuntimeError("convergence_loop reached 100000 iterations without convergence")
