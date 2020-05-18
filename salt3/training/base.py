@@ -141,6 +141,8 @@ class TrainSALTBase:
 							help='Weighting of wave gradient chi^2 regularization during training of model parameters (default=%default)')
 		parser.add_argument('--regulardyad', default=config.get('trainingparams','regulardyad'), type=float,
 							help='Weighting of dyadic chi^2 regularization during training of model parameters (default=%default)')
+		parser.add_argument('--spec_chi2_scaling', default=config.get('trainingparams','spec_chi2_scaling'), type=float,
+							help='scaling of spectral chi^2 so it doesn\'t dominate the total chi^2 (default=%default)')
 		parser.add_argument('--n_min_specrecal', default=config.get('trainingparams','n_min_specrecal'), type=int,
 							help='Minimum order of spectral recalibration polynomials (default=%default)')
 		parser.add_argument('--specrange_wavescale_specrecal', default=config.get('trainingparams','specrange_wavescale_specrecal'), type=float,
@@ -299,7 +301,9 @@ class TrainSALTBase:
 						 'regularize':self.options.regularize,
 						 'outputdir':self.options.outputdir,
 						 'fit_model_err':self.options.fit_model_err,
-						 'fitTpkOff':self.options.fit_tpkoff}
+						 'fitTpkOff':self.options.fit_tpkoff,
+						 'spec_chi2_scaling':self.options.spec_chi2_scaling}
+		
 		for k in self.options.__dict__.keys():
 			if k.startswith('prior') or k.startswith('bound'):
 				saltfitkwargs[k] = self.options.__dict__[k]
