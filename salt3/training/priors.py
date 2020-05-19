@@ -388,6 +388,7 @@ class SALTPriors:
 				debugstring+='{}: {:.2e},'.format(prior,float(results[-1][1]))
 			chi2string+='{}: {:.2e},'.format(prior,(results[-1][0]**2).sum())
 				#debugstring+=f'{prior}: '+' '.join(['{:.2e}'.format(val) for val in results[-1][1]])+','
+		
 		log.debug(debugstring)
 		log.debug(chi2string)
 		residuals,values,jacobian=zip(*results)
