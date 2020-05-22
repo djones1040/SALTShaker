@@ -4,6 +4,7 @@ from inspect import signature
 from functools import partial
 from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
 from sncosmo.salt2utils import SALT2ColorLaw
+from scipy.special import factorial
 import logging
 log=logging.getLogger(__name__)
 
@@ -287,6 +288,40 @@ class SALTPriors:
 		return residual,m1flux/bStdFlux,jacobian
 	
 	@prior
+	def recalprior(self,width,x,components):
+		"""Prior on all spectral recalibration"""
+		results=[]
+		for sn in self.datadict:
+			specdata=self.datadict[sn]['specdata']
+			for k in specdata:
+				spectrum=specdata[k]
+				ispcrcl=np.where(self.parlist=='specrecal_{}_{}'.format(sn,k))[0]
+				coeffs=x[ispcrcl]
+				pow=coeffs.size-np.arange(coeffs.size)
+				wavepoints=spectrum['wavelength'][np.round(np.linspace(0,spectrum['wavelength'].size-1,coeffs.size+2,True)).astype(int)]
+				recalCoord=((wavepoints-np.mean(spectrum['wavelength']))/self.specrange_wavescale_specrecal)
+				drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
+				recalterm=(drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1)
+				jacobian=np.zeros((recalterm.size,self.npar))
+				jacobian[:,ispcrcl]=drecaltermdrecal
+				results+=[(recalterm/width,recalterm,jacobian)]
+		residuals,values,jacobian=zip(*results)
+		return np.concatenate([np.array([x]) if x.shape==() else x for x in residuals]),np.concatenate([np.array([x]) if x.shape==() else x for x in values]),np.concatenate([x if len(x.shape)==2 else x[np.newaxis,:] for x in jacobian])
+	
+	@prior
+	def m0positiveprior(self,width,x,components):
+		"""Prior that m0 is not negative"""
+		val=components[0].copy().flatten()
+		if np.any(val<0):
+			isnegative=val<0
+			negvals=val[isnegative]
+			jacobian=np.zeros((negvals.size,self.npar))
+			jacobian[:,self.im0]=self.spline_derivs.reshape((-1,self.im0.size))[isnegative,:]
+			return negvals/width,negvals,jacobian
+		else:
+			return np.zeros(1),np.zeros(1),np.zeros((1,self.npar))
+		
+	@prior
 	def colormean(self,width,x,components):
 		"""Prior such that the mean of the color population is 0"""
 		mean=np.mean(x[self.ic])
@@ -370,7 +405,7 @@ class SALTPriors:
 			lower[iPar]=lbound
 			upper[iPar]=ubound
 		return lower,upper
-		
+	
 	def priorResids(self,priors,widths,x):
 		"""Given a list of names of priors and widths returns a residuals vector, list of prior values, and Jacobian """
 		components = self.SALTModel(x)

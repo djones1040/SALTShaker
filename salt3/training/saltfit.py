@@ -458,8 +458,8 @@ class GaussNewton(saltresids.SALTResids):
 					uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
 					for name,chi2component,dof in chi2results:
 						log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/chi2_init*100))
-				X,chi2,converged = self.robust_process_fit(X,uncertainties.copy(),chi2_init,superloop)
-				chi2results=self.getChi2Contributions(X,uncertainties.copy())
+				X,chi2,converged = self.robust_process_fit(X,{},chi2_init,superloop)
+				chi2results=self.getChi2Contributions(X,{})
 				for name,chi2component,dof in chi2results:
 					log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/chi2*100))
 					if name.lower()=='photometric':
