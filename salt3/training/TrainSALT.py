@@ -103,8 +103,9 @@ class TrainSALT(TrainSALTBase):
 		init_options['wavesplineres'] = self.options.error_snake_wave_binsize
 		init_options['order']=self.options.errinterporder
 		init_options['n_colorscatpars']=self.options.n_colorscatpars
-		init_options['clscatfile'] = f'{init_rootdir}/salt2_color_dispersion.dat'
+		
 		if self.options.initsalt2var:
+			init_options['clscatfile'] = f'{init_rootdir}/salt2_color_dispersion.dat'
 			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs(
 				 *['%s/%s'%(init_rootdir,x) for x in ['salt2_lc_relative_variance_0.dat','salt2_lc_relative_covariance_01.dat','salt2_lc_relative_variance_1.dat','salt2_lc_dispersion_scaling.dat','salt2_color_dispersion.dat']],**init_options)
 		else:
@@ -144,7 +145,6 @@ class TrainSALT(TrainSALTBase):
 				order-=1
 				recalParams=[f'specx0_{sn}_{k}']+['specrecal_{}_{}'.format(sn,k)]*order
 				parlist=np.append(parlist,recalParams)
-
 		# initial guesses
 		n_params=parlist.size
 		guess = np.zeros(parlist.size)
