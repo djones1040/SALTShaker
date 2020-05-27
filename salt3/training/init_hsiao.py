@@ -18,7 +18,7 @@ def init_salt2(m0file=None,m1file=None,M0triplet=None,M1triplet=None,
 			   hsiaofile=f'{init_rootdir}/Hsiao07.dat',
 			   phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
 			   waveinterpres=2.0,phasesplineres=3.2,wavesplineres=72,
-			   days_interp=5,debug=False,normalize=True,order=3,use_snpca_knots=False):
+			   days_interp=5,debug=False,normalize=True,order=3,use_snpca_knots=True):
 
 	if m0file:
 		phase,wave,m0flux = np.loadtxt(m0file,unpack=True)
