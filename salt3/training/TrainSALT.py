@@ -16,6 +16,7 @@ from scipy.optimize import minimize, least_squares, differential_evolution
 from astropy.io import fits
 from astropy.cosmology import Planck15 as cosmo
 from sncosmo.constants import HC_ERG_AA
+import astropy.table as at
 
 from salt3.util import snana,readutils
 from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
@@ -134,14 +135,28 @@ class TrainSALT(TrainSALTBase):
 		for k in datadict.keys():
 			parlist = np.append(parlist,['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k])
 
+		if self.options.specrecallist:
+			spcrcldata = at.Table.read(self.options.specrecallist,format='ascii')
+			
 		# spectral params
 		for sn in datadict.keys():
 			specdata=datadict[sn]['specdata']
 			photdata=datadict[sn]['photdata']
 			for k in specdata.keys():
-				order=self.options.n_min_specrecal+int(np.log((specdata[k]['wavelength'].max() - \
-					specdata[k]['wavelength'].min())/self.options.specrange_wavescale_specrecal) + \
-					np.unique(photdata['filt']).size* self.options.n_specrecal_per_lightcurve)
+				if not self.options.specrecallist:
+					try:
+						order=self.options.n_min_specrecal+int(np.log((specdata[k]['wavelength'].max() - \
+							specdata[k]['wavelength'].min())/self.options.specrange_wavescale_specrecal) + \
+							np.unique(photdata['filt']).size* self.options.n_specrecal_per_lightcurve)
+					except:
+						import pdb; pdb.set_trace()
+				else:
+					spcrclcopy = spcrcldata[spcrcldata['SNID'] == sn]
+					order = int(spcrclcopy['ncalib'][spcrclcopy['N'] == k+1])
+					#print(spcrclcopy['phase'][spcrclcopy['N'] == k+1],specdata[k]['tobs'],float(spcrclcopy['phase'][spcrclcopy['N'] == k+1])-specdata[k]['tobs'])
+					#if np.abs(float(spcrclcopy['phase'][spcrclcopy['N'] == k+1])-specdata[k]['tobs']) > 1:
+					#	import pdb; pdb.set_trace()
+
 				order-=1
 				recalParams=[f'specx0_{sn}_{k}']+['specrecal_{}_{}'.format(sn,k)]*order
 				parlist=np.append(parlist,recalParams)
@@ -158,12 +173,15 @@ class TrainSALT(TrainSALTBase):
 							break
 						except:
 							continue
-						
+			# HACK!
+			#guess[parlist == 'm0'] = m0knots
+			#guess[parlist == 'm1'] = m1knots
 			for key in np.unique(parlist):
 				try:
-					#if 'specrecal' not in key: 
+					#if key not in ['m0','m1']: 
+					#	guess[parlist == key] = pars[names == key]
+					#else:
 					guess[parlist == key] = pars[names == key]
-					
 				except:
 					log.critical('Problem while initializing parameter ',key,' from previous training')
 					sys.exit(1)
@@ -196,7 +214,8 @@ class TrainSALT(TrainSALTBase):
 			# if SN param list is provided, initialize with these params
 			if self.options.snparlist:
 				snpar = Table.read(self.options.snparlist,format='ascii')
-			
+				snpar['SNID'] = snpar['SNID'].astype(str)
+				
 			i=0
 			for sn in datadict.keys():
 				if self.options.snparlist:
@@ -224,9 +243,13 @@ class TrainSALT(TrainSALTBase):
 				specdata=datadict[sn]['specdata']
 				photdata=datadict[sn]['photdata']
 				for k in specdata.keys():
-					order=self.options.n_min_specrecal+int(np.log((specdata[k]['wavelength'].max() - \
-						specdata[k]['wavelength'].min())/self.options.specrange_wavescale_specrecal) + \
-						np.unique(photdata['filt']).size* self.options.n_specrecal_per_lightcurve)
+					if not self.options.specrecallist:
+						order=self.options.n_min_specrecal+int(np.log((specdata[k]['wavelength'].max() - \
+							specdata[k]['wavelength'].min())/self.options.specrange_wavescale_specrecal) + \
+							np.unique(photdata['filt']).size* self.options.n_specrecal_per_lightcurve)
+					else:
+						spcrclcopy = spcrcldata[spcrcldata['SNID'] == sn]
+						order = int(spcrclcopy['ncalib'][spcrclcopy['N'] == k+1])
 					order-=1
 
 					specpars_init = SpecRecal(datadict[sn]['photdata'],datadict[sn]['specdata'][k],self.kcordict,
@@ -676,9 +699,10 @@ SIGMA_INT: 0.106  # used in simulation"""
 										   binspecres=binspecres)
 			log.info(f'took {time()-tdstart:.3f} to read in data files')
 			tcstart = time()
+
 			datadict = self.mkcuts(datadict,KeepOnlySpec=self.options.keeponlyspec)
 			log.info(f'took {time()-tcstart:.3f} to apply cuts')
-		
+
 			# fit the model - initial pass
 			if self.options.stage == "all" or self.options.stage == "train":
 				# read the data

@@ -557,7 +557,9 @@ class SALTResids:
 				spectralmodel['modelvariance'][negVals]=0
 
 			uncertainty=np.sqrt(variance)*SpecErrScale
-			spectralSuppression=np.sqrt(self.num_phot/self.num_spec/4)
+
+			spectralSuppression=np.sqrt(self.num_phot/self.num_spec)*self.spec_chi2_scaling
+
 			#spectralSuppression=self.phot_snr/self.spec_snr/10
 
 			spectralresids={'resid': spectralSuppression * (spectralmodel['modelflux']-spectralmodel['dataflux'])/uncertainty}

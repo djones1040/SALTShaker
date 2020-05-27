@@ -111,7 +111,7 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 					speccount = 0
 				else:
 					speccount = len(datadict[s]['specdata'].keys())
-					
+				
 				if len(sn.SPECTRA)==0:
 					log.debug('File {} contains no supernova spectra'.format(sf))
 					if KeepOnlySpec: 
@@ -122,7 +122,11 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 				for k in sn.SPECTRA:
 					spec=sn.SPECTRA[k]
 					m=spec['SPECTRUM_MJD']
-					if m-tpk < -19 or m-tpk > 49: continue
+					#if '95ac' in sf:
+					#	import pdb; pdb.set_trace()
+					if m-tpk < -19 or m-tpk > 49:
+						speccount += 1
+						continue
 
 					datadict[s]['specdata'][speccount] = {}
 					datadict[s]['specdata'][speccount]['fluxerr'] = spec['FLAMERR']
@@ -139,8 +143,15 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 
 					z = datadict[s]['zHelio']
 					iGood = ((datadict[s]['specdata'][speccount]['wavelength']/(1+z) > waverange[0]) &
-							 (datadict[s]['specdata'][speccount]['wavelength']/(1+z) < waverange[1]) &
-							 (datadict[s]['specdata'][speccount]['flux']/datadict[s]['specdata'][speccount]['fluxerr'] > 3))
+							 (datadict[s]['specdata'][speccount]['wavelength']/(1+z) < waverange[1])) # &
+							 #(datadict[s]['specdata'][speccount]['flux']/datadict[s]['specdata'][speccount]['fluxerr'] > 3))
+					#if s == '817':
+						#import pdb; pdb.set_trace()
+					#if len(iGood) <= 5:
+					#	datadict[s]['specdata'].pop(speccount)
+					#	continue
+					
+					#import pdb; pdb.set_trace()
 					if binspecres is not None:
 						flux = datadict[s]['specdata'][speccount]['flux'][iGood]
 						wavelength = datadict[s]['specdata'][speccount]['wavelength'][iGood]
@@ -172,7 +183,7 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 
 						
 						#wavebins = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/binspecres)
-						wavebins = np.linspace(np.min(wavelength),np.max(wavelength),(np.max(wavelength)-np.min(wavelength))/binspecres)
+						wavebins = np.linspace(np.min(wavelength),np.max(wavelength),(np.max(wavelength)-np.min(wavelength))/(binspecres))#*(1+z)))
 						binned_flux = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_avg).statistic
 						binned_fluxerr = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_err).statistic
 						iGood = (binned_flux == binned_flux) & (binned_flux/binned_fluxerr > 3)
@@ -185,8 +196,12 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 						datadict[s]['specdata'][speccount]['wavelength'] = datadict[s]['specdata'][speccount]['wavelength'][iGood]
 						datadict[s]['specdata'][speccount]['fluxerr'] = datadict[s]['specdata'][speccount]['fluxerr'][iGood]
 					# error floor
-					datadict[s]['specdata'][speccount]['fluxerr'] = np.sqrt(datadict[s]['specdata'][speccount]['fluxerr']**2. + \
-																			(0.005*np.max(datadict[s]['specdata'][speccount]['flux']))**2.)
+					try:
+						datadict[s]['specdata'][speccount]['fluxerr'] = np.sqrt(datadict[s]['specdata'][speccount]['fluxerr']**2. + \
+																				(0.005*np.max(datadict[s]['specdata'][speccount]['flux']))**2.)
+					except:
+						import pdb; pdb.set_trace()
+
 					speccount+=1
 
 			else:

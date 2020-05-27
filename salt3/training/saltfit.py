@@ -469,8 +469,10 @@ class GaussNewton(saltresids.SALTResids):
 				if chi2_init-chi2 < -1.e-6:
 					log.warning("MESSAGE WARNING chi2 has increased")
 				elif np.abs(chi2_init-chi2) < self.chi2_diff_cutoff:
+
 					log.info(f'chi2 difference less than cutoff {self.chi2_diff_cutoff}, exiting loop')
 					break
+
 				log.info(f'finished iteration {superloop+1}, chi2 improved by {chi2_init-chi2:.1f}')
 				log.info(f'iteration {superloop+1} took {time.time()-tstartloop:.3f} seconds')
 
@@ -495,6 +497,7 @@ class GaussNewton(saltresids.SALTResids):
 		# M0/M1 errors
 		log.info("determining M0/M1 errors")
 		varyingParams=self.fitOptions['all'][1]&self.iModelParam
+
 		
 		residuals,jac=self.lsqwrap(Xredefined,{},varyingParams,True,doSpecResids=True)
 		

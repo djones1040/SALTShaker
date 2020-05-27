@@ -685,10 +685,12 @@ NSPECTRA:  %i
 		if type(self.SNID) == float: self.SNID == str(int(self.SNID))
 
 		list_file_spec=glob.glob(specdir+'/spectrum*'+str(self.__dict__['SNID'])+'*.list')
+		num_spec = [int(l.split('-')[-1].split('.')[0]) for l in list_file_spec]
 		if not len(list_file_spec) and isinstance(self.SNID,str):
 			snid2 = self.SNID[:]
 			snid2 = snid2[:-1]+snid2[-1].lower()
 			list_file_spec=glob.glob(specdir+'/spectrum*'+snid2+'*.list')
+			num_spec = [int(l.split('-')[-1].split('.')[0]) for l in list_file_spec]
 		#if verbose and len(list_file_spec) > 1:
 		#	import pdb; pdb.set_trace()
 		if not len(list_file_spec):
@@ -701,7 +703,7 @@ NSPECTRA:  %i
 		print('\nNVAR_SPEC: 5',file=fout)
 		print('VARNAMES_SPEC: LAMMIN LAMMAX  FLAM  FLAMERR DQ\n',file=fout)
 		counter=0
-		for specfile in sorted(list_file_spec):
+		for specfile in np.array(list_file_spec)[np.argsort(num_spec)]:
 			counter=counter+1
 			sn_spectrum=SuperNovaSpectrum(specfile)
 			print('SPECTRUM_ID: %i'%counter,file=fout)
