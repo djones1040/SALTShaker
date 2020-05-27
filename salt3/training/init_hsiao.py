@@ -18,7 +18,7 @@ def init_salt2(m0file=None,m1file=None,M0triplet=None,M1triplet=None,
 			   hsiaofile=f'{init_rootdir}/Hsiao07.dat',
 			   phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
 			   waveinterpres=2.0,phasesplineres=3.2,wavesplineres=72,
-			   days_interp=5,debug=False,normalize=True,order=3):
+			   days_interp=5,debug=False,normalize=True,order=3,use_snpca_knots=False):
 
 	if m0file:
 		phase,wave,m0flux = np.loadtxt(m0file,unpack=True)
@@ -29,6 +29,21 @@ def init_salt2(m0file=None,m1file=None,M0triplet=None,M1triplet=None,
 	
 	splinephase = np.linspace(phaserange[0],phaserange[1],int((phaserange[1]-phaserange[0])/phasesplineres)+1,True)
 	splinewave	= np.linspace(waverange[0],waverange[1],int((waverange[1]-waverange[0])/wavesplineres)+1,True)
+
+	if use_snpca_knots:
+		splinephase = np.array([-20.0,-20.0,-20.0,-20.0,-16.72,-12.90,-8.20,-3.85,-0.08,3.65,7.91,12.54,16.89,20.87,25.22,30.94,38.59,50.0,50.0,50.0,50.0])
+		splinewave = np.array([2000., 2000., 2000., 2000., 2067., 2133., 2198., 2262., 2325., 2387., 2449., 2510.,
+							   2570., 2630., 2689., 2748., 2806., 2863., 2920., 2977., 3033.,
+							   3089., 3145., 3200., 3255., 3310., 3364., 3418., 3472., 3526.,
+							   3580., 3633., 3687., 3740., 3793., 3846., 3899., 3952., 4005.,
+							   4058., 4111., 4164., 4217., 4270., 4323., 4377., 4430., 4484.,
+							   4538., 4592., 4646., 4700., 4755., 4810., 4865., 4921., 4977.,
+							   5033., 5090., 5147., 5205., 5263., 5322., 5381., 5441., 5501.,
+							   5563., 5624., 5687., 5750., 5814., 5879., 5946.,
+							   6012., 6081., 6150., 6220., 6292., 6365., 6439., 6515.,
+							   6593., 6672., 6754., 6837., 6922., 7010., 7101., 7194., 7290.,
+							   7389., 7492., 7598., 7709., 7825., 7946., 8072., 8205., 8345.,
+							   8494., 8652., 8821., 9003.,9200.,9200.,9200.,9200.])
 	if m1file is not None:
 			m1flux = np.loadtxt(m1file,unpack=True)[2][iGood]
 	else: m1flux = M1triplet[2]
@@ -89,7 +104,7 @@ def init_salt2(m0file=None,m1file=None,M0triplet=None,M1triplet=None,
 		plt.legend()
 		plt.plot(intwave,m0test,label='interp')
 		bspltmp = bspl[2].reshape([len(splinephase)-4,len(splinewave)-4])
-
+	#import pdb; pdb.set_trace()
 	return intphase,intwave,m0,m1,bspl[0],bspl[1],bspl[2],bsplm1[2]
 
 

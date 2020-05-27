@@ -467,12 +467,15 @@ class GaussNewton(saltresids.SALTResids):
 				if chi2_init-chi2 < -1.e-6:
 					log.warning("MESSAGE WARNING chi2 has increased")
 				elif np.abs(chi2_init-chi2) < self.chi2_diff_cutoff:
-					xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-						modelerr,clpars,clerr,clscat,SNParams = \
-						self.getParsGN(X)
-					stepsizes = self.getstepsizes(X,Xlast)
-					return xfinal,X,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-						modelerr,clpars,clerr,clscat,SNParams,stepsizes
+					log.info('Gauss-Newton optimizer could not further improve chi2')
+					break
+
+					#xfinal,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+					#	modelerr,clpars,clerr,clscat,SNParams = \
+					#	self.getParsGN(X)
+					#stepsizes = self.getstepsizes(X,Xlast)
+					#return xfinal,X,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+					#	modelerr,clpars,clerr,clscat,SNParams,stepsizes
 
 				log.info(f'finished iteration {superloop+1}, chi2 improved by {chi2_init-chi2:.1f}')
 				log.info(f'iteration {superloop+1} took {time.time()-tstartloop:.3f} seconds')
@@ -507,7 +510,9 @@ class GaussNewton(saltresids.SALTResids):
 		M1dataerr = np.sqrt(np.sum(np.array(first_dot_M1)*np.array(spline_derivs_2d),axis=1).reshape([self.phase.size,self.wave.size]))
 		first_dot_cov = np.dot(spline_derivs_2d,var[:self.im0.size,self.im0.size:2*self.im0.size])
 		cov_M0_M1_data = np.sum(np.array(first_dot_cov)*np.array(spline_derivs_2d),axis=1).reshape([self.phase.size,self.wave.size])
-					
+		#else:
+		#	M0dataerr,M1dataerr,cov_M0_M1_data = np.zeros([self.phase.size,self.wave.size]),np.zeros([self.phase.size,self.wave.size]),np.zeros([self.phase.size,self.wave.size])
+		
 		#Xredefined = X.copy()
 		#Retranslate x1, M1, x0, M0 to obey definitions
 		Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
