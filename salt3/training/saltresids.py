@@ -1532,9 +1532,9 @@ class SALTResids:
 		#self.neff[self.neff<self.neffMax]=1e-6 #self.nefffloor
 		#self.neff/=self.neffMax
 		if not np.any(np.isinf(self.neff)): log.warning('Regularization is being applied to the entire phase/wavelength space: consider lowering neffmax (currently {:.2e})'.format(self.neffMax))
-
-		self.neff=np.clip(self.neff,self.neffFloor,None)
 		
+		self.neff=np.clip(self.neff,self.neffFloor,None)
+		self.neff=np.sqrt(self.neff)
 	def plotEffectivePoints(self,phases=None,output=None):
 		import matplotlib.pyplot as plt
 		if phases is None:

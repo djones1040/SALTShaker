@@ -327,7 +327,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 		self._robustify = False
 		self._writetmp = False
-		self.chi2_diff_cutoff = 1
+		self.chi2_diff_cutoff = .1
 		self.fitOptions={}
 		self.iModelParam=np.ones(self.npar,dtype=bool)
 		self.iModelParam[self.imodelerr]=False
@@ -917,8 +917,8 @@ class GaussNewton(saltresids.SALTResids):
 					residuals += storedResults[regKey]
 					jacobian +=  [sparse.csr_matrix((r.size,varyParams.sum())) for r in storedResults[regKey]]
 				else:
-					for regResids,regJac in zip( *regularization(guess,storedResults,varyParams)):
-						residuals += [regResids*np.sqrt(weight)]
+					for regResids,regJac,relativeweight in zip( *regularization(guess,storedResults,varyParams),[1,10]):
+						residuals += [regResids*np.sqrt(weight)*relativeweight]
 						jacobian+=[sparse.csr_matrix(regJac)*np.sqrt(weight)]
 					storedResults[regKey]=residuals[-self.n_components:]
 
@@ -1084,7 +1084,7 @@ class GaussNewton(saltresids.SALTResids):
 
 		#Ratio of actual improvement in chi2 to how well the optimizer thinks it did
 		reductionratio= (oldChi-postGN)/(oldChi-(normr**2+(normx*self.damping[fit])**2))
-		if reductionratio<0.1: self.damping[fit]*=scale*11/9
+		if reductionratio<0.33: self.damping[fit]*=scale*11/9
 		log.debug('LSMR results with damping factor {:.2e}: {}, norm r {:.2f}, norm J^T r {:.2f}, norm J {:.2f}, cond J {:.2f}, norm step {:.2f}, reduction ratio {:.2f}'.format(self.damping[fit],stopReasons[stopsignal],normr,normar,norma,conda,normx,reductionratio ))
 		if stopsignal==7: log.warning('Gauss-Newton solver reached max # of iterations')
 
