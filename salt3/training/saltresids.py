@@ -380,6 +380,53 @@ class SALTResids:
 		pbspl /= denom*HC_ERG_AA
 		self.kcordict['default']['Vpbspl'] = pbspl
 
+	def lsqwrap(self,guess,storedResults,varyParams=None,doPriors=True,doSpecResids=True):
+		if varyParams is None:
+			varyParams=np.zeros(self.npar,dtype=bool)
+		self.fillStoredResults(guess,storedResults)
+		if varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any() or varyParams[self.iclscat].any():
+			raise ValueError('lsqwrap not allowed to handle varying model uncertainties')
+		
+		residuals = []
+		jacobian = [] # Jacobian matrix from r
+
+		for sn in self.datadict.keys():
+			photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,storedResults,varyParams,fixUncertainty=True)
+			for residsdict in ([photresidsdict,specresidsdict] if doSpecResids else [photresidsdict]):
+				residuals+=[residsdict[k]['resid'] for k in residsdict]
+				jacobian+=[residsdict[k]['resid_jacobian'] for k in residsdict]
+
+		if doPriors:
+
+			priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,guess)
+			residuals+=[priorResids]
+			jacobian+=[priorJac[:,varyParams]]
+
+			BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
+				self.priors.BoundedPriorResids(self.bounds,self.boundedParams,guess)
+			residuals+=[BoundedPriorResids]
+			jacobian+=[sparse.csr_matrix(BoundedPriorJac[:,varyParams])]
+
+		if self.regularize:
+			for regularization, weight,regKey in [(self.phaseGradientRegularization, self.regulargradientphase,'regresult_phase'),
+										   (self.waveGradientRegularization,self.regulargradientwave,'regresult_wave' ),
+										   (self.dyadicRegularization,self.regulardyad,'regresult_dyad')]:
+				if weight ==0:
+					continue
+				if regKey in storedResults and not (varyParams[self.im0].any() or varyParams[self.im1].any()):
+					residuals += storedResults[regKey]
+					jacobian +=  [sparse.csr_matrix((r.size,varyParams.sum())) for r in storedResults[regKey]]
+				else:
+					for regResids,regJac,relativeweight in zip( *regularization(guess,storedResults,varyParams),[1,self.m1regularization]):
+						residuals += [regResids*np.sqrt(weight*relativeweight)]
+						jacobian+=[sparse.csr_matrix(regJac)*np.sqrt(weight*relativeweight)]
+					storedResults[regKey]=residuals[-self.n_components:]
+
+		if varyParams.any():
+			return np.concatenate(residuals),sparse.vstack(jacobian)
+		else:
+			return  np.concatenate(residuals)
+
 	def maxlikefit(self,x,storedResults=None,varyParams=None,pool=None,debug=False,SpecErrScale=1.0,fixFluxes=False,dospec=True,usesns=None):
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic data given during initialization
@@ -447,10 +494,10 @@ class SALTResids:
 				if weight ==0:
 					continue
 				regResids,regJac=regularization(x,storedResults,varyParams)
-				logp-= sum([(res**2).sum()*weight/2 for res in regResids])
+				logp-= sum([(res**2).sum()*weight*componentweight/2 for res,componentweight in zip(regResids,[1,self.m1regularization])])
 				if computeDerivatives:
-					for res,jac in zip(regResids,regJac):
-						grad -= (res[:,np.newaxis]*jac ).sum(axis=0)
+					for res,jac,componentweight in zip(regResids,regJac,[1,self.m1regularization]):
+						grad -= (res[:,np.newaxis]*jac *weight*componentweight).sum(axis=0)
 		self.nstep += 1
 
 		if computeDerivatives:
@@ -1536,7 +1583,7 @@ class SALTResids:
 		if not np.any(np.isinf(self.neff)): log.warning('Regularization is being applied to the entire phase/wavelength space: consider lowering neffmax (currently {:.2e})'.format(self.neffMax))
 		
 		self.neff=np.clip(self.neff,self.neffFloor,None)
-		self.neff=np.sqrt(self.neff)
+		#self.neff=np.sqrt(self.neff)
 	def plotEffectivePoints(self,phases=None,output=None):
 		import matplotlib.pyplot as plt
 		if phases is None:

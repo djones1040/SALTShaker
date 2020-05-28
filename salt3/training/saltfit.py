@@ -883,53 +883,6 @@ class GaussNewton(saltresids.SALTResids):
 			chi2Results+=[(name,(x**2).sum(),x.size)]
 		return chi2Results
 	
-	def lsqwrap(self,guess,storedResults,varyParams=None,doPriors=True,doSpecResids=True):
-		if varyParams is None:
-			varyParams=np.zeros(self.npar,dtype=bool)
-		self.fillStoredResults(guess,storedResults)
-		if varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any() or varyParams[self.iclscat].any():
-			raise ValueError('lsqwrap not allowed to handle varying model uncertainties')
-		
-		residuals = []
-		jacobian = [] # Jacobian matrix from r
-
-		for sn in self.datadict.keys():
-			photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,storedResults,varyParams,fixUncertainty=True)
-			for residsdict in ([photresidsdict,specresidsdict] if doSpecResids else [photresidsdict]):
-				residuals+=[residsdict[k]['resid'] for k in residsdict]
-				jacobian+=[residsdict[k]['resid_jacobian'] for k in residsdict]
-
-		if doPriors:
-
-			priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,guess)
-			residuals+=[priorResids]
-			jacobian+=[priorJac[:,varyParams]]
-
-			BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
-				self.priors.BoundedPriorResids(self.bounds,self.boundedParams,guess)
-			residuals+=[BoundedPriorResids]
-			jacobian+=[sparse.csr_matrix(BoundedPriorJac[:,varyParams])]
-
-		if self.regularize:
-			for regularization, weight,regKey in [(self.phaseGradientRegularization, self.regulargradientphase,'regresult_phase'),
-										   (self.waveGradientRegularization,self.regulargradientwave,'regresult_wave' ),
-										   (self.dyadicRegularization,self.regulardyad,'regresult_dyad')]:
-				if weight ==0:
-					continue
-				if regKey in storedResults and not (varyParams[self.im0].any() or varyParams[self.im1].any()):
-					residuals += storedResults[regKey]
-					jacobian +=  [sparse.csr_matrix((r.size,varyParams.sum())) for r in storedResults[regKey]]
-				else:
-					for regResids,regJac,relativeweight in zip( *regularization(guess,storedResults,varyParams),[1,10]):
-						residuals += [regResids*np.sqrt(weight)*relativeweight]
-						jacobian+=[sparse.csr_matrix(regJac)*np.sqrt(weight)]
-					storedResults[regKey]=residuals[-self.n_components:]
-
-		if varyParams.any():
-			return np.concatenate(residuals),sparse.vstack(jacobian)
-		else:
-			return  np.concatenate(residuals)
-
 	def robust_process_fit(self,X_init,uncertainties,chi2_init,niter):
 		X,chi2=X_init,chi2_init
 		storedResults=uncertainties.copy()
@@ -1076,18 +1029,25 @@ class GaussNewton(saltresids.SALTResids):
 			precondstep,stopsignal,itn,normr,normar,norma,conda,normx=result
 			self.damping[fit]=damping
 			#If the new position is worse, need to increase the damping until the new position is better
+			increasedDamping=False
 			while oldChi<postGN:
-				
+				increasedDamping=True
 				self.damping[fit]*=scale*11/9
 				result,postGN,gaussNewtonStep,dampingFactor=gaussNewtonFit(self.damping[fit])
 				precondstep,stopsignal,itn,normr,normar,norma,conda,normx=result
+			#Ratio of actual improvement in chi2 to how well the optimizer thinks it did
+			reductionratio= (oldChi-postGN)/(oldChi-(normr**2))
+			#If the chi^2 is improving less than expected, check whether damping needs to be increased
+			if reductionratio<0.33 and not increasedDamping: 
+				increaseddampingresult=gaussNewtonFit(self.damping[fit]*scale*11/9)
+				if increaseddampingresult[1]<postGN:
+					result,postGN,gaussNewtonStep,damping=increaseddampingresult
+					precondstep,stopsignal,itn,normr,normar,norma,conda,normx=result
 		else:
 			result,postGN,gaussNewtonStep,dampingFactor=gaussNewtonFit(0)
 			precondstep,stopsignal,itn,normr,normar,norma,conda,normx=result
+			reductionratio= (oldChi-postGN)/(oldChi-(normr**2))
 
-		#Ratio of actual improvement in chi2 to how well the optimizer thinks it did
-		reductionratio= (oldChi-postGN)/(oldChi-(normr**2+(normx*self.damping[fit])**2))
-		if reductionratio<0.33: self.damping[fit]*=scale*11/9
 		log.debug('LSMR results with damping factor {:.2e}: {}, norm r {:.2f}, norm J^T r {:.2f}, norm J {:.2f}, cond J {:.2f}, norm step {:.2f}, reduction ratio {:.2f}'.format(self.damping[fit],stopReasons[stopsignal],normr,normar,norma,conda,normx,reductionratio ))
 		if stopsignal==7: log.warning('Gauss-Newton solver reached max # of iterations')
 

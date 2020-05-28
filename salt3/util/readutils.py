@@ -183,10 +183,10 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 
 						
 						#wavebins = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/binspecres)
-						wavebins = np.linspace(np.min(wavelength),np.max(wavelength),(np.max(wavelength)-np.min(wavelength))/(binspecres))#*(1+z)))
+						wavebins = np.linspace(np.min(wavelength),np.max(wavelength),(np.max(wavelength)-np.min(wavelength))/(binspecres*(1+z)))
 						binned_flux = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_avg).statistic
 						binned_fluxerr = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_err).statistic
-						iGood = (binned_flux == binned_flux) & (binned_flux/binned_fluxerr > 3)
+						iGood = (binned_flux == binned_flux) #& (binned_flux/binned_fluxerr > 3)
 						datadict[s]['specdata'][speccount]['flux'] = binned_flux[iGood]
 						datadict[s]['specdata'][speccount]['wavelength'] = (wavebins[1:][iGood]+wavebins[:-1][iGood])/2.
 						datadict[s]['specdata'][speccount]['fluxerr'] = binned_fluxerr[iGood]
