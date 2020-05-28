@@ -145,8 +145,8 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 					iGood = ((datadict[s]['specdata'][speccount]['wavelength']/(1+z) > waverange[0]) &
 							 (datadict[s]['specdata'][speccount]['wavelength']/(1+z) < waverange[1])) # &
 							 #(datadict[s]['specdata'][speccount]['flux']/datadict[s]['specdata'][speccount]['fluxerr'] > 3))
-					#if s == '817':
-						#import pdb; pdb.set_trace()
+					#if s == '05D2ci':
+					#	import pdb; pdb.set_trace()
 					#if len(iGood) <= 5:
 					#	datadict[s]['specdata'].pop(speccount)
 					#	continue
@@ -186,7 +186,7 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 						wavebins = np.linspace(np.min(wavelength),np.max(wavelength),(np.max(wavelength)-np.min(wavelength))/(binspecres))#*(1+z)))
 						binned_flux = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_avg).statistic
 						binned_fluxerr = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_err).statistic
-						iGood = (binned_flux == binned_flux) & (binned_flux/binned_fluxerr > 3)
+						iGood = (binned_flux == binned_flux) # & (binned_flux/binned_fluxerr > 3)
 						datadict[s]['specdata'][speccount]['flux'] = binned_flux[iGood]
 						datadict[s]['specdata'][speccount]['wavelength'] = (wavebins[1:][iGood]+wavebins[:-1][iGood])/2.
 						datadict[s]['specdata'][speccount]['fluxerr'] = binned_fluxerr[iGood]

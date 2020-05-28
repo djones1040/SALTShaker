@@ -209,11 +209,12 @@ def customfilt(outfile,lcfile,salt3dir,
 		elif bandpassdict[sn.SURVEY][flt]['magsys'] == 'AB': sys = 'ab'
 		else: sys = 'vega'
 		if bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) > 2800 and \
-		   bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) < 7800 and\
+		   bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) < 9000 and\
 		   '-u' not in bandpassdict[sn.SURVEY][flt]['fullname']:
-			data.add_row((m,flt,flx,flxe,
-						  27.5+bandpassdict[sn.SURVEY][flt]['zpoff'],sys))
-			
+			data.add_row((m,flt,flx*10**(0.4*bandpassdict[sn.SURVEY][flt]['primarymag']),flxe*10**(0.4*bandpassdict[sn.SURVEY][flt]['primarymag']),
+						  27.5,sys)) #+bandpassdict[sn.SURVEY][flt]['zpoff']
+				
+				
 		sysdict[flt] = sys
 		
 	flux = sn.FLUXCAL
@@ -221,7 +222,8 @@ def customfilt(outfile,lcfile,salt3dir,
 	dust = sncosmo.F99Dust()
 	salt2model = sncosmo.Model(salt2source,effects=[dust],effect_names=['mw'],effect_frames=['obs'])
 	hsiaomodel = sncosmo.Model(source='hsiao')
-
+	salt2model = sncosmo.Model(source='salt2',effects=[dust],effect_names=['mw'],effect_frames=['obs'])
+	
 	if not len(list(saltdict.keys())):
 		salt3phase,salt3wave,salt3flux = np.genfromtxt('%s/%s'%(salt3dir,m0file),unpack=True)
 		salt3m1phase,salt3m1wave,salt3m1flux = np.genfromtxt('%s/%s'%(salt3dir,m1file),unpack=True)
@@ -377,10 +379,11 @@ def customfilt(outfile,lcfile,salt3dir,
 			   bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split()[0])) < 9000: # and\
 			   #'-u' not in bandpassdict[sn.SURVEY][flt]['fullname']:
 				try:
-					chi2 = np.sum((sn.FLUXCAL[iFLT]-fitted_model.bandflux(flt, sn.MJD[iFLT], zp=27.5,zpsys=sysdict[flt]))**2./sn.FLUXCALERR[iFLT]**2.)
+					chi2 = np.sum((sn.FLUXCAL[iFLT]-fitted_model.bandflux(
+						flt, sn.MJD[iFLT], zp=27.5-bandpassdict[sn.SURVEY][flt]['primarymag'],zpsys=sysdict[flt]))**2./sn.FLUXCALERR[iFLT]**2.)
 					chi2red = chi2/(len(sn.FLUXCAL[iFLT])-3)
 					ax.plot(plotmjd-t0,fitted_model.bandflux(
-						flt, plotmjd, zp=27.5,zpsys=sysdict[flt]),color='C1',
+						flt, plotmjd, zp=27.5-bandpassdict[sn.SURVEY][flt]['primarymag'],zpsys=sysdict[flt]),color='C1',
 							label='SALT2; $x_1 = %.2f$, $c = %.2f$,\n$\chi_{red}^2 = %.1f$'%(
 								result['parameters'][3],result['parameters'][4],chi2red))
 				except ValueError: pass
@@ -405,7 +408,7 @@ def customfilt(outfile,lcfile,salt3dir,
 		ax.set_ylim([-np.max(sn.FLUXCAL)*1/20.,np.max(sn.FLUXCAL)*1.1])
 
 		#if flt == 'c': import pdb; pdb.set_trace()
-		#import pdb; pdb.set_trace()
+		#
 		ax.legend(prop={'size':5})
 	if 'SIM_SALT2x0' in sn.__dict__.keys():
 
