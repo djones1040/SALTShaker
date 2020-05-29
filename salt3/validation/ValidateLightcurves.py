@@ -288,9 +288,9 @@ def customfilt(outfile,lcfile,salt3dir,
 	if 'SIM_SALT2x0' in sn.__dict__.keys():
 		salt2flux = sn.SIM_SALT2x0*(salt2m0flux*_SCALE_FACTOR + (sn.SIM_SALT2x1)*salt2m1flux*_SCALE_FACTOR) * \
 					10. ** (-0.4 * salt2colorlaw(salt2wave/(1+float(sn.SIM_REDSHIFT_HELIO))) * float(sn.SIM_SALT2c))
-		try: mwextcurve = 10**(-0.4*extinction.fitzpatrick99(salt3wave,float(sn.MWEBV.split()[0])*3.1))
-		except: mwextcurve = 10**(-0.4*extinction.fitzpatrick99(salt3wave,sn.MWEBV*3.1))
-		salt3fluxnew *= mwextcurve[np.newaxis,:]
+		try: mwextcurve = 10**(-0.4*extinction.fitzpatrick99(salt2wave,float(sn.MWEBV.split()[0])*3.1))
+		except: mwextcurve = 10**(-0.4*extinction.fitzpatrick99(salt2wave,sn.MWEBV*3.1))
+		salt2flux *= mwextcurve[np.newaxis,:]
 	else:
 		salt2model.set(z=float(sn.REDSHIFT_HELIO.split()[0]),mwebv=sn.MWEBV.split()[0])
 		fitparams = ['t0', 'x0', 'x1', 'c']

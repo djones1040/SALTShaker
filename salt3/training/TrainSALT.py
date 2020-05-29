@@ -257,7 +257,7 @@ class TrainSALT(TrainSALTBase):
 											  nrecalpars=order,sn=sn)
 					if specpars_init[0] != 0:
 						guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]/specpars_init[0]
-						guess[parlist == 'specrecal_{}_{}'.format(sn,k)] = specpars_init[1:]
+						if self.options.specrecal: guess[parlist == 'specrecal_{}_{}'.format(sn,k)] = specpars_init[1:]
 
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
@@ -629,15 +629,24 @@ SIGMA_INT: 0.106  # used in simulation"""
 			if self.options.n_colorpars > 0:
 				fitc = True
 
-
+			if self.options.binspec:
+				binspecres = self.options.binspecres
+			else:
+				binspecres = None
+			datadict = readutils.rdAllData(snlist,self.options.estimate_tpk,self.kcordict,
+										   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
+										   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
+										   binspecres=binspecres)
 			tlc = time()
+			count = 0
 			for l in snfiles:
 				#if 'Foundation' not in l: continue
 				if '/' not in l:
 					l = f'{os.path.dirname(snlist)}/{l}'
 				sn = snana.SuperNova(l)
 				sn.SNID = str(sn.SNID)
-				if not sn.SNID in datadict: continue
+				if not sn.SNID in datadict:
+					continue
 
 				if not i % 12:
 					fig = plt.figure()
@@ -669,7 +678,8 @@ SIGMA_INT: 0.106  # used in simulation"""
 						ax.xaxis.set_ticklabels([])
 						ax.set_xlabel(None)
 				i += 4
-
+				count += 1
+			log.info(f'plotted light curves for {count} SNe')
 		if not i %12 ==0:
 			pdf_pages.savefig()
 		pdf_pages.close()
