@@ -346,32 +346,30 @@ class SALTPriors:
 	@prior
 	def m0endalllam(self,width,x,components):
 		"""Prior such that at early times there is no flux"""
-		upper,lower=components[0].shape[1],0
-		value=components[0][0,lower:upper]
-		residual = value/width
+		thinning=4
 		try:
 			jacobian= self.__m0endalllamderiv__.copy()
 		except:
-			jacobian=np.zeros((upper-lower,self.npar))
-			for i in range((self.waveknotloc.size-self.bsorder-1)):
-				jacobian[lower:upper,self.im0[i]] = self.regularizationDerivs[0][0,lower:upper,i]
+			jacobian=np.zeros((self.spline_derivs[:2,::thinning,0].size,self.npar))
+			jacobian[:,self.im0] = self.spline_derivs[:2,::thinning,:].reshape((-1, self.im0.size))
 			self.__m0endalllamderiv__=jacobian.copy()
+		value=np.dot(jacobian,x)
+		residual = value/width
 		jacobian/=width
 		return residual,value,jacobian
 
 	@prior
 	def m1endalllam(self,width,x,components):
 		"""Prior such that at early times there is no flux"""
-		upper,lower=components[0].shape[1],0
-		value=components[1][0,lower:upper]
-		residual = value/width
+		thinning=4
 		try:
 			jacobian= self.__m1endalllamderiv__.copy()
 		except:
-			jacobian=np.zeros((upper-lower,self.npar))
-			for i in range((self.waveknotloc.size-self.bsorder-1)):
-				jacobian[lower:upper,self.im1[i]] = self.regularizationDerivs[0][0,lower:upper,i]
+			jacobian=np.zeros((self.spline_derivs[:2,::thinning,0].size,self.npar))
+			jacobian[:,self.im1] = self.spline_derivs[:2,::thinning,:].reshape((-1, self.im1.size))
 			self.__m1endalllamderiv__=jacobian.copy()
+		value=np.dot(jacobian,x)
+		residual = value/width
 		jacobian/=width
 		return residual,value,jacobian	
 
