@@ -69,7 +69,6 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 	plt.close('all')
 	plt.rcParams['figure.figsize'] = (12,12)
 	trd = time()
-
 	if datadict is None:
 		if base:
 			datadict=readutils.rdAllData(speclist,False,None,speclist,KeepOnlySpec=True,peakmjdlist=base.options.tmaxlist,binspecres=binspecres)
@@ -120,12 +119,10 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 				if verbose: print('SN {} is not in parameters, skipping'.format(sn))
 				continue
 
-
 			model.update({'x0':pars[parlist==f'specx0_{sn}_{k}'][0]})
 			if 'hi': #try:
 				wave=specdata[k]['wavelength']
 				restwave=wave/(1+snPars['z'])
-
 				coeffs=pars[parlist=='specrecal_{}_{}'.format(sn,k)]
 				pow=coeffs.size-np.arange(coeffs.size)
 				recalCoord=(wave-np.mean(wave))/2500
@@ -155,7 +152,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 				lims = ax.get_xlim()
 				ax2.set_xlim([lims[0]/(1+snPars['z']),lims[1]/(1+snPars['z'])])
 				ax2.set_xlabel('Rest Wavelength $\AA$')
-				
+
 				axcount += 1
 				if not axcount % 3:
 					pdf_pages.savefig()
