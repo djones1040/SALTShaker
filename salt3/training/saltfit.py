@@ -498,13 +498,12 @@ class GaussNewton(saltresids.SALTResids):
 		log.info("determining M0/M1 errors")
 		varyingParams=self.fitOptions['all'][1]&self.iModelParam
 
-		
 		residuals,jac=self.lsqwrap(Xredefined,{},varyingParams,True,doSpecResids=True)
-		
+
 		#Simple preconditioning of the jacobian before attempting to invert
 		precondition=sparse.diags(1/np.sqrt(np.asarray((jac.power(2)).sum(axis=0))),[0])
 		precondjac=(jac*precondition)
-		
+
 		#Define the matrix sigma^-1=J^T J
 		square=precondjac.T*precondjac
 		#Inverting cholesky matrix for speed
@@ -518,7 +517,11 @@ class GaussNewton(saltresids.SALTResids):
 		M0dataerr = (m0pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size))
 		M1dataerr = (m1pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size))
 		cov_M0_M1_data = (m0pulls*m1pulls).sum(axis=0).reshape((self.phase.size,self.wave.size))
-					
+
+		#M0dataerr,M1dataerr,cov_M0_M1_data = \
+		#	np.zeros([self.phase.size,self.wave.size]),\
+		#  	np.zeros([self.phase.size,self.wave.size]),\
+		#  	np.zeros([self.phase.size,self.wave.size])
 		#Xredefined = X.copy()
 		#Retranslate x1, M1, x0, M0 to obey definitions
 	
@@ -877,7 +880,7 @@ class GaussNewton(saltresids.SALTResids):
 					storedResults[regKey]=priorResids[-self.n_components:]
 		chi2Results=[]
 		for name,x in [('Photometric',photresids),('Spectroscopic',specresids),('Prior',priorResids),('Regularization',regResids)]:
-			if (len(regResids) and name == 'Regularization') or name != 'Regularization':
+			if ((len(regResids) and name == 'Regularization') or name != 'Regularization') and len(x):
 				x=np.concatenate(x)
 			else: x=np.array([0.0])
 			chi2Results+=[(name,(x**2).sum(),x.size)]
