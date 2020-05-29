@@ -65,7 +65,7 @@ class SALTPriors:
 		x1=x[self.ix1]
 		c=x[self.ic]
 		if np.all(x1==0) or np.all(c==0):
-			return 0,np.zeros((1,self.npar))		
+			return np.zeros(1),np.zeros(1),np.zeros((1,self.npar))		
 		x1dev=x1-np.median(x1)
 		x1scale=1.48*np.median(np.abs(x1dev))
 		
@@ -419,6 +419,7 @@ class SALTPriors:
 			except:
 				raise ValueError('Invalid prior supplied: {}'.format(prior)) 
 			results+=[priorFunction(width,x,components)]
+			
 			if results[-1][0].size==0: continue
 			if results[-1][0].size==1:
 				debugstring+='{}: {:.2e},'.format(prior,float(results[-1][1]))

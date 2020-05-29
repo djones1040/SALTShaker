@@ -437,7 +437,7 @@ class GaussNewton(saltresids.SALTResids):
 			#If snparams are totally uninitialized
 			log.info('Estimating supernova parameters x0,x1,c and spectral normalization')
 			for fit in ['x0','color','x0','color','x1']:
-				X,chi2_init,chi2=self.process_fit(X,self.fitOptions[fit][1],{},fit=fit,doSpecResids=  (fit=='x0'))
+				X,chi2_init,chi2=self.process_fit(X,self.fitOptions[fit][1],{},fit=fit,doPriors=False,doSpecResids=  (fit=='x0'))
 		uncertainties={}
 		chi2results=self.getChi2Contributions(X,uncertainties)
 		chi2_init=sum([x[1] for x in chi2results])
@@ -961,13 +961,13 @@ class GaussNewton(saltresids.SALTResids):
 		#In this case GN optimizer can do no better
 		return X,chi2,(X is X_init)
 		 #_init
-	def linear_fit(self,X,gaussnewtonstep,uncertainties,doSpecResids):
-		def opFunc(x,stepdir):
-			return ((self.lsqwrap(X-(x*stepdir),uncertainties.copy(),None,True,doSpecResids=doSpecResids))**2).sum()
-		result,step,stepType=minimize_scalar(opFunc,args=(gaussnewtonstep,)),gaussnewtonstep,'Gauss-Newton'
+	def linesearch(self,X,searchdir,uncertainties,doPriors,doSpecResids):
+		def opFunc(x):
+			return ((self.lsqwrap(X-(x*searchdir),uncertainties.copy(),None,doPriors,doSpecResids=doSpecResids))**2).sum()
+		result,step,stepType=minimize_scalar(opFunc),searchdir,'Gauss-Newton'
 		log.info('Linear optimization factor is {:.2f} x {} step'.format(result.x,stepType))
 		log.info('Linear optimized chi2 is {:.2f}'.format(result.fun))
-		return result.x*gaussnewtonstep,result.fun
+		return result.x*searchdir,result.fun
 		
 		
 	def process_fit(self,X,iFit,storedResults,fit='all',doPriors=True,doSpecResids=True):
@@ -976,7 +976,6 @@ class GaussNewton(saltresids.SALTResids):
 		if not self.fitTpkOff: varyingParams[self.itpk]=False
 		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,doPriors,doSpecResids=doSpecResids)
 		oldChi=(residuals**2).sum()
-		
 		jacobian=jacobian.tocsc()
 		
 		if fit=='highestresids':
@@ -1016,7 +1015,8 @@ class GaussNewton(saltresids.SALTResids):
 			result=sprslinalg.lsmr(precondjac,residuals[includeResids],damp=damping,maxiter=2*min(jacobian.shape))
 			gaussNewtonStep=np.zeros(X.size)
 			gaussNewtonStep[varyingParams]=preconditoningMatrix*result[0]
-			postGN=((self.lsqwrap(X-gaussNewtonStep,uncertainties.copy(),None,True,doSpecResids=doSpecResids))**2).sum() #
+			postGN=((self.lsqwrap(X-gaussNewtonStep,uncertainties.copy(),None,doPriors,doSpecResids=doSpecResids))**2).sum() #
+			if fit=='all': log.debug(f'Attempting fit with damping {damping} gave chi2 {postGN}')
 			return result,postGN,gaussNewtonStep,damping
 			
 				
@@ -1027,7 +1027,6 @@ class GaussNewton(saltresids.SALTResids):
 					results+=[(gaussNewtonFit(self.damping[fit]*dampingFactor))]
 			result,postGN,gaussNewtonStep,damping=min(results,key=lambda x:x[1])
 			precondstep,stopsignal,itn,normr,normar,norma,conda,normx=result
-			self.damping[fit]=damping
 			#If the new position is worse, need to increase the damping until the new position is better
 			increasedDamping=False
 			while oldChi<postGN:
@@ -1043,11 +1042,12 @@ class GaussNewton(saltresids.SALTResids):
 				if increaseddampingresult[1]<postGN:
 					result,postGN,gaussNewtonStep,damping=increaseddampingresult
 					precondstep,stopsignal,itn,normr,normar,norma,conda,normx=result
+			self.damping[fit]=damping
 		else:
-			result,postGN,gaussNewtonStep,dampingFactor=gaussNewtonFit(0)
+			result,postGN,gaussNewtonStep,damping=gaussNewtonFit(0)
 			precondstep,stopsignal,itn,normr,normar,norma,conda,normx=result
 			reductionratio= (oldChi-postGN)/(oldChi-(normr**2))
-
+		
 		log.debug('LSMR results with damping factor {:.2e}: {}, norm r {:.2f}, norm J^T r {:.2f}, norm J {:.2f}, cond J {:.2f}, norm step {:.2f}, reduction ratio {:.2f}'.format(self.damping[fit],stopReasons[stopsignal],normr,normar,norma,conda,normx,reductionratio ))
 		if stopsignal==7: log.warning('Gauss-Newton solver reached max # of iterations')
 
@@ -1061,21 +1061,21 @@ class GaussNewton(saltresids.SALTResids):
 			#Fancypants cubic correction to the Gauss-Newton step based on fun differential geometry! See https://arxiv.org/abs/1207.4999 for derivation
 			# Right now, doesn't seem worth it compared to directional fit; maybe worth trying both?
 						
-			directionalSecondDeriv,tol=	ridders(lambda dx: self.lsqwrap(X+dx*gaussNewtonStep,uncertainties.copy(),None,True,doSpecResids=doSpecResids) ,residuals,.5,5,1e-8)
+			directionalSecondDeriv,tol=	ridders(lambda dx: self.lsqwrap(X+dx*gaussNewtonStep,uncertainties.copy(),None,doPriors,doSpecResids=doSpecResids) ,residuals,.5,5,1e-8)
 			accelerationdir,stopsignal,itn,normr,normar,norma,conda,normx=sprslinalg.lsmr(precondjac,directionalSecondDeriv[includeResids],damp=self.damping[fit],maxiter=2*min(jacobian.shape))
 			secondStep=np.zeros(X.size)
 			secondStep[varyingParams]=0.5*preconditoningMatrix*accelerationdir
 			
-			postgeodesic=(self.lsqwrap(X-gaussNewtonStep-secondStep,uncertainties.copy(),None,True,doSpecResids=doSpecResids)**2).sum() #doSpecResids
+			postgeodesic=(self.lsqwrap(X-gaussNewtonStep-secondStep,uncertainties.copy(),None,doPriors,doSpecResids=doSpecResids)**2).sum() #doSpecResids
 			log.info('After geodesic acceleration correction chi2 is {:.2f}'.format(postgeodesic))
-			if postgeodesic<postGN and 2*():
+			if postgeodesic<postGN :
 				chi2=postgeodesic
 				gaussNewtonStep=gaussNewtonStep+secondStep
 			else:
 				chi2=postGN
 				gaussNewtonStep=gaussNewtonStep
 		if self.directionaloptimization:
-			linearStep,chi2=self.linear_fit(X,gaussNewtonStep,uncertainties,doSpecResids)	
+			linearStep,chi2=self.linesearch(X,gaussNewtonStep,uncertainties,doPriors,doSpecResids)	
 			X-=linearStep		
 		else:
 			X-=gaussNewtonStep
