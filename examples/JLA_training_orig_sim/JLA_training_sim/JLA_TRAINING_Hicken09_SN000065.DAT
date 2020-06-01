@@ -1,0 +1,101 @@
+SURVEY: Hicken2009_LC(Hicken2009_LC)   
+SNID:   65   
+IAUC:    NULL 
+PHOTOMETRY_VERSION: JLA_TRAINING_Hicken09 
+SNTYPE:  1 
+FILTERS: UBVRIfhjklabcde 
+RA:      0.000000  deg 
+DEC:     0.000000  deg 
+PIXSIZE:  0.5000  arcsec 
+CCDNUM: 0  
+FAKE:    2   (=> simulated LC with snlc_sim.exe) 
+MWEBV:       0.0274    MW E(B-V) 
+MWEBV_ERR:   0.0044    error on MWEBV 
+REDSHIFT_HELIO:   0.026915 +- 0.000001  (Helio, z_best) 
+REDSHIFT_FINAL:   0.025682 +- 0.000001  (CMB) 
+
+VPEC:       185.28  # v_pec correction
+VPEC_ERR:     0.00  # error on above  
+PEAKMJD:   52679.180 
+
+HOSTGAL_NMATCH:    0  
+HOSTGAL_NMATCH2:   0  
+ 
+
+SIM_MODEL_NAME:  SALT2.JLA-B14 
+SIM_MODEL_INDEX:  6 
+SIM_TYPE_INDEX:   1 
+SIM_TYPE_NAME:    UNKNOWN 
+SIM_TEMPLATE_INDEX: 0   
+SIM_COMMENT:  SN Type = UNKNOWN , MODEL = SALT2.JLA-B14  
+SIM_LIBID:  15  
+SIM_NGEN_LIBID:  1  
+SIMLIB_MSKOPT:  6  
+SIM_NOBS_UNDEFINED:  0  
+SIM_REDSHIFT_HELIO:  0.02692  
+SIM_REDSHIFT_CMB:    0.02630  
+SIM_REDSHIFT_HOST:   0.02692  
+SIM_REDSHIFT_FLAG:   1  # SNSPEC
+SIM_VPEC:  -185.3 (km/sec) 
+SIM_HOSTLIB_GALID:  0 
+SIM_HOSTLIB_NPAR: 0 
+SIM_DLMU:      35.3025  mag   [ -5*log10(10pc/dL) ]
+SIM_LENSDMU:   0.0000  mag 
+SIM_RA:        0.000000 deg  
+SIM_DEC:       0.000000 deg  
+SIM_MWRV:    3.100   (MilkyWay RV) 
+SIM_MWEBV:   0.0331   (MilkyWay E(B-V)) 
+SIMOPT_MWCOLORLAW:  94   (MW color-law option) 
+SIMOPT_MWEBV:       1   (modify MWEBV_SFD)
+SIM_MAGSMEAR_COH:      0.133  
+SIM_GALFRAC:  -9.000 -9.000 -9.000 -9.000 -9.000 -9.000 -9.000 -9.000 -9.000 -9.000
+     -9.000 -9.000 -9.000 -9.000 -9.000  (UBVRIfhjklabcde F_gal/F_SNpeak for PSF=1'')
+SIM_PEAKMAG:   -9.00  -9.00  -9.00  -9.00  -9.00  -9.00  -9.00  -9.00  -9.00  -9.00
+      16.50  16.60  16.63  16.52  -9.00  (UBVRIfhjklabcde obs)
+SIM_EXPOSURE:     1.0    1.0    1.0    1.0    1.0    1.0    1.0    1.0    1.0    1.0
+        1.0    1.0    1.0    1.0    1.0  (UBVRIfhjklabcde obs)
+SIM_PEAKMJD:   52677.472656  days 
+SIM_SALT2alpha:    0.140   
+SIM_SALT2beta:     3.100   
+SIM_SALT2gammaDM:  0.000  
+SIM_SALT2x0:   6.3183e-03   
+SIM_SALT2x1:   -2.2041   
+SIM_SALT2c:    -0.0363   
+SIM_SALT2mB:   16.1335   
+SIM_SEARCHEFF_MASK:  3  (bits 1,2=> found by software,spec) 
+SIM_SEARCHEFF_SPEC:  1.0000  (spectro-search efficiency (ignores pipelines)) 
+SIM_RISETIME_SHIFT:   0.0 days 
+SIM_FALLTIME_SHIFT:   0.0 days 
+
+
+
+# ============================================ 
+# TERSE LIGHT CURVE OUTPUT: 
+#
+NOBS: 16 
+NVAR: 9 
+VARLIST:  MJD  FLT FIELD   FLUXCAL   FLUXCALERR PHOTFLAG   ZPT  PSF  SIM_MAGOBS
+OBS:  52670.522  a NULL   1.5128e+04   9.529e+02    0  23.109   0.85  17.0750 
+OBS:  52670.525  b NULL   1.3679e+04   2.993e+02    0  25.550   0.85  17.1573 
+OBS:  52670.529  d NULL   1.7107e+04   2.902e+02    0  25.965   0.85  16.9726 
+OBS:  52672.492  a NULL   1.9388e+04   9.735e+02    0  23.321   0.85  16.7092 
+OBS:  52673.528  a NULL   2.3336e+04   6.512e+02    0  24.396   0.85  16.5911 
+OBS:  52673.531  b NULL   1.9892e+04   2.949e+02    0  26.038   0.85  16.7433 
+OBS:  52673.534  c NULL   1.8829e+04   2.500e+02    0  26.399   0.85  16.8233 
+OBS:  52673.535  d NULL   2.2206e+04   3.109e+02    0  26.118   0.85  16.6489 
+OBS:  52680.425  c NULL   2.2948e+04   4.949e+02    0  25.032   0.85  16.6474 
+OBS:  52680.427  d NULL   2.4709e+04   3.438e+02    0  26.006   0.85  16.5405 
+OBS:  52686.530  a NULL   9.3967e+03   6.028e+02    0  23.595   0.85  17.5975 
+OBS:  52686.534  b NULL   1.1952e+04   3.730e+02    0  24.909   0.85  17.3334 
+OBS:  52686.536  c NULL   1.6136e+04   3.350e+02    0  25.530   0.85  16.9557 
+OBS:  52686.538  d NULL   1.6689e+04   4.519e+02    0  24.939   0.85  16.9670 
+OBS:  52705.511  a NULL   8.7016e+02   1.630e+02    0  24.173   0.85  20.0311 
+OBS:  52705.521  d NULL   7.0737e+03   1.584e+02    0  26.447   0.85  17.8315 
+END_PHOTOMETRY: 
+
+# ============================================= 
+NSPECTRA:  0 
+
+NVAR_SPEC: 6 
+VARNAMES_SPEC: LAMMIN LAMMAX  FLAM  FLAMERR   SIM_GENFLAM SIM_GENMAG  
+
