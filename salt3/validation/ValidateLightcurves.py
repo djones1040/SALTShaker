@@ -309,16 +309,8 @@ def customfilt(outfile,lcfile,salt3dir,
 								lcrv11file=lcrv11file,
 								lcrv01file=lcrv01file)
 	
-	if 'PEAKMJD' in sn.__dict__.keys():
-		try:
-			sn.PEAKMJD=float(sn.PEAKMJD)
-		except:
-			sn.PEAKMJD=float(sn.PEAKMJD.split()[0])
-	else:
-		sn.PEAKMJD=sn.MJD[sn.FLUXCAL == np.max(sn.FLUXCAL)][0]
-
-	plotmjd = np.linspace(float(sn.PEAKMJD)-20,
-						  float(sn.PEAKMJD)+55,200)
+	plotmjd = np.linspace(t0-20,
+						  t0+55,200)
 	
 	if not ax1:
 		fig = plt.figure(figsize=(15, 5))

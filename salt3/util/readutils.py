@@ -142,22 +142,11 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 					datadict[s]['specdata'][speccount]['mjd'] = m
 
 					z = datadict[s]['zHelio']
-					if 'DQ' in spec.keys():
-						iGood = ((datadict[s]['specdata'][speccount]['wavelength']/(1+z) > waverange[0]) &
-								 (datadict[s]['specdata'][speccount]['wavelength']/(1+z) < waverange[1]) &
-								 (spec['DQ'] == 1))
-					else:
-						iGood = ((datadict[s]['specdata'][speccount]['wavelength']/(1+z) > waverange[0]) &
-								 (datadict[s]['specdata'][speccount]['wavelength']/(1+z) < waverange[1]))
+					iGood = ((datadict[s]['specdata'][speccount]['wavelength']/(1+z) > waverange[0]) &
+							 (datadict[s]['specdata'][speccount]['wavelength']/(1+z) < waverange[1]))
+					if 'DQ' in spec:
+						iGood=iGood & (spec['DQ']==1)
 
-							 #(datadict[s]['specdata'][speccount]['flux']/datadict[s]['specdata'][speccount]['fluxerr'] > 3))
-					#if s == '05D2ci':
-					#	import pdb; pdb.set_trace()
-					#if len(iGood) <= 5:
-					#	datadict[s]['specdata'].pop(speccount)
-					#	continue
-					
-					#import pdb; pdb.set_trace()
 					if binspecres is not None:
 						flux = datadict[s]['specdata'][speccount]['flux'][iGood]
 						wavelength = datadict[s]['specdata'][speccount]['wavelength'][iGood]
