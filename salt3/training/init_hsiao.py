@@ -277,7 +277,7 @@ def init_errs(m0varfile=None,m0m1file=None,m1varfile=None,scalefile=None,clscatf
 	if n_colorscatpars>0:
 		if clscatfile is None:
 			clscatpars=np.zeros(n_colorscatpars)
-			clscatpars[-1]=-5
+			clscatpars[-1]=-np.inf
 		else:
 			wave,clscat=np.loadtxt(clscatfile,unpack=True)
 			wave,clscat=wave[wave<9200],clscat[wave<9200]

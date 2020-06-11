@@ -106,7 +106,7 @@ class TrainSALT(TrainSALTBase):
 		init_options['n_colorscatpars']=self.options.n_colorscatpars
 		
 		if self.options.initsalt2var:
-			init_options['clscatfile'] = f'{init_rootdir}/salt2_color_dispersion.dat'
+			#import pdb; pdb.set_trace() ; init_options['clscatfile'] = f'{init_rootdir}/salt2_color_dispersion.dat'
 			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs(
 				 *['%s/%s'%(init_rootdir,x) for x in ['salt2_lc_relative_variance_0.dat','salt2_lc_relative_covariance_01.dat','salt2_lc_relative_variance_1.dat','salt2_lc_dispersion_scaling.dat','salt2_color_dispersion.dat']],**init_options)
 		else:

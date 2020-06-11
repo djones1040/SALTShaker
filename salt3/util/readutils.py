@@ -143,8 +143,9 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 
 					z = datadict[s]['zHelio']
 					iGood = ((datadict[s]['specdata'][speccount]['wavelength']/(1+z) > waverange[0]) &
-							 (datadict[s]['specdata'][speccount]['wavelength']/(1+z) < waverange[1])) # &
-							 #(datadict[s]['specdata'][speccount]['flux']/datadict[s]['specdata'][speccount]['fluxerr'] > 3))
+							 (datadict[s]['specdata'][speccount]['wavelength']/(1+z) < waverange[1]))
+					if 'DQ' in spec:
+						iGood=iGood & (spec['DQ']==1)
 					#if s == '05D2ci':
 					#	import pdb; pdb.set_trace()
 					#if len(iGood) <= 5:

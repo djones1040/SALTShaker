@@ -298,7 +298,7 @@ class SALTPriors:
 				recalterm=(drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1)
 				jacobian=np.zeros((recalterm.size,self.npar))
 				jacobian[:,ispcrcl]=drecaltermdrecal
-				results+=[(recalterm/width,recalterm,jacobian)]
+				results+=[(recalterm/width,recalterm,jacobian/width)]
 		residuals,values,jacobian=zip(*results)
 		return np.concatenate([np.array([x]) if x.shape==() else x for x in residuals]),np.concatenate([np.array([x]) if x.shape==() else x for x in values]),np.concatenate([x if len(x.shape)==2 else x[np.newaxis,:] for x in jacobian])
 	
@@ -347,13 +347,10 @@ class SALTPriors:
 	def m0endalllam(self,width,x,components):
 		"""Prior such that at early times there is no flux"""
 		thinning=4
-		try:
-			jacobian= self.__m0endalllamderiv__.copy()
-		except:
-			jacobian=np.zeros((self.spline_derivs[:2,::thinning,0].size,self.npar))
-			jacobian[:,self.im0] = self.spline_derivs[:2,::thinning,:].reshape((-1, self.im0.size))
-			self.__m0endalllamderiv__=jacobian.copy()
-		value=np.dot(jacobian,x)
+		jacobian=np.zeros((self.spline_derivs[:2,::thinning,0].size,self.npar))
+		jacobianm0=self.spline_derivs[:2,::thinning,:].reshape((-1, self.im0.size))
+		jacobian[:,self.im0] = jacobianm0
+		value=np.dot(jacobianm0,x[self.im0])
 		residual = value/width
 		jacobian/=width
 		return residual,value,jacobian
@@ -362,13 +359,10 @@ class SALTPriors:
 	def m1endalllam(self,width,x,components):
 		"""Prior such that at early times there is no flux"""
 		thinning=4
-		try:
-			jacobian= self.__m1endalllamderiv__.copy()
-		except:
-			jacobian=np.zeros((self.spline_derivs[:2,::thinning,0].size,self.npar))
-			jacobian[:,self.im1] = self.spline_derivs[:2,::thinning,:].reshape((-1, self.im1.size))
-			self.__m1endalllamderiv__=jacobian.copy()
-		value=np.dot(jacobian,x)
+		jacobian=np.zeros((self.spline_derivs[:2,::thinning,0].size,self.npar))
+		jacobianm1=self.spline_derivs[:2,::thinning,:].reshape((-1, self.im1.size))
+		jacobian[:,self.im1] = jacobianm1
+		value=np.dot(jacobianm1,x[self.im1])
 		residual = value/width
 		jacobian/=width
 		return residual,value,jacobian	
