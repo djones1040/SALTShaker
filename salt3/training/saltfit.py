@@ -495,33 +495,49 @@ class GaussNewton(saltresids.SALTResids):
 		Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
 		
 		# M0/M1 errors
-		log.info("determining M0/M1 errors")
-		varyingParams=self.fitOptions['all'][1]&self.iModelParam
+		if not 'hi':
+			log.info("determining M0/M1 errors")
+			varyingParams=self.fitOptions['all'][1]&self.iModelParam
+			self.neff[self.neff==self.neffFloor]=10
+			residuals,jac=self.lsqwrap(Xredefined,{},varyingParams,True,doSpecResids=True)
 
-		residuals,jac=self.lsqwrap(Xredefined,{},varyingParams,True,doSpecResids=True)
+			#Simple preconditioning of the jacobian before attempting to invert
+			precondition=sparse.diags(1/np.sqrt(np.asarray((jac.power(2)).sum(axis=0))),[0])
+			precondjac=(jac*precondition)
 
-		#Simple preconditioning of the jacobian before attempting to invert
-		precondition=sparse.diags(1/np.sqrt(np.asarray((jac.power(2)).sum(axis=0))),[0])
-		precondjac=(jac*precondition)
-
-		#Define the matrix sigma^-1=J^T J
-		square=precondjac.T*precondjac
-		#Inverting cholesky matrix for speed
-		L=linalg.cholesky(square.toarray(),lower=True)
-		invL=(linalg.solve_triangular(L,np.diag(np.ones(L.shape[0])),lower=True))
-		#Turning spline_derivs into a sparse matrix for speed
-		spline2d=sparse.csr_matrix(self.spline_derivs.reshape(-1,self.im0.size))
-		#Uncorrelated effect of parameter uncertainties on M0 and M1
-		m0pulls=invL*precondition.tocsr()[:,self.im0]*spline2d.T
-		m1pulls=invL*precondition.tocsr()[:,self.im1]*spline2d.T 
-		M0dataerr = (m0pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size))
-		M1dataerr = (m1pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size))
-		cov_M0_M1_data = (m0pulls*m1pulls).sum(axis=0).reshape((self.phase.size,self.wave.size))
-
-		#M0dataerr,M1dataerr,cov_M0_M1_data = \
-		#	np.zeros([self.phase.size,self.wave.size]),\
-		#  	np.zeros([self.phase.size,self.wave.size]),\
-		#  	np.zeros([self.phase.size,self.wave.size])
+			#Define the matrix sigma^-1=J^T J
+			square=precondjac.T*precondjac
+			#Inverting cholesky matrix for speed
+			L=linalg.cholesky(square.toarray(),lower=True)
+			invL=(linalg.solve_triangular(L,np.diag(np.ones(L.shape[0])),lower=True))
+			#Turning spline_derivs into a sparse matrix for speed
+			spline2d=sparse.csr_matrix(self.spline_derivs.reshape(-1,self.im0.size))
+			#Uncorrelated effect of parameter uncertainties on M0 and M1
+			m0pulls=invL*precondition.tocsr()[:,self.im0]*spline2d.T
+			m1pulls=invL*precondition.tocsr()[:,self.im1]*spline2d.T 
+			M0dataerr = (m0pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size))
+			M1dataerr = (m1pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size))
+			cov_M0_M1_data = (m0pulls*m1pulls).sum(axis=0).reshape((self.phase.size,self.wave.size))
+		else:
+			log.info("determining M0/M1 errors")
+			varyingParams=self.fitOptions['all'][1]&self.iModelParam
+			varyingParams[self.ix0] = False
+			self.neff[self.neff==self.neffFloor]=1e10
+			residuals,J=self.lsqwrap(X,{},varyingParams,True,doSpecResids=True)
+			from numpy.linalg import inv,pinv,norm
+			var = inv((J.T*J).todense())
+			spline_derivs_2d = self.spline_derivs.reshape([self.phase.size*self.wave.size,self.im0.size])
+			first_dot_M0 = np.dot(spline_derivs_2d,var[:self.im0.size,:self.im0.size])
+			M0dataerr = np.sqrt(np.sum(np.array(first_dot_M0)*np.array(spline_derivs_2d),axis=1).reshape([self.phase.size,self.wave.size]))
+			first_dot_M1 = np.dot(spline_derivs_2d,var[self.im0.size:2*self.im0.size,self.im0.size:2*self.im0.size])
+			M1dataerr = np.sqrt(np.sum(np.array(first_dot_M1)*np.array(spline_derivs_2d),axis=1).reshape([self.phase.size,self.wave.size]))
+			first_dot_cov = np.dot(spline_derivs_2d,var[:self.im0.size,self.im0.size:2*self.im0.size])
+			cov_M0_M1_data = np.sum(np.array(first_dot_cov)*np.array(spline_derivs_2d),axis=1).reshape([self.phase.size,self.wave.size])
+			
+			#M0dataerr,M1dataerr,cov_M0_M1_data = \
+			#	np.zeros([self.phase.size,self.wave.size]),\
+		  	#	np.zeros([self.phase.size,self.wave.size]),\
+		  	#	np.zeros([self.phase.size,self.wave.size])
 		#Xredefined = X.copy()
 		#Retranslate x1, M1, x0, M0 to obey definitions
 	

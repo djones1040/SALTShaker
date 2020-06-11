@@ -142,8 +142,14 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 					datadict[s]['specdata'][speccount]['mjd'] = m
 
 					z = datadict[s]['zHelio']
-					iGood = ((datadict[s]['specdata'][speccount]['wavelength']/(1+z) > waverange[0]) &
-							 (datadict[s]['specdata'][speccount]['wavelength']/(1+z) < waverange[1])) # &
+					if 'DQ' in spec.keys():
+						iGood = ((datadict[s]['specdata'][speccount]['wavelength']/(1+z) > waverange[0]) &
+								 (datadict[s]['specdata'][speccount]['wavelength']/(1+z) < waverange[1]) &
+								 (spec['DQ'] == 1))
+					else:
+						iGood = ((datadict[s]['specdata'][speccount]['wavelength']/(1+z) > waverange[0]) &
+								 (datadict[s]['specdata'][speccount]['wavelength']/(1+z) < waverange[1]))
+
 							 #(datadict[s]['specdata'][speccount]['flux']/datadict[s]['specdata'][speccount]['fluxerr'] > 3))
 					#if s == '05D2ci':
 					#	import pdb; pdb.set_trace()
@@ -310,6 +316,13 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 				f = '%s/%s'%(os.path.dirname(snlist),f)
 			rdstart = time()
 			sn = snana.SuperNova(f,readspec=False)
+			if 'FLT' not in sn.__dict__.keys() and \
+			   'BAND' in sn.__dict__.keys():
+				sn.FLT = sn.BAND
+			elif 'FLT' not in sn.__dict__.keys() and 'BAND' \
+				 not in sn.__dict__.keys():
+				raise RuntimeError('can\'t find SN filters!')
+				
 			rdtime += time()-rdstart
 			sn.SNID=str(sn.SNID)
 			if sn.SNID in datadict.keys():
@@ -365,7 +378,7 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 
 			if not (kcordict is None ) and sn.SURVEY not in kcordict.keys():
 				raise RuntimeError('survey %s not in kcor file'%(sn.SURVEY))
-
+			
 			datadict[sn.SNID] = {'snfile':f,
 								 'zHelio':zHel,
 								 'survey':sn.SURVEY,
@@ -375,9 +388,6 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 			for i,f in enumerate(sn.FLT):
 				if sn.MJD[i]-tpk > -19 and sn.MJD[i]-tpk < 49:
 					iGood = np.append(iGood,i)
-				#try: kcordict[sn.SURVEY][f]['fullname']
-				#except: import pdb; pdb.set_trace()
-			
 			# TODO: flux errors
 			datadict[sn.SNID]['specdata'] = {}
 			datadict[sn.SNID]['photdata'] = {}

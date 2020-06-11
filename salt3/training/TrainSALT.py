@@ -639,6 +639,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 										   binspecres=binspecres)
 			tlc = time()
 			count = 0
+			salt2_chi2tot,salt3_chi2tot = 0,0
 			for l in snfiles:
 				#if 'Foundation' not in l: continue
 				if '/' not in l:
@@ -665,11 +666,13 @@ SIGMA_INT: 0.106  # used in simulation"""
 				if not fitc: csn = 0
 				if not fitx1: x1sn = 0
 
-				ValidateLightcurves.customfilt(
+				salt2chi2,salt3chi2 = ValidateLightcurves.customfilt(
 					f'{outputdir}/lccomp_{sn.SNID}.png',l,outputdir,
 					t0=t0sn,x0=x0sn,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc,
 					bandpassdict=self.kcordict,n_components=self.options.n_components,
 					ax1=ax1,ax2=ax2,ax3=ax3,ax4=ax4,saltdict=saltdict,n_colorpars=self.options.n_colorpars)
+				salt2_chi2tot += salt2chi2
+				salt3_chi2tot += salt3chi2
 				if i % 12 == 8:
 					pdf_pages.savefig()
 					plt.close('all')
@@ -680,6 +683,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 				i += 4
 				count += 1
 			log.info(f'plotted light curves for {count} SNe')
+			log.info(f'total chi^2 is {salt2_chi2tot:.1f} for SALT2 and {salt3_chi2tot:.1f} for SALT3')
 		if not i %12 ==0:
 			pdf_pages.savefig()
 		pdf_pages.close()
@@ -712,7 +716,10 @@ SIGMA_INT: 0.106  # used in simulation"""
 
 			datadict = self.mkcuts(datadict,KeepOnlySpec=self.options.keeponlyspec)
 			log.info(f'took {time()-tcstart:.3f} to apply cuts')
-
+			with open('tmp','w') as fout:
+				for k in datadict.keys():
+					print(k,file=fout)
+			
 			# fit the model - initial pass
 			if self.options.stage == "all" or self.options.stage == "train":
 				# read the data

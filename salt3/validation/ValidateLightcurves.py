@@ -170,6 +170,8 @@ def customfilt(outfile,lcfile,salt3dir,
 			   n_components=1, ax1=None, ax2=None, ax3=None, ax4=None,
 			   saltdict={},n_colorpars=4):
 
+	salt2_chi2tot,salt3_chi2tot = 0,0
+	
 	if not ax1:
 		plt.clf()
 	
@@ -285,19 +287,19 @@ def customfilt(outfile,lcfile,salt3dir,
 		salt3flux *= 10. ** (-0.4 * salt3colorlaw(salt3wave/(1+float(sn.REDSHIFT_HELIO.split()[0]))) * c)
 	salt3flux *= _SCALE_FACTOR
 
-	if 'SIM_SALT2x0' in sn.__dict__.keys():
-		salt2flux = sn.SIM_SALT2x0*(salt2m0flux*_SCALE_FACTOR + (sn.SIM_SALT2x1)*salt2m1flux*_SCALE_FACTOR) * \
-					10. ** (-0.4 * salt2colorlaw(salt2wave/(1+float(sn.SIM_REDSHIFT_HELIO))) * float(sn.SIM_SALT2c))
-		try: mwextcurve = 10**(-0.4*extinction.fitzpatrick99(salt2wave,float(sn.MWEBV.split()[0])*3.1))
-		except: mwextcurve = 10**(-0.4*extinction.fitzpatrick99(salt2wave,sn.MWEBV*3.1))
-		salt2flux *= mwextcurve[np.newaxis,:]
-	else:
-		salt2model.set(z=float(sn.REDSHIFT_HELIO.split()[0]),mwebv=sn.MWEBV.split()[0])
-		fitparams = ['t0', 'x0', 'x1', 'c']
-		result, fitted_model = sncosmo.fit_lc(
-			data, salt2model, fitparams,
-			bounds={'t0':(t0-10, t0+10),
-					'z':(0.0,0.7),'x1':(-3,3),'c':(-0.3,0.3)})
+	#if 'SIM_SALT2x0' in sn.__dict__.keys():
+	#	salt2flux = sn.SIM_SALT2x0*(salt2m0flux*_SCALE_FACTOR + (sn.SIM_SALT2x1)*salt2m1flux*_SCALE_FACTOR) * \
+	#				10. ** (-0.4 * salt2colorlaw(salt2wave/(1+float(sn.SIM_REDSHIFT_HELIO))) * float(sn.SIM_SALT2c))
+	#	try: mwextcurve = 10**(-0.4*extinction.fitzpatrick99(salt2wave,float(sn.MWEBV.split()[0])*3.1))
+	#	except: mwextcurve = 10**(-0.4*extinction.fitzpatrick99(salt2wave,sn.MWEBV*3.1))
+	#	salt2flux *= mwextcurve[np.newaxis,:]
+	#else:
+	salt2model.set(z=float(sn.REDSHIFT_HELIO.split()[0]),mwebv=sn.MWEBV.split()[0])
+	fitparams = ['t0', 'x0', 'x1', 'c']
+	result, fitted_model = sncosmo.fit_lc(
+		data, salt2model, fitparams,
+		bounds={'t0':(t0-10, t0+10),
+				'z':(0.0,0.7),'x1':(-3,3),'c':(-0.3,0.3)})
 		
 	salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,
 								m1file=m1file,
@@ -326,8 +328,8 @@ def customfilt(outfile,lcfile,salt3dir,
 		ax4 = fig.add_subplot(144)
 		
 	int1d = interp1d(salt3phase,salt3flux,axis=0,fill_value='extrapolate')
-	if 'SIM_SALT2x0' in sn.__dict__.keys():
-		int1d_salt2 = interp1d(salt2phase,salt2flux,axis=0,fill_value='extrapolate')
+	#if 'SIM_SALT2x0' in sn.__dict__.keys():
+	#	int1d_salt2 = interp1d(salt2phase,salt2flux,axis=0,fill_value='extrapolate')
 	for flt,i,ax in zip(np.unique(sn.FLT),range(4),[ax1,ax2,ax3,ax4]):
 		phase=plotmjd-t0
 		salt3fluxnew = int1d(phase)
@@ -335,9 +337,9 @@ def customfilt(outfile,lcfile,salt3dir,
 		except: mwextcurve = 10**(-0.4*extinction.fitzpatrick99(salt3wave,sn.MWEBV*3.1))
 		salt3fluxnew *= mwextcurve[np.newaxis,:]
 
-		if 'SIM_SALT2x0' in sn.__dict__.keys():
-			phase_salt2 = plotmjd-float(sn.SIM_PEAKMJD.split()[0])
-			salt2fluxnew = int1d_salt2(phase_salt2)
+		#if 'SIM_SALT2x0' in sn.__dict__.keys():
+		#	phase_salt2 = plotmjd-float(sn.SIM_PEAKMJD.split()[0])
+		#	salt2fluxnew = int1d_salt2(phase_salt2)
 
 		filtwave = bandpassdict[sn.SURVEY][flt]['filtwave']
 		filttrans = bandpassdict[sn.SURVEY][flt]['filttrans']
@@ -352,17 +354,14 @@ def customfilt(outfile,lcfile,salt3dir,
 		#salt3synflux=np.trapz(pbspl[np.newaxis,:]*salt3fluxnew[:,g]/HC_ERG_AA,salt3wave[g],axis=1)/denom
 		salt3synflux *= 10**(0.4*bandpassdict[sn.SURVEY][flt]['stdmag'])*10**(0.4*27.5)/(1+float(sn.REDSHIFT_HELIO.split('+-')[0].replace(' ','')))
 		
-		if 'SIM_SALT2x0' in sn.__dict__.keys():
-			g = (salt2wave >= filtwave[0]) & (salt2wave <= filtwave[-1])  # overlap range
-			pbspl = np.interp(salt2wave[g],filtwave,filttrans)
-			pbspl *= salt2wave[g]
-			deltawave = salt2wave[g][1]-salt2wave[g][0]
-			denom = np.sum(pbspl)*deltawave
-			#denom = np.trapz(pbspl,salt2wave[g])
-			salt2synflux=np.sum(pbspl[np.newaxis,:]*salt2fluxnew[:,g],axis=1)*deltawave/HC_ERG_AA/denom
-			#salt2synflux=np.trapz(pbspl[np.newaxis,:]*salt2fluxnew[:,g]/HC_ERG_AA,salt2wave[g],axis=1)/denom
-			#print(salt2synfluxtest,salt2synflux)
-			salt2synflux *= 10**(0.4*bandpassdict[sn.SURVEY][flt]['stdmag'])*10**(0.4*27.5)*10**(-0.4*0.27)/(1+float(sn.REDSHIFT_HELIO.split('+-')[0]))
+		#if 'SIM_SALT2x0' in sn.__dict__.keys():
+		#	g = (salt2wave >= filtwave[0]) & (salt2wave <= filtwave[-1])  # overlap range
+		#	pbspl = np.interp(salt2wave[g],filtwave,filttrans)
+		#	pbspl *= salt2wave[g]
+		#	deltawave = salt2wave[g][1]-salt2wave[g][0]
+		#	denom = np.sum(pbspl)*deltawave
+		#	salt2synflux=np.sum(pbspl[np.newaxis,:]*salt2fluxnew[:,g],axis=1)*deltawave/HC_ERG_AA/denom
+		#	salt2synflux *= 10**(0.4*bandpassdict[sn.SURVEY][flt]['stdmag'])*10**(0.4*27.5)*10**(-0.4*0.27)/(1+float(sn.REDSHIFT_HELIO.split('+-')[0]))
 
 		iFLT = (sn.FLT == flt) & (sn.MJD-t0 > -20) & (sn.MJD-t0 < 50)
 		chi2_salt3 = np.sum((sn.FLUXCAL[iFLT]-\
@@ -371,23 +370,24 @@ def customfilt(outfile,lcfile,salt3dir,
 		ax.plot(plotmjd-t0,salt3synflux,color='C2',
 				label='SALT3, $x_0$ = %8.5e, \nx1=%.2f, z=%.3f\nc=%.3f\n$\chi_{red}^2=%.1f$'%(
 					x0,x1,float(sn.REDSHIFT_HELIO.split('+-')[0]),c,chi2red_salt3))
-		if 'SIM_SALT2x0' in sn.__dict__.keys():
-			ax.plot(plotmjd-t0,salt2synflux,color='C1',
-					label='SALT2')
-		else:
-			if bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split()[0])) > 2800 and \
-			   bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split()[0])) < 9000: # and\
-			   #'-u' not in bandpassdict[sn.SURVEY][flt]['fullname']:
-				try:
-					chi2 = np.sum((sn.FLUXCAL[iFLT]-fitted_model.bandflux(
-						flt, sn.MJD[iFLT], zp=27.5-bandpassdict[sn.SURVEY][flt]['primarymag'],zpsys=sysdict[flt]))**2./sn.FLUXCALERR[iFLT]**2.)
-					chi2red = chi2/(len(sn.FLUXCAL[iFLT])-3)
-					ax.plot(plotmjd-t0,fitted_model.bandflux(
-						flt, plotmjd, zp=27.5-bandpassdict[sn.SURVEY][flt]['primarymag'],zpsys=sysdict[flt]),color='C1',
-							label='SALT2; $x_1 = %.2f$, $c = %.2f$,\n$\chi_{red}^2 = %.1f$'%(
-								result['parameters'][3],result['parameters'][4],chi2red))
-				except ValueError: pass
-				#print(result['parameters'])
+		salt3_chi2tot += chi2_salt3
+		#if 'SIM_SALT2x0' in sn.__dict__.keys():
+		#	ax.plot(plotmjd-t0,salt2synflux,color='C1',
+		#			label='SALT2')
+		#else:
+		if bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split()[0])) > 2800 and \
+		   bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split()[0])) < 9000:
+			try:
+				chi2 = np.sum((sn.FLUXCAL[iFLT]-fitted_model.bandflux(
+					flt, sn.MJD[iFLT], zp=27.5-bandpassdict[sn.SURVEY][flt]['primarymag'],zpsys=sysdict[flt]))**2./sn.FLUXCALERR[iFLT]**2.)
+				chi2red = chi2/(len(sn.FLUXCAL[iFLT])-3)
+				ax.plot(plotmjd-t0,fitted_model.bandflux(
+					flt, plotmjd, zp=27.5-bandpassdict[sn.SURVEY][flt]['primarymag'],zpsys=sysdict[flt]),color='C1',
+						label='SALT2; $x_1 = %.2f$, $c = %.2f$,\n$\chi_{red}^2 = %.1f$'%(
+							result['parameters'][3],result['parameters'][4],chi2red))
+				salt2_chi2tot += chi2
+			except ValueError: pass
+
 		ax.errorbar(sn.MJD[sn.FLT == flt]-t0,sn.FLUXCAL[sn.FLT == flt],
 					yerr=sn.FLUXCALERR[sn.FLT == flt],
 					fmt='.',color='k')
@@ -425,6 +425,7 @@ def customfilt(outfile,lcfile,salt3dir,
 	ax2.yaxis.set_ticklabels([])
 	ax3.yaxis.set_ticklabels([])
 	ax4.yaxis.set_ticklabels([])
+	return salt2_chi2tot,salt3_chi2tot
 	
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='Plot lightcurves from SALT3 model against SALT2 model, Hsiao model, and data')
