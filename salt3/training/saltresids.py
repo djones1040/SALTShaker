@@ -394,6 +394,7 @@ class SALTResids:
 			photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,storedResults,varyParams,fixUncertainty=True)
 			for residsdict in ([photresidsdict,specresidsdict] if doSpecResids else [photresidsdict]):
 				residuals+=[residsdict[k]['resid'] for k in residsdict]
+				if np.isnan(residuals[-1]).any(): import pdb;pdb.set_trace()
 				jacobian+=[residsdict[k]['resid_jacobian'] for k in residsdict]
 
 		if doPriors:
@@ -401,7 +402,7 @@ class SALTResids:
 			priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,guess)
 			residuals+=[priorResids]
 			jacobian+=[priorJac[:,varyParams]]
-
+			if np.isnan(residuals[-1]).any(): import pdb;pdb.set_trace()
 			BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
 				self.priors.BoundedPriorResids(self.bounds,self.boundedParams,guess)
 			residuals+=[BoundedPriorResids]
@@ -419,6 +420,7 @@ class SALTResids:
 				else:
 					for regResids,regJac,relativeweight in zip( *regularization(guess,storedResults,varyParams),[1,self.m1regularization]):
 						residuals += [regResids*np.sqrt(weight*relativeweight)]
+						if np.isnan(residuals[-1]).any(): import pdb;pdb.set_trace()
 						jacobian+=[sparse.csr_matrix(regJac)*np.sqrt(weight*relativeweight)]
 					storedResults[regKey]=residuals[-self.n_components:]
 
@@ -915,7 +917,7 @@ class SALTResids:
 						derivInterp=storedResults[f'pcDeriv_spec_{sn}'][k]
 					else:
 						derivInterp=self.pcderivsparse[f'pcDeriv_spec_{sn}_{k}'].multiply(intmult[:,np.newaxis]).tocsc()
-						interpCache[k]=derivInterp
+						if requiredPCDerivs.all(): interpCache[k]=derivInterp
 					specresultsdict['modelflux_jacobian'][:,(varyParList=='m0')]  = (derivInterp[:,varyParams[self.im0]]*(x0[0])).toarray()
 					specresultsdict['modelflux_jacobian'][:,(varyParList=='m1')] = ( derivInterp[:,varyParams[self.im1]]*(x1[0]*x0[0])).toarray()
 			resultsdict[k]['modelflux_jacobian']=sparse.csr_matrix(resultsdict[k]['modelflux_jacobian'])
