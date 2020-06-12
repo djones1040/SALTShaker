@@ -170,28 +170,14 @@ class RunPipe():
                 if not any([p.startswith('sim') or p.startswith('biascorsim') for p in self.pipe.pipepros]):
                     raise RuntimeError("randseed was given but sim/biascorsim is not defined in the pipeline")
                 print('randseed = {}'.format(self.randseed)) 
-                if any([p.startswith('sim') for p in self.pipe.pipepros]):
-                    sim = self.pipe.Simulation
-                    randseed_old = sim.keys['RANSEED_REPEAT']
-                    randseed_new = [randseed_old.split(' ')[0],str(self.randseed)]
-                    df = pd.DataFrame([{'key':'RANSEED_REPEAT','value':randseed_new}])
-                    sim.configure(pro=sim.pro,baseinput=sim.outname,setkeys=df,prooptions=sim.prooptions,
-                                  batch=sim.batch,validplots=sim.validplots,outname=sim.outname)    
-                if any([p.startswith('biascorsim') for p in self.pipe.pipepros]):
-                    sim_biascor = self.pipe.BiascorSim
-                    randseed_old = sim_biascor.keys['RANSEED_REPEAT']
-                    randseed_new = [randseed_old.split(' ')[0],str(self.randseed)]
-                    df_biascor = pd.DataFrame([{'key':'RANSEED_REPEAT','value':randseed_new}])
-                    sim_biascor.configure(pro=sim_biascor.pro,baseinput=sim_biascor.outname,setkeys=df_biascor,prooptions=sim_biascor.prooptions,
-                                          batch=sim_biascor.batch,validplots=sim_biascor.validplots,outname=sim_biascor.outname)    
                     
                 if self.num is not None:
                     if any([p.startswith('sim') for p in self.pipe.pipepros]):
-                        df_sim = self._add_suffix(sim,['GENVERSION','GENPREFIX'],self.num)
-                        self._reconfig_w_suffix(sim,df_sim,self.num)
+                        df_sim = self._add_suffix(self.pipe.Simulation,['GENVERSION','GENPREFIX'],self.num)
+                        self._reconfig_w_suffix(self.pipe.Simulation,df_sim,self.num)
                     if any([p.startswith('biascorsim') for p in self.pipe.pipepros]):
-                        df_sim_biascor = self._add_suffix(sim_biascor,['GENVERSION','GENPREFIX'],self.num)
-                        self._reconfig_w_suffix(sim_biascor,df_sim_biascor,self.num)
+                        df_sim_biascor = self._add_suffix(self.pipe.BiascorSim,['GENVERSION','GENPREFIX'],self.num)
+                        self._reconfig_w_suffix(self.pipe.BiascorSim,df_sim_biascor,self.num)
                     if any([p.startswith('train') for p in self.pipe.pipepros]): 
                         df_train = self._add_suffix(self.pipe.Training,['outputdir'],self.num,section=['iodata'])
                         self._reconfig_w_suffix(self.pipe.Training,df_train,self.num)
@@ -227,11 +213,31 @@ class RunPipe():
                             self.pipe.glue(['biascorlcfit','getmu'])
                         if ['getmu','cosmofit'] in self.pipe.gluepairs:
                             self.pipe.glue(['getmu','cosmofit'])
-                                                
+            
+                if any([p.startswith('sim') for p in self.pipe.pipepros]):
+                    sim = self.pipe.Simulation
+                    randseed_old = sim.keys['RANSEED_REPEAT']
+                    randseed_new = [randseed_old.split(' ')[0],str(self.randseed)]
+                    df = pd.DataFrame([{'key':'RANSEED_REPEAT','value':randseed_new}])
+                    sim.configure(pro=sim.pro,baseinput=sim.outname,setkeys=df,prooptions=sim.prooptions,
+                                  batch=sim.batch,validplots=sim.validplots,outname=sim.outname)    
+                if any([p.startswith('biascorsim') for p in self.pipe.pipepros]):
+                    sim_biascor = self.pipe.BiascorSim
+                    randseed_old = sim_biascor.keys['RANSEED_REPEAT']
+                    randseed_new = [randseed_old.split(' ')[0],str(self.randseed+10)]
+                    df_biascor = pd.DataFrame([{'key':'RANSEED_REPEAT','value':randseed_new}])
+                    sim_biascor.configure(pro=sim_biascor.pro,baseinput=sim_biascor.outname,setkeys=df_biascor,prooptions=sim_biascor.prooptions,
+                                          batch=sim_biascor.batch,validplots=sim_biascor.validplots,outname=sim_biascor.outname)                
+            
             if not self.norun:
+                #remove success files from previous runs
+                if os.path.exists('PIPELINE_{}.DONE'.format(self.num)):
+                    print("Removing old .DONE files")
+                    os.system('rm PIPELINE_{}.DONE'.format(self.num))
+                    
                 self.pipe.run()
                 if self.pipe.success:
-                    os.system('touch PIPELINE_{}.SUCCESS'.format(self.num))
+                    os.system('echo SUCCESS > PIPELINE_{}.DONE'.format(self.num))
                    
                     for proname in ['lcfit','biascorlcfit','getmu','cosmofit']:
                         if proname in self.pipe.pipepros:
@@ -247,28 +253,30 @@ class RunPipe():
                             else:
                                 if pro.validplots:
                                     pro.get_validplot_inputs(outname='misc/{}_validplot_info_{}.txt'.format(proname,self.num))
+                else:
+                    os.system('echo FAILED > PIPELINE_{}.DONE'.format(self.num))
                                     
           
             """
             below is test
             """      
             
-            os.system('touch PIPELINE_{}.SUCCESS'.format(self.num))
+#             os.system('touch PIPELINE_{}.SUCCESS'.format(self.num))
 
-            for proname in ['lcfit','biascorlcfit','getmu','cosmofit']:
-                if proname in self.pipe.pipepros:
-                    pro = self.pipe._get_pipepro_from_string(proname)
-                    if not os.path.isdir('misc'):
-                        os.makedirs('misc')
-                    if isinstance(pro,list):
-                        for i in range(len(pro)):
-                            if pro[i].validplots:
-                                if proname.startswith('lcfit'):
-                                    proname = 'lcfitting'
-                                pro[i].get_validplot_inputs(outname='misc/{}_validplot_info_{}_{}.txt'.format(proname,self.num,i))
-                    else:
-                        if pro.validplots:
-                            pro.get_validplot_inputs(outname='misc/{}_validplot_info_{}.txt'.format(proname,self.num))
+#             for proname in ['lcfit','biascorlcfit','getmu','cosmofit']:
+#                 if proname in self.pipe.pipepros:
+#                     pro = self.pipe._get_pipepro_from_string(proname)
+#                     if not os.path.isdir('misc'):
+#                         os.makedirs('misc')
+#                     if isinstance(pro,list):
+#                         for i in range(len(pro)):
+#                             if pro[i].validplots:
+#                                 if proname.startswith('lcfit'):
+#                                     proname = 'lcfitting'
+#                                 pro[i].get_validplot_inputs(outname='misc/{}_validplot_info_{}_{}.txt'.format(proname,self.num,i))
+#                     else:
+#                         if pro.validplots:
+#                             pro.get_validplot_inputs(outname='misc/{}_validplot_info_{}.txt'.format(proname,self.num))
                             
                                
         else:
@@ -317,11 +325,18 @@ class RunPipe():
                 while all_finish == False:
                     finish_list = []
                     for i in range(self.batch_mode):
-                        finish_list.append(os.path.exists('PIPELINE_{}.SUCCESS'.format(i+self.start_id)))
+                        finish_list.append(os.path.exists('PIPELINE_{}.DONE'.format(i+self.start_id)))
                     if np.all(finish_list):
                         all_finish = True
                     else:
                         time.sleep(5)
+                success_list = []
+                for i in range(self.batch_mode):
+                    with open('PIPELINE_{}.DONE'.format(i+self.start_id),'r') as f:
+                        line = f.readline()
+                    if 'SUCCESS' in line:
+                        success_list.append(i+self.start_id)
+                    
                 #combine validplots here
                 pipe = self.pipedef()
                 validplot_pros = []
@@ -332,8 +347,9 @@ class RunPipe():
                         validplot_pros.append(p)                        
                     elif hasattr(pipe._get_pipepro_from_string(p),'validplots') and pipe._get_pipepro_from_string(p).validplots:
                         validplot_pros.append(p)
+                print("Making summary plots for successful jobs: ".format(success_list))
                 self.combine_validplot_inputs(pros=[x for x in pipe.pipepros if x in validplot_pros],
-                                              nums=np.arange(self.batch_mode)+self.start_id,outsuffix=outsuffix)
+                                              nums=success_list,outsuffix=outsuffix)
                 for p in validplot_pros:
                     if p.startswith('lcfit'):
                         p = 'lcfitting'
@@ -350,40 +366,40 @@ class RunPipe():
             """
             below is test
             """
-            #wait for all jobs to finish
-            all_finish = False
-            while all_finish == False:
-                finish_list = []
-                for i in range(self.batch_mode):
-                    finish_list.append(os.path.exists('PIPELINE_{}.SUCCESS'.format(i+self.start_id)))
-                if np.all(finish_list):
-                    all_finish = True
-                else:
-                    time.sleep(5)
-            #combine validplots here
-            pipe = self.pipedef()
-            validplot_pros = []
-            outsuffix = 'combined'
-            for p in pipe.pipepros:
-                if isinstance(pipe._get_pipepro_from_string(p),list) \
-                  and np.any([(hasattr(pi,'validplots') and pi.validplots) for pi in pipe._get_pipepro_from_string(p)]):
-                    validplot_pros.append(p)                        
-                elif hasattr(pipe._get_pipepro_from_string(p),'validplots') and pipe._get_pipepro_from_string(p).validplots:
-                    validplot_pros.append(p)
-            self.combine_validplot_inputs(pros=[x for x in pipe.pipepros if x in validplot_pros],
-                                          nums=np.arange(self.batch_mode)+self.start_id,outsuffix=outsuffix)
-            for p in validplot_pros:
-                if p.startswith('lcfit'):
-                    p = 'lcfitting'
-                if p.startswith('cosmofit'):
-                    inputfile_sum = '{}_{}.cospar'.format(p,outsuffix)
-                else:
-                    inputfile_sum = '{}_{}.FITRES'.format(p,outsuffix)
-                print("Making summary plots for {}".format(p))
-                if isinstance(pipe._get_pipepro_from_string(p),list): 
-                    self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p)[0].plotdir,'sum_valid_{}'.format(p))  
-                else:
-                    self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p).plotdir,'sum_valid_{}'.format(p))  
+#             #wait for all jobs to finish
+#             all_finish = False
+#             while all_finish == False:
+#                 finish_list = []
+#                 for i in range(self.batch_mode):
+#                     finish_list.append(os.path.exists('PIPELINE_{}.SUCCESS'.format(i+self.start_id)))
+#                 if np.all(finish_list):
+#                     all_finish = True
+#                 else:
+#                     time.sleep(5)
+#             #combine validplots here
+#             pipe = self.pipedef()
+#             validplot_pros = []
+#             outsuffix = 'combined'
+#             for p in pipe.pipepros:
+#                 if isinstance(pipe._get_pipepro_from_string(p),list) \
+#                   and np.any([(hasattr(pi,'validplots') and pi.validplots) for pi in pipe._get_pipepro_from_string(p)]):
+#                     validplot_pros.append(p)                        
+#                 elif hasattr(pipe._get_pipepro_from_string(p),'validplots') and pipe._get_pipepro_from_string(p).validplots:
+#                     validplot_pros.append(p)
+#             self.combine_validplot_inputs(pros=[x for x in pipe.pipepros if x in validplot_pros],
+#                                           nums=np.arange(self.batch_mode)+self.start_id,outsuffix=outsuffix)
+#             for p in validplot_pros:
+#                 if p.startswith('lcfit'):
+#                     p = 'lcfitting'
+#                 if p.startswith('cosmofit'):
+#                     inputfile_sum = '{}_{}.cospar'.format(p,outsuffix)
+#                 else:
+#                     inputfile_sum = '{}_{}.FITRES'.format(p,outsuffix)
+#                 print("Making summary plots for {}".format(p))
+#                 if isinstance(pipe._get_pipepro_from_string(p),list): 
+#                     self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p)[0].plotdir,'sum_valid_{}'.format(p))  
+#                 else:
+#                     self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p).plotdir,'sum_valid_{}'.format(p))  
                     
         
 def main(**kwargs):

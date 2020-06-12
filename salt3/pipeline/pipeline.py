@@ -81,6 +81,8 @@ class SALT3pipe():
         self.glue_flag = False
         
         self.gluepairs = []
+        
+        self.timestamp = str(time.time())
 
     def gen_input(self):
         pass
@@ -167,6 +169,7 @@ class SALT3pipe():
                 pipepro[i] = pipepro[i]
                 baseinput = self._get_config_option(config,prostr,'baseinput').split(',')[i]
                 outname = self._get_config_option(config,prostr,'outinput').split(',')[i]
+                outname = outname+'.temp.{}'.format(self.timestamp)
                 pro = self._get_config_option(config,prostr,'pro')
                 batch = self._get_config_option(config,prostr,'batch',dtype=boolean_string)
                 validplots = self._get_config_option(config,prostr,'validplots',dtype=boolean_string)
@@ -218,6 +221,10 @@ class SALT3pipe():
             self.success = lastpipepro.success
         else:
             self.success = lastpipepro[-1].success
+            
+        #delete temp files
+        if self.success:
+            os.system('rm *.temp.{}'.format(self.timestamp))
                     
     def glue(self,pipepros=None,on='phot'):
         if not self.build_flag: build_error()
@@ -454,7 +461,7 @@ class PipeProcedure():
                     args.append(argitem)
 
         if batch: self.success = _run_batch_pro(self.pro, args, done_file=self.done_file)
-        else: _run_external_pro(self.pro, args)
+        else: self.success = _run_external_pro(self.pro, args)
 
     def validplot_run(self):
         pass
@@ -1196,10 +1203,11 @@ def _run_external_pro(pro,args):
 
     if res.returncode == 0:
         print("{} finished successfully.".format(pro.strip()))
+        success = True
     else:
         raise ValueError("Something went wrong..") ##possible to pass the error msg from the program?
-
-    return
+        success = False
+    return success
 
 def _run_batch_pro(pro,args,done_file=None):
     
