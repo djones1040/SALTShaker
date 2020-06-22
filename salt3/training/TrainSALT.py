@@ -444,8 +444,10 @@ SIGMA_INT: 0.106  # used in simulation"""
 						if str(k) not in l: continue
 						foundfile = True
 						if '/' not in l:
-							l = '%s/%s'%(os.path.dirname(snlist),l)
+							l = f"{os.path.dirname(snlist)}/{l}"
 						sn = snana.SuperNova(l)
+						if str(k) != str(sn.SNID): continue
+
 						sn.SNID = str(sn.SNID)
 						if 'SIM_SALT2x0' in sn.__dict__.keys(): SIM_x0 = sn.SIM_SALT2x0
 						else: SIM_x0 = -99
@@ -455,6 +457,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 						else: SIM_c = -99
 						if 'SIM_PEAKMJD' in sn.__dict__.keys(): SIM_PEAKMJD = float(sn.SIM_PEAKMJD.split()[0])
 						else: SIM_PEAKMJD = -99
+						break
 					if not foundfile:
 						SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD,salt2x0,salt2x1,salt2c,salt2t0 = -99,-99,-99,-99,-99,-99,-99,-99
 					elif self.options.fitsalt2:
@@ -464,6 +467,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 
 					if 't0' not in SNParams[k].keys():
 						SNParams[k]['t0'] = 0.0
+
 					print(f"{k} {SNParams[k]['x0'][0]:8.10e} {SNParams[k]['x1'][0]:.10f} {SNParams[k]['c'][0]:.10f} {SNParams[k]['t0'][0]:.10f} {SNParams[k]['tpkoff'][0]:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",file=foutsn)
 
 		return
