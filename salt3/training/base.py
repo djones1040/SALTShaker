@@ -49,6 +49,8 @@ class TrainSALTBase:
 							help="""list of SNANA-formatted SN data files, including both photometry and spectroscopy. Can be multiple comma-separated lists. (default=%default)""")
 		parser.add_argument('--snparlist', default=config.get('iodata','snparlist'), type=str,
 							help="""optional list of initial SN parameters.  Needs columns SNID, zHelio, x0, x1, c""")
+		parser.add_argument('--specrecallist', default=config.get('iodata','specrecallist'), type=str,
+							help="""optional list giving number of spectral recalibration params.  Needs columns SNID, N, phase, ncalib where N is the spectrum number for a given SN, starting at 1""")
 		parser.add_argument('--tmaxlist', default=config.get('iodata','tmaxlist'), type=str,
 							help="""optional space-delimited list with SN ID, tmax, tmaxerr (default=%default)""")
 		parser.add_argument('--dospec', default=config.get('iodata','dospec'), type=boolean_string,
@@ -98,6 +100,8 @@ class TrainSALTBase:
 							help='fit for model error if set (default=%default)')
 		parser.add_argument('--fit_tpkoff', default=config.get('trainparams','fit_tpkoff'), type=boolean_string,
 							help='fit for time of max in B-band if set (default=%default)')
+		parser.add_argument('--fitting_sequence', default=config.get('trainparams','fitting_sequence'), type=str,
+							help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn, tpk (default=%default)")
 
 		# mcmc parameters
 		parser.add_argument('--n_steps_mcmc', default=config.get('mcmcparams','n_steps_mcmc'), type=int,
@@ -139,6 +143,10 @@ class TrainSALTBase:
 							help='Weighting of wave gradient chi^2 regularization during training of model parameters (default=%default)')
 		parser.add_argument('--regulardyad', default=config.get('trainingparams','regulardyad'), type=float,
 							help='Weighting of dyadic chi^2 regularization during training of model parameters (default=%default)')
+		parser.add_argument('--m1regularization', default=config.get('trainingparams','m1regularization'), type=float,
+							help='Scales regularization weighting of M1 component relative to M0 weighting (>1 increases smoothing of M1)  (default=%default)')
+		parser.add_argument('--spec_chi2_scaling', default=config.get('trainingparams','spec_chi2_scaling'), type=float,
+							help='scaling of spectral chi^2 so it doesn\'t dominate the total chi^2 (default=%default)')
 		parser.add_argument('--n_min_specrecal', default=config.get('trainingparams','n_min_specrecal'), type=int,
 							help='Minimum order of spectral recalibration polynomials (default=%default)')
 		parser.add_argument('--specrange_wavescale_specrecal', default=config.get('trainingparams','specrange_wavescale_specrecal'), type=float,
@@ -151,8 +159,6 @@ class TrainSALTBase:
 							help='bin the spectra if set (default=%default)')
 		parser.add_argument('--binspecres', default=config.get('trainingparams','binspecres'), type=int,
 							help='binning resolution (default=%default)')
-		parser.add_argument('--fitting_sequence', default=config.get('trainingparams','fitting_sequence'), type=str,
-							help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn, tpk (default=%default)")
 		
    		#neff parameters
 		parser.add_argument('--wavesmoothingneff', default=config.get('trainingparams','wavesmoothingneff'), type=float,
@@ -257,7 +263,7 @@ class TrainSALTBase:
 	def get_saltkw(self,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc):
 
 
-		saltfitkwargs = {'bsorder':self.options.interporder,'errbsorder':self.options.errinterporder,
+		saltfitkwargs = {'m1regularization':self.options.m1regularization,'bsorder':self.options.interporder,'errbsorder':self.options.errinterporder,
 						 'waveSmoothingNeff':self.options.wavesmoothingneff,'phaseSmoothingNeff':self.options.phasesmoothingneff,
 						 'neffFloor':self.options.nefffloor, 'neffMax':self.options.neffmax,
 						 'specrecal':self.options.specrecal, 'regularizationScaleMethod':self.options.regularizationScaleMethod,
@@ -299,7 +305,9 @@ class TrainSALTBase:
 						 'regularize':self.options.regularize,
 						 'outputdir':self.options.outputdir,
 						 'fit_model_err':self.options.fit_model_err,
-						 'fitTpkOff':self.options.fit_tpkoff}
+						 'fitTpkOff':self.options.fit_tpkoff,
+						 'spec_chi2_scaling':self.options.spec_chi2_scaling}
+		
 		for k in self.options.__dict__.keys():
 			if k.startswith('prior') or k.startswith('bound'):
 				saltfitkwargs[k] = self.options.__dict__[k]

@@ -13,8 +13,8 @@ log=logging.getLogger(__name__)
 from scipy.interpolate import bisplrep,bisplev,RegularGridInterpolator
 
 def mkModelPlot(salt3dir='modelfiles/salt3',
-				xlimits=[2000,9200],outfile=None,plotErr=True):
-	
+				xlimits=[2000,9200],outfile=None,plotErr=True,n_colorpars=4):
+
 	plt.figure(figsize=(5,8))
 	plt.subplots_adjust(left=None, bottom=None, right=None, top=None,
 						wspace=0, hspace=0)
@@ -29,9 +29,9 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 		salt3m1phase,salt3m1wave,salt3m1flux = \
 			np.loadtxt('%s/salt3_template_1.dat'%salt3dir,unpack=True)
 		salt3m0errphase,salt3m0errwave,salt3m0fluxerr = \
-			np.loadtxt('%s/salt3_lc_relative_variance_0.dat'%salt3dir,unpack=True)
+			np.loadtxt('%s/salt3_lc_variance_0.dat'%salt3dir,unpack=True)
 		salt3m1errphase,salt3m1errwave,salt3m1fluxerr = \
-			np.loadtxt('%s/salt3_lc_relative_variance_1.dat'%salt3dir,unpack=True)
+			np.loadtxt('%s/salt3_lc_variance_1.dat'%salt3dir,unpack=True)
 	except:
 		salt3m0phase,salt3m0wave,salt3m0flux = \
 			np.loadtxt('%s/salt2_template_0.dat'%salt3dir,unpack=True)
@@ -39,28 +39,27 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 			np.loadtxt('%s/salt2_template_1.dat'%salt3dir,unpack=True)
 		salt3m0errphase,salt3m0errwave,salt3m0fluxerr = salt3m0phase[:],salt3m0wave[:],np.zeros(np.shape(salt3m0phase))
 		salt3m1errphase,salt3m1errwave,salt3m1fluxerr = salt3m1phase[:],salt3m1wave[:],np.zeros(np.shape(salt3m1phase))
-		#salt3m0errphase,salt3m0errwave,salt3m0fluxerr = \
-		#	np.loadtxt('%s/salt2_lc_relative_variance_0.dat'%salt3dir,unpack=True)
-		#salt3m1errphase,salt3m1errwave,salt3m1fluxerr = \
-		#	np.loadtxt('%s/salt2_lc_relative_variance_1.dat'%salt3dir,unpack=True)
 
+	#init_rootdir = '/Users/David/Dropbox/research/salt2/trainsalt'		
 	salt2m0phase,salt2m0wave,salt2m0flux = \
 		np.loadtxt('%s/salt2_template_0.dat'%init_rootdir,unpack=True)
 	salt2m1phase,salt2m1wave,salt2m1flux = \
 		np.loadtxt('%s/salt2_template_1.dat'%init_rootdir,unpack=True)
+	#from salt3.initfiles import init_rootdir
 	salt2m0errphase,salt2m0errwave,salt2m0fluxerr = \
 		np.loadtxt('%s/salt2_lc_relative_variance_0.dat'%init_rootdir,unpack=True)
 	salt2m1errphase,salt2m1errwave,salt2m1fluxerr = \
 		np.loadtxt('%s/salt2_lc_relative_variance_1.dat'%init_rootdir,unpack=True)
 
-	salt2scalephase,salt2scalewave,salt2errscale=np.loadtxt('%s/salt2_lc_dispersion_scaling.dat'%init_rootdir,unpack=True)
-	#Subtract out statistical error from SALT2
-	salt2varscale=(salt2errscale**2-1)
-	salt2scalephase,salt2scalewave=np.unique(salt2scalephase),np.unique(salt2scalewave)
-	scaleinterp=RegularGridInterpolator((salt2scalephase,salt2scalewave),salt2varscale.reshape(salt2scalephase.size,salt2scalewave.size),'nearest')
-	salt2varscaleclipinterp=lambda x,y: scaleinterp((np.clip(x,salt2scalephase.min(),salt2scalephase.max()),np.clip(y,salt2scalewave.min(),salt2scalewave.max())))
-	salt2m0fluxerr*=salt2varscaleclipinterp(salt2m0errphase,salt2m0errwave)
-	salt2m1fluxerr*=salt2varscaleclipinterp(salt2m1errphase,salt2m1errwave)
+	if not 'hi':
+		salt2scalephase,salt2scalewave,salt2errscale=np.loadtxt('%s/salt2_lc_dispersion_scaling.dat'%init_rootdir,unpack=True)
+		# Subtract out statistical error from SALT2
+		salt2varscale=(salt2errscale**2-1)
+		salt2scalephase,salt2scalewave=np.unique(salt2scalephase),np.unique(salt2scalewave)
+		scaleinterp=RegularGridInterpolator((salt2scalephase,salt2scalewave),salt2varscale.reshape(salt2scalephase.size,salt2scalewave.size),'nearest')
+		salt2varscaleclipinterp=lambda x,y: scaleinterp((np.clip(x,salt2scalephase.min(),salt2scalephase.max()),np.clip(y,salt2scalewave.min(),salt2scalewave.max())))
+		salt2m0fluxerr*=salt2varscaleclipinterp(salt2m0errphase,salt2m0errwave)
+		salt2m1fluxerr*=salt2varscaleclipinterp(salt2m1errphase,salt2m1errwave)
 
 	salt2m0flux = salt2m0flux.reshape([len(np.unique(salt2m0phase)),len(np.unique(salt2m0wave))])
 	salt2m0fluxerr = salt2m0fluxerr.reshape([len(np.unique(salt2m0errphase)),len(np.unique(salt2m0errwave))])
@@ -179,9 +178,9 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 	if len(lines):
 		for i in range(len(lines)):
 			lines[i] = lines[i].replace('\n','')
-		colorlaw_salt3_coeffs = np.array(lines[1:5]).astype('float')
-		salt3_colormin = float(lines[6].split()[1])
-		salt3_colormax = float(lines[7].split()[1])
+		colorlaw_salt3_coeffs = np.array(lines[1:n_colorpars+1]).astype('float')
+		salt3_colormin = float(lines[n_colorpars+2].split()[1])
+		salt3_colormax = float(lines[n_colorpars+3].split()[1])
 
 		colorlaw_salt3 = SALT2ColorLaw([salt3_colormin,salt3_colormax],colorlaw_salt3_coeffs)
 		ax3.plot(wave,colorlaw_salt3(wave),color='r',label='SALT3')
@@ -211,15 +210,11 @@ def mkModelErrPlot(salt3dir='modelfiles/salt3',outfile=None,xlimits=[2000,9200])
 
 
 	salt3m0errphase,salt3m0errwave,salt3m0fluxerr = \
-		np.loadtxt('%s/salt3_lc_relative_variance_0.dat'%salt3dir,unpack=True)
+		np.loadtxt('%s/salt3_lc_variance_0.dat'%salt3dir,unpack=True)
 	salt3m1errphase,salt3m1errwave,salt3m1fluxerr = \
-		np.loadtxt('%s/salt3_lc_relative_variance_1.dat'%salt3dir,unpack=True)
+		np.loadtxt('%s/salt3_lc_variance_1.dat'%salt3dir,unpack=True)
 	salt3m0m1errphase,salt3m0m1errwave,salt3m0m1fluxerr = \
-		np.loadtxt('%s/salt3_lc_relative_covariance_01.dat'%salt3dir,unpack=True)
-		#salt3m0errphase,salt3m0errwave,salt3m0fluxerr = \
-		#	np.loadtxt('%s/salt2_lc_relative_variance_0.dat'%salt3dir,unpack=True)
-		#salt3m1errphase,salt3m1errwave,salt3m1fluxerr = \
-		#	np.loadtxt('%s/salt2_lc_relative_variance_1.dat'%salt3dir,unpack=True)
+		np.loadtxt('%s/salt3_lc_covariance_01.dat'%salt3dir,unpack=True)
 
 	salt2m0errphase,salt2m0errwave,salt2m0fluxerr = \
 		np.loadtxt('%s/salt2_lc_relative_variance_0.dat'%init_rootdir,unpack=True)
