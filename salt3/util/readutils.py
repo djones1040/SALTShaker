@@ -111,7 +111,7 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 					speccount = 0
 				else:
 					speccount = len(datadict[s]['specdata'].keys())
-					
+				
 				if len(sn.SPECTRA)==0:
 					log.debug('File {} contains no supernova spectra'.format(sf))
 					if KeepOnlySpec: 
@@ -122,6 +122,12 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 				for k in sn.SPECTRA:
 					spec=sn.SPECTRA[k]
 					m=spec['SPECTRUM_MJD']
+					#if '95ac' in sf:
+					#	import pdb; pdb.set_trace()
+					if m-tpk < -19 or m-tpk > 49:
+						speccount += 1
+						continue
+
 					datadict[s]['specdata'][speccount] = {}
 					datadict[s]['specdata'][speccount]['fluxerr'] = spec['FLAMERR']
 					if 'LAMAVG' in spec.keys():
@@ -138,6 +144,9 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 					z = datadict[s]['zHelio']
 					iGood = ((datadict[s]['specdata'][speccount]['wavelength']/(1+z) > waverange[0]) &
 							 (datadict[s]['specdata'][speccount]['wavelength']/(1+z) < waverange[1]))
+					if 'DQ' in spec:
+						iGood=iGood & (spec['DQ']==1)
+
 					if binspecres is not None:
 						flux = datadict[s]['specdata'][speccount]['flux'][iGood]
 						wavelength = datadict[s]['specdata'][speccount]['wavelength'][iGood]
@@ -169,10 +178,12 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 
 						
 						#wavebins = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/binspecres)
-						wavebins = np.linspace(np.min(wavelength),np.max(wavelength),(np.max(wavelength)-np.min(wavelength))/binspecres)
+						wavebins = np.linspace(np.min(wavelength),np.max(wavelength),(np.max(wavelength)-np.min(wavelength))/(binspecres*(1+z)))
 						binned_flux = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_avg).statistic
 						binned_fluxerr = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_err).statistic
-						iGood = binned_flux == binned_flux
+
+						iGood = (binned_flux == binned_flux) #& (binned_flux/binned_fluxerr > 3)
+
 						datadict[s]['specdata'][speccount]['flux'] = binned_flux[iGood]
 						datadict[s]['specdata'][speccount]['wavelength'] = (wavebins[1:][iGood]+wavebins[:-1][iGood])/2.
 						datadict[s]['specdata'][speccount]['fluxerr'] = binned_fluxerr[iGood]
@@ -181,6 +192,13 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 						datadict[s]['specdata'][speccount]['flux'] = datadict[s]['specdata'][speccount]['flux'][iGood]
 						datadict[s]['specdata'][speccount]['wavelength'] = datadict[s]['specdata'][speccount]['wavelength'][iGood]
 						datadict[s]['specdata'][speccount]['fluxerr'] = datadict[s]['specdata'][speccount]['fluxerr'][iGood]
+					# error floor
+					try:
+						datadict[s]['specdata'][speccount]['fluxerr'] = np.sqrt(datadict[s]['specdata'][speccount]['fluxerr']**2. + \
+																				(0.005*np.max(datadict[s]['specdata'][speccount]['flux']))**2.)
+					except:
+						import pdb; pdb.set_trace()
+
 					speccount+=1
 
 			else:
@@ -264,8 +282,8 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 			  dospec=False,KeepOnlySpec=False,peakmjdlist=None,waverange=[2000,9200],binspecres=None):
 	datadict = {}
 	if peakmjdlist:
-		pksnid,pkmjd,pkmjderr = np.loadtxt(peakmjdlist,unpack=True,dtype=str)
-		pkmjd,pkmjderr = pkmjd.astype('float'),pkmjderr.astype('float')
+		pksnid,pkmjd = np.loadtxt(peakmjdlist,unpack=True,dtype=str,usecols=[0,1])
+		pkmjd = pkmjd.astype('float')
 	rdtime = 0
 	for snlist in snlists.split(','):
 		tsn = time()
@@ -286,7 +304,14 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 			if '/' not in f:
 				f = '%s/%s'%(os.path.dirname(snlist),f)
 			rdstart = time()
-			sn = snana.SuperNova(f)
+			sn = snana.SuperNova(f,readspec=False)
+			if 'FLT' not in sn.__dict__.keys() and \
+			   'BAND' in sn.__dict__.keys():
+				sn.FLT = sn.BAND
+			elif 'FLT' not in sn.__dict__.keys() and 'BAND' \
+				 not in sn.__dict__.keys():
+				raise RuntimeError('can\'t find SN filters!')
+				
 			rdtime += time()-rdstart
 			sn.SNID=str(sn.SNID)
 			if sn.SNID in datadict.keys():
@@ -315,9 +340,10 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 			elif peakmjdlist:
 				if str(sn.SNID) in pksnid:
 					tpk = pkmjd[str(sn.SNID) == pksnid][0]
-					tpkerr = pkmjderr[str(sn.SNID) == pksnid][0]
-					if tpkerr < 2: tpkmsg = 'termination condition is satisfied'
-					else: tpkmsg = 'time of max uncertainty of +/- %.1f days is too uncertain!'%tpkerr
+					tpkmsg = 'termination condition is satisfied'
+					#tpkerr = pkmjderr[str(sn.SNID) == pksnid][0]
+					#if tpkerr < 2: tpkmsg = 'termination condition is satisfied'
+					#else: tpkmsg = 'time of max uncertainty of +/- %.1f days is too uncertain!'%tpkerr
 				else:
 					log.warning('can\'t find tmax in file %s'%peakmjdlist)
 					tpkmsg = 'can\'t find tmax in file %s'%peakmjdlist
@@ -341,7 +367,7 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 
 			if not (kcordict is None ) and sn.SURVEY not in kcordict.keys():
 				raise RuntimeError('survey %s not in kcor file'%(sn.SURVEY))
-
+			
 			datadict[sn.SNID] = {'snfile':f,
 								 'zHelio':zHel,
 								 'survey':sn.SURVEY,
@@ -349,9 +375,8 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 			#datadict[snid]['zHelio'] = zHel
 			iGood = np.array([],dtype=int)
 			for i,f in enumerate(sn.FLT):
-				if '-u' not in kcordict[sn.SURVEY][f]['fullname']:
+				if sn.MJD[i]-tpk > -19 and sn.MJD[i]-tpk < 49:
 					iGood = np.append(iGood,i)
-
 			# TODO: flux errors
 			datadict[sn.SNID]['specdata'] = {}
 			datadict[sn.SNID]['photdata'] = {}

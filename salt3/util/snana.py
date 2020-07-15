@@ -139,7 +139,7 @@ class SuperNova( object ) :
 		or from a SNANA-style .DAT file
 	"""
 	
-	def __init__( self, datfile=None, simname=None, snid=None, verbose=False, simdir=None ) : 
+	def __init__( self, datfile=None, simname=None, snid=None, verbose=False, simdir=None, readspec=True ) : 
 		""" Read in header info (z,type,etc) and full light curve data.
 		For simulated SNe stored in fits tables, user must provide the simname and snid,
 		and the data are collected from binary fits tables, assumed to exist 
@@ -167,7 +167,7 @@ class SuperNova( object ) :
 					print("Unable to read in data for %s %s.  No sim product .fits files found."%(simname, str(snid)))
 		elif datfile :	
 			if verbose : print("Reading in data from light curve file %s"%(datfile))
-			self.readdatfile( datfile ) 
+			self.readdatfile( datfile, readspec=readspec ) 
 
 	@property
 	def name(self):
@@ -424,7 +424,7 @@ class SuperNova( object ) :
 		else : 
 			return( 0 ) 
 
-	def readdatfile(self, datfile ):
+	def readdatfile(self, datfile, readspec=True ):
 		""" read the light curve data from the SNANA-style .dat file.
 		Metadata in the header are in "key: value" pairs
 		Observation data lines are marked with OBS: 
@@ -473,7 +473,7 @@ class SuperNova( object ) :
 		for col in colnames : 
 			self.__dict__[col] = array( self.__dict__[col] )
 
-		self.readspecfromlcfile(datfile)
+		if readspec: self.readspecfromlcfile(datfile)
 		
 		return( None )
 
@@ -685,10 +685,12 @@ NSPECTRA:  %i
 		if type(self.SNID) == float: self.SNID == str(int(self.SNID))
 
 		list_file_spec=glob.glob(specdir+'/spectrum*'+str(self.__dict__['SNID'])+'*.list')
+		num_spec = [int(l.split('-')[-1].split('.')[0]) for l in list_file_spec]
 		if not len(list_file_spec) and isinstance(self.SNID,str):
 			snid2 = self.SNID[:]
 			snid2 = snid2[:-1]+snid2[-1].lower()
 			list_file_spec=glob.glob(specdir+'/spectrum*'+snid2+'*.list')
+			num_spec = [int(l.split('-')[-1].split('.')[0]) for l in list_file_spec]
 		#if verbose and len(list_file_spec) > 1:
 		#	import pdb; pdb.set_trace()
 		if not len(list_file_spec):
@@ -701,7 +703,7 @@ NSPECTRA:  %i
 		print('\nNVAR_SPEC: 5',file=fout)
 		print('VARNAMES_SPEC: LAMMIN LAMMAX  FLAM  FLAMERR DQ\n',file=fout)
 		counter=0
-		for specfile in sorted(list_file_spec):
+		for specfile in np.array(list_file_spec)[np.argsort(num_spec)]:
 			counter=counter+1
 			sn_spectrum=SuperNovaSpectrum(specfile)
 			print('SPECTRUM_ID: %i'%counter,file=fout)

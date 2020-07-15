@@ -23,7 +23,7 @@ def SpecRecal(photdata,specdata,kcordict,survey,specrange_wavescale_specrecal,nr
 	minwave = np.min(specdata['wavelength'])
 
 	iGoodSNR = np.where(specdata['flux']/specdata['fluxerr'] > 3)[0]
-	
+
 	specflux,photflux,photwave,specfluxerr,photfluxerr,photcorr = [],[],[],[],[],[]
 	for flt in np.unique(photdata['filt']):
 		# preliminaries

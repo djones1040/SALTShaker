@@ -48,6 +48,7 @@ def rankOneCholesky(variance,beta,v):
 	"""Given variances, a scalar, and a vector, returns the cholesky matrix describing the covariance formed by the sum of the diagonal variance and the self outer product of the vector multiplied by the scalar"""
 	b=1
 	Lprime=np.zeros((variance.size,variance.size))
+	if beta==0: return np.diag(np.sqrt(variance))
 	for j in range(v.size):
 		Lprime[j,j]=np.sqrt(variance[j]+beta/b*v[j]**2)
 		gamma=(b*variance[j]+beta*v[j]**2)
@@ -58,6 +59,9 @@ def rankOneCholesky(variance,beta,v):
 
 class SALTResids:
 	def __init__(self,guess,datadict,parlist,**kwargs):
+
+		self.photresultsdict = {}
+		self.specresultsdict = {}
 		
 		assert type(parlist) == np.ndarray
 		self.blah = False
@@ -156,6 +160,8 @@ class SALTResids:
 		
 		self.num_spec=0
 		self.num_phot=0
+		self.phot_snr = 0
+		self.spec_snr = 0
 		for sn in self.datadict.keys():
 			photdata = self.datadict[sn]['photdata']
 			specdata = self.datadict[sn]['specdata']
@@ -163,7 +169,9 @@ class SALTResids:
 			filtwave = self.kcordict[survey]['filtwave']
 			z = self.datadict[sn]['zHelio']
 			self.num_spec += sum([specdata[key]['flux'].size for key in specdata])
-
+			for key in specdata:
+				self.spec_snr += np.sum(specdata[key]['flux']/specdata[key]['fluxerr'])
+			self.phot_snr += np.sum(photdata['fluxcal']/photdata['fluxcalerr'])
 			for flt in np.unique(photdata['filt']):
 				self.num_phot+=(photdata['filt']==flt).sum()
 			#While we're at it, calculate the extinction curve for the milky way
@@ -175,6 +183,7 @@ class SALTResids:
 		#Store derivatives of a spline with fixed knot locations with respect to each knot value
 		self.spline_derivs = np.zeros([len(self.phase),len(self.wave),self.im0.size])
 		for i in range(self.im0.size):
+			if self.bsorder == 0: continue
 			self.spline_derivs[:,:,i]=bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
 		nonzero=np.nonzero(self.spline_derivs)
 		self.spline_deriv_interp= RegularGridInterpolator((self.phase,self.wave),self.spline_derivs,self.interpMethod,False,0)
@@ -182,7 +191,9 @@ class SALTResids:
 		#Repeat for the error model parameters
 		self.errorspline_deriv= np.zeros([len(self.phase),len(self.wave),self.imodelerr.size//self.n_components])
 		for i in range(self.imodelerr.size//self.n_components):
-			self.errorspline_deriv[:,:,i]=bisplev(self.phase, self.wave ,(self.errphaseknotloc,self.errwaveknotloc,np.arange(self.imodelerr.size//self.n_components)==i,self.bsorder,self.bsorder))
+			if self.errbsorder==0:
+				continue
+			self.errorspline_deriv[:,:,i]=bisplev(self.phase, self.wave ,(self.errphaseknotloc,self.errwaveknotloc,np.arange(self.imodelerr.size//self.n_components)==i,self.errbsorder,self.errbsorder))
 		self.errorspline_deriv_interp= RegularGridInterpolator((self.phase,self.wave),self.errorspline_deriv,self.interpMethod,False,0)
 		
 		#Store the lower and upper edges of the phase/wavelength basis functions
@@ -207,6 +218,7 @@ class SALTResids:
 		self.regularizationDerivs=[np.zeros((self.phaseRegularizationPoints.size,self.waveRegularizationPoints.size,self.im0.size)) for i in range(4)]
 		for i in range(len(self.im0)):
 			for j,derivs in enumerate([(0,0),(1,0),(0,1),(1,1)]):
+				if self.bsorder == 0: continue
 				self.regularizationDerivs[j][:,:,i]=bisplev(self.phaseRegularizationPoints,self.waveRegularizationPoints,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder),dx=derivs[0],dy=derivs[1])
 
 		phase=self.phaseRegularizationPoints
@@ -222,7 +234,7 @@ class SALTResids:
 		self.colorLawDerivInterp=interp1d(self.wave,self.colorLawDeriv,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
 		
 		
-		log.info('Time to calculate spline_derivs: %.2f'%(time.time()-starttime))
+		log.info(f'Time to calculate spline_derivs: {time.time()-starttime:.2f}')
 		
 		
 		self.getobswave()
@@ -246,13 +258,23 @@ class SALTResids:
 		self.corrmax = tuple([np.max(np.where(self.parlist == 'modelcorr_{}{}'.format(i,j))[0]) for i,j in self.corrcombinations]) 
 		self.im0 = np.where(self.parlist == 'm0')[0]
 		self.im1 = np.where(self.parlist == 'm1')[0]
+
+		wavemin = []
+		for i in range(self.im0.size):
+			wavemin += [self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),
+										  i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]][0]]
+		self.im0new = np.where(self.parlist == 'm0')[0][np.array(wavemin) > 8500]
+		self.im1new = np.where(self.parlist == 'm1')[0][np.array(wavemin) > 8500]
+		
 		self.iCL = np.where(self.parlist == 'cl')[0]
 		self.ix1 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x1')])
 		self.ix0 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x0') or si.startswith('specx0')])
 		self.ic	 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('c_')])
 		self.itpk = np.array([i for i, si in enumerate(self.parlist) if si.startswith('tpkoff')])
 		self.ispcrcl_norm = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specx0')])
+		if self.ispcrcl_norm.size==0: self.ispcrcl_norm=np.zeros(self.npar,dtype=bool)
 		self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specrecal')])
+		if self.ispcrcl.size==0: self.ispcrcl=np.zeros(self.npar,dtype=bool)
 		self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr')])
 		self.imodelcorr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelcorr')])
 		self.iclscat = np.where(self.parlist=='clscat')[0]
@@ -276,12 +298,12 @@ class SALTResids:
 			specdata=self.datadict[sn]['specdata']
 			photdata = self.datadict[sn]['photdata']
 			idx = self.datadict[sn]['idx']
-			tpkoff=X[self.parlist == 'tpkoff_%s'%sn]
+			tpkoff=X[self.parlist == f'tpkoff_{sn}']
 			obsphase = self.datadict[sn]['obsphase'] 
 			for k in specdata.keys():
 				
 				phase=specdata[k]['tobs']+tpkoff
-				self.pcderivsparse[f'derivInterp_spec_{sn}_{k}']=sparse.csr_matrix(self.spline_deriv_interp((phase/(1+z),specdata[k]['wavelength']/(1+z)),method=self.interpMethod))
+				self.pcderivsparse[f'pcDeriv_spec_{sn}_{k}']=sparse.csr_matrix(self.spline_deriv_interp((phase/(1+z),specdata[k]['wavelength']/(1+z)),method=self.interpMethod))
 				
 			for flt in np.unique(photdata['filt']):
 				#Select data from the appropriate filter filter
@@ -299,7 +321,7 @@ class SALTResids:
 						decayFactor= 10**(-0.4*self.extrapolateDecline*(phase[pdx]-obsphase.max()))
 						derivInterp*=decayFactor
 					result+=[sparse.csr_matrix(derivInterp)]
-				self.pcderivsparse[f'derivInterp_phot_{sn}_{flt}']=result
+				self.pcderivsparse[f'pcDeriv_phot_{sn}_{flt}']=result
 					
 		log.info('Time required to calculate all PC derivatives as sparse matrices {:.1f}s'.format(time.time()-start))
 		
@@ -358,7 +380,56 @@ class SALTResids:
 		pbspl /= denom*HC_ERG_AA
 		self.kcordict['default']['Vpbspl'] = pbspl
 
-	def maxlikefit(self,x,storedResults={},varyParams=None,pool=None,debug=False,SpecErrScale=1.0):
+	def lsqwrap(self,guess,storedResults,varyParams=None,doPriors=True,doSpecResids=True):
+		if varyParams is None:
+			varyParams=np.zeros(self.npar,dtype=bool)
+		self.fillStoredResults(guess,storedResults)
+		if varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any() or varyParams[self.iclscat].any():
+			raise ValueError('lsqwrap not allowed to handle varying model uncertainties')
+		
+		residuals = []
+		jacobian = [] # Jacobian matrix from r
+
+		for sn in self.datadict.keys():
+			photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,storedResults,varyParams,fixUncertainty=True)
+			for residsdict in ([photresidsdict,specresidsdict] if doSpecResids else [photresidsdict]):
+				residuals+=[residsdict[k]['resid'] for k in residsdict]
+				if np.isnan(residuals[-1]).any(): import pdb;pdb.set_trace()
+				jacobian+=[residsdict[k]['resid_jacobian'] for k in residsdict]
+
+		if doPriors:
+
+			priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,guess)
+			residuals+=[priorResids]
+			jacobian+=[priorJac[:,varyParams]]
+			if np.isnan(residuals[-1]).any(): import pdb;pdb.set_trace()
+			BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
+				self.priors.BoundedPriorResids(self.bounds,self.boundedParams,guess)
+			residuals+=[BoundedPriorResids]
+			jacobian+=[sparse.csr_matrix(BoundedPriorJac[:,varyParams])]
+
+		if self.regularize:
+			for regularization, weight,regKey in [(self.phaseGradientRegularization, self.regulargradientphase,'regresult_phase'),
+										   (self.waveGradientRegularization,self.regulargradientwave,'regresult_wave' ),
+										   (self.dyadicRegularization,self.regulardyad,'regresult_dyad')]:
+				if weight ==0:
+					continue
+				if regKey in storedResults and not (varyParams[self.im0].any() or varyParams[self.im1].any()):
+					residuals += storedResults[regKey]
+					jacobian +=  [sparse.csr_matrix((r.size,varyParams.sum())) for r in storedResults[regKey]]
+				else:
+					for regResids,regJac,relativeweight in zip( *regularization(guess,storedResults,varyParams),[1,self.m1regularization]):
+						residuals += [regResids*np.sqrt(weight*relativeweight)]
+						if np.isnan(residuals[-1]).any(): import pdb;pdb.set_trace()
+						jacobian+=[sparse.csr_matrix(regJac)*np.sqrt(weight*relativeweight)]
+					storedResults[regKey]=residuals[-self.n_components:]
+
+		if varyParams.any():
+			return np.concatenate(residuals),sparse.vstack(jacobian)
+		else:
+			return  np.concatenate(residuals)
+
+	def maxlikefit(self,x,storedResults=None,varyParams=None,pool=None,debug=False,SpecErrScale=1.0,fixFluxes=False,dospec=True,usesns=None):
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic data given during initialization
 		
@@ -379,41 +450,29 @@ class SALTResids:
 		chi2: float
 			Goodness of fit of model to training data	
 		"""
+		if storedResults is None: storedResults={}
 		if varyParams is None:
 			varyParams=np.zeros(self.npar,dtype=bool)
 		computeDerivatives=np.any(varyParams)
 		#Set up SALT model
 		# HACK
-		if self.n_colorpars:
-			if not 'colorLaw' in storedResults:
-				storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])(self.wave)
-				storedResults['colorLawInterp']= interp1d(self.wave,storedResults['colorLaw'],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
-		else: storedResults['colorLaw'] = 1
-
-		if not all([('specfluxes_{}'.format(sn) in storedResults) and ('photfluxes_{}'.format(sn) in storedResults) for sn in self.datadict]):
-				
-			if not 'components' in storedResults:
-				storedResults['components'] =self.SALTModel(x)
-			if not 'componentderivs' in storedResults:
-				storedResults['componentderivs'] = self.SALTModelDeriv(x,1,0,self.phase,self.wave)
-		
-		if not all([('specvariances_{}'.format(sn) in storedResults) and ('photvariances_{}'.format(sn) in storedResults) for sn in self.datadict]):
-			storedResults['saltErr']=self.ErrModel(x)
-			storedResults['saltCorr']=self.CorrelationModel(x)
-
-
-		
+		self.fillStoredResults(x,storedResults)	
 		# timing stuff
 		
 		chi2 = 0
 		#Construct arguments for maxlikeforSN method
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
-		args=[(x,sn,storedResults,varyParams,debug,SpecErrScale) for sn in self.datadict.keys()]
+		args=[(x,sn,storedResults,varyParams,debug,SpecErrScale,fixFluxes,dospec) for sn in (self.datadict.keys() if usesns is None else usesns)]
 		#args2 = (x,components,componentderivs,salterr,saltcorr,colorLaw,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale)
 		mapFun=pool.map if pool else starmap
 
 		#result = list(pyParz.foreach(self.datadict.keys(),self.loglikeforSN,args2))
 		result=list(mapFun(self.loglikeforSN,args))
+
+		# hack!
+		loglike=sum(result)
+		logp = loglike
+
 		if computeDerivatives:
 			loglike=sum([r[0] for r in result])
 			grad=sum([r[1] for r in result])
@@ -424,26 +483,31 @@ class SALTResids:
 			priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,x)	
 			logp -=(priorResids**2).sum()/2
 			if computeDerivatives:
-				grad-= (priorResids [:,np.newaxis] * priorJac).sum(axis=0)
-		
+				grad-= (priorResids [:,np.newaxis] * priorJac[:,varyParams]).sum(axis=0)
+			BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
+			self.priors.BoundedPriorResids(self.bounds,self.boundedParams,x)
+			logp -=(BoundedPriorResids**2).sum()/2
+			if computeDerivatives:
+				grad-= (BoundedPriorResids [:,np.newaxis] * BoundedPriorJac[:,varyParams]).sum(axis=0)
+
+
 		if self.regularize:
 			for regularization, weight in [(self.phaseGradientRegularization, self.regulargradientphase),(self.waveGradientRegularization,self.regulargradientwave ),(self.dyadicRegularization,self.regulardyad)]:
 				if weight ==0:
 					continue
 				regResids,regJac=regularization(x,storedResults,varyParams)
-				logp-= sum([(res**2).sum()*weight/2 for res in regResids])
+				logp-= sum([(res**2).sum()*weight*componentweight/2 for res,componentweight in zip(regResids,[1,self.m1regularization])])
 				if computeDerivatives:
-					for res,jac in zip(regResids,regJac):
-						grad -= (res[:,np.newaxis]*jac ).sum(axis=0)
+					for res,jac,componentweight in zip(regResids,regJac,[1,self.m1regularization]):
+						grad -= (res[:,np.newaxis]*jac *weight*componentweight).sum(axis=0)
 		self.nstep += 1
-		log.info(logp.sum()*-2)
 
 		if computeDerivatives:
 			return logp,grad
 		else:
 			return logp
 					
-	def ResidsForSN(self,x,sn,storedResults,varyParams=None,fixUncertainty=False,SpecErrScale=1.):
+	def ResidsForSN(self,x,sn,storedResults,varyParams=None,fixUncertainty=False,SpecErrScale=1.,fixFluxes=False):
 		""" This method should be the only one required for any fitter to process the supernova data. 
 		Find the residuals of a set of parameters to the photometric and spectroscopic data of a given supernova. 
 		Photometric residuals are first decorrelated to diagonalize color scatter"""
@@ -452,132 +516,148 @@ class SALTResids:
 			varyParams=np.zeros(self.npar,dtype=bool)
 		self.fillStoredResults(x,storedResults)	
 		photmodel,specmodel=self.modelvalsforSN(x,sn,storedResults,varyParams)
-		#Separate code for photometry and spectra now, since photometry has to handle a covariance matrix with off-diagonal elements
-		if not 'photCholesky_{}'.format(sn) in storedResults:
-			#Calculate cholesky matrix for each set of photometric measurements in each filter
-			if (photmodel['modelvariance']<0).any():
-				warnings.warn('Negative variance in photometry',RuntimeWarning)
-				negVals=photmodel['modelvariance']<0
-				photmodel['modelvariance'][negVals]=0
-			variance=photmodel['fluxvariance']+photmodel['modelvariance']
-			Ls,colorvar=[],[]
-			#Add color scatter
-			for selectFilter,clscat,dclscat in photmodel['colorvariance']:
+		photresids={}
+		for flt in photmodel:
+			filtmodel=photmodel[flt]
+			filtresids={}
+			photresids[flt]=filtresids
+			choleskykey=f'photCholesky_{sn}_{flt}'
+			if not choleskykey in storedResults:
+				#Calculate cholesky matrix for each set of photometric measurements in each filter
+				if (filtmodel['modelvariance']<0).any():
+					warnings.warn('Negative variance in photometry',RuntimeWarning)
+					negVals=filtmodel['modelvariance']<0
+					filtmodel['modelvariance'][negVals]=0
+				variance=filtmodel['fluxvariance']+filtmodel['modelvariance']
+				clscat,dclscatdx=filtmodel['colorvariance']
 				#Find cholesky matrix as sqrt of diagonal uncertainties, then perform rank one update to incorporate color scatter
-				Ls+=[rankOneCholesky(variance[selectFilter],clscat**2,photmodel['modelflux'][selectFilter])]
-				colorvar+=[(selectFilter,clscat,dclscat)]
-			storedResults['photCholesky_{}'.format(sn)]=Ls,colorvar
-
-		Ls,colorvar=storedResults['photCholesky_{}'.format(sn)]
-		
-		photresids={'resid':np.zeros(photmodel['modelflux'].size)}
-		photresids['resid_jacobian']=np.zeros((photmodel['modelflux'].size,varyParams.sum()))
-		
-		if not fixUncertainty: 
-			photresids['lognorm']=0
-			photresids['lognorm_grad']=np.zeros(varyParams.sum())
-		
-		for L,(selectFilter,clscat,dclscat) in zip(Ls,colorvar):
-			#More stable to solve by backsubstitution than to invert and multiply
-			
-			try:
-				fluxdiff=photmodel['modelflux'][selectFilter]-photmodel['dataflux'][selectFilter]
-				photresids['resid'][selectFilter]=linalg.solve_triangular(L, fluxdiff,lower=True)
-			except:
-				import pdb;pdb.set_trace()
+				L = rankOneCholesky(variance,clscat**2,filtmodel['modelflux'])
+				invL=sparse.csr_matrix(linalg.solve_triangular(L,np.diag(np.ones(L.shape[0])),lower=True))
 				
+				storedResults[choleskykey]=L,invL,clscat,dclscatdx
+			else:
+				L,invL,clscat,dclscatdx=storedResults[choleskykey]
+				
+			if not fixUncertainty: 
+				filtresids['lognorm']=0
+				filtresids['lognorm_grad']=np.zeros(varyParams.sum())
+		
+			#More stable to solve by backsubstitution than to invert and multiply
+			fluxdiff=filtmodel['modelflux']-filtmodel['dataflux']
+			filtresids['resid']=linalg.solve_triangular(L, fluxdiff,lower=True)
+
 			if not fixUncertainty:
-				photresids['lognorm']-= (np.log(np.diag(L)).sum())
+				filtresids['lognorm']-= (np.log(np.diag(L)).sum())
+			
+			
 			if varyParams.any():
-				try:
-					photresids['resid_jacobian'][selectFilter]=linalg.solve_triangular(L,photmodel['modelflux_jacobian'][selectFilter],lower=True)
-				except:
-					import pdb;pdb.set_trace()
+				if not fixFluxes: 
+					filtresids['resid_jacobian']=invL.dot(filtmodel['modelflux_jacobian'])
+					#filtresids['resid_jacobian']=linalg.solve_triangular(L,filtmodel['modelflux_jacobian'],lower=True)
+				else: 
+					filtresids['resid_jacobian']=sparse.csr_matrix(filtmodel['modelflux_jacobian'].shape)
 				if not fixUncertainty:
+					raise NotImplementedError('Derivative of variance is still a work in progress')
 					varyParlist=self.parlist[varyParams]
 					#Cut out zeroed jacobian entries to save time
-					nonzero=(~((photmodel['modelvariance_jacobian'][selectFilter]==0) & (photmodel['modelflux_jacobian'][selectFilter]==0)).all(axis=0)) | (self.parlist[varyParams]=='clscat')
-					reducedJac=photmodel['modelvariance_jacobian'][selectFilter][:,nonzero]
+					nonzero=(~((filtmodel['modelvariance_jacobian']==0) & (filtmodel['modelflux_jacobian']==0 if not fixFluxes else True)).all(axis=0)) | (self.parlist[varyParams]=='clscat')
+					reducedJac=filtmodel['modelvariance_jacobian'][:,nonzero]
 					#import pdb;pdb.set_trace()
 					#Calculate L^-1 (necessary for the diagonal derivative)
 					invL=linalg.solve_triangular(L,np.diag(np.ones(fluxdiff.size)),lower=True)
-					
+			
 					# Calculate the fractional derivative of L w.r.t model parameters
 					# L^-1 dL/dx = {L^-1 x d Sigma / dx x L^-T, with the upper triangular part zeroed and the diagonal halved}
-					
+			
 					#First calculating diagonal part
 					fractionalLDeriv=np.dot(invL,np.swapaxes(reducedJac[:,np.newaxis,:]* invL.T[:,:,np.newaxis],0,1))
-					
-					fluxPrime= linalg.solve_triangular(L,photmodel['modelflux'][selectFilter])
-					jacPrime = linalg.solve_triangular(L,photmodel['modelflux_jacobian'][selectFilter][:,nonzero])
-					#Derivative w.r.t  color scatter 
+		
+					fluxPrime= linalg.solve_triangular(L,filtmodel['modelflux'])
 					fractionalLDeriv[:,:,varyParlist[nonzero]=='clscat']+= 2*clscat*dclscat[np.newaxis,np.newaxis,:]* np.outer(fluxPrime,fluxPrime)[:,:,np.newaxis]
-					#Derivative w.r.t model flux
-					dfluxSquared = jacPrime[:,np.newaxis,:]*fluxPrime[np.newaxis,:,np.newaxis]
-					#Symmetrize
-					dfluxSquared = np.swapaxes(dfluxSquared,0,1)+dfluxSquared
-					fractionalLDeriv +=clscat**2 * dfluxSquared
-					
+					if not fixFluxes:
+						jacPrime = linalg.solve_triangular(L,filtmodel['modelflux_jacobian'][:,nonzero])
+						#Derivative w.r.t  color scatter 
+						#Derivative w.r.t model flux
+						dfluxSquared = jacPrime[:,np.newaxis,:]*fluxPrime[np.newaxis,:,np.newaxis]
+						#Symmetrize
+						dfluxSquared = np.swapaxes(dfluxSquared,0,1)+dfluxSquared
+						fractionalLDeriv +=clscat**2 * dfluxSquared
+				
 					fractionalLDeriv[np.triu(np.ones((fluxdiff.size,fluxdiff.size),dtype=bool),1),:]=0
 					fractionalLDeriv[np.diag(np.ones((fluxdiff.size),dtype=bool)),:]/=2
-				
+			
 					#Multiply by size of transformed residuals and apply to resiudal jacobian
-					
-					photresids['resid_jacobian'][np.outer(selectFilter,nonzero)]-=np.dot(np.swapaxes(fractionalLDeriv,1,2),photresids['resid'][selectFilter]).flatten()
-					
-					#Trace of fractional derivative gives the gradient of the lognorm term, since determinant is product of diagonal
-					photresids['lognorm_grad'][nonzero]-= np.trace(fractionalLDeriv)
 				
+					filtresids['resid_jacobian'][:,nonzero]-=np.dot(np.swapaxes(fractionalLDeriv,1,2),filtresids['resid'])
+				
+					#Trace of fractional derivative gives the gradient of the lognorm term, since determinant is product of diagonal
+					filtresids['lognorm_grad'][nonzero]-= np.trace(fractionalLDeriv)
+			else: 
+				filtresids['resid_jacobian']=sparse.csr_matrix(filtmodel['modelflux_jacobian'].shape)
+			
 		#Handle spectra
-		
-		variance=specmodel['fluxvariance'] + specmodel['modelvariance']
-		if (specmodel['modelvariance']<0).any():
-			warnings.warn('Negative variance in spectra',RuntimeWarning)
-			negVals=specmodel['modelvariance']<0
-			specmodel['modelvariance'][negVals]=0
+		specresids={}
+		for k in specmodel:
+			spectralmodel=specmodel[k]
+			variance=spectralmodel['fluxvariance'] + spectralmodel['modelvariance']
+			if (spectralmodel['modelvariance']<0).any():
+				warnings.warn('Negative variance in spectra',RuntimeWarning)
+				negVals=spectralmodel['modelvariance']<0
+				spectralmodel['modelvariance'][negVals]=0
 
-		uncertainty=np.sqrt(variance)*SpecErrScale
-		# HACK
-		#uncertainty *= 0.01
-		#Suppress the effect of the spectra by multiplying chi^2 by number of photometric points over number of spectral points
-		#print('hack!')
-		spectralSuppression=np.sqrt(self.num_phot/self.num_spec	)
+			uncertainty=np.sqrt(variance)*SpecErrScale
+
+			spectralSuppression=np.sqrt(self.num_phot/self.num_spec)*self.spec_chi2_scaling
+
+			#spectralSuppression=self.phot_snr/self.spec_snr/10
+
+			spectralresids={'resid': spectralSuppression * (spectralmodel['modelflux']-spectralmodel['dataflux'])/uncertainty}
+			specresids[k]=spectralresids
+			if not fixUncertainty:
+				spectralresids['lognorm']=-np.log((np.sqrt(2*np.pi)*uncertainty)).sum()
 		
-		specresids={'resid': spectralSuppression * (specmodel['modelflux']-specmodel['dataflux'])/uncertainty}
-		specresids['uncertainty'] = uncertainty
-		if not fixUncertainty:
-			specresids['lognorm']=-np.log((np.sqrt(2*np.pi)*uncertainty)).sum()
-		
-		specresids['resid_jacobian']=spectralSuppression * specmodel['modelflux_jacobian']/(uncertainty[:,np.newaxis])
-		if not fixUncertainty:
-			#Calculate jacobian of total spectral uncertainty including reported uncertainties
-			uncertainty_jac=  specmodel['modelvariance_jacobian'] / (2*uncertainty[:,np.newaxis])
-			specresids['lognorm_grad']= - (uncertainty_jac/uncertainty[:,np.newaxis]).sum(axis=0)
-			specresids['resid_jacobian']-=   uncertainty_jac*(specresids['resid'] /uncertainty)[:,np.newaxis]
+			#Create a diagonal matrix with the inverse uncertainty on the diagonal
+			if not fixFluxes: spectralresids['resid_jacobian']= sparse.diags([spectralSuppression/uncertainty],offsets=[0])*spectralmodel['modelflux_jacobian']
+			else: spectralresids['resid_jacobian']=sparse.csr_matrix((spectralmodel['modelflux'].size,varyParams.sum()))
+
+			if not fixUncertainty:
+				#Calculate jacobian of total spectral uncertainty including reported uncertainties
+				uncertainty_jac=  spectralmodel['modelvariance_jacobian'] / (2*uncertainty[:,np.newaxis])
+				spectralresids['lognorm_grad']= - (uncertainty_jac/uncertainty[:,np.newaxis]).sum(axis=0)
+				spectralresids['resid_jacobian']-=   uncertainty_jac*(spectralresids['resid'] /uncertainty)[:,np.newaxis]
 
 		return photresids,specresids
-		
+	
 	def modelvalsforSN(self,x,sn,storedResults,varyParams):		
+		
 		temporaryResults={}
 		x1Deriv= varyParams[self.parlist=='x1_{}'.format(sn)][0] 
-		tpkDerivs=varyParams[self.parlist=='tpkoff_{}'.format(sn)][0]
 		self.fillStoredResults(x,storedResults)
+
+		fluxphotkey='phot'+'fluxes_{}'.format(sn)
+		varphotkey= 'phot'+'variances_{}'.format(sn)
+		fluxspeckey='spec'+'fluxes_{}'.format(sn)
+		varspeckey= 'spec'+'variances_{}'.format(sn)
+		
 		z = self.datadict[sn]['zHelio']
 		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
-		x1,c,tpkoff = x[self.parlist == 'x1_%s'%sn],\
-						 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
+		x1,c,tpkoff = x[self.parlist == f'x1_{sn}'],\
+						 x[self.parlist == f'c_{sn}'],x[self.parlist == f'tpkoff_{sn}']
 		colorexp= 10. ** (storedResults['colorLaw'] * c)
 		temporaryResults['colorexp'] =colorexp
 		
 		calculateFluxes= not ('photfluxes_{}'.format(sn) in storedResults  and  'specfluxes_{}'.format(sn) in storedResults)
 		calculateVariances= not ('photvariances_{}'.format(sn) in storedResults and  'specvariances_{}'.format(sn) in storedResults)
-		if calculateFluxes:
+		if calculateFluxes and not fluxphotkey in storedResults and not fluxspeckey in storedResults:
+			tpkDerivs=varyParams[self.parlist=='tpkoff_{}'.format(sn)][0]
+			
 			#Apply MW extinction
 			M0,M1 = storedResults['components']
 					
-			prefactor=_SCALE_FACTOR/(1+z)*(colorexp*self.datadict[sn]['mwextcurve'][np.newaxis,:])
+			prefactor=_SCALE_FACTOR/(1+z)*(self.datadict[sn]['mwextcurve'][np.newaxis,:])
 			mod = prefactor*(M0 + x1*M1)
-			temporaryResults['fluxInterp'] = interp1d(obsphase,mod,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
+			#temporaryResults['fluxInterp'] = interp1d(obsphase,mod,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
+			temporaryResults['fluxInterp'] = mod #interp1d(obsphase,mod,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
 			if x1Deriv:
 				int1dM1 = interp1d(obsphase,prefactor*M1,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
 				temporaryResults['M1Interp']=int1dM1
@@ -586,9 +666,9 @@ class SALTResids:
 				M0phasederiv,M1phasederiv = storedResults['componentderivs']
 				phaseDeriv=prefactor*(M0phasederiv +x1*M1phasederiv)
 				temporaryResults['phaseDerivInterp'] = interp1d(obsphase,phaseDeriv,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
-		
-		if calculateVariances:
-			prefactor=(self.datadict[sn]['mwextcurve'] *colorexp*  _SCALE_FACTOR/(1+z))
+				
+		if calculateVariances and not varphotkey in storedResults and not varspeckey in storedResults:
+			prefactor=(self.datadict[sn]['mwextcurve'] *  _SCALE_FACTOR/(1+z))
 			if x1Deriv or varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any():
 				interr1d = [interp1d(obsphase,err * prefactor ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True) for err in storedResults['saltErr']]
 				intcorr1d= [interp1d(obsphase,corr ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True) for corr in storedResults['saltCorr'] ]
@@ -598,31 +678,25 @@ class SALTResids:
 			saltErr=storedResults['saltErr']
 			saltCorr=storedResults['saltCorr'] 
 			modelUncertainty= prefactor**2 *(saltErr[0]**2  + 2*x1* saltCorr[0]*saltErr[0]*saltErr[1] + x1**2 *saltErr[1]**2)
-			interr1d=interp1d(obsphase,modelUncertainty ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
-			temporaryResults['modelUncertaintyInterp']=interr1d
+
+			#interr1d=interp1d(obsphase,modelUncertainty ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
+			#temporaryResults['modelUncertaintyInterp']=interr1d
+			temporaryResults['modelUncertainty']=modelUncertainty
+		
 		returndicts=[]
 		for valfun,uncertaintyfun,name in [(self.photValsForSN,self.photVarianceForSN,'phot'),(self.specValsForSN,self.specVarianceForSN, 'spec')]:
 			fluxkey=name+'fluxes_{}'.format(sn)
 			if not fluxkey in storedResults:
 				storedResults[fluxkey]=valfun(x,sn, storedResults,temporaryResults,varyParams)
 			valdict=storedResults[fluxkey]
-				
-			varkey= name+'variances_{}'.format(sn)
+
+			varkey=name+'variances_{}'.format(sn)	
 			if not varkey in storedResults:
 				storedResults[varkey]=uncertaintyfun(x,sn,storedResults,temporaryResults,varyParams)
-				if len(np.where((storedResults[varkey] != storedResults[varkey]) |
-								(storedResults[varkey] == np.inf))[0]):
-					raise RuntimeError('error!  %s array has issues'%varkey)
-				
+
 			uncertaintydict=storedResults[varkey]
-			#if name == 'spec' and sn == '03D1au' and len(storedResults['specfluxes_03D1au']['modelflux']):
-			#	import pylab as plt
-			#	plt.ion()
-			#	plt.plot(storedResults['specfluxes_03D1au']['modelflux'])
-			#	plt.plot(storedResults['specfluxes_03D1au']['dataflux'])
-			#	import pdb; pdb.set_trace()
-			returndicts+=[{**valdict ,**uncertaintydict}]
-		
+			returndicts+=[{key:{**valdict[key],**uncertaintydict[key]} for key in valdict}]
+
 		return returndicts		
 	
 	def photValsForSN(self,x,sn,storedResults,temporaryResults,varyParams):
@@ -631,12 +705,14 @@ class SALTResids:
 		filtwave = self.kcordict[survey]['filtwave']
 		obswave = self.datadict[sn]['obswave'] #self.wave*(1+z)
 		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
+		wavedelt = obswave[1]-obswave[0]
+		phasedelt = obsphase[1]-obsphase[0]
 		photdata = self.datadict[sn]['photdata']
 		pbspl = self.datadict[sn]['pbspl']
 		dwave = self.datadict[sn]['dwave']
 		idx = self.datadict[sn]['idx']
-		x0,x1,c,tpkoff = x[self.parlist == 'x0_%s'%sn],x[self.parlist == 'x1_%s'%sn],\
-						 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
+		x0,x1,c,tpkoff = x[self.parlist == f'x0_{sn}'],x[self.parlist == f'x1_{sn}'],\
+						 x[self.parlist == f'c_{sn}'],x[self.parlist == f'tpkoff_{sn}']
 		
 		x0Deriv= varyParams[self.parlist==f'x0_{sn}']
 		x1Deriv= varyParams[self.parlist==f'x1_{sn}'][0] 
@@ -644,86 +720,93 @@ class SALTResids:
 		cDeriv=  varyParams[self.parlist==f'c_{sn}'][0]
 		requiredPCDerivs=varyParams[self.im0]|varyParams[self.im1]
 		
-		varyParList=self.parlist[varyParams]
+		varyparlist=self.parlist[varyParams]
 		
 		colorlaw,colorexp=storedResults['colorLaw'],temporaryResults['colorexp']
-		
+		reddenedsalt2flux=colorexp*temporaryResults['fluxInterp']
 		photresultsdict={}
-		photresultsdict['modelflux'] = np.zeros(len(photdata['filt']))
-		photresultsdict['dataflux'] = photdata['fluxcal']
-		photresultsdict['modelflux_jacobian'] = np.zeros((photdata['filt'].size,varyParams.sum()))
-		if requiredPCDerivs.all() and not 'pcDeriv_phot_%s'%sn in storedResults:
-			summationCache=np.zeros((photdata['filt'].size,self.im0.size))
 		for flt in np.unique(photdata['filt']):
+			selectFilter=(photdata['filt']==flt)
+			filtresultsdict={}
+			photresultsdict[flt]=filtresultsdict
+			filtresultsdict['dataflux'] = photdata['fluxcal'][selectFilter]
+			filtresultsdict['modelflux_jacobian'] = np.zeros((filtresultsdict['dataflux'].size,varyParams.sum()))
+
+			pcderivkey=f'pcDeriv_phot_{sn}_{flt}'
+			if requiredPCDerivs.all() and not pcderivkey in storedResults:
+				summationCache=np.zeros((filtresultsdict['dataflux'].size,self.im0.size))
+
 			intmult = dwave*self.fluxfactor[survey][flt]*_SCALE_FACTOR/(1+z)*x0
 			#Select data from the appropriate filter filter
-			selectFilter=(photdata['filt']==flt)
 			phase=photdata['tobs']+tpkoff
 			phase=phase[selectFilter]
 			clippedPhase=np.clip(phase,obsphase.min(),obsphase.max())
 			nphase = len(phase)
 			#Array output indices match time along 0th axis, wavelength along 1st axis
-			modulatedFlux = pbspl[flt]*temporaryResults['fluxInterp'](clippedPhase)[:,idx[flt]]
+			modulatedFlux = pbspl[flt]*reddenedsalt2flux[np.round((clippedPhase-obsphase[0])/phasedelt).astype(int),:][:,idx[flt]]
 			if ( (phase>obsphase.max())).any():
 				decayFactor=10**(-0.4*self.extrapolateDecline*(phase[phase>obsphase.max()]-obsphase.max()))
 				modulatedFlux[np.where(phase>obsphase.max())[0]] *= decayFactor[:,np.newaxis]
 			dmodelfluxdx0 = np.sum(modulatedFlux, axis=1)*dwave*self.fluxfactor[survey][flt]
 			modelflux=dmodelfluxdx0*x0
+			filtresultsdict['modelflux']=modelflux
+
 			modulatedFlux*=(dwave*self.fluxfactor[survey][flt]*x0)
 			if  x0Deriv:
-				photresultsdict['modelflux_jacobian'][selectFilter,(varyParList == 'x0_{}'.format(sn))] = dmodelfluxdx0
+				filtresultsdict['modelflux_jacobian'][:,(varyparlist == 'x0_{}'.format(sn))] = dmodelfluxdx0[:,np.newaxis]
 			if x1Deriv:
 				int1dM1=temporaryResults['M1Interp']
 				M1interp = int1dM1(clippedPhase)
-				modulatedM1=pbspl[flt]*M1interp[:,idx[flt]]
+				modulatedM1=pbspl[flt]*colorexp[idx[flt]]*M1interp[:,idx[flt]]
 				if ( (phase>obsphase.max())).any():
 					decayFactor=10**(-0.4*self.extrapolateDecline*(phase[phase>obsphase.max()]-obsphase.max()))
 					modulatedM1[np.where(phase>obsphase.max())[0]] *= decayFactor[:,np.newaxis]
-				photresultsdict['modelflux_jacobian'][selectFilter,(varyParList == 'x1_{}'.format(sn))] = np.sum(modulatedM1, axis=1)*(dwave*self.fluxfactor[survey][flt]*x0)
+				filtresultsdict['modelflux_jacobian'][:,(varyparlist == 'x1_{}'.format(sn))] = (np.sum(modulatedM1, axis=1)*(dwave*self.fluxfactor[survey][flt]*x0))[:,np.newaxis]
 			
 			if tpkDeriv:
 				#Need to figure out how to handle derivatives wrt time when dealing with nearest neighbor interpolation; maybe require linear?
 				modulatedPhaseDeriv= pbspl[flt]*temporaryResults['phaseDerivInterp'](clippedPhase)[:,idx[flt]]
-				photresultsdict['modelflux_jacobian'][selectFilter,(varyParList == 'tpkoff_{}'.format(sn))] =np.sum(modulatedPhaseDeriv, axis=1)*(dwave*self.fluxfactor[survey][flt]*x0) 
+				filtresultsdict['modelflux_jacobian'][:,(varyparlist == 'tpkoff_{}'.format(sn))] =(np.sum(modulatedPhaseDeriv, axis=1)*(dwave*self.fluxfactor[survey][flt]*x0) )[:,np.newaxis]
 				for p in np.where(phase>obsphase.max())[0]:
-					photresultsdict['modelflux_jacobian'][np.where(selectFilter)[0][p],(varyParList=='tpkoff_{}'.format(sn))]=-0.4*np.log(10)*self.extrapolateDecline*modelflux[p]
+					filtresultsdict['modelflux_jacobian'][p,(varyparlist=='tpkoff_{}'.format(sn))]=-0.4*np.log(10)*self.extrapolateDecline*modelflux[p]
+			
 			if cDeriv:
 				#d model / dc is total flux (M0 and M1 components (already modulated with passband)) times the color law and a factor of ln(10)
-				photresultsdict['modelflux_jacobian'][selectFilter,(varyParList == 'c_{}'.format(sn))]=np.sum((modulatedFlux)*np.log(10)*colorlaw[np.newaxis,idx[flt]], axis=1)
+				filtresultsdict['modelflux_jacobian'][:,(varyparlist == 'c_{}'.format(sn))]=np.sum((modulatedFlux)*np.log(10)*colorlaw[np.newaxis,idx[flt]], axis=1)[:,np.newaxis]
 				
 			#Multiply M0 and M1 components (already modulated with passband) by c* d colorlaw / d cl_i, with associated normalizations
-			for i,varIndex in enumerate(np.where(varyParList=='cl')[0]): 
-				photresultsdict['modelflux_jacobian'][selectFilter,varIndex]= (np.sum((modulatedFlux)[:,:]*self.colorLawDeriv[np.newaxis,idx[flt],i], axis=1))*-0.4*np.log(10)*c	
+			filtresultsdict['modelflux_jacobian'][:,varyparlist=='cl']= (np.sum((modulatedFlux)[:,:,np.newaxis]*self.colorLawDeriv[:,varyParams[self.iCL]][np.newaxis,idx[flt],:], axis=1))*-0.4*np.log(10)*c	
 			
 			if requiredPCDerivs.any():
 					passbandColorExp=pbspl[flt]*colorexp[idx[flt]]*self.datadict[sn]['mwextcurve'][idx[flt]]
-					for pdx,p in enumerate(np.where(selectFilter)[0]):
-						if 'pcDeriv_phot_%s'%sn in storedResults:
-							summation=storedResults['pcDeriv_phot_%s'%sn][p,requiredPCDerivs]
+					for p in range(filtresultsdict['modelflux'].size):
+						if pcderivkey in storedResults:
+							summation=storedResults[pcderivkey][p,requiredPCDerivs]
 						else:
 							if self.fitTpkOff:
 								derivInterp = self.spline_deriv_interp(
-									(clippedPhase[pdx]/(1+z),self.wave[idx[flt]]),
+									(clippedPhase[p]/(1+z),self.wave[idx[flt]]),
 									method=self.interpMethod)[:,requiredPCDerivs]
 								summation = np.sum( passbandColorExp.T * derivInterp, axis=0)
-								if phase[pdx]>obsphase.max():
-									decayFactor= 10**(-0.4*self.extrapolateDecline*(phase[pdx]-obsphase.max()))
+								if phase[p]>obsphase.max():
+									decayFactor= 10**(-0.4*self.extrapolateDecline*(phase[p]-obsphase.max()))
 									summation*=decayFactor
 							else:
-								derivInterp=self.pcderivsparse[f'derivInterp_phot_{sn}_{flt}'][pdx][:,requiredPCDerivs]
+								derivInterp=self.pcderivsparse[pcderivkey][p][:,requiredPCDerivs]
 								summation=derivInterp.T.dot(passbandColorExp[0])
+
 							if requiredPCDerivs.all():
 								summationCache[p,:]=summation
 
-						photresultsdict['modelflux_jacobian'][p,(varyParList=='m0')]=summation[varyParams[self.im0][requiredPCDerivs]]*intmult
-						photresultsdict['modelflux_jacobian'][p,(varyParList=='m1')]=summation[varyParams[self.im1][requiredPCDerivs]]*intmult*x1
+						filtresultsdict['modelflux_jacobian'][p,(varyparlist=='m0')]=summation[varyParams[self.im0][requiredPCDerivs]]*intmult
+						filtresultsdict['modelflux_jacobian'][p,(varyparlist=='m1')]=summation[varyParams[self.im1][requiredPCDerivs]]*intmult*x1
 					
-			photresultsdict['modelflux'][selectFilter]=modelflux
-		if requiredPCDerivs.all() and not 'pcDeriv_phot_%s'%sn in storedResults :
-			storedResults['pcDeriv_phot_%s'%sn]=summationCache
-		if len(np.where((photresultsdict['modelflux'] != photresultsdict['modelflux']) |
-						(photresultsdict['modelflux'] == np.inf))[0]):
-			raise RuntimeError('phot model fluxes are nonsensical')
+			if requiredPCDerivs.all() and not pcderivkey in storedResults :
+				storedResults[pcderivkey]=summationCache
+			filtresultsdict['modelflux_jacobian']=sparse.csr_matrix(filtresultsdict['modelflux_jacobian'])
+			if ((filtresultsdict['modelflux'] != filtresultsdict['modelflux']) |
+							(filtresultsdict['modelflux'] == np.inf)).any():
+				raise RuntimeError(f'phot model fluxes are nonsensical for SN {sn}')
 		
 		return photresultsdict
 			
@@ -733,12 +816,14 @@ class SALTResids:
 		filtwave = self.kcordict[survey]['filtwave']
 		obswave = self.datadict[sn]['obswave'] #self.wave*(1+z)
 		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
+		wavedelt = obswave[1]-obswave[0]
+		phasedelt = obsphase[1]-obsphase[0]
 		specdata = self.datadict[sn]['specdata']
 		pbspl = self.datadict[sn]['pbspl']
 		dwave = self.datadict[sn]['dwave']
 		idx = self.datadict[sn]['idx']
-		x1,c,tpkoff = x[self.parlist == 'x1_%s'%sn],\
-						 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
+		x1,c,tpkoff = x[self.parlist == f'x1_{sn}'],\
+						 x[self.parlist == f'c_{sn}'],x[self.parlist == f'tpkoff_{sn}']
 
 		x1Deriv= varyParams[self.parlist=='x1_{}'.format(sn)][0] 
 		tpkDeriv=varyParams[self.parlist=='tpkoff_{}'.format(sn)][0]
@@ -748,152 +833,139 @@ class SALTResids:
 		varyParList=self.parlist[varyParams]
 
 		nspecdata = sum([specdata[key]['flux'].size for key in specdata])
-		specresultsdict={}
-		specresultsdict['modelflux'] = np.zeros(nspecdata)
-		specresultsdict['dataflux'] = np.zeros(nspecdata)
-		specresultsdict['modelflux_jacobian'] = np.zeros((nspecdata,varyParams.sum()))
-		
-		if requiredPCDerivs.all() and not 'pcDeriv_spec_%s'%sn in storedResults:
-			if self.fitTpkOff:
-				interpCache=np.zeros((nspecdata,self.im0.size))
-			else:
-				interpCache={}
-		iSpecStart = 0
+		resultsdict={}
+		if requiredPCDerivs.all() and not f'pcDeriv_spec_{sn}' in storedResults:
+			interpCache={}
+	
 		for k in specdata.keys():
+			spectrum=specdata[k]
+			specresultsdict={}
+			resultsdict[k]=specresultsdict
+			specresultsdict['dataflux'] = specdata[k]['flux']
+			specresultsdict['modelflux_jacobian'] = np.zeros((specresultsdict['dataflux'].size,varyParams.sum()))
+		
+
+
 			x0=x[self.parlist==f'specx0_{sn}_{k}']
 			x0Deriv=varyParams[self.parlist==f'specx0_{sn}_{k}'][0]
 			
 			SpecLen = specdata[k]['flux'].size
 			phase=specdata[k]['tobs']+tpkoff
-			specSlice=slice(iSpecStart,iSpecStart+SpecLen)
-			specresultsdict['dataflux'][specSlice] = specdata[k]['flux']
 
 			#Define recalibration factor
 			coeffs=x[self.parlist=='specrecal_{}_{}'.format(sn,k)]
 			pow=coeffs.size-np.arange(coeffs.size)
-			recalCoord=(specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal
+			recalCoord=(spectrum['wavelength']-np.mean(spectrum['wavelength']))/self.specrange_wavescale_specrecal
 			drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
-			recalexp=np.exp((drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1))
-			if len(np.where((recalexp != recalexp) | (recalexp == np.inf))[0]):
-				raise RuntimeError('error....spec recalibration problem for SN %s!'%sn)
+			recalterm=(drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1)
+			pastbounds=np.abs(recalterm)>100
+			recalterm=np.clip(recalterm,-100,100)
+			drecaltermdrecal[pastbounds,:]=0
+			recalexp=np.exp(recalterm)
 			
-			modinterp = temporaryResults['fluxInterp'](phase)
-			dmodelfluxdx0 = interp1d(obswave,modinterp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(specdata[k]['wavelength'])*recalexp
+			if len(np.where((recalexp != recalexp) | (recalexp == np.inf))[0]):
+				raise RuntimeError(f'error....spec recalibration problem for SN {sn}!')
 
+			dmodelfluxdx0 = recalexp*temporaryResults['fluxInterp'][int(np.round((phase-obsphase[0])/phasedelt)),
+																		 (np.round((spectrum['wavelength']-obswave[0])/wavedelt)).astype(int)]
+			#modinterp = temporaryResults['fluxInterp'](phase)
+			#dmodelfluxdx0 = interp1d(obswave,modinterp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(spectrum['wavelength'])*recalexp
+			
 			modulatedFlux = dmodelfluxdx0*x0
-			specresultsdict['modelflux'][specSlice] = modulatedFlux
+			specresultsdict['modelflux']  = modulatedFlux
+			if len(np.where((specresultsdict['modelflux'] != specresultsdict['modelflux']) |
+							(specresultsdict['modelflux'] == np.inf))[0]):
+				raise RuntimeError(f'spec model flux nonsensical for SN {sn}')
+
 			if x0Deriv:
-				specresultsdict['modelflux_jacobian'][specSlice,varyParList==f'specx0_{sn}_{k}'] = dmodelfluxdx0[:,np.newaxis]
+				specresultsdict['modelflux_jacobian'][:,varyParList==f'specx0_{sn}_{k}'] = dmodelfluxdx0[:,np.newaxis]
 			
 			if x1Deriv:
 				M1interp = temporaryResults['M1Interp'](phase)
 				M1int = interp1d(obswave,M1interp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
-				M1interp = M1int(specdata[k]['wavelength'])*recalexp
-				specresultsdict['modelflux_jacobian'][specSlice,(varyParList == 'x1_{}'.format(sn))] = x0*M1interp[:,np.newaxis]
+				M1interp = M1int(spectrum['wavelength'])*recalexp
+				specresultsdict['modelflux_jacobian'][:,(varyParList == 'x1_{}'.format(sn))] = x0*M1interp[:,np.newaxis]
 			
 			if tpkDeriv:
 				phaseDerivInterp = temporaryResults['phaseDerivInterp'](phase)
-				phaseDerivInterp = interp1d(obswave,phaseDerivInterp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(specdata[k]['wavelength'])
+				phaseDerivInterp = interp1d(obswave,phaseDerivInterp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(spectrum['wavelength'])
 				modPhaseDeriv = phaseDerivInterp*recalexp*x0
-				specresultsdict['modelflux_jacobian'][specSlice,varyParList == 'tpkoff_{}'.format(sn)] = modPhaseDeriv[:,np.newaxis]
+				specresultsdict['modelflux_jacobian'][:,varyParList == 'tpkoff_{}'.format(sn)] = modPhaseDeriv[:,np.newaxis]
 
 			#Check spectrum is inside proper phase range, extrapolate decline if necessary
 			#	saltfluxinterp*=10**(-0.4* self.extrapolateDecline* (phase-obsphase.max()))
 
 			if self.specrecal:
 				varySpecRecal=varyParams[self.parlist == 'specrecal_{}_{}'.format(sn,k)]
-				specresultsdict['modelflux_jacobian'][specSlice,(varyParList == 'specrecal_{}_{}'.format(sn,k))]  = modulatedFlux[:,np.newaxis] * drecaltermdrecal[:,varySpecRecal]
+				specresultsdict['modelflux_jacobian'][:,(varyParList == 'specrecal_{}_{}'.format(sn,k))]  = modulatedFlux[:,np.newaxis] * drecaltermdrecal[:,varySpecRecal]
 
-			# derivatives....
-			if cDeriv or varyParams[self.iCL].any() or requiredPCDerivs.any():
-				colorlawinterp=storedResults['colorLawInterp'](specdata[k]['wavelength']/(1+z))
-				colorexpinterp=10**(c*colorlawinterp)
-				
-			if cDeriv:
-				specresultsdict['modelflux_jacobian'][specSlice,varyParList == 'c_{}'.format(sn)] = (modulatedFlux *np.log(10)*colorlawinterp)[:,np.newaxis]
-
-			# color law
-			if varyParams[self.iCL].any():
-				try: specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='cl')] = modulatedFlux[:,np.newaxis]*-0.4*np.log(10)*c*self.colorLawDerivInterp(specdata[k]['wavelength']/(1+z))[:,varyParams[self.iCL]]
-				except: import pdb; pdb.set_trace()
 
 			# M0, M1
 			if (requiredPCDerivs).any():
-				intmult = _SCALE_FACTOR/(1+z)*recalexp*colorexpinterp*self.datadict[sn]['mwextcurveint'](specdata[k]['wavelength'])
+				intmult = _SCALE_FACTOR/(1+z)*recalexp*self.datadict[sn]['mwextcurveint'](spectrum['wavelength'])
 				if self.fitTpkOff:
-					if 'pcDeriv_spec_%s'%sn in storedResults:
-						derivInterp= storedResults['pcDeriv_spec_%s'%sn][specSlice,:]
+					if f'pcDeriv_spec_{sn}' in storedResults:
+						derivInterp= storedResults[f'pcDeriv_spec_{sn}'][specSlice,:]
 					else:
-						derivInterp=self.spline_deriv_interp((phase[0]/(1+z),specdata[k]['wavelength']/(1+z)),method=self.interpMethod)*intmult[:,np.newaxis]
-					specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='m0')]  = derivInterp[:,varyParams[self.im0]]*(x0)
-					specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='m1')] =  derivInterp[:,varyParams[self.im1]]*(x1*x0)
-					if requiredPCDerivs.all() and not 'pcDeriv_spec_%s'%sn in storedResults:
-						interpCache[specSlice,:] = derivInterp
-				else:
-					if 'pcDeriv_spec_%s'%sn in storedResults:
-						derivInterp=storedResults['pcDeriv_spec_%s'%sn][k]
-					else:
-						derivInterp=self.pcderivsparse[f'derivInterp_spec_{sn}_{k}'].multiply(intmult[:,np.newaxis]).tocsc()
+						derivInterp=self.spline_deriv_interp((phase[0]/(1+z),spectrum['wavelength']/(1+z)),method=self.interpMethod)*intmult[:,np.newaxis]
+					specresultsdict['modelflux_jacobian'][:,(varyParList=='m0')]  = derivInterp[:,varyParams[self.im0]]*(x0)
+					specresultsdict['modelflux_jacobian'][:,(varyParList=='m1')] =  derivInterp[:,varyParams[self.im1]]*(x1*x0)
+					if requiredPCDerivs.all() and not f'pcDeriv_spec_{sn}' in storedResults:
 						interpCache[k]=derivInterp
-					specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='m0')]  = (derivInterp[:,varyParams[self.im0]]*(x0[0])).toarray()
-					specresultsdict['modelflux_jacobian'][specSlice,(varyParList=='m1')] = ( derivInterp[:,varyParams[self.im1]]*(x1[0]*x0[0])).toarray()
-# 				if ( (phase>obsphase.max())).any():
-# 					if phase > obsphase.max():
-# 						#if computePCDerivs != 2:
-# 						specresultsdict['modelflux_jacobian'][specSlice,self.im0] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
-# 						specresultsdict['modelflux_jacobian'][specSlice,self.im1] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
-# 
-# 						self.__dict__['dmodelflux_dM0_spec_%s'%sn][specSlice,:] *= 10**(-0.4*self.extrapolateDecline*(phase-obsphase.max()))
-# 						#if computePCDerivs != 1:
-			iSpecStart += SpecLen
+				else:
+					if f'pcDeriv_spec_{sn}' in storedResults:
+						derivInterp=storedResults[f'pcDeriv_spec_{sn}'][k]
+					else:
+						derivInterp=self.pcderivsparse[f'pcDeriv_spec_{sn}_{k}'].multiply(intmult[:,np.newaxis]).tocsc()
+						if requiredPCDerivs.all(): interpCache[k]=derivInterp
+					specresultsdict['modelflux_jacobian'][:,(varyParList=='m0')]  = (derivInterp[:,varyParams[self.im0]]*(x0[0])).toarray()
+					specresultsdict['modelflux_jacobian'][:,(varyParList=='m1')] = ( derivInterp[:,varyParams[self.im1]]*(x1[0]*x0[0])).toarray()
+			resultsdict[k]['modelflux_jacobian']=sparse.csr_matrix(resultsdict[k]['modelflux_jacobian'])
+		if requiredPCDerivs.all() and not f'pcDeriv_spec_{sn}' in storedResults: 
+			storedResults[f'pcDeriv_spec_{sn}']=interpCache
 
-		if requiredPCDerivs.all() and not 'pcDeriv_spec_%s'%sn in storedResults: 
-			storedResults['pcDeriv_spec_%s'%sn]=interpCache
-		if len(np.where((specresultsdict['modelflux'] != specresultsdict['modelflux']) |
-						(specresultsdict['modelflux'] == np.inf))[0]):
-			raise RuntimeError('spec model flux nonsensical for SN %s'%sn)
-
-		return specresultsdict
+		return resultsdict
 
 	def specVarianceForSN(self,x,sn,storedResults,temporaryResults,varyParams):
 		z = self.datadict[sn]['zHelio']
 		survey = self.datadict[sn]['survey']
 		filtwave = self.kcordict[survey]['filtwave']
 		obswave = self.datadict[sn]['obswave'] #self.wave*(1+z)
+		wavedelt = obswave[1]-obswave[0]
 		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
+		phasedelt = obsphase[1]-obsphase[0]
 		specdata = self.datadict[sn]['specdata']
 		pbspl = self.datadict[sn]['pbspl']
 		dwave = self.datadict[sn]['dwave']
 		idx = self.datadict[sn]['idx']
-		x1,c,tpkoff = x[self.parlist == 'x1_%s'%sn],\
-						 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
+		x1,c,tpkoff = x[self.parlist == f'x1_{sn}'],\
+						 x[self.parlist == f'c_{sn}'],x[self.parlist == f'tpkoff_{sn}']
 
 		x1Deriv= varyParams[self.parlist=='x1_{}'.format(sn)][0] 
 		tpkDeriv=varyParams[self.parlist=='tpkoff_{}'.format(sn)][0]
 		cDeriv=varyParams[self.parlist=='c_{}'.format(sn)][0]
 		varyParlist=self.parlist[varyParams]
 		
-		nspecdata = sum([specdata[key]['flux'].size for key in specdata])
-		specresultsdict={}
-		specresultsdict['fluxvariance'] =  np.zeros(nspecdata)
-		specresultsdict['modelvariance'] =  np.zeros(nspecdata)
-		specresultsdict['modelvariance_jacobian']=np.zeros([nspecdata,varyParams.sum()])
-		
-		iSpecStart = 0
+		resultsdict={}
 		for k in specdata.keys():
 			x0=x[self.parlist==f'specx0_{sn}_{k}']
 			x0Deriv=varyParams[self.parlist==f'specx0_{sn}_{k}'][0]
+			
+			spectrum=specdata[k]
+			nspecdata = spectrum['flux'].size
+			
+			specresultsdict={}
+			resultsdict[k]=specresultsdict
+			specresultsdict['fluxvariance'] =  spectrum['fluxerr']**2
+			specresultsdict['modelvariance_jacobian']=np.zeros([nspecdata,varyParams.sum()])
 
-			SpecLen = specdata[k]['flux'].size
-			phase=specdata[k]['tobs']+tpkoff
-
-			specSlice=slice(iSpecStart,iSpecStart+SpecLen)
+			phase=spectrum['tobs']+tpkoff
 			
 			#Define recalibration factor
 			if self.specrecal:
 				coeffs=x[self.parlist=='specrecal_{}_{}'.format(sn,k)]
 				pow=coeffs.size-np.arange(coeffs.size)
-				recalCoord=(specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/self.specrange_wavescale_specrecal
+				recalCoord=(spectrum['wavelength']-np.mean(spectrum['wavelength']))/self.specrange_wavescale_specrecal
 				drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
 				recalexp=np.exp((drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1))
 			else:
@@ -903,44 +975,38 @@ class SALTResids:
 				modelErrInt = [ interp1d( obswave, interr(phase)[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)  for interr in temporaryResults['uncertaintyComponentsInterp']]
 				modelCorrInt= [ interp1d( obswave, intcorr(phase)[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True) for intcorr in temporaryResults['uncertaintyCorrelationsInterp']]
 				
-				modelerrnox = [  interr( specdata[k]['wavelength']) *recalexp for interr in (modelErrInt)]
-				corr=  [intcorr(specdata[k]['wavelength']) for intcorr in modelCorrInt]
-
-			uncertaintyNoX0=  recalexp**2 *  interp1d( obswave, temporaryResults['modelUncertaintyInterp'](phase)[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(specdata[k]['wavelength'])
-			modelUncertainty=uncertaintyNoX0*x0**2
+				modelerrnox = [  interr( spectrum['wavelength']) *recalexp for interr in (modelErrInt)]
+				corr=  [intcorr(spectrum['wavelength']) for intcorr in modelCorrInt]
 				
-			specresultsdict['fluxvariance'][specSlice] = specdata[k]['fluxerr']**2
-			specresultsdict['modelvariance'][specSlice] = modelUncertainty # np.clip(modelUncertainty, (specdata[k]['flux']*1e-3)**2,None)
+			uncertaintyNoX0 = recalexp**2. * temporaryResults['modelUncertainty'][
+				int(np.round((phase-obsphase[0])/phasedelt)),
+				(np.round((spectrum['wavelength']-obswave[0])/wavedelt)).astype(int)]
+			#uncertaintyNoX0=  recalexp**2 *  interp1d( obswave, temporaryResults['modelUncertaintyInterp'](phase)[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(spectrum['wavelength'])
+			modelUncertainty=uncertaintyNoX0*x0**2
+
+			specresultsdict['modelvariance'] = modelUncertainty # np.clip(modelUncertainty, (spectrum['flux']*1e-3)**2,None)
 
 			if x0Deriv:
-				specresultsdict['modelvariance_jacobian'][specSlice,(varyParlist == f'specx0_{sn}_{k}')] = uncertaintyNoX0[:,np.newaxis]*2*x0
+				specresultsdict['modelvariance_jacobian'][:,(varyParlist == f'specx0_{sn}_{k}')] = uncertaintyNoX0[:,np.newaxis]*2*x0
 			if x1Deriv:
-				specresultsdict['modelvariance_jacobian'][specSlice,(varyParlist == 'x1_{}'.format(sn))] = x0**2 * 2*(modelerrnox[0]*modelerrnox[1]*corr[0]+ x1* modelerrnox[1]**2)[:,np.newaxis]
-
-			if cDeriv or varyParams[self.iCL].any() or varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any():
-				colorlawinterp=storedResults['colorLawInterp'](specdata[k]['wavelength']/(1+z))
-				colorexpinterp=10**(c*colorlawinterp)
-
-			if cDeriv:
-				specresultsdict['modelvariance_jacobian'][specSlice,(varyParlist == 'c_{}'.format(sn))] = (modelUncertainty * 2 *np.log(10)*colorlawinterp)[:,np.newaxis]
-				
-			if varyParams[self.iCL].any():
-				specresultsdict['modelvariance_jacobian'][specSlice,(varyParlist=='cl')] =  2* (-0.4 *np.log(10)*c)*modelUncertainty[:,np.newaxis]*self.colorLawDerivInterp(specdata[k]['wavelength']/(1+z))[:,varyParams[self.iCL]]
+				specresultsdict['modelvariance_jacobian'][:,(varyParlist == 'x1_{}'.format(sn))] = x0**2 * 2*(modelerrnox[0]*modelerrnox[1]*corr[0]+ x1* modelerrnox[1]**2)[:,np.newaxis]
 
 			if self.specrecal : 
 				varySpecRecal=varyParams[self.parlist == 'specrecal_{}_{}'.format(sn,k)]
-				specresultsdict['modelvariance_jacobian'][specSlice,varyParlist == 'specrecal_{}_{}'.format(sn,k)]  =  modelUncertainty[:,np.newaxis] * drecaltermdrecal[:,varySpecRecal] * 2
+				specresultsdict['modelvariance_jacobian'][:,varyParlist == 'specrecal_{}_{}'.format(sn,k)]  =  modelUncertainty[:,np.newaxis] * drecaltermdrecal[:,varySpecRecal] * 2
 
 			if varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any():
-				interpresult=  self.errorspline_deriv_interp((phase[0]/(1+z),specdata[k]['wavelength']/(1+z)),method=self.interpMethod) 
-				extinctionexp=(recalexp*colorexpinterp* _SCALE_FACTOR/(1+z)*self.datadict[sn]['mwextcurveint'](specdata[k]['wavelength']))
-				specresultsdict['modelvariance_jacobian'][specSlice,(varyParlist=='modelerr_0'  )]   = 2* x0**2  * (extinctionexp *( modelerrnox[0] + corr[0]*modelerrnox[1]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_0']]
-				specresultsdict['modelvariance_jacobian'][specSlice,(varyParlist=='modelerr_1'  )]   = 2* x0**2  * (extinctionexp *(modelerrnox[1]*x1**2 + corr[0]*modelerrnox[0]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_1']]
-				specresultsdict['modelvariance_jacobian'][specSlice,(varyParlist=='modelcorr_01')] = 2* x0**2  * (modelerrnox[1]*modelerrnox[0]*x1)[:,np.newaxis]  * interpresult[:,varyParams[self.parlist=='modelcorr_01']]
+				interpresult=  self.errorspline_deriv_interp((phase[0]/(1+z),spectrum['wavelength']/(1+z)),method=self.interpMethod) 
+				extinctionexp=(recalexp* _SCALE_FACTOR/(1+z)*self.datadict[sn]['mwextcurveint'](spectrum['wavelength']))
+				specresultsdict['modelvariance_jacobian'][:,(varyParlist=='modelerr_0'  )]   = \
+					2* x0**2  * (extinctionexp *( modelerrnox[0] + corr[0]*modelerrnox[1]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_0']]
+				specresultsdict['modelvariance_jacobian'][:,(varyParlist=='modelerr_1'  )]   = \
+					2* x0**2  * (extinctionexp *(modelerrnox[1]*x1**2 + corr[0]*modelerrnox[0]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_1']]
+				specresultsdict['modelvariance_jacobian'][:,(varyParlist=='modelcorr_01')] = \
+					2* x0**2  * (modelerrnox[1]*modelerrnox[0]*x1)[:,np.newaxis]  * interpresult[:,varyParams[self.parlist=='modelcorr_01']]
 
-			iSpecStart += SpecLen
 			
-		return specresultsdict
+		return resultsdict
 
 	def photVarianceForSN(self,x,sn,storedResults,temporaryResults,varyParams):
 		"""Currently calculated only at the effective wavelength of the filter, not integrated over."""
@@ -948,32 +1014,32 @@ class SALTResids:
 		survey = self.datadict[sn]['survey']
 		filtwave = self.kcordict[survey]['filtwave']
 		obswave = self.datadict[sn]['obswave'] #self.wave*(1+z)
+		wavedelt = obswave[1]-obswave[0]
 		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
+		phasedelt=obsphase[1]-obsphase[0]
 		photdata = self.datadict[sn]['photdata']
 		pbspl = self.datadict[sn]['pbspl']
 		dwave = self.datadict[sn]['dwave']
 		idx = self.datadict[sn]['idx']
-		x0,x1,c,tpkoff = x[self.parlist == 'x0_%s'%sn],x[self.parlist == 'x1_%s'%sn],\
-						 x[self.parlist == 'c_%s'%sn],x[self.parlist == 'tpkoff_%s'%sn]
+		x0,x1,c,tpkoff = x[self.parlist == f'x0_{sn}'],x[self.parlist == f'x1_{sn}'],\
+						 x[self.parlist == f'c_{sn}'],x[self.parlist == f'tpkoff_{sn}']
 		
 		x0Deriv= varyParams[self.parlist=='x0_{}'.format(sn)][0] 
 		x1Deriv= varyParams[self.parlist=='x1_{}'.format(sn)][0] 
 		tpkDeriv=varyParams[self.parlist=='tpkoff_{}'.format(sn)][0]
 		cDeriv=varyParams[self.parlist=='c_{}'.format(sn)][0]
-		varyParlist=self.parlist[varyParams]
-		
-		varyParList=self.parlist[varyParams]
+		varyparlist=self.parlist[varyParams]
 		
 		photresultsdict={}
-		photresultsdict['fluxvariance'] =  np.zeros(len(photdata['filt']))
-		photresultsdict['modelvariance'] =  np.zeros(len(photdata['filt']))
-		photresultsdict['colorvariance'] = []
-		photresultsdict['modelvariance_jacobian']=np.zeros([photdata['filt'].size,varyParList.size])
-		
+
 		for flt in np.unique(photdata['filt']):
+			filtresultsdict={}
+			selectFilter=(photdata['filt']==flt)
+
+			photresultsdict[flt]=filtresultsdict
+
 			lameff= self.datadict[sn]['lambdaeff'][flt]
 			#Select data from the appropriate filter filter
-			selectFilter=(photdata['filt']==flt)
 			phase=photdata['tobs']+tpkoff
 			phase=phase[selectFilter]
 			clippedPhase=np.clip(phase,obsphase.min(),obsphase.max())
@@ -981,24 +1047,20 @@ class SALTResids:
 			
 			#Calculate color scatter
 			if self.iclscat.size:
-				coeffs=x[self.parlist=='clscat']
-				pow=coeffs.size-1-np.arange(coeffs.size)
-				coeffs/=factorial(pow)
-				lameffPrime=lameff/(1+z)/1000
-				colorscat=np.exp(np.poly1d(coeffs)(lameffPrime))
+				colorscat,dcolorscatdx=self.colorscatter(x,lameff/(1+z),varyParams)
 				if colorscat == np.inf:
 					log.error('infinite color scatter!')
 					import pdb; pdb.set_trace()
-
-				pow=pow[varyParams[self.parlist=='clscat']]
-				dcolorscatdx= colorscat*((lameffPrime) ** (pow) )/ factorial(pow)
 			else:
 				colorscat=0
 				dcolorscatdx=np.array([])
 
-			photresultsdict['colorvariance']+= [(selectFilter,colorscat,dcolorscatdx)]
+			filtresultsdict['colorvariance']= colorscat,dcolorscatdx
 
-			fluxfactor=(self.fluxfactor[survey][flt]*(pbspl[flt].sum())*dwave)**2
+			colorlawinterp=storedResults['colorLawInterp'](lameff/(1+z))
+			colorexpinterp=10**(c*colorlawinterp)
+
+			fluxfactor=(colorexpinterp*self.fluxfactor[survey][flt]*(pbspl[flt].sum())*dwave)**2
 			
 			if  x1Deriv or varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any():
 				modelErrInt = [ interp1d( obswave, interr(clippedPhase) ,kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)  for interr in temporaryResults['uncertaintyComponentsInterp']]
@@ -1006,56 +1068,61 @@ class SALTResids:
 				
 				modelerrnox = [  interr( lameff)  for interr in (modelErrInt)]
 				corr=  [intcorr(lameff) for intcorr in modelCorrInt]
-				
-			modelErrInt =  interp1d( obswave, temporaryResults['modelUncertaintyInterp'](clippedPhase),kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(lameff)
-			uncertaintyNoX0= fluxfactor *  modelErrInt
+			
+			#modelErrInt = interp1d( obswave, temporaryResults['modelUncertaintyInterp'](clippedPhase),kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(lameff)
+			modelErrInt =  temporaryResults['modelUncertainty'][np.round((clippedPhase-obsphase[0])/phasedelt).astype(int),int(np.round((lameff-obswave[0])/wavedelt))]
+			uncertaintyNoX0=  fluxfactor *  modelErrInt
 			modelUncertainty=uncertaintyNoX0*x0**2
-			photresultsdict['fluxvariance'][selectFilter] = photdata['fluxcalerr'][selectFilter]**2
-			photresultsdict['modelvariance'][selectFilter]=  modelUncertainty
+			negativevariance=modelUncertainty<0
+			modelUncertainty[negativevariance]=0
+			filtresultsdict['fluxvariance'] = photdata['fluxcalerr'][selectFilter]**2
+			filtresultsdict['modelvariance']=  modelUncertainty
+			filtresultsdict['modelvariance_jacobian']=np.zeros((filtresultsdict['fluxvariance'].size,varyparlist.size))
 
 			if x0Deriv:
-				photresultsdict['modelvariance_jacobian'][selectFilter,(varyParlist == 'x0_{}'.format(sn))] = uncertaintyNoX0*2*x0
+				filtresultsdict['modelvariance_jacobian'][:,(varyparlist == 'x0_{}'.format(sn))] = (uncertaintyNoX0*2*x0)[:,np.newaxis]
 			if x1Deriv:
-				photresultsdict['modelvariance_jacobian'][selectFilter,(varyParlist == 'x1_{}'.format(sn))] = x0**2 *fluxfactor * 2*(modelerrnox[0]*modelerrnox[1]*corr[0]+ x1* modelerrnox[1]**2)
-
-			if cDeriv or varyParams[self.iCL].any() or varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any():
-				colorlawinterp=storedResults['colorLawInterp'](lameff/(1+z))
-				colorexpinterp=10**(c*colorlawinterp)
+				filtresultsdict['modelvariance_jacobian'][:,(varyparlist == 'x1_{}'.format(sn))] = (x0**2 *fluxfactor * 2*(modelerrnox[0]*modelerrnox[1]*corr[0]+ x1* modelerrnox[1]**2))[:,np.newaxis]
 
 			if cDeriv:
-				photresultsdict['modelvariance_jacobian'][selectFilter,(varyParlist == 'c_{}'.format(sn))] = (modelUncertainty * 2 *np.log(10)*colorlawinterp)
+				filtresultsdict['modelvariance_jacobian'][:,(varyparlist == 'c_{}'.format(sn))] = (modelUncertainty * 2 *np.log(10)*colorlawinterp)[:,np.newaxis]
 
-			for i,varIndex in enumerate(np.where(varyParList=='cl')[0]): 
-				photresultsdict['modelvariance_jacobian'][selectFilter,varIndex] =  2* (-0.4 *np.log(10)*c)*modelUncertainty*self.colorLawDerivInterp(lameff/(1+z))[varyParams[self.iCL]][i]
+			for i,varIndex in enumerate(np.where(varyparlist=='cl')[0]): 
+				filtresultsdict['modelvariance_jacobian'][:,varIndex] =  2* (-0.4 *np.log(10)*c)*modelUncertainty*self.colorLawDerivInterp(lameff/(1+z))[varyParams[self.iCL]][i]
 			
 			if varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any():
 				extinctionexp=(colorexpinterp* _SCALE_FACTOR/(1+z)*self.datadict[sn]['mwextcurveint'](lameff))
 			
 				interpresult =  self.errorspline_deriv_interp((clippedPhase/(1+z),lameff/(1+z)),method=self.interpMethod) 
-				photresultsdict['modelvariance_jacobian'][np.outer(selectFilter,(varyParList=='modelerr_0')  )]  =( 2* fluxfactor* x0**2  * extinctionexp) *((( modelerrnox[0] + corr[0]*modelerrnox[1]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_0']]).flatten()
-				photresultsdict['modelvariance_jacobian'][np.outer(selectFilter,(varyParList=='modelerr_1')  )]  =( 2* fluxfactor* x0**2  * extinctionexp )*(((modelerrnox[1]*x1**2 + corr[0]*modelerrnox[0]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_1']]).flatten()
-				photresultsdict['modelvariance_jacobian'][np.outer(selectFilter,(varyParList=='modelcorr_01'))]  =( 2*fluxfactor* x0**2 *x1) * ((modelerrnox[1]*modelerrnox[0])[:,np.newaxis]  * interpresult[:,varyParams[self.parlist=='modelcorr_01']]).flatten()
-					
+				filtresultsdict['modelvariance_jacobian'][:,(varyparlist=='modelerr_0') ]  =\
+					( 2* fluxfactor* x0**2  * extinctionexp) *((( modelerrnox[0] + corr[0]*modelerrnox[1]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_0']])
+				filtresultsdict['modelvariance_jacobian'][:,(varyparlist=='modelerr_1')  ]  =\
+					( 2* fluxfactor* x0**2  * extinctionexp )*(((modelerrnox[1]*x1**2 + corr[0]*modelerrnox[0]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_1']])
+				filtresultsdict['modelvariance_jacobian'][:,(varyparlist=='modelcorr_01')]  =\
+					( 2*fluxfactor* x0**2 *x1) * ((modelerrnox[1]*modelerrnox[0])[:,np.newaxis]  * interpresult[:,varyParams[self.parlist=='modelcorr_01']])
+
 		return photresultsdict
-		
+
+	
 	def fillStoredResults(self,x,storedResults):
 		if self.n_colorpars:
-			#if not 'colorLaw' in storedResults:
-			storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])(self.wave)
-			storedResults['colorLawInterp']= interp1d(self.wave,storedResults['colorLaw'],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
+			if not 'colorLaw' in storedResults:
+				storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])(self.wave)
+				storedResults['colorLawInterp']= interp1d(self.wave,storedResults['colorLaw'],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
 		else: storedResults['colorLaw'] = 1
 				
 		if not 'components' in storedResults:
 			storedResults['components'] =self.SALTModel(x)
 		if not 'componentderivs' in storedResults:
-			storedResults['componentderivs'] = self.SALTModelDeriv(x,1,0,self.phase,self.wave)
+			if self.bsorder != 0: storedResults['componentderivs'] = self.SALTModelDeriv(x,1,0,self.phase,self.wave)
 		
-		if not all([('specvariances_{}'.format(sn) in storedResults) and ('photvariances_{}'.format(sn) in storedResults) for sn in self.datadict]):
+		if 'saltErr' not in storedResults:
 			storedResults['saltErr']=self.ErrModel(x)
+		if 'saltCorr' not in storedResults:
 			storedResults['saltCorr']=self.CorrelationModel(x)
 
 	
-	def loglikeforSN(self,x,sn,storedResults={},varyParams=None,debug=False,SpecErrScale=1.0):
+	def loglikeforSN(self,x,sn,storedResults,varyParams=None,debug=False,SpecErrScale=1.0,fixFluxes=False,dospec=True):
 		
 		"""
 		Calculates the likelihood of given SALT model to photometric and spectroscopic observations of a single SN 
@@ -1085,12 +1152,17 @@ class SALTResids:
 		chi2: float
 			Model chi2 relative to training data	
 		"""
-		photResidsDict,specResidsDict = self.ResidsForSN(x,sn,storedResults,varyParams,fixUncertainty=False,SpecErrScale=SpecErrScale)
-
-		
-		loglike= - (photResidsDict['resid']**2).sum() / 2.   -(specResidsDict['resid']**2).sum()/2.+photResidsDict['lognorm']+specResidsDict['lognorm']
-		if (not varyParams is None) and np.any(varyParams):
-			grad_loglike=  - (photResidsDict['resid'][:,np.newaxis] * photResidsDict['resid_jacobian']).sum(axis=0) - (specResidsDict['resid'][:,np.newaxis] * specResidsDict['resid_jacobian']).sum(axis=0) + photResidsDict['lognorm_grad'] +specResidsDict['lognorm_grad']
+		photResidsDict,specResidsDict = self.ResidsForSN(x,sn,storedResults,varyParams,fixUncertainty=False,fixFluxes=True,SpecErrScale=SpecErrScale)
+		loglike=0
+		grad_loglike=0
+		calculategrad=(not varyParams is None) and np.any(varyParams)
+		for residsdict in ([photResidsDict,specResidsDict] if dospec else [photResidsDict]):
+			for key in residsdict:
+				resids=residsdict[key]
+				loglike+= resids['lognorm']- (resids['resid']**2).sum() / 2.  
+				if calculategrad:
+					grad_loglike+=resids['lognorm_grade']-resids['resid_jacobian'].T.dot(resids['resid'])
+		if calculategrad:
 			return loglike,grad_loglike
 		else:
 			return loglike
@@ -1101,31 +1173,46 @@ class SALTResids:
 	
 	def SALTModel(self,x,evaluatePhase=None,evaluateWave=None):
 		"""Returns flux surfaces of SALT model"""
-		try: m0pars = x[self.m0min:self.m0max]
+		try: m0pars = x[self.m0min:self.m0max+1]
 		except: import pdb; pdb.set_trace()
 		try:
-			m0 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
-						 self.wave if evaluateWave is None else evaluateWave,
-						 (self.phaseknotloc,self.waveknotloc,m0pars,self.bsorder,self.bsorder))
+			if self.bsorder != 0:
+				m0 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
+							 self.wave if evaluateWave is None else evaluateWave,
+							 (self.phaseknotloc,self.waveknotloc,m0pars,self.bsorder,self.bsorder))
+			else:
+				phase = self.phase if evaluatePhase is None else evaluatePhase
+				wave = self.wave if evaluateWave is None else evaluateWave
+				n_repeat_phase = int(phase.size/(self.phaseknotloc.size-1))+1
+				n_repeat_phase_extra = -1*(n_repeat_phase*(self.phaseknotloc.size-1) % phase.size)
+				if n_repeat_phase_extra == 0: n_repeat_phase_extra = None
+				n_repeat_wave = int(wave.size/(self.waveknotloc.size-1))+1
+				n_repeat_wave_extra = -1*(n_repeat_wave*(self.waveknotloc.size-1) % wave.size)
+				if n_repeat_wave_extra == 0: n_repeat_wave_extra = None
+				m0 = np.repeat(np.repeat(m0pars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),n_repeat_phase,axis=0),n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]
 		except:
 			import pdb; pdb.set_trace()
 			
 		if self.n_components == 2:
-			m1pars = x[self.parlist == 'm1']
-			m1 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
-						 self.wave if evaluateWave is None else evaluateWave,
-						 (self.phaseknotloc,self.waveknotloc,m1pars,self.bsorder,self.bsorder))
+			m1pars = x[self.im1]
+			if self.bsorder != 0:
+				m1 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
+							 self.wave if evaluateWave is None else evaluateWave,
+							 (self.phaseknotloc,self.waveknotloc,m1pars,self.bsorder,self.bsorder))
+			else:
+				m1 = np.repeat(np.repeat(m1pars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),n_repeat_phase,axis=0),n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]
+
 			components = (m0,m1)
 		elif self.n_components == 1:
 			components = (m0,)
 		else:
 			raise RuntimeError('A maximum of two principal components is allowed')
-			
+		#if self.bsorder == 0: import pdb; pdb.set_trace()
 		return components
 
 	def SALTModelDeriv(self,x,dx,dy,evaluatePhase=None,evaluateWave=None):
 		"""Returns derivatives of flux surfaces of SALT model"""
-		try: m0pars = x[self.m0min:self.m0max]
+		try: m0pars = x[self.m0min:self.m0max+1]
 		except: import pdb; pdb.set_trace()
 		try:
 			m0 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
@@ -1136,7 +1223,7 @@ class SALTResids:
 			import pdb; pdb.set_trace()
 			
 		if self.n_components == 2:
-			m1pars = x[self.parlist == 'm1']
+			m1pars = x[self.im1]
 			m1 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
 						 self.wave if evaluateWave is None else evaluateWave,
 						 (self.phaseknotloc,self.waveknotloc,m1pars,self.bsorder,self.bsorder),
@@ -1152,28 +1239,69 @@ class SALTResids:
 	def CorrelationModel(self,x,evaluatePhase=None,evaluateWave=None):
 		"""Returns correlation between SALT model components as a function of phase and wavelength"""
 		components=[]
+		phase=self.phase if evaluatePhase is None else evaluatePhase
+		wave=self.wave if evaluateWave is None else evaluateWave
 		for min,max in zip(self.corrmin,self.corrmax):
-			try: errpars = x[min:max]
+			try: errpars = x[min:max+1]
 			except: import pdb; pdb.set_trace()
-
-			components+=[  bisplev(self.phase if evaluatePhase is None else evaluatePhase,
-							   self.wave if evaluateWave is None else evaluateWave,
-							   (self.errphaseknotloc,self.errwaveknotloc,errpars,self.bsorder,self.bsorder))]
+			if self.errbsorder == 0:
+				binphasecenter=((self.errphaseknotloc)[1:]+(self.errphaseknotloc)[:-1])/2
+				binwavecenter =((self.errwaveknotloc)[1:]+(self.errwaveknotloc)[:-1])/2
+				interp=RegularGridInterpolator((binphasecenter,binwavecenter),errpars.reshape(binphasecenter.size,binwavecenter.size),'nearest',False,0)
+				gridwave,gridphase=np.meshgrid(wave,phase)
+				clipinterp=lambda x,y: interp((np.clip(x,binphasecenter.min(),binphasecenter.max()),np.clip(y,binwavecenter.min(),binwavecenter.max())))
+				result=clipinterp(gridphase.flatten(),gridwave.flatten()).reshape((phase.size,wave.size))
+				components+=[result]
+			else:
+				components+=[  bisplev(phase,
+								   wave,
+								   (self.errphaseknotloc,self.errwaveknotloc,errpars,self.errbsorder,self.errbsorder))]
 		return components
-
+	
+	def colorscatter(self,x,wave,varyParams=None):
+		clscatpars = x[self.parlist == 'clscat']
+		pow=clscatpars.size-1-np.arange(clscatpars.size)
+		coeffs=clscatpars/factorial(pow)
+		clscat=np.exp(np.poly1d(coeffs)((wave-5500)/1000))
+		if varyParams is None:
+			return clscat
+		else:
+			pow=pow[varyParams[self.parlist=='clscat']]
+			dcolorscatdx= clscat*(((wave-5500)/1000) ** (pow) )/ factorial(pow)
+			return clscat,dcolorscatdx
+		
 	
 	def ErrModel(self,x,evaluatePhase=None,evaluateWave=None):
 		"""Returns modeled variance of SALT model components as a function of phase and wavelength"""
+		phase=self.phase if evaluatePhase is None else evaluatePhase
+		wave=self.wave if evaluateWave is None else evaluateWave
 		components=[]
 		for min,max in zip(self.errmin,self.errmax):
-			try: errpars = x[min:max]
+			try: errpars = x[min:max+1]
 			except: import pdb; pdb.set_trace()
-
-			components+=[  bisplev(self.phase if evaluatePhase is None else evaluatePhase,
-							   self.wave if evaluateWave is None else evaluateWave,
-							   (self.errphaseknotloc,self.errwaveknotloc,errpars,self.bsorder,self.bsorder))]
+			if self.errbsorder == 0:
+				binphasecenter=((self.errphaseknotloc)[1:]+(self.errphaseknotloc)[:-1])/2
+				binwavecenter =((self.errwaveknotloc)[1:]+(self.errwaveknotloc)[:-1])/2
+				
+				interp=RegularGridInterpolator((binphasecenter,binwavecenter),errpars.reshape(binphasecenter.size,binwavecenter.size),'nearest',False,0)
+				clipinterp=lambda x,y: interp((np.clip(x,binphasecenter.min(),binphasecenter.max()),np.clip(y,binwavecenter.min(),binwavecenter.max())))
+				gridwave,gridphase=np.meshgrid(wave,phase)
+				result=clipinterp(gridphase.flatten(),gridwave.flatten()).reshape((phase.size,wave.size))
+				components+=[result]
+			else:
+				components+=[  bisplev(phase,
+								   wave,
+								   (self.errphaseknotloc,self.errwaveknotloc,errpars,self.errbsorder,self.errbsorder))]
+			
 		return components
 
+	def CustomErrModel(self,m0var,m1var,m01cov,evaluatePhase=None,evaluateWave=None):
+		"""Returns modeled variance of SALT model components as a function of phase and wavelength"""
+
+				
+		return components
+
+	
 	def getParsGN(self,x):
 
 		m0pars = x[self.parlist == 'm0']
@@ -1181,65 +1309,63 @@ class SALTResids:
 		m1pars = x[self.parlist == 'm1']
 		#m1err = np.zeros(len(x[self.parlist == 'm1']))
 		
-		# covmat (diagonals only?)
-		m0_m1_cov = np.zeros(len(m0pars))
-
-		modelerrpars = x[self.parlist == 'modelerr']
-		#modelerrerr = np.zeros(len(x[self.parlist == 'modelerr']))
-
 		clpars = x[self.parlist == 'cl']
 		clerr = np.zeros(len(x[self.parlist == 'cl']))
 		
-		clscatpars = x[self.parlist == 'clscat']
-		clscat=np.exp(np.poly1d(clscatpars)(self.wave/1000))
 
 		#clscaterr = x[self.parlist == 'clscaterr']
-		
-
+		clscat=self.colorscatter(x,self.wave)
 		resultsdict = {}
 		n_sn = len(self.datadict.keys())
 		for k in self.datadict.keys():
-			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k],
-							  'x1':x[self.parlist == 'x1_%s'%k],# - np.mean(x[self.ix1]),
-							  'c':x[self.parlist == 'c_%s'%k],
-							  'tpkoff':x[self.parlist == 'tpkoff_%s'%k],
-							  'x0err':x[self.parlist == 'x0_%s'%k],
-							  'x1err':x[self.parlist == 'x1_%s'%k],
-							  'cerr':x[self.parlist == 'c_%s'%k],
-							  'tpkofferr':x[self.parlist == 'tpkoff_%s'%k]}
+			resultsdict[k] = {'x0':x[self.parlist == f'x0_{k}'],
+							  'x1':x[self.parlist == f'x1_{k}'],# - np.mean(x[self.ix1]),
+							  'c':x[self.parlist == f'c_{k}'],
+							  'tpkoff':x[self.parlist == f'tpkoff_{k}'],
+							  'x0err':x[self.parlist == f'x0_{k}'],
+							  'x1err':x[self.parlist == f'x1_{k}'],
+							  'cerr':x[self.parlist == f'c_{k}'],
+							  'tpkofferr':x[self.parlist == f'tpkoff_{k}']}
 
 
-		m0 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars,self.bsorder,self.bsorder))
-		#m0errp = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars+m0err,self.bsorder,self.bsorder))
-		#m0errm = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars-m0err,self.bsorder,self.bsorder))
-		#m0err = (m0errp-m0errm)/2.
-		if len(m1pars):
-			m1 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars,self.bsorder,self.bsorder))
-			#m1errp = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars+m1err,self.bsorder,self.bsorder))
-			#m1errm = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m1pars-m1err,self.bsorder,self.bsorder))
-			#m1err = (m1errp-m1errm)/2.
-		else:
-			m1 = np.zeros(np.shape(m0))
-			#m1err = np.zeros(np.shape(m0))
+		m0,m1=self.SALTModel(x)
 
-		#cov_m0_m1 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0_m1_cov,self.bsorder,self.bsorder))
-		modelerr = bisplev(self.phase,self.wave,(self.errphaseknotloc,self.errwaveknotloc,modelerrpars,self.bsorder,self.bsorder))
-		modelerr[:] = 0.0
 		#clscat = splev(self.wave,(self.errwaveknotloc,clscatpars,3))
 		if not len(clpars): clpars = []
 
 		# model errors
 		m0err,m1err = self.ErrModel(x)
 		cov_m0_m1 = self.CorrelationModel(x)[0]*m0err*m1err
-		
+		modelerr=np.ones(m0err.shape)
 		return(x,self.phase,self.wave,m0,m0err,m1,m1err,cov_m0_m1,modelerr,
 			   clpars,clerr,clscat,resultsdict)
 
+	def getErrsGN(self,m0var,m1var,m0m1cov):
+
+		errs=[]
+		for errpars in [m0var,m1var,m0m1cov]:
+			if self.bsorder != 0:
+				errs+=[  bisplev(self.phase,
+								 self.wave,
+								 (self.phaseknotloc,self.waveknotloc,errpars,self.bsorder,self.bsorder))]
+			else:
+				n_repeat_phase = int(self.phase.size/(self.phaseknotloc.size-1))+1
+				n_repeat_phase_extra = -1*(n_repeat_phase*(self.phaseknotloc.size-1) % self.phase.size)
+				if n_repeat_phase_extra == 0: n_repeat_phase_extra = None
+				n_repeat_wave = int(self.wave.size/(self.waveknotloc.size-1))+1
+				n_repeat_wave_extra = -1*(n_repeat_wave*(self.waveknotloc.size-1) % self.wave.size)
+				if n_repeat_wave_extra == 0: n_repeat_wave_extra = None
+				errs += [np.repeat(np.repeat(errpars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),n_repeat_phase,axis=0),n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]]
+
+
+		return(np.sqrt(errs[0]),np.sqrt(errs[1]),errs[2])
+
+	
 	def getPars(self,loglikes,x,nburn=500,mkplots=False):
 
 		axcount = 0; parcount = 0
 		from matplotlib.backends.backend_pdf import PdfPages
-		pdf_pages = PdfPages('%s/MCMC_hist.pdf'%self.outputdir)
+		pdf_pages = PdfPages(f'{self.outputdir}/MCMC_hist.pdf')
 		fig = plt.figure()
 
 		m0pars = np.array([])
@@ -1319,14 +1445,14 @@ class SALTResids:
 		resultsdict = {}
 		n_sn = len(self.datadict.keys())
 		for k in self.datadict.keys():
-			resultsdict[k] = {'x0':x[self.parlist == 'x0_%s'%k,nburn:].mean(),
-							  'x1':x[self.parlist == 'x1_%s'%k,nburn:].mean(),# - x[self.ix1,nburn:].mean(),
-							  'c':x[self.parlist == 'c_%s'%k,nburn:].mean(),
-							  'tpkoff':x[self.parlist == 'tpkoff_%s'%k,nburn:].mean(),
-							  'x0err':x[self.parlist == 'x0_%s'%k,nburn:].std(),
-							  'x1err':x[self.parlist == 'x1_%s'%k,nburn:].std(),
-							  'cerr':x[self.parlist == 'c_%s'%k,nburn:].std(),
-							  'tpkofferr':x[self.parlist == 'tpkoff_%s'%k,nburn:].std()}
+			resultsdict[k] = {'x0':x[self.parlist == f'x0_{k}',nburn:].mean(),
+							  'x1':x[self.parlist == f'x1_{k}',nburn:].mean(),# - x[self.ix1,nburn:].mean(),
+							  'c':x[self.parlist == f'c_{k}',nburn:].mean(),
+							  'tpkoff':x[self.parlist == f'tpkoff_{k}',nburn:].mean(),
+							  'x0err':x[self.parlist == f'x0_{k}',nburn:].std(),
+							  'x1err':x[self.parlist == f'x1_{k}',nburn:].std(),
+							  'cerr':x[self.parlist == f'c_{k}',nburn:].std(),
+							  'tpkofferr':x[self.parlist == f'tpkoff_{k}',nburn:].std()}
 
 
 		m0 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0pars,self.bsorder,self.bsorder))
@@ -1354,18 +1480,18 @@ class SALTResids:
 		#modelerr2 = bisplev(self.phase,self.wave,bspl)
 		#plt.plot(self.wave,modelerr[self.phase == 0,:].flatten())
 		#plt.plot(self.wave,modelerr2[self.phase == 0,:].flatten())
-		clscat = splev(self.wave,(self.errwaveknotloc,clscatpars,3))
+		clscat = self.colorscatter(np.mean(x[:,nburn:],axis=1),self.wave)
 		if not len(clpars): clpars = []
 
 		for snpar in ['x0','x1','c','tpkoff']:
 			subnum = axcount%9+1
 			ax = plt.subplot(3,3,subnum)
 			axcount += 1
-			md = np.mean(x[self.parlist == '%s_%s'%(snpar,k),nburn:])
-			std = np.std(x[self.parlist == '%s_%s'%(snpar,k),nburn:])
+			md = np.mean(x[self.parlist == f'{snpar}_{k}',nburn:])
+			std = np.std(x[self.parlist == f'{snpar}_{k}',nburn:])
 			histbins = np.linspace(md-3*std,md+3*std,50)
-			ax.hist(x[self.parlist == '%s_%s'%(snpar,k),nburn:],bins=histbins)
-			ax.set_title('%s_%s'%(snpar,k))
+			ax.hist(x[self.parlist == f'{snpar}_{k}',nburn:],bins=histbins)
+			ax.set_title(f'{snpar}_{k}')
 			if axcount % 9 == 8:
 				pdf_pages.savefig(fig)
 				fig = plt.figure()
@@ -1393,10 +1519,8 @@ class SALTResids:
 		#Clean out array
 		self.neffRaw=np.zeros((self.phaseRegularizationPoints.size,self.waveRegularizationPoints.size))
 
-	# 		start=time.time()
-	# 		spectime,phottime=0,0
 		for sn in (self.datadict.keys()):
-			tpkoff=x[self.parlist == 'tpkoff_%s'%sn]
+			tpkoff=x[self.parlist == f'tpkoff_{sn}']
 			photdata = self.datadict[sn]['photdata']
 			specdata = self.datadict[sn]['specdata']
 			survey = self.datadict[sn]['survey']
@@ -1447,16 +1571,21 @@ class SALTResids:
 		# D. Jones - just testing this out
 		#for j,p in enumerate(self.phaseBinCenters):
 		#	if np.max(self.neffRaw[j,:]) > 0: self.neffRaw[j,:] /= np.max(self.neffRaw[j,:])
+		# HACK
 		#self.neffRaw[self.neffRaw > 1] = 1
 		#self.neffRaw[self.neffRaw < 1e-6] = 1e-6
 
 		self.plotEffectivePoints([-12.5,0.5,16.5,26],'neff.png')
 		self.plotEffectivePoints(None,'neff-heatmap.png')
 		self.neff=self.neffRaw.copy()
-		self.neff[self.neff>self.neffMax]=np.inf		
-		self.neff/=self.neffMax
-		self.neff=np.clip(self.neff,self.neffFloor,None)
+		self.neff[self.neff>self.neffMax]=np.inf
+		# HACK!
+		#self.neff[self.neff<self.neffMax]=1e-6 #self.nefffloor
+		#self.neff/=self.neffMax
+		if not np.any(np.isinf(self.neff)): log.warning('Regularization is being applied to the entire phase/wavelength space: consider lowering neffmax (currently {:.2e})'.format(self.neffMax))
 		
+		self.neff=np.clip(self.neff,self.neffFloor,None)
+		#self.neff=np.sqrt(self.neff)
 	def plotEffectivePoints(self,phases=None,output=None):
 		import matplotlib.pyplot as plt
 		if phases is None:

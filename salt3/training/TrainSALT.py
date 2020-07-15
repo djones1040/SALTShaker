@@ -16,6 +16,7 @@ from scipy.optimize import minimize, least_squares, differential_evolution
 from astropy.io import fits
 from astropy.cosmology import Planck15 as cosmo
 from sncosmo.constants import HC_ERG_AA
+import astropy.table as at
 
 from salt3.util import snana,readutils
 from salt3.util.estimate_tpk_bazin import estimate_tpk_bazin
@@ -23,7 +24,7 @@ from salt3.util.txtobj import txtobj
 from salt3.util.specSynPhot import getScaleForSN
 from salt3.util.specrecal import SpecRecal
 
-from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs, init_errs_fromfile
+from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs,init_custom,init_salt2
 from salt3.training.base import TrainSALTBase
 from salt3.training.saltfit import fitting
 from salt3.training import saltfit as saltfit
@@ -36,6 +37,7 @@ import astropy.units as u
 import sncosmo
 from astropy.table import Table
 from salt3.initfiles import init_rootdir as salt2dir
+_flatnu=f'{init_rootdir}/flatnu.dat'
 
 # validation utils
 import matplotlib as mpl
@@ -61,14 +63,13 @@ class TrainSALT(TrainSALTBase):
 	
 	def initialParameters(self,datadict):
 		from salt3.initfiles import init_rootdir
-		self.options.inithsiaofile = '%s/hsiao07.dat'%(init_rootdir)
-		flatnu='%s/flatnu.dat'%(init_rootdir)
-		self.options.initbfilt = '%s/%s'%(init_rootdir,self.options.initbfilt)
+		self.options.inithsiaofile = f'{init_rootdir}/hsiao07.dat'
+		self.options.initbfilt = f'{init_rootdir}/{self.options.initbfilt}'
 		if self.options.initm0modelfile and not os.path.exists(self.options.initm0modelfile):
 			if self.options.initm0modelfile:
-				self.options.initm0modelfile = '%s/%s'%(init_rootdir,self.options.initm0modelfile)
+				self.options.initm0modelfile = f'{init_rootdir}/{self.options.initm0modelfile}'
 			if self.options.initm1modelfile:
-				self.options.initm1modelfile = '%s/%s'%(init_rootdir,self.options.initm1modelfile)
+				self.options.initm1modelfile = f'{init_rootdir}/{self.options.initm1modelfile}'
 		
 		if self.options.initm0modelfile and not os.path.exists(self.options.initm0modelfile):
 			raise RuntimeError('model initialization file not found in local directory or %s'%init_rootdir)
@@ -77,31 +78,43 @@ class TrainSALT(TrainSALTBase):
 		init_options = {'phaserange':self.options.phaserange,'waverange':self.options.waverange,
 						'phasesplineres':self.options.phasesplineres,'wavesplineres':self.options.wavesplineres,
 						'phaseinterpres':self.options.phaseoutres,'waveinterpres':self.options.waveoutres,
-						'normalize':True}
+						'normalize':True,'order':self.options.interporder}
 				
 		phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
-			self.options.inithsiaofile,self.options.initbfilt,flatnu,**init_options)
-		if self.options.initm1modelfile:
-			phase,wave,m1,mtemp,phaseknotloc,waveknotloc,m1knots,m1tmpknots = init_hsiao(
-				self.options.initm1modelfile,
-				self.options.initbfilt,flatnu,**init_options)
-		if self.options.initm0modelfile:
-			phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_kaepora(
-				self.options.initm0modelfile,self.options.initm1modelfile,self.options.initbfilt,flatnu,**init_options)
+			self.options.inithsiaofile,self.options.initbfilt,_flatnu,**init_options)
+
+		if self.options.initsalt2model:
+			if self.options.initm0modelfile =='':
+				self.options.initm0modelfile=f'{init_rootdir}/salt2_template_0.dat'
+			if self.options.initm1modelfile  =='':
+				self.options.initm1modelfile=f'{init_rootdir}/salt2_template_1.dat'
+
+		if self.options.initm0modelfile and self.options.initm1modelfile:
+			if self.options.initsalt2model:
+				phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_salt2(
+					m0file=self.options.initm0modelfile,m1file=self.options.initm1modelfile,
+					Bfilt=self.options.initbfilt,flatnu=_flatnu,**init_options)
+			else:
+				phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_kaepora(
+					self.options.initm0modelfile,self.options.initm1modelfile,
+					Bfilt=self.options.initbfilt,flatnu=_flatnu,**init_options)
 
 			
 		init_options['phasesplineres'] = self.options.error_snake_phase_binsize
 		init_options['wavesplineres'] = self.options.error_snake_wave_binsize
+		init_options['order']=self.options.errinterporder
+		init_options['n_colorscatpars']=self.options.n_colorscatpars
 		
-		errphaseknotloc = np.array([-20., -20., -20., -20.,-3.52941176, 0.58823529,   4.70588235,   8.82352941,
-									12.94117647,  17.05882353,  21.17647059,  25.29411765,        29.41176471,
-									85.        ,  85.        ,  85.        ,85.]) 
-		errwaveknotloc = np.array([ 1000.,  1000.,  1000.,  1000.,  3600.,  4000.,  4400.,  4800.,
-									5200.,  5600.,  6000.,  6400.,  6800.,  7200., 25000., 25000.,
-									25000., 25000.])
+		if self.options.initsalt2var:
+			#import pdb; pdb.set_trace() ; init_options['clscatfile'] = f'{init_rootdir}/salt2_color_dispersion.dat'
+			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs(
+				 *['%s/%s'%(init_rootdir,x) for x in ['salt2_lc_relative_variance_0.dat','salt2_lc_relative_covariance_01.dat','salt2_lc_relative_variance_1.dat','salt2_lc_dispersion_scaling.dat','salt2_color_dispersion.dat']],**init_options)
+		else:
+			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs(**init_options)
+
 		# number of parameters
-		n_phaseknots,n_waveknots = len(phaseknotloc)-4,len(waveknotloc)-4
-		n_errphaseknots,n_errwaveknots = len(errphaseknotloc)-4,len(errwaveknotloc)-4
+		n_phaseknots,n_waveknots = len(phaseknotloc)-self.options.interporder-1,len(waveknotloc)-self.options.interporder-1
+		n_errphaseknots,n_errwaveknots = len(errphaseknotloc)-self.options.errinterporder-1,len(errwaveknotloc)-self.options.errinterporder-1
 		n_sn = len(datadict.keys())
 
 		# set up the list of parameters
@@ -122,14 +135,28 @@ class TrainSALT(TrainSALTBase):
 		for k in datadict.keys():
 			parlist = np.append(parlist,['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k])
 
+		if self.options.specrecallist:
+			spcrcldata = at.Table.read(self.options.specrecallist,format='ascii')
+			
 		# spectral params
 		for sn in datadict.keys():
 			specdata=datadict[sn]['specdata']
 			photdata=datadict[sn]['photdata']
 			for k in specdata.keys():
-				order=self.options.n_min_specrecal+int(np.log((specdata[k]['wavelength'].max() - \
-					specdata[k]['wavelength'].min())/self.options.specrange_wavescale_specrecal) + \
-					np.unique(photdata['filt']).size* self.options.n_specrecal_per_lightcurve)
+				if not self.options.specrecallist:
+					try:
+						order=self.options.n_min_specrecal+int(np.log((specdata[k]['wavelength'].max() - \
+							specdata[k]['wavelength'].min())/self.options.specrange_wavescale_specrecal) + \
+							np.unique(photdata['filt']).size* self.options.n_specrecal_per_lightcurve)
+					except:
+						import pdb; pdb.set_trace()
+				else:
+					spcrclcopy = spcrcldata[spcrcldata['SNID'] == sn]
+					order = int(spcrclcopy['ncalib'][spcrclcopy['N'] == k+1])
+					#print(spcrclcopy['phase'][spcrclcopy['N'] == k+1],specdata[k]['tobs'],float(spcrclcopy['phase'][spcrclcopy['N'] == k+1])-specdata[k]['tobs'])
+					#if np.abs(float(spcrclcopy['phase'][spcrclcopy['N'] == k+1])-specdata[k]['tobs']) > 1:
+					#	import pdb; pdb.set_trace()
+
 				order-=1
 				recalParams=[f'specx0_{sn}_{k}']+['specrecal_{}_{}'.format(sn,k)]*order
 				parlist=np.append(parlist,recalParams)
@@ -146,12 +173,15 @@ class TrainSALT(TrainSALTBase):
 							break
 						except:
 							continue
-						
+			# HACK!
+			#guess[parlist == 'm0'] = m0knots
+			#guess[parlist == 'm1'] = m1knots
 			for key in np.unique(parlist):
 				try:
-					#if 'specrecal' not in key: 
+					#if key not in ['m0','m1']: 
+					#	guess[parlist == key] = pars[names == key]
+					#else:
 					guess[parlist == key] = pars[names == key]
-					
 				except:
 					log.critical('Problem while initializing parameter ',key,' from previous training')
 					sys.exit(1)
@@ -164,16 +194,45 @@ class TrainSALT(TrainSALTBase):
 			if self.options.n_components == 2:
 				guess[parlist == 'm1'] = m1knots
 			if self.options.n_colorpars:
-				log.warning('BAD CL HACK')
-				guess[parlist == 'cl'] = [-0.504294,0.787691,-0.461715,0.0815619] #[0.]*self.options.n_colorpars
+				#log.warning('BAD CL HACK')
+				if self.options.initsalt2model:
+					guess[parlist == 'cl'] = [-0.504294,0.787691,-0.461715,0.0815619]
+				else: 
+					guess[parlist == 'cl'] =[0.]*self.options.n_colorpars 
 			if self.options.n_colorscatpars:
-				guess[parlist == 'clscat'] = [1e-6]*self.options.n_colorscatpars
-				guess[np.where(parlist == 'clscat')[0][-1]]=-30
-			guess[(parlist == 'm0') & (guess < 0)] = 1e-4
 
+				#guess[parlist == 'clscat'] = cdisp_coeffs #[1e-6]*self.options.n_colorscatpars
+				#guess[np.where(parlist == 'clscat')[0][-1]]=-np.inf
+				guess[parlist == 'clscat'] = clscatcoeffs
+
+			guess[(parlist == 'm0') & (guess < 0)] = 1e-4
+			
+			guess[parlist=='modelerr_0']=m0varknots
+			guess[parlist=='modelerr_1']=m1varknots
+			guess[parlist=='modelcorr_01']=m0m1corrknots
+
+			# if SN param list is provided, initialize with these params
+			if self.options.snparlist:
+				snpar = Table.read(self.options.snparlist,format='ascii')
+				snpar['SNID'] = snpar['SNID'].astype(str)
+				
 			i=0
 			for sn in datadict.keys():
-				guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn]['zHelio']).value-19.36-10.635))
+				if self.options.snparlist:
+					# hacky matching, but SN names are a mess as usual
+					iSN = ((sn == snpar['SNID']) | ('sn'+sn == snpar['SNID']) |
+						   ('sn'+sn.lower() == snpar['SNID']) | (sn+'.0' == snpar['SNID']))
+					if len(snpar[iSN]):
+						guess[parlist == 'x0_%s'%sn] = snpar['x0'][iSN]
+						guess[parlist == 'x1_%s'%sn] = snpar['x1'][iSN]
+						guess[parlist == 'c_%s'%sn] = snpar['c'][iSN]
+					else:
+						log.warning(f'SN {sn} not found in SN par list {self.options.snparlist}')
+						guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn]['zHelio']).value-19.36-10.635))
+
+				else:
+					guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn]['zHelio']).value-19.36-10.635))
+				
 				for k in datadict[sn]['specdata'] : 
 					guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]
 				i+=1
@@ -184,9 +243,13 @@ class TrainSALT(TrainSALTBase):
 				specdata=datadict[sn]['specdata']
 				photdata=datadict[sn]['photdata']
 				for k in specdata.keys():
-					order=self.options.n_min_specrecal+int(np.log((specdata[k]['wavelength'].max() - \
-						specdata[k]['wavelength'].min())/self.options.specrange_wavescale_specrecal) + \
-						np.unique(photdata['filt']).size* self.options.n_specrecal_per_lightcurve)
+					if not self.options.specrecallist:
+						order=self.options.n_min_specrecal+int(np.log((specdata[k]['wavelength'].max() - \
+							specdata[k]['wavelength'].min())/self.options.specrange_wavescale_specrecal) + \
+							np.unique(photdata['filt']).size* self.options.n_specrecal_per_lightcurve)
+					else:
+						spcrclcopy = spcrcldata[spcrcldata['SNID'] == sn]
+						order = int(spcrclcopy['ncalib'][spcrclcopy['N'] == k+1])
 					order-=1
 
 					specpars_init = SpecRecal(datadict[sn]['photdata'],datadict[sn]['specdata'][k],self.kcordict,
@@ -194,7 +257,7 @@ class TrainSALT(TrainSALTBase):
 											  nrecalpars=order,sn=sn)
 					if specpars_init[0] != 0:
 						guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]/specpars_init[0]
-						guess[parlist == 'specrecal_{}_{}'.format(sn,k)] = specpars_init[1:]
+						if self.options.specrecal: guess[parlist == 'specrecal_{}_{}'.format(sn,k)] = specpars_init[1:]
 
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
@@ -225,13 +288,22 @@ class TrainSALT(TrainSALTBase):
 
 			if self.options.do_gaussnewton:
 				saltfitkwargs['regularize'] = self.options.regularize
-				saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)			
+				saltfitkwargs['fitting_sequence'] = self.options.fitting_sequence
+				saltfitkwargs['fix_salt2modelpars'] = self.options.fix_salt2modelpars
+				saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)
 				# do the fitting
-				x_modelpars,x_unscaled,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+				x_modelpars,x_unscaled,phase,wave,M0,M0modelerr,M0dataerr,M1,M1modelerr,M1dataerr,cov_M0_M1_model,cov_M0_M1_data,\
 					modelerr,clpars,clerr,clscat,SNParams,laststepsize,message = fitter.gaussnewton(
-						saltfitter,x_modelpars,self.options.n_processes,
-						self.options.n_steps_mcmc,self.options.n_burnin_mcmc,
+						saltfitter,x_modelpars,
 						self.options.gaussnewton_maxiter)
+
+				#if not 'hi': #self.options.fit_model_err:
+				#	M0dataerr,M1dataerr,cov_M0_M1_data = fitter.gaussnewton(
+				#		saltfitter,x_modelpars,
+				#		self.options.gaussnewton_maxiter,only_data_errs=True)
+				#else:
+				#	M0dataerr = M1dataerr = cov_M0_M1_data = np.zeros(len(M0))
+					
 			for k in datadict.keys():
 				try:
 					tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
@@ -239,7 +311,7 @@ class TrainSALT(TrainSALTBase):
 				except:
 					SNParams[k]['t0'] = -99
 		
-		log.info('MCMC message: %s'%message)
+		log.info('message: %s'%message)
 		#print('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
 		#	  saltfitter.regularizationChi2(x_modelpars,0,1,0),saltfitter.regularizationChi2(x_modelpars,0,0,1))
 		log.info('Final loglike'); saltfitter.maxlikefit(x_unscaled)
@@ -255,11 +327,11 @@ class TrainSALT(TrainSALTBase):
 			loglikes = saltfitter.loglikes
 		else: chain,loglikes = None,None
 
-		return phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+		return phase,wave,M0,M0modelerr,M0dataerr,M1,M1modelerr,M1dataerr,cov_M0_M1_model,cov_M0_M1_data,\
 			modelerr,clpars,clerr,clscat,SNParams,x_modelpars,x_unscaled,parlist,chain,loglikes
 
 	def wrtoutput(self,outdir,phase,wave,
-				  M0,M0err,M1,M1err,cov_M0_M1,
+				  M0,M0modelerr,M0dataerr,M1,M1modelerr,M1dataerr,cov_M0_M1_model,cov_M0_M1_data,
 				  modelerr,clpars,
 				  clerr,clscat,SNParams,pars,
 				  pars_unscaled,parlist,chain,
@@ -287,32 +359,34 @@ class TrainSALT(TrainSALTBase):
 		np.save('{}/salt3_loglikes.npy'.format(outdir),loglikes)
 		
 		# principal components and color law
-		foutm0 = open('%s/salt3_template_0.dat'%outdir,'w')
-		foutm1 = open('%s/salt3_template_1.dat'%outdir,'w')
-		foutm0err = open('%s/salt3_lc_relative_variance_0.dat'%outdir,'w')
-		foutm1err = open('%s/salt3_lc_relative_variance_1.dat'%outdir,'w')
-		fouterrmod = open('%s/salt3_lc_dispersion_scaling.dat'%outdir,'w')
-		foutcov = open('%s/salt3_lc_relative_covariance_01.dat'%outdir,'w')
-		foutcl = open('%s/salt3_color_correction.dat'%outdir,'w')
-		foutinfo = open('%s/SALT3.INFO'%outdir,'w')
+		with open(f'{outdir}/salt3_template_0.dat','w') as foutm0, open('%s/salt3_template_1.dat'%outdir,'w') as foutm1,\
+			 open(f'{outdir}/salt3_lc_model_variance_0.dat','w') as foutm0modelerr,\
+			 open(f'{outdir}/salt3_lc_model_variance_1.dat','w') as foutm1modelerr,\
+			 open(f'{outdir}/salt3_lc_dispersion_scaling.dat','w') as fouterrmod,\
+			 open(f'{outdir}/salt3_lc_model_covariance_01.dat','w') as foutmodelcov,\
+			 open(f'{outdir}/salt3_lc_covariance_01.dat','w') as foutdatacov,\
+			 open(f'{outdir}/salt3_lc_variance_0.dat','w') as foutm0dataerr,\
+			 open(f'{outdir}/salt3_lc_variance_1.dat','w') as foutm1dataerr:
 		
-		for p,i in zip(phase,range(len(phase))):
-			for w,j in zip(wave,range(len(wave))):
-				print('%.1f %.2f %8.15e'%(p,w,M0[i,j]),file=foutm0)
-				print('%.1f %.2f %8.15e'%(p,w,M1[i,j]),file=foutm1)
-				print('%.1f %.2f %8.15e'%(p,w,M0err[i,j]**2.),file=foutm0err)
-				print('%.1f %.2f %8.15e'%(p,w,M1err[i,j]**2.),file=foutm1err)
-				print('%.1f %.2f %8.15e'%(p,w,cov_M0_M1[i,j]),file=foutcov)
-				print('%.1f %.2f %8.15e'%(p,w,modelerr[i,j]),file=fouterrmod)
+			for i,p in enumerate(phase):
+				for j,w in enumerate(wave):
+					print(f'{p:.1f} {w:.2f} {M0[i,j]:8.15e}',file=foutm0)
+					print(f'{p:.1f} {w:.2f} {M1[i,j]:8.15e}',file=foutm1)
+					print(f'{p:.1f} {w:.2f} {M0modelerr[i,j]**2.:8.15e}',file=foutm0modelerr)
+					print(f'{p:.1f} {w:.2f} {M1modelerr[i,j]**2.:8.15e}',file=foutm1modelerr)
+					print(f'{p:.1f} {w:.2f} {cov_M0_M1_model[i,j]:8.15e}',file=foutmodelcov)
+					print(f'{p:.1f} {w:.2f} {cov_M0_M1_data[i,j]+cov_M0_M1_model[i,j]:8.15e}',file=foutdatacov)
+					print(f'{p:.1f} {w:.2f} {modelerr[i,j]:8.15e}',file=fouterrmod)
+					print(f'{p:.1f} {w:.2f} {M0dataerr[i,j]**2.+M0modelerr[i,j]**2.:8.15e}',file=foutm0dataerr)
+					print(f'{p:.1f} {w:.2f} {M1dataerr[i,j]**2.+M1modelerr[i,j]**2.:8.15e}',file=foutm1dataerr)
+					
+		with open(f'{outdir}/salt3_color_dispersion.dat','w') as foutclscat:
+			for j,w in enumerate(wave):
+				print(f'{w:.2f} {clscat[j]:8.15e}',file=foutclscat)
 
-		foutclscat = open('%s/salt3_color_dispersion.dat'%outdir,'w')
-		for w,j in zip(wave,range(len(wave))):
-			print('%.2f %8.15e'%(w,clscat[j]),file=foutclscat)
-		foutclscat.close()
-
-		foutinfotext = """RESTLAMBDA_RANGE: %i %s
+		foutinfotext = f"""RESTLAMBDA_RANGE: {self.options.colorwaverange[0]} {self.options.colorwaverange[1]}
 COLORLAW_VERSION: 1
-COLORCOR_PARAMS: %i %i  %i  %s
+COLORCOR_PARAMS: {self.options.colorwaverange[0]:.0f} {self.options.colorwaverange[1]:.0f}  {len(clpars)}  {' '.join(['%8.10e'%cl for cl in clpars])}
 
 COLOR_OFFSET:  0.0
 
@@ -326,78 +400,76 @@ MAGERR_FLOOR:   0.005            # don;t allow smaller error than this
 MAGERR_LAMOBS:  0.0  2000  4000  # magerr minlam maxlam
 MAGERR_LAMREST: 0.1   100   200  # magerr minlam maxlam
 
-SIGMA_INT: 0.106  # used in simulation"""%(
-	self.options.colorwaverange[0],self.options.colorwaverange[1],
-	self.options.colorwaverange[0],self.options.colorwaverange[1],
-	len(clpars),' '.join(['%8.10e'%cl for cl in clpars]))
-		print(foutinfotext,file=foutinfo)
+SIGMA_INT: 0.106  # used in simulation"""
+		with open(f'{outdir}/SALT3.INFO','w') as foutinfo:
+			print(foutinfotext,file=foutinfo)
 		
 		foutm0.close()
 		foutm1.close()
-		foutm0err.close()
-		foutm1err.close()
-		foutcov.close()
+		foutm0modelerr.close()
+		foutm1modelerr.close()
+		foutmodelcov.close()
+		foutm0dataerr.close()
+		foutm1dataerr.close()
+		foutdatacov.close()
 		fouterrmod.close()
-		foutinfo.close()
-		print('%i'%len(clpars),file=foutcl)
-		for c in clpars:
-			print('%8.10e'%c,file=foutcl)
-		print("""Salt2ExtinctionLaw.version 1
-Salt2ExtinctionLaw.min_lambda %i
-Salt2ExtinctionLaw.max_lambda %i"""%(
-	self.options.colorwaverange[0],
-	self.options.colorwaverange[1]),file=foutcl)
-		foutcl.close()
 
-		#for c in foutclscat
-		foutclscat.close()
+		with open(f'{outdir}/salt3_color_correction.dat','w') as foutcl:
+			print(f'{len(clpars):.0f}',file=foutcl)
+			for c in clpars:
+				print(f'{c:8.10e}',file=foutcl)
+			print(f"""Salt2ExtinctionLaw.version 1
+			Salt2ExtinctionLaw.min_lambda {self.options.colorwaverange[0]:.0f}
+			Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutcl)
+
 		
 		# best-fit and simulated SN params
-		foutsn = open('%s/salt3train_snparams.txt'%outdir,'w')
-		print('# SN x0 x1 c t0 tpkoff SIM_x0 SIM_x1 SIM_c SIM_t0 SALT2_x0 SALT2_x1 SALT2_c SALT2_t0',file=foutsn)
-		for snlist in self.options.snlists.split(','):
-			snlist = os.path.expandvars(snlist)
-			if not os.path.exists(snlist):
-				log.warning('SN list file %s does not exist.    Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
-				snlist = '%s/trainingdata/%s'%(data_rootdir,snlist)
+		with open(f'{outdir}/salt3train_snparams.txt','w') as foutsn:
+			print('# SN x0 x1 c t0 tpkoff SIM_x0 SIM_x1 SIM_c SIM_t0 SALT2_x0 SALT2_x1 SALT2_c SALT2_t0',file=foutsn)
+			for snlist in self.options.snlists.split(','):
+				snlist = os.path.expandvars(snlist)
 				if not os.path.exists(snlist):
-					raise RuntimeError('SN list file %s does not exist'%snlist)
+					log.warning(f'SN list file {snlist} does not exist. Checking {data_rootdir}/trainingdata/{snlist}')
+					snlist = f'{data_rootdir}/trainingdata/{snlist}'
+					if not os.path.exists(snlist):
+						raise RuntimeError(f'SN list file {snlist} does not exist')
 
 
-			snfiles = np.genfromtxt(snlist,dtype='str')
-			snfiles = np.atleast_1d(snfiles)
-		
-			for k in SNParams.keys():
-				foundfile = False
-				for l in snfiles:
-					if str(k) not in l: continue
-					foundfile = True
-					if '/' not in l:
-						l = '%s/%s'%(os.path.dirname(snlist),l)
-					sn = snana.SuperNova(l)
-					sn.SNID = str(sn.SNID)
-					if 'SIM_SALT2x0' in sn.__dict__.keys(): SIM_x0 = sn.SIM_SALT2x0
-					else: SIM_x0 = -99
-					if 'SIM_SALT2x1' in sn.__dict__.keys(): SIM_x1 = sn.SIM_SALT2x1
-					else: SIM_x1 = -99
-					if 'SIM_SALT2c' in sn.__dict__.keys(): SIM_c = sn.SIM_SALT2c
-					else: SIM_c = -99
-					if 'SIM_PEAKMJD' in sn.__dict__.keys(): SIM_PEAKMJD = float(sn.SIM_PEAKMJD.split()[0])
-					else: SIM_PEAKMJD = -99
-				if not foundfile:
-					SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD,salt2x0,salt2x1,salt2c,salt2t0 = -99,-99,-99,-99,-99,-99,-99,-99
-				elif self.options.fitsalt2:
-					salt2x0,salt2x1,salt2c,salt2t0 = self.salt2fit(sn,datadict)
-				else:
-					salt2x0,salt2x1,salt2c,salt2t0 = -99,-99,-99,-99
-					
-				if 't0' not in SNParams[k].keys():
-					SNParams[k]['t0'] = 0.0
-				print('%s %8.10e %.10f %.10f %.10f %.10f %8.10e %.10f %.10f %.2f %8.10e %.10f %.10f %.10f'%(
-					k,SNParams[k]['x0'],SNParams[k]['x1'],SNParams[k]['c'],SNParams[k]['t0'],
-					SNParams[k]['tpkoff'],SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD,salt2x0,salt2x1,salt2c,salt2t0),file=foutsn)
-		foutsn.close()
-			
+				snfiles = np.genfromtxt(snlist,dtype='str')
+				snfiles = np.atleast_1d(snfiles)
+
+				for k in SNParams.keys():
+					foundfile = False
+					for l in snfiles:
+						if str(k) not in l: continue
+						foundfile = True
+						if '/' not in l:
+							l = f"{os.path.dirname(snlist)}/{l}"
+						sn = snana.SuperNova(l)
+						if str(k) != str(sn.SNID): continue
+
+						sn.SNID = str(sn.SNID)
+						if 'SIM_SALT2x0' in sn.__dict__.keys(): SIM_x0 = sn.SIM_SALT2x0
+						else: SIM_x0 = -99
+						if 'SIM_SALT2x1' in sn.__dict__.keys(): SIM_x1 = sn.SIM_SALT2x1
+						else: SIM_x1 = -99
+						if 'SIM_SALT2c' in sn.__dict__.keys(): SIM_c = sn.SIM_SALT2c
+						else: SIM_c = -99
+						if 'SIM_PEAKMJD' in sn.__dict__.keys(): SIM_PEAKMJD = float(sn.SIM_PEAKMJD.split()[0])
+						else: SIM_PEAKMJD = -99
+						break
+					if not foundfile:
+						SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD,salt2x0,salt2x1,salt2c,salt2t0 = -99,-99,-99,-99,-99,-99,-99,-99
+					elif self.options.fitsalt2:
+						salt2x0,salt2x1,salt2c,salt2t0 = self.salt2fit(sn,datadict)
+					else:
+						salt2x0,salt2x1,salt2c,salt2t0 = -99,-99,-99,-99
+
+					if 't0' not in SNParams[k].keys():
+						SNParams[k]['t0'] = 0.0
+
+					print(f"{k} {SNParams[k]['x0'][0]:8.10e} {SNParams[k]['x1'][0]:.10f} {SNParams[k]['c'][0]:.10f} {SNParams[k]['t0'][0]:.10f} {SNParams[k]['tpkoff'][0]:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",file=foutsn)
+
 		return
 
 	def salt2fit(self,sn,datadict):
@@ -418,11 +490,11 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 		sysdict = {}
 		for m,flt,flx,flxe in zip(sn.MJD,sn.FLT,sn.FLUXCAL,sn.FLUXCALERR):
-			if 'BD17' in self.kcordict.keys(): sys = 'bd17'
-			elif 'AB' in self.kcordict.keys(): sys = 'ab'
+			if self.kcordict[sn.SURVEY][flt]['magsys'] == 'BD17': sys = 'bd17'
+			elif self.kcordict[sn.SURVEY][flt]['magsys'] == 'AB': sys = 'ab'
 			else: sys = 'vega'
-			if self.kcordict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) > 2800 and \
-			   self.kcordict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) < 7000 and\
+			if self.kcordict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) > 2000 and \
+			   self.kcordict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split('+-')[0])) < 9200 and\
 			   '-u' not in self.kcordict[sn.SURVEY][flt]['fullname']:
 				data.add_row((m,flt,flx,flxe,
 							  27.5+self.kcordict[sn.SURVEY][flt]['zpoff'],sys))
@@ -444,8 +516,8 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 
 		# prelims
 		plt.subplots_adjust(left=None, bottom=None, right=None, top=0.85, wspace=0.025, hspace=0)
-		x0,x1,c,t0 = np.loadtxt('%s/salt3train_snparams.txt'%outputdir,unpack=True,usecols=[1,2,3,4])
-		snid = np.genfromtxt('%s/salt3train_snparams.txt'%outputdir,unpack=True,dtype='str',usecols=[0])
+		x0,x1,c,t0 = np.loadtxt(f'{outputdir}/salt3train_snparams.txt',unpack=True,usecols=[1,2,3,4])
+		snid = np.genfromtxt(f'{outputdir}/salt3train_snparams.txt',unpack=True,dtype='str',usecols=[0])
 
 		# have stopped really looking at these for now
 		#ValidateModel.main(
@@ -455,12 +527,20 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		#	'%s/spectralcomp_chi2.png'%outputdir,
 		#	outputdir)
 
-		plotSALTModel.mkModelPlot(outputdir,outfile='%s/SALTmodelcomp.pdf'%outputdir,
-								  xlimits=[self.options.waverange[0],self.options.waverange[1]])
+		if self.options.fitsalt2:
+			from salt3.validation import ValidateParams
+			ValidateParams.main(f'{outputdir}/salt3train_snparams.txt',f'{outputdir}/saltparcomp.png')
+		
+		plotSALTModel.mkModelErrPlot(outputdir,outfile=f'{outputdir}/SALTmodelerrcomp.pdf',
+									 xlimits=[self.options.waverange[0],self.options.waverange[1]])
+
+		plotSALTModel.mkModelPlot(outputdir,outfile=f'{outputdir}/SALTmodelcomp.pdf',
+								  xlimits=[self.options.waverange[0],self.options.waverange[1]],
+								  n_colorpars=self.options.n_colorpars)
 		SynPhotPlot.plotSynthPhotOverStretchRange(
-			'{}/synthphotrange.pdf'.format(outputdir),outputdir,'SDSS')
+			'{}/synthphotrange.pdf'.format(outputdir),outputdir,'Bessell')
 		SynPhotPlot.overPlotSynthPhotByComponent(
-			'{}/synthphotoverplot.pdf'.format(outputdir),outputdir,'SDSS')		
+			'{}/synthphotoverplot.pdf'.format(outputdir),outputdir,'Bessell')		
 		
 		snfiles_tot = np.array([])
 		for j,snlist in enumerate(self.options.snlists.split(',')):
@@ -469,7 +549,7 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			snfiles = np.atleast_1d(snfiles)
 			snfiles_tot = np.append(snfiles_tot,snfiles)
 			parlist,parameters = np.genfromtxt(
-				'%s/salt3_parameters.dat'%outputdir,unpack=True,dtype=str,skip_header=1)
+				f'{outputdir}/salt3_parameters.dat',unpack=True,dtype=str,skip_header=1)
 			parameters = parameters.astype(float)
 			CheckSALTParams.checkSALT(parameters,parlist,snfiles,snlist,outputdir,idx=j)
 		
@@ -496,19 +576,19 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		from matplotlib.backends.backend_pdf import PdfPages
 		plt.close('all')
 
-		pdf_pages = PdfPages('%s/lcfits.pdf'%outputdir)
+		pdf_pages = PdfPages(f'{outputdir}/lcfits.pdf')
 		import matplotlib.gridspec as gridspec
-		gs1 = gridspec.GridSpec(3, 3)
+		gs1 = gridspec.GridSpec(3, 4)
 		gs1.update(wspace=0.0)
 		i = 0
 		
 		# read in and save SALT2 files
 		m0file='salt3_template_0.dat'
 		m1file='salt3_template_1.dat'
-		salt3phase,salt3wave,salt3flux = np.genfromtxt('%s/%s'%(outputdir,m0file),unpack=True)
-		salt3m1phase,salt3m1wave,salt3m1flux = np.genfromtxt('%s/%s'%(outputdir,m1file),unpack=True)
-		salt2phase,salt2wave,salt2flux = np.genfromtxt('{}/salt2_template_0.dat'.format(salt2dir),unpack=True)
-		salt2m1phase,salt2m1wave,salt2m1flux = np.genfromtxt('{}/salt2_template_1.dat'.format(salt2dir),unpack=True)
+		salt3phase,salt3wave,salt3flux = np.genfromtxt(f'{outputdir}/{m0file}',unpack=True)
+		salt3m1phase,salt3m1wave,salt3m1flux = np.genfromtxt(f'{outputdir}/{m1file}',unpack=True)
+		salt2phase,salt2wave,salt2flux = np.genfromtxt(f'{salt2dir}/salt2_template_0.dat',unpack=True)
+		salt2m1phase,salt2m1wave,salt2m1flux = np.genfromtxt(f'{salt2dir}/salt2_template_1.dat',unpack=True)
 		salt3phase = np.unique(salt3phase)
 		salt3wave = np.unique(salt3wave)
 		salt3flux = salt3flux.reshape([len(salt3phase),len(salt3wave)])
@@ -528,10 +608,10 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 		for j,snlist in enumerate(self.options.snlists.split(',')):
 			snlist = os.path.expandvars(snlist)
 			if not os.path.exists(snlist):
-				print('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
-				snlist = '%s/trainingdata/%s'%(data_rootdir,snlist)
+				print(f'SN list file {snlist} does not exist.  Checking {data_rootdir}/trainingdata/{snlist}')
+				snlist = f'{data_rootdir}/trainingdata/{snlist}'%(data_rootdir,snlist)
 				if not os.path.exists(snlist):
-					raise RuntimeError('SN list file %s does not exist'%snlist)
+					raise RuntimeError(f'SN list file {snlist} does not exist')
 
 			tspec = time()
 			if self.options.dospec:
@@ -541,9 +621,9 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 					binspecres = None
 
 				ValidateSpectra.compareSpectra(
-					snlist,self.options.outputdir,specfile='%s/speccomp_%i.pdf'%(self.options.outputdir,j),
+					snlist,self.options.outputdir,specfile=f'{self.options.outputdir}/speccomp_{j:.0f}.pdf',
 					maxspec=50,base=self,verbose=self.verbose,datadict=datadict,binspecres=binspecres)
-			log.info('plotting spectra took %.1f'%(time()-tspec))
+			log.info(f'plotting spectra took {time()-tspec:.1f}')
 				
 			snfiles = np.genfromtxt(snlist,dtype='str')
 			snfiles = np.atleast_1d(snfiles)
@@ -553,23 +633,36 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			if self.options.n_colorpars > 0:
 				fitc = True
 
-
+			if self.options.binspec:
+				binspecres = self.options.binspecres
+			else:
+				binspecres = None
+			datadict = readutils.rdAllData(snlist,self.options.estimate_tpk,self.kcordict,
+										   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
+										   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
+										   binspecres=binspecres)
 			tlc = time()
+			count = 0
+			salt2_chi2tot,salt3_chi2tot = 0,0
 			for l in snfiles:
-				if not i % 9:
+				#if 'Foundation' not in l: continue
+				if '/' not in l:
+					l = f'{os.path.dirname(snlist)}/{l}'
+				sn = snana.SuperNova(l)
+				sn.SNID = str(sn.SNID)
+				if not sn.SNID in datadict:
+					continue
+
+				if not i % 12:
 					fig = plt.figure()
 				try:
-					ax1 = plt.subplot(gs1[i % 9]); ax2 = plt.subplot(gs1[(i+1) % 9]); ax3 = plt.subplot(gs1[(i+2) % 9])
+					ax1 = plt.subplot(gs1[i % 12]); ax2 = plt.subplot(gs1[(i+1) % 12]); ax3 = plt.subplot(gs1[(i+2) % 12]); ax4 = plt.subplot(gs1[(i+3) % 12])
 				except:
 					import pdb; pdb.set_trace()
 
-				if '/' not in l:
-					l = '%s/%s'%(os.path.dirname(snlist),l)
-				sn = snana.SuperNova(l)
-				sn.SNID = str(sn.SNID)
 
 				if sn.SNID not in snid:
-					log.warning('sn %s not in output files'%sn.SNID)
+					log.warning(f'sn {sn.SNID} not in output files')
 					continue
 				x0sn,x1sn,csn,t0sn = \
 					x0[snid == sn.SNID][0],x1[snid == sn.SNID][0],\
@@ -577,31 +670,37 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 				if not fitc: csn = 0
 				if not fitx1: x1sn = 0
 
-				ValidateLightcurves.customfilt(
-					'%s/lccomp_%s.png'%(outputdir,sn.SNID),l,outputdir,
+				salt2chi2,salt3chi2 = ValidateLightcurves.customfilt(
+					f'{outputdir}/lccomp_{sn.SNID}.png',l,outputdir,
 					t0=t0sn,x0=x0sn,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc,
 					bandpassdict=self.kcordict,n_components=self.options.n_components,
-					ax1=ax1,ax2=ax2,ax3=ax3,saltdict=saltdict)
-				if i % 9 == 6:
+					ax1=ax1,ax2=ax2,ax3=ax3,ax4=ax4,saltdict=saltdict,n_colorpars=self.options.n_colorpars)
+				salt2_chi2tot += salt2chi2
+				salt3_chi2tot += salt3chi2
+				if i % 12 == 8:
 					pdf_pages.savefig()
 					plt.close('all')
 				else:
-					for ax in [ax1,ax2,ax3]:
+					for ax in [ax1,ax2,ax3,ax4]:
 						ax.xaxis.set_ticklabels([])
 						ax.set_xlabel(None)
-				i += 3
-
-		if not i %9 ==0:
+				i += 4
+				count += 1
+			log.info(f'plotted light curves for {count} SNe')
+			log.info(f'total chi^2 is {salt2_chi2tot:.1f} for SALT2 and {salt3_chi2tot:.1f} for SALT3')
+		if not i %12 ==0:
 			pdf_pages.savefig()
 		pdf_pages.close()
-		log.info('plotting light curves took %.1f'%(time()-tlc))
+		log.info(f'plotting light curves took {time()-tlc:.1f}')
 		
 	def main(self):
 		try:
 			stage='initialization'
 			if not len(self.surveylist):
 				raise RuntimeError('surveys are not defined - see documentation')
+			tkstart = time()
 			self.kcordict=readutils.rdkcor(self.surveylist,self.options)
+			log.info(f'took {time()-tkstart:.3f} to read in kcor files')
 			# TODO: ASCII filter files
 				
 			if not os.path.exists(self.options.outputdir):
@@ -611,23 +710,30 @@ Salt2ExtinctionLaw.max_lambda %i"""%(
 			else:
 				binspecres = None
 
+			tdstart = time()
 			datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,self.kcordict,
 										   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
 										   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
 										   binspecres=binspecres)
-			datadict = self.mkcuts(datadict,KeepOnlySpec=self.options.keeponlyspec)
+			log.info(f'took {time()-tdstart:.3f} to read in data files')
+			tcstart = time()
 
-		
+			datadict = self.mkcuts(datadict,KeepOnlySpec=self.options.keeponlyspec)
+			log.info(f'took {time()-tcstart:.3f} to apply cuts')
+			with open('tmp','w') as fout:
+				for k in datadict.keys():
+					print(k,file=fout)
+			
 			# fit the model - initial pass
 			if self.options.stage == "all" or self.options.stage == "train":
 				# read the data
 				stage='training'
 
-				phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+				phase,wave,M0,M0modelerr,M0dataerr,M1,M1modelerr,M1dataerr,cov_M0_M1_model,cov_M0_M1_data,\
 					modelerr,clpars,clerr,clscat,SNParams,pars,pars_unscaled,parlist,chain,loglikes = self.fitSALTModel(datadict)
 				stage='output'
 				# write the output model - M0, M1, c
-				self.wrtoutput(self.options.outputdir,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,
+				self.wrtoutput(self.options.outputdir,phase,wave,M0,M0modelerr,M0dataerr,M1,M1modelerr,M1dataerr,cov_M0_M1_model,cov_M0_M1_data,
 							   modelerr,clpars,clerr,clscat,SNParams,
 							   pars,pars_unscaled,parlist,chain,loglikes,datadict)
 			log.info('successful SALT2 training!  Output files written to %s'%self.options.outputdir)

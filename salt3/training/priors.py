@@ -4,6 +4,7 @@ from inspect import signature
 from functools import partial
 from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
 from sncosmo.salt2utils import SALT2ColorLaw
+from scipy.special import factorial
 import logging
 log=logging.getLogger(__name__)
 
@@ -15,9 +16,25 @@ def prior(prior):
 	__priors__[prior.__name__]=prior
 	return prior
 
-# TODO
-# x0 > 0, M0 > 0
-# -5 < tpk < 5
+
+#This is taken from https://arxiv.org/pdf/1712.05151.pdf
+b=1.5
+c=4
+q1=1.540793 
+q2 = 0.8622731
+def psi(z):
+	result=np.zeros(z.size)
+	absz=np.abs(z)
+	trans=(b<absz)&(c>absz)
+	interior=b>=absz
+	tanhterm=np.tanh(q2*(c-absz[trans]))
+	result[trans]=q1*tanhterm*np.sign(z[trans])
+	result[interior]=z[interior]
+	deriv=np.zeros(z.size)
+	deriv[interior]=1
+	deriv[trans]=-q1*(1-tanhterm**2)*q2
+	return result,deriv
+
 
 class SALTPriors:
 
@@ -29,21 +46,47 @@ class SALTPriors:
 		self.regularizationScale=SALTResidsObj.regularizationScale
 		
 		self.priors={ key: partial(__priors__[key],self) for key in __priors__}
+		phase=self.phaseRegularizationPoints
+		wave=self.waveRegularizationPoints
+		components=self.SALTModel(self.guess,evaluatePhase=phase,evaluateWave=wave)
+
 		for prior in self.usePriors:
-			result=self.priors[prior](1,self.guess,self.SALTModel(self.guess))
+			result=self.priors[prior](1,self.guess,components)
 		self.numBoundResids=0
 		for boundedparam in self.boundedParams:
 			#width,bound,x,par
 			result=self.boundedprior(0.1,(0,1),self.guess,boundedparam)
 			self.numBoundResids += result[0].size
+	
+	
+	@prior
+	def colorstretchcorr(self,width,x,components):
+		"""x1 should have no inner product with c"""
+		x1=x[self.ix1]
+		c=x[self.ic]
+		if np.all(x1==0) or np.all(c==0):
+			return np.zeros(1),np.zeros(1),np.zeros((1,self.npar))		
+		x1dev=x1-np.median(x1)
+		x1scale=1.48*np.median(np.abs(x1dev))
+		
+		cdev=c-np.median(c)
+		cscale=1.48*np.median(np.abs(cdev))
+		#Attempt to construct a robust correlator against the optimizer choosing certain points to blow up by using a median estimators, then transforming points. This (hopefully) gives relatively smooth derivatives
+		#The psi function is identity for objects within 2 MAD, and transitions to 0 for extreme objects
+		#This derivative then isn't wholly accurate since median estimator derivatives aren't accounted for. Maybe it's fine???????
+		
+		x1transformed,x1deriv=psi(x1dev/x1scale)
+		ctransformed,cderiv=psi(cdev/cscale)
+		corr=np.mean(x1transformed*ctransformed)
+		jacobian=np.zeros((1,self.npar))
+		jacobian[0,self.ix1]=ctransformed*x1deriv /(x1.size*x1scale)
+		jacobian[0,self.ic]=x1transformed*cderiv/(x1.size*cscale)
+		return corr/width,corr,jacobian/width
+				
 	@prior
 	def m0m1prior(self,width,x,components):
 		"""M1 should have no inner product with the effect of reddening on M0"""
-		phase=self.phaseRegularizationPoints
-		wave=self.waveRegularizationPoints
-		componentsatreg=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
 		scale,scaleDeriv=self.regularizationScale(components,componentsatreg)
-		components=componentsatreg
 		
 		
 		
@@ -61,6 +104,25 @@ class SALTPriors:
 		jacobian[:,self.im0]= (((components[1] * coloreffect )[:,:,np.newaxis]*self.regularizationDerivs[0]).sum(axis=(0,1)) -corr*scaleDeriv[0]*0.5*scale[1]/m0m1scale)/m0m1scale
 		jacobian[:,self.im1]=  (((reddenedM0)[:,:,np.newaxis]*self.regularizationDerivs[0]).sum(axis=(0,1))-corr*scaleDeriv[1]*0.5*scale[0]/m0m1scale)/m0m1scale
 		jacobian[:,self.iCL]= (( components[1]*reddenedM0)[:,:,np.newaxis]* 0.4*self.colorLawDerivInterp(wave)[np.newaxis,:,:]).sum(axis=(0,1))/m0m1scale
+		residual=corr/width
+		
+		return corr/width,corr,jacobian/width	
+
+	@prior
+	def m0m1nocprior(self,width,x,components):
+		"""M1 should have no inner product with M0"""
+		scale,scaleDeriv=self.regularizationScale(components,componentsatreg)		
+		
+		
+		m0m1=(components[0]*components[1]).sum()
+		m0m1scale=np.sqrt(scale[0]*scale[1])
+		corr=np.array([m0m1/m0m1scale])
+		#Derivative with respect to m0
+		
+		
+		jacobian=np.zeros((1,self.npar))
+		jacobian[:,self.im0]= (((components[1] )[:,:,np.newaxis]*self.regularizationDerivs[0]).sum(axis=(0,1)) -corr*scaleDeriv[0]*0.5*scale[1]/m0m1scale)/m0m1scale
+		jacobian[:,self.im1]=  ((components[0][:,:,np.newaxis]*self.regularizationDerivs[0]).sum(axis=(0,1))-corr*scaleDeriv[1]*0.5*scale[0]/m0m1scale)/m0m1scale
 		residual=corr/width
 		
 		return corr/width,corr,jacobian/width	
@@ -104,7 +166,6 @@ class SALTPriors:
 	def satisfyDefinitions(self,X,components):
 		"""Ensures that the definitions of M1,M0,x0,x1 are satisfied"""
 		X=X.copy()
-
 		int1d = interp1d(self.phase,components[0],axis=0,assume_sorted=True)
 		m0Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
 			(self.wave[1]-self.wave[0])*self.fluxfactor['default']['B']
@@ -115,8 +176,8 @@ class SALTPriors:
 		ratio=m1Bflux/m0Bflux
 		#Define M1 to have no effect on B band at t=0
 		for sn in self.datadict:
-			ix0=np.array([f'x0_{sn}' in x for x in self.parlist])
-			X[ix0]*=1+ratio*X[f'x1_{sn}'==self.parlist]
+			ix0=np.array([(x==f'x0_{sn}' ) or (x.startswith(f'specx0_{sn}_')) for x in self.parlist])
+			X[ix0]*=(1+ratio*X[f'x1_{sn}'==self.parlist])
 		X[self.ix1]/=1+ratio*X[self.ix1]
 		X[self.im1]-=ratio*X[self.im0]
 		
@@ -135,7 +196,17 @@ class SALTPriors:
 		#Define m0 to have a standard B-band magnitude at peak
 		bStdFlux=(10**((self.m0guess-27.5)/-2.5) )
 		X[self.im0]*=bStdFlux/m0Bflux 
+		X[self.im1]*=bStdFlux/m0Bflux 
 		X[self.ix0]*=m0Bflux /bStdFlux
+		
+# 		Define color to have 0 mean
+# 		centralwavelength=self.waveBinCenters[np.arange(self.im0.size)%self.waveBinCenters.size])
+# 		
+# 		X[self.im0]*=
+# 		stats.pearsonr(X[self.ix1],X[self.ic])
+# 		
+# 		X[self.ic]-=X[self.ix1]
+		
 		return X
 		
 	@prior
@@ -167,7 +238,7 @@ class SALTPriors:
 					#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
 					#Integrate only over wavelengths within the relevant range
 					inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
-					derivInterp = interp1d(self.phase,self.spline_derivs[:,inbounds,i],axis=0,kind=self.interpMethod,bounds_error=False,fill_value="extrapolate",assume_sorted=True)
+					derivInterp = interp1d(self.phase,self.regularizationDerivs[0][:,inbounds,i],axis=0,kind=self.interpMethod,bounds_error=False,fill_value="extrapolate",assume_sorted=True)
 					fluxDeriv[self.im0[i]] = np.sum( passbandColorExp[inbounds] * derivInterp(0))*intmult 
 			self.__m0priorfluxderiv__=fluxDeriv.copy()
 		
@@ -202,7 +273,7 @@ class SALTPriors:
 					#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
 					#Integrate only over wavelengths within the relevant range
 					inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
-					derivInterp = interp1d(self.phase,self.spline_derivs[:,inbounds,i],axis=0,kind=self.interpMethod,bounds_error=False,fill_value="extrapolate",assume_sorted=True)
+					derivInterp = interp1d(self.phase,self.regularizationDerivs[0][:,inbounds,i],axis=0,kind=self.interpMethod,bounds_error=False,fill_value="extrapolate",assume_sorted=True)
 					fluxDeriv[:,self.im1[i]] = np.sum( pbspl[:,inbounds]* derivInterp([0]),axis=1) 
 			self.__m1priorfluxderiv__=fluxDeriv.copy()
 		
@@ -210,6 +281,38 @@ class SALTPriors:
 		
 		return residual,m1flux/bStdFlux,jacobian
 	
+	@prior
+	def recalprior(self,width,x,components):
+		"""Prior on all spectral recalibration"""
+		results=[]
+		for sn in self.datadict:
+			specdata=self.datadict[sn]['specdata']
+			for k in specdata:
+				spectrum=specdata[k]
+				ispcrcl=np.where(self.parlist=='specrecal_{}_{}'.format(sn,k))[0]
+				coeffs=x[ispcrcl]
+				pow=coeffs.size-np.arange(coeffs.size)
+				wavepoints=spectrum['wavelength'][np.round(np.linspace(0,spectrum['wavelength'].size-1,coeffs.size+2,True)).astype(int)]
+				recalCoord=((wavepoints-np.mean(spectrum['wavelength']))/self.specrange_wavescale_specrecal)
+				drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
+				recalterm=(drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1)
+				jacobian=np.zeros((recalterm.size,self.npar))
+				jacobian[:,ispcrcl]=drecaltermdrecal
+				results+=[(recalterm/width,recalterm,jacobian/width)]
+		residuals,values,jacobian=zip(*results)
+		return np.concatenate([np.array([x]) if x.shape==() else x for x in residuals]),np.concatenate([np.array([x]) if x.shape==() else x for x in values]),np.concatenate([x if len(x.shape)==2 else x[np.newaxis,:] for x in jacobian])
+	
+	@prior
+	def m0positiveprior(self,width,x,components):
+		"""Prior that m0 is not negative"""
+		val=components[0].copy().flatten()
+		isnegative=val<0
+		val[~isnegative]=0
+		jacobian=np.zeros((val.size,self.npar))
+		jacobian[:,self.im0]=self.regularizationDerivs[0].reshape((-1,self.im0.size)).copy()
+		jacobian[~isnegative,:]=0
+		return val/width,val,jacobian
+		
 	@prior
 	def colormean(self,width,x,components):
 		"""Prior such that the mean of the color population is 0"""
@@ -243,24 +346,24 @@ class SALTPriors:
 	@prior
 	def m0endalllam(self,width,x,components):
 		"""Prior such that at early times there is no flux"""
-		upper,lower=components[0].shape[1],0
-		value=components[0][0,lower:upper]
+		thinning=4
+		jacobian=np.zeros((self.spline_derivs[:2,::thinning,0].size,self.npar))
+		jacobianm0=self.spline_derivs[:2,::thinning,:].reshape((-1, self.im0.size))
+		jacobian[:,self.im0] = jacobianm0
+		value=np.dot(jacobianm0,x[self.im0])
 		residual = value/width
-		jacobian=np.zeros((upper-lower,self.npar))
-		for i in range((self.waveknotloc.size-self.bsorder-1)):
-			jacobian[lower:upper,self.im0[i]] = self.spline_derivs[0,lower:upper,i]
 		jacobian/=width
 		return residual,value,jacobian
 
 	@prior
 	def m1endalllam(self,width,x,components):
 		"""Prior such that at early times there is no flux"""
-		upper,lower=components[0].shape[1],0
-		value=components[1][0,lower:upper]
+		thinning=4
+		jacobian=np.zeros((self.spline_derivs[:2,::thinning,0].size,self.npar))
+		jacobianm1=self.spline_derivs[:2,::thinning,:].reshape((-1, self.im1.size))
+		jacobian[:,self.im1] = jacobianm1
+		value=np.dot(jacobianm1,x[self.im1])
 		residual = value/width
-		jacobian=np.zeros((upper-lower,self.npar))
-		for i in range((self.waveknotloc.size-self.bsorder-1)):
-			jacobian[lower:upper,self.im1[i]] = self.spline_derivs[0,lower:upper,i]
 		jacobian/=width
 		return residual,value,jacobian	
 
@@ -271,17 +374,17 @@ class SALTPriors:
 		lbound,ubound = bound
 		
 		iPar = self.__dict__['i%s'%par]
-		
+		if iPar.dtype==bool and iPar.sum() ==0: return np.zeros(0),np.zeros(0),sparse.csr_matrix((0,self.npar))
 		iOut = (x[iPar] < lbound) | (x[iPar] > ubound)
 		iLow = (x[iPar] < lbound)
 		iHigh = (x[iPar] > ubound)
 		residual = np.zeros(iPar.size)
-		residual[iLow] = (x[iPar][iLow]-lbound)**2./(2*width**2.)
-		residual[iHigh] = (x[iPar][iHigh]-ubound)**2./(2*width**2.)
+		residual[iLow] = (x[iPar][iLow]-lbound)/(width)
+		residual[iHigh] = (x[iPar][iHigh]-ubound)/(width)
 
 		jacobian = np.zeros((x[iPar].size,self.npar))
-		jacobian[iLow,iPar[iLow]] = (x[iPar][iLow]-lbound)/(width**2.)
-		jacobian[iHigh,iPar[iHigh]] = (x[iPar][iHigh]-ubound)/(width**2.)
+		jacobian[iLow,iPar[iLow]] = 1/(width)
+		jacobian[iHigh,iPar[iHigh]] = 1/(width)
 		
 		return residual,x[iPar],jacobian	
 
@@ -294,23 +397,31 @@ class SALTPriors:
 			lower[iPar]=lbound
 			upper[iPar]=ubound
 		return lower,upper
-		
+	
 	def priorResids(self,priors,widths,x):
 		"""Given a list of names of priors and widths returns a residuals vector, list of prior values, and Jacobian """
-		components = self.SALTModel(x)
+		phase=self.phaseRegularizationPoints
+		wave=self.waveRegularizationPoints
+		components=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
+
 		results=[]
 		debugstring='Prior values are '
+		chi2string='Prior chi2 are '
 		for prior,width in zip(priors,widths):
-			
 			try:
 				priorFunction=self.priors[prior]
 			except:
 				raise ValueError('Invalid prior supplied: {}'.format(prior)) 
 			results+=[priorFunction(width,x,components)]
+			
+			if results[-1][0].size==0: continue
 			if results[-1][0].size==1:
 				debugstring+='{}: {:.2e},'.format(prior,float(results[-1][1]))
+			chi2string+='{}: {:.2e},'.format(prior,(results[-1][0]**2).sum())
 				#debugstring+=f'{prior}: '+' '.join(['{:.2e}'.format(val) for val in results[-1][1]])+','
+		
 		log.debug(debugstring)
+		log.debug(chi2string)
 		residuals,values,jacobian=zip(*results)
 		return np.concatenate([np.array([x]) if x.shape==() else x for x in residuals]),np.concatenate([np.array([x]) if x.shape==() else x for x in values]),np.concatenate([x if len(x.shape)==2 else x[np.newaxis,:] for x in jacobian])
 
@@ -319,19 +430,18 @@ class SALTPriors:
 		"""Given a list of names of priors and widths returns a residuals vector, list of prior values, and Jacobian """
 
 		components = self.SALTModel(x)
-		residuals=np.zeros(self.numBoundResids)
-		jacobian=np.zeros((self.numBoundResids,self.npar))
-		values=np.zeros(self.numBoundResids)
-		idx=0
 		debugstring='Values outside bounds: '
+		results=[]
 		for bound,par in zip(bounds,boundparams):
+
 			result=self.boundedprior(bound[-1],(bound[0],bound[1]),x,par)
+			results+=[result]
 			numResids=result[0].size
-			residuals[idx:idx+numResids],values[idx:idx+numResids],\
-				jacobian[idx:idx+numResids,:]=result
+			if numResids==0: continue
 			if result[0].any():
 				debugstring+='{} {}, '.format(par,np.nonzero(result[0])[0].size)
-			idx+=numResids
+		residuals,values,jacobian=zip(*results)
+		residuals,values,jacobian=np.concatenate([np.array([x]) if x.shape==() else x for x in residuals]),np.concatenate([np.array([x]) if x.shape==() else x for x in values]),np.concatenate([x if len(x.shape)==2 else x[np.newaxis,:] for x in jacobian])
 		if residuals.any():
 			log.debug(debugstring[:-1])
 		return residuals,values,jacobian
