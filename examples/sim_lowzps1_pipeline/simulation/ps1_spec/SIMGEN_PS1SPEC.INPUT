@@ -82,7 +82,7 @@ GENRANGE_SALT2c:   -1.0  1.0
 GENPEAK_SALT2ALPHA: 0.165
 GENPEAK_SALT2BETA: 3.032
 
-GENMEAN_RV:         3.1               # mean RV to generate
+#GENMEAN_RV:         3.1               # mean RV to generate
 
 RANSEED: 58474       # random number seed
 
