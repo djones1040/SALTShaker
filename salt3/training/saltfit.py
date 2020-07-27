@@ -519,7 +519,7 @@ class GaussNewton(saltresids.SALTResids):
 		Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
 		
 		# M0/M1 errors
-		if not 'hi':
+		if 'hi':
 			log.info("determining M0/M1 errors")
 			varyingParams=self.fitOptions['all'][1]&self.iModelParam
 			self.neff[self.neff==self.neffFloor]=10
@@ -542,7 +542,7 @@ class GaussNewton(saltresids.SALTResids):
 			M0dataerr = (m0pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size))
 			M1dataerr = (m1pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size))
 			cov_M0_M1_data = (m0pulls*m1pulls).sum(axis=0).reshape((self.phase.size,self.wave.size))
-		else:
+		else: #if not 'hi':
 			log.info("determining M0/M1 errors")
 			varyingParams=self.fitOptions['all'][1]&self.iModelParam
 			varyingParams[self.ix0] = False
@@ -560,8 +560,8 @@ class GaussNewton(saltresids.SALTResids):
 			
 			#M0dataerr,M1dataerr,cov_M0_M1_data = \
 			#	np.zeros([self.phase.size,self.wave.size]),\
-		  	#	np.zeros([self.phase.size,self.wave.size]),\
-		  	#	np.zeros([self.phase.size,self.wave.size])
+			#	np.zeros([self.phase.size,self.wave.size]),\
+			#	np.zeros([self.phase.size,self.wave.size])
 		#Xredefined = X.copy()
 		#Retranslate x1, M1, x0, M0 to obey definitions
 	

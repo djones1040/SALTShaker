@@ -159,8 +159,6 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 
 		ax2.text(xlimits[1]-100,spacing*(i+0.2),'%s'%plotphasestr,ha='right')
 		
-		#import pdb; pdb.set_trace()
-		
 	with open('%s/salt2_color_correction.dat'%init_rootdir) as fin:
 		lines = fin.readlines()
 	for i in range(len(lines)):
@@ -196,7 +194,6 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 	plt.tight_layout()
 	if not outfile is None:
 		plt.savefig(outfile)
-
 
 def mkModelErrPlot(salt3dir='modelfiles/salt3',outfile=None,xlimits=[2000,9200]):
 	plt.figure(figsize=(5,11))
