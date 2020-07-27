@@ -13,6 +13,7 @@ from sncosmo.constants import HC_ERG_AA
 from salt3.initfiles import init_rootdir
 from salt3.training.init_hsiao import synphotB
 from sncosmo.salt2utils import SALT2ColorLaw
+import os
 _SCALE_FACTOR = 1e-12
 
 def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
@@ -44,12 +45,12 @@ def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
 								lcrv01file=lcrv01file)
 	salt3model =  sncosmo.Model(salt3)
 	
-	salt2model.set(z=0)
+	salt2model.set(z=0.0)
 	salt2model.set(x0=1)
 	salt2model.set(t0=0)
 	salt2model.set(c=0)
 	
-	salt3model.set(z=0)
+	salt3model.set(z=0.0)
 	salt3model.set(x0=1)
 	salt3model.set(t0=0)
 	salt3model.set(c=0)
@@ -90,6 +91,135 @@ def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
 	plt.savefig(outfile)
 	plt.close(fig)
 
+def overPlotSynthPhotByComponentCustom(
+		outfile,salt3dir,filterset='SDSS',
+		m0file='salt3_template_0.dat',
+		m1file='salt3_template_1.dat',
+		clfile='salt3_color_correction.dat',
+		cdfile='salt3_color_dispersion.dat',
+		errscalefile='salt3_lc_dispersion_scaling.dat',
+		lcrv00file='salt3_lc_variance_0.dat',
+		lcrv11file='salt3_lc_variance_1.dat',
+		lcrv01file='salt3_lc_covariance_01.dat',
+		ufilt='$SNDATA_ROOT/filters/SDSS/SDSS_web2001/u.dat',
+		gfilt='$SNDATA_ROOT/filters/SDSS/SDSS_web2001/g.dat',
+		rfilt='$SNDATA_ROOT/filters/SDSS/SDSS_web2001/r.dat',
+		ifilt='$SNDATA_ROOT/filters/SDSS/SDSS_web2001/i.dat',
+		zfilt='$SNDATA_ROOT/filters/SDSS/SDSS_web2001/z.dat'):
+	
+	plt.clf()
+
+
+	# read everything in
+	salt2dir = os.path.expandvars('$SNDATA_ROOT/models/SALT2/SALT2.JLA-B14')
+	salt3phase,salt3wave,salt3flux = np.genfromtxt('%s/%s'%(salt3dir,m0file),unpack=True)
+	salt3m1phase,salt3m1wave,salt3m1flux = np.genfromtxt('%s/%s'%(salt3dir,m1file),unpack=True)
+	salt2phase,salt2wave,salt2flux = np.genfromtxt('{}/salt2_template_0.dat'.format(salt2dir),unpack=True)
+	salt2m1phase,salt2m1wave,salt2m1flux = np.genfromtxt('{}/salt2_template_1.dat'.format(salt2dir),unpack=True)
+
+	salt3flux = salt3flux.reshape([len(np.unique(salt3phase)),len(np.unique(salt3wave))])
+	salt3m1flux = salt3m1flux.reshape([len(np.unique(salt3phase)),len(np.unique(salt3wave))])
+	salt3phase = np.unique(salt3phase)
+	salt3wave = np.unique(salt3wave)
+
+	salt2m0flux = salt2flux.reshape([len(np.unique(salt2phase)),len(np.unique(salt2wave))])
+	salt2flux = salt2flux.reshape([len(np.unique(salt2phase)),len(np.unique(salt2wave))])
+	salt2m1flux = salt2m1flux.reshape([len(np.unique(salt2phase)),len(np.unique(salt2wave))])
+	salt2phase = np.unique(salt2phase)
+	salt2wave = np.unique(salt2wave)
+	int1dm0 = interp1d(salt3phase,salt3flux,axis=0,fill_value='extrapolate')
+	int1dm1 = interp1d(salt3phase,salt3m1flux,axis=0,fill_value='extrapolate')
+	int1ds2m0 = interp1d(salt2phase,salt2flux,axis=0,fill_value='extrapolate')
+	int1ds2m1 = interp1d(salt2phase,salt2m1flux,axis=0,fill_value='extrapolate')
+	
+
+	filtdict = {'SDSS':['sdss%s'%s for s in  'ugri'],'Bessell':['bessell%s'%s +('x' if s=='u' else '')for s in  'ubvri']}
+	filters=filtdict[filterset]
+	
+	zpsys='AB'
+	
+	salt2model = sncosmo.Model(source='salt2')
+	salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,
+								m1file=m1file,
+								clfile=clfile,cdfile=cdfile,
+								errscalefile=errscalefile,
+								lcrv00file=lcrv00file,
+								lcrv11file=lcrv11file,
+								lcrv01file=lcrv01file)
+	salt3model =  sncosmo.Model(salt3)
+	
+	salt2model.set(z=0.0)
+	salt2model.set(x0=1)
+	salt2model.set(t0=0)
+	salt2model.set(c=0)
+	
+	salt3model.set(z=0.0)
+	salt3model.set(x0=1)
+	salt3model.set(t0=0)
+	salt3model.set(c=0)
+
+	plotmjd = np.linspace(-20, 55,100)
+	
+	fig = plt.figure(figsize=(15, 5))
+	m0axes = [fig.add_subplot(2,len(filters),1+i) for i in range(len(filters))]
+	m1axes = [fig.add_subplot(2,len(filters),len(filters)+ 1+i,sharex=ax) for i,ax in enumerate(m0axes)]
+	xmin,xmax=-2,2
+	for flt,ax0,ax1,fltfile in zip(filters,m0axes,m1axes,[ufilt,gfilt,rfilt,ifilt]):
+
+		salt3m0flux = int1dm0(plotmjd)
+		salt3m1flux = int1dm1(plotmjd)
+		salt2m0flux = int1ds2m0(plotmjd)
+		salt2m1flux = int1ds2m1(plotmjd)
+		
+		filtwave,filttrans = np.loadtxt(os.path.expandvars(fltfile),unpack=True)
+		g = (salt3wave >= filtwave[0]) & (salt3wave <= filtwave[-1])  # overlap range
+		pbspl = np.interp(salt3wave[g],filtwave,filttrans)
+		pbspl *= salt3wave[g]
+		deltawave = salt3wave[g][1]-salt3wave[g][0]
+		denom = np.sum(pbspl)*deltawave
+		salt3m0synflux=np.sum(pbspl[np.newaxis,:]*salt3m0flux[:,g],axis=1)*deltawave/HC_ERG_AA/denom
+		salt3m1synflux=np.sum(pbspl[np.newaxis,:]*salt3m1flux[:,g],axis=1)*deltawave/HC_ERG_AA/denom
+		g = (salt2wave >= filtwave[0]) & (salt2wave <= filtwave[-1])  # overlap range
+		pbspl = np.interp(salt2wave[g],filtwave,filttrans)
+		pbspl *= salt2wave[g]
+		deltawave = salt2wave[g][1]-salt2wave[g][0]
+		denom = np.sum(pbspl)*deltawave
+		salt2m0synflux=np.sum(pbspl[np.newaxis,:]*salt2m0flux[:,g],axis=1)*deltawave/HC_ERG_AA/denom
+		salt2m1synflux=np.sum(pbspl[np.newaxis,:]*salt2m1flux[:,g],axis=1)*deltawave/HC_ERG_AA/denom
+		
+		salt2model.set(x1=1)
+		salt3model.set(x1=1)
+		salt2stretchedflux = salt2model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')
+		salt3stretchedflux = salt3model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')#*\
+
+		salt2model.set(x1=0)
+		salt3model.set(x1=0)
+		salt2flux = salt2model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')
+		salt3flux = salt3model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')#*\
+
+		#ax0.set_yticks([])
+		#ax1.set_yticks([])
+		#ax0.plot(plotmjd,salt2flux,color='b',label='SALT2')
+		#ax0.plot(plotmjd,salt3flux,color='r',label='SALT3')
+		ax0.plot(plotmjd,salt2m0synflux,color='b',label='SALT2 Syn')
+		ax0.plot(plotmjd,salt3m0synflux,color='r',label='SALT3 Syn')
+		#ax1.plot(plotmjd,salt2stretchedflux-salt2flux,color='b',label='SALT2')
+		#ax1.plot(plotmjd,salt3stretchedflux-salt3flux,color='r',label='SALT3')
+		ax1.plot(plotmjd,salt2m1synflux,color='b',label='SALT2 Syn')
+		ax1.plot(plotmjd,salt3m1synflux,color='r',label='SALT3 Syn')		
+		ax0.set_title(flt,fontsize=20)
+		#ax.set_xlim([-30,55])
+		
+	fig.subplots_adjust(right=0.8,bottom=0.15,left=0.05)
+	m0axes[0].set_ylabel('M0 Flux',fontsize=20)
+	m1axes[0].set_ylabel('M1 Flux',fontsize=20)
+	
+	fig.text(0.5,0.04,'Time since peak (days)',ha='center',fontsize=20)
+	#axes[0].legend()
+	plt.savefig(outfile)
+	import pdb; pdb.set_trace()
+	plt.close(fig)
+	
 
 def plotSynthPhotOverStretchRange(outfile,salt3dir,filterset='SDSS',
 		 m0file='salt3_template_0.dat',
@@ -178,6 +308,6 @@ if __name__ == "__main__":
 	if parser.outdir is None:
 		parser.outdir=(parser.salt3dir)
 	plotSynthPhotOverStretchRange('{}/synthphotrange.pdf'.format(parser.outdir),parser.salt3dir,parser.filterset)
-	overPlotSynthPhotByComponent('{}/synthphotoverplot.pdf'.format(parser.outdir),parser.salt3dir,parser.filterset)
+	overPlotSynthPhotByComponentCustom('{}/synthphotoverplot.pdf'.format(parser.outdir),parser.salt3dir,parser.filterset)
 	
 	
