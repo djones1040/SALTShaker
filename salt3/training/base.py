@@ -321,8 +321,8 @@ class TrainSALTBase:
 		numSpecPoints=0
 		failedlist = []
 		log.info('hack! no spec color cut')
-		#log.info('hack!  no cuts at all')
-		#return datadict
+		log.info('hack!  no cuts at all')
+		return datadict
 		for sn in list(datadict.keys()):
 			photdata = datadict[sn]['photdata']
 			specdata = datadict[sn]['specdata']
