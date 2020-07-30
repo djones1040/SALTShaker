@@ -11,6 +11,7 @@ import f90nml
 import logging
 import configparser
 import time
+import datetime
 import glob
 from salt3.pipeline.pipeline import SALT3pipe
 from salt3.pipeline.validplot import ValidPlots,lcfitting_validplots,getmu_validplots,cosmofit_validplots
@@ -39,7 +40,7 @@ def _MyPipe(mypipe):
 
 class RunPipe():
     def __init__(self, pipeinput, mypipe=False, batch_mode=False,batch_script=None,start_id=None,
-                 randseed=None,fseeds=None,num=None,norun=None,debug=False):
+                 randseed=None,fseeds=None,num=None,norun=None,debug=False,timeout=None):
         if mypipe is None:
             self.pipedef = self.__DefaultPipe
         else:
@@ -59,6 +60,7 @@ class RunPipe():
             self.num += start_id
         self.norun = norun
         self.debug = debug
+        self.timeout = timeout
  
     def __DefaultPipe(self):
         pipe = SALT3pipe(finput=self.pipeinput)
@@ -163,7 +165,7 @@ class RunPipe():
                 self._combine_fitres(inputfiles,pro,outsuffix)
     
     def run(self):
-
+        
         if self.batch_mode == 0:
             self.pipe = self.pipedef()
             if self.randseed is not None:
@@ -321,15 +323,26 @@ class RunPipe():
                 
             if not self.norun:
                 #wait for all jobs to finish
+                time_start = time.time()
+                
                 all_finish = False
-                while all_finish == False:
+                job_ids = np.arange(self.batch_mode)+self.start_id
+                while all_finish == False and time.time() - time_start < self.timeout:
                     finish_list = []
                     for i in range(self.batch_mode):
                         finish_list.append(os.path.exists('PIPELINE_{}.DONE'.format(i+self.start_id)))
                     if np.all(finish_list):
                         all_finish = True
                     else:
+                        if int(time.time() - time_start) % 600 == 0: 
+                            print("{}: ".format(time.strftime("%H:%M:%S", time.localtime())))
+                            print("wait for all jobs to finish")
+                            print("jobs already finished: {}".format(np.array(job_ids)[np.array(finish_list)]))
                         time.sleep(5)
+                
+                if not all_finish:
+                    raise RuntimeError("Timeout after {} seconds".format(self.timeout))
+                    
                 success_list = []
                 for i in range(self.batch_mode):
                     with open('PIPELINE_{}.DONE'.format(i+self.start_id),'r') as f:
@@ -424,12 +437,14 @@ def main(**kwargs):
                         help='set to only check configurations without launch jobs')   
     parser.add_argument('--debug',dest='debug', action='store_true',
                         help='use $MY_SALT3_DIR instead of installed runpipe for debugging')  
+    parser.add_argument('--timeout',dest='timeout', default=36000,type=int,
+                        help='running time limit (seconds). only valid if using batch mode')  
     
     p = parser.parse_args()
     
     pipe = RunPipe(p.pipeinput,mypipe=p.mypipe,batch_mode=p.batch_mode,batch_script=p.batch_script,
                    start_id=p.start_id,randseed=p.randseed,fseeds=p.fseeds,num=p.num,norun=p.norun,
-                   debug=p.debug)
+                   debug=p.debug,timeout=p.timeout)
     pipe.run()
     
     

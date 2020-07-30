@@ -223,8 +223,8 @@ class SALT3pipe():
             self.success = lastpipepro[-1].success
             
         #delete temp files
-        if self.success:
-            os.system('rm *.temp.{}'.format(self.timestamp))
+#         if self.success:
+#             os.system('rm *.temp.{}'.format(self.timestamp))
                     
     def glue(self,pipepros=None,on='phot'):
         if not self.build_flag: build_error()
