@@ -469,7 +469,7 @@ class GaussNewton(saltresids.SALTResids):
 			tstartloop = time.time()
 			try:
 				if not superloop % 10:
-					if self.fit_model_err and photochi2perdof<2.5 :# and not superloop == 0:
+					if self.fit_model_err and photochi2perdof<2.8 :# and not superloop == 0:
 						log.info('Optimizing model error')
 						X=self.iterativelyfiterrmodel(X)
 						storedResults={}
@@ -482,7 +482,11 @@ class GaussNewton(saltresids.SALTResids):
 						chi2results=self.getChi2Contributions(X,storedResults)
 						uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
 				else:
-					chi2results=self.getChi2Contributions(X,uncertainties.copy())
+					log.info('Reevaluted model error')
+					storedResults={}
+					chi2results=self.getChi2Contributions(X,storedResults)
+					uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
+# 					chi2results=self.getChi2Contributions(X,uncertainties.copy())
 				
 				for name,chi2component,dof in chi2results:
 					log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/sum([x[1] for x in chi2results])*100))
