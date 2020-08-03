@@ -41,7 +41,7 @@ _flatnu=f'{init_rootdir}/flatnu.dat'
 
 # validation utils
 import matplotlib as mpl
-mpl.use('agg')
+mpl.use('MacOSX')
 import pylab as plt
 from salt3.validation import ValidateLightcurves
 from salt3.validation import ValidateSpectra
@@ -52,6 +52,7 @@ from salt3.util.synphot import synphot
 from salt3.initfiles import init_rootdir as salt2dir
 from salt3.validation import SynPhotPlot
 from time import time
+from sncosmo.salt2utils import SALT2ColorLaw
 
 import logging
 log=logging.getLogger(__name__)
@@ -78,7 +79,7 @@ class TrainSALT(TrainSALTBase):
 		init_options = {'phaserange':self.options.phaserange,'waverange':self.options.waverange,
 						'phasesplineres':self.options.phasesplineres,'wavesplineres':self.options.wavesplineres,
 						'phaseinterpres':self.options.phaseoutres,'waveinterpres':self.options.waveoutres,
-						'normalize':True,'order':self.options.interporder}
+						'normalize':True,'order':self.options.interporder,'use_snpca_knots':self.options.use_snpca_knots}
 				
 		phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
 			self.options.inithsiaofile,self.options.initbfilt,_flatnu,**init_options)
@@ -104,7 +105,8 @@ class TrainSALT(TrainSALTBase):
 		init_options['wavesplineres'] = self.options.error_snake_wave_binsize
 		init_options['order']=self.options.errinterporder
 		init_options['n_colorscatpars']=self.options.n_colorscatpars
-		
+
+		del init_options['use_snpca_knots']
 		if self.options.initsalt2var:
 			#import pdb; pdb.set_trace() ; init_options['clscatfile'] = f'{init_rootdir}/salt2_color_dispersion.dat'
 			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs(
@@ -194,10 +196,28 @@ class TrainSALT(TrainSALTBase):
 			if self.options.n_components == 2:
 				guess[parlist == 'm1'] = m1knots
 			if self.options.n_colorpars:
-				#log.warning('BAD CL HACK')
 				if self.options.initsalt2model:
-					guess[parlist == 'cl'] = [-0.504294,0.787691,-0.461715,0.0815619]
-				else: 
+					if self.options.n_colorpars == 4:
+						guess[parlist == 'cl'] = [-0.504294,0.787691,-0.461715,0.0815619]
+					else:
+						#import pylab as plt
+						#plt.ion()
+						#plt.clf()
+						clwave = np.linspace(self.options.waverange[0],self.options.waverange[1],1000)
+						salt2cl = SALT2ColorLaw([2800.,7000.], [-0.504294,0.787691,-0.461715,0.0815619])(clwave)
+						def bestfit(p):
+							cl_init = SALT2ColorLaw(self.options.colorwaverange, p)(clwave)
+							return cl_init-salt2cl
+
+						md = least_squares(bestfit,[0,0,0,0,0])
+						# test
+						#clnew = SALT2ColorLaw(self.options.colorwaverange, md.x)(clwave)
+						#plt.plot(clwave,salt2cl,color='b')
+						#plt.plot(clwave,clnew,color='r')
+						if 'termination conditions are satisfied' not in md.message:
+							raise RuntimeError('problem initializing color law!')
+						guess[parlist == 'cl'] = md.x
+				else:
 					guess[parlist == 'cl'] =[0.]*self.options.n_colorpars 
 			if self.options.n_colorscatpars:
 
@@ -474,6 +494,8 @@ SIGMA_INT: 0.106  # used in simulation"""
 
 	def salt2fit(self,sn,datadict):
 
+		if 'FLT' not in sn.__dict__.keys():
+			sn.FLT = sn.BAND[:]
 		for flt in np.unique(sn.FLT):
 			filtwave = self.kcordict[sn.SURVEY]['filtwave']
 			filttrans = self.kcordict[sn.SURVEY][flt]['filttrans']
