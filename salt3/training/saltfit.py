@@ -469,7 +469,7 @@ class GaussNewton(saltresids.SALTResids):
 			tstartloop = time.time()
 			try:
 				if not superloop % 10:
-					if self.fit_model_err and photochi2perdof<2.5 :# and not superloop == 0:
+					if (self.fit_model_err or self.fit_cdisp_only) and photochi2perdof<3.0: #5 :# and not superloop == 0:
 						log.info('Optimizing model error')
 						X=self.iterativelyfiterrmodel(X)
 						storedResults={}
@@ -519,10 +519,15 @@ class GaussNewton(saltresids.SALTResids):
 		Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
 		
 		# M0/M1 errors
-		if 'hi':
+		if not 'hi':
 			log.info("determining M0/M1 errors")
 			varyingParams=self.fitOptions['all'][1]&self.iModelParam
-			self.neff[self.neff==self.neffFloor]=10
+			#print('hack - turning regularization on until D\'Arcy puts in some fixes')
+			#import pdb; pdb.set_trace()
+			#self.regulargradientwave *= 0.01
+			#self.regulardyad *= 0.01
+			#self.m1regularization *= 0.01
+			#self.neff[self.neff==self.neffFloor]=10
 			residuals,jac=self.lsqwrap(Xredefined,{},varyingParams,True,doSpecResids=True)
 
 			#Simple preconditioning of the jacobian before attempting to invert
@@ -664,17 +669,20 @@ class GaussNewton(saltresids.SALTResids):
 		result0=np.array(list(mapFun(self.loglikeforSN,args)))
 		partriplets= list(zip(np.where(self.parlist=='modelerr_0')[0],np.where(self.parlist=='modelerr_1')[0],np.where(self.parlist=='modelcorr_01')[0]))
 
-		for parindices in tqdm(partriplets):
-			includePars=np.zeros(self.parlist.size,dtype=bool)
-			includePars[list(parindices)]=True
+		if not self.fit_cdisp_only:
+			for parindices in tqdm(partriplets):
+				includePars=np.zeros(self.parlist.size,dtype=bool)
+				includePars[list(parindices)]=True
 
-			storedResults=fluxes.copy()
-			args=[(X0+includePars*.5,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
-			result=np.array(list(mapFun(self.loglikeforSN,args)))
+				storedResults=fluxes.copy()
+				args=[(X0+includePars*.5,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
+				result=np.array(list(mapFun(self.loglikeforSN,args)))
 
-			usesns=np.array(list(self.datadict.keys()))[result!=result0]
+				usesns=np.array(list(self.datadict.keys()))[result!=result0]
 
-			X=self.minuitoptimize(X,includePars,fluxes,fixFluxes=True,dospec=False,usesns=usesns)
+				X=self.minuitoptimize(X,includePars,fluxes,fixFluxes=True,dospec=False,usesns=usesns)
+
+		log.info('fitting color dispersion')
 		if X[self.iclscat[-1]]==-np.inf:
 			X[self.iclscat[-1]]=-8
 		includePars=np.zeros(self.parlist.size,dtype=bool)

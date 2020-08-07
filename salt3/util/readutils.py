@@ -363,6 +363,7 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 
 			if 'termination condition is satisfied' not in tpkmsg:
 				log.warning('skipping SN %s; can\'t estimate t_max'%sn.SNID)
+				#import pdb; pdb.set_trace()
 				continue
 
 			if not (kcordict is None ) and sn.SURVEY not in kcordict.keys():

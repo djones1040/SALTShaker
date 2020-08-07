@@ -108,7 +108,6 @@ class TrainSALT(TrainSALTBase):
 
 		del init_options['use_snpca_knots']
 		if self.options.initsalt2var:
-			#import pdb; pdb.set_trace() ; init_options['clscatfile'] = f'{init_rootdir}/salt2_color_dispersion.dat'
 			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs(
 				 *['%s/%s'%(init_rootdir,x) for x in ['salt2_lc_relative_variance_0.dat','salt2_lc_relative_covariance_01.dat','salt2_lc_relative_variance_1.dat','salt2_lc_dispersion_scaling.dat','salt2_color_dispersion.dat']],**init_options)
 		else:
@@ -556,7 +555,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 		plotSALTModel.mkModelErrPlot(outputdir,outfile=f'{outputdir}/SALTmodelerrcomp.pdf',
 									 xlimits=[self.options.waverange[0],self.options.waverange[1]])
 
-		plotSALTModel.mkModelPlot(outputdir,outfile=f'{outputdir}/SALTmodelcomp.pdf',
+		plotSALTModel.mkModelPlot(outputdir,outfile=f'{outputdir}/SALTmodelcomp.png',
 								  xlimits=[self.options.waverange[0],self.options.waverange[1]],
 								  n_colorpars=self.options.n_colorpars)
 		SynPhotPlot.plotSynthPhotOverStretchRange(
