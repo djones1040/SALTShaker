@@ -143,6 +143,29 @@ class RunPipe():
         outname = '{}_{}.cospar'.format(pro,outsuffix)
         with open(outname,'w') as outf:
             outf.writelines(all_lines)
+    
+    def _combine_nuisance(self,files,pro=None,outsuffix=None,appendfile=True,outfile=None):
+        outlines = []
+        for file in files:
+            with open(file,'r') as f:
+                lines = f.readlines()
+                for line in lines:
+                    if line.strip().startswith('#'):
+                        outlines.append(line)
+        if not appendfile:
+            outname = '{}_{}.nuisance.FITRES'.format(pro,outsuffix)
+            with open(outname,'r+') as outf:
+                outf.writelines(outlines)                           
+        else:
+            if outfile is None:
+                raise ValueError("outfile can't be None when appendfile=True")
+            else:
+                outname = outfile
+                with open(outname,'r') as fin:
+                    lines = fin.readlines()
+                lines.insert(0,'\n'.join(outlines))
+                with open(outname,'w') as outf:
+                    outf.writelines(lines)                           
         
     def combine_validplot_inputs(self,pros=[],nums=[],outsuffix='combined'):
         for pro in pros:
@@ -163,6 +186,8 @@ class RunPipe():
                 self._combine_cospar(inputfiles,pro,outsuffix)
             else:
                 self._combine_fitres(inputfiles,pro,outsuffix)
+                if pro.startswith('getmu'):
+                    self._combine_nuisance(inputfiles,pro,outsuffix,outfile='{}_{}.FITRES'.format(pro,outsuffix))
     
     def run(self):
         
