@@ -6,7 +6,7 @@ STRINGMATCH_IGNORE: IGNORE
 # systematics list
 #MUOPT:	[MASS_G10_HIGHER] p7=10.15
 
-surveygroup_biascor='PS1_LOWZ_COMBINED(zbin=0.01)'
+#surveygroup_biascor='PS1_LOWZ_COMBINED(zbin=0.01)'
 snrmin_sigint_biascor=30 # SNRMIN to compute siginit_biascor
 
 file=blah
@@ -30,7 +30,7 @@ prefix=SALT2mu_FoundPS1
 vpecerr=250
 lensing_zpar=0.055
 min_per_zbin=1
-varname_pIa=PIa
+#varname_pIa=PIa
 redchi2_tol=.01
 fitflag_sigmb=2
 
@@ -60,7 +60,7 @@ u1=1
 u2=1
 u3=0
 u4=0
-u5=1
+u5=0
 u6=0
 u7=0
 u8=0

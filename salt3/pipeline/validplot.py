@@ -151,35 +151,44 @@ class getmu_validplots(ValidPlots):
 
 	@validfunction
 	def nuisancebias(self):
+		sigint,alpha,beta = [],[],[]
+		alphaerr,betaerr = [],[]
 		with open(self.inputfile) as fin:
 			for line in fin:
 				if line.startswith('#') and 'sigint' in line and '=' in line:
-					sigint = float(line.split()[3])
+					sigint.append(float(line.split()[3]))
 				elif line.startswith('#') and 'alpha0' in line and '=' in line:
-					alpha,alphaerr = float(line.split()[3]),float(line.split()[5])
+					alpha.append(float(line.split()[3]))
+					alphaerr.append(float(line.split()[5]))
 				elif line.startswith('#') and 'beta0' in line and '=' in line:
-					beta,betaerr = float(line.split()[3]),float(line.split()[5])
+					beta.append(float(line.split()[3]))
+					betaerr.append(float(line.split()[5]))
 
+		if np.any(np.isnan(sigint+alpha+beta)):
+			return
+        
 		fr = txtobj(self.inputfile,fitresheader=True)
+		sim_alpha = fr.SIM_alpha[0]
+		sim_beta = fr.SIM_beta[0]
 		plt.clf()
 		ax = plt.axes()
 		ax.set_ylabel('Nuisance Parameters',fontsize=15)
 		ax.xaxis.set_ticks([1,2,3])
 		ax.xaxis.set_ticklabels(['alpha','beta',r'$\sigma_{\mathrm{int}}$'],rotation=30)
 
-		ax.errorbar(1,alpha-fr.SIM_alpha[0],yerr=alphaerr,fmt='o',color='C0',label='fit')
-		ax.errorbar(2,beta-fr.SIM_beta[0],yerr=betaerr,fmt='o',color='C0')
-		ax.errorbar(3,sigint-0.1,fmt='o',color='C0')
+		ax.errorbar(1,np.mean(alpha)-sim_alpha,yerr=np.sqrt(np.sum(np.power(alphaerr,2))),fmt='o',color='C0',label='fit')
+		ax.errorbar(2,np.mean(beta)-sim_beta,yerr=np.sqrt(np.sum(np.power(betaerr,2))),fmt='o',color='C0')
+		ax.errorbar(3,np.mean(sigint)-0.1,fmt='o',color='C0')
 		ax.axhline(0,color='k',lw=2)
 		
 		ax.text(0.17,0.9,r"""$\alpha_{sim} = %.3f$
 $\alpha_{fit} = %.3f \pm %.3f$"""%(
-	fr.SIM_alpha[0],alpha,alphaerr),transform=ax.transAxes,ha='center',va='center')
+	sim_alpha,np.mean(alpha),np.sqrt(np.sum(np.power(alphaerr,2))/len(alphaerr))),transform=ax.transAxes,ha='center',va='center')
 		ax.text(0.5,0.9,r"""$\beta_{sim} = %.3f$
 $\beta_{fit} = %.3f \pm %.3f$"""%(
-	fr.SIM_beta[0],beta,betaerr),transform=ax.transAxes,ha='center',va='center')
+	sim_beta,np.mean(beta),np.sqrt(np.sum(np.power(betaerr,2))/len(betaerr))),transform=ax.transAxes,ha='center',va='center')
 		ax.text(0.83,0.9,"""$\sigma_{int} = %.3f$"""%(
-			sigint),transform=ax.transAxes,ha='center',va='center')
+			np.mean(sigint)),transform=ax.transAxes,ha='center',va='center')
 
 		ax.set_xlim([0.5,3.5])
 		plt.savefig('%s%s_nuisancebias.png'%(self.outputdir,self.prefix))
@@ -194,21 +203,22 @@ class cosmofit_validplots(ValidPlots):
 		w_Planck = -1
 		
 		data = at.Table.read(self.inputfile,format='ascii')
+		print(data)
 		
 		plt.clf()
 		ax = plt.axes()
-		ax.set_ylabel('Nuisance Parameters',fontsize=15)
+		ax.set_ylabel('Cosmo Parameters',fontsize=15)
 		ax.xaxis.set_ticks([1,2])
 		ax.xaxis.set_ticklabels(['$w$','$\Omega_M$'],rotation=30)
 
-		ax.errorbar(1,data['w']-w_Planck,yerr=data['wsig_marg'],fmt='o',color='C0',label='fit')
-		ax.errorbar(2,data['OM']-Om_Planck,yerr=data['OM_sig'],fmt='o',color='C0')
+		ax.errorbar(1,np.mean(data['w'])-w_Planck,yerr=np.sqrt(np.sum(data['wsig_marg']**2)/len(data['wsig_marg'])),fmt='o',color='C0',label='fit')
+		ax.errorbar(2,np.mean(data['OM'])-Om_Planck,yerr=np.sqrt(np.sum(data['OM_sig']**2)/len(data['OM_sig'])),fmt='o',color='C0')
 		ax.axhline(0,color='k',lw=2)
 		
 		ax.text(0.17,0.9,r"""$w = %.3f \pm %.3f$"""%(
-			data['w'],data['wsig_marg']),transform=ax.transAxes,ha='center',va='center')
+			np.mean(data['w']),np.sqrt(np.sum(data['wsig_marg']**2)/len(data['wsig_marg']))),transform=ax.transAxes,ha='center',va='center')
 		ax.text(0.5,0.9,r"""$\Omega_M = %.3f \pm %.3f$"""%(
-			data['OM'],data['OM_sig']),transform=ax.transAxes,ha='center',va='center')
+			np.mean(data['OM']),np.sqrt(np.sum(data['OM_sig']**2)/len(data['OM_sig']))),transform=ax.transAxes,ha='center',va='center')
 
 		ax.set_xlim([0.5,2.5])
 		plt.savefig('%s%s_cosmopar.png'%(self.outputdir,self.prefix))
