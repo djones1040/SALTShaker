@@ -163,7 +163,11 @@ class RunPipe():
                 outname = outfile
                 with open(outname,'r') as fin:
                     lines = fin.readlines()
-                lines.insert(0,'\n'.join(outlines))
+                comment_count = 0
+                for line in lines:
+                    if line.strip().startswith('#'):
+                        comment_count += 1
+                lines = outlines + lines[comment_count:]
                 with open(outname,'w') as outf:
                     outf.writelines(lines)                           
         
