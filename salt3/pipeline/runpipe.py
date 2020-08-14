@@ -101,7 +101,7 @@ class RunPipe():
                           batch=proname.batch,validplots=proname.validplots,outname=proname.outname,
                           proargs=proname.proargs,plotdir=proname.plotdir,**kwargs)  
     
-    def make_validplots_sum(self,prostr,inputfile_sum,outputdir,prefix_sum):
+    def make_validplots_sum(self,prostr,inputfile_sum,outputdir,prefix_sum='sum_valid'):
         if prostr.startswith('lcfit'):
             prostr = 'lcfitting'
         if 'lcfit' in prostr:
@@ -109,7 +109,7 @@ class RunPipe():
         else:
             validfunc_str = prostr
         validplots_sum = eval(validfunc_str.strip().lower()+'_validplots()')
-        prefix_sum = 'valid_{}_sum'.format(prostr)
+        prefix_sum = '{}_{}'.format(prefix_sum,prostr)
         validplots_sum.input(inputfile_sum)
         validplots_sum.output(outputdir=outputdir,prefix=prefix_sum)
         validplots_sum.run()        
@@ -391,7 +391,7 @@ class RunPipe():
                         validplot_pros.append(p)
                 print("Making summary plots for successful jobs: ".format(success_list))
                 self.combine_validplot_inputs(pros=[x for x in pipe.pipepros if x in validplot_pros],
-                                              nums=success_list,outsuffix=outsuffix)
+                                              nums=success_list,outsuffix="{}_{}-{}".format(outsuffix,min(success_list),max(success_list)))
                 for p in validplot_pros:
                     if p.startswith('lcfit'):
                         p = 'lcfitting'
@@ -401,9 +401,11 @@ class RunPipe():
                         inputfile_sum = '{}_{}.FITRES'.format(p,outsuffix)
                     print("Making summary plots for {}".format(p))
                     if isinstance(pipe._get_pipepro_from_string(p),list): 
-                        self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p)[0].plotdir,'sum_valid_{}'.format(p))  
+                        self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p)[0].plotdir,
+                                                 prefix_sum='sum_valid_{}-{}'.format(min(success_list),max(success_list)))  
                     else:
-                        self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p).plotdir,'sum_valid_{}'.format(p))  
+                        self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p).plotdir,
+                                                 prefix_sum='sum_valid_{}-{}'.format(min(success_list),max(success_list)))  
                     
             """
             below is test
