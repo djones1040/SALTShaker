@@ -172,6 +172,7 @@ class SALT3pipe():
                 outname = outname+'.temp.{}'.format(self.timestamp)
                 pro = self._get_config_option(config,prostr,'pro')
                 batch = self._get_config_option(config,prostr,'batch',dtype=boolean_string)
+                batch_info = self._get_config_option(config,prostr,'batch_info')
                 validplots = self._get_config_option(config,prostr,'validplots',dtype=boolean_string)
                 proargs = self._get_config_option(config,prostr,'proargs')
                 prooptions = self._get_config_option(config,prostr,'prooptions')
@@ -184,6 +185,7 @@ class SALT3pipe():
                                      prooptions=prooptions,
                                      snlists=snlists,
                                      batch=batch,
+                                     batch_info = batch_info,
                                      validplots=validplots,
                                      plotdir=self.plotdir)
                 if hasattr(pipepro[i], 'biascor') and pipepro[i].biascor:
@@ -429,7 +431,7 @@ class PipeProcedure():
         self.outname = None
 
     def configure(self,pro=None,baseinput=None,setkeys=None,
-                  proargs=None,prooptions=None,batch=False,
+                  proargs=None,prooptions=None,batch=False,batch_info=None,
                   validplots=False,plotdir=None,**kwargs):  
         if pro is not None and "$" in pro:
             self.pro = os.path.expandvars(pro)
@@ -443,6 +445,7 @@ class PipeProcedure():
         self.proargs = proargs
         self.prooptions = prooptions
         self.batch = batch
+        self.batch_info = batch_info
         self.validplots = validplots
         self.plotdir = plotdir
 
@@ -557,20 +560,23 @@ class Simulation(PipeProcedure):
         super().__init__()
 
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
-                  batch=False,validplots=False,
+                  batch=False,batch_info=None,validplots=False,
                   outname="pipeline_byosed_input.input",**kwargs):
         self.done_file = finput_abspath('%s/Sim.DONE'%os.path.dirname(baseinput))
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
+        self.batch_info = batch_info
         self.validplots = validplots
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
-                          prooptions=prooptions,batch=batch,validplots=validplots)
+                          prooptions=prooptions,batch=batch,batch_info=batch_info,
+                          validplots=validplots)
 
     def gen_input(self,outname="pipeline_sim_input.input"):
         self.outname = outname
         self.finput,self.keys,self.done_file = _gen_snana_sim_input(basefilename=self.baseinput,setkeys=self.setkeys,
-                                                                    outname=outname,done_file=self.done_file)
+                                                                    outname=outname,done_file=self.done_file,
+                                                                    batch_info=self.batch_info)
 
     def _get_output_info(self):
         if self.batch:
@@ -912,23 +918,26 @@ class LCFitting(PipeProcedure):
         super().__init__()
         
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
-                  batch=False,validplots=False,outname="pipeline_lcfit_input.input",
+                  batch=False,batch_info=None,
+                  validplots=False,outname="pipeline_lcfit_input.input",
                   done_file='LCFit.DONE',plotdir=None,**kwargs):
 #         self.done_file = 'ALL.DONE'
         self.done_file = '%s/%s'%(os.path.dirname(baseinput),os.path.split(done_file)[1])
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
+        self.batch_info = batch_info
         self.validplots = validplots
         self.plotdir = plotdir
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
-                          prooptions=prooptions,batch=batch,
+                          prooptions=prooptions,batch=batch,batch_info=batch_info,
                           validplots=validplots,plotdir=plotdir)
         
     def gen_input(self,outname="pipeline_lcfit_input.input"):
         self.outname = outname
         self.finput,self.keys = _gen_snana_fit_input(basefilename=self.baseinput,setkeys=self.setkeys,
-                                                     outname=outname,done_file=self.done_file)
+                                                     outname=outname,done_file=self.done_file,
+                                                     batch_info=self.batch_info)
 
 
     def glueto(self,pipepro):
@@ -1056,23 +1065,26 @@ class GetMu(PipeProcedure):
         super().__init__()
         
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
-                  batch=False,validplots=False,plotdir=None,outname="pipeline_getmu_input.input",
+                  batch=False,batch_info=None,
+                  validplots=False,plotdir=None,outname="pipeline_getmu_input.input",
                   done_file='GetMu.DONE',**kwargs):
         self.done_file = finput_abspath('%s/%s'%(os.path.dirname(baseinput),os.path.split(done_file)[1]))
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
+        self.batch_info = batch_info
         self.validplots = validplots
         self.plotdir = plotdir
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
-                          prooptions=prooptions,batch=batch,validplots=validplots,
+                          prooptions=prooptions,batch=batch,batch_info=batch_info,
+                          validplots=validplots,
                           done_file=self.done_file,plotdir=plotdir)
 
     def gen_input(self,outname="pipeline_getmu_input.input"):
         self.outname = outname
         self.finput,self.keys,self.delimiter = _gen_general_input(basefilename=self.baseinput,setkeys=self.setkeys,
                                                                   outname=outname,sep=['=',': '],done_file=self.done_file,
-                                                                  outdir='Run_GetMu')
+                                                                  outdir='Run_GetMu',batch_info=self.batch_info)
         
     def glueto(self,pipepro):
         if not isinstance(pipepro,str):
@@ -1150,16 +1162,18 @@ class GetMu(PipeProcedure):
 
 class CosmoFit(PipeProcedure):
     def configure(self,setkeys=None,pro=None,outname=None,prooptions=None,batch=False,
-                  validplots=False,plotdir=None,**kwargs):
+                  batch_info=None,validplots=False,plotdir=None,**kwargs):
         self.done_file = None
         if setkeys is not None:
             outname = setkeys.value.values[0]
         self.prooptions = prooptions
         self.finput = outname
         self.batch = batch
+        self.batch_info = batch_info
         self.validplots = validplots
         self.plotdir = plotdir
-        super().configure(pro=pro,outname=outname,prooptions=prooptions,batch=batch,validplots=validplots,plotdir=plotdir)
+        super().configure(pro=pro,outname=outname,prooptions=prooptions,batch=batch,
+                          batch_info=batch_info,validplots=validplots,plotdir=plotdir)
 
     def _get_input_info(self):
         df = {}
@@ -1317,7 +1331,7 @@ def _rename_duplicate_keys(keys):
     return newkeys
 
 def _gen_snana_sim_input(basefilename=None,setkeys=None,
-                         outname=None,done_file=None):
+                         outname=None,done_file=None,batch_info=None):
 
     #TODO:
     #read in kwlist from standard snana kw list
@@ -1336,8 +1350,6 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
     linenum = []
 
     if setkeys is None:
-        print("No modification on the input file, copying {} to {}".format(basefilename,outname))
-        os.system('cp %s %s'%(basefilename,outname))
         config = {}
         for i,line in enumerate(lines):
             if ":" in line and not line.strip().startswith("#"):
@@ -1354,8 +1366,25 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
                 linenum.append(i)
 
         basekws_renamed = _rename_duplicate_keys(basekws)
-        for i,kw in enumerate(basekws_renamed): 
-            config[kw] = basevals[i]  
+        for i,kw in enumerate(basekws_renamed):
+            if "BATCH_INFO" in kw and batch_info is not None:
+                print("Changing BATCH_INFO to {}".format(batch_info))
+                config[kw] = batch_info
+            else:
+                config[kw] = basevals[i]  
+        if batch_info is None:
+            print("No modification on the input file, copying {} to {}".format(basefilename,outname))
+            os.system('cp %s %s'%(basefilename,outname))
+        else:
+            lines_to_write = []
+            for line in lines:
+                if 'BATCH_INFO' in line:
+                    line = batch_info
+                lines_to_write.append(line)
+            with _open_shared_file(outname,"w") as outfile:
+                for line in lines_to_write:
+                    outfile.write(line)
+            print("Write sim input to file:",outname)
         
     else:
         setkeys = pd.DataFrame(setkeys)
@@ -1395,6 +1424,10 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
                     lines[linenum[i]] = "{}: {}\n".format(keystr,val)
                 print("Setting {} = {}".format(keystr,val.strip()))
                 config[kw] = val 
+            elif "BATCH_INFO" in kw and batch_info is not None:
+                print("Changing BATCH_INFO to {}".format(batch_info))
+                lines[linenum[i]] = "BATCH_INFO: {}\n".format(batch_info)
+                config[kw] = batch_info
             else:
                 config[kw] = basevals[i]          
 
@@ -1445,12 +1478,11 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
                 else:
                     print('DONE_STAMP: %s'%done_file,file=fout)
 
-
     return outname,config,done_file
 
 
 def _gen_snana_fit_input(basefilename=None,setkeys=None,
-                         outname=None,done_file=None):
+                         outname=None,done_file=None,batch_info=None):
 
     import f90nml
     from f90nml.namelist import Namelist
@@ -1488,6 +1520,10 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
             nml['header'].__setitem__(key,value)
     if not done_file: nml['header'].__setitem__('done_stamp','ALL.DONE')
     else: nml['header'].__setitem__('done_stamp',done_file)
+    
+    if batch_info is not None:
+        print("Changing BATCH_INFO to {}".format(batch_info))
+        nml['header'].__setitem__('batch_info',batch_info)
 
     if setkeys is not None:
         for index, row in setkeys.iterrows():
@@ -1510,7 +1546,8 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
 
     return outname,nml
 
-def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_file=None,outdir=None):
+def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',
+                       batch_info=None,done_file=None,outdir=None):
 
     config,delimiter = _read_simple_config_file(basefilename,sep=sep)
     #if setkeys is None:
@@ -1535,6 +1572,10 @@ def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_
     if outdir is not None and 'OUTDIR_OVERRIDE' not in config.keys():
         config['OUTDIR_OVERRIDE'] = outdir
         delimiter['OUTDIR_OVERRIDE'] = ': '
+    if 'BATCH_INFO' in config.keys() and batch_info is not None:
+        print("Changing BATCH_INFO to {}".format(batch_info))
+        config['BATCH_INFO'] = batch_info
+        delimiter['BATCH_INFO'] = ': '
         
     print("input file saved as:",outname)
     _write_simple_config_file(config,outname,delimiter)
