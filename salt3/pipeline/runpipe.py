@@ -124,11 +124,19 @@ class RunPipe():
         return info_dict
         
     def _combine_fitres(self,files,pro=None,outsuffix=None):
-        cmd = 'sntable_cat.py -i {} -o {}_{}.FITRES'.format(','.join(files),pro,outsuffix)
-        print(cmd)
-        cmdrun = subprocess.run(args=shlex.split(cmd),capture_output=True)
-        if cmdrun.returncode != 0:
-            raise RuntimeError("sntable_cat.py failed")
+#         cmd = 'sntable_cat.py -i {} -o {}_{}.FITRES'.format(','.join(files),pro,outsuffix)
+#         print(cmd)
+#         cmdrun = subprocess.run(args=shlex.split(cmd),capture_output=True)
+#         if cmdrun.returncode != 0:
+#             raise RuntimeError("sntable_cat.py failed")
+        outname = '{}_{}.FITRES'.format(pro,outsuffix)
+        print("combining files {} to {}".format(files,outname))
+        dflist = []
+        for f in files:
+            df = pd.read_csv(f,sep='\s+',comment='#')
+            dflist.append(df)
+        data = pd.concat(dflist,ignore_index=True).fillna('NULL')
+        data.to_csv(outname,index=False,sep=' ',float_format='%.5e')
         
     def _combine_cospar(self,files,pro='cosmofit',outsuffix=None):
         all_lines = []
@@ -382,7 +390,7 @@ class RunPipe():
                 #combine validplots here
                 pipe = self.pipedef()
                 validplot_pros = []
-                outsuffix = 'combined'
+#                 outsuffix = 'combined'
                 for p in pipe.pipepros:
                     if isinstance(pipe._get_pipepro_from_string(p),list) \
                       and np.any([(hasattr(pi,'validplots') and pi.validplots) for pi in pipe._get_pipepro_from_string(p)]):
@@ -390,8 +398,9 @@ class RunPipe():
                     elif hasattr(pipe._get_pipepro_from_string(p),'validplots') and pipe._get_pipepro_from_string(p).validplots:
                         validplot_pros.append(p)
                 print("Making summary plots for successful jobs: ".format(success_list))
+                outsuffix="combined_{}-{}".format(min(success_list),max(success_list))
                 self.combine_validplot_inputs(pros=[x for x in pipe.pipepros if x in validplot_pros],
-                                              nums=success_list,outsuffix="{}_{}-{}".format(outsuffix,min(success_list),max(success_list)))
+                                              nums=success_list,outsuffix=outsuffix)
                 for p in validplot_pros:
                     if p.startswith('lcfit'):
                         p = 'lcfitting'
