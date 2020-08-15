@@ -515,14 +515,15 @@ class GaussNewton(saltresids.SALTResids):
 						import pdb;pdb.set_trace()
 					else:
 						raise e
-
-		Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
-		
+		Xredefined = X[:]
+		#Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
+    
+    
 		# M0/M1 errors
-		if not 'hi':
+		if 'hi':
 			log.info("determining M0/M1 errors")
 			varyingParams=self.fitOptions['all'][1]&self.iModelParam
-			#print('hack - turning regularization on until D\'Arcy puts in some fixes')
+			print('hack - turning regularization on until D\'Arcy puts in some fixes')
 			#import pdb; pdb.set_trace()
 			#self.regulargradientwave *= 0.01
 			#self.regulardyad *= 0.01
@@ -569,7 +570,6 @@ class GaussNewton(saltresids.SALTResids):
 			#	np.zeros([self.phase.size,self.wave.size])
 		#Xredefined = X.copy()
 		#Retranslate x1, M1, x0, M0 to obey definitions
-	
 		xfinal,phase,wave,M0,M0modelerr,M1,M1modelerr,cov_M0_M1_model,\
 			modelerr,clpars,clerr,clscat,SNParams = \
 			self.getParsGN(Xredefined)

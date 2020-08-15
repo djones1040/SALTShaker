@@ -56,8 +56,9 @@ def main(outfile,lcfile,salt3dir,
 	if not c and fitc: fitparams_salt3 += ['c']
 
 	sn = snana.SuperNova(lcfile)
-	sn.FLT = sn.FLT.astype('U20')
-
+	try: sn.FLT = sn.FLT.astype('U20')
+	except: sn.FLT = sn.BAND.astype('U20')
+    
 	if bandpassdict:
 		bandlist = []
 		for k in bandpassdict.keys():
@@ -182,7 +183,8 @@ def customfilt(outfile,lcfile,salt3dir,
 	if not c and fitc: fitparams_salt3 += ['c']
 	
 	sn = snana.SuperNova(lcfile)
-	sn.FLT = sn.FLT.astype('U20')
+	try: sn.FLT = sn.FLT.astype('U20')
+	except: sn.FLT = sn.BAND.astype('U20')
 
 
 	zpsys='AB'
