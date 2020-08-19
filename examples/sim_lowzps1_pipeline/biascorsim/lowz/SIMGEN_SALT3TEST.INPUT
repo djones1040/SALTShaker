@@ -80,10 +80,11 @@ CUTWIN_MWEBV:      0 .20
 
 # -----------------------
 # cosmological params for lightcurve generation and redshift distribution
-OMEGA_MATTER:  0.3
-OMEGA_LAMBDA:  0.7
-W0_LAMBDA:    -1.00
-H0:            70.0
+# use defaults
+#OMEGA_MATTER:  0.3
+#OMEGA_LAMBDA:  0.7
+#W0_LAMBDA:    -1.00
+#H0:            70.0
 
 #HOSTLIB_FILE: $PS1MD_ROOT/simlib/DS_empty.HOSTLIB
 #HOSTLIB_STOREPAR: LOGMASS
