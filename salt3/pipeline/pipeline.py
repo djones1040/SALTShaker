@@ -1556,6 +1556,8 @@ def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',
         for index, row in setkeys.iterrows():
             key = row['key']
             values = row['value']
+            if key not in delimiter.keys():
+                delimiter[key] = '='
             if delimiter[key] == '=' and isinstance(values,(list,np.ndarray)):
                 values = [','.join(values)]
             else:
