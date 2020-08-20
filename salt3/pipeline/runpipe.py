@@ -13,6 +13,7 @@ import configparser
 import time
 import datetime
 import glob
+import copy
 from salt3.pipeline.pipeline import SALT3pipe
 from salt3.pipeline.validplot import ValidPlots,lcfitting_validplots,getmu_validplots,cosmofit_validplots
 log=logging.getLogger(__name__)
@@ -74,7 +75,7 @@ class RunPipe():
         pipe = MyPipe(finput=self.pipeinput)
         return pipe
 
-    def _add_suffix(self,pro,keylist,suffix,section=None):
+    def _add_suffix(self,pro,keylist,suffix,section=None,add_label=None):
         df = pd.DataFrame() 
         for i,key in enumerate(keylist):
             if isinstance(pro.keys, dict) and not isinstance(pro.keys,f90nml.namelist.Namelist):
@@ -90,16 +91,31 @@ class RunPipe():
                 else:
                     sec = section[i]
                     val_old = pro.keys[sec][keystr]
-                val_new = '{}_{:03d}'.format(val_old.strip(),suffix)
-                df = pd.concat([df,pd.DataFrame([{'section':sec,'key':keystr,'value':val_new}])])
+                if isinstance(val_old,list):
+                    val_new = ['{}_{:03d}'.format(x.strip(),suffix) for x in val_old]
+                elif isinstance(val_old,dict):
+                    val_new = {}
+                    for dictkey in val_old:
+                        val_new[dictkey] = '{}_{:03d}'.format(val_old.strip(),suffix)
+                else:
+                    val_new = '{}_{:03d}'.format(val_old.strip(),suffix)
+                df = pd.concat([df,pd.DataFrame([{'section':sec,'key':keystr,'value':val_new,'label':add_label}])])
         return df
     
     def _reconfig_w_suffix(self,proname,df,suffix,**kwargs):
-        outname_orig = proname.outname
-        proname.outname = '{}_{:03d}'.format(proname.outname,self.num)
+        outname_orig = copy.copy(proname.outname)
+        if isinstance(outname_orig,list):
+            proname.outname = ['{}_{:03d}'.format(x,self.num) for x in outname_orig]
+        elif isinstance(outname_orig,dict):
+            for dictkey in outname_orig:
+                proname.outname[dictkey] = '{}_{:03d}'.format(outname_orig[dictkey],self.num)
+        else:
+            proname.outname = '{}_{:03d}'.format(outname_orig,self.num)
+        print(outname_orig)
+        print(proname.outname)
         proname.configure(pro=proname.pro,baseinput=outname_orig,setkeys=df,prooptions=proname.prooptions,
                           batch=proname.batch,validplots=proname.validplots,outname=proname.outname,
-                          proargs=proname.proargs,plotdir=proname.plotdir,**kwargs)  
+                          proargs=proname.proargs,plotdir=proname.plotdir,labels=proname.labels,**kwargs)  
     
     def make_validplots_sum(self,prostr,inputfile_sum,outputdir,prefix_sum='sum_valid'):
         if prostr.startswith('lcfit'):
@@ -218,7 +234,7 @@ class RunPipe():
                         df_sim_biascor = self._add_suffix(self.pipe.BiascorSim,['GENVERSION','GENPREFIX'],self.num)
                         self._reconfig_w_suffix(self.pipe.BiascorSim,df_sim_biascor,self.num)
                     if any([p.startswith('train') for p in self.pipe.pipepros]): 
-                        df_train = self._add_suffix(self.pipe.Training,['outputdir'],self.num,section=['iodata'])
+                        df_train = self._add_suffix(self.pipe.Training,['outputdir'],self.num,section=['iodata'],add_label='main')
                         self._reconfig_w_suffix(self.pipe.Training,df_train,self.num)
                         if ['sim','train'] in self.pipe.gluepairs: 
                             self.pipe.glue(['sim','train'])
