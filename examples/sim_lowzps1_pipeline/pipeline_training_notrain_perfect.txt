@@ -27,6 +27,8 @@ set_key=2
         NGENTOT_LC[1] 16000
         GENMODEL[0] SALT2.JLA-B14
         GENMODEL[1] SALT2.JLA-B14
+        GENPERFECT[0]: 1
+        GENPERFECT[1]: 1
 
 [training]
 pro=trainsalt
@@ -71,6 +73,8 @@ set_key=2
         NGENTOT_LC[1] 320000
         GENMODEL[0] SALT2.JLA-B14
         GENMODEL[1] SALT2.JLA-B14
+        GENPERFECT[0] 1
+        GENPERFECT[1] 1
         GENSIGMA_SALT2ALPHA[0] 1.E8 1.E8  
         GENSIGMA_SALT2BETA[0] 1.E8 1.E8
         GENRANGE_SALT2ALPHA[0]  0.09  0.2
@@ -112,6 +116,7 @@ validplots=True
 prooptions=NOPROMPT
 set_key=2
         opt_biascor 240
+        sigint_biascor 0
 
 [cosmofit]
 pro=wfit.exe
