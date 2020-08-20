@@ -794,6 +794,7 @@ class Training(PyPipeProcedure):
         self.outname,config_dict = _gen_training_inputs(basefilenames=self.baseinput,setkeys=self.setkeys,
                                                         outnames=self.outname,labels=self.labels)
         self.keys = config_dict['main']
+        self.finput = self.outname['main']
         
     def _get_input_info(self):
         section_key_pair = [['iodata','snlists','io']]
