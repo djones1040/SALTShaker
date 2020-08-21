@@ -93,14 +93,14 @@ def RatioToSatisfyDefinitions(phase,wave,kcordict,components):
 
 def specflux(obsphase,obswave,m0phase,m0wave,m0flux,m1flux,colorlaw,z,x0,x1,c,mwebv):
 	
-	modelflux = x0*(m0flux + x1*m1flux)*10**(-0.4*c*colorlaw(np.unique(m0wave)))*1e-12/(1+z)
+	modelflux = x0*(m0flux + x1*m1flux)*1e-12/(1+z) # 10**(-0.4*c*colorlaw(np.unique(m0wave)))*
 
-	m0interp = interp1d(np.unique(m0phase)*(1+z),m0flux*10**(-0.4*c*colorlaw(np.unique(m0wave)))*1e-12/(1+z),axis=0,
+	m0interp = interp1d(np.unique(m0phase)*(1+z),m0flux*1e-12/(1+z),axis=0, #*10**(-0.4*c*colorlaw(np.unique(m0wave)))
 						kind='nearest',bounds_error=False,fill_value="extrapolate")
 	m0phaseinterp = m0interp(obsphase)
 	m0interp = np.interp(obswave,np.unique(m0wave)*(1+z),m0phaseinterp)
 
-	m1interp = interp1d(np.unique(m0phase)*(1+z),m1flux*10**(-0.4*c*colorlaw(np.unique(m0wave)))*1e-12/(1+z),axis=0,
+	m1interp = interp1d(np.unique(m0phase)*(1+z),m1flux*1e-12/(1+z),axis=0, #*10**(-0.4*c*colorlaw(np.unique(m0wave)))
 						kind='nearest',bounds_error=False,fill_value="extrapolate")
 	m1phaseinterp = m1interp(obsphase)
 	m1interp = np.interp(obswave,np.unique(m0wave)*(1+z),m1phaseinterp)
@@ -373,12 +373,15 @@ class TrainSALT(TrainSALTBase):
 					except:
 						log.warning('couldn\'t estimate spectral recalibration!')
 						import pdb; pdb.set_trace()
+                        
 					#plt.ion()
 					#plt.clf()
 					#plt.plot(specdata[k]['wavelength'],specdata[k]['flux'],color='k')
 					#plt.plot(specdata[k]['wavelength'],uncalledModel,color='r')
 					#plt.plot(specdata[k]['wavelength'],recalfunc(md.x))
-
+					#import pdb; pdb.set_trace()
+                    # 0.03802382
+                    # 0.0469286]), array([-0.38700634, 0.3495, 0.00424
 					# old code
 					#if specpars_init[0] != 0:
 					#	guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]/specpars_init[0]
