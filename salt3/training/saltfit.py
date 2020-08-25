@@ -437,12 +437,12 @@ class GaussNewton(saltresids.SALTResids):
 		else:
 			self.fitlist = [f for f in kwargs['fitting_sequence'].split(',')]
 
-	def modeluncertaintiesfromdata(X):
+	def modeluncertaintiesfromdata(self,X):
 		"""Approximate Hessian by jacobian times own transpose to determine uncertainties in flux surfaces"""
 		log.info("determining M0/M1 errors by approximate Hessian")
 		itpk=np.zeros(X.size,dtype=bool)
 		itpk[self.itpk]=True
-		varyingParams=self.fitOptions['components'][1]&self.fitOptions['color'][1]&self.fitOptions['spectralrecalibration'][1]&self.fitOptions['colorlaw'][1]
+		varyingParams=self.fitOptions['components'][1]|self.fitOptions['color'][1]|self.fitOptions['spectralrecalibration'][1]|self.fitOptions['colorlaw'][1]
 		logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
 		residuals,jac=self.lsqwrap(X,{},varyingParams,True,doSpecResids=True)
 
@@ -550,7 +550,6 @@ class GaussNewton(saltresids.SALTResids):
 		else:
 			M0dataerr, M1dataerr,cov_M0_M1_data=None,None,None
 		# M0/M1 errors
-
 		xfinal,phase,wave,M0,M0modelerr,M1,M1modelerr,cov_M0_M1_model,\
 			modelerr,clpars,clerr,clscat,SNParams = \
 			self.getParsGN(Xredefined)
