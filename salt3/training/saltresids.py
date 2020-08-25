@@ -380,7 +380,7 @@ class SALTResids:
 		pbspl /= denom*HC_ERG_AA
 		self.kcordict['default']['Vpbspl'] = pbspl
 
-	def lsqwrap(self,guess,storedResults,varyParams=None,doPriors=True,doSpecResids=True):
+	def lsqwrap(self,guess,storedResults,varyParams=None,doPriors=True,doSpecResids=True,usesns=None):
 		if varyParams is None:
 			varyParams=np.zeros(self.npar,dtype=bool)
 		self.fillStoredResults(guess,storedResults)
@@ -390,7 +390,7 @@ class SALTResids:
 		residuals = []
 		jacobian = [] # Jacobian matrix from r
 
-		for sn in self.datadict.keys():
+		for sn in self.datadict.keys() if usesns is None else usesns:
 			photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,storedResults,varyParams,fixUncertainty=True)
 			for residsdict in ([photresidsdict,specresidsdict] if doSpecResids else [photresidsdict]):
 				residuals+=[residsdict[k]['resid'] for k in residsdict]
