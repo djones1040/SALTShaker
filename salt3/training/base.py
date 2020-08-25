@@ -346,7 +346,10 @@ class TrainSALTBase:
 			NFiltColorCut = len(np.unique(photdata['filt'][iColorCut]))
 			iPreMaxCut = len(np.unique(photdata['filt'][np.where((phase > -10) & (phase < -2))[0]]))
 			medSNR = np.median(photdata['fluxcal'][(phase > -10) & (phase < 10)]/photdata['fluxcalerr'][(phase > -10) & (phase < 10)])
-			if len(iEpochsCut) < 4 or not len(iPkCut) or not len(iShapeCut) or NFiltColorCut < 2: # or iPreMaxCut < 2 or medSNR < 10:
+			iFitprob = datadict[sn]['fitprob'] >= 1e-4
+			if not iFitprob:
+				print(f'SN {sn} failing fitprob cut!')
+			if len(iEpochsCut) < 4 or not len(iPkCut) or not len(iShapeCut) or NFiltColorCut < 2 or not iFitprob: # or iPreMaxCut < 2 or medSNR < 10:
 				datadict.pop(sn)
 				failedlist += [sn]
 				log.debug('SN %s fails cuts'%sn)
