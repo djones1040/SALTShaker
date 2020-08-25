@@ -12,47 +12,72 @@ import extinction
 from time import time
 import logging;
 log=logging.getLogger(__name__)
-def flux(salt3dir,obsphase,obswave,z,x0,x1,c,mwebv):
-	m0phase,m0wave,m0flux = np.loadtxt('%s/salt3_template_0.dat'%salt3dir,unpack=True)
-	m1phase,m1wave,m1flux = np.loadtxt('%s/salt3_template_1.dat'%salt3dir,unpack=True)
+colordict = {'SALT2':'#009988', # teal
+             'SALT3':'#EE7733',  # orange
+}
+
+# 1.0168250140665575e-12
+# 1.0375060945204798e-12
+#np.sum(modelflux_wave[(obswave > 4000) & (obswave < 7000)])
+#6.943610463393568e-13
+
+#7.587895263857783e-13
+#1.1156384142650487e-12
+
+
+def flux(salt3dir,obsphase,obswave,z,x0,x1,c,mwebv,fill_value="extrapolate"):
+	#salt3dir = os.path.expandvars('$SNDATA_ROOT/models/SALT2/SALT2.JLA-B14')
+	try:
+		m0phase,m0wave,m0flux = np.loadtxt('%s/salt3_template_0.dat'%salt3dir,unpack=True)
+		m1phase,m1wave,m1flux = np.loadtxt('%s/salt3_template_1.dat'%salt3dir,unpack=True)
+	except:
+		m0phase,m0wave,m0flux = np.loadtxt('%s/salt2_template_0.dat'%salt3dir,unpack=True)
+		m1phase,m1wave,m1flux = np.loadtxt('%s/salt2_template_1.dat'%salt3dir,unpack=True)
+		
 	m0flux = m0flux.reshape([len(np.unique(m0phase)),len(np.unique(m0wave))])
 	m1flux = m1flux.reshape([len(np.unique(m1phase)),len(np.unique(m1wave))])
 	
 	try:
-		with open('%s/salt3_color_correction.dat'%(salt3dir)) as fin:
-			lines = fin.readlines()
+		try:
+			with open('%s/salt3_color_correction.dat'%(salt3dir)) as fin:
+				lines = fin.readlines()
+		except:
+			with open('%s/salt2_color_correction.dat'%(salt3dir)) as fin:
+				lines = fin.readlines()
+
 		if len(lines):
 			for i in range(len(lines)):
 				lines[i] = lines[i].replace('\n','')
-			colorlaw_salt3_coeffs = np.array(lines[1:5]).astype('float')
-			salt3_colormin = float(lines[6].split()[1])
-			salt3_colormax = float(lines[7].split()[1])
-
-			salt3colorlaw = SALT2ColorLaw([2800,7000],colorlaw_salt3_coeffs)
+			n_coeffs = int(lines[0].split()[0].replace('\n',''))
+			colorlaw_salt3_coeffs = np.array(lines[1:n_coeffs+1]).astype('float')
+			salt3_colormin = float(lines[n_coeffs+2].split()[1])
+			salt3_colormax = float(lines[n_coeffs+3].split()[1])
+			salt3colorlaw = SALT2ColorLaw([salt3_colormin,salt3_colormax],colorlaw_salt3_coeffs)
 	except:
 		pass
-	
-	modelflux = x0*(m0flux + x1*m1flux)*10**(-0.4*c*salt3colorlaw(np.unique(m0wave)))*1e-12/(1+z)
 
-	m0interp = interp1d(np.unique(m0phase)*(1+z),m0flux*10**(-0.4*c*salt3colorlaw(np.unique(m0wave)))*1e-12/(1+z),axis=0,
-						kind='nearest',bounds_error=False,fill_value="extrapolate")
+	modelflux = x0*(m0flux + x1*m1flux)*1e-12/(1+z) #10**(-0.4*c*salt3colorlaw(np.unique(m0wave)))*
+
+	m0interp = interp1d(np.unique(m0phase)*(1+z),m0flux*1e-12/(1+z),axis=0, #*10**(-0.4*c*salt3colorlaw(np.unique(m0wave)))
+						kind='nearest',bounds_error=False,fill_value=fill_value)
 	m0phaseinterp = m0interp(obsphase)
-	m0interp = np.interp(obswave,np.unique(m0wave)*(1+z),m0phaseinterp)
+	m0interp = np.interp(obswave,np.unique(m0wave)*(1+z),m0phaseinterp,left=np.nan,right=np.nan)
 
-	m1interp = interp1d(np.unique(m0phase)*(1+z),m1flux*10**(-0.4*c*salt3colorlaw(np.unique(m0wave)))*1e-12/(1+z),axis=0,
-						kind='nearest',bounds_error=False,fill_value="extrapolate")
+	m1interp = interp1d(np.unique(m0phase)*(1+z),m1flux*1e-12/(1+z),axis=0, #*10**(-0.4*c*salt3colorlaw(np.unique(m0wave)))
+						kind='nearest',bounds_error=False,fill_value=fill_value)
 	m1phaseinterp = m1interp(obsphase)
-	m1interp = np.interp(obswave,np.unique(m0wave)*(1+z),m1phaseinterp)
+	m1interp = np.interp(obswave,np.unique(m0wave)*(1+z),m1phaseinterp,left=np.nan,right=np.nan)
 
 	
-	intphase = interp1d(np.unique(m0phase)*(1+z),modelflux,axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
+	intphase = interp1d(np.unique(m0phase)*(1+z),modelflux,axis=0,kind='nearest',bounds_error=False,fill_value=fill_value)
 	modelflux_phase = intphase(obsphase)
-	intwave = interp1d(np.unique(m0wave)*(1+z),modelflux_phase,kind='nearest',bounds_error=False,fill_value="extrapolate")
+	intwave = interp1d(np.unique(m0wave)*(1+z),modelflux_phase,kind='nearest',bounds_error=False,fill_value=fill_value)
 	modelflux_wave = intwave(obswave)
 	modelflux_wave = x0*(m0interp + x1*m1interp)
 	mwextcurve = 10**(-0.4*extinction.fitzpatrick99(obswave,mwebv*3.1))
 	modelflux_wave *= mwextcurve
-
+	#if np.max(obswave/(1+z)) > 9200 and 'SNDATA_ROOT' in salt3dir: import pdb; pdb.set_trace()
+	#import pdb; pdb.set_trace()
 	return modelflux_wave
 	
 def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_parameters.dat',
@@ -100,9 +125,9 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 		specdata=datadict[sn]['specdata']
 		snPars={'z':datadict[sn]['zHelio']}
 
-# 		if np.abs(snPars['x1'])<2.23: 
-# 			log.warning(f'Skipping {sn} because x1 is not extreme')
-# 			continue
+#		if np.abs(snPars['x1'])<2.23: 
+#			log.warning(f'Skipping {sn} because x1 is not extreme')
+#			continue
 		model.update(snPars)
 		for k in specdata.keys():
 			try:
@@ -152,7 +177,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 				lims = ax.get_xlim()
 				ax2.set_xlim([lims[0]/(1+snPars['z']),lims[1]/(1+snPars['z'])])
 				ax2.set_xlabel('Rest Wavelength $\AA$')
-
+				#import pdb; pdb.set_trace()
 				axcount += 1
 				if not axcount % 3:
 					pdf_pages.savefig()
