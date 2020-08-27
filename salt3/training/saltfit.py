@@ -39,6 +39,18 @@ log=logging.getLogger(__name__)
 #Which integer code corresponds to which reason for LSMR terminating
 stopReasons=['x=0 solution','atol approx. solution','atol+btol approx. solution','ill conditioned','machine precision limit','machine precision limit','machine precision limit','max # of iteration']
 
+def ensurepositivedefinite(matrix,maxiter=5):
+    mineigenval=np.linalg.eigvalsh(matrix)[0]
+    print(mineigenval)
+    if mineigenval>0:
+        return matrix
+    else:
+        if maxiter==0: 
+            raise ValueError('Unable to make matrix positive semidefinite')
+        return ensurepositivedefinite(matrix+np.diag(-mineigenval*2* np.ones(matrix.shape[0])),maxiter-1)
+        
+
+
 def isDiag(M):
     i, j = M.shape
     assert i == j 
@@ -437,15 +449,15 @@ class GaussNewton(saltresids.SALTResids):
 		else:
 			self.fitlist = [f for f in kwargs['fitting_sequence'].split(',')]
 
-	def modeluncertaintiesfromdata(X):
+	def datauncertaintiesfromhessianapprox(self,X):
 		"""Approximate Hessian by jacobian times own transpose to determine uncertainties in flux surfaces"""
-		log.info("determining M0/M1 errors by approximate Hessian")
+		log.info("determining M0/M1 errors by approximated Hessian")
 		itpk=np.zeros(X.size,dtype=bool)
 		itpk[self.itpk]=True
-		varyingParams=self.fitOptions['components'][1]&self.fitOptions['color'][1]&self.fitOptions['spectralrecalibration'][1]&self.fitOptions['colorlaw'][1]
+		varyingParams=self.fitOptions['components'][1]#|self.fitOptions['color'][1]|self.fitOptions['spectralrecalibration'][1]|self.fitOptions['colorlaw'][1]
 		logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
 		residuals,jac=self.lsqwrap(X,{},varyingParams,True,doSpecResids=True)
-
+		
 		#Simple preconditioning of the jacobian before attempting to invert
 		precondition=sparse.diags(1/np.sqrt(np.asarray((jac.power(2)).sum(axis=0))),[0])
 		precondjac=(jac*precondition)
@@ -458,14 +470,36 @@ class GaussNewton(saltresids.SALTResids):
 		#Turning spline_derivs into a sparse matrix for speed
 		spline2d=sparse.csr_matrix(self.spline_derivs.reshape(-1,self.im0.size))
 		#Uncorrelated effect of parameter uncertainties on M0 and M1
-		m0pulls=invL*precondition.tocsr()[:,self.im0]*spline2d.T
-		m1pulls=invL*precondition.tocsr()[:,self.im1]*spline2d.T 
-		M0dataerr = (m0pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size))
-		M1dataerr = (m1pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size))
+		varyparlist= self.parlist[varyingParams]
+		m0pulls=invL*precondition.tocsr()[:,varyparlist=='m0']*spline2d.T
+		m1pulls=invL*precondition.tocsr()[:,varyparlist=='m1']*spline2d.T 
+		M0dataerr = np.sqrt((m0pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size)))
+		M1dataerr = np.sqrt((m1pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size)))
 		cov_M0_M1_data = (m0pulls*m1pulls).sum(axis=0).reshape((self.phase.size,self.wave.size))
 		return M0dataerr, M1dataerr,cov_M0_M1_data
+
+	def datauncertaintiesfrombootstrap(self,X,max_iter,n_bootstrapsamples):
+		"""Determine uncertainties in flux surfaces by bootstrapping"""
+		log.info("determining M0/M1 errors by bootstrapping")
+		snlist=list(self.datadict.keys())
+		samples=[self.convergence_loop(X,max_iter, snlist[:i]+snlist[i+1:], getdatauncertainties=False) for i in  (np.random.choice(len(snlist),n_bootstrapsamples))]
+		samplesredefined=np.array([self.priors.satisfyDefinitions(x,self.SALTModel(x)) for x in samples])
+		deviation=(samplesredefined-X)
+		sigma=ensurepositivedefinite(np.dot(deviation.T,deviation)/(deviation.shape[0]-1))
+		L=linalg.cholesky(sigma,lower=True)
+		
+		#Turning spline_derivs into a sparse matrix for speed
+		spline2d=sparse.csr_matrix(self.spline_derivs.reshape(-1,self.im0.size))
+		m0pulls=L[varyparlist=='m0',:].T*spline2d.T
+		m1pulls=L[varyparlist=='m1',:].T*spline2d.T 
+		
+		M0dataerr = np.sqrt((m0pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size)))
+		M1dataerr = np.sqrt((m1pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size)))
+		cov_M0_M1_data = (m0pulls*m1pulls).sum(axis=0).reshape((self.phase.size,self.wave.size))
+
+		return M0dataerr, M1dataerr,cov_M0_M1_data
 	
-	def convergence_loop(self,guess,loop_niter=3,usesns=None,getmodeluncertainties=True):
+	def convergence_loop(self,guess,loop_niter=3,usesns=None,getdatauncertainties=True):
 		lastResid = 1e20
 		log.info('Initializing')
 		start=datetime.now()
@@ -545,7 +579,7 @@ class GaussNewton(saltresids.SALTResids):
 						raise e
 
 		Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
-		if getmodeluncertainties:
+		if getdatauncertainties:
 			M0dataerr, M1dataerr,cov_M0_M1_data=self.modeluncertaintiesfromdata(Xredefined)
 		else:
 			M0dataerr, M1dataerr,cov_M0_M1_data=None,None,None
@@ -650,7 +684,7 @@ class GaussNewton(saltresids.SALTResids):
 		result0=np.array(list(mapFun(self.loglikeforSN,args)))
 		partriplets= list(zip(np.where(self.parlist=='modelerr_0')[0],np.where(self.parlist=='modelerr_1')[0],np.where(self.parlist=='modelcorr_01')[0]))
 
-		for parindices in tqdm(partriplets):
+		for i,parindices in tqdm(enumerate(partriplets)):
 			includePars=np.zeros(self.parlist.size,dtype=bool)
 			includePars[list(parindices)]=True
 
@@ -659,7 +693,7 @@ class GaussNewton(saltresids.SALTResids):
 			result=np.array(list(mapFun(self.loglikeforSN,args)))
 
 			usesns=np.array(list(self.datadict.keys()))[result!=result0]
-
+			logging.debug(f'{usesns.size} SNe constraining {i}th error bin')
 			X=self.minuitoptimize(X,includePars,fluxes,fixFluxes=True,dospec=False,usesns=usesns)
 		if X[self.iclscat[-1]]==-np.inf:
 			X[self.iclscat[-1]]=-8
@@ -713,6 +747,7 @@ class GaussNewton(saltresids.SALTResids):
 		m=Minuit(fn,use_array_call=True,forced_parameters=params,errordef=.5,**minuitkwargs)
 		result,paramResults=m.migrad(ncall=100)
 		X=X.copy()
+		
 		paramresults=np.array([x.value for x  in paramResults])
 		if rescaleerrs:
 			X[includePars]=paramresults[:-1]
@@ -720,7 +755,7 @@ class GaussNewton(saltresids.SALTResids):
 		else:
 			X[includePars]=paramresults
 		
-		return X
+		return X,result
 	
 	#def iterativelyfitdataerrmodel(self,X):
 	#
