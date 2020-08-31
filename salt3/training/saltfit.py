@@ -533,7 +533,7 @@ class GaussNewton(saltresids.SALTResids):
 		for superloop in range(loop_niter):
 			tstartloop = time.time()
 			try:
-				if not superloop % 5 and  self.fit_model_err and photochi2perdof<3 :# and not superloop == 0:
+				if not superloop % 5 and  self.fit_model_err and not self.fit_cdisp_only and photochi2perdof<3 :# and not superloop == 0:
 					log.info('Optimizing model error')
 					X=self.iterativelyfiterrmodel(X)
 					storedResults={}
@@ -695,14 +695,19 @@ class GaussNewton(saltresids.SALTResids):
 		for i,parindices in tqdm(enumerate(partriplets)):
 			includePars=np.zeros(self.parlist.size,dtype=bool)
 			includePars[list(parindices)]=True
-
 			storedResults=fluxes.copy()
 			args=[(X0+includePars*.5,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
 			result=np.array(list(mapFun(self.loglikeforSN,args)))
-
 			usesns=np.array(list(self.datadict.keys()))[result!=result0]
 			logging.debug(f'{usesns.size} SNe constraining {i}th error bin')
 			X=self.minuitoptimize(X,includePars,fluxes,fixFluxes=True,dospec=False,usesns=usesns)
+
+		log.info('fitting color dispersion')
+		if X[self.iclscat[-1]]==-np.inf:
+			X[self.iclscat[-1]]=-8
+		includePars=np.zeros(self.parlist.size,dtype=bool)
+		includePars[self.iclscat]=True
+		X=self.minuitoptimize(X,includePars,fluxes,rescaleerrs=True,fixFluxes=True,dospec=False)
 
 		self.usePriors = store_priors
 		return X

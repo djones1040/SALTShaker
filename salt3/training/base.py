@@ -98,6 +98,8 @@ class TrainSALTBase:
 							help='repeat mcmc and/or gauss newton n times (default=%default)')
 		parser.add_argument('--fit_model_err', default=config.get('trainparams','fit_model_err'), type=boolean_string,
 							help='fit for model error if set (default=%default)')
+		parser.add_argument('--fit_cdisp_only', default=config.get('trainparams','fit_cdisp_only'), type=boolean_string,
+							help='fit for color dispersion component of model error if set (default=%default)')
 		parser.add_argument('--fit_tpkoff', default=config.get('trainparams','fit_tpkoff'), type=boolean_string,
 							help='fit for time of max in B-band if set (default=%default)')
 		parser.add_argument('--fitting_sequence', default=config.get('trainparams','fitting_sequence'), type=str,
@@ -246,6 +248,8 @@ class TrainSALTBase:
 							help='if set, periodically adjust the SN params via least squares fitting (default=%default)')
 		parser.add_argument('--adaptive_sigma_opt_scale', default=config.get('mcmcparams','adaptive_sigma_opt_scale'), type=float,
 							help='scaling the adaptive step sizes (default=%default)')
+		parser.add_argument('--use_snpca_knots', default=config.get('modelparams','use_snpca_knots'), type=boolean_string,
+							help='if set, define model on SNPCA knots (default=%default)')
 
 		# priors
 		for prior,val in config.items('priors'):
@@ -305,6 +309,7 @@ class TrainSALTBase:
 						 'regularize':self.options.regularize,
 						 'outputdir':self.options.outputdir,
 						 'fit_model_err':self.options.fit_model_err,
+						 'fit_cdisp_only':self.options.fit_cdisp_only,
 						 'fitTpkOff':self.options.fit_tpkoff,
 						 'spec_chi2_scaling':self.options.spec_chi2_scaling}
 		
@@ -339,7 +344,9 @@ class TrainSALTBase:
 			iShapeCut = np.where((phase > 5) & (phase < 20))[0]
 			iColorCut = np.where((phase > -8) & (phase < 10))[0]
 			NFiltColorCut = len(np.unique(photdata['filt'][iColorCut]))
-			if len(iEpochsCut) < 4 or not len(iPkCut) or not len(iShapeCut) or NFiltColorCut < 2:
+			iPreMaxCut = len(np.unique(photdata['filt'][np.where((phase > -10) & (phase < -2))[0]]))
+			medSNR = np.median(photdata['fluxcal'][(phase > -10) & (phase < 10)]/photdata['fluxcalerr'][(phase > -10) & (phase < 10)])
+			if len(iEpochsCut) < 4 or not len(iPkCut) or not len(iShapeCut) or NFiltColorCut < 2: # or iPreMaxCut < 2 or medSNR < 10:
 				datadict.pop(sn)
 				failedlist += [sn]
 				log.debug('SN %s fails cuts'%sn)
