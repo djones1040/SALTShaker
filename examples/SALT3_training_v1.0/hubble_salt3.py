@@ -108,8 +108,8 @@ def main():
     # hubble diagram w/ bins
     fr2 = getmu.getmu(fr2,salt2alpha=salt2alpha,salt2beta=salt2beta,sigint=0.0)
     fr3 = getmu.getmu(fr3,salt2alpha=salt3alpha,salt2beta=salt3beta,sigint=0.0)
-    fr2 = getmu.mkcuts(fr2,salt2alpha=salt2alpha,salt2beta=salt2beta,fitprobmin=0.0) #1e-5)
-    fr3 = getmu.mkcuts(fr3,salt2alpha=salt3alpha,salt2beta=salt3beta,fitprobmin=0.0) #1e-5)
+    fr2 = getmu.mkcuts(fr2,salt2alpha=salt2alpha,salt2beta=salt2beta,fitprobmin=1e-5)
+    fr3 = getmu.mkcuts(fr3,salt2alpha=salt3alpha,salt2beta=salt3beta,fitprobmin=1e-5)
 
     iGood2 = np.array([],dtype=int)
     for j,i in enumerate(fr2.CID):
