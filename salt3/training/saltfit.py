@@ -351,7 +351,8 @@ class GaussNewton(saltresids.SALTResids):
 		self.iModelParam[self.imodelcorr]=False
 		self.iModelParam[self.iclscat]=False
 		self.uncertaintyKeys=set(['photvariances_' +sn for sn in self.datadict]+['specvariances_' +sn for sn in self.datadict]+sum([[f'photCholesky_{sn}_{flt}' for flt in np.unique(self.datadict[sn]['photdata']['filt'])] for sn in self.datadict],[]))
-
+		
+		self.Xhistory=[]
 		self.tryFittingAllParams=True
 		fitlist = [('all parameters','all'),('all parameters grouped','all-grouped'),('supernova params','sn'),
 				   (" x0",'x0'),('both components','components'),('component 0 piecewise','piecewisecomponent0'),('principal component 0','component0'),('x1','x1'),
@@ -476,15 +477,16 @@ class GaussNewton(saltresids.SALTResids):
 		M0dataerr = np.sqrt((m0pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size)))
 		M1dataerr = np.sqrt((m1pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size)))
 		cov_M0_M1_data = (m0pulls*m1pulls).sum(axis=0).reshape((self.phase.size,self.wave.size))
-		return M0dataerr, M1dataerr,cov_M0_M1_data
+		
+		return M0dataerr, M1dataerr,cov_M0_M1_data,ensurepositivedefinite(np.dot(invL.T,invL))
 
 	def datauncertaintiesfromjackknife(self,X,max_iter,n_bootstrapsamples):
 		"""Determine uncertainties in flux surfaces by bootstrapping"""
 		log.info("determining M0/M1 errors by bootstrapping")
 		snlist=list(self.datadict.keys())
-		samples=[self.convergence_loop(X,max_iter, snlist[:i]+snlist[i+1:], getdatauncertainties=False) for i in  (np.random.choice(len(snlist),n_bootstrapsamples))]
-		samplesredefined=np.array([self.priors.satisfyDefinitions(x,self.SALTModel(x)) for x in samples])
-		deviation=(samplesredefined-X)
+		removesnindices=np.random.choice(len(snlist),n_bootstrapsamples)
+		samples=[self.convergence_loop(X,max_iter, snlist[:i]+snlist[i+1:], getdatauncertainties=False)[0] for i in  removesnindices]
+		deviation=(samples-X)
 		sigma=ensurepositivedefinite(np.dot(deviation.T,deviation)/(deviation.shape[0]-1))
 		L=linalg.cholesky(sigma,lower=True)
 		
@@ -497,7 +499,7 @@ class GaussNewton(saltresids.SALTResids):
 		M1dataerr = np.sqrt((m1pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size)))
 		cov_M0_M1_data = (m0pulls*m1pulls).sum(axis=0).reshape((self.phase.size,self.wave.size))
 
-		return M0dataerr, M1dataerr,cov_M0_M1_data
+		return M0dataerr, M1dataerr,cov_M0_M1_data,sigma,samples,
 	
 	def convergence_loop(self,guess,loop_niter=3,usesns=None,getdatauncertainties=True):
 		lastResid = 1e20
@@ -539,7 +541,6 @@ class GaussNewton(saltresids.SALTResids):
 					storedResults={}
 					chi2results=self.getChi2Contributions(X,storedResults)
 					uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
-					log.info('Reevaluted model error')
 				else:
 					log.info('Reevaluted model error')
 					storedResults={}
@@ -577,7 +578,7 @@ class GaussNewton(saltresids.SALTResids):
 						import pdb;pdb.set_trace()
 					else:
 						raise e
-		X= self.fitcolorscatter(X)		
+		if self.fit_model_err: X= self.fitcolorscatter(X)		
 		Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
 		if getdatauncertainties:
 			M0dataerr, M1dataerr,cov_M0_M1_data=self.datauncertaintiesfromhessianapprox(Xredefined)
@@ -662,13 +663,16 @@ class GaussNewton(saltresids.SALTResids):
 		
 		return X,-result.fval
 	
-	def fitcolorscatter(self,X,fitcolorlaw=True):
+	def fitcolorscatter(self,X,fitcolorlaw=True,maxiter=2000):
 		if X[self.iclscat[-1]]==-np.inf:
 			X[self.iclscat[-1]]=-8
 		includePars=np.zeros(self.parlist.size,dtype=bool)
 		includePars[self.iclscat]=True
 		includePars[self.iCL]=fitcolorlaw
-		X=self.minuitoptimize(X,includePars,fluxes,rescaleerrs=True,fixFluxes=True,dospec=False)
+		storedResults={}
+		log.info('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X,storedResults)))
+		X,minuitresult=self.minuitoptimize(X,includePars,{},rescaleerrs=True,fixFluxes=False,dospec=False,maxiter=maxiter)
+		log.debug(str(minuitresult))
 		return X
 		 
 	def iterativelyfiterrmodel(self,X):
@@ -712,7 +716,7 @@ class GaussNewton(saltresids.SALTResids):
 		self.usePriors = store_priors
 		return X
 
-	def minuitoptimize(self,X,includePars,storedResults=None,rescaleerrs=False,**kwargs):
+	def minuitoptimize(self,X,includePars,storedResults=None,rescaleerrs=False,maxiter=100,**kwargs):
 		X=X.copy()
 		if not self.fitTpkOff: includePars[self.itpk]=False
 		if storedResults is None: storedResults={}
@@ -753,7 +757,7 @@ class GaussNewton(saltresids.SALTResids):
 			minuitkwargs['limit_'+extrapar]=(0,2)
 		
 		m=Minuit(fn,use_array_call=True,forced_parameters=params,errordef=.5,**minuitkwargs)
-		result,paramResults=m.migrad(ncall=100)
+		result,paramResults=m.migrad(ncall=maxiter)
 		X=X.copy()
 		
 		paramresults=np.array([x.value for x  in paramResults])
@@ -1146,6 +1150,7 @@ class GaussNewton(saltresids.SALTResids):
 			
 			for i in range(30):
 				log.debug('Approximating jacobian and reiterating')
+				self.Xhistory+=[prevresult]
 				residpreddiff=((currentresids-prevresids)-prevjac.dot(-prevresult[0]))
 				sparsestructure=((prevjac!=0)*sparse.diags(prevresult[0]))
 				rowproduct=np.asarray((sparsestructure.power(2)).sum(axis=1)).T[0]
@@ -1173,6 +1178,7 @@ class GaussNewton(saltresids.SALTResids):
 			gaussNewtonStep=prevstep
 
 		else:
+			self.Xhistory+=[prevresult]
 			if self.geodesiccorrection:
 				#Fancypants cubic correction to the Gauss-Newton step based on fun differential geometry! See https://arxiv.org/abs/1207.4999 for derivation
 				# Right now, doesn't seem worth it compared to directional fit; maybe worth trying both?
