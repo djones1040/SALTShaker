@@ -19,6 +19,8 @@ VERSION: MD_BYOSEDTEST
      NFIT_ITERATION = 3
      INTERP_OPT     = 1
 
+     zTOL_HELIO2CMB = .1
+
      H0_REF   = 70.0
      OLAM_REF =  0.70
      OMAT_REF =  0.30
