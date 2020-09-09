@@ -11,6 +11,7 @@ import astropy.units as u
 import warnings
 from time import time
 import scipy.stats as ss
+import astropy.table as at
 import logging
 log=logging.getLogger(__name__)
 
@@ -239,7 +240,7 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 						values, weights -- Numpy ndarrays with the same shape.
 						"""
 						average = np.average(values, weights=weights)
-						variance = np.average((values-average)**2, weights=weights)  # Fast and numerically precise
+						variance = np.average((values-average)**2, weights=weights)	 # Fast and numerically precise
 
 						return average
 
@@ -249,7 +250,7 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 						values, weights -- Numpy ndarrays with the same shape.
 						"""
 						average = np.average(values, weights=weights)
-						variance = np.average((values-average)**2, weights=weights)  # Fast and numerically precise
+						variance = np.average((values-average)**2, weights=weights)	 # Fast and numerically precise
 						return np.sqrt(variance)/np.sqrt(len(values))
 					
 					wavebins = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/binspecres)
@@ -279,12 +280,16 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 	return datadict
 
 def rdAllData(snlists,estimate_tpk,kcordict,
-			  dospec=False,KeepOnlySpec=False,peakmjdlist=None,waverange=[2000,9200],binspecres=None):
+			  dospec=False,KeepOnlySpec=False,peakmjdlist=None,waverange=[2000,9200],binspecres=None,snparlist=None):
 	datadict = {}
 	if peakmjdlist:
 		pksnid,pkmjd = np.loadtxt(peakmjdlist,unpack=True,dtype=str,usecols=[0,1])
 		pkmjd = pkmjd.astype('float')
-	rdtime = 0
+	if snparlist:
+		snpar = at.Table.read(snparlist,format='ascii')
+		snpar['SNID'] = snpar['SNID'].astype(str)
+		
+	rdtime = 0; skipcount = 0
 	for snlist in snlists.split(','):
 		tsn = time()
 		snlist = os.path.expandvars(snlist)
@@ -354,6 +359,15 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 					tpk = float(sn.SEARCH_PEAKMJD.split()[0])
 				tpkmsg = 'termination condition is satisfied'
 
+			# to allow a fitprob cut
+			if snparlist:
+				if 'FITPROB' in snpar.keys() and str(sn.SNID) in snpar['SNID']:
+					fitprob = snpar['FITPROB'][str(sn.SNID) == snpar['SNID']][0]
+				else:
+					fitprob = -99
+			else:
+				fitprob = -99
+				
 			# at least one epoch 3 days before max
 			#try:
 			#	if not len(sn.MJD[sn.MJD < tpk-3]):
@@ -363,6 +377,7 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 
 			if 'termination condition is satisfied' not in tpkmsg:
 				log.warning('skipping SN %s; can\'t estimate t_max'%sn.SNID)
+				skipcount += 1
 				#import pdb; pdb.set_trace()
 				continue
 
@@ -372,7 +387,8 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 			datadict[sn.SNID] = {'snfile':f,
 								 'zHelio':zHel,
 								 'survey':sn.SURVEY,
-								 'tpk':tpk}
+								 'tpk':tpk,
+								 'fitprob':fitprob}
 			#datadict[snid]['zHelio'] = zHel
 			iGood = np.array([],dtype=int)
 			for i,f in enumerate(sn.FLT):
@@ -403,6 +419,6 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 	log.info('reading data files took %.1f'%(rdtime))
 	if not len(datadict.keys()):
 		raise RuntimeError('no light curve data to train on!!')
-		
+
 	return datadict
 	

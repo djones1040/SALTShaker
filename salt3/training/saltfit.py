@@ -455,7 +455,7 @@ class GaussNewton(saltresids.SALTResids):
 		log.info("determining M0/M1 errors by approximated Hessian")
 		itpk=np.zeros(X.size,dtype=bool)
 		itpk[self.itpk]=True
-		varyingParams=self.fitOptions['components'][1]#|self.fitOptions['color'][1]|self.fitOptions['spectralrecalibration'][1]|self.fitOptions['colorlaw'][1]
+		varyingParams=self.fitOptions['components'][1]|self.fitOptions['color'][1]|self.fitOptions['spectralrecalibration'][1]|self.fitOptions['colorlaw'][1]
 		logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
 		residuals,jac=self.lsqwrap(X,{},varyingParams,True,doSpecResids=True)
 		
@@ -585,7 +585,6 @@ class GaussNewton(saltresids.SALTResids):
 		else:
 			M0dataerr, M1dataerr,cov_M0_M1_data=None,None,None
 		# M0/M1 errors
-
 		xfinal,phase,wave,M0,M0modelerr,M1,M1modelerr,cov_M0_M1_model,\
 			modelerr,clpars,clerr,clscat,SNParams = \
 			self.getParsGN(Xredefined)
