@@ -4,7 +4,7 @@ import numpy as np
 from numpy.random import standard_normal
 from numpy.linalg import inv,pinv,norm
 
-import time,copy,extinction
+import time,copy,extinction,pickle
 
 from scipy.interpolate import splprep,splev,BSpline,griddata,bisplev,bisplrep,interp1d,interp2d
 from scipy.integrate import trapz, simps
@@ -31,6 +31,7 @@ from iminuit import Minuit
 from datetime import datetime
 from tqdm import tqdm
 from itertools import starmap
+from os import path
 
 import iminuit,warnings
 import logging
@@ -478,7 +479,7 @@ class GaussNewton(saltresids.SALTResids):
 		M1dataerr = np.sqrt((m1pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size)))
 		cov_M0_M1_data = (m0pulls*m1pulls).sum(axis=0).reshape((self.phase.size,self.wave.size))
 		
-		return M0dataerr, M1dataerr,cov_M0_M1_data,ensurepositivedefinite(np.dot(invL.T,invL))
+		return M0dataerr, M1dataerr,cov_M0_M1_data
 
 	def datauncertaintiesfromjackknife(self,X,max_iter,n_bootstrapsamples):
 		"""Determine uncertainties in flux surfaces by bootstrapping"""
@@ -499,7 +500,7 @@ class GaussNewton(saltresids.SALTResids):
 		M1dataerr = np.sqrt((m1pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size)))
 		cov_M0_M1_data = (m0pulls*m1pulls).sum(axis=0).reshape((self.phase.size,self.wave.size))
 
-		return M0dataerr, M1dataerr,cov_M0_M1_data,sigma,samples,
+		return M0dataerr, M1dataerr,cov_M0_M1_data
 	
 	def convergence_loop(self,guess,loop_niter=3,usesns=None,getdatauncertainties=True):
 		lastResid = 1e20
@@ -513,9 +514,14 @@ class GaussNewton(saltresids.SALTResids):
 			raise RuntimeError('length of priors does not equal length of prior widths!')
 		stepsizes=None
 		#residuals = self.lsqwrap(guess,uncertainties,False,False,doPriors=False)
-		
-
+	
 		X = copy.deepcopy(guess[:])
+		clscatzeropoint=X[self.iclscat[-1]]
+		nocolorscatter=clscatzeropoint==-np.inf
+		if not nocolorscatter: log.debug('Turning off color scatter for convergence_loop')
+		X[self.iclscat[-1]]=-np.inf
+
+
 		Xlast = copy.deepcopy(guess[:])
 		if np.all(X[self.ix1]==0) or np.all(X[self.ic]==0):
 			#If snparams are totally uninitialized
@@ -537,7 +543,9 @@ class GaussNewton(saltresids.SALTResids):
 			try:
 				if not superloop % 5 and  self.fit_model_err and not self.fit_cdisp_only and photochi2perdof<3 :# and not superloop == 0:
 					log.info('Optimizing model error')
+					X[self.iclscat[-1]]=clscatzeropoint
 					X=self.iterativelyfiterrmodel(X)
+					X[self.iclscat[-1]]=-np.inf
 					storedResults={}
 					chi2results=self.getChi2Contributions(X,storedResults)
 					uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
@@ -578,6 +586,7 @@ class GaussNewton(saltresids.SALTResids):
 						import pdb;pdb.set_trace()
 					else:
 						raise e
+		X[self.iclscat[-1]]=clscatzeropoint
 		if self.fit_model_err: X= self.fitcolorscatter(X)		
 		Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
 		if getdatauncertainties:
@@ -703,14 +712,7 @@ class GaussNewton(saltresids.SALTResids):
 			result=np.array(list(mapFun(self.loglikeforSN,args)))
 			usesns=np.array(list(self.datadict.keys()))[result!=result0]
 			logging.debug(f'{usesns.size} SNe constraining {i}th error bin')
-			X=self.minuitoptimize(X,includePars,fluxes,fixFluxes=True,dospec=False,usesns=usesns)
-
-		log.info('fitting color dispersion')
-		if X[self.iclscat[-1]]==-np.inf:
-			X[self.iclscat[-1]]=-8
-		includePars=np.zeros(self.parlist.size,dtype=bool)
-		includePars[self.iclscat]=True
-		X=self.minuitoptimize(X,includePars,fluxes,rescaleerrs=True,fixFluxes=True,dospec=False)
+			X,minuitfitresult=self.minuitoptimize(X,includePars,fluxes,fixFluxes=True,dospec=False,usesns=usesns)
 
 		self.usePriors = store_priors
 		return X
@@ -961,10 +963,6 @@ class GaussNewton(saltresids.SALTResids):
 	def robust_process_fit(self,X_init,uncertainties,chi2_init,niter,usesns=None):
 		X,chi2=X_init.copy(),chi2_init
 		storedResults=uncertainties.copy()
-		clscatzeropoint=X_init[self.iclscat][-1]
-		nocolorscatter=clscatzeropoint==-np.inf
-		if not nocolorscatter: log.debug('Turning off color scatter for robust_process_fit')
-		X[self.iclscat[-1]]=-np.inf
 		for fit in self.fitlist:
 			if 'all-grouped' in fit :continue #
 			if 'modelerr' in fit: continue
@@ -1035,7 +1033,6 @@ class GaussNewton(saltresids.SALTResids):
 						break
 				else:
 					continue
-		X[self.iclscat[-1]]=X_init[self.iclscat][-1]
 		#In this case GN optimizer can do no better
 		return X,chi2,(X is X_init)
 		 #_init
@@ -1049,6 +1046,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 		
 	def process_fit(self,X,iFit,storedResults,fit='all',allowjacupdate=True,**kwargs):
+		import pdb;pdb.set_trace()
 		X=X.copy()
 		varyingParams=iFit&self.iModelParam
 		if 'usesns' in kwargs :
@@ -1146,10 +1144,9 @@ class GaussNewton(saltresids.SALTResids):
 			prevresids=residuals
 			prevjac=precondjac.copy()
 			prevstep=gaussNewtonStep.copy()
-			
+			currentchi2=(currentresids**2).sum()
 			for i in range(30):
-				log.debug('Approximating jacobian and reiterating')
-				self.Xhistory+=[prevresult]
+				self.Xhistory+=[(X-prevstep,currentchi2,prevresult)]
 				residpreddiff=((currentresids-prevresids)-prevjac.dot(-prevresult[0]))
 				sparsestructure=((prevjac!=0)*sparse.diags(prevresult[0]))
 				rowproduct=np.asarray((sparsestructure.power(2)).sum(axis=1)).T[0]
@@ -1158,26 +1155,31 @@ class GaussNewton(saltresids.SALTResids):
 				currentjac= prevjac-(sparse.diags(residpreddiff)*sparsestructure)
 				currentresult=sprslinalg.lsmr(currentjac,currentresids,damp=damping,maxiter=2*min(jacobian.shape),atol=tol,btol=tol)
 				precondstep,stopsignal,itn,normr,normar,norma,conda,normx=currentresult
-				log.debug('On reiteration: LSMR results are {}, norm r {:.2f}, norm J^T r {:.2f}, norm J {:.2f}, cond J {:.2f}, norm step {:.2f}, reduction ratio {:.2f} required {} iterations'.format(stopReasons[stopsignal],normr,normar,norma,conda,normx,reductionratio,itn ))
+
 				currentstep=prevstep.copy()
 				currentstep[varyingParams]+=preconditoningMatrix*currentresult[0]
 				
 				nextresids=self.lsqwrap(X-currentstep,uncertainties.copy(),None,**kwargs)
-				print((nextresids**2).sum())
-				if (nextresids**2).sum() > (currentresids**2).sum():
+				nextchi2=(nextresids**2).sum()
+				chi2improvement=currentchi2-nextchi2
+				reductionratio= chi2improvement/(currentchi2-(normr**2))
+				log.info(f'Reiterating with updated jacobian gives improvement {chi2improvement}')
+				log.debug('On reiteration: LSMR results are {}, norm r {:.2f}, norm J^T r {:.2f}, norm J {:.2f}, cond J {:.2f}, norm step {:.2f}, reduction ratio {:.2f} required {} iterations'.format(stopReasons[stopsignal],normr,normar,norma,conda,normx,reductionratio,itn ))
+				if chi2improvement<0:
+					log.info('Negative improvement, finishing process_fit')
 					break
 				else:
 					prevstep=currentstep
 					prevresids=currentresids
 					currentresids=nextresids
+					currentchi2=nextchi2
 					prevjac=currentjac
 					prevresult=currentresult
-					
+			self.Xhistory+=[(X-prevstep,currentchi2,prevresult)]
+			
 			postGN=(currentresids**2).sum()
 			gaussNewtonStep=prevstep
-
 		else:
-			self.Xhistory+=[prevresult]
 			if self.geodesiccorrection:
 				#Fancypants cubic correction to the Gauss-Newton step based on fun differential geometry! See https://arxiv.org/abs/1207.4999 for derivation
 				# Right now, doesn't seem worth it compared to directional fit; maybe worth trying both?
@@ -1201,7 +1203,8 @@ class GaussNewton(saltresids.SALTResids):
 		else:
 			X-=gaussNewtonStep
 			chi2=postGN
-			
+		
+		with open(path.join(self.outputdir,'gaussnewtonhistory.pickle'),'wb') as file: pickle.dump(self.Xhistory,file)
 		log.info('Chi2 diff, % diff')
 		log.info(' '.join(['{:.2f}'.format(x) for x in [oldChi-chi2,(100*(oldChi-chi2)/oldChi)] ]))
 		print('')
