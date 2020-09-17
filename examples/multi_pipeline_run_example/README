@@ -1,0 +1,14 @@
+Running the pipeline with multiple submissions
+----------------------------------------------
+
+1. make sure in pipeline_batch_script_base_broadwl, the correct environment is activated. (e.g `source activate salt3`)
+
+2. activate the same environment in terminal to use the correct `runpipe` version
+
+3. run the following (also saved in `example_script_to_call`)
+`nohup runpipe -c pipeline_training_notrain-wl.txt --mypipe mypipe_notraining.py --batch_mode 5 --start_id 345 --batch_script pipeline_batch_script_base_broadwl --timeout 360000 > log 2>&1`
+
+where `mypipe_notraining.py` is where the pipeline is built;
+`--batch_mode` specify how many jobs to submit (make sure to modify the pipeline input -- e.g. `pipeline_training_notrain-wl.txt` so that total jobs at each stage don't exceed 100 on midway)
+
+see `runpipe --help` for more descriptions
