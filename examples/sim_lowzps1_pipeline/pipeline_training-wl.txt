@@ -20,7 +20,7 @@ pro=sim_SNmix.pl
 baseinput=simulation/MASTER_LOWZ_PS1.INPUT
 outinput=pipeline/MASTER_LOWZ_PS1.INPUT
 batch=True
-batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 5
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2_3hr.TEMPLATE 5
 prooptions=
 set_key=2
         NGENTOT_LC[0] 400
@@ -38,15 +38,15 @@ outinput=pipeline/SALT_SNANA.conf
 set_key=3
         trainparams fitsalt2 False
         trainparams fit_tpkoff False
-        trainparams gaussnewton_maxiter 2
-        iodata maxsn 25
+        trainparams gaussnewton_maxiter 15
+        iodata maxsn 500
 
 [lcfitting]
 pro=split_and_fit.pl
 baseinput=lcfitting/snfit_base.nml,lcfitting/snfit_base.nml
 outinput=pipeline/snfit_TEST.nml,pipeline/snfit_TEST2.nml
 batch=True
-batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 10
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2_3hr.TEMPLATE 10
 validplots=True
 prooptions=NOPROMPT
 set_key=4
@@ -54,8 +54,6 @@ set_key=4
         1 HEADER OUTDIR SIM_LOWZPS1_PS1
         1 FITINP FILTLIST_FIT griz
         1 SNLCINP CUTWIN_REDSHIFT 0.01 0.8
-        0 FITINP FITMODEL_NAME SALT2.JLA-B14
-        1 FITINP FITMODEL_NAME SALT2.JLA-B14
         0 SNLCINP OPT_MWEBV 1
         1 SNLCINP OPT_MWEBV 1
 
@@ -64,13 +62,11 @@ pro=sim_SNmix.pl
 baseinput=biascorsim/MASTER_LOWZ_PS1.INPUT
 outinput=pipeline/MASTER_LOWZ_PS1_biascor.INPUT
 batch=True
-batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 10
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2_3hr.TEMPLATE 10
 prooptions=
 set_key=2
-        NGENTOT_LC[0] 80000
-        NGENTOT_LC[1] 3200000
-        GENMODEL[0] SALT2.JLA-B14
-        GENMODEL[1] SALT2.JLA-B14
+        NGENTOT_LC[0] 8000
+        NGENTOT_LC[1] 320000
         GENSIGMA_SALT2ALPHA[0] 1.E8 1.E8  
         GENSIGMA_SALT2BETA[0] 1.E8 1.E8
         GENRANGE_SALT2ALPHA[0]  0.09  0.2
@@ -83,21 +79,21 @@ set_key=2
         GENGRID_SALT2ALPHA[1]   2
         GENRANGE_SALT2BETA[1]  2.0  4.0
         GENGRID_SALT2BETA[1]  2
+        GENMODEL[0] SALT2.JLA-B14
+        GENMODEL[1] SALT2.JLA-B14
 
 [biascorlcfit]
 pro=split_and_fit.pl
 baseinput=lcfitting/snfit_base.nml,lcfitting/snfit_base.nml
 outinput=pipeline/snfit_TEST_biascor.nml,pipeline/snfit_TEST_biascor2.nml
 batch=True
-batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 10
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2_3hr.TEMPLATE 10
 validplots=True
 prooptions=NOPROMPT
 set_key=4
         0 HEADER OUTDIR SIM_LOWZPS1_BIASCOR_LOWZ
         1 HEADER OUTDIR SIM_LOWZPS1_BIASCOR_PS1
         1 FITINP FILTLIST_FIT griz
-        0 FITINP FITMODEL_NAME SALT2.JLA-B14
-        1 FITINP FITMODEL_NAME SALT2.JLA-B14
         1 SNLCINP CUTWIN_REDSHIFT 0.01 0.8
         0 SNLCINP OPT_MWEBV 1
         1 SNLCINP OPT_MWEBV 1
@@ -107,12 +103,12 @@ pro=SALT2mu_fit.pl
 baseinput=getmu/BBC_LOWZ_PS1.input
 outinput=pipeline/BBC.input
 batch=True
-batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 20
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2_3hr.TEMPLATE 20
 validplots=True
 prooptions=NOPROMPT
 set_key=2
         opt_biascor 240
-        surveygroup_biascor 'CFA3+CFA3S+CFA3K+CFA4p1+CFA4p2+CSP(zbin=0.02),PS1MD(zbin=0.05)'
+
 
 [cosmofit]
 pro=wfit.exe
