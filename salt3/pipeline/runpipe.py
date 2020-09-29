@@ -13,6 +13,7 @@ import configparser
 import time
 import datetime
 import glob
+import copy
 from salt3.pipeline.pipeline import SALT3pipe
 from salt3.pipeline.validplot import ValidPlots,lcfitting_validplots,getmu_validplots,cosmofit_validplots
 log=logging.getLogger(__name__)
@@ -74,7 +75,7 @@ class RunPipe():
         pipe = MyPipe(finput=self.pipeinput)
         return pipe
 
-    def _add_suffix(self,pro,keylist,suffix,section=None):
+    def _add_suffix(self,pro,keylist,suffix,section=None,add_label=None):
         df = pd.DataFrame() 
         for i,key in enumerate(keylist):
             if isinstance(pro.keys, dict) and not isinstance(pro.keys,f90nml.namelist.Namelist):
@@ -90,18 +91,33 @@ class RunPipe():
                 else:
                     sec = section[i]
                     val_old = pro.keys[sec][keystr]
-                val_new = '{}_{:03d}'.format(val_old.strip(),suffix)
-                df = pd.concat([df,pd.DataFrame([{'section':sec,'key':keystr,'value':val_new}])])
+                if isinstance(val_old,list):
+                    val_new = ['{}_{:03d}'.format(x.strip(),suffix) for x in val_old]
+                elif isinstance(val_old,dict):
+                    val_new = {}
+                    for dictkey in val_old:
+                        val_new[dictkey] = '{}_{:03d}'.format(val_old.strip(),suffix)
+                else:
+                    val_new = '{}_{:03d}'.format(val_old.strip(),suffix)
+                df = pd.concat([df,pd.DataFrame([{'section':sec,'key':keystr,'value':val_new,'label':add_label}])])
         return df
     
     def _reconfig_w_suffix(self,proname,df,suffix,**kwargs):
-        outname_orig = proname.outname
-        proname.outname = '{}_{:03d}'.format(proname.outname,self.num)
+        outname_orig = copy.copy(proname.outname)
+        if isinstance(outname_orig,list):
+            proname.outname = ['{}_{:03d}'.format(x,self.num) for x in outname_orig]
+        elif isinstance(outname_orig,dict):
+            for dictkey in outname_orig:
+                proname.outname[dictkey] = '{}_{:03d}'.format(outname_orig[dictkey],self.num)
+        else:
+            proname.outname = '{}_{:03d}'.format(outname_orig,self.num)
+        print(outname_orig)
+        print(proname.outname)
         proname.configure(pro=proname.pro,baseinput=outname_orig,setkeys=df,prooptions=proname.prooptions,
                           batch=proname.batch,validplots=proname.validplots,outname=proname.outname,
-                          proargs=proname.proargs,plotdir=proname.plotdir,**kwargs)  
+                          proargs=proname.proargs,plotdir=proname.plotdir,labels=proname.labels,**kwargs)  
     
-    def make_validplots_sum(self,prostr,inputfile_sum,outputdir,prefix_sum):
+    def make_validplots_sum(self,prostr,inputfile_sum,outputdir,prefix_sum='sum_valid'):
         if prostr.startswith('lcfit'):
             prostr = 'lcfitting'
         if 'lcfit' in prostr:
@@ -109,7 +125,7 @@ class RunPipe():
         else:
             validfunc_str = prostr
         validplots_sum = eval(validfunc_str.strip().lower()+'_validplots()')
-        prefix_sum = 'valid_{}_sum'.format(prostr)
+        prefix_sum = '{}_{}'.format(prefix_sum,prostr)
         validplots_sum.input(inputfile_sum)
         validplots_sum.output(outputdir=outputdir,prefix=prefix_sum)
         validplots_sum.run()        
@@ -124,11 +140,19 @@ class RunPipe():
         return info_dict
         
     def _combine_fitres(self,files,pro=None,outsuffix=None):
-        cmd = 'sntable_cat.py -i {} -o {}_{}.FITRES'.format(','.join(files),pro,outsuffix)
-        print(cmd)
-        cmdrun = subprocess.run(args=shlex.split(cmd),capture_output=True)
-        if cmdrun.returncode != 0:
-            raise RuntimeError("sntable_cat.py failed")
+#         cmd = 'sntable_cat.py -i {} -o {}_{}.FITRES'.format(','.join(files),pro,outsuffix)
+#         print(cmd)
+#         cmdrun = subprocess.run(args=shlex.split(cmd),capture_output=True)
+#         if cmdrun.returncode != 0:
+#             raise RuntimeError("sntable_cat.py failed")
+        outname = '{}_{}.FITRES'.format(pro,outsuffix)
+        print("combining files {} to {}".format(files,outname))
+        dflist = []
+        for f in files:
+            df = pd.read_csv(f,sep='\s+',comment='#')
+            dflist.append(df)
+        data = pd.concat(dflist,ignore_index=True).fillna('NULL')
+        data.to_csv(outname,index=False,sep=' ',float_format='%.5e')
         
     def _combine_cospar(self,files,pro='cosmofit',outsuffix=None):
         all_lines = []
@@ -163,7 +187,11 @@ class RunPipe():
                 outname = outfile
                 with open(outname,'r') as fin:
                     lines = fin.readlines()
-                lines.insert(0,'\n'.join(outlines))
+                comment_count = 0
+                for line in lines:
+                    if line.strip().startswith('#'):
+                        comment_count += 1
+                lines = outlines + lines[comment_count:]
                 with open(outname,'w') as outf:
                     outf.writelines(lines)                           
         
@@ -206,7 +234,7 @@ class RunPipe():
                         df_sim_biascor = self._add_suffix(self.pipe.BiascorSim,['GENVERSION','GENPREFIX'],self.num)
                         self._reconfig_w_suffix(self.pipe.BiascorSim,df_sim_biascor,self.num)
                     if any([p.startswith('train') for p in self.pipe.pipepros]): 
-                        df_train = self._add_suffix(self.pipe.Training,['outputdir'],self.num,section=['iodata'])
+                        df_train = self._add_suffix(self.pipe.Training,['outputdir'],self.num,section=['iodata'],add_label='main')
                         self._reconfig_w_suffix(self.pipe.Training,df_train,self.num)
                         if ['sim','train'] in self.pipe.gluepairs: 
                             self.pipe.glue(['sim','train'])
@@ -281,30 +309,7 @@ class RunPipe():
                                 if pro.validplots:
                                     pro.get_validplot_inputs(outname='misc/{}_validplot_info_{}.txt'.format(proname,self.num))
                 else:
-                    os.system('echo FAILED > PIPELINE_{}.DONE'.format(self.num))
-                                    
-          
-            """
-            below is test
-            """      
-            
-#             os.system('touch PIPELINE_{}.SUCCESS'.format(self.num))
-
-#             for proname in ['lcfit','biascorlcfit','getmu','cosmofit']:
-#                 if proname in self.pipe.pipepros:
-#                     pro = self.pipe._get_pipepro_from_string(proname)
-#                     if not os.path.isdir('misc'):
-#                         os.makedirs('misc')
-#                     if isinstance(pro,list):
-#                         for i in range(len(pro)):
-#                             if pro[i].validplots:
-#                                 if proname.startswith('lcfit'):
-#                                     proname = 'lcfitting'
-#                                 pro[i].get_validplot_inputs(outname='misc/{}_validplot_info_{}_{}.txt'.format(proname,self.num,i))
-#                     else:
-#                         if pro.validplots:
-#                             pro.get_validplot_inputs(outname='misc/{}_validplot_info_{}.txt'.format(proname,self.num))
-                            
+                    os.system('echo FAILED > PIPELINE_{}.DONE'.format(self.num))                           
                                
         else:
             if self.batch_script is None:
@@ -378,7 +383,7 @@ class RunPipe():
                 #combine validplots here
                 pipe = self.pipedef()
                 validplot_pros = []
-                outsuffix = 'combined'
+#                 outsuffix = 'combined'
                 for p in pipe.pipepros:
                     if isinstance(pipe._get_pipepro_from_string(p),list) \
                       and np.any([(hasattr(pi,'validplots') and pi.validplots) for pi in pipe._get_pipepro_from_string(p)]):
@@ -386,58 +391,28 @@ class RunPipe():
                     elif hasattr(pipe._get_pipepro_from_string(p),'validplots') and pipe._get_pipepro_from_string(p).validplots:
                         validplot_pros.append(p)
                 print("Making summary plots for successful jobs: ".format(success_list))
-                self.combine_validplot_inputs(pros=[x for x in pipe.pipepros if x in validplot_pros],
-                                              nums=success_list,outsuffix=outsuffix)
-                for p in validplot_pros:
-                    if p.startswith('lcfit'):
-                        p = 'lcfitting'
-                    if p.startswith('cosmofit'):
-                        inputfile_sum = '{}_{}.cospar'.format(p,outsuffix)
-                    else:
-                        inputfile_sum = '{}_{}.FITRES'.format(p,outsuffix)
-                    print("Making summary plots for {}".format(p))
-                    if isinstance(pipe._get_pipepro_from_string(p),list): 
-                        self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p)[0].plotdir,'sum_valid_{}'.format(p))  
-                    else:
-                        self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p).plotdir,'sum_valid_{}'.format(p))  
+                outsuffix="combined_{}-{}".format(min(success_list),max(success_list))
+                if len(success_list)<2:
+                    print("Number of successful jobs < 2. Ending without making combined plots.")
                     
-            """
-            below is test
-            """
-#             #wait for all jobs to finish
-#             all_finish = False
-#             while all_finish == False:
-#                 finish_list = []
-#                 for i in range(self.batch_mode):
-#                     finish_list.append(os.path.exists('PIPELINE_{}.SUCCESS'.format(i+self.start_id)))
-#                 if np.all(finish_list):
-#                     all_finish = True
-#                 else:
-#                     time.sleep(5)
-#             #combine validplots here
-#             pipe = self.pipedef()
-#             validplot_pros = []
-#             outsuffix = 'combined'
-#             for p in pipe.pipepros:
-#                 if isinstance(pipe._get_pipepro_from_string(p),list) \
-#                   and np.any([(hasattr(pi,'validplots') and pi.validplots) for pi in pipe._get_pipepro_from_string(p)]):
-#                     validplot_pros.append(p)                        
-#                 elif hasattr(pipe._get_pipepro_from_string(p),'validplots') and pipe._get_pipepro_from_string(p).validplots:
-#                     validplot_pros.append(p)
-#             self.combine_validplot_inputs(pros=[x for x in pipe.pipepros if x in validplot_pros],
-#                                           nums=np.arange(self.batch_mode)+self.start_id,outsuffix=outsuffix)
-#             for p in validplot_pros:
-#                 if p.startswith('lcfit'):
-#                     p = 'lcfitting'
-#                 if p.startswith('cosmofit'):
-#                     inputfile_sum = '{}_{}.cospar'.format(p,outsuffix)
-#                 else:
-#                     inputfile_sum = '{}_{}.FITRES'.format(p,outsuffix)
-#                 print("Making summary plots for {}".format(p))
-#                 if isinstance(pipe._get_pipepro_from_string(p),list): 
-#                     self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p)[0].plotdir,'sum_valid_{}'.format(p))  
-#                 else:
-#                     self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p).plotdir,'sum_valid_{}'.format(p))  
+                else:
+                    self.combine_validplot_inputs(pros=[x for x in pipe.pipepros if x in validplot_pros],
+                                                  nums=success_list,outsuffix=outsuffix)
+                    for p in validplot_pros:
+                        if p.startswith('lcfit'):
+                            p = 'lcfitting'
+                        if p.startswith('cosmofit'):
+                            inputfile_sum = '{}_{}.cospar'.format(p,outsuffix)
+                        else:
+                            inputfile_sum = '{}_{}.FITRES'.format(p,outsuffix)
+                        print("Making summary plots for {}".format(p))
+                        if isinstance(pipe._get_pipepro_from_string(p),list): 
+                            self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p)[0].plotdir,
+                                                     prefix_sum='sum_valid_{}-{}'.format(min(success_list),max(success_list)))  
+                        else:
+                            self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p).plotdir,
+                                                     prefix_sum='sum_valid_{}-{}'.format(min(success_list),max(success_list)))  
+                      
                     
         
 def main(**kwargs):
