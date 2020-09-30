@@ -14,6 +14,7 @@ import copy
 import shutil
 import psutil
 import yaml
+import shlex
 from salt3.pipeline.validplot import ValidPlots
 cwd = os.getcwd()
 
@@ -174,6 +175,7 @@ class SALT3pipe():
                 pro = self._get_config_option(config,prostr,'pro')
                 batch = self._get_config_option(config,prostr,'batch',dtype=boolean_string)
                 batch_info = self._get_config_option(config,prostr,'batch_info')
+                translate = self._get_config_option(config,prostr,'translate',dtype=boolean_string)
                 validplots = self._get_config_option(config,prostr,'validplots',dtype=boolean_string)
                 proargs = self._get_config_option(config,prostr,'proargs')
                 prooptions = self._get_config_option(config,prostr,'prooptions')
@@ -192,6 +194,7 @@ class SALT3pipe():
                                      prooptions=prooptions,
                                      snlists=snlists,
                                      batch=batch,
+                                     translate=translate,
                                      batch_info = batch_info,
                                      validplots=validplots,
                                      plotdir=self.plotdir,
@@ -215,13 +218,15 @@ class SALT3pipe():
             
             pipepro = self._get_pipepro_from_string(prostr)
             if not isinstance(pipepro,list):
-                pipepro.run(batch=pipepro.batch)
+                pipepro.run(batch=pipepro.batch,translate=pipepro.translate)
+                pipepro.extract_gzfitres()
                 if pipepro.validplots:
                     print('making validation plots in %s/'%self.plotdir)
                     pipepro.validplot_run()
             else:
                 for i in range(len(pipepro)):
-                    pipepro[i].run(batch=pipepro[i].batch)
+                    pipepro[i].run(batch=pipepro[i].batch,translate=pipepro[i].translate)
+                    pipepro[i].extract_gzfitres()
                     if pipepro[i].validplots:
                         print('making validation plots in %s/'%self.plotdir)
                         pipepro[i].validplot_run()
@@ -232,9 +237,9 @@ class SALT3pipe():
         else:
             self.success = lastpipepro[-1].success
             
-        #delete temp files
+#         #delete temp files
 #         if self.success:
-#             os.system('rm *.temp.{}'.format(self.timestamp))
+#             os.system('rm *.temp.{}*'.format(self.timestamp))
                     
     def glue(self,pipepros=None,on='phot'):
         if not self.build_flag: build_error()
@@ -334,6 +339,7 @@ class SALT3pipe():
                                    prooptions=pro1.prooptions,
                                    outname=pro1.outname,
                                    batch=pro1.batch,
+                                   translate=pro1.translate,
                                    validplots=pro1.validplots,
                                    plotdir=pro1.plotdir,
                                    labels=pro1.labels)
@@ -346,6 +352,7 @@ class SALT3pipe():
                                    prooptions=pro2.prooptions,
                                    outname=pro2.outname,
                                    batch=pro2.batch,
+                                   translate=pro2.translate,
                                    validplots=pro2.validplots,
                                    done_file=pro2.done_file,
                                    plotdir=pro2.plotdir,
@@ -358,6 +365,7 @@ class SALT3pipe():
                                    prooptions=pro2.prooptions,
                                    outname=vinput,
                                    batch=pro2.batch,
+                                   translate=pro2.translate,
                                    validplots=pro2.validplots,
                                    plotdir=pro2.plotdir,
                                    labels=pro2.labels)
@@ -443,6 +451,7 @@ class PipeProcedure():
 
     def configure(self,pro=None,baseinput=None,setkeys=None,
                   proargs=None,prooptions=None,batch=False,batch_info=None,
+                  translate=False,
                   validplots=False,plotdir=None,labels=None,**kwargs):  
         if pro is not None and "$" in pro:
             self.pro = os.path.expandvars(pro)
@@ -456,6 +465,7 @@ class PipeProcedure():
         self.proargs = proargs
         self.prooptions = prooptions
         self.batch = batch
+        self.translate = translate
         self.batch_info = batch_info
         self.validplots = validplots
         self.plotdir = plotdir
@@ -466,8 +476,11 @@ class PipeProcedure():
     def gen_input(self,outname=None):
         pass
 
-    def run(self,batch=None):
-        arglist = [self.proargs] + [finput_abspath(self.finput)] +[self.prooptions]
+    def run(self,batch=None,translate=None):
+#         arglist = [self.proargs] + [finput_abspath(self.finput)] +[self.prooptions]
+        if not os.path.split(self.finput)[0] == '':
+            finput_nopath = os.path.split(self.finput)[1]
+        arglist = [self.proargs] + [finput_nopath] +[self.prooptions] #input can't be absolute path for new snana submission script
         arglist = list(filter(None,arglist))
         args = []
         for arg in arglist:
@@ -475,10 +488,38 @@ class PipeProcedure():
                 for argitem in arg.split(' '):
                     args.append(argitem)
 
+        if translate:
+            print("Translating old snana inputs")
+            inputdir = os.path.split(finput_abspath(self.finput))[0]
+            inputfile = os.path.split(finput_abspath(self.finput))[1]
+            currentdir = os.getcwd()
+            print("Entering input dir: {}".format(inputdir))
+            os.chdir(inputdir)
+            print("Current dir: ",os.getcwd())
+            shellcommand = "submit_batch_jobs.sh --opt_translate 2 {}".format(inputfile) 
+            shellrun = subprocess.run(args=shlex.split(shellcommand),capture_output=True)
+            if shellrun.returncode == 1 and 'Exit after input file translation' in str(shellrun.stderr):
+                print("Finished translation - {}".format(shellcommand))
+            else:
+                raise RuntimeError("Error occured:\n{}".format(shellrun.stdout))
+            print("Going back to original dir: {}".format(currentdir))
+            os.chdir(currentdir)            
+            print("Current dir: ",os.getcwd())           
+        
+        #copy self.finput to current dir:
+        os.system('cp {} {}'.format(finput_abspath(self.finput),currentdir))
+        
         if batch: self.success = _run_batch_pro(self.pro, args, done_file=self.done_file)
         else: self.success = _run_external_pro(self.pro, args)
+            
+        #delete self.finput in currentdir
+        if self.success:
+            os.system('rm {}'.format(finput_nopath))
 
     def validplot_run(self):
+        pass
+    
+    def extract_gzfitres(self):
         pass
         
     def _get_input_info(self):
@@ -572,16 +613,18 @@ class Simulation(PipeProcedure):
         super().__init__()
 
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
-                  batch=False,batch_info=None,validplots=False,
+                  batch=False,batch_info=None,translate=False,validplots=False,
                   outname="pipeline_byosed_input.input",**kwargs):
         self.done_file = finput_abspath('%s/Sim.DONE'%os.path.dirname(baseinput))
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
+        self.translate = translate
         self.batch_info = batch_info
         self.validplots = validplots
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
                           prooptions=prooptions,batch=batch,batch_info=batch_info,
+                          translate=translate,
                           validplots=validplots)
 
     def gen_input(self,outname="pipeline_sim_input.input"):
@@ -940,7 +983,7 @@ class LCFitting(PipeProcedure):
         super().__init__()
         
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
-                  batch=False,batch_info=None,
+                  batch=False,batch_info=None,translate=False,
                   validplots=False,outname="pipeline_lcfit_input.input",
                   done_file='LCFit.DONE',plotdir=None,**kwargs):
 #         self.done_file = 'ALL.DONE'
@@ -948,11 +991,13 @@ class LCFitting(PipeProcedure):
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
+        self.translate = translate
         self.batch_info = batch_info
         self.validplots = validplots
         self.plotdir = plotdir
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
                           prooptions=prooptions,batch=batch,batch_info=batch_info,
+                          translate=translate,
                           validplots=validplots,plotdir=plotdir)
         
     def gen_input(self,outname="pipeline_lcfit_input.input"):
@@ -1079,6 +1124,11 @@ class LCFitting(PipeProcedure):
             with open(outname,'w') as f:
                 f.write("INPUTFILES: {}\n".format(','.join(self.validplot_inputfiles)))
                 f.write("INPUTBASES: {}\n".format(','.join(self.validplot_inputbases)))
+                            
+    def extract_gzfitres(self):
+        gzfiles = glob.glob('%s/*/FITOPT000.FITRES.gz'%self.keys['header']['outdir'].strip())
+        for gzfile in gzfiles:
+            os.system('gunzip {}'.format(gzfile))
             
 class GetMu(PipeProcedure):
             
@@ -1087,19 +1137,20 @@ class GetMu(PipeProcedure):
         super().__init__()
         
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
-                  batch=False,batch_info=None,
+                  batch=False,batch_info=None,translate=False,
                   validplots=False,plotdir=None,outname="pipeline_getmu_input.input",
                   done_file='GetMu.DONE',**kwargs):
         self.done_file = finput_abspath('%s/%s'%(os.path.dirname(baseinput),os.path.split(done_file)[1]))
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
+        self.translate = translate
         self.batch_info = batch_info
         self.validplots = validplots
         self.plotdir = plotdir
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
                           prooptions=prooptions,batch=batch,batch_info=batch_info,
-                          validplots=validplots,
+                          validplots=validplots,translate=translate,
                           done_file=self.done_file,plotdir=plotdir)
 
     def gen_input(self,outname="pipeline_getmu_input.input"):
@@ -1184,18 +1235,20 @@ class GetMu(PipeProcedure):
 
 class CosmoFit(PipeProcedure):
     def configure(self,setkeys=None,pro=None,outname=None,prooptions=None,batch=False,
-                  batch_info=None,validplots=False,plotdir=None,**kwargs):
+                  batch_info=None,translate=False,validplots=False,plotdir=None,**kwargs):
         self.done_file = None
         if setkeys is not None:
             outname = setkeys.value.values[0]
         self.prooptions = prooptions
         self.finput = outname
         self.batch = batch
+        self.translate = translate
         self.batch_info = batch_info
         self.validplots = validplots
         self.plotdir = plotdir
         super().configure(pro=pro,outname=outname,prooptions=prooptions,batch=batch,
-                          batch_info=batch_info,validplots=validplots,plotdir=plotdir)
+                          batch_info=batch_info,translate=translate,
+                          validplots=validplots,plotdir=plotdir)
 
     def _get_input_info(self):
         df = {}
@@ -1691,6 +1744,7 @@ def _read_simple_config_file(filename,sep='='):
     config,delimiter = {},{}
     with _open_shared_file(filename) as f:
         lines = f.readlines()
+    f.close()
 
     # sighhhh so many SNANA inputs with multiple key/value separators
     if isinstance(sep,str):
@@ -1820,7 +1874,7 @@ def _has_handle(fpath):
 
     return False
 
-def _open_shared_file(filename,flag="r",max_time=100):
+def _open_shared_file(filename,flag="r",max_time=600):
     status = False
     total_time = 0
     while status is False and total_time < max_time:
