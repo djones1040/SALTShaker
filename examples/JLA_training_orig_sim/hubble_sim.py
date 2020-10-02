@@ -11,10 +11,10 @@ import pylab as plt
 plt.ion()
 from scipy.stats import binned_statistic
 from scipy.optimize import least_squares,minimize
-import getmu
+from util import getmu
 import os
 from matplotlib.gridspec import GridSpec
-from txtobj import txtobj
+from util.txtobj import txtobj
 from matplotlib.ticker import NullFormatter
 plt.rcParams['figure.figsize'] = (10,4)
 

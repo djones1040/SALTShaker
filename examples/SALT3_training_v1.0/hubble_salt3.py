@@ -206,8 +206,8 @@ $med. \chi^2_{{\nu}}$ = {med_chi3:.2f}""",
     ax1.set_xlabel('$z_{CMB}$',fontsize=15)
     ax1.set_ylabel('$\mu-\mu_{\Lambda CDM}$',fontsize=15)
     ax2.xaxis.set_ticks([])
-    
-    import pdb; pdb.set_trace()
+    plt.savefig('hubblediagsalt3.pdf')
+    #import pdb; pdb.set_trace()
 
 def plot_outliers():
 

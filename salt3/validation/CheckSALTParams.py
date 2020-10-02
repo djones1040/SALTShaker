@@ -47,4 +47,9 @@ def checkSALT(parameters,parlist,lcfiles,snlist,outdir,idx=0):
 	plt.savefig('%s/saltparcomp_%i.png'%(outdir,idx))
 	print(np.mean(x1_salt3),np.mean(x1_salt2))
 	print(np.mean(c_salt3),np.mean(c_salt2))	
+	
+	plt.clf()
+	plt.plot(x1_salt3,c_salt3,'bx')
+	plt.savefig('%s/colorx1cor_%i.png'%(outdir,idx))
+	
 	return
