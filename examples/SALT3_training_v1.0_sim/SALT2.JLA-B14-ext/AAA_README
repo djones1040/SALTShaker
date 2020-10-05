@@ -1,0 +1,9 @@
+Copy the following from nominal model:
+salt2_lc_dispersion_scaling.dat  (100 A binning!)
+salt2_color_dispersion.dat
+
+The U-magerr floor is set to zero here, which is 
+different than the 0.1 magerr floor in SALT2.Guy10.
+In the JLA analsis, CFA3,CSP,SDSS UV region has no
+additional UV error; however, a 0.1 UV-magerr is
+added to CalanTololo, CFAI,CFAII, lowz.
