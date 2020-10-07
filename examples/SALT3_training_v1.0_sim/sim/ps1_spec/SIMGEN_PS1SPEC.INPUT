@@ -16,9 +16,9 @@ SIMLIB_FILE: sim/ps1_spec/PS1MD.simlib
 
 # should be 46.46% SNe Ia
 NGENTOT_LC:    400 # 500 #2000 # 40000                 # number of SN lightcurves to generate 
-GENVERSION: PS1_SIM_IA_SPEC             # SNDATA version to generate
+GENVERSION: PS1_SIM_IA_SPEC_SALT3TRAIN             # SNDATA version to generate
 GENSOURCE:  RANDOM
-GENMODEL:   SALT2.JLA-B14
+GENMODEL:   saltmodels/SALT2.JLA-B14-ext
 
 EFFERR_STOPGEN: 1.0E-7
 
@@ -41,7 +41,6 @@ GENRANGE_RA:      -1.0     +1.0   deg
 GENRANGE_DECL:    -1.258    +1.258  deg
 
 GENRANGE_PEAKMJD:  55080.0  56660.0
-SOLID_ANGLE: 0.022 # 1 field, 7 sq degreees
 FUDGE_MAGERR: 0.005
 
 GENSIGMA_SEARCH_PEAKMJD:  1.0     # sigma-smearing for  SEARCH_PEAKMJD (days)

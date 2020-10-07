@@ -6,17 +6,20 @@
 #
 #########################################################
 
-NGENTOT_LC:    1100
-GENVERSION: Foundation_BBC         # SNDATA version to generate
+NGENTOT_LC:    100
+GENVERSION: Foundation_TRAINSALT         # SNDATA version to generate
 GENSOURCE:  RANDOM
-GENMODEL: SALT2.JLA-B14-ext
+GENMODEL: saltmodels/SALT2.JLA-B14-ext
 
-SIMLIB_FILE: sim/found_spec/found.simlib
+SIMLIB_FILE: sim/simlib/Foundation_DR1.SIMLIB
 USE_SIMLIB_PEAKMJD: 1
+USE_SIMLIB_REDSHIFT: 1
+USE_SIMLIB_SPECTRA: 1
+USE_SIMLIB_SALT2: 1
 
 RESTLAMBDA_FITRANGE: 3000 13000
 CIDOFF: 500
-KCOR_FILE:  kcor/kcor_PS1_none.fits
+KCOR_FILE:  kcor/kcor_PS1_none_spec.fits
 APPLY_SEARCHEFF_OPT: 3
 
 GENMAG_SMEAR_MODELNAME: G10
@@ -32,9 +35,7 @@ GENRANGE_REDSHIFT:  0.009    0.11
 GENSIGMA_REDSHIFT:  0.000001
 DNDZ: POWERLAW  2.6E-5  2.2
 GENSIGMA_VPEC: 250 #this we will need to play with this for redshift uncertainty
-GENRANGE_TREST:   -12.0    40.0     # rest epoch relative to peak (days)
-
-GENMEAN_RV:         3.1               # mean RV to generate
+GENRANGE_TREST:   -15.0    40.0     # rest epoch relative to peak (days)
 
 OPT_MWEBV: 1
 
