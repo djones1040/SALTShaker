@@ -6,7 +6,7 @@
 #
 #########################################################
 
-NGENTOT_LC:    100
+NGENTOT_LC:    400
 GENVERSION: Foundation_TRAINSALT         # SNDATA version to generate
 GENSOURCE:  RANDOM
 GENMODEL: saltmodels/SALT2.JLA-B14-ext
