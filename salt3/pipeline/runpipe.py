@@ -260,7 +260,7 @@ class RunPipe():
                         if ['train','biascorlcfit'] in self.pipe.gluepairs:
                             self.pipe.glue(['train','biascorlcfit'],on='model')
                     if any([p.startswith('getmu') for p in self.pipe.pipepros]): 
-                        df_getmu = self._add_suffix(self.pipe.GetMu,['OUTDIR_OVERRIDE'],self.num)
+                        df_getmu = self._add_suffix(self.pipe.GetMu,[self.pipe.GetMu.outdir_key],self.num)
                         done_file = "{}_{:03d}".format(self.pipe.GetMu.done_file.strip(),self.num)
                         self._reconfig_w_suffix(self.pipe.GetMu,df_getmu,self.num,done_file=done_file)
                         if ['lcfit','getmu'] in self.pipe.gluepairs:

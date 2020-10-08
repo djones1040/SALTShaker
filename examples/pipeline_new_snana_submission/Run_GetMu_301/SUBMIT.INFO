@@ -1,0 +1,39 @@
+
+# Required info 
+TIME_STAMP_NSEC:   21406    # submit time; Nsec since midnight
+TIME_STAMP_SUBMIT: 2020-10-07 05:56:50.599608    
+SCRIPT_DIR:       /home/midai/pipeline_new_snana_submission/Run_GetMu_301/SCRIPTS_BBCFIT 
+DONE_STAMP_LIST:  ['ALL.DONE', '/home/midai/pipeline_new_snana_submission/pipeline/GetMu.DONE_301'] 
+CLEANUP_FLAG:     1 
+N_JOB_TOT:        1     # total number of jobs (excludes sym links)
+N_DONE_TOT:       1     # total number of done files (includes sym links)
+N_JOB_SPLIT:      1     # njob to merge per task after processing
+N_CORE:           20     # number of cores 
+FORCE_CRASH_PREP:    False 
+FORCE_CRASH_MERGE:   False
+
+
+# BBC info
+JOBFILE_WILDCARD:  '*FITOPT*MUOPT*' 
+NVERSION:       1      # number of data VERSIONs
+NFITOPT:        1      # number of FITOPTs
+NMUOPT:         1      # number of BBC options
+NSPLITRAN:      1      # number of random sub-samples
+USE_WFIT:       False     # option to run wfit on BBC output
+IGNORE_FITOPT:  False 
+IGNORE_MUOPT:   False 
+FITOPTxMUOPT:   ALL 
+
+INPDIR_LIST:
+  - /home/midai/pipeline_new_snana_submission/SIM_LOWZPS1_LOWZ_301
+  - /home/midai/pipeline_new_snana_submission/SIM_LOWZPS1_PS1_301
+
+VERSION_OUT_LIST:
+  - OUTPUT_BBCFIT
+
+MUOPT_LIST:  # 'internal_Label'  'user_label'  'user_args'
+  - ['MUOPT000', 'DEFAULT', ''] 
+
+
+SBATCH_LIST:  # [CPU,PID,JOB_NAME] 
+  - [   0, 5922707, BBC.input.temp.1602041344.2483244_301-CPU0000 ] 

@@ -1,0 +1,1 @@
+nohup runpipe -c pipeline_training_notrain-wl.txt --mypipe mypipe_notraining.py --batch_mode 5 --start_id 345 --batch_script pipeline_batch_script_base_broadwl --timeout 360000 > log 2>&1

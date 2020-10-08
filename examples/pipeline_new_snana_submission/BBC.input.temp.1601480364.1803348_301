@@ -1,0 +1,65 @@
+# Automatic translation for legacy BBC file LEGACY_BBC.input.temp.1601480364.1803348_301
+
+CONFIG:
+  BATCH_INFO: sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 20
+  DONE_STAMP: /home/midai/pipeline_new_snana_submission/pipeline/GetMu.DONE_301
+  STRINGMATCH_IGNORE: IGNORE
+  FITOPT000_ONLY: 1
+  OUTDIR: Run_GetMu_301
+  INPDIR+:
+  - /home/midai/pipeline_new_snana_submission/SIM_LOWZPS1_LOWZ_301
+  - /home/midai/pipeline_new_snana_submission/SIM_LOWZPS1_PS1_301
+
+#END_YAML
+
+file=blah
+nlogzbin=25
+blindflag=0
+prefix=SALT2mu_FoundPS1
+vpecerr=250
+lensing_zpar=0.055
+min_per_zbin=1
+redchi2_tol=.01
+fitflag_sigmb=2
+iflag_duplicate=2 # 0=ignore, 1=abort, 2=merge
+sig1=0.11
+zmin=0.01
+zmax=0.7
+x1min=-3.0
+x1max=+3.0
+cmax=+0.3
+cmin=-0.3
+errmask_write=0
+p1=0.14635
+p2=3.10805
+p3=0.0 # alpha evolution
+p4=0.0 # beta evolution
+p5=0.0 # host mass
+p6=0.0 # host mass evolution
+p7=10.0 # mass step split
+p8=0.01 # step widthx
+p9=0.70
+p10=0.0
+p11=-1.0
+p12=0.0
+p13=1.0
+u1=1
+u2=1
+u3=0
+u4=0
+u5=0
+u6=0
+u7=0
+u8=0
+u9=0
+u10=0
+u11=0
+u12=0
+u13=1
+h0=70.0
+mag0=-30.00
+uave=1
+hgtype=-1 # uave = use average magnitude from cosmology (not nommag0)
+opt_biascor=240
+surveygroup_biascor='CFA3S+CFA3K+CFA4p1+CFA4p2(zbin=0.02),PS1MD(zbin=0.05)'
+simfile_biascor=/home/midai/pipeline_new_snana_submission/SIM_LOWZPS1_BIASCOR_LOWZ_301/AllSurveys_LOWZ_BIASCOR_301/FITOPT000.FITRES,/home/midai/pipeline_new_snana_submission/SIM_LOWZPS1_BIASCOR_PS1_301/ALLSurveys_PS1_BIASCOR_301/FITOPT000.FITRES

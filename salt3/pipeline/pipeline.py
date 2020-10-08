@@ -358,7 +358,9 @@ class SALT3pipe():
                                    plotdir=pro2.plotdir,
                                    labels=pro2.labels)
                 else:
-                    version_photometry = '/'+self.LCFitting[0].keys['SNLCINP']['VERSION_PHOTOMETRY']+'/'
+#                     version_photometry = '/'+self.LCFitting[0].keys['SNLCINP']['VERSION_PHOTOMETRY']+'/'
+#                     vinput = version_photometry.strip().join(setkeys['value'].values[0])
+                    version_photometry = '/OUTPUT_BBCFIT/'
                     vinput = version_photometry.strip().join(setkeys['value'].values[0])
                     print("cosmofit input file = ",vinput)
                     pro2.configure(pro=pro2.pro,
@@ -478,9 +480,11 @@ class PipeProcedure():
 
     def run(self,batch=None,translate=None):
 #         arglist = [self.proargs] + [finput_abspath(self.finput)] +[self.prooptions]
-        if not os.path.split(self.finput)[0] == '':
+        if translate and not os.path.split(self.finput)[0] == '':
             finput_nopath = os.path.split(self.finput)[1]
-        arglist = [self.proargs] + [finput_nopath] +[self.prooptions] #input can't be absolute path for new snana submission script
+            arglist = [self.proargs] + [finput_nopath] +[self.prooptions] #input can't be absolute path for new snana submission script
+        else:
+            arglist = [self.proargs] + [finput_abspath(self.finput)] +[self.prooptions]
         arglist = list(filter(None,arglist))
         args = []
         for arg in arglist:
@@ -506,14 +510,14 @@ class PipeProcedure():
             os.chdir(currentdir)            
             print("Current dir: ",os.getcwd())           
         
-        #copy self.finput to current dir:
-        os.system('cp {} {}'.format(finput_abspath(self.finput),currentdir))
+            #copy self.finput to current dir:
+            os.system('cp {} {}'.format(finput_abspath(self.finput),currentdir))
         
         if batch: self.success = _run_batch_pro(self.pro, args, done_file=self.done_file)
         else: self.success = _run_external_pro(self.pro, args)
             
         #delete self.finput in currentdir
-        if self.success:
+        if translate and self.success:
             os.system('rm {}'.format(finput_nopath))
 
     def validplot_run(self):
@@ -1148,6 +1152,11 @@ class GetMu(PipeProcedure):
         self.batch_info = batch_info
         self.validplots = validplots
         self.plotdir = plotdir
+        if self.translate:
+            self.outdir_key = 'OUTDIR'
+        else:
+            self.outdir_key = 'OUTDIR_OVERRIDE'
+            
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
                           prooptions=prooptions,batch=batch,batch_info=batch_info,
                           validplots=validplots,translate=translate,
@@ -1157,7 +1166,8 @@ class GetMu(PipeProcedure):
         self.outname = outname
         self.finput,self.keys,self.delimiter = _gen_general_input(basefilename=self.baseinput,setkeys=self.setkeys,
                                                                   outname=outname,sep=['=',': '],done_file=self.done_file,
-                                                                  outdir='Run_GetMu',batch_info=self.batch_info)
+                                                                  outdir='Run_GetMu',batch_info=self.batch_info,
+                                                                  outdir_key=self.outdir_key)
         
     def glueto(self,pipepro):
         if not isinstance(pipepro,str):
@@ -1206,8 +1216,10 @@ class GetMu(PipeProcedure):
             df['value'] = self.keys[key].strip()+'.M0DIF'
             return pd.DataFrame([df])
         else:
+#             df = {'key':None,
+#                   'value':[self.keys[self.outdir_key],'SALT2mu_FITOPT000_MUOPT000.M0DIF']}
             df = {'key':None,
-                  'value':[self.keys['OUTDIR_OVERRIDE'],'SALT2mu_FITOPT000_MUOPT000.M0DIF']}
+                  'value':[self.keys[self.outdir_key],'FITOPT000_MUOPT000.M0DIF']}
             return pd.DataFrame([df])          
         
     def validplot_run(self):
@@ -1217,11 +1229,11 @@ class GetMu(PipeProcedure):
         self.get_validplot_inputs()
         for inputfile,inputbase in zip(self.validplot_inputfiles,self.validplot_inputbases):
             self.validplot_func.input(inputfile)
-            self.validplot_func.output(outputdir=self.plotdir,prefix='valid_getmu_%s'%self.keys['OUTDIR_OVERRIDE'])
+            self.validplot_func.output(outputdir=self.plotdir,prefix='valid_getmu_%s'%self.keys[self.outdir_key])
             self.validplot_func.run()
             
     def get_validplot_inputs(self,outname=None):
-        inputfiles = glob.glob('%s/*/SALT2mu_FITOPT000_MUOPT000.FITRES'%self.keys['OUTDIR_OVERRIDE'])
+        inputfiles = glob.glob('%s/*/FITOPT000_MUOPT000.FITRES'%self.keys[self.outdir_key])
         inputbases = [inputfile.split('/')[-1] for inputfile in inputfiles]
         
         self.validplot_inputfiles = inputfiles
@@ -1231,7 +1243,12 @@ class GetMu(PipeProcedure):
             with open(outname,'w') as f:
                 f.write("INPUTFILES: {}\n".format(','.join(self.validplot_inputfiles)))
                 f.write("INPUTBASES: {}\n".format(','.join(self.validplot_inputbases)))
-        
+                
+    def extract_gzfitres(self):
+        gzfiles = glob.glob('%s/*/FITOPT000_MUOPT000*.gz'%self.keys[self.outdir_key])
+        for gzfile in gzfiles:
+            os.system('gunzip {}'.format(gzfile))
+                
 
 class CosmoFit(PipeProcedure):
     def configure(self,setkeys=None,pro=None,outname=None,prooptions=None,batch=False,
@@ -1702,7 +1719,8 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
     return outname,nml
 
 def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',
-                       batch_info=None,done_file=None,outdir=None):
+                       batch_info=None,done_file=None,outdir=None,
+                       outdir_key='OUTDIR_OVERRIDE'):
 
     config,delimiter = _read_simple_config_file(basefilename,sep=sep)
     #if setkeys is None:
@@ -1726,9 +1744,9 @@ def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',
         v = done_file
         config[key] = v
         if len(delimiter.keys()): delimiter[key] = ': '
-    if outdir is not None and 'OUTDIR_OVERRIDE' not in config.keys():
-        config['OUTDIR_OVERRIDE'] = outdir
-        delimiter['OUTDIR_OVERRIDE'] = ': '
+    if outdir is not None and outdir_key not in config.keys():
+        config[outdir_key] = outdir
+        delimiter[outdir_key] = ': '
     if 'BATCH_INFO' in config.keys() and batch_info is not None:
         print("Changing BATCH_INFO to {}".format(batch_info))
         config['BATCH_INFO'] = batch_info

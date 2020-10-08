@@ -1,0 +1,255 @@
+nohup: ignoring input
+Submitted batch job 5919654
+No randseed file provided. A random list generated
+Submitting batch job...
+sbatch /home/midai/pipeline_new_snana_submission/test_pipeline_batch_script_301
+14:22:32: 
+wait for all jobs to finish
+jobs already finished: []
+14:32:32: 
+wait for all jobs to finish
+jobs already finished: []
+16:02:32: 
+wait for all jobs to finish
+jobs already finished: []
+17:32:32: 
+wait for all jobs to finish
+jobs already finished: []
+17:42:33: 
+wait for all jobs to finish
+jobs already finished: []
+19:02:32: 
+wait for all jobs to finish
+jobs already finished: []
+19:12:32: 
+wait for all jobs to finish
+jobs already finished: []
+20:42:32: 
+wait for all jobs to finish
+jobs already finished: []
+20:52:33: 
+wait for all jobs to finish
+jobs already finished: []
+22:12:32: 
+wait for all jobs to finish
+jobs already finished: []
+22:22:32: 
+wait for all jobs to finish
+jobs already finished: []
+23:52:32: 
+wait for all jobs to finish
+jobs already finished: []
+00:02:33: 
+wait for all jobs to finish
+jobs already finished: []
+01:22:32: 
+wait for all jobs to finish
+jobs already finished: []
+01:32:33: 
+wait for all jobs to finish
+jobs already finished: []
+02:52:32: 
+wait for all jobs to finish
+jobs already finished: []
+03:02:32: 
+wait for all jobs to finish
+jobs already finished: []
+04:32:32: 
+wait for all jobs to finish
+jobs already finished: []
+04:42:33: 
+wait for all jobs to finish
+jobs already finished: []
+06:02:32: 
+wait for all jobs to finish
+jobs already finished: []
+06:12:32: 
+wait for all jobs to finish
+jobs already finished: []
+07:42:32: 
+wait for all jobs to finish
+jobs already finished: []
+07:52:32: 
+wait for all jobs to finish
+jobs already finished: []
+09:22:32: 
+wait for all jobs to finish
+jobs already finished: []
+09:32:33: 
+wait for all jobs to finish
+jobs already finished: []
+10:52:32: 
+wait for all jobs to finish
+jobs already finished: []
+11:02:33: 
+wait for all jobs to finish
+jobs already finished: []
+12:22:32: 
+wait for all jobs to finish
+jobs already finished: []
+12:32:32: 
+wait for all jobs to finish
+jobs already finished: []
+14:02:32: 
+wait for all jobs to finish
+jobs already finished: []
+14:12:33: 
+wait for all jobs to finish
+jobs already finished: []
+15:32:32: 
+wait for all jobs to finish
+jobs already finished: []
+15:42:33: 
+wait for all jobs to finish
+jobs already finished: []
+17:02:32: 
+wait for all jobs to finish
+jobs already finished: []
+17:12:33: 
+wait for all jobs to finish
+jobs already finished: []
+18:42:32: 
+wait for all jobs to finish
+jobs already finished: []
+18:52:33: 
+wait for all jobs to finish
+jobs already finished: []
+20:12:32: 
+wait for all jobs to finish
+jobs already finished: []
+20:22:33: 
+wait for all jobs to finish
+jobs already finished: []
+21:52:32: 
+wait for all jobs to finish
+jobs already finished: []
+22:02:33: 
+wait for all jobs to finish
+jobs already finished: []
+23:22:32: 
+wait for all jobs to finish
+jobs already finished: []
+23:32:32: 
+wait for all jobs to finish
+jobs already finished: []
+01:02:32: 
+wait for all jobs to finish
+jobs already finished: []
+01:12:33: 
+wait for all jobs to finish
+jobs already finished: []
+02:32:32: 
+wait for all jobs to finish
+jobs already finished: []
+02:42:32: 
+wait for all jobs to finish
+jobs already finished: []
+04:02:32: 
+wait for all jobs to finish
+jobs already finished: []
+04:12:32: 
+wait for all jobs to finish
+jobs already finished: []
+05:42:32: 
+wait for all jobs to finish
+jobs already finished: []
+05:52:33: 
+wait for all jobs to finish
+jobs already finished: []
+Using user defined pipeline: mypipe_notraining.py
+Current procedures:  ['sim', 'lcfit', 'biascorsim', 'biascorlcfit', 'getmu', 'cosmofit']
+Load base sim input file.. simulation/MASTER_LOWZ_PS1.INPUT
+Changing BATCH_INFO to sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 10
+Setting GENRANGE_REDSHIFT = 0.02 0.08
+Setting GENRANGE_REDSHIFT = 0.05 0.7
+Setting FORMAT_MASK = 48
+Adding key NGENTOT_LC = 200 for GENVERSION[0]
+Adding key NGENTOT_LC = 8000 for GENVERSION[1]
+Adding key GENMODEL = SALT2.JLA-B14 for GENVERSION[0]
+Adding key GENMODEL = SALT2.JLA-B14 for GENVERSION[1]
+Write sim input to file: pipeline/MASTER_LOWZ_PS1.INPUT.temp.1602068333.581935
+Load base fit input file.. lcfitting/snfit_base.nml
+Changing BATCH_INFO to sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 10
+Setting key OUTDIR=['SIM_LOWZPS1_LOWZ', None] in &HEADER
+Setting key FITMODEL_NAME=['SALT2.JLA-B14', None] in &FITINP
+Setting key OPT_MWEBV=['1', None] in &SNLCINP
+Write fit input to file: pipeline/snfit_TEST.nml.temp.1602068333.581935
+Load base fit input file.. lcfitting/snfit_base.nml
+Changing BATCH_INFO to sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 10
+Setting key OUTDIR=['SIM_LOWZPS1_PS1', None] in &HEADER
+Setting key FILTLIST_FIT=['griz', None] in &FITINP
+Setting key CUTWIN_REDSHIFT=['0.01', '0.7'] in &SNLCINP
+Setting key FITMODEL_NAME=['SALT2.JLA-B14', None] in &FITINP
+Setting key OPT_MWEBV=['1', None] in &SNLCINP
+Write fit input to file: pipeline/snfit_TEST2.nml.temp.1602068333.581935
+Load base sim input file.. biascorsim/MASTER_LOWZ_PS1.INPUT
+Changing BATCH_INFO to sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 40
+Setting GENMODEL = SALT2.JLA-B14
+Setting GENRANGE_REDSHIFT = 0.02 0.09
+Setting GENMODEL = SALT2.JLA-B14
+Setting GENRANGE_REDSHIFT = 0.05 0.7
+Adding key NGENTOT_LC = 40000 for GENVERSION[0]
+Adding key NGENTOT_LC = 2000000 for GENVERSION[1]
+Adding key GENSIGMA_SALT2ALPHA = 1.E8 1.E8 for GENVERSION[0]
+Adding key GENSIGMA_SALT2BETA = 1.E8 1.E8 for GENVERSION[0]
+Adding key GENRANGE_SALT2ALPHA = 0.09 0.2 for GENVERSION[0]
+Adding key GENGRID_SALT2ALPHA = 2 for GENVERSION[0]
+Adding key GENRANGE_SALT2BETA = 2.0 4.0 for GENVERSION[0]
+Adding key GENGRID_SALT2BETA = 2 for GENVERSION[0]
+Adding key GENSIGMA_SALT2ALPHA = 1.E8 1.E8 for GENVERSION[1]
+Adding key GENSIGMA_SALT2BETA = 1.E8 1.E8 for GENVERSION[1]
+Adding key GENRANGE_SALT2ALPHA = 0.09 0.2 for GENVERSION[1]
+Adding key GENGRID_SALT2ALPHA = 2 for GENVERSION[1]
+Adding key GENRANGE_SALT2BETA = 2.0 4.0 for GENVERSION[1]
+Adding key GENGRID_SALT2BETA = 2 for GENVERSION[1]
+Write sim input to file: pipeline/MASTER_LOWZ_PS1_biascor.INPUT.temp.1602068333.581935
+Load base fit input file.. lcfitting/snfit_base.nml
+Changing BATCH_INFO to sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 80
+Setting key OUTDIR=['SIM_LOWZPS1_BIASCOR_LOWZ', None] in &HEADER
+Setting key FITMODEL_NAME=['SALT2.JLA-B14', None] in &FITINP
+Setting key OPT_MWEBV=['1', None] in &SNLCINP
+Write fit input to file: pipeline/snfit_TEST_biascor.nml.temp.1602068333.581935
+Load base fit input file.. lcfitting/snfit_base.nml
+Changing BATCH_INFO to sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 80
+Setting key OUTDIR=['SIM_LOWZPS1_BIASCOR_PS1', None] in &HEADER
+Setting key FILTLIST_FIT=['griz', None] in &FITINP
+Setting key FITMODEL_NAME=['SALT2.JLA-B14', None] in &FITINP
+Setting key CUTWIN_REDSHIFT=['0.01', '0.8'] in &SNLCINP
+Setting key OPT_MWEBV=['1', None] in &SNLCINP
+Write fit input to file: pipeline/snfit_TEST_biascor2.nml.temp.1602068333.581935
+Adding/modifying key opt_biascor=240
+Adding/modifying key surveygroup_biascor='CFA3S+CFA3K+CFA4p1+CFA4p2(zbin=0.02),PS1MD(zbin=0.05)'
+Changing BATCH_INFO to sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 20
+input file saved as: pipeline/BBC.input.temp.1602068333.581935
+Connecting  ['sim', 'lcfit']
+Load base fit input file.. pipeline/snfit_TEST.nml.temp.1602068333.581935
+Setting key VERSION_PHOTOMETRY=AllSurveys_LOWZ in &SNLCINP
+Setting key KCOR_FILE=kcor/kcor_SPEC_PS1_LOWZ_COMBINED.fits in &SNLCINP
+Setting key VERSION=AllSurveys_LOWZ in &HEADER
+Write fit input to file: pipeline/snfit_TEST.nml.temp.1602068333.581935
+Load base fit input file.. pipeline/snfit_TEST2.nml.temp.1602068333.581935
+Setting key VERSION_PHOTOMETRY=ALLSurveys_PS1 in &SNLCINP
+Setting key KCOR_FILE=kcor/kcor_PS1_PS1MD_SPEC.fits in &SNLCINP
+Setting key VERSION=ALLSurveys_PS1 in &HEADER
+Write fit input to file: pipeline/snfit_TEST2.nml.temp.1602068333.581935
+Connecting  ['lcfit', 'getmu']
+Adding/modifying key INPDIR+=['/home/midai/pipeline_new_snana_submission/SIM_LOWZPS1_LOWZ', '/home/midai/pipeline_new_snana_submission/SIM_LOWZPS1_PS1']
+input file saved as: pipeline/BBC.input.temp.1602068333.581935
+Connecting  ['biascorsim', 'biascorlcfit']
+Load base fit input file.. pipeline/snfit_TEST_biascor.nml.temp.1602068333.581935
+Setting key VERSION_PHOTOMETRY=AllSurveys_LOWZ_BIASCOR in &SNLCINP
+Setting key KCOR_FILE=kcor/kcor_SPEC_PS1_LOWZ_COMBINED.fits in &SNLCINP
+Setting key VERSION=AllSurveys_LOWZ_BIASCOR in &HEADER
+Write fit input to file: pipeline/snfit_TEST_biascor.nml.temp.1602068333.581935
+Load base fit input file.. pipeline/snfit_TEST_biascor2.nml.temp.1602068333.581935
+Setting key VERSION_PHOTOMETRY=ALLSurveys_PS1_BIASCOR in &SNLCINP
+Setting key KCOR_FILE=kcor/kcor_PS1_PS1MD_SPEC.fits in &SNLCINP
+Setting key VERSION=ALLSurveys_PS1_BIASCOR in &HEADER
+Write fit input to file: pipeline/snfit_TEST_biascor2.nml.temp.1602068333.581935
+Connecting  ['biascorlcfit', 'getmu']
+Adding/modifying key simfile_biascor=/home/midai/pipeline_new_snana_submission/SIM_LOWZPS1_BIASCOR_LOWZ/AllSurveys_LOWZ_BIASCOR/FITOPT000.FITRES,/home/midai/pipeline_new_snana_submission/SIM_LOWZPS1_BIASCOR_PS1/ALLSurveys_PS1_BIASCOR/FITOPT000.FITRES
+input file saved as: pipeline/BBC.input.temp.1602068333.581935
+Connecting  ['getmu', 'cosmofit']
+cosmofit input file =  Run_GetMu/AllSurveys_LOWZ/SALT2mu_FITOPT000_MUOPT000.M0DIF
+Making summary plots for successful jobs: 
+Number of successful jobs < 2. Ending without making combined plots.
