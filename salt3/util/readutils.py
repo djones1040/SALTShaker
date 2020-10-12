@@ -390,18 +390,14 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 								 'tpk':tpk,
 								 'fitprob':fitprob}
 			#datadict[snid]['zHelio'] = zHel
-			iGood = np.array([],dtype=int)
-			for i,f in enumerate(sn.FLT):
-				if sn.MJD[i]-tpk > -19 and sn.MJD[i]-tpk < 49:
-					iGood = np.append(iGood,i)
 			# TODO: flux errors
 			datadict[sn.SNID]['specdata'] = {}
 			datadict[sn.SNID]['photdata'] = {}
-			datadict[sn.SNID]['photdata']['tobs'] = sn.MJD[iGood] - tpk
-			datadict[sn.SNID]['photdata']['mjd'] = sn.MJD[iGood]
-			datadict[sn.SNID]['photdata']['fluxcal'] = sn.FLUXCAL[iGood]
-			datadict[sn.SNID]['photdata']['fluxcalerr'] = sn.FLUXCALERR[iGood]
-			datadict[sn.SNID]['photdata']['filt'] = sn.FLT[iGood]
+			datadict[sn.SNID]['photdata']['tobs'] = sn.MJD - tpk
+			datadict[sn.SNID]['photdata']['mjd'] = sn.MJD
+			datadict[sn.SNID]['photdata']['fluxcal'] = sn.FLUXCAL
+			datadict[sn.SNID]['photdata']['fluxcalerr'] = sn.FLUXCALERR
+			datadict[sn.SNID]['photdata']['filt'] = sn.FLT
 			if 'MWEBV' in sn.__dict__.keys():
 				try: datadict[sn.SNID]['MWEBV'] = float(sn.MWEBV.split()[0])
 				except: datadict[sn.SNID]['MWEBV'] = float(sn.MWEBV)

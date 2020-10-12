@@ -480,7 +480,7 @@ class GaussNewton(saltresids.SALTResids):
 		varyingParams=self.fitOptions['components'][1]|self.fitOptions['color'][1]|self.fitOptions['spectralrecalibration'][1]|self.fitOptions['colorlaw'][1]
 		logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
 		if suppressregularization:
-			self.neff[self.neff<self.neffMax]=100
+			self.neff[self.neff<self.neffMax]=10
 		residuals,jac=self.lsqwrap(X,{},varyingParams,True,doSpecResids=True)
 		self.updateEffectivePoints(X)
 		#Simple preconditioning of the jacobian before attempting to invert

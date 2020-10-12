@@ -243,7 +243,7 @@ class TrainSALT(TrainSALTBase):
 					#else:
 					guess[parlist == key] = pars[names == key]
 				except:
-					log.critical('Problem while initializing parameter ',key,' from previous training')
+					log.critical(f'Problem while initializing parameter {key} from previous training')
 					sys.exit(1)
 					
 
