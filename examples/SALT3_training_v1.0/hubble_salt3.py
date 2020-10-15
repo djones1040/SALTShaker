@@ -21,6 +21,7 @@ import textwrap
 from matplotlib.backends.backend_pdf import PdfPages
 from scipy.interpolate import interp1d
 import math
+import sys
 plt.rcParams['figure.figsize'] = (10,4)
 
 __band_order__=np.append(['u','b','g','v','r','i','z','y','j','h','k'],
@@ -251,8 +252,8 @@ def plot_outliers():
     # hubble diagram w/ bins
     fr2 = getmu.getmu(fr2,salt2alpha=salt2alpha,salt2beta=salt2beta,sigint=0.0)
     fr3 = getmu.getmu(fr3,salt2alpha=salt3alpha,salt2beta=salt3beta,sigint=0.0)
-    fr2 = getmu.mkcuts(fr2,salt2alpha=salt2alpha,salt2beta=salt2beta)
-    fr3 = getmu.mkcuts(fr3,salt2alpha=salt3alpha,salt2beta=salt3beta)
+    #fr2 = getmu.mkcuts(fr2,salt2alpha=salt2alpha,salt2beta=salt2beta)
+    #fr3 = getmu.mkcuts(fr3,salt2alpha=salt3alpha,salt2beta=salt3beta)
 
     iGood2 = np.array([],dtype=int)
     for j,i in enumerate(fr2.CID):
@@ -269,8 +270,11 @@ def plot_outliers():
             
     mn2,md2,std2 = sigma_clipped_stats(fr2.mures)
     mn3,md3,std3 = sigma_clipped_stats(fr2.mures)
-    iOut2 = np.where(((fr2.mures < md2-3*std2) | (fr2.mures > md2+3*std2)) & (fr2.zCMB > 0.015))[0]
-    iOut3 = np.where(((fr3.mures < md3-3*std3) | (fr3.mures > md3+3*std3)) & (fr3.zCMB > 0.015))[0]
+    #iOut2 = np.where(((fr2.mures < md2-3*std2) | (fr2.mures > md2+3*std2)) & (fr2.zCMB > 0.015))[0]
+    #iOut3 = np.where(((fr3.mures < md3-3*std3) | (fr3.mures > md3+3*std3)) & (fr3.zCMB > 0.015))[0]
+    iOut2=np.where(fr2.FITCHI2/fr2.NDOF> 10)
+    iOut3=np.where(fr3.FITCHI2/fr3.NDOF> 100)
+#    import pdb;pdb.set_trace(n)
     for j,i in enumerate(fr3.CID[iOut3]):
         if i in fr2.CID[iOut2] or i not in fr2.CID: continue
         with PdfPages(f'{i}.pdf') as pdf:
@@ -403,6 +407,10 @@ def run_snana_plot(genversion,cid_list,nml,isdist,private):
     if nml is not None:
         if os.path.splitext(nml)[1].upper()!='.NML':
             nml=os.path.splitext(nml)[0]+'.NML'
+        for filename in os.listdir(os.path.split(nml)[0]):
+        	if os.path.split(nml)[1] in filename:
+        		nml=os.path.join(os.path.split(nml)[0],filename)
+        	
         with open(nml,'r') as f:
             p=f.readlines()
     
@@ -549,11 +557,13 @@ def salt2to3_disp():
     from scipy.interpolate import splprep,splev,BSpline,griddata,bisplev,bisplrep,interp1d,interp2d
 
     for salt2file,salt3file in zip([os.path.expandvars('$SNDATA_ROOT/models/SALT2/SALT2.JLA-B14/salt2_lc_relative_variance_0.dat'),
+    								os.path.expandvars('$SNDATA_ROOT/models/SALT2/SALT2.JLA-B14/salt2_lc_relative_variance_0.dat'),
                                     os.path.expandvars('$SNDATA_ROOT/models/SALT2/SALT2.JLA-B14/salt2_lc_relative_variance_1.dat'),
                                     os.path.expandvars('$SNDATA_ROOT/models/SALT2/SALT2.JLA-B14/salt2_lc_relative_covariance_01.dat')],
-                                   ['SALT3.K20_scat/salt3_lc_variance_0.dat',
-                                    'SALT3.K20_scat/salt3_lc_variance_1.dat',
-                                    'SALT3.K20_scat/salt3_lc_covariance_01.dat']):
+                                   ['SALT3.K20/salt3_lc_dispersion_scaling.dat'
+                                   	'SALT3.K20/salt3_lc_variance_0.dat',
+                                    'SALT3.K20/salt3_lc_variance_1.dat',
+                                    'SALT3.K20/salt3_lc_covariance_01.dat']):
         phase2,wave2,var2 = np.loadtxt(salt2file,
                                        unpack=True)
         var2 = var2.reshape([len(np.unique(phase2)),len(np.unique(wave2))])
