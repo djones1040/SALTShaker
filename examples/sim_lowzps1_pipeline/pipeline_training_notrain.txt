@@ -20,10 +20,11 @@ pro=sim_SNmix.pl
 baseinput=simulation/MASTER_LOWZ_PS1.INPUT
 outinput=pipeline/MASTER_LOWZ_PS1.INPUT
 batch=True
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 5
 prooptions=
 set_key=2
-        NGENTOT_LC[0] 100
-        NGENTOT_LC[1] 4000
+        NGENTOT_LC[0] 400
+        NGENTOT_LC[1] 16000
         GENMODEL[0] SALT2.JLA-B14
         GENMODEL[1] SALT2.JLA-B14
 
@@ -45,6 +46,7 @@ pro=split_and_fit.pl
 baseinput=lcfitting/snfit_base.nml,lcfitting/snfit_base.nml
 outinput=pipeline/snfit_TEST.nml,pipeline/snfit_TEST2.nml
 batch=True
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 10
 validplots=True
 prooptions=NOPROMPT
 set_key=4
@@ -54,24 +56,40 @@ set_key=4
         1 SNLCINP CUTWIN_REDSHIFT 0.01 0.8
         0 FITINP FITMODEL_NAME SALT2.JLA-B14
         1 FITINP FITMODEL_NAME SALT2.JLA-B14
+        0 SNLCINP OPT_MWEBV 1
+        1 SNLCINP OPT_MWEBV 1
 
 [biascorsim]
 pro=sim_SNmix.pl
 baseinput=biascorsim/MASTER_LOWZ_PS1.INPUT
 outinput=pipeline/MASTER_LOWZ_PS1_biascor.INPUT
 batch=True
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 10
 prooptions=
 set_key=2
-        NGENTOT_LC[0] 800
-        NGENTOT_LC[1] 32000
+        NGENTOT_LC[0] 8000
+        NGENTOT_LC[1] 320000
         GENMODEL[0] SALT2.JLA-B14
         GENMODEL[1] SALT2.JLA-B14
+        GENSIGMA_SALT2ALPHA[0] 1.E8 1.E8  
+        GENSIGMA_SALT2BETA[0] 1.E8 1.E8
+        GENRANGE_SALT2ALPHA[0]  0.09  0.2
+        GENGRID_SALT2ALPHA[0]   2
+        GENRANGE_SALT2BETA[0]  2.0  4.0
+        GENGRID_SALT2BETA[0]  2
+        GENSIGMA_SALT2ALPHA[1] 1.E8 1.E8  
+        GENSIGMA_SALT2BETA[1] 1.E8 1.E8
+        GENRANGE_SALT2ALPHA[1]  0.09  0.2
+        GENGRID_SALT2ALPHA[1]   2
+        GENRANGE_SALT2BETA[1]  2.0  4.0
+        GENGRID_SALT2BETA[1]  2
 
 [biascorlcfit]
 pro=split_and_fit.pl
 baseinput=lcfitting/snfit_base.nml,lcfitting/snfit_base.nml
 outinput=pipeline/snfit_TEST_biascor.nml,pipeline/snfit_TEST_biascor2.nml
 batch=True
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 10
 validplots=True
 prooptions=NOPROMPT
 set_key=4
@@ -81,20 +99,24 @@ set_key=4
         0 FITINP FITMODEL_NAME SALT2.JLA-B14
         1 FITINP FITMODEL_NAME SALT2.JLA-B14
         1 SNLCINP CUTWIN_REDSHIFT 0.01 0.8
+        0 SNLCINP OPT_MWEBV 1
+        1 SNLCINP OPT_MWEBV 1
         
 [getmu]
 pro=SALT2mu_fit.pl
 baseinput=getmu/BBC_LOWZ_PS1.input
 outinput=pipeline/BBC.input
 batch=True
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 20
 validplots=True
 prooptions=NOPROMPT
-set_key=
+set_key=2
+        opt_biascor 240
 
 [cosmofit]
 pro=wfit.exe
 outinput=SALT2mu_FITOPT000_MUOPT000.M0DIF
-prooptions= -dompri 0.007
+prooptions= -ompri 0.307 -dompri 0.01
 baseinput=
 batch=False
 validplots=True

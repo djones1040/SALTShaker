@@ -273,7 +273,7 @@ class SALTResids:
 		self.itpk = np.array([i for i, si in enumerate(self.parlist) if si.startswith('tpkoff')])
 		self.ispcrcl_norm = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specx0')])
 		if self.ispcrcl_norm.size==0: self.ispcrcl_norm=np.zeros(self.npar,dtype=bool)
-		self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specrecal')])
+		self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('spec')]) # used to be specrecal
 		if self.ispcrcl.size==0: self.ispcrcl=np.zeros(self.npar,dtype=bool)
 		self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr')])
 		self.imodelcorr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelcorr')])
@@ -831,7 +831,7 @@ class SALTResids:
 		requiredPCDerivs=varyParams[self.im0]|varyParams[self.im1]
 		
 		varyParList=self.parlist[varyParams]
-
+        
 		nspecdata = sum([specdata[key]['flux'].size for key in specdata])
 		resultsdict={}
 		if requiredPCDerivs.all() and not f'pcDeriv_spec_{sn}' in storedResults:
@@ -843,6 +843,8 @@ class SALTResids:
 			resultsdict[k]=specresultsdict
 			specresultsdict['dataflux'] = specdata[k]['flux']
 			specresultsdict['modelflux_jacobian'] = np.zeros((specresultsdict['dataflux'].size,varyParams.sum()))
+			#colorlawinterp=storedResults['colorLawInterp'](spectrum['wavelength']/(1+z))
+			#colorexpinterp=10**(c*colorlawinterp)
 		
 
 
@@ -862,12 +864,14 @@ class SALTResids:
 			recalterm=np.clip(recalterm,-100,100)
 			drecaltermdrecal[pastbounds,:]=0
 			recalexp=np.exp(recalterm)
-			
+            
 			if len(np.where((recalexp != recalexp) | (recalexp == np.inf))[0]):
 				raise RuntimeError(f'error....spec recalibration problem for SN {sn}!')
 
 			dmodelfluxdx0 = recalexp*temporaryResults['fluxInterp'][int(np.round((phase-obsphase[0])/phasedelt)),
-																		 (np.round((spectrum['wavelength']-obswave[0])/wavedelt)).astype(int)]
+																	(np.round((spectrum['wavelength']-obswave[0])/wavedelt)).astype(int)]
+			#import pdb; pdb.set_trace()
+			#dmodelfluxdx0 *= colorexpinterp
 			#modinterp = temporaryResults['fluxInterp'](phase)
 			#dmodelfluxdx0 = interp1d(obswave,modinterp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(spectrum['wavelength'])*recalexp
 			
@@ -877,6 +881,17 @@ class SALTResids:
 							(specresultsdict['modelflux'] == np.inf))[0]):
 				raise RuntimeError(f'spec model flux nonsensical for SN {sn}')
 
+
+			#plt.ion()
+			#plt.clf()
+			#plt.plot(spectrum['wavelength'],spectrum['flux'],label='data')
+			#plt.plot(spectrum['wavelength'],modulatedFlux/recalexp,label='uncalibrated model')
+			#plt.plot(spectrum['wavelength'],modulatedFlux,label='calibrated model')
+			#plt.legend()
+			#plt.show()
+			#import pdb; pdb.set_trace()
+
+            
 			if x0Deriv:
 				specresultsdict['modelflux_jacobian'][:,varyParList==f'specx0_{sn}_{k}'] = dmodelfluxdx0[:,np.newaxis]
 			
