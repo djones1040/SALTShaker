@@ -504,12 +504,17 @@ class GaussNewton(saltresids.SALTResids):
 		m0pulls=invL*precondition.tocsr()[:,varyparlist=='m0']*spline2d.T
 		m1pulls=invL*precondition.tocsr()[:,varyparlist=='m1']*spline2d.T 
 		M0dataerr = np.sqrt((m0pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size)))
-		M1dataerr = np.sqrt((m1pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size)))
 		cov_M0_M1_data = (m0pulls*m1pulls).sum(axis=0).reshape((self.phase.size,self.wave.size))
+		del m0pulls
+		M1dataerr = np.sqrt((m1pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size)))
+		del m1pulls
+		correlation=cov_M0_M1_data/(M0dataerr*M1dataerr)
+		correlation[np.isnan(correlation)]=0
 		M0,M1=self.SALTModel(X)
 		M0dataerr=np.clip(M0dataerr,0,np.abs(M0).max()*2)
 		M1dataerr=np.clip(M1dataerr,0,np.abs(M1).max()*2)
-		cov_M0_M1_data=np.clip(cov_M0_M1_data,-np.sqrt(M0dataerr*M1dataerr),np.sqrt(M0dataerr*M1dataerr))
+		correlation=np.clip(correlation,-1,1)
+		cov_M0_M1_data=correlation*(M0dataerr*M1dataerr)
 		
 		return M0dataerr, M1dataerr,cov_M0_M1_data
 
@@ -623,6 +628,20 @@ class GaussNewton(saltresids.SALTResids):
 			logging.critical('Color scatter crashed during fitting, finishing writing output')
 			logging.critical(e, exc_info=True)
 		Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
+		logging.info('Checking that rescaling components to satisfy definitions did not modify photometry')
+		
+		try:
+			unscaledresults={}
+			scaledresults={}
+			for sn in self.datadict:
+				photresidsunscaled=self.ResidsForSN(X,sn,unscaledresults)[0]
+				photresidsrescaled=self.ResidsForSN(Xredefined,sn,scaledresults)[0]
+				for flt in photresidsunscaled:
+					assert(np.allclose(photresidsunscaled[flt]['resid'],photresidsrescaled[flt]['resid']))
+		except AssertionError:
+			logging.critical('Rescaling components failed; photometric residuals have changed. Will finish writing output using unscaled quantities')
+			Xredefined=X.copy()
+		
 		if getdatauncertainties:
 			M0dataerr, M1dataerr,cov_M0_M1_data=self.datauncertaintiesfromhessianapprox(Xredefined)
 		else:

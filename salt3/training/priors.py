@@ -181,23 +181,53 @@ class SALTPriors:
 		X[self.ix1]/=1+ratio*X[self.ix1]
 		X[self.im1]-=ratio*X[self.im0]
 		
+		####This code will not work if the model uncertainties are not 0th order (simple interpolation)
+		if self.errbsorder==0:
+			m0variance=X[self.imodelerr0]**2
+			m0m1covariance=X[self.imodelerr1]*X[self.imodelerr0]*X[self.imodelcorr]
+			m1variance=X[self.imodelerr1]**2
+			
+			m1variance+=-2*ratio*m0m1covariance+ratio**2*m0variance
+			m0m1covariance-=m0variance*ratio
+		else:
+			log.critical('RESCALING ERROR TO SATISFY DEFINITIONS HAS NOT BEEN IMPLEMENTED')
+		
 		#Define x1 to have mean 0
 		#m0 at peak is not modified, since m1B at peak is defined as 0
 		#Thus does not need to be recalculated for the last definition
-		X[self.im0]+= np.mean(X[self.ix1])*X[self.im1]
-		X[self.ix1]-=np.mean(X[self.ix1])
+		meanx1=np.mean(X[self.ix1])
+		X[self.im0]+= meanx1*X[self.im1]
+		X[self.ix1]-=meanx1
+		if self.errbsorder==0:
+			m0variance+=2*meanx1*m0m1covariance+meanx1**2*m1variance
+			m0m1covariance+=m1variance*meanx1
+		else:
+			log.critical('RESCALING ERROR TO SATISFY DEFINITIONS HAS NOT BEEN IMPLEMENTED')
+
 		
 		#Define x1 to have std deviation 1
 		x1std = np.std(X[self.ix1])
 		if x1std == x1std and x1std != 0.0:
 			X[self.im1]*= x1std
 			X[self.ix1]/= x1std
+		if self.errbsorder==0:
+			m1variance*=x1std**2
+			m0m1covariance*=x1std
+		else:
+			log.critical('RESCALING ERROR TO SATISFY DEFINITIONS HAS NOT BEEN IMPLEMENTED')
 			
 		#Define m0 to have a standard B-band magnitude at peak
 		bStdFlux=(10**((self.m0guess-27.5)/-2.5) )
-		X[self.im0]*=bStdFlux/m0Bflux 
-		X[self.im1]*=bStdFlux/m0Bflux 
-		X[self.ix0]*=m0Bflux /bStdFlux
+		fluxratio=bStdFlux/m0Bflux
+		X[self.im0]*=fluxratio
+		X[self.im1]*= fluxratio
+		X[self.ix0]/=fluxratio
+		if self.errbsorder==0:
+			m1variance*=fluxratio**2
+			m0variance*=fluxratio**2
+			m0m1covariance*=fluxratio**2
+		else:
+			log.critical('RESCALING ERROR TO SATISFY DEFINITIONS HAS NOT BEEN IMPLEMENTED')
 		
 # 		Define color to have 0 mean
 # 		centralwavelength=self.waveBinCenters[np.arange(self.im0.size)%self.waveBinCenters.size])
@@ -206,7 +236,10 @@ class SALTPriors:
 # 		stats.pearsonr(X[self.ix1],X[self.ic])
 # 		
 # 		X[self.ic]-=X[self.ix1]
-		
+		if self.errbsorder==0:
+			X[self.imodelerr0]= np.sqrt(m0variance)
+			X[self.imodelcorr]=	m0m1covariance/np.sqrt(m0variance*m1variance)
+			X[self.imodelerr1]=np.sqrt(m1variance) 
 		return X
 		
 	@prior

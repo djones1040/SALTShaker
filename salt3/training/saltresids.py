@@ -276,6 +276,8 @@ class SALTResids:
 		self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('spec')]) # used to be specrecal
 		if self.ispcrcl.size==0: self.ispcrcl=np.zeros(self.npar,dtype=bool)
 		self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr')])
+		self.imodelerr0 = np.array([i for i, si in enumerate(self.parlist) if si ==('modelerr_0')])
+		self.imodelerr1 = np.array([i for i, si in enumerate(self.parlist) if si==('modelerr_1')])
 		self.imodelcorr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelcorr')])
 		self.iclscat = np.where(self.parlist=='clscat')[0]
 
