@@ -4,7 +4,7 @@ import numpy as np
 from numpy.random import standard_normal
 from numpy.linalg import inv,pinv,norm
 
-import time,copy,extinction
+import time,copy,extinction,pickle
 
 from scipy.interpolate import splprep,splev,BSpline,griddata,bisplev,bisplrep,interp1d,interp2d
 from scipy.integrate import trapz, simps
@@ -31,6 +31,11 @@ from iminuit import Minuit
 from datetime import datetime
 from tqdm import tqdm
 from itertools import starmap
+from os import path
+
+from scipy.ndimage import gaussian_filter1d
+from scipy import sparse
+
 
 import iminuit,warnings
 import logging
@@ -50,6 +55,23 @@ def ensurepositivedefinite(matrix,maxiter=5):
         return ensurepositivedefinite(matrix+np.diag(-mineigenval*2* np.ones(matrix.shape[0])),maxiter-1)
         
 
+def getgaussianfilterdesignmatrix(shape,smoothing):
+    windowsize=10+shape%2
+    window=gaussian_filter1d(1.*(np.arange(windowsize)==windowsize//2),smoothing)
+    while ~(np.any(window==0)):
+        windowsize=2*windowsize+shape%2
+        window=gaussian_filter1d(1.*(np.arange(windowsize)==windowsize//2),smoothing)
+    window=window[window>0]
+
+    diagonals=[]
+    offsets=list(range(-(window.size//2),window.size//2+1))
+    for i,offset in enumerate(offsets):
+        diagonals+=[np.tile(window[i],shape-np.abs(offset))]
+    design=sparse.diags(diagonals,offsets).tocsr()
+    for i in range(window.size//2+1):
+        design[i,:window.size//2+1]=gaussian_filter1d(1.*(np.arange(design.shape[0])== i ),5)[:window.size//2+1]
+        design[-i-1,-(window.size//2+1) : ]=gaussian_filter1d(1.*(np.arange(design.shape[0])== i ),5)[:window.size//2+1][::-1]    
+    return design
 
 def isDiag(M):
     i, j = M.shape
@@ -351,7 +373,8 @@ class GaussNewton(saltresids.SALTResids):
 		self.iModelParam[self.imodelcorr]=False
 		self.iModelParam[self.iclscat]=False
 		self.uncertaintyKeys=set(['photvariances_' +sn for sn in self.datadict]+['specvariances_' +sn for sn in self.datadict]+sum([[f'photCholesky_{sn}_{flt}' for flt in np.unique(self.datadict[sn]['photdata']['filt'])] for sn in self.datadict],[]))
-
+		
+		self.Xhistory=[]
 		self.tryFittingAllParams=True
 		fitlist = [('all parameters','all'),('all parameters grouped','all-grouped'),('supernova params','sn'),
 				   (" x0",'x0'),('both components','components'),('component 0 piecewise','piecewisecomponent0'),('principal component 0','component0'),('x1','x1'),
@@ -449,42 +472,59 @@ class GaussNewton(saltresids.SALTResids):
 		else:
 			self.fitlist = [f for f in kwargs['fitting_sequence'].split(',')]
 
-	def datauncertaintiesfromhessianapprox(self,X):
+	def datauncertaintiesfromhessianapprox(self,X,suppressregularization=True,smoothingfactor=150):
 		"""Approximate Hessian by jacobian times own transpose to determine uncertainties in flux surfaces"""
 		log.info("determining M0/M1 errors by approximated Hessian")
 		itpk=np.zeros(X.size,dtype=bool)
 		itpk[self.itpk]=True
-		varyingParams=self.fitOptions['components'][1]#|self.fitOptions['color'][1]|self.fitOptions['spectralrecalibration'][1]|self.fitOptions['colorlaw'][1]
+		varyingParams=self.fitOptions['components'][1]|self.fitOptions['color'][1]|self.fitOptions['spectralrecalibration'][1]|self.fitOptions['colorlaw'][1]
 		logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
+		if suppressregularization:
+			self.neff[self.neff<self.neffMax]=10
 		residuals,jac=self.lsqwrap(X,{},varyingParams,True,doSpecResids=True)
-		
+		self.updateEffectivePoints(X)
 		#Simple preconditioning of the jacobian before attempting to invert
 		precondition=sparse.diags(1/np.sqrt(np.asarray((jac.power(2)).sum(axis=0))),[0])
 		precondjac=(jac*precondition)
 		
 		#Define the matrix sigma^-1=J^T J
-		square=precondjac.T*precondjac
+		square=ensurepositivedefinite(precondjac.T*precondjac.toarray())
 		#Inverting cholesky matrix for speed
-		L=linalg.cholesky(square.toarray(),lower=True)
+		L=linalg.cholesky(square,lower=True)
 		invL=(linalg.solve_triangular(L,np.diag(np.ones(L.shape[0])),lower=True))
 		#Turning spline_derivs into a sparse matrix for speed
 		spline2d=sparse.csr_matrix(self.spline_derivs.reshape(-1,self.im0.size))
+		
+		#Smooth things, since this is supposed to be for broadband photometry
+		if smoothingfactor>0:
+			smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
+			spline2d=smoothingmatrix*spline2d
 		#Uncorrelated effect of parameter uncertainties on M0 and M1
 		varyparlist= self.parlist[varyingParams]
 		m0pulls=invL*precondition.tocsr()[:,varyparlist=='m0']*spline2d.T
 		m1pulls=invL*precondition.tocsr()[:,varyparlist=='m1']*spline2d.T 
 		M0dataerr = np.sqrt((m0pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size)))
-		M1dataerr = np.sqrt((m1pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size)))
 		cov_M0_M1_data = (m0pulls*m1pulls).sum(axis=0).reshape((self.phase.size,self.wave.size))
+		del m0pulls
+		M1dataerr = np.sqrt((m1pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size)))
+		del m1pulls
+		correlation=cov_M0_M1_data/(M0dataerr*M1dataerr)
+		correlation[np.isnan(correlation)]=0
+		M0,M1=self.SALTModel(X)
+		M0dataerr=np.clip(M0dataerr,0,np.abs(M0).max()*2)
+		M1dataerr=np.clip(M1dataerr,0,np.abs(M1).max()*2)
+		correlation=np.clip(correlation,-1,1)
+		cov_M0_M1_data=correlation*(M0dataerr*M1dataerr)
+		
 		return M0dataerr, M1dataerr,cov_M0_M1_data
 
 	def datauncertaintiesfromjackknife(self,X,max_iter,n_bootstrapsamples):
 		"""Determine uncertainties in flux surfaces by bootstrapping"""
 		log.info("determining M0/M1 errors by bootstrapping")
 		snlist=list(self.datadict.keys())
-		samples=[self.convergence_loop(X,max_iter, snlist[:i]+snlist[i+1:], getdatauncertainties=False) for i in  (np.random.choice(len(snlist),n_bootstrapsamples))]
-		samplesredefined=np.array([self.priors.satisfyDefinitions(x,self.SALTModel(x)) for x in samples])
-		deviation=(samplesredefined-X)
+		removesnindices=np.random.choice(len(snlist),n_bootstrapsamples)
+		samples=[self.convergence_loop(X,max_iter, snlist[:i]+snlist[i+1:], getdatauncertainties=False)[0] for i in  removesnindices]
+		deviation=(samples-X)
 		sigma=ensurepositivedefinite(np.dot(deviation.T,deviation)/(deviation.shape[0]-1))
 		L=linalg.cholesky(sigma,lower=True)
 		
@@ -511,9 +551,14 @@ class GaussNewton(saltresids.SALTResids):
 			raise RuntimeError('length of priors does not equal length of prior widths!')
 		stepsizes=None
 		#residuals = self.lsqwrap(guess,uncertainties,False,False,doPriors=False)
-		
-
+	
 		X = copy.deepcopy(guess[:])
+		clscatzeropoint=X[self.iclscat[-1]]
+		nocolorscatter=clscatzeropoint==-np.inf
+		if not nocolorscatter: log.debug('Turning off color scatter for convergence_loop')
+		X[self.iclscat[-1]]=-np.inf
+
+
 		Xlast = copy.deepcopy(guess[:])
 		if np.all(X[self.ix1]==0) or np.all(X[self.ic]==0):
 			#If snparams are totally uninitialized
@@ -523,23 +568,19 @@ class GaussNewton(saltresids.SALTResids):
 		else:
 			chi2_init=(self.lsqwrap(X,{},usesns=usesns)**2).sum()
 		log.info(f'starting loop; {loop_niter} iterations')
-		
 		chi2results=self.getChi2Contributions(X,{})
 		for name,chi2component,dof in chi2results:
-			log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/sum([x[1] for x in chi2results])*100))
 			if name.lower()=='photometric':
 				photochi2perdof=chi2component/dof
-
+		
 		for superloop in range(loop_niter):
 			tstartloop = time.time()
 			try:
-				if not superloop % 5 and  self.fit_model_err and photochi2perdof<3 :# and not superloop == 0:
-					log.info('Optimizing model error')
+				if not superloop % 5 and  self.fit_model_err and not self.fit_cdisp_only and photochi2perdof<3 :# and not superloop == 0:
 					X=self.iterativelyfiterrmodel(X)
 					storedResults={}
 					chi2results=self.getChi2Contributions(X,storedResults)
 					uncertainties={key:storedResults[key] for key in self.uncertaintyKeys}
-					log.info('Reevaluted model error')
 				else:
 					log.info('Reevaluted model error')
 					storedResults={}
@@ -577,14 +618,35 @@ class GaussNewton(saltresids.SALTResids):
 						import pdb;pdb.set_trace()
 					else:
 						raise e
-		X= self.fitcolorscatter(X)		
+			except Exception as e:
+				logging.exception('Error encountered in convergence_loop, exiting')
+				raise e
+		X[self.iclscat[-1]]=clscatzeropoint
+		try:
+			if self.fit_model_err: X= self.fitcolorscatter(X)
+		except Exception as e:
+			logging.critical('Color scatter crashed during fitting, finishing writing output')
+			logging.critical(e, exc_info=True)
 		Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
+		logging.info('Checking that rescaling components to satisfy definitions did not modify photometry')
+		
+		try:
+			unscaledresults={}
+			scaledresults={}
+			for sn in self.datadict:
+				photresidsunscaled=self.ResidsForSN(X,sn,unscaledresults)[0]
+				photresidsrescaled=self.ResidsForSN(Xredefined,sn,scaledresults)[0]
+				for flt in photresidsunscaled:
+					assert(np.allclose(photresidsunscaled[flt]['resid'],photresidsrescaled[flt]['resid']))
+		except AssertionError:
+			logging.critical('Rescaling components failed; photometric residuals have changed. Will finish writing output using unscaled quantities')
+			Xredefined=X.copy()
+		
 		if getdatauncertainties:
 			M0dataerr, M1dataerr,cov_M0_M1_data=self.datauncertaintiesfromhessianapprox(Xredefined)
 		else:
 			M0dataerr, M1dataerr,cov_M0_M1_data=None,None,None
 		# M0/M1 errors
-
 		xfinal,phase,wave,M0,M0modelerr,M1,M1modelerr,cov_M0_M1_model,\
 			modelerr,clpars,clerr,clscat,SNParams = \
 			self.getParsGN(Xredefined)
@@ -662,16 +724,25 @@ class GaussNewton(saltresids.SALTResids):
 		
 		return X,-result.fval
 	
-	def fitcolorscatter(self,X,fitcolorlaw=True):
+	def fitcolorscatter(self,X,fitcolorlaw=True,rescaleerrs=False,maxiter=2000):
+		message='Optimizing color scatter and scaling model uncertainties'
+		if fitcolorlaw:
+			message+=', with color law varying'
+		log.info(message)
 		if X[self.iclscat[-1]]==-np.inf:
 			X[self.iclscat[-1]]=-8
 		includePars=np.zeros(self.parlist.size,dtype=bool)
 		includePars[self.iclscat]=True
 		includePars[self.iCL]=fitcolorlaw
-		X=self.minuitoptimize(X,includePars,fluxes,rescaleerrs=True,fixFluxes=True,dospec=False)
+		storedResults={}
+		log.info('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X,storedResults)))
+		X,minuitresult=self.minuitoptimize(X,includePars,{},rescaleerrs=rescaleerrs,fixFluxes=False,dospec=False,maxiter=maxiter)
+		log.info('Finished optimizing color scatter')
+		log.debug(str(minuitresult))
 		return X
 		 
 	def iterativelyfiterrmodel(self,X):
+		log.info('Optimizing model error')
 		X=X.copy()
 		imodelerr=np.zeros(self.parlist.size,dtype=bool)
 		imodelerr[self.imodelerr]=True
@@ -680,7 +751,8 @@ class GaussNewton(saltresids.SALTResids):
 
 		X0=X.copy()
 		mapFun= starmap
-
+		
+		log.debug('turning off model priors')
 		store_priors = self.usePriors.copy()
 		self.usePriors = ()
 		
@@ -692,22 +764,21 @@ class GaussNewton(saltresids.SALTResids):
 		result0=np.array(list(mapFun(self.loglikeforSN,args)))
 		partriplets= list(zip(np.where(self.parlist=='modelerr_0')[0],np.where(self.parlist=='modelerr_1')[0],np.where(self.parlist=='modelcorr_01')[0]))
 
-		if not self.fit_cdisp_only:
-			for parindices in tqdm(partriplets):
-				includePars=np.zeros(self.parlist.size,dtype=bool)
-				includePars[list(parindices)]=True
-				storedResults=fluxes.copy()
-				args=[(X0+includePars*.5,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
-				result=np.array(list(mapFun(self.loglikeforSN,args)))
-				usesns=np.array(list(self.datadict.keys()))[result!=result0]
-				logging.debug(f'{usesns.size} SNe constraining {i}th error bin')
-
-				X=self.minuitoptimize(X,includePars,fluxes,fixFluxes=True,dospec=False,usesns=usesns)
-
+		for i,parindices in tqdm(enumerate(partriplets)):
+			includePars=np.zeros(self.parlist.size,dtype=bool)
+			includePars[list(parindices)]=True
+			storedResults=fluxes.copy()
+			args=[(X0+includePars*.5,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
+			result=np.array(list(mapFun(self.loglikeforSN,args)))
+			usesns=np.array(list(self.datadict.keys()))[result!=result0]
+			logging.debug(f'{usesns.size} SNe constraining {i}th error bin')
+			X,minuitfitresult=self.minuitoptimize(X,includePars,fluxes,fixFluxes=True,dospec=False,usesns=usesns)
+		log.debug('turning on model priors')
 		self.usePriors = store_priors
+		log.info('Finished model error optimization')
 		return X
 
-	def minuitoptimize(self,X,includePars,storedResults=None,rescaleerrs=False,**kwargs):
+	def minuitoptimize(self,X,includePars,storedResults=None,rescaleerrs=False,maxiter=100,**kwargs):
 		X=X.copy()
 		if not self.fitTpkOff: includePars[self.itpk]=False
 		if storedResults is None: storedResults={}
@@ -719,12 +790,15 @@ class GaussNewton(saltresids.SALTResids):
 				return 1e10 if np.isnan(result) else result
 		else:
 			def fn(Y):
-				Xnew=X.copy()
-				Xnew[includePars]=Y[:-1]
-				Xnew[self.imodelerr]*=Y[-1]
-				result=-self.maxlikefit(Xnew,storedResults.copy(),**kwargs)
-				return 1e10 if np.isnan(result) else result
-			
+				try:
+					Xnew=X.copy()
+					Xnew[includePars]=Y[:-1]
+					Xnew[self.imodelerr]*=Y[-1]
+					result=-self.maxlikefit(Xnew,storedResults.copy(),**kwargs)
+					return 1e10 if np.isnan(result) else result
+				except:
+					logging.warning('Error caught in minuit loop')
+					return 1e10
 		params=['x'+str(i) for i in range(includePars.sum())]
 		initVals=X[includePars].copy()
 
@@ -740,6 +814,9 @@ class GaussNewton(saltresids.SALTResids):
 		minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelerr_1')[0]})
 		minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelcorr_01')[0]})
 		
+		minuitkwargs.update({'limit_'+params[i]: (-100,100) for i in np.where(self.parlist[includePars] == 'cl')[0]})
+
+		
 		if rescaleerrs:
 			extrapar= 'x'+str(includePars.sum())
 			params+=[extrapar]
@@ -748,7 +825,7 @@ class GaussNewton(saltresids.SALTResids):
 			minuitkwargs['limit_'+extrapar]=(0,2)
 		
 		m=Minuit(fn,use_array_call=True,forced_parameters=params,errordef=.5,**minuitkwargs)
-		result,paramResults=m.migrad(ncall=100)
+		result,paramResults=m.migrad(ncall=maxiter)
 		X=X.copy()
 		
 		paramresults=np.array([x.value for x  in paramResults])
@@ -953,10 +1030,6 @@ class GaussNewton(saltresids.SALTResids):
 	def robust_process_fit(self,X_init,uncertainties,chi2_init,niter,usesns=None):
 		X,chi2=X_init.copy(),chi2_init
 		storedResults=uncertainties.copy()
-		clscatzeropoint=X_init[self.iclscat][-1]
-		nocolorscatter=clscatzeropoint==-np.inf
-		if not nocolorscatter: log.debug('Turning off color scatter for robust_process_fit')
-		X[self.iclscat[-1]]=-np.inf
 		for fit in self.fitlist:
 			if 'all-grouped' in fit :continue #
 			if 'modelerr' in fit: continue
@@ -1027,7 +1100,6 @@ class GaussNewton(saltresids.SALTResids):
 						break
 				else:
 					continue
-		X[self.iclscat[-1]]=X_init[self.iclscat][-1]
 		#In this case GN optimizer can do no better
 		return X,chi2,(X is X_init)
 		 #_init
@@ -1138,9 +1210,9 @@ class GaussNewton(saltresids.SALTResids):
 			prevresids=residuals
 			prevjac=precondjac.copy()
 			prevstep=gaussNewtonStep.copy()
-			
+			currentchi2=(currentresids**2).sum()
 			for i in range(30):
-				log.debug('Approximating jacobian and reiterating')
+				self.Xhistory+=[(X-prevstep,currentchi2,prevresult)]
 				residpreddiff=((currentresids-prevresids)-prevjac.dot(-prevresult[0]))
 				sparsestructure=((prevjac!=0)*sparse.diags(prevresult[0]))
 				rowproduct=np.asarray((sparsestructure.power(2)).sum(axis=1)).T[0]
@@ -1149,24 +1221,30 @@ class GaussNewton(saltresids.SALTResids):
 				currentjac= prevjac-(sparse.diags(residpreddiff)*sparsestructure)
 				currentresult=sprslinalg.lsmr(currentjac,currentresids,damp=damping,maxiter=2*min(jacobian.shape),atol=tol,btol=tol)
 				precondstep,stopsignal,itn,normr,normar,norma,conda,normx=currentresult
-				log.debug('On reiteration: LSMR results are {}, norm r {:.2f}, norm J^T r {:.2f}, norm J {:.2f}, cond J {:.2f}, norm step {:.2f}, reduction ratio {:.2f} required {} iterations'.format(stopReasons[stopsignal],normr,normar,norma,conda,normx,reductionratio,itn ))
+
 				currentstep=prevstep.copy()
 				currentstep[varyingParams]+=preconditoningMatrix*currentresult[0]
 				
 				nextresids=self.lsqwrap(X-currentstep,uncertainties.copy(),None,**kwargs)
-				print((nextresids**2).sum())
-				if (nextresids**2).sum() > (currentresids**2).sum():
+				nextchi2=(nextresids**2).sum()
+				chi2improvement=currentchi2-nextchi2
+				reductionratio= chi2improvement/(currentchi2-(normr**2))
+				log.info(f'Reiterating with updated jacobian gives improvement {chi2improvement}')
+				log.debug('On reiteration: LSMR results are {}, norm r {:.2f}, norm J^T r {:.2f}, norm J {:.2f}, cond J {:.2f}, norm step {:.2f}, reduction ratio {:.2f} required {} iterations'.format(stopReasons[stopsignal],normr,normar,norma,conda,normx,reductionratio,itn ))
+				if chi2improvement<0:
+					log.info('Negative improvement, finishing process_fit')
 					break
 				else:
 					prevstep=currentstep
 					prevresids=currentresids
 					currentresids=nextresids
+					currentchi2=nextchi2
 					prevjac=currentjac
 					prevresult=currentresult
-					
+			self.Xhistory+=[(X-prevstep,currentchi2,prevresult)]
+			
 			postGN=(currentresids**2).sum()
 			gaussNewtonStep=prevstep
-
 		else:
 			if self.geodesiccorrection:
 				#Fancypants cubic correction to the Gauss-Newton step based on fun differential geometry! See https://arxiv.org/abs/1207.4999 for derivation
@@ -1191,7 +1269,8 @@ class GaussNewton(saltresids.SALTResids):
 		else:
 			X-=gaussNewtonStep
 			chi2=postGN
-			
+		
+		with open(path.join(self.outputdir,'gaussnewtonhistory.pickle'),'wb') as file: pickle.dump(self.Xhistory,file)
 		log.info('Chi2 diff, % diff')
 		log.info(' '.join(['{:.2f}'.format(x) for x in [oldChi-chi2,(100*(oldChi-chi2)/oldChi)] ]))
 		print('')

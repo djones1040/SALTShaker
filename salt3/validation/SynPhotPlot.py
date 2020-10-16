@@ -212,8 +212,11 @@ def overPlotSynthPhotByComponentCustom(
 		#ax1.plot(plotmjd,salt2stretchedflux-salt2flux,color='b',label='SALT2')
 		#ax1.plot(plotmjd,salt3stretchedflux-salt3flux,color='r',label='SALT3')
 		ax1.plot(plotmjd,salt2m1synflux,color='b',label='SALT2 Syn')
-		ax1.plot(plotmjd,salt3m1synflux,color='r',label='SALT3 Syn')		
-		ax0.set_title(flt,fontsize=20)
+		ax1.plot(plotmjd,salt3m1synflux,color='r',label='SALT3 Syn')	
+		title=flt
+		if 'bessell' in title:
+			title= 'Bessell '+ flt[len('bessell')].upper()
+		ax0.set_title(title,fontsize=20)
 		#ax.set_xlim([-30,55])
 		
 	fig.subplots_adjust(right=0.8,bottom=0.15,left=0.05)
@@ -235,7 +238,7 @@ def plotSynthPhotOverStretchRange(outfile,salt3dir,filterset='SDSS',
 		 errscalefile='salt3_lc_dispersion_scaling.dat',
 		 lcrv00file='salt3_lc_variance_0.dat',
 		 lcrv11file='salt3_lc_variance_1.dat',
-		 lcrv01file='salt3_lc_covariance_01.dat'):
+		 lcrv01file='salt3_lc_covariance_01.dat',includeSALT2=True):
 	
 	plt.clf()
 
@@ -269,8 +272,10 @@ def plotSynthPhotOverStretchRange(outfile,salt3dir,filterset='SDSS',
 	plotmjd = np.linspace(-20, 55,100)
 	
 	fig = plt.figure(figsize=(15, 5))
-	salt3axes = [fig.add_subplot(2,len(filters),1+i) for i in range(len(filters))]
-	salt2axes = [fig.add_subplot(2,len(filters),len(filters)+ 1+i,sharex=salt3ax) for i,salt3ax in enumerate(salt3axes)]
+	salt3axes = [fig.add_subplot(1+includeSALT2,len(filters),1+i) for i in range(len(filters))]
+	if includeSALT2: salt2axes = [fig.add_subplot(2,len(filters),len(filters)+ 1+i,sharex=salt3ax) for i,salt3ax in enumerate(salt3axes)]
+	else:
+		salt2axes=[None for ax in salt3axes]	
 	xmin,xmax=-2,2
 	norm=colors.Normalize(vmin=xmin,vmax=xmax)
 	cmap=plt.get_cmap('RdBu')
@@ -280,27 +285,32 @@ def plotSynthPhotOverStretchRange(outfile,salt3dir,filterset='SDSS',
 			salt2model.set(x1=x1)
 			salt3model.set(x1=x1)
 			color=cmap(norm(x1))
-			try:
-				salt2flux = salt2model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')
-				ax2.plot(plotmjd,salt2flux,color=color,label='SALT2',linewidth=0.1)
-			except: pass
+			if includeSALT2: 
+				try:
+					salt2flux = salt2model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')
+					ax2.plot(plotmjd,salt2flux,color=color,label='SALT2',linewidth=0.1)
+				except: pass
 			try:
 				salt3flux = salt3model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')
 				ax3.plot(plotmjd,salt3flux,color=color,label='SALT3',linewidth=0.1)
 			except: pass
 			
-			ax2.set_yticks([])
+			if includeSALT2: ax2.set_yticks([])
 			ax3.set_yticks([])
 
 	
-			ax3.set_title(flt,fontsize=20)
+			title=flt
+			if 'bessell' in title:
+				title= 'Bessell '+ flt[len('bessell')].upper()
+			ax3.set_title(title,fontsize=20)
 			#ax.set_xlim([-30,55])
 	sm=plt.cm.ScalarMappable(norm=norm,cmap=cmap)
 	sm._A=[]
 	fig.subplots_adjust(right=0.8,bottom=0.15,left=0.05)
 	cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
-	salt2axes[0].set_ylabel('SALT2 Flux',fontsize=20)
+	if includeSALT2: salt2axes[0].set_ylabel('SALT2 Flux',fontsize=20)
 	salt3axes[0].set_ylabel('SALT3 Flux',fontsize=20)
+
 	fig.colorbar(sm,cax=cbar_ax)
 	cbar_ax.set_ylabel('Stretch	 ($x_1$ parameter)',fontsize=20)
 	

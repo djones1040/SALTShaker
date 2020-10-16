@@ -243,7 +243,7 @@ class TrainSALT(TrainSALTBase):
 					#else:
 					guess[parlist == key] = pars[names == key]
 				except:
-					log.critical('Problem while initializing parameter ',key,' from previous training')
+					log.critical(f'Problem while initializing parameter {key} from previous training')
 					sys.exit(1)
 					
 
@@ -844,7 +844,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 			datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,self.kcordict,
 										   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
 										   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
-										   binspecres=binspecres)
+										   binspecres=binspecres,snparlist=self.options.snparlist)
 			log.info(f'took {time()-tdstart:.3f} to read in data files')
 			tcstart = time()
 

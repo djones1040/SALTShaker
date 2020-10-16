@@ -276,6 +276,8 @@ class SALTResids:
 		self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('spec')]) # used to be specrecal
 		if self.ispcrcl.size==0: self.ispcrcl=np.zeros(self.npar,dtype=bool)
 		self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr')])
+		self.imodelerr0 = np.array([i for i, si in enumerate(self.parlist) if si ==('modelerr_0')])
+		self.imodelerr1 = np.array([i for i, si in enumerate(self.parlist) if si==('modelerr_1')])
 		self.imodelcorr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelcorr')])
 		self.iclscat = np.where(self.parlist=='clscat')[0]
 
@@ -379,7 +381,7 @@ class SALTResids:
 		denom = np.trapz(pbspl,self.wave)
 		pbspl /= denom*HC_ERG_AA
 		self.kcordict['default']['Vpbspl'] = pbspl
-
+	
 	def lsqwrap(self,guess,storedResults,varyParams=None,doPriors=True,doSpecResids=True,usesns=None):
 		if varyParams is None:
 			varyParams=np.zeros(self.npar,dtype=bool)
@@ -628,6 +630,19 @@ class SALTResids:
 
 		return photresids,specresids
 	
+	def bestfitsinglebandnormalizationsforSN(self,x,sn,storedResults):
+		photmodel,specmodel=self.modelvalsforSN(x,sn,storedResults,np.zeros(self.parlist.size,dtype=bool))
+		results={}
+		for flt in photmodel:
+			fluxes=photmodel[flt]
+			designmatrix=photmodel[flt]['modelflux']
+			vals=photmodel[flt]['dataflux']
+			variance=photmodel[flt]['fluxvariance']+photmodel[flt]['modelvariance']
+			normvariance=1/(designmatrix**2/variance).sum()
+			normalization=(designmatrix*vals/variance).sum()*normvariance
+			results[flt]=normalization,normvariance
+		return results
+		
 	def modelvalsforSN(self,x,sn,storedResults,varyParams):		
 		
 		temporaryResults={}
