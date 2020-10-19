@@ -493,7 +493,11 @@ class GaussNewton(saltresids.SALTResids):
 		L=linalg.cholesky(square,lower=True)
 		invL=(linalg.solve_triangular(L,np.diag(np.ones(L.shape[0])),lower=True))
 		#Turning spline_derivs into a sparse matrix for speed
-		spline2d=sparse.csr_matrix(self.spline_derivs.reshape(-1,self.im0.size))
+		spline_derivs = np.zeros([len(self.phaseout),len(self.waveout),self.im0.size])
+		for i in range(self.im0.size):
+			if self.bsorder == 0: continue
+			spline_derivs[:,:,i]=bisplev(self.phaseout,self.waveout,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
+		spline2d=sparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))
 		
 		#Smooth things, since this is supposed to be for broadband photometry
 		if smoothingfactor>0:
@@ -503,10 +507,10 @@ class GaussNewton(saltresids.SALTResids):
 		varyparlist= self.parlist[varyingParams]
 		m0pulls=invL*precondition.tocsr()[:,varyparlist=='m0']*spline2d.T
 		m1pulls=invL*precondition.tocsr()[:,varyparlist=='m1']*spline2d.T 
-		M0dataerr = np.sqrt((m0pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size)))
-		cov_M0_M1_data = (m0pulls*m1pulls).sum(axis=0).reshape((self.phase.size,self.wave.size))
+		M0dataerr = np.sqrt((m0pulls**2).sum(axis=0).reshape((self.phaseout.size,self.waveout.size)))
+		cov_M0_M1_data = (m0pulls*m1pulls).sum(axis=0).reshape((self.phaseout.size,self.waveout.size))
 		del m0pulls
-		M1dataerr = np.sqrt((m1pulls**2).sum(axis=0).reshape((self.phase.size,self.wave.size)))
+		M1dataerr = np.sqrt((m1pulls**2).sum(axis=0).reshape((self.phaseout.size,self.waveout.size)))
 		del m1pulls
 		correlation=cov_M0_M1_data/(M0dataerr*M1dataerr)
 		correlation[np.isnan(correlation)]=0
@@ -724,8 +728,10 @@ class GaussNewton(saltresids.SALTResids):
 		
 		return X,-result.fval
 	
-	def fitcolorscatter(self,X,fitcolorlaw=True,rescaleerrs=False,maxiter=2000):
-		message='Optimizing color scatter and scaling model uncertainties'
+	def fitcolorscatter(self,X,fitcolorlaw=False,rescaleerrs=False,maxiter=2000):
+		message='Optimizing color scatter'
+		if rescaleerrs:
+			message+=' and scaling model uncertainties'
 		if fitcolorlaw:
 			message+=', with color law varying'
 		log.info(message)
@@ -734,9 +740,18 @@ class GaussNewton(saltresids.SALTResids):
 		includePars=np.zeros(self.parlist.size,dtype=bool)
 		includePars[self.iclscat]=True
 		includePars[self.iCL]=fitcolorlaw
+		
+		log.info('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X,{})))
 		storedResults={}
-		log.info('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X,storedResults)))
-		X,minuitresult=self.minuitoptimize(X,includePars,{},rescaleerrs=rescaleerrs,fixFluxes=False,dospec=False,maxiter=maxiter)
+		storedResults['components'] =self.SALTModel(x)
+		if self.bsorder != 0: storedResults['componentderivs'] = self.SALTModelDeriv(x,1,0,self.phase,self.wave)		
+		if not rescaleerrs :
+			if 'saltErr' not in storedResults:
+				storedResults['saltErr']=self.ErrModel(x)
+			if 'saltCorr' not in storedResults:
+				storedResults['saltCorr']=self.CorrelationModel(x)
+		log.debug(str(storedResults.keys()))
+		X,minuitresult=self.minuitoptimize(X,includePars,{},rescaleerrs=rescaleerrs,fixFluxes=not fitcolorlaw,dospec=False,maxiter=maxiter)
 		log.info('Finished optimizing color scatter')
 		log.debug(str(minuitresult))
 		return X

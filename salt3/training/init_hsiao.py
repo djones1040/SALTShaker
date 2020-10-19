@@ -164,11 +164,8 @@ def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
 	stretch=(1.07+0.069-0.015+0.00067)/1.07
 	stretchedPhase=np.clip(intphase*stretch,phaserange[0],phaserange[1])
 	m1fluxguess = (m0-bisplev(stretchedPhase,intwave,bspl)).flatten()
-	intphasetmp,intwavetmp = np.meshgrid(intphase,intwave)
-
-	bsplm1 = bisplrep(intphasetmp.flatten(),intwavetmp.flatten(),
-					  m1fluxguess,kx=order,ky=order,
-					  tx=splinephase,ty=splinewave,task=-1)
+	intwavetmp,intphasetmp = np.meshgrid(intwave,intphase)
+	bsplm1 = bisplrep(intphasetmp.flatten(),intwavetmp.flatten(),m1fluxguess,kx=order,ky=order,tx=splinephase,ty=splinewave,task=-1)
 	m1 = bisplev(intphase,intwave,bsplm1)
 	if debug:
 		import pylab as plt

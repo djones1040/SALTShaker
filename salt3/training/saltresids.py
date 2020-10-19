@@ -99,13 +99,15 @@ class SALTResids:
 		
 		# set some phase/wavelength arrays
 		self.phase = np.linspace(self.phaserange[0],self.phaserange[1],
+								 int((self.phaserange[1]-self.phaserange[0])/self.phaseinterpres)+1,True)
+		self.phaseout = np.linspace(self.phaserange[0],self.phaserange[1],
 								 int((self.phaserange[1]-self.phaserange[0])/self.phaseoutres)+1,True)
-
 		self.interpMethod='nearest'
 		
-		nwaveout=int((self.waverange[1]-self.waverange[0])/self.waveoutres)
 		self.wave = np.linspace(self.waverange[0],self.waverange[1],
-								nwaveout+1,True)
+								int((self.waverange[1]-self.waverange[0])/self.waveinterpres)+1,True)
+		self.waveout = np.linspace(self.waverange[0],self.waverange[1],
+								int((self.waverange[1]-self.waverange[0])/self.waveoutres)+1,True)
 		self.maxPhase=np.where(abs(self.phase) == np.min(abs(self.phase)))[0]
 				
 		self.neff=0
@@ -1089,7 +1091,7 @@ class SALTResids:
 
 			colorlawinterp=storedResults['colorLawInterp'](lameff/(1+z))
 			colorexpinterp=10**(c*colorlawinterp)
-
+			
 			fluxfactor=(colorexpinterp*self.fluxfactor[survey][flt]*(pbspl[flt].sum())*dwave)**2
 			
 			if  x1Deriv or varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any():
@@ -1358,16 +1360,16 @@ class SALTResids:
 							  'tpkofferr':x[self.parlist == f'tpkoff_{k}']}
 
 
-		m0,m1=self.SALTModel(x)
+		m0,m1=self.SALTModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)
 
 		#clscat = splev(self.wave,(self.errwaveknotloc,clscatpars,3))
 		if not len(clpars): clpars = []
 
 		# model errors
-		m0err,m1err = self.ErrModel(x)
-		cov_m0_m1 = self.CorrelationModel(x)[0]*m0err*m1err
+		m0err,m1err = self.ErrModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)
+		cov_m0_m1 = self.CorrelationModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)[0]*m0err*m1err
 		modelerr=np.ones(m0err.shape)
-		return(x,self.phase,self.wave,m0,m0err,m1,m1err,cov_m0_m1,modelerr,
+		return(x,self.phaseout,self.waveout,m0,m0err,m1,m1err,cov_m0_m1,modelerr,
 			   clpars,clerr,clscat,resultsdict)
 
 	def getErrsGN(self,m0var,m1var,m0m1cov):

@@ -187,6 +187,10 @@ class TrainSALTBase:
 							help='number of angstroms between each wavelength spline knot (default=%default)')
 		parser.add_argument('--phasesplineres', default=config.get('modelparams','phasesplineres'), type=float,
 							help='number of angstroms between each phase spline knot (default=%default)')
+		parser.add_argument('--waveinterpres', default=config.get('modelparams','waveinterpres'), type=float,
+							help='wavelength resolution in angstroms, used for internal interpolation (default=%default)')
+		parser.add_argument('--phaseinterpres', default=config.get('modelparams','phaseinterpres'), type=float,
+							help='phase resolution in angstroms, used for internal interpolation (default=%default)')
 		parser.add_argument('--waveoutres', default=config.get('modelparams','waveoutres'), type=float,
 							help='wavelength resolution in angstroms of the output file (default=%default)')
 		parser.add_argument('--phaseoutres', default=config.get('modelparams','phaseoutres'), type=float,
@@ -271,6 +275,7 @@ class TrainSALTBase:
 						 'waveSmoothingNeff':self.options.wavesmoothingneff,'phaseSmoothingNeff':self.options.phasesmoothingneff,
 						 'neffFloor':self.options.nefffloor, 'neffMax':self.options.neffmax,
 						 'specrecal':self.options.specrecal, 'regularizationScaleMethod':self.options.regularizationScaleMethod,
+						 'phaseinterpres':self.options.phaseinterpres,'waveinterpres':self.options.waveinterpres,
 						 'phaseknotloc':phaseknotloc,'waveknotloc':waveknotloc,
 						 'errphaseknotloc':errphaseknotloc,'errwaveknotloc':errwaveknotloc,
 						 'phaserange':self.options.phaserange,

@@ -137,7 +137,7 @@ class TrainSALT(TrainSALTBase):
 		# initial guesses
 		init_options = {'phaserange':self.options.phaserange,'waverange':self.options.waverange,
 						'phasesplineres':self.options.phasesplineres,'wavesplineres':self.options.wavesplineres,
-						'phaseinterpres':self.options.phaseoutres,'waveinterpres':self.options.waveoutres,
+						'phaseinterpres':self.options.phaseinterpres,'waveinterpres':self.options.waveinterpres,
 						'normalize':True,'order':self.options.interporder,'use_snpca_knots':self.options.use_snpca_knots}
 				
 		phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
