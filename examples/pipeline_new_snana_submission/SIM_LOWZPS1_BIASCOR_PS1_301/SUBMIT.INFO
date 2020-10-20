@@ -1,0 +1,112 @@
+
+# Required info 
+TIME_STAMP_NSEC:   12279    # submit time; Nsec since midnight
+TIME_STAMP_SUBMIT: 2020-10-07 03:24:40.012510    
+SCRIPT_DIR:       /home/midai/pipeline_new_snana_submission/SIM_LOWZPS1_BIASCOR_PS1_301/SPLIT_JOBS_LCFIT 
+DONE_STAMP_LIST:  ['ALL.DONE', 'pipeline/LCFit.DONE_biascor_1_301'] 
+CLEANUP_FLAG:     1 
+N_JOB_TOT:        80     # total number of jobs (excludes sym links)
+N_DONE_TOT:       80     # total number of done files (includes sym links)
+N_JOB_SPLIT:      80     # njob to merge per task after processing
+N_CORE:           80     # number of cores 
+FORCE_CRASH_PREP:    False 
+FORCE_CRASH_MERGE:   False
+
+
+# Fit info
+N_JOB_LINK:          0   # Njob with link to FITOPT000
+JOBFILE_WILDCARD:    '*SPLIT*' 
+TABLE_FORMATS:       ['TEXT', 'HBOOK', 'ROOT'] 
+USE_TABLE_FORMAT:    [True, False, False] 
+IGNORE_FITOPT:       False
+
+VERSION_LIST: 
+  - ALLSurveys_PS1_BIASCOR_301
+
+FITOPT_LIST: 
+  - ['FITOPT000', 'DEFAULT', ''] 
+
+LINK_FITOPT000_LIST: []
+
+
+SBATCH_LIST:  # [CPU,PID,JOB_NAME] 
+  - [   0, 5921549, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0000 ] 
+  - [   1, 5921550, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0001 ] 
+  - [   2, 5921551, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0002 ] 
+  - [   3, 5921552, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0003 ] 
+  - [   4, 5921553, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0004 ] 
+  - [   5, 5921554, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0005 ] 
+  - [   6, 5921555, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0006 ] 
+  - [   7, 5921556, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0007 ] 
+  - [   8, 5921557, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0008 ] 
+  - [   9, 5921558, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0009 ] 
+  - [  10, 5921559, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0010 ] 
+  - [  11, 5921560, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0011 ] 
+  - [  12, 5921561, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0012 ] 
+  - [  13, 5921562, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0013 ] 
+  - [  14, 5921563, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0014 ] 
+  - [  15, 5921564, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0015 ] 
+  - [  16, 5921565, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0016 ] 
+  - [  17, 5921566, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0017 ] 
+  - [  18, 5921567, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0018 ] 
+  - [  19, 5921568, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0019 ] 
+  - [  20, 5921569, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0020 ] 
+  - [  21, 5921570, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0021 ] 
+  - [  22, 5921571, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0022 ] 
+  - [  23, 5921572, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0023 ] 
+  - [  24, 5921573, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0024 ] 
+  - [  25, 5921574, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0025 ] 
+  - [  26, 5921575, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0026 ] 
+  - [  27, 5921576, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0027 ] 
+  - [  28, 5921577, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0028 ] 
+  - [  29, 5921578, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0029 ] 
+  - [  30, 5921579, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0030 ] 
+  - [  31, 5921580, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0031 ] 
+  - [  32, 5921581, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0032 ] 
+  - [  33, 5921582, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0033 ] 
+  - [  34, 5921583, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0034 ] 
+  - [  35, 5921584, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0035 ] 
+  - [  36, 5921585, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0036 ] 
+  - [  37, 5921586, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0037 ] 
+  - [  38, 5921587, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0038 ] 
+  - [  39, 5921588, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0039 ] 
+  - [  40, 5921589, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0040 ] 
+  - [  41, 5921590, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0041 ] 
+  - [  42, 5921591, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0042 ] 
+  - [  43, 5921592, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0043 ] 
+  - [  44, 5921593, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0044 ] 
+  - [  45, 5921594, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0045 ] 
+  - [  46, 5921595, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0046 ] 
+  - [  47, 5921596, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0047 ] 
+  - [  48, 5921597, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0048 ] 
+  - [  49, 5921598, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0049 ] 
+  - [  50, 5921599, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0050 ] 
+  - [  51, 5921600, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0051 ] 
+  - [  52, 5921601, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0052 ] 
+  - [  53, 5921602, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0053 ] 
+  - [  54, 5921603, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0054 ] 
+  - [  55, 5921604, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0055 ] 
+  - [  56, 5921605, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0056 ] 
+  - [  57, 5921606, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0057 ] 
+  - [  58, 5921607, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0058 ] 
+  - [  59, 5921608, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0059 ] 
+  - [  60, 5921609, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0060 ] 
+  - [  61, 5921610, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0061 ] 
+  - [  62, 5921611, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0062 ] 
+  - [  63, 5921612, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0063 ] 
+  - [  64, 5921613, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0064 ] 
+  - [  65, 5921614, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0065 ] 
+  - [  66, 5921615, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0066 ] 
+  - [  67, 5921616, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0067 ] 
+  - [  68, 5921617, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0068 ] 
+  - [  69, 5921618, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0069 ] 
+  - [  70, 5921619, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0070 ] 
+  - [  71, 5921620, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0071 ] 
+  - [  72, 5921621, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0072 ] 
+  - [  73, 5921622, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0073 ] 
+  - [  74, 5921623, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0074 ] 
+  - [  75, 5921624, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0075 ] 
+  - [  76, 5921625, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0076 ] 
+  - [  77, 5921626, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0077 ] 
+  - [  78, 5921627, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0078 ] 
+  - [  79, 5921629, snfit_TEST_biascor2.nml.temp.1602041344.2483244_301-CPU0079 ] 

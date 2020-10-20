@@ -22,7 +22,7 @@ GENMODEL:   SALT2.JLA-B14
 
 EFFERR_STOPGEN: 1.0E-7
 
-CLEARPROMPT: 0
+#CLEARPROMPT: 0
 
 KCOR_FILE:  kcor/kcor_PS1_PS1MD_SPEC.fits
 
@@ -41,7 +41,7 @@ GENRANGE_RA:      -1.0     +1.0   deg
 GENRANGE_DECL:    -1.258    +1.258  deg
 
 GENRANGE_PEAKMJD:  55080.0  56660.0
-SOLID_ANGLE: 0.022 # 1 field, 7 sq degreees
+#SOLID_ANGLE: 0.022 # 1 field, 7 sq degreees
 FUDGE_MAGERR: 0.005
 
 GENSIGMA_SEARCH_PEAKMJD:  1.0     # sigma-smearing for  SEARCH_PEAKMJD (days)
@@ -83,7 +83,7 @@ HOSTNOISE_FILE:  simulation/ps1_spec/PS1MD_SBNOISEMODEL.DAT
 GENPEAK_SALT2ALPHA: 0.165
 GENPEAK_SALT2BETA: 3.032
 
-GENMEAN_RV:         3.1               # mean RV to generate
+#GENMEAN_RV:         3.1               # mean RV to generate
 
 RANSEED: 58474       # random number seed
 
@@ -105,4 +105,4 @@ GENSIGMA_SALT2c:    0.029   0.121     # bifurcated sigmas
 
 SEARCHEFF_PIPELINE_LOGIC_FILE: simulation/ps1_spec/SEARCHEFF_PIPELINE_LOGIC.DAT
 
-TAKE_SPECTRUM:  TOBS(-5:10)  SNR_ZPOLY(10,0,0)  SNR_LAMOBS(5000:6000)
+#TAKE_SPECTRUM:  TOBS(-5:10)  SNR_ZPOLY(10,0,0)  SNR_LAMOBS(5000:6000)
