@@ -187,13 +187,12 @@ class SALT3pipe():
                 if labels is not None:
                     labels = labels.split(',')
                     labels = self._drop_empty_string(labels)                
-                if isinstance(baseinput,(list,np.ndarray)) and 'lcfit' in prostr:
-                    if len(baseinput) == niter:
-                        if labels is None:
-                            baseinput = baseinput[i]
-                            outname=outname[i]
-                    else:
+                if isinstance(baseinput,(list,np.ndarray)):
+                    if 'lcfit' in prostr and not len(baseinput) == niter:
                         raise ValueError("length of input list [{}] must match n_lcfit/n_biascorlcfit [{}]".format(len(baseinput),niter))
+                    if labels is None:
+                        baseinput = baseinput[i]
+                        outname=outname[i]
                 pipepro[i].configure(baseinput=baseinput,
                                      setkeys=pipepro[i].setkeys,
                                      outname=outname,
@@ -484,6 +483,8 @@ class PipeProcedure():
         self.plotdir = plotdir
         self.labels = labels
 
+        if not os.path.isdir(os.path.split(self.outname)[0]):
+            os.mkdir(os.path.split(self.outname)[0])
         self.gen_input(outname=self.outname)
 
     def gen_input(self,outname=None):
@@ -630,6 +631,7 @@ class Simulation(PipeProcedure):
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
                   batch=False,batch_info=None,translate=False,validplots=False,
                   outname="pipeline_byosed_input.input",**kwargs):
+#         print(baseinput)
         self.done_file = finput_abspath('%s/Sim.DONE'%os.path.dirname(baseinput))
         self.outname = outname
         self.prooptions = prooptions
@@ -637,6 +639,13 @@ class Simulation(PipeProcedure):
         self.translate = translate
         self.batch_info = batch_info
         self.validplots = validplots
+        super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
+                          prooptions=prooptions,batch=batch,batch_info=batch_info,
+                          translate=translate,
+                          validplots=validplots)
+        setkeys_add = self._append_genmodel_abspath()
+        setkeys = setkeys.append(setkeys_add).drop_duplicates(subset=['key'],keep='last')
+        print("Re-writing sim input after appending GENMODEL to absolute path")
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
                           prooptions=prooptions,batch=batch,batch_info=batch_info,
                           translate=translate,
@@ -808,6 +817,38 @@ class Simulation(PipeProcedure):
                 simlib_file = config['SIMLIB_FILE'].strip()
                 simlib_dict[label] = simlib_file
         return simlib_dict
+    
+    def _append_genmodel_abspath(self):
+#         print(self.keys)
+        genmodel_dict = {}
+        for key,value in self.keys.items():
+            if key.startswith('GENMODEL'):
+                if '[' in key: label = key.split('[')[1].split(']')[0]
+                else: label = 0
+                genmodel_dict[label] = value
+
+        findkey = [key for key,value in self.keys.items() if key.startswith('SIMGEN_INFILE_Ia')]
+        for key in findkey:
+            label = key.split('[')[1].split(']')[0]
+            if label in genmodel_dict.keys():
+                continue
+            else:
+                sim_input = self.keys[key]
+                config,delimiter = _read_simple_config_file(sim_input,sep=':')
+                genmodel_file = config['GENMODEL'].strip()
+                genmodel_dict[label] = genmodel_file
+        
+        genmodel_dict_new = {}
+        for label in genmodel_dict.keys():
+            genmodel_file = genmodel_dict[label]
+            if '.' not in genmodel_file or os.path.split(genmodel_file)[0] != '' or \
+              (not os.path.exists(os.path.expandvars('$SNDATA_ROOT/models/{}/{}'.format(genmodel_file.split('.')[0],genmodel_file)))):
+                genmodel_file = '%s/%s'%(cwd,genmodel_file)
+            label = 'GENMODEL[{}]'.format(label)
+            genmodel_dict_new[label] = genmodel_file
+                
+        df = pd.DataFrame(genmodel_dict_new,index=['value']).transpose().reset_index().rename(columns={'index':'key'})
+        return df
     
     def _get_survey_names(self,simlib_dict):
         result_dict = {}
