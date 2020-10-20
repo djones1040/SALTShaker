@@ -187,7 +187,7 @@ class SALT3pipe():
                 if labels is not None:
                     labels = labels.split(',')
                     labels = self._drop_empty_string(labels)                
-                if isinstance(baseinput,(list,np.ndarray)):
+                if isinstance(baseinput,(list,np.ndarray)) and 'lcfit' in prostr:
                     if len(baseinput) == niter:
                         if labels is None:
                             baseinput = baseinput[i]
