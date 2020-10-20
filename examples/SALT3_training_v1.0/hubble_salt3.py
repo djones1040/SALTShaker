@@ -57,6 +57,7 @@ def concatfitres():
 
     count2,count3 = 0,0
     with open('fit_output/JLA_TRAINING_SALT2.FITRES','w') as fout2,open('fit_output/JLA_TRAINING_SALT3.FITRES','w') as fout3:
+        print(frfiles)
         for f in frfiles:
             if 'SALT2' not in f:
                 with open(f) as fin:
@@ -108,8 +109,8 @@ def main():
     # hubble diagram w/ bins
     fr2 = getmu.getmu(fr2,salt2alpha=salt2alpha,salt2beta=salt2beta,sigint=0.0)
     fr3 = getmu.getmu(fr3,salt2alpha=salt3alpha,salt2beta=salt3beta,sigint=0.0)
-    fr2 = getmu.mkcuts(fr2,salt2alpha=salt2alpha,salt2beta=salt2beta,fitprobmin=1e-5)
-    fr3 = getmu.mkcuts(fr3,salt2alpha=salt3alpha,salt2beta=salt3beta,fitprobmin=1e-5)
+    fr2 = getmu.mkcuts(fr2,salt2alpha=salt2alpha,salt2beta=salt2beta,fitprobmin=0.0)#1e-5)
+    fr3 = getmu.mkcuts(fr3,salt2alpha=salt3alpha,salt2beta=salt3beta,fitprobmin=0.0)#1e-5)
 
     iGood2 = np.array([],dtype=int)
     for j,i in enumerate(fr2.CID):
@@ -288,6 +289,86 @@ def plot_outliers():
             #os.system(f'rm {base_name}*')
                 
         import pdb; pdb.set_trace()
+
+def plot_91t():
+
+    idsurvey_map = {1:('fit_output/SDSS.FITRES.TEXT','fit_output/SDSS_SALT2.FITRES.TEXT','SDSS',
+                       'pipeline/SDSS.NML','pipeline/SDSS_SALT2.NML'),
+                    10:('fit_output/DES-SN3YR_DES.FITRES.TEXT','fit_output/DES-SN3YR_DES_SALT2.FITRES.TEXT','DES-SN3YR_DES',
+                        'pipeline/DES-SN3YR_DES.NML','pipeline/DES-SN3YR_DES_SALT2.NML'),
+                    15:('fit_output/Pantheon_PS1MD_TEXT.FITRES.TEXT','fit_output/Pantheon_PS1MD_TEXT_SALT2.FITRES.TEXT',
+                        'Pantheon_PS1MD_TEXT','pipeline/Pantheon_PS1MD_TEXT.NML','pipeline/Pantheon_PS1MD_TEXT_SALT2.NML'),
+                    150:('fit_output/Foundation_DR1.FITRES.TEXT','fit_output/Foundation_DR1_SALT2.FITRES.TEXT',
+                         'Foundation_DR1','pipeline/Foundation_DR1.NML','pipeline/Foundation_DR1.NML'),
+                    191:('fit_output/Hamuy1996_LC.FITRES.TEXT','fit_output/Hamuy1996_LC_SALT2.FITRES.TEXT',
+                         'Hamuy1996_LC','pipeline/Hamuy1996_LC.NML','pipeline/Hamuy1996_LC_SALT2.NML'),
+                    192:('fit_output/Hicken2009_LC.FITRES.TEXT','fit_output/Hicken2009_LC_SALT2.FITRES.TEXT',
+                         'Hicken2009_LC','pipeline/Hicken2009_LC.NML','pipeline/Hicken2009_LC_SALT2.NML'),
+                    193:('fit_output/Jha2006_LC.FITRES.TEXT','fit_output/Jha2006_LC_SALT2.FITRES.TEXT',
+                         'Jha2006_LC','pipeline/Jha2006_LC.NML','pipeline/Jha2006_LC_SALT2.NML'),
+                    194:('fit_output/OTHER_LOWZ_LC.FITRES.TEXT','fit_output/OTHER_LOWZ_LC_SALT2.FITRES.TEXT',
+                         'OTHER_LOWZ_LC','pipeline/OTHER_LOWZ_LC.NML','pipeline/OTHER_LOWZ_LC_SALT2.NML'),
+                    195:('fit_output/Riess1999_LC.FITRES.TEXT','fit_output/Riess1999_LC_SALT2.FITRES.TEXT',
+                         'Riess1999_LC','pipeline/Riess1999_LC.NML','pipeline/Riess1999_LC_SALT2.NML'),
+                    196:('fit_output/SNLS3_LC.FITRES.TEXT','fit_output/SNLS3_LC_SALT2.FITRES.TEXT',
+                         'SNLS3_LC','pipeline/SNLS3_LC.NML','pipeline/SNLS3_LC_SALT2.NML')}
+    
+    # figure out alpha, beta for each.  comp against simulation
+    with open('SALT2mu_SALT2.FITRES') as fin:
+        for line in fin:
+            if line.startswith('#  alpha0'): salt2alpha,salt2alphaerr = float(line.split()[3]),float(line.split()[5].replace('\n',''))
+            if line.startswith('#  beta0'): salt2beta,salt2betaerr = float(line.split()[3]),float(line.split()[5].replace('\n',''))
+            if line.startswith('#  sigint'): salt2sigint = float(line.split()[3])
+    with open('SALT2mu_SALT3.FITRES') as fin:
+        for line in fin:
+            if line.startswith('#  alpha0'): salt3alpha,salt3alphaerr = float(line.split()[3]),float(line.split()[5].replace('\n',''))
+            if line.startswith('#  beta0'): salt3beta,salt3betaerr = float(line.split()[3]),float(line.split()[5].replace('\n',''))
+            if line.startswith('#  sigint'): salt3sigint = float(line.split()[3])
+
+    # avg chi2/SN
+    fr2 = txtobj('fit_output/JLA_TRAINING_SALT2.FITRES',fitresheader=True)
+    fr3 = txtobj('fit_output/JLA_TRAINING_SALT3.FITRES',fitresheader=True)
+    
+    # hubble diagram w/ bins
+    #fr2 = getmu.getmu(fr2,salt2alpha=salt2alpha,salt2beta=salt2beta,sigint=0.0)
+    #fr3 = getmu.getmu(fr3,salt2alpha=salt3alpha,salt2beta=salt3beta,sigint=0.0)
+    #fr2 = getmu.mkcuts(fr2,salt2alpha=salt2alpha,salt2beta=salt2beta)
+    #fr3 = getmu.mkcuts(fr3,salt2alpha=salt3alpha,salt2beta=salt3beta)
+
+    iGood2 = np.array([],dtype=int)
+    for j,i in enumerate(fr2.CID):
+        if i in fr3.CID:
+            iGood2 = np.append(iGood2,j)
+    for k in fr2.__dict__.keys():
+        fr2.__dict__[k] = fr2.__dict__[k][iGood2]
+    iGood3 = np.array([],dtype=int)
+    for j,i in enumerate(fr3.CID):
+        if i in fr2.CID:
+            iGood3 = np.append(iGood3,j)
+    for k in fr3.__dict__.keys():
+        fr3.__dict__[k] = fr3.__dict__[k][iGood3]
+
+    iPlot = fr3.CID == 'sn1991t'
+    iPlot2 = fr2.CID == 'sn1991t'
+    for j,i in enumerate(fr3.CID[iPlot]):
+        if i not in fr2.CID[iPlot2] or i not in fr2.CID: continue
+
+        with PdfPages(f'{i}.pdf') as pdf:
+            plotter_choice,base_name,CID=run_snana_plot(
+                idsurvey_map[fr3.IDSURVEY[iPlot][j]][2],i,idsurvey_map[fr3.IDSURVEY[iPlot][j]][3],False,None)
+            figs,fits=plot_lc([i],base_name,False,plotter_choice,None,None,None,None,'zCMB',title=f'{i}, SALT3')
+            for f in figs:
+                pdf.savefig(f)
+            #os.system(f'rm {base_name}*')
+            plotter_choice,base_name,CID=run_snana_plot(
+                idsurvey_map[fr3.IDSURVEY[iPlot][j]][2],i,idsurvey_map[fr3.IDSURVEY[iPlot][j]][4],False,None)
+            figs,fits=plot_lc([i],base_name,False,plotter_choice,None,None,None,None,'zCMB',title=f'{i}, SALT2')
+            for f in figs:
+                pdf.savefig(f)
+            #os.system(f'rm {base_name}*')
+                
+            import pdb; pdb.set_trace()
+
         
 
 def plot_lc(cid,base_name,noGrid,plotter_choice,tmin,tmax,filter_list,plot_all,zname,title=None):
@@ -578,4 +659,5 @@ if __name__ == "__main__":
     run_salt2mu()
     main()
     #plot_outliers()
+    #plot_91t()
     #salt2to3_disp()
