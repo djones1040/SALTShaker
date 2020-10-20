@@ -170,7 +170,9 @@ class SALT3pipe():
             for i in range(niter):
                 pipepro[i] = pipepro[i]
                 baseinput = self._get_config_option(config,prostr,'baseinput').split(',')
+                baseinput = self._drop_empty_string(baseinput)
                 outname = self._get_config_option(config,prostr,'outinput').split(',')
+                outname = self._drop_empty_string(outname)
                 outname = [x+'.temp.{}'.format(self.timestamp) for x in outname]
                 pro = self._get_config_option(config,prostr,'pro')
                 batch = self._get_config_option(config,prostr,'batch',dtype=boolean_string)
@@ -181,11 +183,17 @@ class SALT3pipe():
                 prooptions = self._get_config_option(config,prostr,'prooptions')
                 snlists = self._get_config_option(config,prostr,'snlists')
                 labels = self._get_config_option(config,prostr,'labels')
+                
                 if labels is not None:
                     labels = labels.split(',')
-                if len(baseinput) == niter:
-                    baseinput = baseinput[i]
-                    outname=outname[i]
+                    labels = self._drop_empty_string(labels)                
+                if isinstance(baseinput,(list,np.ndarray)):
+                    if len(baseinput) == niter:
+                        if labels is None:
+                            baseinput = baseinput[i]
+                            outname=outname[i]
+                    else:
+                        raise ValueError("length of input list [{}] must match n_lcfit/n_biascorlcfit [{}]".format(len(baseinput),niter))
                 pipepro[i].configure(baseinput=baseinput,
                                      setkeys=pipepro[i].setkeys,
                                      outname=outname,
@@ -441,6 +449,9 @@ class SALT3pipe():
         else:
             df.columns = colnames
         return df
+    
+    def _drop_empty_string(self,arr):
+        return [x for x in arr if x != '']
 
 
 class PipeProcedure():
@@ -1456,6 +1467,8 @@ def _gen_training_inputs(basefilenames=None,setkeys=None,
     print(outnames)
     print(labels)
     for basefilename,outname,label in zip(basefilenames,outnames,labels):
+        if basefilename == '':
+            continue
         if not label in ['main','logging','training']:
             raise ValueError("{} is not a valid label, check input file".format(label))     
         if not os.path.isfile(basefilename):
@@ -1468,16 +1481,18 @@ def _gen_training_inputs(basefilenames=None,setkeys=None,
             os.system('cp %s %s'%(basefilename,outname))
         else:
             setkeys_df = pd.DataFrame(setkeys)
-            print(setkeys_df)
+#             print(setkeys_df)
             if label in setkeys_df['label'].unique():
                 setkeys_l = setkeys_df.loc[setkeys_df['label']==label]
             else:
                 setkeys_l = None
-            print(setkeys_l)
-            print(setkeys_df['label'].unique())
+#             print(setkeys_l)
+#             print(setkeys_df['label'].unique())
             if label in ['main','training']:
                 if label == 'main':
                     for l in ['logging','training']:
+                        if l not in labels:
+                            continue
                         df_add = {}
                         df_add['section'] = 'iodata'
                         df_add['key'] = l+'config'
