@@ -41,8 +41,7 @@ set_key=4
         main trainparams fit_tpkoff False
         main trainparams gaussnewton_maxiter 15
         main iodata maxsn 500
-        logging none handlers:file:filename testing_change.log
-        training trainingparams estimate_tpk False
+        logging none handlers:file:filename OUTPUTDIR/testing.log
 
 [lcfitting]
 pro=split_and_fit.pl

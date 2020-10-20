@@ -1,0 +1,42 @@
+
+# Required info 
+TIME_STAMP_NSEC:   83322    # submit time; Nsec since midnight
+TIME_STAMP_SUBMIT: 2020-10-06 23:08:43.428052    
+SCRIPT_DIR:       /home/midai/pipeline_new_snana_submission/SIM_LOWZPS1_PS1_301/SPLIT_JOBS_LCFIT 
+DONE_STAMP_LIST:  ['ALL.DONE', 'pipeline/LCFit.DONE_1_301'] 
+CLEANUP_FLAG:     1 
+N_JOB_TOT:        10     # total number of jobs (excludes sym links)
+N_DONE_TOT:       10     # total number of done files (includes sym links)
+N_JOB_SPLIT:      10     # njob to merge per task after processing
+N_CORE:           10     # number of cores 
+FORCE_CRASH_PREP:    False 
+FORCE_CRASH_MERGE:   False
+
+
+# Fit info
+N_JOB_LINK:          0   # Njob with link to FITOPT000
+JOBFILE_WILDCARD:    '*SPLIT*' 
+TABLE_FORMATS:       ['TEXT', 'HBOOK', 'ROOT'] 
+USE_TABLE_FORMAT:    [True, False, False] 
+IGNORE_FITOPT:       False
+
+VERSION_LIST: 
+  - ALLSurveys_PS1_301
+
+FITOPT_LIST: 
+  - ['FITOPT000', 'DEFAULT', ''] 
+
+LINK_FITOPT000_LIST: []
+
+
+SBATCH_LIST:  # [CPU,PID,JOB_NAME] 
+  - [   0, 5920069, snfit_TEST2.nml.temp.1602041344.2483244_301-CPU0000 ] 
+  - [   1, 5920071, snfit_TEST2.nml.temp.1602041344.2483244_301-CPU0001 ] 
+  - [   2, 5920073, snfit_TEST2.nml.temp.1602041344.2483244_301-CPU0002 ] 
+  - [   3, 5920074, snfit_TEST2.nml.temp.1602041344.2483244_301-CPU0003 ] 
+  - [   4, 5920075, snfit_TEST2.nml.temp.1602041344.2483244_301-CPU0004 ] 
+  - [   5, 5920076, snfit_TEST2.nml.temp.1602041344.2483244_301-CPU0005 ] 
+  - [   6, 5920077, snfit_TEST2.nml.temp.1602041344.2483244_301-CPU0006 ] 
+  - [   7, 5920078, snfit_TEST2.nml.temp.1602041344.2483244_301-CPU0007 ] 
+  - [   8, 5920079, snfit_TEST2.nml.temp.1602041344.2483244_301-CPU0008 ] 
+  - [   9, 5920080, snfit_TEST2.nml.temp.1602041344.2483244_301-CPU0009 ] 

@@ -67,8 +67,8 @@ batch=True
 batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 10
 prooptions=
 set_key=2
-        NGENTOT_LC[0] 8000
-        NGENTOT_LC[1] 320000
+        NGENTOT_LC[0] 80000
+        NGENTOT_LC[1] 3200000
         GENMODEL[0] SALT2.JLA-B14
         GENMODEL[1] SALT2.JLA-B14
         GENSIGMA_SALT2ALPHA[0] 1.E8 1.E8  
@@ -112,6 +112,7 @@ validplots=True
 prooptions=NOPROMPT
 set_key=2
         opt_biascor 240
+        surveygroup_biascor 'CFA3+CFA3S+CFA3K+CFA4p1+CFA4p2+CSP(zbin=0.02),PS1MD(zbin=0.05)'
 
 [cosmofit]
 pro=wfit.exe

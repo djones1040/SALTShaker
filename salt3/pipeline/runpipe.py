@@ -114,7 +114,8 @@ class RunPipe():
         print(outname_orig)
         print(proname.outname)
         proname.configure(pro=proname.pro,baseinput=outname_orig,setkeys=df,prooptions=proname.prooptions,
-                          batch=proname.batch,validplots=proname.validplots,outname=proname.outname,
+                          batch=proname.batch,translate=proname.translate,validplots=proname.validplots,
+                          outname=proname.outname,
                           proargs=proname.proargs,plotdir=proname.plotdir,labels=proname.labels,**kwargs)  
     
     def make_validplots_sum(self,prostr,inputfile_sum,outputdir,prefix_sum='sum_valid'):
@@ -259,7 +260,7 @@ class RunPipe():
                         if ['train','biascorlcfit'] in self.pipe.gluepairs:
                             self.pipe.glue(['train','biascorlcfit'],on='model')
                     if any([p.startswith('getmu') for p in self.pipe.pipepros]): 
-                        df_getmu = self._add_suffix(self.pipe.GetMu,['OUTDIR_OVERRIDE'],self.num)
+                        df_getmu = self._add_suffix(self.pipe.GetMu,[self.pipe.GetMu.outdir_key],self.num)
                         done_file = "{}_{:03d}".format(self.pipe.GetMu.done_file.strip(),self.num)
                         self._reconfig_w_suffix(self.pipe.GetMu,df_getmu,self.num,done_file=done_file)
                         if ['lcfit','getmu'] in self.pipe.gluepairs:
@@ -275,14 +276,16 @@ class RunPipe():
                     randseed_new = [randseed_old.split(' ')[0],str(self.randseed)]
                     df = pd.DataFrame([{'key':'RANSEED_REPEAT','value':randseed_new}])
                     sim.configure(pro=sim.pro,baseinput=sim.outname,setkeys=df,prooptions=sim.prooptions,
-                                  batch=sim.batch,validplots=sim.validplots,outname=sim.outname)    
+                                  batch=sim.batch,translate=sim.translate,validplots=sim.validplots,
+                                  outname=sim.outname)    
                 if any([p.startswith('biascorsim') for p in self.pipe.pipepros]):
                     sim_biascor = self.pipe.BiascorSim
                     randseed_old = sim_biascor.keys['RANSEED_REPEAT']
                     randseed_new = [randseed_old.split(' ')[0],str(self.randseed+10)]
                     df_biascor = pd.DataFrame([{'key':'RANSEED_REPEAT','value':randseed_new}])
                     sim_biascor.configure(pro=sim_biascor.pro,baseinput=sim_biascor.outname,setkeys=df_biascor,prooptions=sim_biascor.prooptions,
-                                          batch=sim_biascor.batch,validplots=sim_biascor.validplots,outname=sim_biascor.outname)                
+                                          batch=sim_biascor.batch,translate=sim_biascor.translate,validplots=sim_biascor.validplots,
+                                          outname=sim_biascor.outname)                
             
             if not self.norun:
                 #remove success files from previous runs

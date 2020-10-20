@@ -6,7 +6,7 @@
 #           
 #########################################################
 
-SOLID_ANGLE:  0.021   # 70 sq deg
+#SOLID_ANGLE:  0.021   # 70 sq deg
 
 #USE_SIMLIB_PEAKMJD: 1
 #USE_SIMLIB_REDSHIFT: 0
