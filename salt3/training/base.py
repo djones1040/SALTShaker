@@ -187,6 +187,10 @@ class TrainSALTBase:
 							help='number of angstroms between each wavelength spline knot (default=%default)')
 		parser.add_argument('--phasesplineres', default=config.get('modelparams','phasesplineres'), type=float,
 							help='number of angstroms between each phase spline knot (default=%default)')
+		parser.add_argument('--waveinterpres', default=config.get('modelparams','waveinterpres'), type=float,
+							help='wavelength resolution in angstroms, used for internal interpolation (default=%default)')
+		parser.add_argument('--phaseinterpres', default=config.get('modelparams','phaseinterpres'), type=float,
+							help='phase resolution in angstroms, used for internal interpolation (default=%default)')
 		parser.add_argument('--waveoutres', default=config.get('modelparams','waveoutres'), type=float,
 							help='wavelength resolution in angstroms of the output file (default=%default)')
 		parser.add_argument('--phaseoutres', default=config.get('modelparams','phaseoutres'), type=float,
@@ -271,6 +275,7 @@ class TrainSALTBase:
 						 'waveSmoothingNeff':self.options.wavesmoothingneff,'phaseSmoothingNeff':self.options.phasesmoothingneff,
 						 'neffFloor':self.options.nefffloor, 'neffMax':self.options.neffmax,
 						 'specrecal':self.options.specrecal, 'regularizationScaleMethod':self.options.regularizationScaleMethod,
+						 'phaseinterpres':self.options.phaseinterpres,'waveinterpres':self.options.waveinterpres,
 						 'phaseknotloc':phaseknotloc,'waveknotloc':waveknotloc,
 						 'errphaseknotloc':errphaseknotloc,'errwaveknotloc':errwaveknotloc,
 						 'phaserange':self.options.phaserange,
@@ -346,9 +351,13 @@ class TrainSALTBase:
 			NFiltColorCut = len(np.unique(photdata['filt'][iColorCut]))
 			iPreMaxCut = len(np.unique(photdata['filt'][np.where((phase > -10) & (phase < -2))[0]]))
 			medSNR = np.median(photdata['fluxcal'][(phase > -10) & (phase < 10)]/photdata['fluxcalerr'][(phase > -10) & (phase < 10)])
-			iFitprob = datadict[sn]['fitprob'] >= 1e-4
+			hasvalidfitprob=datadict[sn]['fitprob']!=-99
+			iFitprob = (datadict[sn]['fitprob'] >= 1e-4)
 			if not iFitprob:
-				print(f'SN {sn} failing fitprob cut!')
+				log.debug(f'SN {sn} failing fitprob cut!')
+			if not hasvalidfitprob:
+				log.warning(f'SN {sn} does not have a valid fitprob, including in sample')
+				iFitprob=True
 			if len(iEpochsCut) < 4 or not len(iPkCut) or not len(iShapeCut) or NFiltColorCut < 2 or not iFitprob: # or iPreMaxCut < 2 or medSNR < 10:
 				datadict.pop(sn)
 				failedlist += [sn]

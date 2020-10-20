@@ -72,10 +72,11 @@ HOSTLIB_DZTOL: 0.03 0 0
 HOSTNOISE_FILE:  simulation/ps1_spec/PS1MD_SBNOISEMODEL.DAT
 
 # cosmological params for lightcurve generation and redshift distribution
-OMEGA_MATTER:  0.3
-OMEGA_LAMBDA:  0.7
-W0_LAMBDA:    -1.00
-H0:            70.0   
+# use defaults
+#OMEGA_MATTER:  0.3
+#OMEGA_LAMBDA:  0.7
+#W0_LAMBDA:    -1.00
+#H0:            70.0   
 
 #GENRANGE_SALT2x1:  -5.0  5.0
 #GENRANGE_SALT2c:   -1.0  1.0

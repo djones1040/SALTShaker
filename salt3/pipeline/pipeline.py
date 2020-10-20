@@ -13,6 +13,7 @@ import warnings
 import copy
 import shutil
 import psutil
+import yaml
 from salt3.pipeline.validplot import ValidPlots
 cwd = os.getcwd()
 
@@ -167,15 +168,22 @@ class SALT3pipe():
                 pipepro = [pipepro]
             for i in range(niter):
                 pipepro[i] = pipepro[i]
-                baseinput = self._get_config_option(config,prostr,'baseinput').split(',')[i]
-                outname = self._get_config_option(config,prostr,'outinput').split(',')[i]
-                outname = outname+'.temp.{}'.format(self.timestamp)
+                baseinput = self._get_config_option(config,prostr,'baseinput').split(',')
+                outname = self._get_config_option(config,prostr,'outinput').split(',')
+                outname = [x+'.temp.{}'.format(self.timestamp) for x in outname]
                 pro = self._get_config_option(config,prostr,'pro')
                 batch = self._get_config_option(config,prostr,'batch',dtype=boolean_string)
+                batch_info = self._get_config_option(config,prostr,'batch_info')
                 validplots = self._get_config_option(config,prostr,'validplots',dtype=boolean_string)
                 proargs = self._get_config_option(config,prostr,'proargs')
                 prooptions = self._get_config_option(config,prostr,'prooptions')
                 snlists = self._get_config_option(config,prostr,'snlists')
+                labels = self._get_config_option(config,prostr,'labels')
+                if labels is not None:
+                    labels = labels.split(',')
+                if len(baseinput) == niter:
+                    baseinput = baseinput[i]
+                    outname=outname[i]
                 pipepro[i].configure(baseinput=baseinput,
                                      setkeys=pipepro[i].setkeys,
                                      outname=outname,
@@ -184,8 +192,10 @@ class SALT3pipe():
                                      prooptions=prooptions,
                                      snlists=snlists,
                                      batch=batch,
+                                     batch_info = batch_info,
                                      validplots=validplots,
-                                     plotdir=self.plotdir)
+                                     plotdir=self.plotdir,
+                                     labels=labels)
                 if hasattr(pipepro[i], 'biascor') and pipepro[i].biascor:
                     pipepro[i].done_file = "{}_{}".format(pipepro[i].done_file,'biascor')
                 if niter > 1:
@@ -264,25 +274,25 @@ class SALT3pipe():
                         else:
                             split_arr = self.genversion_split_biascor.split(',')
                         split_idx = [int(x) for x in split_arr]
-                        for label in ['io','kcor']:
-                            pro1_out = pro1_out_dict[label][split_idx[j:j+1]] #:split_idx[j+1]] 
+                        for tag in ['io','kcor']:
+                            pro1_out = pro1_out_dict[tag][split_idx[j:j+1]] #:split_idx[j+1]] 
                             if isinstance(pro1_out,list) or isinstance(pro1_out,np.ndarray): 
-                                pro2_in.loc[pro2_in['label']==label,'value'] = ', '.join(pro1_out)
+                                pro2_in.loc[pro2_in['tag']==tag,'value'] = ', '.join(pro1_out)
                             else:
-                                pro2_in.loc[pro2_in['label']==label,'value'] = pro1_out
+                                pro2_in.loc[pro2_in['tag']==tag,'value'] = pro1_out
                     elif isinstance(pro2, Training):
                         pro2_in = pro2._get_input_info()
-                        for label in ['io','kcor']:     
-                            pro1_out = pro1_out_dict[label]    
+                        for tag in ['io','kcor']:     
+                            pro1_out = pro1_out_dict[tag]    
                             if isinstance(pro1_out,list) or isinstance(pro1_out,np.ndarray): 
-                                if label == 'io':
-                                    pro2_in.loc[pro2_in['label']==label,'value'] = ','.join(pro1_out)
-                                elif label == 'kcor':
+                                if tag == 'io':
+                                    pro2_in.loc[pro2_in['tag']==tag,'value'] = ','.join(pro1_out)
+                                elif tag == 'kcor':
                                     for i,survey in zip(pro1_out_dict['ind'],pro1_out_dict['survey']):
                                         section = 'survey_{}'.format(survey.strip())
-                                        pro2_in.loc[(pro2_in['label']==label) & (pro2_in['section']==section),'value'] = pro1_out[int(i)]
+                                        pro2_in.loc[(pro2_in['tag']==tag) & (pro2_in['section']==section),'value'] = pro1_out[int(i)]
                             else:
-                                pro2_in.loc[pro2_in['label']==label,'value'] = pro1_out
+                                pro2_in.loc[pro2_in['tag']==tag,'value'] = pro1_out
 
                 elif isinstance(pro1, Training) and isinstance(pro2, LCFitting):
                     pro2_in = pro2._get_input_info().loc[on]
@@ -325,7 +335,8 @@ class SALT3pipe():
                                    outname=pro1.outname,
                                    batch=pro1.batch,
                                    validplots=pro1.validplots,
-                                   plotdir=pro1.plotdir)
+                                   plotdir=pro1.plotdir,
+                                   labels=pro1.labels)
 
                 if not pipepros[1].lower().startswith('cosmofit'):
                     pro2.configure(setkeys = setkeys,
@@ -337,7 +348,8 @@ class SALT3pipe():
                                    batch=pro2.batch,
                                    validplots=pro2.validplots,
                                    done_file=pro2.done_file,
-                                   plotdir=pro2.plotdir)
+                                   plotdir=pro2.plotdir,
+                                   labels=pro2.labels)
                 else:
                     version_photometry = '/'+self.LCFitting[0].keys['SNLCINP']['VERSION_PHOTOMETRY']+'/'
                     vinput = version_photometry.strip().join(setkeys['value'].values[0])
@@ -347,7 +359,8 @@ class SALT3pipe():
                                    outname=vinput,
                                    batch=pro2.batch,
                                    validplots=pro2.validplots,
-                                   plotdir=pro2.plotdir)
+                                   plotdir=pro2.plotdir,
+                                   labels=pro2.labels)
 
         self.gluepairs.append(pipepros)
 
@@ -429,8 +442,8 @@ class PipeProcedure():
         self.outname = None
 
     def configure(self,pro=None,baseinput=None,setkeys=None,
-                  proargs=None,prooptions=None,batch=False,
-                  validplots=False,plotdir=None,**kwargs):  
+                  proargs=None,prooptions=None,batch=False,batch_info=None,
+                  validplots=False,plotdir=None,labels=None,**kwargs):  
         if pro is not None and "$" in pro:
             self.pro = os.path.expandvars(pro)
         else:
@@ -443,8 +456,10 @@ class PipeProcedure():
         self.proargs = proargs
         self.prooptions = prooptions
         self.batch = batch
+        self.batch_info = batch_info
         self.validplots = validplots
         self.plotdir = plotdir
+        self.labels = labels
 
         self.gen_input(outname=self.outname)
 
@@ -557,20 +572,23 @@ class Simulation(PipeProcedure):
         super().__init__()
 
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
-                  batch=False,validplots=False,
+                  batch=False,batch_info=None,validplots=False,
                   outname="pipeline_byosed_input.input",**kwargs):
         self.done_file = finput_abspath('%s/Sim.DONE'%os.path.dirname(baseinput))
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
+        self.batch_info = batch_info
         self.validplots = validplots
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
-                          prooptions=prooptions,batch=batch,validplots=validplots)
+                          prooptions=prooptions,batch=batch,batch_info=batch_info,
+                          validplots=validplots)
 
     def gen_input(self,outname="pipeline_sim_input.input"):
         self.outname = outname
         self.finput,self.keys,self.done_file = _gen_snana_sim_input(basefilename=self.baseinput,setkeys=self.setkeys,
-                                                                    outname=outname,done_file=self.done_file)
+                                                                    outname=outname,done_file=self.done_file,
+                                                                    batch_info=self.batch_info)
 
     def _get_output_info(self):
         if self.batch:
@@ -746,13 +764,14 @@ class Simulation(PipeProcedure):
 class Training(PyPipeProcedure):
 
     def configure(self,pro=None,baseinput=None,setkeys=None,proargs=None,
-                  prooptions=None,outname="pipeline_train_input.input",**kwargs):
+                  prooptions=None,outname="pipeline_train_input.input",
+                  labels=None,**kwargs):
         self.done_file = None
         self.outname = outname
         self.proargs = proargs
         self.prooptions = prooptions
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
-                          proargs=proargs,prooptions=prooptions)
+                          proargs=proargs,prooptions=prooptions,labels=labels)
 
     def glueto(self,pipepro):
         if not isinstance(pipepro,str):
@@ -770,6 +789,13 @@ class Training(PyPipeProcedure):
         else:
             raise ValueError("training can only glue to lcfit")
 
+    def gen_input(self,outname=[]):
+        self.outname = outname
+        self.outname,config_dict = _gen_training_inputs(basefilenames=self.baseinput,setkeys=self.setkeys,
+                                                        outnames=self.outname,labels=self.labels)
+        self.keys = config_dict['main']
+        self.finput = self.outname['main']
+        
     def _get_input_info(self):
         section_key_pair = [['iodata','snlists','io']]
         survey_sections = [x for x in self.keys.sections() if x.strip().lower().startswith('survey')]
@@ -781,11 +807,12 @@ class Training(PyPipeProcedure):
             df = {}
             section = p[0]
             key = p[1]
-            label = p[2]
+            tag = p[2]
             df['section'] = section
             df['key'] = key
             df['value'] = self.keys[section][key]
-            df['label'] = label
+            df['tag'] = tag
+            df['label'] = 'main'
             dflist.append(df)
         df2 = pd.DataFrame(dflist)
         return df2
@@ -805,6 +832,7 @@ class Training(PyPipeProcedure):
         df['section'] = section
         df['key'] = key
         df['value'] = self.keys[section][key]
+        df['label'] = 'main'
         return pd.DataFrame([df])
 
     def _set_output_info(self,value):
@@ -912,23 +940,26 @@ class LCFitting(PipeProcedure):
         super().__init__()
         
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
-                  batch=False,validplots=False,outname="pipeline_lcfit_input.input",
+                  batch=False,batch_info=None,
+                  validplots=False,outname="pipeline_lcfit_input.input",
                   done_file='LCFit.DONE',plotdir=None,**kwargs):
 #         self.done_file = 'ALL.DONE'
         self.done_file = '%s/%s'%(os.path.dirname(baseinput),os.path.split(done_file)[1])
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
+        self.batch_info = batch_info
         self.validplots = validplots
         self.plotdir = plotdir
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
-                          prooptions=prooptions,batch=batch,
+                          prooptions=prooptions,batch=batch,batch_info=batch_info,
                           validplots=validplots,plotdir=plotdir)
         
     def gen_input(self,outname="pipeline_lcfit_input.input"):
         self.outname = outname
         self.finput,self.keys = _gen_snana_fit_input(basefilename=self.baseinput,setkeys=self.setkeys,
-                                                     outname=outname,done_file=self.done_file)
+                                                     outname=outname,done_file=self.done_file,
+                                                     batch_info=self.batch_info)
 
 
     def glueto(self,pipepro):
@@ -962,12 +993,12 @@ class LCFitting(PipeProcedure):
             section = p[0]
             key = p[1]
             t = p[2]
-            label = p[3]
+            tag = p[3]
             df['section'] = section
             df['key'] = key
             df['value'] = self.keys[section][key]
             df['type'] = t
-            df['label'] = label
+            df['tag'] = tag
             dflist.append(df)
         df2 = pd.DataFrame(dflist)
         
@@ -997,7 +1028,7 @@ class LCFitting(PipeProcedure):
             df['key'] = key
             df['value'] = self.keys[section][key]
             df['type'] = 'phot'
-            df['label'] = 'io'
+            df['tag'] = 'io'
             df2 = df2.append(df,ignore_index=True)
             return df2.set_index('type')
 
@@ -1056,23 +1087,26 @@ class GetMu(PipeProcedure):
         super().__init__()
         
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
-                  batch=False,validplots=False,plotdir=None,outname="pipeline_getmu_input.input",
+                  batch=False,batch_info=None,
+                  validplots=False,plotdir=None,outname="pipeline_getmu_input.input",
                   done_file='GetMu.DONE',**kwargs):
         self.done_file = finput_abspath('%s/%s'%(os.path.dirname(baseinput),os.path.split(done_file)[1]))
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
+        self.batch_info = batch_info
         self.validplots = validplots
         self.plotdir = plotdir
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
-                          prooptions=prooptions,batch=batch,validplots=validplots,
+                          prooptions=prooptions,batch=batch,batch_info=batch_info,
+                          validplots=validplots,
                           done_file=self.done_file,plotdir=plotdir)
 
     def gen_input(self,outname="pipeline_getmu_input.input"):
         self.outname = outname
         self.finput,self.keys,self.delimiter = _gen_general_input(basefilename=self.baseinput,setkeys=self.setkeys,
                                                                   outname=outname,sep=['=',': '],done_file=self.done_file,
-                                                                  outdir='Run_GetMu')
+                                                                  outdir='Run_GetMu',batch_info=self.batch_info)
         
     def glueto(self,pipepro):
         if not isinstance(pipepro,str):
@@ -1150,16 +1184,18 @@ class GetMu(PipeProcedure):
 
 class CosmoFit(PipeProcedure):
     def configure(self,setkeys=None,pro=None,outname=None,prooptions=None,batch=False,
-                  validplots=False,plotdir=None,**kwargs):
+                  batch_info=None,validplots=False,plotdir=None,**kwargs):
         self.done_file = None
         if setkeys is not None:
             outname = setkeys.value.values[0]
         self.prooptions = prooptions
         self.finput = outname
         self.batch = batch
+        self.batch_info = batch_info
         self.validplots = validplots
         self.plotdir = plotdir
-        super().configure(pro=pro,outname=outname,prooptions=prooptions,batch=batch,validplots=validplots,plotdir=plotdir)
+        super().configure(pro=pro,outname=outname,prooptions=prooptions,batch=batch,
+                          batch_info=batch_info,validplots=validplots,plotdir=plotdir)
 
     def _get_input_info(self):
         df = {}
@@ -1303,6 +1339,86 @@ def _gen_general_python_input(basefilename=None,setkeys=None,
         print("input file saved as:",outname)
     return outname,config
 
+def _gen_general_yaml_input(basefilename=None,setkeys=None,
+                            outname=None):
+    
+    with _open_shared_file(basefilename,'r') as f:
+        config = yaml.full_load(f)
+    
+    if not os.path.isfile(basefilename):
+        raise ValueError("File does not exist",basefilename)
+    if not os.path.exists(os.path.dirname(outname)):
+        os.makedirs(os.path.dirname(outname))
+
+    if setkeys is None:
+        print("No modification on the input file, copying {} to {}".format(basefilename,outname))
+        os.system('cp %s %s'%(basefilename,outname))
+    else:
+        setkeys = pd.DataFrame(setkeys)
+        for index, row in setkeys.iterrows():
+            keystr = row['key']
+            values = row['value']
+            keys = keystr.split(':')
+            config_temp = config
+            for i,key in enumerate(keys):
+                if key in config_temp.keys() and i<len(keys):
+                    config_temp = config_temp[key]
+                else:
+                    raise ValueError("Can only change keys that are already in yaml file")
+            config_idx = ("['%s']"*len(keys)) % tuple(keys)
+            exec("config{}='{}'".format(config_idx,values))
+        with _open_shared_file(outname, 'w') as f:
+            yaml.dump(config,f)
+        print("input file saved as:",outname)
+    return outname,config
+
+def _gen_training_inputs(basefilenames=None,setkeys=None,
+                         outnames=None,labels=None):
+
+    outnames_dict = {}
+    config_dict = {}
+    if isinstance(basefilenames,dict):
+        labels = list(basefilenames.keys())
+        basefilenames = list(basefilenames.values())
+    if isinstance(outnames,dict):
+        outnames = [outnames[key] for key in labels]
+    print(basefilenames)
+    print(outnames)
+    print(labels)
+    for basefilename,outname,label in zip(basefilenames,outnames,labels):
+        if not label in ['main','logging','training']:
+            raise ValueError("{} is not a valid label, check input file".format(label))     
+        if not os.path.isfile(basefilename):
+            raise ValueError("File does not exist",basefilename)
+        if not os.path.exists(os.path.dirname(outname)):
+            os.makedirs(os.path.dirname(outname))
+   
+        if setkeys is None and label in ['main']:
+            print("No modification on the input file, copying {} to {}".format(basefilename,outname))
+            os.system('cp %s %s'%(basefilename,outname))
+        else:
+            setkeys_df = pd.DataFrame(setkeys)
+            print(setkeys_df)
+            if label in setkeys_df['label'].unique():
+                setkeys_l = setkeys_df.loc[setkeys_df['label']==label]
+            else:
+                setkeys_l = None
+            print(setkeys_l)
+            print(setkeys_df['label'].unique())
+            if label in ['main','training']:
+                if label == 'main':
+                    for l in ['logging','training']:
+                        df_add = {}
+                        df_add['section'] = 'iodata'
+                        df_add['key'] = l+'config'
+                        df_add['value'] = outnames[labels.index(l)]
+                        setkeys_l = setkeys_l.append(pd.DataFrame([df_add]))
+                outnames_dict[label],config_dict[label] = _gen_general_python_input(basefilename=basefilename,setkeys=setkeys_l,outname=outname)
+            elif label in ['logging']:
+                outnames_dict[label],config_dict[label] = _gen_general_yaml_input(basefilename=basefilename,setkeys=setkeys_l,outname=outname)
+
+    return outnames_dict,config_dict
+
 def _rename_duplicate_keys(keys):
     df = pd.DataFrame(keys,columns=['value'])
     df['count'] = 1
@@ -1317,7 +1433,7 @@ def _rename_duplicate_keys(keys):
     return newkeys
 
 def _gen_snana_sim_input(basefilename=None,setkeys=None,
-                         outname=None,done_file=None):
+                         outname=None,done_file=None,batch_info=None):
 
     #TODO:
     #read in kwlist from standard snana kw list
@@ -1336,8 +1452,6 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
     linenum = []
 
     if setkeys is None:
-        print("No modification on the input file, copying {} to {}".format(basefilename,outname))
-        os.system('cp %s %s'%(basefilename,outname))
         config = {}
         for i,line in enumerate(lines):
             if ":" in line and not line.strip().startswith("#"):
@@ -1354,8 +1468,25 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
                 linenum.append(i)
 
         basekws_renamed = _rename_duplicate_keys(basekws)
-        for i,kw in enumerate(basekws_renamed): 
-            config[kw] = basevals[i]  
+        for i,kw in enumerate(basekws_renamed):
+            if "BATCH_INFO" in kw and batch_info is not None:
+                print("Changing BATCH_INFO to {}".format(batch_info))
+                config[kw] = batch_info
+            else:
+                config[kw] = basevals[i]  
+        if batch_info is None:
+            print("No modification on the input file, copying {} to {}".format(basefilename,outname))
+            os.system('cp %s %s'%(basefilename,outname))
+        else:
+            lines_to_write = []
+            for line in lines:
+                if 'BATCH_INFO' in line:
+                    line = batch_info
+                lines_to_write.append(line)
+            with _open_shared_file(outname,"w") as outfile:
+                for line in lines_to_write:
+                    outfile.write(line)
+            print("Write sim input to file:",outname)
         
     else:
         setkeys = pd.DataFrame(setkeys)
@@ -1395,6 +1526,10 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
                     lines[linenum[i]] = "{}: {}\n".format(keystr,val)
                 print("Setting {} = {}".format(keystr,val.strip()))
                 config[kw] = val 
+            elif "BATCH_INFO" in kw and batch_info is not None:
+                print("Changing BATCH_INFO to {}".format(batch_info))
+                lines[linenum[i]] = "BATCH_INFO: {}\n".format(batch_info)
+                config[kw] = batch_info
             else:
                 config[kw] = basevals[i]          
 
@@ -1445,12 +1580,11 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
                 else:
                     print('DONE_STAMP: %s'%done_file,file=fout)
 
-
     return outname,config,done_file
 
 
 def _gen_snana_fit_input(basefilename=None,setkeys=None,
-                         outname=None,done_file=None):
+                         outname=None,done_file=None,batch_info=None):
 
     import f90nml
     from f90nml.namelist import Namelist
@@ -1488,6 +1622,10 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
             nml['header'].__setitem__(key,value)
     if not done_file: nml['header'].__setitem__('done_stamp','ALL.DONE')
     else: nml['header'].__setitem__('done_stamp',done_file)
+    
+    if batch_info is not None:
+        print("Changing BATCH_INFO to {}".format(batch_info))
+        nml['header'].__setitem__('batch_info',batch_info)
 
     if setkeys is not None:
         for index, row in setkeys.iterrows():
@@ -1510,7 +1648,8 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
 
     return outname,nml
 
-def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_file=None,outdir=None):
+def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',
+                       batch_info=None,done_file=None,outdir=None):
 
     config,delimiter = _read_simple_config_file(basefilename,sep=sep)
     #if setkeys is None:
@@ -1519,6 +1658,8 @@ def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_
         for index, row in setkeys.iterrows():
             key = row['key']
             values = row['value']
+            if key not in delimiter.keys():
+                delimiter[key] = '='
             if delimiter[key] == '=' and isinstance(values,(list,np.ndarray)):
                 values = [','.join(values)]
             else:
@@ -1535,6 +1676,10 @@ def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',done_
     if outdir is not None and 'OUTDIR_OVERRIDE' not in config.keys():
         config['OUTDIR_OVERRIDE'] = outdir
         delimiter['OUTDIR_OVERRIDE'] = ': '
+    if 'BATCH_INFO' in config.keys() and batch_info is not None:
+        print("Changing BATCH_INFO to {}".format(batch_info))
+        config['BATCH_INFO'] = batch_info
+        delimiter['BATCH_INFO'] = ': '
         
     print("input file saved as:",outname)
     _write_simple_config_file(config,outname,delimiter)

@@ -1,3 +1,4 @@
+zpecerr=0.001
 bins=5
 zmin=0.02
 zmax=1.02

@@ -6,7 +6,8 @@ from salt3.util.txtobj import txtobj
 from salt3.util import getmu
 from functools import partial
 from scipy.stats import binned_statistic
-from astropy.cosmology import Planck15 as cosmo
+from astropy.cosmology import Planck15 as planck
+from astropy.cosmology import FlatLambdaCDM
 import astropy.table as at
 #from salt3.pipeline.pipeline import LCFitting
 
@@ -122,6 +123,7 @@ class getmu_validplots(ValidPlots):
 			left=None, bottom=0.2, right=None, top=None, wspace=0, hspace=0)
 		fr = txtobj(self.inputfile,fitresheader=True)
 		ax = plt.axes()
+		cosmo = FlatLambdaCDM(H0=70, Om0=0.315, Tcmb0=planck.Tcmb0)
 		fr.MURES = fr.MU - cosmo.distmod(fr.zCMB).value
 
 		def errfnc(x):
