@@ -30,7 +30,7 @@ def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
 
 
 
-	filtdict = {'SDSS':['sdss%s'%s for s in  'ugri'],'Bessell':['bessell%s'%s +('x' if s=='u' else '')for s in  'ubvri']}
+	filtdict = {'SDSS':['sdss%s'%s for s in	 'ugri']+['desz'],'Bessell':['bessell%s'%s +('x' if s=='u' else '')for s in	 'ubvri']}
 	filters=filtdict[filterset]
 	
 	zpsys='AB'
@@ -65,20 +65,26 @@ def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
 		
 			salt2model.set(x1=1)
 			salt3model.set(x1=1)
-			salt2stretchedflux = salt2model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')
-			salt3stretchedflux = salt3model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')#*\
-			
-			salt2model.set(x1=0)
-			salt3model.set(x1=0)
-			salt2flux = salt2model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')
-			salt3flux = salt3model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')#*\
-			
+			try:
+				salt2stretchedflux = salt2model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')
+				salt2model.set(x1=0)
+				salt2flux = salt2model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')
+				ax0.plot(plotmjd,salt2flux,color='b',label='SALT2')
+				ax1.plot(plotmjd,salt2stretchedflux-salt2flux,color='b',label='SALT2')
+			except: pass
+
+			try:
+				salt3stretchedflux = salt3model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')
+				salt3model.set(x1=0)
+
+				salt3flux = salt3model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')
+				ax0.plot(plotmjd,salt3flux,color='r',label='SALT3')
+				ax1.plot(plotmjd,salt3stretchedflux-salt3flux,color='r',label='SALT3')
+			except: pass
+				
 			ax0.set_yticks([])
 			ax1.set_yticks([])
-			ax0.plot(plotmjd,salt2flux,color='b',label='SALT2')
-			ax0.plot(plotmjd,salt3flux,color='r',label='SALT3')
-			ax1.plot(plotmjd,salt2stretchedflux-salt2flux,color='b',label='SALT2')
-			ax1.plot(plotmjd,salt3stretchedflux-salt3flux,color='r',label='SALT3')
+
 	
 			ax0.set_title(flt,fontsize=20)
 			#ax.set_xlim([-30,55])
@@ -133,7 +139,7 @@ def overPlotSynthPhotByComponentCustom(
 	int1ds2m1 = interp1d(salt2phase,salt2m1flux,axis=0,fill_value='extrapolate')
 	
 
-	filtdict = {'SDSS':['sdss%s'%s for s in  'ugri'],'Bessell':['bessell%s'%s +('x' if s=='u' else '')for s in  'ubvri']}
+	filtdict = {'SDSS':['sdss%s'%s for s in	 'ugri']+['desz'],'Bessell':['bessell%s'%s +('x' if s=='u' else '')for s in	 'ubvri']}
 	filters=filtdict[filterset]
 	
 	zpsys='AB'
@@ -148,12 +154,12 @@ def overPlotSynthPhotByComponentCustom(
 								lcrv01file=lcrv01file)
 	salt3model =  sncosmo.Model(salt3)
 	
-	salt2model.set(z=0.0)
+	salt2model.set(z=0.025)
 	salt2model.set(x0=1)
 	salt2model.set(t0=0)
 	salt2model.set(c=0)
 	
-	salt3model.set(z=0.0)
+	salt3model.set(z=0.025)
 	salt3model.set(x0=1)
 	salt3model.set(t0=0)
 	salt3model.set(c=0)
@@ -206,8 +212,11 @@ def overPlotSynthPhotByComponentCustom(
 		#ax1.plot(plotmjd,salt2stretchedflux-salt2flux,color='b',label='SALT2')
 		#ax1.plot(plotmjd,salt3stretchedflux-salt3flux,color='r',label='SALT3')
 		ax1.plot(plotmjd,salt2m1synflux,color='b',label='SALT2 Syn')
-		ax1.plot(plotmjd,salt3m1synflux,color='r',label='SALT3 Syn')		
-		ax0.set_title(flt,fontsize=20)
+		ax1.plot(plotmjd,salt3m1synflux,color='r',label='SALT3 Syn')	
+		title=flt
+		if 'bessell' in title:
+			title= 'Bessell '+ flt[len('bessell')].upper()
+		ax0.set_title(title,fontsize=20)
 		#ax.set_xlim([-30,55])
 		
 	fig.subplots_adjust(right=0.8,bottom=0.15,left=0.05)
@@ -229,13 +238,13 @@ def plotSynthPhotOverStretchRange(outfile,salt3dir,filterset='SDSS',
 		 errscalefile='salt3_lc_dispersion_scaling.dat',
 		 lcrv00file='salt3_lc_variance_0.dat',
 		 lcrv11file='salt3_lc_variance_1.dat',
-		 lcrv01file='salt3_lc_covariance_01.dat'):
+		 lcrv01file='salt3_lc_covariance_01.dat',includeSALT2=True):
 	
 	plt.clf()
 
 
 
-	filtdict = {'SDSS':['sdss%s'%s for s in  'ugri'],'Bessell':['bessell%s'%s +('x' if s=='u' else '')for s in  'ubvri']}
+	filtdict = {'SDSS':['sdss%s'%s for s in	 'ugri']+['desz'],'Bessell':['bessell%s'%s +('x' if s=='u' else '')for s in	'ubvri']}
 	filters=filtdict[filterset]
 	
 	zpsys='AB'
@@ -263,8 +272,10 @@ def plotSynthPhotOverStretchRange(outfile,salt3dir,filterset='SDSS',
 	plotmjd = np.linspace(-20, 55,100)
 	
 	fig = plt.figure(figsize=(15, 5))
-	salt3axes = [fig.add_subplot(2,len(filters),1+i) for i in range(len(filters))]
-	salt2axes = [fig.add_subplot(2,len(filters),len(filters)+ 1+i,sharex=salt3ax) for i,salt3ax in enumerate(salt3axes)]
+	salt3axes = [fig.add_subplot(1+includeSALT2,len(filters),1+i) for i in range(len(filters))]
+	if includeSALT2: salt2axes = [fig.add_subplot(2,len(filters),len(filters)+ 1+i,sharex=salt3ax) for i,salt3ax in enumerate(salt3axes)]
+	else:
+		salt2axes=[None for ax in salt3axes]	
 	xmin,xmax=-2,2
 	norm=colors.Normalize(vmin=xmin,vmax=xmax)
 	cmap=plt.get_cmap('RdBu')
@@ -274,24 +285,34 @@ def plotSynthPhotOverStretchRange(outfile,salt3dir,filterset='SDSS',
 			salt2model.set(x1=x1)
 			salt3model.set(x1=x1)
 			color=cmap(norm(x1))
-			salt2flux = salt2model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')
-			salt3flux = salt3model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')#*\
+			if includeSALT2: 
+				try:
+					salt2flux = salt2model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')
+					ax2.plot(plotmjd,salt2flux,color=color,label='SALT2',linewidth=0.1)
+				except: pass
+			try:
+				salt3flux = salt3model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')
+				ax3.plot(plotmjd,salt3flux,color=color,label='SALT3',linewidth=0.1)
+			except: pass
 			
-			ax2.set_yticks([])
+			if includeSALT2: ax2.set_yticks([])
 			ax3.set_yticks([])
-			ax2.plot(plotmjd,salt2flux,color=color,label='SALT2',linewidth=0.1)
-			ax3.plot(plotmjd,salt3flux,color=color,label='SALT3',linewidth=0.1)
+
 	
-			ax3.set_title(flt,fontsize=20)
+			title=flt
+			if 'bessell' in title:
+				title= 'Bessell '+ flt[len('bessell')].upper()
+			ax3.set_title(title,fontsize=20)
 			#ax.set_xlim([-30,55])
 	sm=plt.cm.ScalarMappable(norm=norm,cmap=cmap)
 	sm._A=[]
 	fig.subplots_adjust(right=0.8,bottom=0.15,left=0.05)
 	cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
-	salt2axes[0].set_ylabel('SALT2 Flux',fontsize=20)
+	if includeSALT2: salt2axes[0].set_ylabel('SALT2 Flux',fontsize=20)
 	salt3axes[0].set_ylabel('SALT3 Flux',fontsize=20)
+
 	fig.colorbar(sm,cax=cbar_ax)
-	cbar_ax.set_ylabel('Stretch  ($x_1$ parameter)',fontsize=20)
+	cbar_ax.set_ylabel('Stretch	 ($x_1$ parameter)',fontsize=20)
 	
 	fig.text(0.5,0.04,'Time since peak (days)',ha='center',fontsize=20)
 	#axes[0].legend()
@@ -308,6 +329,6 @@ if __name__ == "__main__":
 	if parser.outdir is None:
 		parser.outdir=(parser.salt3dir)
 	plotSynthPhotOverStretchRange('{}/synthphotrange.pdf'.format(parser.outdir),parser.salt3dir,parser.filterset)
-	overPlotSynthPhotByComponentCustom('{}/synthphotoverplot.pdf'.format(parser.outdir),parser.salt3dir,parser.filterset)
+	overPlotSynthPhotByComponent('{}/synthphotoverplot.pdf'.format(parser.outdir),parser.salt3dir,parser.filterset)
 	
 	

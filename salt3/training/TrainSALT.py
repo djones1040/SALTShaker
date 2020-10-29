@@ -41,7 +41,7 @@ _flatnu=f'{init_rootdir}/flatnu.dat'
 
 # validation utils
 import matplotlib as mpl
-mpl.use('agg')
+mpl.use('MacOSX')
 import pylab as plt
 from salt3.validation import ValidateLightcurves
 from salt3.validation import ValidateSpectra
@@ -52,9 +52,69 @@ from salt3.util.synphot import synphot
 from salt3.initfiles import init_rootdir as salt2dir
 from salt3.validation import SynPhotPlot
 from time import time
+from sncosmo.salt2utils import SALT2ColorLaw
+from scipy.interpolate import interp1d
+from scipy.optimize import least_squares
+from scipy.special import factorial
+import extinction
 
 import logging
 log=logging.getLogger(__name__)
+
+def RatioToSatisfyDefinitions(phase,wave,kcordict,components):
+	"""Ensures that the definitions of M1,M0,x0,x1 are satisfied"""
+
+	Bmag = synphot(
+		kcordict['default']['primarywave'],kcordict['default']['AB'],
+		filtwave=kcordict['default']['Bwave'],filttp=kcordict['default']['Btp'],
+		zpoff=0)
+	
+	Bflux = 10**(0.4*(Bmag+27.5))
+
+	filttrans = kcordict['default']['Btp']
+	filtwave = kcordict['default']['Bwave']
+			
+	pbspl = np.interp(wave,filtwave,filttrans,left=0,right=0)
+	
+	pbspl *= wave
+	denom = np.trapz(pbspl,wave)
+	pbspl /= denom*HC_ERG_AA
+	kcordict['default']['Bpbspl'] = pbspl
+	
+	int1d = interp1d(phase,components[0],axis=0,assume_sorted=True)
+	m0Bflux = np.sum(kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
+		(wave[1]-wave[0])*Bflux
+	
+	int1d = interp1d(phase,components[1],axis=0,assume_sorted=True)
+	m1Bflux = np.sum(kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
+		(wave[1]-wave[0])*Bflux
+	ratio=m1Bflux/m0Bflux
+	return ratio
+
+def specflux(obsphase,obswave,m0phase,m0wave,m0flux,m1flux,colorlaw,z,x0,x1,c,mwebv):
+	
+	modelflux = x0*(m0flux + x1*m1flux)*1e-12/(1+z) # 10**(-0.4*c*colorlaw(np.unique(m0wave)))*
+
+	m0interp = interp1d(np.unique(m0phase)*(1+z),m0flux*1e-12/(1+z),axis=0, #*10**(-0.4*c*colorlaw(np.unique(m0wave)))
+						kind='nearest',bounds_error=False,fill_value="extrapolate")
+	m0phaseinterp = m0interp(obsphase)
+	m0interp = np.interp(obswave,np.unique(m0wave)*(1+z),m0phaseinterp)
+
+	m1interp = interp1d(np.unique(m0phase)*(1+z),m1flux*1e-12/(1+z),axis=0, #*10**(-0.4*c*colorlaw(np.unique(m0wave)))
+						kind='nearest',bounds_error=False,fill_value="extrapolate")
+	m1phaseinterp = m1interp(obsphase)
+	m1interp = np.interp(obswave,np.unique(m0wave)*(1+z),m1phaseinterp)
+
+	
+	intphase = interp1d(np.unique(m0phase)*(1+z),modelflux,axis=0,kind='nearest',bounds_error=False,fill_value="extrapolate")
+	modelflux_phase = intphase(obsphase)
+	intwave = interp1d(np.unique(m0wave)*(1+z),modelflux_phase,kind='nearest',bounds_error=False,fill_value="extrapolate")
+	modelflux_wave = intwave(obswave)
+	modelflux_wave = x0*(m0interp + x1*m1interp)
+	mwextcurve = 10**(-0.4*extinction.fitzpatrick99(obswave,mwebv*3.1))
+	modelflux_wave *= mwextcurve
+
+	return modelflux_wave
 
 
 class TrainSALT(TrainSALTBase):
@@ -77,8 +137,8 @@ class TrainSALT(TrainSALTBase):
 		# initial guesses
 		init_options = {'phaserange':self.options.phaserange,'waverange':self.options.waverange,
 						'phasesplineres':self.options.phasesplineres,'wavesplineres':self.options.wavesplineres,
-						'phaseinterpres':self.options.phaseoutres,'waveinterpres':self.options.waveoutres,
-						'normalize':True,'order':self.options.interporder}
+						'phaseinterpres':self.options.phaseinterpres,'waveinterpres':self.options.waveinterpres,
+						'normalize':True,'order':self.options.interporder,'use_snpca_knots':self.options.use_snpca_knots}
 				
 		phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
 			self.options.inithsiaofile,self.options.initbfilt,_flatnu,**init_options)
@@ -86,7 +146,7 @@ class TrainSALT(TrainSALTBase):
 		if self.options.initsalt2model:
 			if self.options.initm0modelfile =='':
 				self.options.initm0modelfile=f'{init_rootdir}/salt2_template_0.dat'
-			if self.options.initm1modelfile  =='':
+			if self.options.initm1modelfile	 =='':
 				self.options.initm1modelfile=f'{init_rootdir}/salt2_template_1.dat'
 
 		if self.options.initm0modelfile and self.options.initm1modelfile:
@@ -104,9 +164,9 @@ class TrainSALT(TrainSALTBase):
 		init_options['wavesplineres'] = self.options.error_snake_wave_binsize
 		init_options['order']=self.options.errinterporder
 		init_options['n_colorscatpars']=self.options.n_colorscatpars
-		
+
+		del init_options['use_snpca_knots']
 		if self.options.initsalt2var:
-			#import pdb; pdb.set_trace() ; init_options['clscatfile'] = f'{init_rootdir}/salt2_color_dispersion.dat'
 			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs(
 				 *['%s/%s'%(init_rootdir,x) for x in ['salt2_lc_relative_variance_0.dat','salt2_lc_relative_covariance_01.dat','salt2_lc_relative_variance_1.dat','salt2_lc_dispersion_scaling.dat','salt2_color_dispersion.dat']],**init_options)
 		else:
@@ -183,7 +243,7 @@ class TrainSALT(TrainSALTBase):
 					#else:
 					guess[parlist == key] = pars[names == key]
 				except:
-					log.critical('Problem while initializing parameter ',key,' from previous training')
+					log.critical(f'Problem while initializing parameter {key} from previous training')
 					sys.exit(1)
 					
 
@@ -194,10 +254,28 @@ class TrainSALT(TrainSALTBase):
 			if self.options.n_components == 2:
 				guess[parlist == 'm1'] = m1knots
 			if self.options.n_colorpars:
-				#log.warning('BAD CL HACK')
 				if self.options.initsalt2model:
-					guess[parlist == 'cl'] = [-0.504294,0.787691,-0.461715,0.0815619]
-				else: 
+					if self.options.n_colorpars == 4:
+						guess[parlist == 'cl'] = [-0.504294,0.787691,-0.461715,0.0815619]
+					else:
+						#import pylab as plt
+						#plt.ion()
+						#plt.clf()
+						clwave = np.linspace(self.options.waverange[0],self.options.waverange[1],1000)
+						salt2cl = SALT2ColorLaw([2800.,7000.], [-0.504294,0.787691,-0.461715,0.0815619])(clwave)
+						def bestfit(p):
+							cl_init = SALT2ColorLaw(self.options.colorwaverange, p)(clwave)
+							return cl_init-salt2cl
+
+						md = least_squares(bestfit,[0,0,0,0,0])
+						# test
+						#clnew = SALT2ColorLaw(self.options.colorwaverange, md.x)(clwave)
+						#plt.plot(clwave,salt2cl,color='b')
+						#plt.plot(clwave,clnew,color='r')
+						if 'termination conditions are satisfied' not in md.message:
+							raise RuntimeError('problem initializing color law!')
+						guess[parlist == 'cl'] = md.x
+				else:
 					guess[parlist == 'cl'] =[0.]*self.options.n_colorpars 
 			if self.options.n_colorscatpars:
 
@@ -237,6 +315,15 @@ class TrainSALT(TrainSALTBase):
 					guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]
 				i+=1
 
+            # let's redefine x1 before we start
+			ratio = RatioToSatisfyDefinitions(phase,wave,self.kcordict,[m0,m1])
+			ix1 = np.array([i for i, si in enumerate(parlist) if si.startswith('x1')])
+			guess[ix1]/=1+ratio*guess[ix1]
+			guess[ix1]-=np.mean(guess[ix1])
+			x1std = np.std(guess[ix1])
+			if x1std == x1std and x1std != 0.0:
+				guess[ix1]/= x1std
+                
 
 			# spectral params
 			for sn in datadict.keys():
@@ -255,9 +342,50 @@ class TrainSALT(TrainSALTBase):
 					specpars_init = SpecRecal(datadict[sn]['photdata'],datadict[sn]['specdata'][k],self.kcordict,
 											  datadict[sn]['survey'],self.options.specrange_wavescale_specrecal,
 											  nrecalpars=order,sn=sn)
-					if specpars_init[0] != 0:
-						guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]/specpars_init[0]
-						if self.options.specrecal: guess[parlist == 'specrecal_{}_{}'.format(sn,k)] = specpars_init[1:]
+
+
+					# or we can use the model to recalibrate
+					#coeffs=parval[parname=='specrecal_{}_{}'.format(sn.SNID,0)]
+					pow=(order)-np.arange(order) #coeffs.size-np.arange(coeffs.size)
+					recalCoord=(specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/2500
+					drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
+
+					zHel,x0,x1,c = datadict[sn]['zHelio'],guess[parlist == f'x0_{sn}'],guess[parlist == f'x1_{sn}'],guess[parlist == f'c_{sn}']
+					mwebv = datadict[sn]['MWEBV']
+					colorlaw = SALT2ColorLaw(self.options.colorwaverange,guess[parlist == 'cl'])
+					uncalledModel = specflux(specdata[k]['tobs'],specdata[k]['wavelength'],phase,wave,
+											 m0,m1,colorlaw,zHel,x0,x1,c,mwebv=mwebv)
+					#import pdb; pdb.set_trace()
+		
+					def recalpars(x):
+						recalexp=np.exp((drecaltermdrecal*x[1:][np.newaxis,:]).sum(axis=1))
+						return (x[0]*uncalledModel*recalexp - specdata[k]['flux'])/specdata[k]['fluxerr']
+					def recalfunc(x):
+						recalexp=np.exp((drecaltermdrecal*x[1:][np.newaxis,:]).sum(axis=1))
+						return x[0]*uncalledModel*recalexp
+
+					try:
+						md = least_squares(recalpars,[np.median(specdata[k]['flux'])/np.median(uncalledModel)]+list(guess[parlist == 'specrecal_{}_{}'.format(sn,k)]))
+						recalexp=np.exp((drecaltermdrecal*md.x[1:][np.newaxis,:]).sum(axis=1))
+						guess[parlist==f'specx0_{sn}_{k}']= md.x[0]*x0 #guess[parlist == 'x0_%s'%sn]/specpars_init[0]
+						guess[parlist == 'specrecal_{}_{}'.format(sn,k)] = md.x[1:]
+						#import pdb; pdb.set_trace()
+					except:
+						log.warning('couldn\'t estimate spectral recalibration!')
+						import pdb; pdb.set_trace()
+                        
+					#plt.ion()
+					#plt.clf()
+					#plt.plot(specdata[k]['wavelength'],specdata[k]['flux'],color='k')
+					#plt.plot(specdata[k]['wavelength'],uncalledModel,color='r')
+					#plt.plot(specdata[k]['wavelength'],recalfunc(md.x))
+					#import pdb; pdb.set_trace()
+                    # 0.03802382
+                    # 0.0469286]), array([-0.38700634, 0.3495, 0.00424
+					# old code
+					#if specpars_init[0] != 0:
+					#	guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]/specpars_init[0]
+					#	if self.options.specrecal: guess[parlist == 'specrecal_{}_{}'.format(sn,k)] = specpars_init[1:]
 
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
@@ -386,19 +514,19 @@ class TrainSALT(TrainSALTBase):
 
 		foutinfotext = f"""RESTLAMBDA_RANGE: {self.options.colorwaverange[0]} {self.options.colorwaverange[1]}
 COLORLAW_VERSION: 1
-COLORCOR_PARAMS: {self.options.colorwaverange[0]:.0f} {self.options.colorwaverange[1]:.0f}  {len(clpars)}  {' '.join(['%8.10e'%cl for cl in clpars])}
+COLORCOR_PARAMS: {self.options.colorwaverange[0]:.0f} {self.options.colorwaverange[1]:.0f}	{len(clpars)}  {' '.join(['%8.10e'%cl for cl in clpars])}
 
 COLOR_OFFSET:  0.0
 
-MAG_OFFSET:  0.27  # to get B-band mag from cosmology fit (Nov 23, 2011)
+MAG_OFFSET:	 0.27  # to get B-band mag from cosmology fit (Nov 23, 2011)
 
-SEDFLUX_INTERP_OPT: 2  # 1=>linear,    2=>spline
-ERRMAP_INTERP_OPT:  1  # 1  # 0=snake off;  1=>linear  2=>spline
-ERRMAP_KCOR_OPT:    1  # 1/0 => on/off
+SEDFLUX_INTERP_OPT: 2  # 1=>linear,	   2=>spline
+ERRMAP_INTERP_OPT:	1  # 1	# 0=snake off;	1=>linear  2=>spline
+ERRMAP_KCOR_OPT:	1  # 1/0 => on/off
 
-MAGERR_FLOOR:   0.005            # don;t allow smaller error than this
-MAGERR_LAMOBS:  0.0  2000  4000  # magerr minlam maxlam
-MAGERR_LAMREST: 0.1   100   200  # magerr minlam maxlam
+MAGERR_FLOOR:	0.005			 # don;t allow smaller error than this
+MAGERR_LAMOBS:	0.0	 2000  4000	 # magerr minlam maxlam
+MAGERR_LAMREST: 0.1	  100	200	 # magerr minlam maxlam
 
 SIGMA_INT: 0.106  # used in simulation"""
 		with open(f'{outdir}/SALT3.INFO','w') as foutinfo:
@@ -474,6 +602,8 @@ SIGMA_INT: 0.106  # used in simulation"""
 
 	def salt2fit(self,sn,datadict):
 
+		if 'FLT' not in sn.__dict__.keys():
+			sn.FLT = sn.BAND[:]
 		for flt in np.unique(sn.FLT):
 			filtwave = self.kcordict[sn.SURVEY]['filtwave']
 			filttrans = self.kcordict[sn.SURVEY][flt]['filttrans']
@@ -534,13 +664,13 @@ SIGMA_INT: 0.106  # used in simulation"""
 		plotSALTModel.mkModelErrPlot(outputdir,outfile=f'{outputdir}/SALTmodelerrcomp.pdf',
 									 xlimits=[self.options.waverange[0],self.options.waverange[1]])
 
-		plotSALTModel.mkModelPlot(outputdir,outfile=f'{outputdir}/SALTmodelcomp.pdf',
+		plotSALTModel.mkModelPlot(outputdir,outfile=f'{outputdir}/SALTmodelcomp.png',
 								  xlimits=[self.options.waverange[0],self.options.waverange[1]],
 								  n_colorpars=self.options.n_colorpars)
 		SynPhotPlot.plotSynthPhotOverStretchRange(
-			'{}/synthphotrange.pdf'.format(outputdir),outputdir,'Bessell')
+			'{}/synthphotrange.pdf'.format(outputdir),outputdir,'SDSS')#Bessell')
 		SynPhotPlot.overPlotSynthPhotByComponent(
-			'{}/synthphotoverplot.pdf'.format(outputdir),outputdir,'Bessell')		
+			'{}/synthphotoverplot.pdf'.format(outputdir),outputdir,'SDSS')#Bessell')		
 		
 		snfiles_tot = np.array([])
 		for j,snlist in enumerate(self.options.snlists.split(',')):
@@ -714,7 +844,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 			datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,self.kcordict,
 										   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
 										   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
-										   binspecres=binspecres)
+										   binspecres=binspecres,snparlist=self.options.snparlist)
 			log.info(f'took {time()-tdstart:.3f} to read in data files')
 			tcstart = time()
 
