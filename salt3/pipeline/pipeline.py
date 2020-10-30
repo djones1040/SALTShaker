@@ -186,12 +186,13 @@ class SALT3pipe():
                 
                 if labels is not None:
                     labels = labels.split(',')
-                    labels = self._drop_empty_string(labels)                
+                    labels = self._drop_empty_string(labels)     
                 if isinstance(baseinput,(list,np.ndarray)):
                     if 'lcfit' in prostr and not len(baseinput) == niter:
                         raise ValueError("length of input list [{}] must match n_lcfit/n_biascorlcfit [{}]".format(len(baseinput),niter))
                     if labels is None:
-                        baseinput = baseinput[i]
+                        if len(baseinput)>0:
+                            baseinput = baseinput[i]
                         outname=outname[i]
                 pipepro[i].configure(baseinput=baseinput,
                                      setkeys=pipepro[i].setkeys,
@@ -483,7 +484,7 @@ class PipeProcedure():
         self.plotdir = plotdir
         self.labels = labels
 
-        if not os.path.isdir(os.path.split(self.outname)[0]):
+        if self.outname is not None and not os.path.isdir(os.path.split(self.outname)[0]) and os.path.split(self.outname)[0] != '':
             os.mkdir(os.path.split(self.outname)[0])
         self.gen_input(outname=self.outname)
 
@@ -1615,9 +1616,9 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
             print("Write sim input to file:",outname)
         
     else:
-        setkeys = pd.DataFrame(setkeys)
+        setkeys = pd.DataFrame(setkeys).dropna(subset=['key'])
         if np.any(setkeys.key.duplicated()):
-            raise ValueError("Check for duplicated entries for",setkeys.keys[setkeys.keys.duplicated()].unique())
+            raise ValueError("Check for duplicated entries for",setkeys.key[setkeys.key.duplicated()].unique())
 
         config = {}
         for i,line in enumerate(lines):
@@ -1724,6 +1725,7 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
     print("Load base fit input file..",basefilename)
     with _open_shared_file(basefilename) as basefile:
         lines = basefile.readlines()
+    basefile.close()
     basekws = []
 
     #if setkeys is None:
@@ -1915,6 +1917,7 @@ def _write_nml_to_file(nml,filename,headerlines=[],append=False):
     with _open_shared_file(filename,"w") as outfile:
         for line in lines:
             outfile.write(line)
+    outfile.close()
 
     return
 
