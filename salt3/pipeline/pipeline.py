@@ -841,9 +841,10 @@ class Simulation(PipeProcedure):
         
         genmodel_dict_new = {}
         for label in genmodel_dict.keys():
-            genmodel_file = genmodel_dict[label]
-            if '.' not in genmodel_file or os.path.split(genmodel_file)[0] != '' or \
-              (not os.path.exists(os.path.expandvars('$SNDATA_ROOT/models/{}/{}'.format(genmodel_file.split('.')[0],genmodel_file)))):
+            genmodel_file = genmodel_dict[label] 
+            if (not genmodel_file.startswith('$') and not genmodel_file.startswith('/')) and \
+              ('.' not in genmodel_file or os.path.split(genmodel_file)[0] != '' or \
+              (not os.path.exists(os.path.expandvars('$SNDATA_ROOT/models/{}/{}'.format(genmodel_file.split('.')[0],genmodel_file))))):
                 genmodel_file = '%s/%s'%(cwd,genmodel_file)
             label = 'GENMODEL[{}]'.format(label)
             genmodel_dict_new[label] = genmodel_file
