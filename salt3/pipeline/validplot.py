@@ -44,11 +44,13 @@ class lcfitting_validplots(ValidPlots):
 	
 	@validfunction		
 	def simvfit(self):
-
 		plt.rcParams['figure.figsize'] = (12,4)
 		plt.subplots_adjust(left=None, bottom=0.2, right=None, top=None, wspace=0, hspace=0)
 		fr = txtobj(self.inputfile,fitresheader=True)
-
+		if 'SIM_mB' not in fr.__dict__.keys():
+			print('not a simulation!  skipping simvfit')
+			return
+            
 		ax1,ax2,ax3 = plt.subplot(131),plt.subplot(132),plt.subplot(133)
 
 		cbins = np.linspace(-0.3,0.3,20)
