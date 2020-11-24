@@ -499,7 +499,7 @@ class GaussNewton(saltresids.SALTResids):
 			spline_derivs[:,:,i]=bisplev(self.phaseout,self.waveout,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
 		spline2d=sparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))
 		
-		#Smooth things, since this is supposed to be for broadband photometry
+		#Smooth things a bit, since this is supposed to be for broadband photometry
 		if smoothingfactor>0:
 			smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
 			spline2d=smoothingmatrix*spline2d
@@ -728,7 +728,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 		return X,-result.fval
 	
-	def fitcolorscatter(self,X,fitcolorlaw=False,rescaleerrs=False,maxiter=2000):
+	def fitcolorscatter(self,X,fitcolorlaw=False,rescaleerrs=True,maxiter=2000):
 		message='Optimizing color scatter'
 		if rescaleerrs:
 			message+=' and scaling model uncertainties'
@@ -743,13 +743,13 @@ class GaussNewton(saltresids.SALTResids):
 		
 		log.info('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X,{})))
 		storedResults={}
-		storedResults['components'] =self.SALTModel(x)
-		if self.bsorder != 0: storedResults['componentderivs'] = self.SALTModelDeriv(x,1,0,self.phase,self.wave)		
+		storedResults['components'] =self.SALTModel(X)
+		if self.bsorder != 0: storedResults['componentderivs'] = self.SALTModelDeriv(X,1,0,self.phase,self.wave)		
 		if not rescaleerrs :
 			if 'saltErr' not in storedResults:
-				storedResults['saltErr']=self.ErrModel(x)
+				storedResults['saltErr']=self.ErrModel(X)
 			if 'saltCorr' not in storedResults:
-				storedResults['saltCorr']=self.CorrelationModel(x)
+				storedResults['saltCorr']=self.CorrelationModel(X)
 		log.debug(str(storedResults.keys()))
 		X,minuitresult=self.minuitoptimize(X,includePars,{},rescaleerrs=rescaleerrs,fixFluxes=not fitcolorlaw,dospec=False,maxiter=maxiter)
 		log.info('Finished optimizing color scatter')
