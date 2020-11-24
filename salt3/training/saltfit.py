@@ -1128,6 +1128,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 		
 	def process_fit(self,X,iFit,storedResults,fit='all',allowjacupdate=True,**kwargs):
+        
 		X=X.copy()
 		varyingParams=iFit&self.iModelParam
 		if 'usesns' in kwargs :

@@ -44,4 +44,5 @@ sntype=-1
 hgtype=-1
 sig1fit=1
 CUTWIN zCMB 0.015 3.0
-CUTWIN FITPROB 0.01 1.0
+
+
