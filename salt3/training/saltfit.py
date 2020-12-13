@@ -631,6 +631,7 @@ class GaussNewton(saltresids.SALTResids):
 		except Exception as e:
 			logging.critical('Color scatter crashed during fitting, finishing writing output')
 			logging.critical(e, exc_info=True)
+		#print('HACK NO SATISFY DEFS')
 		Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
 		logging.info('Checking that rescaling components to satisfy definitions did not modify photometry')
 		
@@ -743,13 +744,13 @@ class GaussNewton(saltresids.SALTResids):
 		
 		log.info('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X,{})))
 		storedResults={}
-		storedResults['components'] =self.SALTModel(x)
-		if self.bsorder != 0: storedResults['componentderivs'] = self.SALTModelDeriv(x,1,0,self.phase,self.wave)		
+		storedResults['components'] =self.SALTModel(X)
+		if self.bsorder != 0: storedResults['componentderivs'] = self.SALTModelDeriv(X,1,0,self.phase,self.wave)		
 		if not rescaleerrs :
 			if 'saltErr' not in storedResults:
-				storedResults['saltErr']=self.ErrModel(x)
+				storedResults['saltErr']=self.ErrModel(X)
 			if 'saltCorr' not in storedResults:
-				storedResults['saltCorr']=self.CorrelationModel(x)
+				storedResults['saltCorr']=self.CorrelationModel(X)
 		log.debug(str(storedResults.keys()))
 		X,minuitresult=self.minuitoptimize(X,includePars,{},rescaleerrs=rescaleerrs,fixFluxes=not fitcolorlaw,dospec=False,maxiter=maxiter)
 		log.info('Finished optimizing color scatter')
