@@ -168,7 +168,7 @@ def customfilt(outfile,lcfile,salt3dir,
 			   flatnu='flatnu.dat',
 			   x0 = None, x1 = None, c = None, t0 = None,
 			   fitx1=False,fitc=False,bandpassdict=None,
-			   n_components=1, ax1=None, ax2=None, ax3=None, ax4=None,
+			   n_components=1, ax1=None, ax2=None, ax3=None, ax4=None, ax5=None,
 			   saltdict={},n_colorpars=4):
 
 	salt2_chi2tot,salt3_chi2tot = 0,0
@@ -185,7 +185,7 @@ def customfilt(outfile,lcfile,salt3dir,
 	sn = snana.SuperNova(lcfile)
 	try: sn.FLT = sn.FLT.astype('U20')
 	except: sn.FLT = sn.BAND.astype('U20')
-
+	#if sn.SNID != 15201.0: return 0,0
 
 	zpsys='AB'
 	if 'PEAKMJD' in sn.__dict__.keys():
@@ -316,15 +316,16 @@ def customfilt(outfile,lcfile,salt3dir,
 	
 	if not ax1:
 		fig = plt.figure(figsize=(15, 5))
-		ax1 = fig.add_subplot(141)
-		ax2 = fig.add_subplot(142)
-		ax3 = fig.add_subplot(143)
-		ax4 = fig.add_subplot(144)
+		ax1 = fig.add_subplot(151)
+		ax2 = fig.add_subplot(152)
+		ax3 = fig.add_subplot(153)
+		ax4 = fig.add_subplot(154)
+		ax5 = fig.add_subplot(155)
 		
 	int1d = interp1d(salt3phase,salt3flux,axis=0,fill_value='extrapolate')
 	#if 'SIM_SALT2x0' in sn.__dict__.keys():
 	#	int1d_salt2 = interp1d(salt2phase,salt2flux,axis=0,fill_value='extrapolate')
-	for flt,i,ax in zip(np.unique(sn.FLT),range(4),[ax1,ax2,ax3,ax4]):
+	for flt,i,ax in zip(np.unique(sn.FLT),range(5),[ax1,ax2,ax3,ax4,ax5]):
 		phase=plotmjd-t0
 		salt3fluxnew = int1d(phase)
 		try: mwextcurve = 10**(-0.4*extinction.fitzpatrick99(salt3wave,float(sn.MWEBV.split()[0])*3.1))

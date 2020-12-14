@@ -11,7 +11,7 @@ from scipy.interpolate import interp1d
 import os
 from salt3.config import config_rootdir
 
-
+#python -m unittest salt3.tests.test_saltresids.TRAINING_Test.test_specresid_jacobian
 
 class TRAINING_Test(unittest.TestCase):
 	
@@ -371,26 +371,28 @@ class TRAINING_Test(unittest.TestCase):
 		storedResults=self.defineStoredResults(self.guess,sn,defineInterpolations=False)[0]
 		#import pdb;pdb.set_trace()
 		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,storedResults,varyParams=np.zeros(self.resids.npar,dtype=bool),fixUncertainty=True)
-		residuals = specresidsdict['resid']
+		#import pdb; pdb.set_trace()
+		residuals = specresidsdict[0]['resid']
 		
 		uncertainties={key:storedResults[key] for key in storedResults if key.startswith('photvariances_') or key.startswith('specvariances_') or key.startswith('photCholesky_') }
 		storedResults=self.defineStoredResults(self.guess,sn,defineInterpolations=False)[0]
 		storedResults.update(uncertainties)
 
 		photresidsdict,specresidsdict=self.resids.ResidsForSN(self.guess,sn,storedResults,varyParams=np.ones(self.resids.npar,dtype=bool),fixUncertainty=True)
-		jacobian=specresidsdict['resid_jacobian']
+		jacobian=specresidsdict[0]['resid_jacobian']
 		def incrementOneParam(i,dx):
 			guess=self.guess.copy()
 			guess[i]+=dx
 			storedResults=self.defineStoredResults(guess,sn,defineInterpolations=False)[0]
 			storedResults.update(uncertainties)
-			return self.resids.ResidsForSN(guess,sn,storedResults ,np.zeros(self.resids.npar,dtype=bool),fixUncertainty=True)[1]['resid']
+			return self.resids.ResidsForSN(guess,sn,storedResults ,np.zeros(self.resids.npar,dtype=bool),fixUncertainty=True)[1][0]['resid']
 
 		dResiddX=np.zeros((residuals.size,self.parlist.size))
 		for i in range(self.guess.size):
+			#if self.parlist[i].startswith('specrecal'):
 			dResiddX[:,i]=(incrementOneParam(i,dx/2)-incrementOneParam(i,-dx/2))/dx
-
-		if not np.allclose(jacobian,dResiddX,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(jacobian,dResiddX,rtol,atol))[1]]))
+		#import pdb; pdb.set_trace()
+		if not np.allclose(jacobian.todense(),dResiddX,rtol): print('Problems with derivatives: ',np.unique(self.parlist[np.where(~np.isclose(jacobian.todense(),dResiddX,rtol,atol))[1]]))
 		self.assertTrue((np.isclose(jacobian,dResiddX,rtol,atol).all(axis=0)|((self.parlist==f'tpkoff_{sn}'))).all())
 
 	def test_specresid_jacobian_vary_uncertainty(self):

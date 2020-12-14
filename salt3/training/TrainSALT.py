@@ -682,7 +682,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 				f'{outputdir}/salt3_parameters.dat',unpack=True,dtype=str,skip_header=1)
 			parameters = parameters.astype(float)
 			CheckSALTParams.checkSALT(parameters,parlist,snfiles,snlist,outputdir,idx=j)
-		
+
 		# kcor files
 		kcordict = {}
 		for k in self.kcordict.keys():
@@ -708,7 +708,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 
 		pdf_pages = PdfPages(f'{outputdir}/lcfits.pdf')
 		import matplotlib.gridspec as gridspec
-		gs1 = gridspec.GridSpec(3, 4)
+		gs1 = gridspec.GridSpec(3, 5)
 		gs1.update(wspace=0.0)
 		i = 0
 		
@@ -750,6 +750,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 				else:
 					binspecres = None
 
+				#print('hack!  no spectral plotting')
 				ValidateSpectra.compareSpectra(
 					snlist,self.options.outputdir,specfile=f'{self.options.outputdir}/speccomp_{j:.0f}.pdf',
 					maxspec=50,base=self,verbose=self.verbose,datadict=datadict,binspecres=binspecres)
@@ -786,7 +787,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 				if not i % 12:
 					fig = plt.figure()
 				try:
-					ax1 = plt.subplot(gs1[i % 12]); ax2 = plt.subplot(gs1[(i+1) % 12]); ax3 = plt.subplot(gs1[(i+2) % 12]); ax4 = plt.subplot(gs1[(i+3) % 12])
+					ax1 = plt.subplot(gs1[i % 15]); ax2 = plt.subplot(gs1[(i+1) % 15]); ax3 = plt.subplot(gs1[(i+2) % 15]); ax4 = plt.subplot(gs1[(i+3) % 15]); ax5 = plt.subplot(gs1[(i+4) % 15])
 				except:
 					import pdb; pdb.set_trace()
 
@@ -804,7 +805,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 					f'{outputdir}/lccomp_{sn.SNID}.png',l,outputdir,
 					t0=t0sn,x0=x0sn,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc,
 					bandpassdict=self.kcordict,n_components=self.options.n_components,
-					ax1=ax1,ax2=ax2,ax3=ax3,ax4=ax4,saltdict=saltdict,n_colorpars=self.options.n_colorpars)
+					ax1=ax1,ax2=ax2,ax3=ax3,ax4=ax4,ax5=ax5,saltdict=saltdict,n_colorpars=self.options.n_colorpars)
 				salt2_chi2tot += salt2chi2
 				salt3_chi2tot += salt3chi2
 				if i % 12 == 8:

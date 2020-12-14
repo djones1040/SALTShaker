@@ -115,7 +115,7 @@ class SALTResids:
 		# initialize the model
 		self.components = self.SALTModel(guess)
 		self.salterr = self.ErrModel(guess)
-		
+
 		self.m0guess = -19.49 #10**(-0.4*(-19.49-27.5))
 		self.extrapolateDecline=0.015
 		# set up the filters
