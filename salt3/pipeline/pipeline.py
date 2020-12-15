@@ -484,8 +484,15 @@ class PipeProcedure():
         self.plotdir = plotdir
         self.labels = labels
 
-        if self.outname is not None and not os.path.isdir(os.path.split(self.outname)[0]) and os.path.split(self.outname)[0] != '':
-            os.mkdir(os.path.split(self.outname)[0])
+        if self.outname is not None:
+#             print(self.outname)
+            if not isinstance(self.outname,(list,dict)) and not os.path.isdir(os.path.split(self.outname)[0]) and os.path.split(self.outname)[0] != '':
+                os.mkdir(os.path.split(self.outname)[0])
+            else:
+                outname_list = self.outname if not isinstance(self.outname,dict) else self.outname.values()
+                for item in outname_list:
+                    if not os.path.isdir(os.path.split(item)[0]) and os.path.split(item)[0] != '':
+                        os.mkdir(os.path.split(item)[0])
         self.gen_input(outname=self.outname)
 
     def gen_input(self,outname=None):
@@ -829,6 +836,9 @@ class Simulation(PipeProcedure):
                 genmodel_dict[label] = value
 
         findkey = [key for key,value in self.keys.items() if key.startswith('SIMGEN_INFILE_Ia')]
+        n_genversion = len([key for key,value in self.keys.items() if key.startswith('GENVERSION')])
+        if len(findkey) > n_genversion:
+            findkey = findkey[0:n_genversion]
         for key in findkey:
             label = key.split('[')[1].split(']')[0]
             if label in genmodel_dict.keys():
@@ -883,7 +893,7 @@ class Training(PyPipeProcedure):
 #             modeldir = 'lcfitting/SALT3.test'
             modeldir = outdir
             #self.__transfer_model_files(outdir,modeldir,rename=False)
-            self.__copy_salt2info(modeldir,template_file='lcfitting/SALT2.INFO')
+#             self.__copy_salt2info(modeldir,template_file='lcfitting/SALT2.INFO')
             self._set_output_info(modeldir)
             os.environ['SNANA_MODELPATH'] = os.path.join(os.getcwd(),'lcfitting')
             return modeldir
@@ -1506,9 +1516,9 @@ def _gen_training_inputs(basefilenames=None,setkeys=None,
         basefilenames = list(basefilenames.values())
     if isinstance(outnames,dict):
         outnames = [outnames[key] for key in labels]
-    print(basefilenames)
-    print(outnames)
-    print(labels)
+#     print(basefilenames)
+#     print(outnames)
+#     print(labels)
     for basefilename,outname,label in zip(basefilenames,outnames,labels):
         if basefilename == '':
             continue
