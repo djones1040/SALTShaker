@@ -295,7 +295,7 @@ class SALT3pipe():
                                 pro2_in.loc[pro2_in['tag']==tag,'value'] = pro1_out
                     elif isinstance(pro2, Training):
                         pro2_in = pro2._get_input_info()
-                        for tag in ['io','kcor']:     
+                        for tag in ['io','kcor','subsurvey_list']:     
                             pro1_out = pro1_out_dict[tag]    
                             if isinstance(pro1_out,list) or isinstance(pro1_out,np.ndarray): 
                                 if tag == 'io':
@@ -303,7 +303,21 @@ class SALT3pipe():
                                 elif tag == 'kcor':
                                     for i,survey in zip(pro1_out_dict['ind'],pro1_out_dict['survey']):
                                         section = 'survey_{}'.format(survey.strip())
+                                        if section not in pro2_in.loc[pro2_in['tag']==tag,'section'].values:
+                                            df_newrow = pd.DataFrame([{'section':'survey_{}'.format(survey),'key':'kcorfile',
+                                                                       'value':'','tag':tag,'label':'main'}])
+                                            pro2_in = pd.concat([pro2_in,df_newrow])
                                         pro2_in.loc[(pro2_in['tag']==tag) & (pro2_in['section']==section),'value'] = pro1_out[int(i)]
+                                elif tag == 'subsurvey_list':
+                                    for i,survey in zip(pro1_out_dict['ind'],pro1_out_dict['survey']):
+                                        section = 'survey_{}'.format(survey.strip())
+                                        if section not in pro2_in.loc[pro2_in['tag']==tag,'section'].values:
+                                            df_newrow = pd.DataFrame([{'section':'survey_{}'.format(survey),'key':'subsurveylist',
+                                                                       'value':'','tag':tag,'label':'main'}])
+                                            pro2_in = pd.concat([pro2_in,df_newrow])
+                                        if pro1_out[int(i)] is not None:
+                                            pro2_in.loc[(pro2_in['tag']==tag) & (pro2_in['section']==section),'value'] = pro1_out[int(i)]
+                                        
                             else:
                                 pro2_in.loc[pro2_in['tag']==tag,'value'] = pro1_out
 
