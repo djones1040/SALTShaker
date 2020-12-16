@@ -160,7 +160,7 @@ def rdSpecSingle(sn,datadict,KeepOnlySpec=False,binspecres=None,waverange=None):
 
 
 				#wavebins = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/binspecres)
-				wavebins = np.linspace(np.min(wavelength),np.max(wavelength),(np.max(wavelength)-np.min(wavelength))/(binspecres*(1+z)))
+				wavebins = np.linspace(np.min(wavelength),np.max(wavelength),int((np.max(wavelength)-np.min(wavelength))/(binspecres*(1+z))))
 				binned_flux = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_avg).statistic
 				binned_fluxerr = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_err).statistic
 
@@ -197,11 +197,13 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 
 	for sf in specfiles:
 		
-		if sf.lower().endswith('.fits'):
+		if sf.lower().endswith('.fits') or sf.lower().endswith('.fits.gz'):
 
 			if '/' not in sf:
 				sf = '%s/%s'%(os.path.dirname(speclist),sf)
-
+			if sf.lower().endswith('.fits') and not os.path.exists(sf) and os.path.exists('{}.gz'.format(sf)):
+				sf = '{}.gz'.format(sf)
+					
 			# get list of SNIDs
 			hdata = fits.getdata( sf, ext=1 )
 			survey = fits.getval( sf, 'SURVEY')
@@ -209,12 +211,13 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 			snidlist = np.array([ int( hdata[isn]['SNID'] ) for isn in range(Nsn) ])
 			if os.path.exists(sf.replace('_HEAD.FITS','_SPEC.FITS')):
 				specfitsfile = sf.replace('_HEAD.FITS','_SPEC.FITS')
-				
+			else: specfitsfile = None
 			for snid in snidlist:
 				sn = snana.SuperNova(
 					snid=snid,headfitsfile=sf,photfitsfile=sf.replace('_HEAD.FITS','_PHOT.FITS'),
 					specfitsfile=specfitsfile,readspec=True)
-				if 'SUBSURVEY' in sn.__dict__.keys():
+				if 'SUBSURVEY' in sn.__dict__.keys() and not (len(np.unique(sn.SUBSURVEY))==1 and survey.strip()==np.unique(sn.SUBSURVEY)[0].strip()) \
+					and sn.SUBSURVEY.strip() != '':
 					sn.SURVEY = f"{survey}({sn.SUBSURVEY})"
 				else:
 					sn.SURVEY = survey
@@ -337,9 +340,11 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 	if peakmjdlist:
 		pksnid,pkmjd = np.loadtxt(peakmjdlist,unpack=True,dtype=str,usecols=[0,1])
 		pkmjd = pkmjd.astype('float')
+	else: pkmjd,pksnid=[],[]
 	if snparlist:
 		snpar = at.Table.read(snparlist,format='ascii')
 		snpar['SNID'] = snpar['SNID'].astype(str)
+	else: snpar = None
 		
 	rdtime = 0; skipcount = 0
 	rdstart = time()
@@ -355,12 +360,13 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 		snfiles = np.genfromtxt(snlist,dtype='str')
 		snfiles = np.atleast_1d(snfiles)
 
-		for f in snfiles:
-			if f.lower().endswith('.fits'):
+		for f in snfiles:           
+			if f.lower().endswith('.fits') or f.lower().endswith('.fits.gz'):
 
 				if '/' not in f:
 					f = '%s/%s'%(os.path.dirname(snlist),f)
-
+				if f.lower().endswith('.fits') and not os.path.exists(f) and os.path.exists('{}.gz'.format(f)):
+					f = '{}.gz'.format(f)
 				# get list of SNIDs
 				hdata = fits.getdata( f, ext=1 )
 				survey = fits.getval( f, 'SURVEY')
@@ -368,12 +374,14 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 				snidlist = np.array([ int( hdata[isn]['SNID'] ) for isn in range(Nsn) ])
 				if os.path.exists(f.replace('_HEAD.FITS','_SPEC.FITS')):
 					specfitsfile = f.replace('_HEAD.FITS','_SPEC.FITS')
+				else: specfitsfile = None
 				
 				for snid in snidlist:
 					sn = snana.SuperNova(
 						snid=snid,headfitsfile=f,photfitsfile=f.replace('_HEAD.FITS','_PHOT.FITS'),
 						specfitsfile=specfitsfile,readspec=False)
-					if 'SUBSURVEY' in sn.__dict__.keys():
+					if 'SUBSURVEY' in sn.__dict__.keys() and not (len(np.unique(sn.SUBSURVEY))==1 and survey.strip()==np.unique(sn.SUBSURVEY)[0].strip()) \
+						and sn.SUBSURVEY.strip() != '':
 						sn.SURVEY = f"{survey}({sn.SUBSURVEY})"
 					else:
 						sn.SURVEY = survey
