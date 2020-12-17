@@ -133,7 +133,8 @@ def rdSpecSingle(sn,datadict,KeepOnlySpec=False,binspecres=None,waverange=None):
 				flux = datadict[s]['specdata'][speccount]['flux'][iGood]
 				wavelength = datadict[s]['specdata'][speccount]['wavelength'][iGood]
 				fluxerr = datadict[s]['specdata'][speccount]['fluxerr'][iGood]
-				weights = 1/fluxerr**2.
+				fluxmax = np.max(flux)
+				weights = 1/(fluxerr/fluxmax)**2.
 
 				def weighted_avg(values):
 					"""
@@ -141,8 +142,8 @@ def rdSpecSingle(sn,datadict,KeepOnlySpec=False,binspecres=None,waverange=None):
 					values, weights -- Numpy ndarrays with the same shape.
 					"""
 					#try:
-					average = np.average(flux[values], weights=weights[values])
-					variance = np.average((flux[values]-average)**2, weights=weights[values])  # Fast and numerically precise
+					average = np.average(flux[values]/fluxmax, weights=weights[values])
+					variance = np.average((flux[values]/fluxmax-average)**2, weights=weights[values])  # Fast and numerically precise
 					#except:
 					#	import pdb; pdb.set_trace()
 
@@ -153,8 +154,8 @@ def rdSpecSingle(sn,datadict,KeepOnlySpec=False,binspecres=None,waverange=None):
 					Return the weighted average and standard deviation.
 					values, weights -- Numpy ndarrays with the same shape.
 					"""
-					average = np.average(flux[values], weights=weights[values])
-					variance = np.average((flux[values]-average)**2, weights=weights[values])  # Fast and numerically precise
+					average = np.average(flux[values]/fluxmax, weights=weights[values])
+					variance = np.average((flux[values]/fluxmax-average)**2, weights=weights[values])  # Fast and numerically precise
 					return np.sqrt(variance) #/np.sqrt(len(values))
 
 
@@ -178,7 +179,6 @@ def rdSpecSingle(sn,datadict,KeepOnlySpec=False,binspecres=None,waverange=None):
 			# error floor
 			datadict[s]['specdata'][speccount]['fluxerr'] = np.sqrt(datadict[s]['specdata'][speccount]['fluxerr']**2. + \
 																	(0.005*np.max(datadict[s]['specdata'][speccount]['flux']))**2.)
-
 			speccount+=1
 
 	else:
