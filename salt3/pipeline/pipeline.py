@@ -133,9 +133,9 @@ class SALT3pipe():
         self.genversion_split = self._get_config_option(config,'pipeline','genversion_split')
         self.genversion_split_biascor = self._get_config_option(config,'pipeline','genversion_split_biascor')
 
-        if n_lcfit > 1:
+        if n_lcfit >= 1:
             self.LCFitting = [LCFitting() for i in range(n_lcfit)]
-        if n_biascorlcfit > 1:
+        if n_biascorlcfit >= 1:
             self.BiascorLCFit = [LCFitting(biascor=True) for i in range(n_biascorlcfit)]
         
         for prostr in self.pipepros:
@@ -685,6 +685,7 @@ class Simulation(PipeProcedure):
         else:
             keys = ['PATH_SNDATA_SIM','GENVERSION']
         df = pd.DataFrame()
+#         print(self.keys)
         for key in keys:
             df0 = {}     
             keystrs = [x.split('[')[0] for x in self.keys.keys()]
@@ -710,6 +711,7 @@ class Simulation(PipeProcedure):
         if not isinstance(pipepro,str):
             pipepro = type(pipepro).__name__
         df = self._get_output_info()
+#         print(df)
         df_kcor = pd.DataFrame.from_dict(self._get_kcor_location(), orient='index',columns=['value'])
         df_kcor['key'] = 'KCOR_FILE'
         df_kcor = df_kcor.reset_index().rename(columns={'index':'ind'})
@@ -1575,9 +1577,14 @@ def _rename_duplicate_keys(keys):
     df = pd.DataFrame(keys,columns=['value'])
     df['count'] = 1
     counts = df.groupby('value').count() 
-    for key in counts.index:
+    try:
+        i_genversion_start = keys.index('GENVERSION') 
+        i_genversion_end = keys.index('ENDLIST_GENVERSION')
+    except:
+        raise ValueError("GENVERSION and ENDLIST_GENVERSION must be in the sim put")
+    for key in counts.index:  
         ct = counts.loc[key,'count']
-        if ct > 1:
+        if keys.index(key) >= i_genversion_start and keys.index(key) < i_genversion_end and ct > 0:
             df.loc[df['value']==key,'value'] = ['{}[{}]'.format(key,i) for i in range(ct)]
         else:
             df.loc[df['value']==key] = key
