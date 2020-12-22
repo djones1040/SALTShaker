@@ -368,7 +368,8 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 				snidlist = np.array([ int( hdata[isn]['SNID'] ) for isn in range(Nsn) ])
 				if os.path.exists(f.replace('_HEAD.FITS','_SPEC.FITS')):
 					specfitsfile = f.replace('_HEAD.FITS','_SPEC.FITS')
-				
+				else: specfitsfile = None
+					
 				for snid in snidlist:
 					sn = snana.SuperNova(
 						snid=snid,headfitsfile=f,photfitsfile=f.replace('_HEAD.FITS','_PHOT.FITS'),

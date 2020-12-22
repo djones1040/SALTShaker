@@ -430,4 +430,11 @@ class TrainSALTBase:
 		log.info('{} spectra and {} photometric observations remaining'.format(numSpec,numPhot))
 		log.info('{} total spectroscopic data points'.format(numSpecPoints))
 		log.info('Total number of supernovae: {}'.format(len(datadict)))
+
+		#surveys,redshifts = [],[]
+		#for k in datadict.keys():
+		#	surveys += [datadict[k]['survey']]
+		#	redshifts += [datadict[k]['zHelio']]
+		#surveys = np.array(surveys)
+		#import pdb; pdb.set_trace()
 		return datadict
