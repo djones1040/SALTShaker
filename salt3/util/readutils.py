@@ -213,7 +213,7 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 				specfitsfile = sf.replace('_HEAD.FITS','_SPEC.FITS')
 			else: specfitsfile = None
 			for snid in snidlist:
-				if snid not in datadict.keys(): continue
+				if str(snid) not in datadict.keys(): continue
 				sn = snana.SuperNova(
 					snid=snid,headfitsfile=sf,photfitsfile=sf.replace('_HEAD.FITS','_PHOT.FITS'),
 					specfitsfile=specfitsfile,readspec=True)

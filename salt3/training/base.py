@@ -416,15 +416,15 @@ class TrainSALTBase:
 			numPhot+=keepPhot.sum()
 			datadict[sn]['photdata'] ={key:photdata[key][keepPhot] for key in photdata}
 
-		if self.options.maxsn is not None:
-			surveys = np.unique([datadict[k]['survey'].split('(')[0] for k in datadict.keys()])
-			for s in surveys:
-				count = 0
-				for i,sn in enumerate(list(datadict.keys())):
-					if datadict[sn]['survey'].split('(')[0] != s: continue
-					if count >= self.options.maxsn/len(surveys):
-						datadict.pop(sn)
-					count += 1
+		#if self.options.maxsn is not None:
+		#	surveys = np.unique([datadict[k]['survey'].split('(')[0] for k in datadict.keys()])
+		#	for s in surveys:
+		#		count = 0
+		#		for i,sn in enumerate(list(datadict.keys())):
+		#			if datadict[sn]['survey'].split('(')[0] != s: continue
+		#			if count >= self.options.maxsn/len(surveys):
+		#				datadict.pop(sn)
+		#			count += 1
 
 		log.info('{} spectra and {} photometric observations removed for being outside phase range'.format(numSpecElimmed,numPhotElimmed))
 		log.info('{} spectra and {} photometric observations remaining'.format(numSpec,numPhot))
