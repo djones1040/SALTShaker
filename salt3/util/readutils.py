@@ -213,6 +213,7 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 				specfitsfile = sf.replace('_HEAD.FITS','_SPEC.FITS')
 			else: specfitsfile = None
 			for snid in snidlist:
+                if snid not in datadict.keys(): continue
 				sn = snana.SuperNova(
 					snid=snid,headfitsfile=sf,photfitsfile=sf.replace('_HEAD.FITS','_PHOT.FITS'),
 					specfitsfile=specfitsfile,readspec=True)
@@ -230,6 +231,7 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 			if not os.path.exists(sf):
 				raise RuntimeError('specfile %s does not exist'%sf)
 			sn=snana.SuperNova(sf)
+            if sn.SNID not in datadict.keys(): continue
 			datadict = rdSpecSingle(sn,datadict,KeepOnlySpec=KeepOnlySpec,binspecres=binspecres,waverange=waverange)
 		
 	return datadict
@@ -335,7 +337,8 @@ def rdDataSingle(sn,datadict,kcordict,skipcount,rdtime,rdstart,
 	return datadict,skipcount,rdtime
 	
 def rdAllData(snlists,estimate_tpk,kcordict,
-			  dospec=False,KeepOnlySpec=False,peakmjdlist=None,waverange=[2000,9200],binspecres=None,snparlist=None):
+			  dospec=False,KeepOnlySpec=False,peakmjdlist=None,
+              waverange=[2000,9200],binspecres=None,snparlist=None,maxsn=None):
 	datadict = {}
 	if peakmjdlist:
 		pksnid,pkmjd = np.loadtxt(peakmjdlist,unpack=True,dtype=str,usecols=[0,1])
@@ -344,24 +347,37 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 	if snparlist:
 		snpar = at.Table.read(snparlist,format='ascii')
 		snpar['SNID'] = snpar['SNID'].astype(str)
-	else: snpar = None
-		
-	rdtime = 0; skipcount = 0
-	rdstart = time()
-	for snlist in snlists.split(','):
-		tsn = time()
+
+
+    nsn = []
+    for snlist in snlists.split(','):
+
 		snlist = os.path.expandvars(snlist)
 		if not os.path.exists(snlist):
 			log.info('SN list file %s does not exist.	Checking %s/trainingdata/%s'%(snlist,data_rootdir,snlist))
 			snlist = '%s/trainingdata/%s'%(data_rootdir,snlist)
 		if not os.path.exists(snlist):
 			raise RuntimeError('SN list file %s does not exist'%snlist)
-
 		snfiles = np.genfromtxt(snlist,dtype='str')
 		snfiles = np.atleast_1d(snfiles)
 
+        nsn += [len(snfiles)]
+        
+	rdtime = 0; skipcount = 0
+	rdstart = time()
+    if maxsn is not None: maxcount = np.array(nsn)*maxsn/np.sum(nsn)
+    else: maxcount = [np.inf]*len(snlists.split(','))
+	for snlist,maxct in zip(snlists.split(','),maxcount):
+		tsn = time()
+		snlist = os.path.expandvars(snlist)
+		snfiles = np.genfromtxt(snlist,dtype='str')
+		snfiles = np.atleast_1d(snfiles)
+        sncount = 0
+        
+
 		for f in snfiles:           
 			if f.lower().endswith('.fits') or f.lower().endswith('.fits.gz'):
+
 
 				if '/' not in f:
 					f = '%s/%s'%(os.path.dirname(snlist),f)
@@ -375,8 +391,9 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 				if os.path.exists(f.replace('_HEAD.FITS','_SPEC.FITS')):
 					specfitsfile = f.replace('_HEAD.FITS','_SPEC.FITS')
 				else: specfitsfile = None
-				
+
 				for snid in snidlist:
+                    if sncount > maxct: break
 					sn = snana.SuperNova(
 						snid=snid,headfitsfile=f,photfitsfile=f.replace('_HEAD.FITS','_PHOT.FITS'),
 						specfitsfile=specfitsfile,readspec=False)
@@ -390,7 +407,9 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 						sn,datadict,kcordict,skipcount,
 						rdtime,rdstart,estimate_tpk=estimate_tpk,
 						pkmjd=pkmjd,pksnid=pksnid,snpar=snpar)
+                    sncount += 1
 			else:
+                if sncount > maxct: break
 				if '/' not in f:
 					f = '%s/%s'%(os.path.dirname(snlist),f)
 				rdstart = time()
@@ -398,7 +417,7 @@ def rdAllData(snlists,estimate_tpk,kcordict,
 				datadict,skipcount,rdtime = rdDataSingle(
 					sn,datadict,kcordict,skipcount,
 					rdtime,rdstart,estimate_tpk=estimate_tpk,pkmjd=pkmjd,pksnid=pksnid,snpar=snpar)
-				
+				sncount += 1
 
 		if dospec:
 			tspec = time()

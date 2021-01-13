@@ -773,7 +773,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 				datadict = readutils.rdAllData(snlist,self.options.estimate_tpk,self.kcordict,
 											   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
 											   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
-											   binspecres=binspecres)
+											   binspecres=binspecres,maxsn=self.options.maxsn)
 			except Exception as e:
 				log.warning("An exception occured: {}".format(str(e)))
 				
