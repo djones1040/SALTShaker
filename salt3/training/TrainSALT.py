@@ -317,7 +317,7 @@ class TrainSALT(TrainSALTBase):
 
             # let's redefine x1 before we start
 			ratio = RatioToSatisfyDefinitions(phase,wave,self.kcordict,[m0,m1])
-			ix1 = np.array([i for i, si in enumerate(parlist) if si.startswith('x1')])
+			ix1 = np.array([i for i, si in enumerate(parlist) if si.startswith('x1')],dtype=int)
 			guess[ix1]/=1+ratio*guess[ix1]
 			guess[ix1]-=np.mean(guess[ix1])
 			x1std = np.std(guess[ix1])
@@ -769,13 +769,13 @@ SIGMA_INT: 0.106  # used in simulation"""
 			else:
 				binspecres = None
 			
-			try:
-				datadict = readutils.rdAllData(snlist,self.options.estimate_tpk,self.kcordict,
-											   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
-											   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
-											   binspecres=binspecres,maxsn=self.options.maxsn)
-			except Exception as e:
-				log.warning("An exception occured: {}".format(str(e)))
+			#try:
+			datadict = readutils.rdAllData(snlist,self.options.estimate_tpk,self.kcordict,
+										   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
+										   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
+										   binspecres=binspecres,maxsn=self.options.maxsn)
+			#except Exception as e:
+			#	log.warning("An exception occured: {}".format(str(e)))
 				
 			tlc = time()
 			count = 0
@@ -882,7 +882,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 			datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,self.kcordict,
 										   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
 										   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
-										   binspecres=binspecres,snparlist=self.options.snparlist)
+										   binspecres=binspecres,snparlist=self.options.snparlist,maxsn=self.options.maxsn)
 			log.info(f'took {time()-tdstart:.3f} to read in data files')
 			tcstart = time()
 
