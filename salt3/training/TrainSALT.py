@@ -771,7 +771,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 			datadict = readutils.rdAllData(snlist,self.options.estimate_tpk,self.kcordict,
 										   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
 										   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
-										   binspecres=binspecres)
+										   binspecres=binspecres,maxsn=self.options.maxsn)
 			tlc = time()
 			count = 0
 			salt2_chi2tot,salt3_chi2tot = 0,0
