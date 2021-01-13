@@ -169,7 +169,7 @@ def customfilt(outfile,lcfile,salt3dir,
 			   x0 = None, x1 = None, c = None, t0 = None,
 			   fitx1=False,fitc=False,bandpassdict=None,
 			   n_components=1, ax1=None, ax2=None, ax3=None, ax4=None, ax5=None,
-			   saltdict={},n_colorpars=4):
+			   saltdict={},n_colorpars=4,snid=None):
 
 	salt2_chi2tot,salt3_chi2tot = 0,0
 	
@@ -182,7 +182,11 @@ def customfilt(outfile,lcfile,salt3dir,
 	if not x1 and fitx1: fitparams_salt3 += ['x1']
 	if not c and fitc: fitparams_salt3 += ['c']
 	
-	sn = snana.SuperNova(lcfile)
+	if not '.fits' in lcfile.lower():
+		sn = snana.SuperNova(lcfile)
+	else:
+		sn = snana.SuperNova(snid=snid,headfitsfile=lcfile,photfitsfile=lcfile.replace('_HEAD.FITS','_PHOT.FITS'),
+							 specfitsfile=None,readspec=False)
 	try: sn.FLT = sn.FLT.astype('U20')
 	except: sn.FLT = sn.BAND.astype('U20')
 	#if sn.SNID != 15201.0: return 0,0
