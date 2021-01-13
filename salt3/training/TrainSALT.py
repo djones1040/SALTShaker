@@ -317,7 +317,7 @@ class TrainSALT(TrainSALTBase):
 
             # let's redefine x1 before we start
 			ratio = RatioToSatisfyDefinitions(phase,wave,self.kcordict,[m0,m1])
-			ix1 = np.array([i for i, si in enumerate(parlist) if si.startswith('x1')])
+			ix1 = np.array([i for i, si in enumerate(parlist) if si.startswith('x1')],dtype=int)
 			guess[ix1]/=1+ratio*guess[ix1]
 			guess[ix1]-=np.mean(guess[ix1])
 			x1std = np.std(guess[ix1])
