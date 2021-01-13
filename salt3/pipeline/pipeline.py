@@ -323,7 +323,8 @@ class SALT3pipe():
 
                 elif isinstance(pro1, Training) and isinstance(pro2, LCFitting):
                     pro2_in = pro2._get_input_info().loc[on]
-                    pro2_in['value'] = pro1_out
+#                     pro2_in['value'] = pro1_out
+                    pro2_in['value'] = os.path.join(os.getcwd(),pro1_out)
                     
                 elif isinstance(pro2, GetMu):
                     if pro1.biascor:
@@ -911,7 +912,7 @@ class Training(PyPipeProcedure):
             #self.__transfer_model_files(outdir,modeldir,rename=False)
 #             self.__copy_salt2info(modeldir,template_file='lcfitting/SALT2.INFO')
             self._set_output_info(modeldir)
-            os.environ['SNANA_MODELPATH'] = os.path.join(os.getcwd(),'lcfitting')
+#             os.environ['SNANA_MODELPATH'] = os.path.join(os.getcwd(),'lcfitting') #caused a bug
             return modeldir
         else:
             raise ValueError("training can only glue to lcfit")
