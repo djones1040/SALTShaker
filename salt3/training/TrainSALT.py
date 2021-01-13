@@ -768,21 +768,53 @@ SIGMA_INT: 0.106  # used in simulation"""
 				binspecres = self.options.binspecres
 			else:
 				binspecres = None
-			datadict = readutils.rdAllData(snlist,self.options.estimate_tpk,self.kcordict,
-										   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
-										   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
-										   binspecres=binspecres)
+			
+			try:
+				datadict = readutils.rdAllData(snlist,self.options.estimate_tpk,self.kcordict,
+											   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
+											   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
+											   binspecres=binspecres)
+			except Exception as e:
+				log.warning("An exception occured: {}".format(str(e)))
+				
 			tlc = time()
 			count = 0
 			salt2_chi2tot,salt3_chi2tot = 0,0
+			plotsnlist = []
+			snfilelist = []
 			for l in snfiles:
-				#if 'Foundation' not in l: continue
-				if '/' not in l:
-					l = f'{os.path.dirname(snlist)}/{l}'
-				sn = snana.SuperNova(l)
-				sn.SNID = str(sn.SNID)
-				if not sn.SNID in datadict:
-					continue
+				if l.lower().endswith('.fits') or l.lower().endswith('.fits.gz'):
+
+					if '/' not in l:
+						l = '%s/%s'%(os.path.dirname(snlist),l)
+					if l.lower().endswith('.fits') and not os.path.exists(l) and os.path.exists('{}.gz'.format(l)):
+						l = '{}.gz'.format(l)
+					# get list of SNIDs
+					hdata = fits.getdata( l, ext=1 )
+					survey = fits.getval( l, 'SURVEY')
+					Nsn = fits.getval( l, 'NAXIS2', ext=1 )
+					snidlist = np.array([ int( hdata[isn]['SNID'] ) for isn in range(Nsn) ])
+
+					for sniditer in snidlist:
+						sn = snana.SuperNova(
+							snid=sniditer,headfitsfile=l,photfitsfile=l.replace('_HEAD.FITS','_PHOT.FITS'),
+							specfitsfile=None,readspec=False)
+						sn.SNID = str(sn.SNID)
+						plotsnlist.append(sn)
+						snfilelist.append(l)
+				
+				else:
+					#if 'Foundation' not in l: continue
+					if '/' not in l:
+						l = f'{os.path.dirname(snlist)}/{l}'
+					sn = snana.SuperNova(l)
+					sn.SNID = str(sn.SNID)
+					if not sn.SNID in datadict:
+						continue
+					plotsnlist.append(sn)
+					snfilelist.append(l)
+
+			for sn,l in zip(plotsnlist,snfilelist):
 
 				if not i % 12:
 					fig = plt.figure()
@@ -801,11 +833,16 @@ SIGMA_INT: 0.106  # used in simulation"""
 				if not fitc: csn = 0
 				if not fitx1: x1sn = 0
 
+				if '.fits' in l.lower():
+					snidval = int(sn.SNID)
+				else:
+					snidval = None
 				salt2chi2,salt3chi2 = ValidateLightcurves.customfilt(
 					f'{outputdir}/lccomp_{sn.SNID}.png',l,outputdir,
 					t0=t0sn,x0=x0sn,x1=x1sn,c=csn,fitx1=fitx1,fitc=fitc,
 					bandpassdict=self.kcordict,n_components=self.options.n_components,
-					ax1=ax1,ax2=ax2,ax3=ax3,ax4=ax4,ax5=ax5,saltdict=saltdict,n_colorpars=self.options.n_colorpars)
+					ax1=ax1,ax2=ax2,ax3=ax3,ax4=ax4,ax5=ax5,saltdict=saltdict,n_colorpars=self.options.n_colorpars,
+					snid=snidval)
 				salt2_chi2tot += salt2chi2
 				salt3_chi2tot += salt3chi2
 				if i % 12 == 8:
