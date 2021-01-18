@@ -106,7 +106,7 @@ class RunPipe():
                 df = pd.concat([df,pd.DataFrame([{'section':sec,'key':keystr,'value':val_new,'label':add_label}])])
         return df
     
-    def _reconfig_w_suffix(self,proname,df,suffix,**kwargs):
+    def _reconfig_w_suffix(self,proname,df,suffix,done_file=None,**kwargs):
         outname_orig = copy.copy(proname.outname)
         if isinstance(outname_orig,list):
             proname.outname = ['{}_{:03d}'.format(x,self.num) for x in outname_orig]
@@ -115,12 +115,14 @@ class RunPipe():
                 proname.outname[dictkey] = '{}_{:03d}'.format(outname_orig[dictkey],self.num)
         else:
             proname.outname = '{}_{:03d}'.format(outname_orig,self.num)
-        print(outname_orig)
-        print(proname.outname)
+#         print(outname_orig)
+#         print(proname.outname)
+#         print("DONE_FILE = ",done_file)
         proname.configure(pro=proname.pro,baseinput=outname_orig,setkeys=df,prooptions=proname.prooptions,
                           batch=proname.batch,translate=proname.translate,validplots=proname.validplots,
                           outname=proname.outname,
-                          proargs=proname.proargs,plotdir=proname.plotdir,labels=proname.labels,**kwargs)  
+                          proargs=proname.proargs,plotdir=proname.plotdir,labels=proname.labels,
+                          done_file=done_file,**kwargs)  
     
     def make_validplots_sum(self,prostr,inputfile_sum,outputdir,prefix_sum='sum_valid'):
         if prostr.startswith('lcfit'):
@@ -234,10 +236,12 @@ class RunPipe():
                 if self.num is not None:
                     if any([p.startswith('sim') for p in self.pipe.pipepros]):
                         df_sim = self._add_suffix(self.pipe.Simulation,['GENVERSION','GENPREFIX'],self.num)
-                        self._reconfig_w_suffix(self.pipe.Simulation,df_sim,self.num)
+                        done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.Simulation.done_file.strip()),self.num)
+                        self._reconfig_w_suffix(self.pipe.Simulation,df_sim,self.num,done_file=done_file)
                     if any([p.startswith('biascorsim') for p in self.pipe.pipepros]):
                         df_sim_biascor = self._add_suffix(self.pipe.BiascorSim,['GENVERSION','GENPREFIX'],'biascor_{:03d}'.format(self.num))
-                        self._reconfig_w_suffix(self.pipe.BiascorSim,df_sim_biascor,self.num)
+                        done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.BiascorSim.done_file.strip()),self.num)
+                        self._reconfig_w_suffix(self.pipe.BiascorSim,df_sim_biascor,self.num,done_file=done_file)
                     if any([p.startswith('train') for p in self.pipe.pipepros]): 
                         df_train = self._add_suffix(self.pipe.Training,['outputdir'],self.num,section=['iodata'],add_label='main')
                         self._reconfig_w_suffix(self.pipe.Training,df_train,self.num)
@@ -246,7 +250,7 @@ class RunPipe():
                     if any([p.startswith('lcfit') for p in self.pipe.pipepros]):    
                         for i in range(self.pipe.n_lcfit):
                             df_lcfit = self._add_suffix(self.pipe.LCFitting[i],['outdir'],self.num,section=['header'])
-                            done_file = "{}_{:03d}".format(self.pipe.LCFitting[i].done_file.strip(),self.num)
+                            done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.LCFitting[i].done_file.strip()),self.num)
                             self._reconfig_w_suffix(self.pipe.LCFitting[i],df_lcfit,self.num,done_file=done_file)
                         if ['sim','lcfit'] in self.pipe.gluepairs:
                             self.pipe.glue(['sim','lcfit'],on='phot')
@@ -256,7 +260,7 @@ class RunPipe():
                     if any([p.startswith('biascorlcfit') for p in self.pipe.pipepros]):       
                         for i in range(self.pipe.n_biascorlcfit):
                             df_lcfit_biascor = self._add_suffix(self.pipe.BiascorLCFit[i],['outdir'],self.num,section=['header'])
-                            done_file = "{}_{:03d}".format(self.pipe.BiascorLCFit[i].done_file.strip(),self.num)
+                            done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.BiascorLCFit[i].done_file.strip()),self.num)
                             self._reconfig_w_suffix(self.pipe.BiascorLCFit[i],df_lcfit_biascor,self.num,done_file=done_file)
 #                             self._reconfig_w_suffix(self.pipe.BiascorLCFit[i],None,self.num)
                         if ['biascorsim','biascorlcfit'] in self.pipe.gluepairs:
@@ -265,7 +269,7 @@ class RunPipe():
                             self.pipe.glue(['train','biascorlcfit'],on='model')
                     if any([p.startswith('getmu') for p in self.pipe.pipepros]): 
                         df_getmu = self._add_suffix(self.pipe.GetMu,[self.pipe.GetMu.outdir_key],self.num)
-                        done_file = "{}_{:03d}".format(self.pipe.GetMu.done_file.strip(),self.num)
+                        done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.GetMu.done_file.strip()),self.num)
                         self._reconfig_w_suffix(self.pipe.GetMu,df_getmu,self.num,done_file=done_file)
                         if ['lcfit','getmu'] in self.pipe.gluepairs:
                             self.pipe.glue(['lcfit','getmu'])
@@ -289,7 +293,13 @@ class RunPipe():
                     df_biascor = pd.DataFrame([{'key':'RANSEED_REPEAT','value':randseed_new}])
                     sim_biascor.configure(pro=sim_biascor.pro,baseinput=sim_biascor.outname,setkeys=df_biascor,prooptions=sim_biascor.prooptions,
                                           batch=sim_biascor.batch,translate=sim_biascor.translate,validplots=sim_biascor.validplots,
-                                          outname=sim_biascor.outname)                
+                                          outname=sim_biascor.outname)       
+                
+#                 for pro in self.pipe.LCFitting:
+#                     print("lcfitting")
+#                     print(pro.done_file)
+#                 print("getmu")
+#                 print(self.pipe.GetMu.done_file)
             
             if not self.norun:
                 #remove success files from previous runs

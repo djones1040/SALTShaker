@@ -207,10 +207,10 @@ class SALT3pipe():
                                      validplots=validplots,
                                      plotdir=self.plotdir,
                                      labels=labels)
-                if hasattr(pipepro[i], 'biascor') and pipepro[i].biascor:
-                    pipepro[i].done_file = "{}_{}".format(pipepro[i].done_file,'biascor')
-                if niter > 1:
-                    pipepro[i].done_file = "{}_{}".format(pipepro[i].done_file,i)
+#                 if hasattr(pipepro[i], 'biascor') and pipepro[i].biascor:
+#                     pipepro[i].done_file = "{}_{}".format(pipepro[i].done_file,'biascor')
+#                 if niter > 1:
+#                     pipepro[i].done_file = "{}_{}".format(pipepro[i].done_file,i)
 
     def run(self,onlyrun=None):
         if not self.build_flag: build_error()
@@ -653,9 +653,10 @@ class Simulation(PipeProcedure):
 
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
                   batch=False,batch_info=None,translate=False,validplots=False,
-                  outname="pipeline_byosed_input.input",**kwargs):
+                  outname="pipeline_byosed_input.input",done_file='ALL.DONE',**kwargs):
 #         print(baseinput)
-        self.done_file = finput_abspath('%s/Sim.DONE'%os.path.dirname(baseinput))
+#         self.done_file = finput_abspath('%s/Sim.DONE'%os.path.dirname(baseinput))
+        self.done_file = done_file
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
@@ -1070,9 +1071,10 @@ class LCFitting(PipeProcedure):
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
                   batch=False,batch_info=None,translate=False,
                   validplots=False,outname="pipeline_lcfit_input.input",
-                  done_file='LCFit.DONE',plotdir=None,**kwargs):
+                  done_file='ALL.DONE',plotdir=None,**kwargs):
 #         self.done_file = 'ALL.DONE'
-        self.done_file = '%s/%s'%(os.path.dirname(baseinput),os.path.split(done_file)[1])
+#         self.done_file = '%s/%s'%(os.path.dirname(baseinput),os.path.split(done_file)[1])
+        self.done_file = done_file
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
@@ -1087,10 +1089,9 @@ class LCFitting(PipeProcedure):
         
     def gen_input(self,outname="pipeline_lcfit_input.input"):
         self.outname = outname
-        self.finput,self.keys = _gen_snana_fit_input(basefilename=self.baseinput,setkeys=self.setkeys,
+        self.finput,self.keys,self.done_file = _gen_snana_fit_input(basefilename=self.baseinput,setkeys=self.setkeys,
                                                      outname=outname,done_file=self.done_file,
                                                      batch_info=self.batch_info)
-
 
     def glueto(self,pipepro):
         if not isinstance(pipepro,str):
@@ -1224,8 +1225,9 @@ class GetMu(PipeProcedure):
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
                   batch=False,batch_info=None,translate=False,
                   validplots=False,plotdir=None,outname="pipeline_getmu_input.input",
-                  done_file='GetMu.DONE',**kwargs):
-        self.done_file = finput_abspath('%s/%s'%(os.path.dirname(baseinput),os.path.split(done_file)[1]))
+                  done_file='ALL.DONE',**kwargs):
+#         self.done_file = finput_abspath('%s/%s'%(os.path.dirname(baseinput),os.path.split(done_file)[1]))
+        self.done_file = done_file
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
@@ -1245,10 +1247,10 @@ class GetMu(PipeProcedure):
 
     def gen_input(self,outname="pipeline_getmu_input.input"):
         self.outname = outname
-        self.finput,self.keys,self.delimiter = _gen_general_input(basefilename=self.baseinput,setkeys=self.setkeys,
-                                                                  outname=outname,sep=['=',': '],done_file=self.done_file,
-                                                                  outdir='Run_GetMu',batch_info=self.batch_info,
-                                                                  outdir_key=self.outdir_key)
+        self.finput,self.keys,self.delimiter,self.done_file = _gen_general_input(basefilename=self.baseinput,setkeys=self.setkeys,
+                                                                                 outname=outname,sep=['=',': '],done_file=self.done_file,
+                                                                                 outdir='Run_GetMu',batch_info=self.batch_info,
+                                                                                 outdir_key=self.outdir_key)
         
     def glueto(self,pipepro):
         if not isinstance(pipepro,str):
@@ -1732,13 +1734,13 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
                 print('',file=fout)
                 if 'GENPREFIX' in config.keys():
                     done_file = finput_abspath('%s/%s'%('SIMLOGS_%s'%config['GENPREFIX'].split('#')[0].replace(' ',''),done_file.split('/')[-1]))
-                    print('DONE_STAMP: %s'%done_file,file=fout)
+#                     print('DONE_STAMP: %s'%done_file,file=fout)
 
                     if os.path.exists('SIMLOGS_%s'%config['GENPREFIX'].split('#')[0].replace(' ','')):
                         print('warning : clobbering old sim dir SIMLOGS_%s so SNANA doesn\'t hang'%config['GENPREFIX'].split('#')[0].replace(' ',''))
                         os.system('rm -r SIMLOGS_%s'%config['GENPREFIX'])
-                else:
-                    print('DONE_STAMP: %s'%done_file,file=fout)
+#                 else:
+#                     print('DONE_STAMP: %s'%done_file,file=fout)
 
     return outname,config,done_file
 
@@ -1781,8 +1783,8 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
         else:
             value = line.split(':')[1].replace('\n','')
             nml['header'].__setitem__(key,value)
-    if not done_file: nml['header'].__setitem__('done_stamp','ALL.DONE')
-    else: nml['header'].__setitem__('done_stamp',done_file)
+#     if not done_file: nml['header'].__setitem__('done_stamp','ALL.DONE')
+#     else: nml['header'].__setitem__('done_stamp',done_file)
     
     if batch_info is not None:
         print("Changing BATCH_INFO to {}".format(batch_info))
@@ -1807,7 +1809,9 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
     print("Write fit input to file:",outname)
     _write_nml_to_file(nml,outname,append=True)
 
-    return outname,nml
+    done_file = finput_abspath('%s/ALL.DONE'%(nml['header']['outdir']))
+    
+    return outname,nml,done_file
 
 def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',
                        batch_info=None,done_file=None,outdir=None,
@@ -1830,11 +1834,11 @@ def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',
                 print("Adding/modifying key {}={}".format(key,value))
                 config['{}[{}]'.format(key,i)] = value
                 delimiter['{}[{}]'.format(key,i)] = delimiter[key]
-    if done_file:
-        key = 'DONE_STAMP'
-        v = done_file
-        config[key] = v
-        if len(delimiter.keys()): delimiter[key] = ': '
+#     if done_file:
+#         key = 'DONE_STAMP'
+#         v = done_file
+#         config[key] = v
+#         if len(delimiter.keys()): delimiter[key] = ': '
     if outdir is not None and outdir_key not in config.keys():
         config[outdir_key] = outdir
         delimiter[outdir_key] = ': '
@@ -1846,8 +1850,10 @@ def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',
     print("input file saved as:",outname)
     _write_simple_config_file(config,outname,delimiter)
 
-    if len(sep) == 1: return outname,config
-    else: return outname,config,delimiter
+    done_file = finput_abspath('%s/ALL.DONE'%(config[outdir_key]))    
+    
+    if len(sep) == 1: return outname,config,done_file
+    else: return outname,config,delimiter,done_file
 
 def _read_simple_config_file(filename,sep='='):
     config,delimiter = {},{}
