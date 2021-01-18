@@ -281,7 +281,11 @@ class RunPipe():
                 if any([p.startswith('sim') for p in self.pipe.pipepros]):
                     sim = self.pipe.Simulation
                     randseed_old = sim.keys['RANSEED_REPEAT']
-                    randseed_new = [randseed_old.split(' ')[0],str(self.randseed)]
+                    if 'BATCH_INFO' in sim.keys:
+                        nrepeat = sim.keys['BATCH_INFO'].strip().split(' ')[-1]
+                    else:
+                        nrepeat = randseed_old.split(' ')[0]
+                    randseed_new = [nrepeat,str(self.randseed)]
                     df = pd.DataFrame([{'key':'RANSEED_REPEAT','value':randseed_new}])
                     sim.configure(pro=sim.pro,baseinput=sim.outname,setkeys=df,prooptions=sim.prooptions,
                                   batch=sim.batch,translate=sim.translate,validplots=sim.validplots,
