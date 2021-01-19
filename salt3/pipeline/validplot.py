@@ -187,10 +187,10 @@ class getmu_validplots(ValidPlots):
 		
 		ax.text(0.17,0.9,r"""$\alpha_{sim} = %.3f$
 $\alpha_{fit} = %.3f \pm %.3f$"""%(
-	sim_alpha,np.mean(alpha),np.sqrt(np.std(alpha)**2/len(alpha)),transform=ax.transAxes,ha='center',va='center')
+	sim_alpha,np.mean(alpha),np.sqrt(np.std(alpha)**2/len(alpha))),transform=ax.transAxes,ha='center',va='center')
 		ax.text(0.5,0.9,r"""$\beta_{sim} = %.3f$
 $\beta_{fit} = %.3f \pm %.3f$"""%(
-	sim_beta,np.mean(beta),np.sqrt(np.std(beta)**2/len(beta)),transform=ax.transAxes,ha='center',va='center')
+	sim_beta,np.mean(beta),np.sqrt(np.std(beta)**2/len(beta))),transform=ax.transAxes,ha='center',va='center')
 		ax.text(0.83,0.9,"""$\sigma_{int} = %.3f$"""%(
 			np.mean(sigint)),transform=ax.transAxes,ha='center',va='center')
 
@@ -220,9 +220,9 @@ class cosmofit_validplots(ValidPlots):
 		ax.axhline(0,color='k',lw=2)
 		
 		ax.text(0.17,0.9,r"""$w = %.3f \pm %.3f$"""%(
-			np.mean(data['w']),np.sqrt(np.std(data['w'])**2/len(data['w'])),transform=ax.transAxes,ha='center',va='center')
+			np.mean(data['w']),np.sqrt(np.std(data['w'])**2/len(data['w']))),transform=ax.transAxes,ha='center',va='center')
 		ax.text(0.5,0.9,r"""$\Omega_M = %.3f \pm %.3f$"""%(
-			np.mean(data['OM']),np.sqrt(np.std(data['OM'])**2/len(data['OM'])),transform=ax.transAxes,ha='center',va='center')
+			np.mean(data['OM']),np.sqrt(np.std(data['OM'])**2/len(data['OM']))),transform=ax.transAxes,ha='center',va='center')
 
 		ax.set_xlim([0.5,2.5])
 		plt.savefig('%s%s_cosmopar.png'%(self.outputdir,self.prefix))
