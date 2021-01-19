@@ -222,28 +222,28 @@ class SALT3pipe():
         
         for prostr in self.pipepros:
             if onlyrun is not None and prostr not in onlyrun:
-                continue
-            
-            pipepro = self._get_pipepro_from_string(prostr)
-            if not isinstance(pipepro,list):
-                pipepro.run(batch=pipepro.batch,translate=pipepro.translate)
-                pipepro.extract_gzfitres()
-                if pipepro.validplots:
-                    print('making validation plots in %s/'%self.plotdir)
-                    pipepro.validplot_run()
-            else:
-                for i in range(len(pipepro)):
-                    pipepro[i].run(batch=pipepro[i].batch,translate=pipepro[i].translate)
-                    pipepro[i].extract_gzfitres()
-                    if pipepro[i].validplots:
+                    continue
+            try:
+                pipepro = self._get_pipepro_from_string(prostr)
+                if not isinstance(pipepro,list):
+                    pipepro.run(batch=pipepro.batch,translate=pipepro.translate)
+                    pipepro.extract_gzfitres()
+                    if pipepro.validplots:
                         print('making validation plots in %s/'%self.plotdir)
-                        pipepro[i].validplot_run()
-        
-        lastpipepro = self._get_pipepro_from_string(self.pipepros[-1])
-        if not isinstance(lastpipepro,list):
-            self.success = lastpipepro.success
-        else:
-            self.success = lastpipepro[-1].success
+                        pipepro.validplot_run()
+                else:
+                    for i in range(len(pipepro)):
+                        pipepro[i].run(batch=pipepro[i].batch,translate=pipepro[i].translate)
+                        pipepro[i].extract_gzfitres()
+                        if pipepro[i].validplots:
+                            print('making validation plots in %s/'%self.plotdir)
+                            pipepro[i].validplot_run()
+            except:       
+                lastpipepro = self._get_pipepro_from_string(prostr)
+                if not isinstance(lastpipepro,list):
+                    self.success = lastpipepro.success
+                else:
+                    self.success = np.all([p.success for p in lastpipepro])
             
 #         #delete temp files
 #         if self.success:
