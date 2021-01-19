@@ -1455,6 +1455,7 @@ def _run_batch_pro(pro,args,done_file=None):
         print("{} finished successfully.".format(pro.strip()))
     else:
         raise ValueError("Something went wrong..") ##possible to pass the error msg from the program?
+        return success
 
     return success
 
