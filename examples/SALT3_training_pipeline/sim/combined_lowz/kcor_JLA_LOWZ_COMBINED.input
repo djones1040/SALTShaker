@@ -2,11 +2,12 @@
 #   ['/project2/rkessler/PRODUCTS/SNANA/SNANA/util/combine_dataVersions.py', 'combine_jla_lowz_after_split.input']
 # User = midai 
 # Host = midway2-login2.rcc.local
-# Tue Dec  8 13:53:52 2020
+# Tue Jan 19 09:46:20 2021
 
 SN_SED:       Hsiao07.dat 
 BD17_SED:     bd_17d4708_stisnic_005.dat
 LAMBDA_RANGE: 2100 12600 
+SPECTROGRAPH: $WFIRST_USERS/mdai/combine_lowz/combine_lowz/kcor_for_combine/spectrograph_table_lowz.dat 
 OUTFILE:      kcor_JLA_LOWZ_COMBINED.fits 
 
 # Start filters for VERSION = Hamuy1996_LC_Bessell

@@ -1,8 +1,8 @@
 GENVERSION: JLA_TRAINING_TEST
 GENRANGE_REDSHIFT: 0.01 0.1
 SIMLIB_FILE: sim/combined_lowz/JLA_LOWZ_COMBINED.SIMLIB
-# KCOR_FILE: sim/combined_lowz/kcor_JLA_LOWZ_COMBINED.fits
-KCOR_FILE: sim/combined_lowz/kcor_JLA_LOWZ_COMBINED_add_spectrograph.fits
+KCOR_FILE: sim/combined_lowz/kcor_JLA_LOWZ_COMBINED.fits #updated with added spectrograph
+#KCOR_FILE: sim/combined_lowz/kcor_JLA_LOWZ_COMBINED_add_spectrograph.fits
 GENRANGE_PEAKMJD: 40000 60000
 GENFILTERS: abcdefghijklmno
 NGENTOT_LC: 150
