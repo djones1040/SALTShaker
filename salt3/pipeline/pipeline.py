@@ -220,6 +220,7 @@ class SALT3pipe():
             if isinstance(onlyrun,str):
                 onlyrun = [onlyrun]
         
+        self.lastpipepro = self.pipepros[-1]
         for prostr in self.pipepros:
             if onlyrun is not None and prostr not in onlyrun:
                     continue
@@ -239,15 +240,26 @@ class SALT3pipe():
                             print('making validation plots in %s/'%self.plotdir)
                             pipepro[i].validplot_run()
             except:       
-                lastpipepro = self._get_pipepro_from_string(prostr)
-                if not isinstance(lastpipepro,list):
-                    self.success = lastpipepro.success
-                else:
-                    self.success = np.all([p.success for p in lastpipepro])
+                self.lastpipepro = self._get_pipepro_from_string(prostr)
+                break
+                
+        if not isinstance(self.lastpipepro,list):
+            self.success = self.lastpipepro.success
+        else:
+            self.success = np.all([p.success for p in self.lastpipepro])
             
-#         #delete temp files
-#         if self.success:
-#             os.system('rm *.temp.{}*'.format(self.timestamp))
+        #tar temp files
+        if self.success:
+            print("Pack temp files")
+            
+            try:
+                for p in self.pipepros:
+                    outnamelist += list(p.outname)
+                for i,outname_unique in enumerate(np.unique(outnamelist)):
+                    dirname = os.path.dirname(outname_unique)
+                    os.system('tar -zcvf {}/tempfiles.{}_{}.tar.gz {}/*.temp.{}*'.format(dirname,self.timestamp,i,dirname,self.timestamp))
+            except:
+                warnings.warn("Unable to pack all temp files")
                     
     def glue(self,pipepros=None,on='phot'):
         if not self.build_flag: build_error()
