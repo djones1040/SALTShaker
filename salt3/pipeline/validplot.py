@@ -180,17 +180,17 @@ class getmu_validplots(ValidPlots):
 		ax.xaxis.set_ticks([1,2,3])
 		ax.xaxis.set_ticklabels(['alpha','beta',r'$\sigma_{\mathrm{int}}$'],rotation=30)
 
-		ax.errorbar(1,np.mean(alpha)-sim_alpha,yerr=np.sqrt(np.sum(np.power(alphaerr,2))),fmt='o',color='C0',label='fit')
-		ax.errorbar(2,np.mean(beta)-sim_beta,yerr=np.sqrt(np.sum(np.power(betaerr,2))),fmt='o',color='C0')
+		ax.errorbar(1,np.mean(alpha)-sim_alpha,yerr=np.sqrt(np.std(alpha)**2/len(alpha)),fmt='o',color='C0',label='fit')
+		ax.errorbar(2,np.mean(beta)-sim_beta,yerr=np.sqrt(np.std(beta)**2/len(beta)),fmt='o',color='C0')
 		ax.errorbar(3,np.mean(sigint)-0.1,fmt='o',color='C0')
 		ax.axhline(0,color='k',lw=2)
 		
 		ax.text(0.17,0.9,r"""$\alpha_{sim} = %.3f$
 $\alpha_{fit} = %.3f \pm %.3f$"""%(
-	sim_alpha,np.mean(alpha),np.sqrt(np.sum(np.power(alphaerr,2))/len(alphaerr))),transform=ax.transAxes,ha='center',va='center')
+	sim_alpha,np.mean(alpha),np.sqrt(np.std(alpha)**2/len(alpha)),transform=ax.transAxes,ha='center',va='center')
 		ax.text(0.5,0.9,r"""$\beta_{sim} = %.3f$
 $\beta_{fit} = %.3f \pm %.3f$"""%(
-	sim_beta,np.mean(beta),np.sqrt(np.sum(np.power(betaerr,2))/len(betaerr))),transform=ax.transAxes,ha='center',va='center')
+	sim_beta,np.mean(beta),np.sqrt(np.std(beta)**2/len(beta)),transform=ax.transAxes,ha='center',va='center')
 		ax.text(0.83,0.9,"""$\sigma_{int} = %.3f$"""%(
 			np.mean(sigint)),transform=ax.transAxes,ha='center',va='center')
 
@@ -215,14 +215,14 @@ class cosmofit_validplots(ValidPlots):
 		ax.xaxis.set_ticks([1,2])
 		ax.xaxis.set_ticklabels(['$w$','$\Omega_M$'],rotation=30)
 
-		ax.errorbar(1,np.mean(data['w'])-w_Planck,yerr=np.sqrt(np.sum(data['wsig_marg']**2)/len(data['wsig_marg'])),fmt='o',color='C0',label='fit')
-		ax.errorbar(2,np.mean(data['OM'])-Om_Planck,yerr=np.sqrt(np.sum(data['OM_sig']**2)/len(data['OM_sig'])),fmt='o',color='C0')
+		ax.errorbar(1,np.mean(data['w'])-w_Planck,yerr=np.sqrt(np.std(data['w'])**2/len(data['w'])),fmt='o',color='C0',label='fit')
+		ax.errorbar(2,np.mean(data['OM'])-Om_Planck,yerr=np.sqrt(np.std(data['OM'])**2/len(data['OM'])),fmt='o',color='C0')
 		ax.axhline(0,color='k',lw=2)
 		
 		ax.text(0.17,0.9,r"""$w = %.3f \pm %.3f$"""%(
-			np.mean(data['w']),np.sqrt(np.sum(data['wsig_marg']**2)/len(data['wsig_marg']))),transform=ax.transAxes,ha='center',va='center')
+			np.mean(data['w']),np.sqrt(np.std(data['w'])**2/len(data['w'])),transform=ax.transAxes,ha='center',va='center')
 		ax.text(0.5,0.9,r"""$\Omega_M = %.3f \pm %.3f$"""%(
-			np.mean(data['OM']),np.sqrt(np.sum(data['OM_sig']**2)/len(data['OM_sig']))),transform=ax.transAxes,ha='center',va='center')
+			np.mean(data['OM']),np.sqrt(np.std(data['OM'])**2/len(data['OM'])),transform=ax.transAxes,ha='center',va='center')
 
 		ax.set_xlim([0.5,2.5])
 		plt.savefig('%s%s_cosmopar.png'%(self.outputdir,self.prefix))
