@@ -1,4 +1,5 @@
 import sys
+import numpy as np
 import pandas as pd
 from salt3.pipeline import pipeline
 from salt3.pipeline.pipeline import *
@@ -41,7 +42,8 @@ def _MyPipe(mypipe):
 
 class RunPipe():
     def __init__(self, pipeinput, mypipe=False, batch_mode=False,batch_script=None,start_id=None,
-                 randseed=None,fseeds=None,num=None,norun=None,debug=False,timeout=None):
+                 randseed=None,fseeds=None,num=None,norun=None,debug=False,timeout=None,
+                 make_summary=False,validplots_only=False,success_list=None):
         if mypipe is None:
             self.pipedef = self.__DefaultPipe
         else:
@@ -62,6 +64,9 @@ class RunPipe():
         self.norun = norun
         self.debug = debug
         self.timeout = timeout
+        self.make_summary = make_summary
+        self.validplots_only = validplots_only
+        self.success_list = success_list
  
     def __DefaultPipe(self):
         pipe = SALT3pipe(finput=self.pipeinput)
@@ -70,9 +75,9 @@ class RunPipe():
         pipe.glue(['sim','lcfit'],on='phot')
         return pipe
         
-    def __MyPipe(self): 
+    def __MyPipe(self,**kwargs): 
         MyPipe = _MyPipe(self.mypipe)
-        pipe = MyPipe(finput=self.pipeinput)
+        pipe = MyPipe(finput=self.pipeinput,**kwargs)
         return pipe
 
     def _add_suffix(self,pro,keylist,suffix,section=None,add_label=None):
@@ -225,6 +230,18 @@ class RunPipe():
                     self._combine_nuisance(inputfiles,pro,outsuffix,outfile='{}_{}.FITRES'.format(pro,outsuffix))
     
     def run(self):
+        
+        if self.validplots_only:
+            if self.success_list is None:
+                raise RuntimeError("Must provide success list for making validplots only")
+            else:
+                print("validplots=True. Making Validplots only")
+                self.pipeinit = self.pipedef(skip_config=True)
+                with open(self.success_list,'r') as f: 
+                    success_list = f.readlines()
+                self.success_list = [str(x).strip() for x in success_list]
+                self.gen_validplots()        
+                return
         
         if self.batch_mode == 0:
             self.pipe = self.pipedef()
@@ -400,40 +417,82 @@ class RunPipe():
                         line = f.readline()
                     if 'SUCCESS' in line:
                         success_list.append(i+self.start_id)
-                    
+                self.success_list = [str(x) for x in success_list]
+                fsuccess = 'success_list_{}-{}.txt'.format(self.start_id,self.batch_mode+self.start_id)
+                print("Writing out success list in {}".format(fsuccess))
+                with open(fsuccess,'w') as fss:
+                    print('\n'.join(self.success_list),file=fss)
+                
                 #combine validplots here
-                pipe = self.pipedef()
-                validplot_pros = []
-#                 outsuffix = 'combined'
-                for p in pipe.pipepros:
-                    if isinstance(pipe._get_pipepro_from_string(p),list) \
-                      and np.any([(hasattr(pi,'validplots') and pi.validplots) for pi in pipe._get_pipepro_from_string(p)]):
-                        validplot_pros.append(p)                        
-                    elif hasattr(pipe._get_pipepro_from_string(p),'validplots') and pipe._get_pipepro_from_string(p).validplots:
-                        validplot_pros.append(p)
-                print("Making summary plots for successful jobs: ".format(success_list))
-                outsuffix="combined_{}-{}".format(min(success_list),max(success_list))
-                if len(success_list)<2:
-                    print("Number of successful jobs < 2. Ending without making combined plots.")
+                
+                if make_summary:
+                    self.pipeinit = self.pipedef(skip_config=True)
+                    self.gen_validplots()
+#                     pipe = self.pipedef()
+#                     validplot_pros = []
+#     #                 outsuffix = 'combined'
+#                     for p in pipe.pipepros:
+#                         if isinstance(pipe._get_pipepro_from_string(p),list) \
+#                           and np.any([(hasattr(pi,'validplots') and pi.validplots) for pi in pipe._get_pipepro_from_string(p)]):
+#                             validplot_pros.append(p)                        
+#                         elif hasattr(pipe._get_pipepro_from_string(p),'validplots') and pipe._get_pipepro_from_string(p).validplots:
+#                             validplot_pros.append(p)
+#                     print("Making summary plots for successful jobs: ".format(success_list))
+#                     outsuffix="combined_{}-{}".format(min(success_list),max(success_list))
+#                     if len(success_list)<2:
+#                         print("Number of successful jobs < 2. Ending without making combined plots.")
+
+#                     else:
+#                         self.combine_validplot_inputs(pros=[x for x in pipe.pipepros if x in validplot_pros],
+#                                                       nums=success_list,outsuffix=outsuffix)
+#                         for p in validplot_pros:
+#                             if p.startswith('lcfit'):
+#                                 p = 'lcfitting'
+#                             if p.startswith('cosmofit'):
+#                                 inputfile_sum = '{}_{}.cospar'.format(p,outsuffix)
+#                             else:
+#                                 inputfile_sum = '{}_{}.FITRES'.format(p,outsuffix)
+#                             print("Making summary plots for {}".format(p))
+#                             if isinstance(pipe._get_pipepro_from_string(p),list): 
+#                                 self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p)[0].plotdir,
+#                                                          prefix_sum='sum_valid_{}-{}'.format(min(success_list),max(success_list)))  
+#                             else:
+#                                 self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p).plotdir,
+#                                                          prefix_sum='sum_valid_{}-{}'.format(min(success_list),max(success_list)))                    
+
                     
+    def gen_validplots(self,validplot_pros = ['lcfit','biascorlcfit','getmu','cosmofit'],plotdir='figs'):
+        pipeinit = self.pipeinit
+        success_list = self.success_list        
+#                 outsuffix = 'combined'
+#         for p in pipeinit.pipepros:
+#             if isinstance(pipeinit._get_pipepro_from_string(p),list) \
+#               and np.any([(hasattr(pi,'validplots') and pi.validplots) for pi in pipeinit._get_pipepro_from_string(p)]):
+#                 validplot_pros.append(p)                        
+#             elif hasattr(pipeinit._get_pipepro_from_string(p),'validplots') and pipeinit._get_pipepro_from_string(p).validplots:
+#                 validplot_pros.append(p)
+        print("Making summary plots for successful jobs: {}".format(success_list))
+        outsuffix="combined_{}-{}".format(min(success_list),max(success_list))
+        if len(success_list)<2:
+            print("Number of successful jobs < 2. Ending without making combined plots.")
+
+        else:
+            self.combine_validplot_inputs(pros=[x for x in pipeinit.pipepros if x in validplot_pros],
+                                          nums=success_list,outsuffix=outsuffix)
+            for p in validplot_pros:
+                if p.startswith('lcfit'):
+                    p = 'lcfitting'
+                if p.startswith('cosmofit'):
+                    inputfile_sum = '{}_{}.cospar'.format(p,outsuffix)
                 else:
-                    self.combine_validplot_inputs(pros=[x for x in pipe.pipepros if x in validplot_pros],
-                                                  nums=success_list,outsuffix=outsuffix)
-                    for p in validplot_pros:
-                        if p.startswith('lcfit'):
-                            p = 'lcfitting'
-                        if p.startswith('cosmofit'):
-                            inputfile_sum = '{}_{}.cospar'.format(p,outsuffix)
-                        else:
-                            inputfile_sum = '{}_{}.FITRES'.format(p,outsuffix)
-                        print("Making summary plots for {}".format(p))
-                        if isinstance(pipe._get_pipepro_from_string(p),list): 
-                            self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p)[0].plotdir,
-                                                     prefix_sum='sum_valid_{}-{}'.format(min(success_list),max(success_list)))  
-                        else:
-                            self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p).plotdir,
-                                                     prefix_sum='sum_valid_{}-{}'.format(min(success_list),max(success_list)))  
-                      
+                    inputfile_sum = '{}_{}.FITRES'.format(p,outsuffix)
+                print("Making summary plots for {}".format(p))
+                if isinstance(pipeinit._get_pipepro_from_string(p),list): 
+                    self.make_validplots_sum(p,inputfile_sum,plotdir,
+                                             prefix_sum='sum_valid_{}-{}'.format(min(success_list),max(success_list)))  
+                else:
+                    self.make_validplots_sum(p,inputfile_sum,plotdir,
+                                             prefix_sum='sum_valid_{}-{}'.format(min(success_list),max(success_list)))   
                     
         
 def main(**kwargs):
@@ -460,12 +519,19 @@ def main(**kwargs):
                         help='use $MY_SALT3_DIR instead of installed runpipe for debugging')  
     parser.add_argument('--timeout',dest='timeout', default=36000,type=int,
                         help='running time limit (seconds). only valid if using batch mode')  
+    parser.add_argument('--make_summary',dest='make_summary', action='store_true',
+                        help='making summary plots for all the runs')  
+    parser.add_argument('--validplots_only',dest='validplots_only', action='store_true',
+                        help='making summary plots only without running the pipeline (success_list is needed)')  
+    parser.add_argument('--success_list',dest='success_list', default=None,
+                        help='success list file from a previous run for making validplots')  
     
     p = parser.parse_args()
     
     pipe = RunPipe(p.pipeinput,mypipe=p.mypipe,batch_mode=p.batch_mode,batch_script=p.batch_script,
                    start_id=p.start_id,randseed=p.randseed,fseeds=p.fseeds,num=p.num,norun=p.norun,
-                   debug=p.debug,timeout=p.timeout)
+                   debug=p.debug,timeout=p.timeout,make_summary=p.make_summary,validplots_only=p.validplots_only,
+                   success_list=p.success_list)
     pipe.run()
     
     
