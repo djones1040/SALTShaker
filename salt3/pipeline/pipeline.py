@@ -545,6 +545,7 @@ class PipeProcedure():
 
     def run(self,batch=None,translate=None):
 #         arglist = [self.proargs] + [finput_abspath(self.finput)] +[self.prooptions]
+        time_start = time.time()
         if translate and not os.path.split(self.finput)[0] == '':
             finput_nopath = os.path.split(self.finput)[1]
             arglist = [self.proargs] + [finput_nopath] +[self.prooptions] #input can't be absolute path for new snana submission script
@@ -584,7 +585,11 @@ class PipeProcedure():
         #delete self.finput in currentdir
         if translate and self.success:
             os.system('rm {}'.format(finput_nopath))
-
+            
+        time_end = time.time()
+        time_taken = (time_end - time_start)/60. #in minutes
+        print("this took {} minutes".format(time_taken))
+        
     def validplot_run(self):
         pass
     
