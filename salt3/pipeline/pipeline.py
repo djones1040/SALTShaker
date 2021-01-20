@@ -225,6 +225,7 @@ class SALT3pipe():
             if onlyrun is not None and prostr not in onlyrun:
                     continue
             try:
+                i = -9
                 pipepro = self._get_pipepro_from_string(prostr)
                 if not isinstance(pipepro,list):
                     pipepro.run(batch=pipepro.batch,translate=pipepro.translate)
@@ -246,8 +247,11 @@ class SALT3pipe():
         if not isinstance(self.lastpipepro,list):
             self.success = self.lastpipepro.success
         else:
-            self.success = np.all([p.success for p in self.lastpipepro])
-            
+            if i == len(self.lastpipepro)-1:
+                self.success = np.all([p.success for p in self.lastpipepro])
+            else:
+                self.success = self.lastpipepro[i].success
+                
         #tar temp files
         if self.success:
             print("Packing temp files")
@@ -845,6 +849,8 @@ class Simulation(PipeProcedure):
                 sim_input = self.keys[key]
                 config,delimiter = _read_simple_config_file(sim_input,sep=':')
                 kcorfile = config['KCOR_FILE'].strip()
+                if '#' in kcorfile:
+                    kcorfile = kcorfile.split('#')[0]
                 kcor_dict[label] = kcorfile
         return kcor_dict
     
