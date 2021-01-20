@@ -220,7 +220,7 @@ class SALT3pipe():
             if isinstance(onlyrun,str):
                 onlyrun = [onlyrun]
         
-        self.lastpipepro = self.pipepros[-1]
+        self.lastpipepro = self._get_pipepro_from_string(self.pipepros[-1])
         for prostr in self.pipepros:
             if onlyrun is not None and prostr not in onlyrun:
                     continue
@@ -260,6 +260,8 @@ class SALT3pipe():
                     os.system('tar -zcvf {}/tempfiles.{}_{}.tar.gz {}/*.temp.{}*'.format(dirname,self.timestamp,i,dirname,self.timestamp))
             except:
                 warnings.warn("Unable to pack all temp files")
+        else:
+            raise RuntimeError("Something went wrong..")
                     
     def glue(self,pipepros=None,on='phot'):
         if not self.build_flag: build_error()
@@ -1465,9 +1467,6 @@ def _run_batch_pro(pro,args,done_file=None):
 
     if success:
         print("{} finished successfully.".format(pro.strip()))
-    else:
-        raise ValueError("Something went wrong..") ##possible to pass the error msg from the program?
-        return success
 
     return success
 
