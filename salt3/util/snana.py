@@ -785,6 +785,7 @@ NSPECTRA:  %i
 		specid = 0
 		for i,snid in enumerate(hdu[2].data['SNID']):
 			if self.SNID != snid: continue
+			if hdu[2].data['NBIN_LAM'][i] == 0: continue
 			self.SPECTRA[specid] = {}
 			#self.SPECTRA[specid]['LAMINDEX'] = hdu[1].data['LAMINDEX']
 
@@ -796,6 +797,7 @@ NSPECTRA:  %i
 			self.SPECTRA[specid]['FLAMERR'] = hdu[3].data['FLAMERR'][hdu[2].data['PTRSPEC_MIN'][i]-1:hdu[2].data['PTRSPEC_MAX'][i]]
 			self.SPECTRA[specid]['SPECTRUM_MJD'] = hdu[2].data['MJD'][i]
 			specid += 1
+
 		return( True )
 
 	
