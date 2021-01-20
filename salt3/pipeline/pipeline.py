@@ -207,10 +207,10 @@ class SALT3pipe():
                                      validplots=validplots,
                                      plotdir=self.plotdir,
                                      labels=labels)
-                if hasattr(pipepro[i], 'biascor') and pipepro[i].biascor:
-                    pipepro[i].done_file = "{}_{}".format(pipepro[i].done_file,'biascor')
-                if niter > 1:
-                    pipepro[i].done_file = "{}_{}".format(pipepro[i].done_file,i)
+#                 if hasattr(pipepro[i], 'biascor') and pipepro[i].biascor:
+#                     pipepro[i].done_file = "{}_{}".format(pipepro[i].done_file,'biascor')
+#                 if niter > 1:
+#                     pipepro[i].done_file = "{}_{}".format(pipepro[i].done_file,i)
 
     def run(self,onlyrun=None):
         if not self.build_flag: build_error()
@@ -220,34 +220,64 @@ class SALT3pipe():
             if isinstance(onlyrun,str):
                 onlyrun = [onlyrun]
         
+        self.lastpipepro = self._get_pipepro_from_string(self.pipepros[-1])
         for prostr in self.pipepros:
             if onlyrun is not None and prostr not in onlyrun:
-                continue
-            
-            pipepro = self._get_pipepro_from_string(prostr)
-            if not isinstance(pipepro,list):
-                pipepro.run(batch=pipepro.batch,translate=pipepro.translate)
-                pipepro.extract_gzfitres()
-                if pipepro.validplots:
-                    print('making validation plots in %s/'%self.plotdir)
-                    pipepro.validplot_run()
-            else:
-                for i in range(len(pipepro)):
-                    pipepro[i].run(batch=pipepro[i].batch,translate=pipepro[i].translate)
-                    pipepro[i].extract_gzfitres()
-                    if pipepro[i].validplots:
+                    continue
+            try:
+                i = -9
+                pipepro = self._get_pipepro_from_string(prostr)
+                if not isinstance(pipepro,list):
+                    pipepro.run(batch=pipepro.batch,translate=pipepro.translate)
+                    pipepro.extract_gzfitres()
+                    if pipepro.validplots:
                         print('making validation plots in %s/'%self.plotdir)
-                        pipepro[i].validplot_run()
-        
-        lastpipepro = self._get_pipepro_from_string(self.pipepros[-1])
-        if not isinstance(lastpipepro,list):
-            self.success = lastpipepro.success
+                        pipepro.validplot_run()
+                else:
+                    for i in range(len(pipepro)):
+                        pipepro[i].run(batch=pipepro[i].batch,translate=pipepro[i].translate)
+                        pipepro[i].extract_gzfitres()
+                        if pipepro[i].validplots:
+                            print('making validation plots in %s/'%self.plotdir)
+                            pipepro[i].validplot_run()
+            except:       
+                self.lastpipepro = self._get_pipepro_from_string(prostr)
+                break
+                
+        if not isinstance(self.lastpipepro,list):
+            self.success = self.lastpipepro.success
         else:
-            self.success = lastpipepro[-1].success
+            if i == len(self.lastpipepro)-1:
+                self.success = np.all([p.success for p in self.lastpipepro])
+            else:
+                self.success = self.lastpipepro[i].success
+                
+        #tar temp files
+        if self.success:
+            print("Packing temp files")
             
-#         #delete temp files
-#         if self.success:
-#             os.system('rm *.temp.{}*'.format(self.timestamp))
+            try:
+                outnamelist = []
+                for p in self.pipepros:
+                    prooutname = self._get_pipepro_from_string(p).outname
+                    if isinstance(prooutname,list):
+                        outnamelist += prooutname
+                    else:
+                        outnamelist += [prooutname]
+                for i,outname_unique in enumerate(np.unique(list(outnamelist))):
+#                     print(outname_unique)
+                    dirname = os.path.dirname(outname_unique)
+                    if dirname != '':
+                        tarcommand = 'tar -zcvf {}/tempfiles.{}_{}.tar.gz {}/*.temp.{}*'.format(dirname,self.timestamp,i,dirname,self.timestamp)
+                    else:
+                        tarcommand = 'tar -zcvf tempfiles.{}_{}.tar.gz *.temp.{}*'.format(self.timestamp,i,self.timestamp)
+                    tarcommand += ' --remove-files'
+                    print(tarcommand)
+                    os.system(tarcommand)
+            except:
+                print("[WARNING] Unable to pack all temp files")
+        else:
+            raise RuntimeError("Something went wrong..")
                     
     def glue(self,pipepros=None,on='phot'):
         if not self.build_flag: build_error()
@@ -653,9 +683,10 @@ class Simulation(PipeProcedure):
 
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
                   batch=False,batch_info=None,translate=False,validplots=False,
-                  outname="pipeline_byosed_input.input",**kwargs):
+                  outname="pipeline_byosed_input.input",done_file='ALL.DONE',**kwargs):
 #         print(baseinput)
-        self.done_file = finput_abspath('%s/Sim.DONE'%os.path.dirname(baseinput))
+#         self.done_file = finput_abspath('%s/Sim.DONE'%os.path.dirname(baseinput))
+        self.done_file = done_file
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
@@ -818,6 +849,8 @@ class Simulation(PipeProcedure):
                 sim_input = self.keys[key]
                 config,delimiter = _read_simple_config_file(sim_input,sep=':')
                 kcorfile = config['KCOR_FILE'].strip()
+                if '#' in kcorfile:
+                    kcorfile = kcorfile.split('#')[0]
                 kcor_dict[label] = kcorfile
         return kcor_dict
     
@@ -1070,9 +1103,10 @@ class LCFitting(PipeProcedure):
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
                   batch=False,batch_info=None,translate=False,
                   validplots=False,outname="pipeline_lcfit_input.input",
-                  done_file='LCFit.DONE',plotdir=None,**kwargs):
+                  done_file='ALL.DONE',plotdir=None,**kwargs):
 #         self.done_file = 'ALL.DONE'
-        self.done_file = '%s/%s'%(os.path.dirname(baseinput),os.path.split(done_file)[1])
+#         self.done_file = '%s/%s'%(os.path.dirname(baseinput),os.path.split(done_file)[1])
+        self.done_file = done_file
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
@@ -1087,10 +1121,9 @@ class LCFitting(PipeProcedure):
         
     def gen_input(self,outname="pipeline_lcfit_input.input"):
         self.outname = outname
-        self.finput,self.keys = _gen_snana_fit_input(basefilename=self.baseinput,setkeys=self.setkeys,
+        self.finput,self.keys,self.done_file = _gen_snana_fit_input(basefilename=self.baseinput,setkeys=self.setkeys,
                                                      outname=outname,done_file=self.done_file,
                                                      batch_info=self.batch_info)
-
 
     def glueto(self,pipepro):
         if not isinstance(pipepro,str):
@@ -1224,8 +1257,9 @@ class GetMu(PipeProcedure):
     def configure(self,pro=None,baseinput=None,setkeys=None,prooptions=None,
                   batch=False,batch_info=None,translate=False,
                   validplots=False,plotdir=None,outname="pipeline_getmu_input.input",
-                  done_file='GetMu.DONE',**kwargs):
-        self.done_file = finput_abspath('%s/%s'%(os.path.dirname(baseinput),os.path.split(done_file)[1]))
+                  done_file='ALL.DONE',**kwargs):
+#         self.done_file = finput_abspath('%s/%s'%(os.path.dirname(baseinput),os.path.split(done_file)[1]))
+        self.done_file = done_file
         self.outname = outname
         self.prooptions = prooptions
         self.batch = batch
@@ -1245,10 +1279,10 @@ class GetMu(PipeProcedure):
 
     def gen_input(self,outname="pipeline_getmu_input.input"):
         self.outname = outname
-        self.finput,self.keys,self.delimiter = _gen_general_input(basefilename=self.baseinput,setkeys=self.setkeys,
-                                                                  outname=outname,sep=['=',': '],done_file=self.done_file,
-                                                                  outdir='Run_GetMu',batch_info=self.batch_info,
-                                                                  outdir_key=self.outdir_key)
+        self.finput,self.keys,self.delimiter,self.done_file = _gen_general_input(basefilename=self.baseinput,setkeys=self.setkeys,
+                                                                                 outname=outname,sep=['=',': '],done_file=self.done_file,
+                                                                                 outdir='Run_GetMu',batch_info=self.batch_info,
+                                                                                 outdir_key=self.outdir_key)
         
     def glueto(self,pipepro):
         if not isinstance(pipepro,str):
@@ -1451,8 +1485,6 @@ def _run_batch_pro(pro,args,done_file=None):
 
     if success:
         print("{} finished successfully.".format(pro.strip()))
-    else:
-        raise ValueError("Something went wrong..") ##possible to pass the error msg from the program?
 
     return success
 
@@ -1732,13 +1764,13 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
                 print('',file=fout)
                 if 'GENPREFIX' in config.keys():
                     done_file = finput_abspath('%s/%s'%('SIMLOGS_%s'%config['GENPREFIX'].split('#')[0].replace(' ',''),done_file.split('/')[-1]))
-                    print('DONE_STAMP: %s'%done_file,file=fout)
+#                     print('DONE_STAMP: %s'%done_file,file=fout)
 
                     if os.path.exists('SIMLOGS_%s'%config['GENPREFIX'].split('#')[0].replace(' ','')):
                         print('warning : clobbering old sim dir SIMLOGS_%s so SNANA doesn\'t hang'%config['GENPREFIX'].split('#')[0].replace(' ',''))
                         os.system('rm -r SIMLOGS_%s'%config['GENPREFIX'])
-                else:
-                    print('DONE_STAMP: %s'%done_file,file=fout)
+#                 else:
+#                     print('DONE_STAMP: %s'%done_file,file=fout)
 
     return outname,config,done_file
 
@@ -1781,8 +1813,8 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
         else:
             value = line.split(':')[1].replace('\n','')
             nml['header'].__setitem__(key,value)
-    if not done_file: nml['header'].__setitem__('done_stamp','ALL.DONE')
-    else: nml['header'].__setitem__('done_stamp',done_file)
+#     if not done_file: nml['header'].__setitem__('done_stamp','ALL.DONE')
+#     else: nml['header'].__setitem__('done_stamp',done_file)
     
     if batch_info is not None:
         print("Changing BATCH_INFO to {}".format(batch_info))
@@ -1807,7 +1839,9 @@ def _gen_snana_fit_input(basefilename=None,setkeys=None,
     print("Write fit input to file:",outname)
     _write_nml_to_file(nml,outname,append=True)
 
-    return outname,nml
+    done_file = finput_abspath('%s/ALL.DONE'%(nml['header']['outdir']))
+    
+    return outname,nml,done_file
 
 def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',
                        batch_info=None,done_file=None,outdir=None,
@@ -1830,11 +1864,11 @@ def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',
                 print("Adding/modifying key {}={}".format(key,value))
                 config['{}[{}]'.format(key,i)] = value
                 delimiter['{}[{}]'.format(key,i)] = delimiter[key]
-    if done_file:
-        key = 'DONE_STAMP'
-        v = done_file
-        config[key] = v
-        if len(delimiter.keys()): delimiter[key] = ': '
+#     if done_file:
+#         key = 'DONE_STAMP'
+#         v = done_file
+#         config[key] = v
+#         if len(delimiter.keys()): delimiter[key] = ': '
     if outdir is not None and outdir_key not in config.keys():
         config[outdir_key] = outdir
         delimiter[outdir_key] = ': '
@@ -1846,8 +1880,10 @@ def _gen_general_input(basefilename=None,setkeys=None,outname=None,sep='=',
     print("input file saved as:",outname)
     _write_simple_config_file(config,outname,delimiter)
 
-    if len(sep) == 1: return outname,config
-    else: return outname,config,delimiter
+    done_file = finput_abspath('%s/ALL.DONE'%(config[outdir_key]))    
+    
+    if len(sep) == 1: return outname,config,done_file
+    else: return outname,config,delimiter,done_file
 
 def _read_simple_config_file(filename,sep='='):
     config,delimiter = {},{}

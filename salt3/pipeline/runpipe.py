@@ -1,4 +1,5 @@
 import sys
+import numpy as np
 import pandas as pd
 from salt3.pipeline import pipeline
 from salt3.pipeline.pipeline import *
@@ -41,7 +42,8 @@ def _MyPipe(mypipe):
 
 class RunPipe():
     def __init__(self, pipeinput, mypipe=False, batch_mode=False,batch_script=None,start_id=None,
-                 randseed=None,fseeds=None,num=None,norun=None,debug=False,timeout=None):
+                 randseed=None,fseeds=None,num=None,norun=None,debug=False,timeout=None,
+                 make_summary=False,validplots_only=False,success_list=None):
         if mypipe is None:
             self.pipedef = self.__DefaultPipe
         else:
@@ -62,6 +64,9 @@ class RunPipe():
         self.norun = norun
         self.debug = debug
         self.timeout = timeout
+        self.make_summary = make_summary
+        self.validplots_only = validplots_only
+        self.success_list = success_list
  
     def __DefaultPipe(self):
         pipe = SALT3pipe(finput=self.pipeinput)
@@ -70,9 +75,9 @@ class RunPipe():
         pipe.glue(['sim','lcfit'],on='phot')
         return pipe
         
-    def __MyPipe(self): 
+    def __MyPipe(self,**kwargs): 
         MyPipe = _MyPipe(self.mypipe)
-        pipe = MyPipe(finput=self.pipeinput)
+        pipe = MyPipe(finput=self.pipeinput,**kwargs)
         return pipe
 
     def _add_suffix(self,pro,keylist,suffix,section=None,add_label=None):
@@ -106,7 +111,7 @@ class RunPipe():
                 df = pd.concat([df,pd.DataFrame([{'section':sec,'key':keystr,'value':val_new,'label':add_label}])])
         return df
     
-    def _reconfig_w_suffix(self,proname,df,suffix,**kwargs):
+    def _reconfig_w_suffix(self,proname,df,suffix,done_file=None,**kwargs):
         outname_orig = copy.copy(proname.outname)
         if isinstance(outname_orig,list):
             proname.outname = ['{}_{:03d}'.format(x,self.num) for x in outname_orig]
@@ -115,12 +120,12 @@ class RunPipe():
                 proname.outname[dictkey] = '{}_{:03d}'.format(outname_orig[dictkey],self.num)
         else:
             proname.outname = '{}_{:03d}'.format(outname_orig,self.num)
-        print(outname_orig)
-        print(proname.outname)
+
         proname.configure(pro=proname.pro,baseinput=outname_orig,setkeys=df,prooptions=proname.prooptions,
                           batch=proname.batch,translate=proname.translate,validplots=proname.validplots,
                           outname=proname.outname,
-                          proargs=proname.proargs,plotdir=proname.plotdir,labels=proname.labels,**kwargs)  
+                          proargs=proname.proargs,plotdir=proname.plotdir,labels=proname.labels,
+                          done_file=done_file,**kwargs)  
     
     def make_validplots_sum(self,prostr,inputfile_sum,outputdir,prefix_sum='sum_valid'):
         if prostr.startswith('lcfit'):
@@ -145,11 +150,6 @@ class RunPipe():
         return info_dict
         
     def _combine_fitres(self,files,pro=None,outsuffix=None):
-#         cmd = 'sntable_cat.py -i {} -o {}_{}.FITRES'.format(','.join(files),pro,outsuffix)
-#         print(cmd)
-#         cmdrun = subprocess.run(args=shlex.split(cmd),capture_output=True)
-#         if cmdrun.returncode != 0:
-#             raise RuntimeError("sntable_cat.py failed")
         outname = '{}_{}.FITRES'.format(pro,outsuffix)
         print("combining files {} to {}".format(files,outname))
         dflist = []
@@ -224,6 +224,18 @@ class RunPipe():
     
     def run(self):
         
+        if self.validplots_only:
+            if self.success_list is None:
+                raise RuntimeError("Must provide success list for making validplots only")
+            else:
+                print("validplots=True. Making Validplots only")
+                self.pipeinit = self.pipedef(skip_config=True)
+                with open(self.success_list,'r') as f: 
+                    success_list = f.readlines()
+                self.success_list = [str(x).strip() for x in success_list]
+                self.gen_validplots()        
+                return
+        
         if self.batch_mode == 0:
             self.pipe = self.pipedef()
             if self.randseed is not None:
@@ -234,10 +246,12 @@ class RunPipe():
                 if self.num is not None:
                     if any([p.startswith('sim') for p in self.pipe.pipepros]):
                         df_sim = self._add_suffix(self.pipe.Simulation,['GENVERSION','GENPREFIX'],self.num)
-                        self._reconfig_w_suffix(self.pipe.Simulation,df_sim,self.num)
+                        done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.Simulation.done_file.strip()),self.num)
+                        self._reconfig_w_suffix(self.pipe.Simulation,df_sim,self.num,done_file=done_file)
                     if any([p.startswith('biascorsim') for p in self.pipe.pipepros]):
                         df_sim_biascor = self._add_suffix(self.pipe.BiascorSim,['GENVERSION','GENPREFIX'],'biascor_{:03d}'.format(self.num))
-                        self._reconfig_w_suffix(self.pipe.BiascorSim,df_sim_biascor,self.num)
+                        done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.BiascorSim.done_file.strip()),self.num)
+                        self._reconfig_w_suffix(self.pipe.BiascorSim,df_sim_biascor,self.num,done_file=done_file)
                     if any([p.startswith('train') for p in self.pipe.pipepros]): 
                         df_train = self._add_suffix(self.pipe.Training,['outputdir'],self.num,section=['iodata'],add_label='main')
                         self._reconfig_w_suffix(self.pipe.Training,df_train,self.num)
@@ -246,7 +260,7 @@ class RunPipe():
                     if any([p.startswith('lcfit') for p in self.pipe.pipepros]):    
                         for i in range(self.pipe.n_lcfit):
                             df_lcfit = self._add_suffix(self.pipe.LCFitting[i],['outdir'],self.num,section=['header'])
-                            done_file = "{}_{:03d}".format(self.pipe.LCFitting[i].done_file.strip(),self.num)
+                            done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.LCFitting[i].done_file.strip()),self.num)
                             self._reconfig_w_suffix(self.pipe.LCFitting[i],df_lcfit,self.num,done_file=done_file)
                         if ['sim','lcfit'] in self.pipe.gluepairs:
                             self.pipe.glue(['sim','lcfit'],on='phot')
@@ -256,7 +270,7 @@ class RunPipe():
                     if any([p.startswith('biascorlcfit') for p in self.pipe.pipepros]):       
                         for i in range(self.pipe.n_biascorlcfit):
                             df_lcfit_biascor = self._add_suffix(self.pipe.BiascorLCFit[i],['outdir'],self.num,section=['header'])
-                            done_file = "{}_{:03d}".format(self.pipe.BiascorLCFit[i].done_file.strip(),self.num)
+                            done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.BiascorLCFit[i].done_file.strip()),self.num)
                             self._reconfig_w_suffix(self.pipe.BiascorLCFit[i],df_lcfit_biascor,self.num,done_file=done_file)
 #                             self._reconfig_w_suffix(self.pipe.BiascorLCFit[i],None,self.num)
                         if ['biascorsim','biascorlcfit'] in self.pipe.gluepairs:
@@ -265,7 +279,7 @@ class RunPipe():
                             self.pipe.glue(['train','biascorlcfit'],on='model')
                     if any([p.startswith('getmu') for p in self.pipe.pipepros]): 
                         df_getmu = self._add_suffix(self.pipe.GetMu,[self.pipe.GetMu.outdir_key],self.num)
-                        done_file = "{}_{:03d}".format(self.pipe.GetMu.done_file.strip(),self.num)
+                        done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.GetMu.done_file.strip()),self.num)
                         self._reconfig_w_suffix(self.pipe.GetMu,df_getmu,self.num,done_file=done_file)
                         if ['lcfit','getmu'] in self.pipe.gluepairs:
                             self.pipe.glue(['lcfit','getmu'])
@@ -277,7 +291,11 @@ class RunPipe():
                 if any([p.startswith('sim') for p in self.pipe.pipepros]):
                     sim = self.pipe.Simulation
                     randseed_old = sim.keys['RANSEED_REPEAT']
-                    randseed_new = [randseed_old.split(' ')[0],str(self.randseed)]
+                    if 'BATCH_INFO' in sim.keys:
+                        nrepeat = sim.keys['BATCH_INFO'].strip().split(' ')[-1]
+                    else:
+                        nrepeat = randseed_old.split(' ')[0]
+                    randseed_new = [nrepeat,str(self.randseed)]
                     df = pd.DataFrame([{'key':'RANSEED_REPEAT','value':randseed_new}])
                     sim.configure(pro=sim.pro,baseinput=sim.outname,setkeys=df,prooptions=sim.prooptions,
                                   batch=sim.batch,translate=sim.translate,validplots=sim.validplots,
@@ -289,7 +307,7 @@ class RunPipe():
                     df_biascor = pd.DataFrame([{'key':'RANSEED_REPEAT','value':randseed_new}])
                     sim_biascor.configure(pro=sim_biascor.pro,baseinput=sim_biascor.outname,setkeys=df_biascor,prooptions=sim_biascor.prooptions,
                                           batch=sim_biascor.batch,translate=sim_biascor.translate,validplots=sim_biascor.validplots,
-                                          outname=sim_biascor.outname)                
+                                          outname=sim_biascor.outname)       
             
             if not self.norun:
                 #remove success files from previous runs
@@ -386,40 +404,51 @@ class RunPipe():
                         line = f.readline()
                     if 'SUCCESS' in line:
                         success_list.append(i+self.start_id)
-                    
+                self.success_list = [str(x) for x in success_list]
+                fsuccess = 'success_list_{}-{}.txt'.format(self.start_id,self.batch_mode+self.start_id)
+                print("Writing out success list in {}".format(fsuccess))
+                with open(fsuccess,'w') as fss:
+                    print('\n'.join(self.success_list),file=fss)
+                
                 #combine validplots here
-                pipe = self.pipedef()
-                validplot_pros = []
-#                 outsuffix = 'combined'
-                for p in pipe.pipepros:
-                    if isinstance(pipe._get_pipepro_from_string(p),list) \
-                      and np.any([(hasattr(pi,'validplots') and pi.validplots) for pi in pipe._get_pipepro_from_string(p)]):
-                        validplot_pros.append(p)                        
-                    elif hasattr(pipe._get_pipepro_from_string(p),'validplots') and pipe._get_pipepro_from_string(p).validplots:
-                        validplot_pros.append(p)
-                print("Making summary plots for successful jobs: ".format(success_list))
-                outsuffix="combined_{}-{}".format(min(success_list),max(success_list))
-                if len(success_list)<2:
-                    print("Number of successful jobs < 2. Ending without making combined plots.")
+                
+                if make_summary:
+                    self.pipeinit = self.pipedef(skip_config=True)
+                    self.gen_validplots()                 
+
                     
+    def gen_validplots(self,validplot_pros = ['lcfit','biascorlcfit','getmu','cosmofit'],plotdir='figs'):
+        pipeinit = self.pipeinit
+        success_list = self.success_list        
+#                 outsuffix = 'combined'
+#         for p in pipeinit.pipepros:
+#             if isinstance(pipeinit._get_pipepro_from_string(p),list) \
+#               and np.any([(hasattr(pi,'validplots') and pi.validplots) for pi in pipeinit._get_pipepro_from_string(p)]):
+#                 validplot_pros.append(p)                        
+#             elif hasattr(pipeinit._get_pipepro_from_string(p),'validplots') and pipeinit._get_pipepro_from_string(p).validplots:
+#                 validplot_pros.append(p)
+        print("Making summary plots for successful jobs: {}".format(success_list))
+        outsuffix="combined_{}-{}".format(min(success_list),max(success_list))
+        if len(success_list)<2:
+            print("Number of successful jobs < 2. Ending without making combined plots.")
+
+        else:
+            self.combine_validplot_inputs(pros=[x for x in pipeinit.pipepros if x in validplot_pros],
+                                          nums=success_list,outsuffix=outsuffix)
+            for p in validplot_pros:
+                if p.startswith('lcfit'):
+                    p = 'lcfitting'
+                if p.startswith('cosmofit'):
+                    inputfile_sum = '{}_{}.cospar'.format(p,outsuffix)
                 else:
-                    self.combine_validplot_inputs(pros=[x for x in pipe.pipepros if x in validplot_pros],
-                                                  nums=success_list,outsuffix=outsuffix)
-                    for p in validplot_pros:
-                        if p.startswith('lcfit'):
-                            p = 'lcfitting'
-                        if p.startswith('cosmofit'):
-                            inputfile_sum = '{}_{}.cospar'.format(p,outsuffix)
-                        else:
-                            inputfile_sum = '{}_{}.FITRES'.format(p,outsuffix)
-                        print("Making summary plots for {}".format(p))
-                        if isinstance(pipe._get_pipepro_from_string(p),list): 
-                            self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p)[0].plotdir,
-                                                     prefix_sum='sum_valid_{}-{}'.format(min(success_list),max(success_list)))  
-                        else:
-                            self.make_validplots_sum(p,inputfile_sum,pipe._get_pipepro_from_string(p).plotdir,
-                                                     prefix_sum='sum_valid_{}-{}'.format(min(success_list),max(success_list)))  
-                      
+                    inputfile_sum = '{}_{}.FITRES'.format(p,outsuffix)
+                print("Making summary plots for {}".format(p))
+                if isinstance(pipeinit._get_pipepro_from_string(p),list): 
+                    self.make_validplots_sum(p,inputfile_sum,plotdir,
+                                             prefix_sum='sum_valid_{}-{}'.format(min(success_list),max(success_list)))  
+                else:
+                    self.make_validplots_sum(p,inputfile_sum,plotdir,
+                                             prefix_sum='sum_valid_{}-{}'.format(min(success_list),max(success_list)))   
                     
         
 def main(**kwargs):
@@ -446,12 +475,19 @@ def main(**kwargs):
                         help='use $MY_SALT3_DIR instead of installed runpipe for debugging')  
     parser.add_argument('--timeout',dest='timeout', default=36000,type=int,
                         help='running time limit (seconds). only valid if using batch mode')  
+    parser.add_argument('--make_summary',dest='make_summary', action='store_true',
+                        help='making summary plots for all the runs')  
+    parser.add_argument('--validplots_only',dest='validplots_only', action='store_true',
+                        help='making summary plots only without running the pipeline (success_list is needed)')  
+    parser.add_argument('--success_list',dest='success_list', default=None,
+                        help='success list file from a previous run for making validplots')  
     
     p = parser.parse_args()
     
     pipe = RunPipe(p.pipeinput,mypipe=p.mypipe,batch_mode=p.batch_mode,batch_script=p.batch_script,
                    start_id=p.start_id,randseed=p.randseed,fseeds=p.fseeds,num=p.num,norun=p.norun,
-                   debug=p.debug,timeout=p.timeout)
+                   debug=p.debug,timeout=p.timeout,make_summary=p.make_summary,validplots_only=p.validplots_only,
+                   success_list=p.success_list)
     pipe.run()
     
     

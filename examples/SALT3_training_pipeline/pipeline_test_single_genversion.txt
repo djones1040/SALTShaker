@@ -1,0 +1,114 @@
+##SALT3 INPUT
+[pipeline]
+n_lcfit = 1
+n_biascorlcfit = 1
+genversion_split = 0,1
+genversion_split_biascor = 0,1
+plotdir = figs
+
+[data]
+snlists=/home/midai/salt3_local/SALT3/examples/pipelinetest/training/data/SALT3TEST_SIMPLE.LIST
+
+[byosed]
+baseinput=byosed/BYOSED_base.params
+outinput=pipelinetest/TEST_BYOSED.params
+set_key= FLAGS COLOR False
+    FLAGS STRETCH False
+    
+[simulation]
+pro=submit_batch_jobs.sh
+baseinput=sim/SALT3_TRAINING_MASTER_SINGLE_GENVERSION.INPUT
+outinput=pipeline/SALT3_TRAINING_MASTER.INPUT
+batch=True
+translate=True
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 10
+prooptions=
+set_key=2
+        FORMAT_MASK 48
+        NGENTOT_LC[0] 150
+
+[training]
+pro=trainsalt
+proargs = -c 
+baseinput=training/SALT_SNANA.conf,training/logging.yaml,training/training.conf
+labels = main,logging,training
+prooptions = 
+#--stage validate
+outinput=pipeline/SALT_SNANA.conf,pipeline/logging.yaml,pipeline/training.conf
+set_key=4
+        main trainparams fitsalt2 False
+        main trainparams fit_tpkoff False
+        main trainparams gaussnewton_maxiter 15
+        main iodata maxsn 500
+        logging none handlers:file:filename OUTPUTDIR/testing.log
+
+[lcfitting]
+pro=submit_batch_jobs.sh
+baseinput=lcfitting/snfit_base.nml
+outinput=pipeline/LOWZ_COMBINED.NML
+batch=True
+translate=True
+validplots=True
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 20
+prooptions=
+set_key=4
+    0 HEADER OUTDIR LOWZ_COMBINED_LC
+    0 FITINP FILTLIST_FIT abcdefghijklmno
+
+
+[biascorsim]
+pro=submit_batch_jobs.sh
+baseinput=sim/SALT3_TRAINING_MASTER_SINGLE_GENVERSION.INPUT
+outinput=pipeline/SALT3_TRAINING_MASTER_biascor.INPUT
+batch=True
+translate=True
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 10
+prooptions=
+set_key=2
+        GENPREFIX SIM_SALT3TRAIN_BIASCOR
+        SIMLIB_MSKOPT 2
+        USE_SIMLIB_SPECTRA 0
+
+        NGENTOT_LC[0] 1500
+        GENSIGMA_SALT2ALPHA[0] 1.E8 1.E8  
+        GENSIGMA_SALT2BETA[0] 1.E8 1.E8
+        GENRANGE_SALT2ALPHA[0]  0.09  0.2
+        GENGRID_SALT2ALPHA[0]   2
+        GENRANGE_SALT2BETA[0]  2.0  4.0
+        GENGRID_SALT2BETA[0]  2
+               
+        
+[biascorlcfit]
+pro=submit_batch_jobs.sh
+baseinput=lcfitting/snfit_base.nml
+outinput=pipeline/LOWZ_COMBINED_biascor.NML
+batch=True
+translate=True
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 20
+validplots=True
+prooptions=
+set_key=4
+    0 HEADER OUTDIR LOWZ_COMBINED_LC_BIASCOR
+    0 FITINP FILTLIST_FIT abcdefghijklmno
+
+        
+[getmu]
+pro=submit_batch_jobs.sh
+baseinput=getmu/BBC.input
+outinput=pipeline/BBC.input
+batch=True
+translate=True
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 20
+validplots=True
+prooptions=
+set_key=2
+        opt_biascor 240
+#        surveygroup_biascor 'CFA3S+CFA3K+CFA4p1+CFA4p2(zbin=0.01),PS1MD(zbin=0.05)'
+
+[cosmofit]
+pro=wfit.exe
+outinput=SALT2mu_FITOPT000_MUOPT000.M0DIF
+prooptions= -ompri 0.307 -dompri 0.01
+baseinput=
+batch=False
+validplots=True

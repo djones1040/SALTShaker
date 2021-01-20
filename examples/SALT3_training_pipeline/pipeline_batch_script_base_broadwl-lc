@@ -1,0 +1,19 @@
+#!/bin/bash
+#SBATCH --job-name=pipelinetest
+#SBATCH --output=pipelinetest%j.out
+#SBATCH --error=pipelinetest%j.err
+#SBATCH --time=12:00:00
+#SBATCH --partition=broadwl-lc
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem-per-cpu=20000
+
+#source $WFIRST_ROOT/BYOSED_dev/SNANA_byotest.sourceme
+source activate salt3_local
+alias python=python3
+echo "python:"
+which python
+echo "python3:"
+which python3
+export MY_SALT3_DIR=/home/midai/salt3_local
+export PYTHONUNBUFFERED=1

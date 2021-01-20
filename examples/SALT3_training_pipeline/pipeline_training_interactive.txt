@@ -1,0 +1,83 @@
+##SALT3 INPUT
+[pipeline]
+n_lcfit = 1
+n_biascorlcfit = 1
+genversion_split = 0
+genversion_split_biascor = 0
+plotdir = figs
+
+[data]
+snlists=/home/midai/salt3_local/SALT3/examples/pipelinetest/training/data/SALT3TEST_SIMPLE.LIST
+
+[byosed]
+baseinput=byosed/BYOSED_base.params
+outinput=pipelinetest/TEST_BYOSED.params
+set_key= FLAGS COLOR False
+    FLAGS STRETCH False
+    
+[simulation]
+pro=snlc_sim.exe
+baseinput=simulation/lowz/SIMGEN_SALT3TEST.INPUT
+outinput=pipeline/LOWZ.INPUT
+batch=False
+prooptions=
+set_key=2
+        NGENTOT_LC 100
+
+[training]
+pro=trainsalt
+proargs = -c 
+baseinput=training/SALT_SNANA.conf
+prooptions = 
+#--stage validate
+outinput=pipeline/SALT_SNANA.conf
+set_key=3
+        trainparams fitsalt2 False
+        trainparams fit_tpkoff False
+        trainparams gaussnewton_maxiter 10
+        iodata maxsn 25
+
+[lcfitting]
+pro=snlc_fit.exe
+baseinput=lcfitting/snfit_base.nml
+outinput=pipeline/snfit_TEST.nml
+batch=False
+validplots=True
+prooptions=
+set_key=4
+        0 HEADER OUTDIR SIM_LOWZPS1_LOWZ 
+
+[biascorsim]
+pro=snlc_sim.exe
+baseinput=biascorsim/lowz/SIMGEN_SALT3TEST.INPUT
+outinput=pipeline/MASTER_LOWZ_biascor.INPUT
+batch=True
+prooptions=
+set_key=2
+        NGENTOT_LC 100
+
+[biascorlcfit]
+pro=snlc_fit.exe
+baseinput=lcfitting/snfit_base.nml
+outinput=pipeline/snfit_TEST_biascor.nml
+batch=True
+validplots=True
+prooptions=
+set_key=4
+        HEADER OUTDIR SIM_LOWZPS1_BIASCOR_LOWZ
+        FITINP FITMODEL_NAME SALT2.JLA-B14
+        
+[getmu]
+pro=SALT2mu.exe
+baseinput=getmu/BBC_LOWZ_PS1.input
+outinput=pipeline/BBC.input
+batch=True
+validplots=True
+prooptions=
+set_key=2
+	file snfit_test.FITRES.TEXT
+
+[cosmofit]
+pro=wfit.exe
+outinput=cosmofit/test.M0DIF
+prooptions= -ompri 0.3 -dompri 0.01
