@@ -250,16 +250,28 @@ class SALT3pipe():
             
         #tar temp files
         if self.success:
-            print("Pack temp files")
+            print("Packing temp files")
             
             try:
+                outnamelist = []
                 for p in self.pipepros:
-                    outnamelist += list(p.outname)
-                for i,outname_unique in enumerate(np.unique(outnamelist)):
+                    prooutname = self._get_pipepro_from_string(p).outname
+                    if isinstance(prooutname,list):
+                        outnamelist += prooutname
+                    else:
+                        outnamelist += [prooutname]
+                for i,outname_unique in enumerate(np.unique(list(outnamelist))):
+#                     print(outname_unique)
                     dirname = os.path.dirname(outname_unique)
-                    os.system('tar -zcvf {}/tempfiles.{}_{}.tar.gz {}/*.temp.{}*'.format(dirname,self.timestamp,i,dirname,self.timestamp))
+                    if dirname != '':
+                        tarcommand = 'tar -zcvf {}/tempfiles.{}_{}.tar.gz {}/*.temp.{}*'.format(dirname,self.timestamp,i,dirname,self.timestamp)
+                    else:
+                        tarcommand = 'tar -zcvf tempfiles.{}_{}.tar.gz *.temp.{}*'.format(self.timestamp,i,self.timestamp)
+                    tarcommand += ' --remove-files'
+                    print(tarcommand)
+                    os.system(tarcommand)
             except:
-                warnings.warn("Unable to pack all temp files")
+                print("[WARNING] Unable to pack all temp files")
         else:
             raise RuntimeError("Something went wrong..")
                     
