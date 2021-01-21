@@ -187,6 +187,13 @@ def customfilt(outfile,lcfile,salt3dir,
 	else:
 		sn = snana.SuperNova(snid=snid,headfitsfile=lcfile,photfitsfile=lcfile.replace('_HEAD.FITS','_PHOT.FITS'),
 							 specfitsfile=None,readspec=False)
+		survey = fits.getval( lcfile, 'SURVEY')
+		if 'SUBSURVEY' in sn.__dict__.keys() and not (len(np.unique(sn.SUBSURVEY))==1 and survey.strip()==np.unique(sn.SUBSURVEY)[0].strip()) \
+		   and sn.SUBSURVEY.strip() != '':
+			sn.SURVEY = f"{survey}({sn.SUBSURVEY})"
+		else:
+			sn.SURVEY = survey
+
 	try: sn.FLT = sn.FLT.astype('U20')
 	except: sn.FLT = sn.BAND.astype('U20')
 	#if sn.SNID != 15201.0: return 0,0
