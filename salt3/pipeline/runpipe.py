@@ -303,7 +303,11 @@ class RunPipe():
                 if any([p.startswith('biascorsim') for p in self.pipe.pipepros]):
                     sim_biascor = self.pipe.BiascorSim
                     randseed_old = sim_biascor.keys['RANSEED_REPEAT']
-                    randseed_new = [randseed_old.split(' ')[0],str(self.randseed+10)]
+                    if 'BATCH_INFO' in sim_biascor.keys:
+                        nrepeat = sim_biascor.keys['BATCH_INFO'].strip().split(' ')[-1]
+                    else:
+                        nrepeat = randseed_old.split(' ')[0]
+                    randseed_new = [nrepeat,str(self.randseed+10)]
                     df_biascor = pd.DataFrame([{'key':'RANSEED_REPEAT','value':randseed_new}])
                     sim_biascor.configure(pro=sim_biascor.pro,baseinput=sim_biascor.outname,setkeys=df_biascor,prooptions=sim_biascor.prooptions,
                                           batch=sim_biascor.batch,translate=sim_biascor.translate,validplots=sim_biascor.validplots,
@@ -405,7 +409,7 @@ class RunPipe():
                     if 'SUCCESS' in line:
                         success_list.append(i+self.start_id)
                 self.success_list = [str(x) for x in success_list]
-                fsuccess = 'success_list_{}-{}.txt'.format(self.start_id,self.batch_mode+self.start_id)
+                fsuccess = 'success_list_{}-{}.txt'.format(self.start_id,self.batch_mode+self.start_id-1)
                 print("Writing out success list in {}".format(fsuccess))
                 with open(fsuccess,'w') as fss:
                     print('\n'.join(self.success_list),file=fss)
