@@ -562,6 +562,8 @@ class PipeProcedure():
         if hasattr(self,'success') and self.success:
             print("Skip a previously successful stage")
             return
+        else:
+            self.success = False
             
         time_start = time.time()
         if not os.path.split(self.finput)[0] == '':
