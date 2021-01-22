@@ -15,6 +15,7 @@ import shutil
 import psutil
 import yaml
 import shlex
+import pickle
 from salt3.pipeline.validplot import ValidPlots
 cwd = os.getcwd()
 
@@ -220,29 +221,41 @@ class SALT3pipe():
             if isinstance(onlyrun,str):
                 onlyrun = [onlyrun]
         
-        self.lastpipepro = self._get_pipepro_from_string(self.pipepros[-1])
+#         self.lastpipepro = self._get_pipepro_from_string(self.pipepros[-1])
+        self.success = False
         for prostr in self.pipepros:
+            print("Current stage: ",prostr)
+            self.lastpipepro = self._get_pipepro_from_string(prostr)
             if onlyrun is not None and prostr not in onlyrun:
-                    continue
+                continue
             try:
                 i = -9
                 pipepro = self._get_pipepro_from_string(prostr)
                 if not isinstance(pipepro,list):
                     pipepro.run(batch=pipepro.batch,translate=pipepro.translate)
-                    pipepro.extract_gzfitres()
-                    if pipepro.validplots:
-                        print('making validation plots in %s/'%self.plotdir)
-                        pipepro.validplot_run()
+                    if pipepro.success:
+                        pipepro.extract_gzfitres()
+                        if pipepro.validplots:
+                            print('making validation plots in %s/'%self.plotdir)
+                            pipepro.validplot_run()
+                    else:
+                        raise RuntimeError("Something went wrong..")
                 else:
                     for i in range(len(pipepro)):
                         pipepro[i].run(batch=pipepro[i].batch,translate=pipepro[i].translate)
-                        pipepro[i].extract_gzfitres()
-                        if pipepro[i].validplots:
-                            print('making validation plots in %s/'%self.plotdir)
-                            pipepro[i].validplot_run()
-            except:       
-                self.lastpipepro = self._get_pipepro_from_string(prostr)
-                break
+                        if pipepro[i].success:
+                            pipepro[i].extract_gzfitres()
+                            if pipepro[i].validplots:
+                                print('making validation plots in %s/'%self.plotdir)
+                                pipepro[i].validplot_run()
+                        else:
+                            raise RuntimeError("Something went wrong..")
+            except:                       
+                # pickle pipeline status where it failed for continue from this point
+                picklename = "pipeline.{}.pickle".format(self.timestamp)
+                pickle.dump(self, open(picklename, "wb" ) )
+                print("Wrote pipeline object as {}".format(picklename))
+                raise RuntimeError("Something went wrong..")
                 
         if not isinstance(self.lastpipepro,list):
             self.success = self.lastpipepro.success
@@ -274,8 +287,9 @@ class SALT3pipe():
                     tarcommand += ' --remove-files'
                     print(tarcommand)
                     os.system(tarcommand)
-            except:
+            except Exception as e:
                 print("[WARNING] Unable to pack all temp files")
+                print(str(e))
         else:
             raise RuntimeError("Something went wrong..")
                     
@@ -545,12 +559,16 @@ class PipeProcedure():
 
     def run(self,batch=None,translate=None):
 #         arglist = [self.proargs] + [finput_abspath(self.finput)] +[self.prooptions]
+        if hasattr(self,'success') and self.success:
+            print("Skip a previously successful stage")
+            return
+            
         time_start = time.time()
-        if translate and not os.path.split(self.finput)[0] == '':
+        if not os.path.split(self.finput)[0] == '':
             finput_nopath = os.path.split(self.finput)[1]
             arglist = [self.proargs] + [finput_nopath] +[self.prooptions] #input can't be absolute path for new snana submission script
-        else:
-            arglist = [self.proargs] + [finput_abspath(self.finput)] +[self.prooptions]
+#         else:
+#             arglist = [self.proargs] + [finput_abspath(self.finput)] +[self.prooptions]
         arglist = list(filter(None,arglist))
         args = []
         for arg in arglist:
@@ -570,20 +588,22 @@ class PipeProcedure():
             shellrun = subprocess.run(args=shlex.split(shellcommand),capture_output=True)
             if shellrun.returncode == 1 and 'Exit after input file translation' in str(shellrun.stderr):
                 print("Finished translation - {}".format(shellcommand))
+                self.translate = False
             else:
                 raise RuntimeError("Error occured:\n{}".format(shellrun.stdout))
             print("Going back to original dir: {}".format(currentdir))
             os.chdir(currentdir)            
             print("Current dir: ",os.getcwd())           
         
-            #copy self.finput to current dir:
-            os.system('cp {} {}'.format(finput_abspath(self.finput),currentdir))
+        #copy self.finput to current dir:
+        currentdir = os.getcwd()
+        os.system('cp {} {}'.format(finput_abspath(self.finput),currentdir))
         
         if batch: self.success = _run_batch_pro(self.pro, args, done_file=self.done_file)
         else: self.success = _run_external_pro(self.pro, args)
             
         #delete self.finput in currentdir
-        if translate and self.success:
+        if self.success:
             os.system('rm {}'.format(finput_nopath))
             
         time_end = time.time()

@@ -15,6 +15,8 @@ import time
 import datetime
 import glob
 import copy
+import pickle
+import atexit
 from salt3.pipeline.pipeline import SALT3pipe
 from salt3.pipeline.validplot import ValidPlots,lcfitting_validplots,getmu_validplots,cosmofit_validplots
 log=logging.getLogger(__name__)
@@ -43,7 +45,7 @@ def _MyPipe(mypipe):
 class RunPipe():
     def __init__(self, pipeinput, mypipe=False, batch_mode=False,batch_script=None,start_id=None,
                  randseed=None,fseeds=None,num=None,norun=None,debug=False,timeout=None,
-                 make_summary=False,validplots_only=False,success_list=None):
+                 make_summary=False,validplots_only=False,success_list=None,load_from_pickle=None):
         if mypipe is None:
             self.pipedef = self.__DefaultPipe
         else:
@@ -67,6 +69,7 @@ class RunPipe():
         self.make_summary = make_summary
         self.validplots_only = validplots_only
         self.success_list = success_list
+        self.load_from_pickle = load_from_pickle
  
     def __DefaultPipe(self):
         pipe = SALT3pipe(finput=self.pipeinput)
@@ -237,81 +240,86 @@ class RunPipe():
                 return
         
         if self.batch_mode == 0:
-            self.pipe = self.pipedef()
-            if self.randseed is not None:
-                if not any([p.startswith('sim') or p.startswith('biascorsim') for p in self.pipe.pipepros]):
-                    raise RuntimeError("randseed was given but sim/biascorsim is not defined in the pipeline")
-                print('randseed = {}'.format(self.randseed)) 
-                    
-                if self.num is not None:
+            if self.load_from_pickle is None:
+                self.pipe = self.pipedef()
+                
+                if self.randseed is not None:
+                    if not any([p.startswith('sim') or p.startswith('biascorsim') for p in self.pipe.pipepros]):
+                        raise RuntimeError("randseed was given but sim/biascorsim is not defined in the pipeline")
+                    print('randseed = {}'.format(self.randseed)) 
+
+                    if self.num is not None:
+                        if any([p.startswith('sim') for p in self.pipe.pipepros]):
+                            df_sim = self._add_suffix(self.pipe.Simulation,['GENVERSION','GENPREFIX'],self.num)
+                            done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.Simulation.done_file.strip()),self.num)
+                            self._reconfig_w_suffix(self.pipe.Simulation,df_sim,self.num,done_file=done_file)
+                        if any([p.startswith('biascorsim') for p in self.pipe.pipepros]):
+                            df_sim_biascor = self._add_suffix(self.pipe.BiascorSim,['GENVERSION','GENPREFIX'],'biascor_{:03d}'.format(self.num))
+                            done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.BiascorSim.done_file.strip()),self.num)
+                            self._reconfig_w_suffix(self.pipe.BiascorSim,df_sim_biascor,self.num,done_file=done_file)
+                        if any([p.startswith('train') for p in self.pipe.pipepros]): 
+                            df_train = self._add_suffix(self.pipe.Training,['outputdir'],self.num,section=['iodata'],add_label='main')
+                            self._reconfig_w_suffix(self.pipe.Training,df_train,self.num)
+                            if ['sim','train'] in self.pipe.gluepairs: 
+                                self.pipe.glue(['sim','train'])
+                        if any([p.startswith('lcfit') for p in self.pipe.pipepros]):    
+                            for i in range(self.pipe.n_lcfit):
+                                df_lcfit = self._add_suffix(self.pipe.LCFitting[i],['outdir'],self.num,section=['header'])
+                                done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.LCFitting[i].done_file.strip()),self.num)
+                                self._reconfig_w_suffix(self.pipe.LCFitting[i],df_lcfit,self.num,done_file=done_file)
+                            if ['sim','lcfit'] in self.pipe.gluepairs:
+                                self.pipe.glue(['sim','lcfit'],on='phot')
+                            if ['train','lcfit'] in self.pipe.gluepairs:
+                                self.pipe.glue(['train','lcfit'],on='model')
+    #                             self._reconfig_w_suffix(self.pipe.LCFitting[i],None,self.num)
+                        if any([p.startswith('biascorlcfit') for p in self.pipe.pipepros]):       
+                            for i in range(self.pipe.n_biascorlcfit):
+                                df_lcfit_biascor = self._add_suffix(self.pipe.BiascorLCFit[i],['outdir'],self.num,section=['header'])
+                                done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.BiascorLCFit[i].done_file.strip()),self.num)
+                                self._reconfig_w_suffix(self.pipe.BiascorLCFit[i],df_lcfit_biascor,self.num,done_file=done_file)
+    #                             self._reconfig_w_suffix(self.pipe.BiascorLCFit[i],None,self.num)
+                            if ['biascorsim','biascorlcfit'] in self.pipe.gluepairs:
+                                self.pipe.glue(['biascorsim','biascorlcfit'],on='phot')
+                            if ['train','biascorlcfit'] in self.pipe.gluepairs:
+                                self.pipe.glue(['train','biascorlcfit'],on='model')
+                        if any([p.startswith('getmu') for p in self.pipe.pipepros]): 
+                            df_getmu = self._add_suffix(self.pipe.GetMu,[self.pipe.GetMu.outdir_key],self.num)
+                            done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.GetMu.done_file.strip()),self.num)
+                            self._reconfig_w_suffix(self.pipe.GetMu,df_getmu,self.num,done_file=done_file)
+                            if ['lcfit','getmu'] in self.pipe.gluepairs:
+                                self.pipe.glue(['lcfit','getmu'])
+                            if ['biascorlcfit','getmu'] in self.pipe.gluepairs:
+                                self.pipe.glue(['biascorlcfit','getmu'])
+                            if ['getmu','cosmofit'] in self.pipe.gluepairs:
+                                self.pipe.glue(['getmu','cosmofit'])
+
                     if any([p.startswith('sim') for p in self.pipe.pipepros]):
-                        df_sim = self._add_suffix(self.pipe.Simulation,['GENVERSION','GENPREFIX'],self.num)
-                        done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.Simulation.done_file.strip()),self.num)
-                        self._reconfig_w_suffix(self.pipe.Simulation,df_sim,self.num,done_file=done_file)
+                        sim = self.pipe.Simulation
+                        randseed_old = sim.keys['RANSEED_REPEAT']
+                        if 'BATCH_INFO' in sim.keys:
+                            nrepeat = sim.keys['BATCH_INFO'].strip().split(' ')[-1]
+                        else:
+                            nrepeat = randseed_old.split(' ')[0]
+                        randseed_new = [nrepeat,str(self.randseed)]
+                        df = pd.DataFrame([{'key':'RANSEED_REPEAT','value':randseed_new}])
+                        sim.configure(pro=sim.pro,baseinput=sim.outname,setkeys=df,prooptions=sim.prooptions,
+                                      batch=sim.batch,translate=sim.translate,validplots=sim.validplots,
+                                      outname=sim.outname)    
                     if any([p.startswith('biascorsim') for p in self.pipe.pipepros]):
-                        df_sim_biascor = self._add_suffix(self.pipe.BiascorSim,['GENVERSION','GENPREFIX'],'biascor_{:03d}'.format(self.num))
-                        done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.BiascorSim.done_file.strip()),self.num)
-                        self._reconfig_w_suffix(self.pipe.BiascorSim,df_sim_biascor,self.num,done_file=done_file)
-                    if any([p.startswith('train') for p in self.pipe.pipepros]): 
-                        df_train = self._add_suffix(self.pipe.Training,['outputdir'],self.num,section=['iodata'],add_label='main')
-                        self._reconfig_w_suffix(self.pipe.Training,df_train,self.num)
-                        if ['sim','train'] in self.pipe.gluepairs: 
-                            self.pipe.glue(['sim','train'])
-                    if any([p.startswith('lcfit') for p in self.pipe.pipepros]):    
-                        for i in range(self.pipe.n_lcfit):
-                            df_lcfit = self._add_suffix(self.pipe.LCFitting[i],['outdir'],self.num,section=['header'])
-                            done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.LCFitting[i].done_file.strip()),self.num)
-                            self._reconfig_w_suffix(self.pipe.LCFitting[i],df_lcfit,self.num,done_file=done_file)
-                        if ['sim','lcfit'] in self.pipe.gluepairs:
-                            self.pipe.glue(['sim','lcfit'],on='phot')
-                        if ['train','lcfit'] in self.pipe.gluepairs:
-                            self.pipe.glue(['train','lcfit'],on='model')
-#                             self._reconfig_w_suffix(self.pipe.LCFitting[i],None,self.num)
-                    if any([p.startswith('biascorlcfit') for p in self.pipe.pipepros]):       
-                        for i in range(self.pipe.n_biascorlcfit):
-                            df_lcfit_biascor = self._add_suffix(self.pipe.BiascorLCFit[i],['outdir'],self.num,section=['header'])
-                            done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.BiascorLCFit[i].done_file.strip()),self.num)
-                            self._reconfig_w_suffix(self.pipe.BiascorLCFit[i],df_lcfit_biascor,self.num,done_file=done_file)
-#                             self._reconfig_w_suffix(self.pipe.BiascorLCFit[i],None,self.num)
-                        if ['biascorsim','biascorlcfit'] in self.pipe.gluepairs:
-                            self.pipe.glue(['biascorsim','biascorlcfit'],on='phot')
-                        if ['train','biascorlcfit'] in self.pipe.gluepairs:
-                            self.pipe.glue(['train','biascorlcfit'],on='model')
-                    if any([p.startswith('getmu') for p in self.pipe.pipepros]): 
-                        df_getmu = self._add_suffix(self.pipe.GetMu,[self.pipe.GetMu.outdir_key],self.num)
-                        done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.GetMu.done_file.strip()),self.num)
-                        self._reconfig_w_suffix(self.pipe.GetMu,df_getmu,self.num,done_file=done_file)
-                        if ['lcfit','getmu'] in self.pipe.gluepairs:
-                            self.pipe.glue(['lcfit','getmu'])
-                        if ['biascorlcfit','getmu'] in self.pipe.gluepairs:
-                            self.pipe.glue(['biascorlcfit','getmu'])
-                        if ['getmu','cosmofit'] in self.pipe.gluepairs:
-                            self.pipe.glue(['getmu','cosmofit'])
-            
-                if any([p.startswith('sim') for p in self.pipe.pipepros]):
-                    sim = self.pipe.Simulation
-                    randseed_old = sim.keys['RANSEED_REPEAT']
-                    if 'BATCH_INFO' in sim.keys:
-                        nrepeat = sim.keys['BATCH_INFO'].strip().split(' ')[-1]
-                    else:
-                        nrepeat = randseed_old.split(' ')[0]
-                    randseed_new = [nrepeat,str(self.randseed)]
-                    df = pd.DataFrame([{'key':'RANSEED_REPEAT','value':randseed_new}])
-                    sim.configure(pro=sim.pro,baseinput=sim.outname,setkeys=df,prooptions=sim.prooptions,
-                                  batch=sim.batch,translate=sim.translate,validplots=sim.validplots,
-                                  outname=sim.outname)    
-                if any([p.startswith('biascorsim') for p in self.pipe.pipepros]):
-                    sim_biascor = self.pipe.BiascorSim
-                    randseed_old = sim_biascor.keys['RANSEED_REPEAT']
-                    if 'BATCH_INFO' in sim_biascor.keys:
-                        nrepeat = sim_biascor.keys['BATCH_INFO'].strip().split(' ')[-1]
-                    else:
-                        nrepeat = randseed_old.split(' ')[0]
-                    randseed_new = [nrepeat,str(self.randseed+10)]
-                    df_biascor = pd.DataFrame([{'key':'RANSEED_REPEAT','value':randseed_new}])
-                    sim_biascor.configure(pro=sim_biascor.pro,baseinput=sim_biascor.outname,setkeys=df_biascor,prooptions=sim_biascor.prooptions,
-                                          batch=sim_biascor.batch,translate=sim_biascor.translate,validplots=sim_biascor.validplots,
-                                          outname=sim_biascor.outname)       
+                        sim_biascor = self.pipe.BiascorSim
+                        randseed_old = sim_biascor.keys['RANSEED_REPEAT']
+                        if 'BATCH_INFO' in sim_biascor.keys:
+                            nrepeat = sim_biascor.keys['BATCH_INFO'].strip().split(' ')[-1]
+                        else:
+                            nrepeat = randseed_old.split(' ')[0]
+                        randseed_new = [nrepeat,str(self.randseed+10)]
+                        df_biascor = pd.DataFrame([{'key':'RANSEED_REPEAT','value':randseed_new}])
+                        sim_biascor.configure(pro=sim_biascor.pro,baseinput=sim_biascor.outname,setkeys=df_biascor,prooptions=sim_biascor.prooptions,
+                                              batch=sim_biascor.batch,translate=sim_biascor.translate,validplots=sim_biascor.validplots,
+                                              outname=sim_biascor.outname)       
+            else:
+                print("Load saved pipeline object from a previous run")
+                self.pipe = pickle.load(open(self.load_from_pickle, "rb"))
             
             if not self.norun:
                 #remove success files from previous runs
@@ -320,6 +328,7 @@ class RunPipe():
                     os.system('rm PIPELINE_{}.DONE'.format(self.num))
                     
                 self.pipe.run()
+                
                 if self.pipe.success:
                     os.system('echo SUCCESS > PIPELINE_{}.DONE'.format(self.num))
                    
@@ -454,7 +463,13 @@ class RunPipe():
                     self.make_validplots_sum(p,inputfile_sum,plotdir,
                                              prefix_sum='sum_valid_{}-{}'.format(min(success_list),max(success_list)))   
                     
-        
+def exit_handler(pipe,num):
+    picklename = "pipeline_{}.{}.pickle".format(num,pipe.timestamp)
+    pickle.dump(pipe, open(picklename, "wb" ))
+    print("Wrote pipeline object as {}".format(picklename))      
+    print("Exited")
+    
+    
 def main(**kwargs):
     parser = argparse.ArgumentParser(description='Run SALT3 Pipe.')
     parser.add_argument('-c',dest='pipeinput',default=None,
@@ -485,14 +500,18 @@ def main(**kwargs):
                         help='making summary plots only without running the pipeline (success_list is needed)')  
     parser.add_argument('--success_list',dest='success_list', default=None,
                         help='success list file from a previous run for making validplots')  
+    parser.add_argument('--load_from_pickle',dest='load_from_pickle',default=None,
+                        help='load a saved pipeline object from a pickle file previously generated. only used for batch_mode=0')  
     
     p = parser.parse_args()
     
     pipe = RunPipe(p.pipeinput,mypipe=p.mypipe,batch_mode=p.batch_mode,batch_script=p.batch_script,
                    start_id=p.start_id,randseed=p.randseed,fseeds=p.fseeds,num=p.num,norun=p.norun,
                    debug=p.debug,timeout=p.timeout,make_summary=p.make_summary,validplots_only=p.validplots_only,
-                   success_list=p.success_list)
+                   success_list=p.success_list,load_from_pickle=p.load_from_pickle)
     pipe.run()
+    
+    atexit.register(exit_handler,pipe.pipe,pipe.num)        
     
     
 if __name__== "__main__":
