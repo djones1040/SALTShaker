@@ -77,6 +77,10 @@ class RunPipe():
 
     def _add_suffix(self,pro,keylist,suffix,section=None,add_label=None):
         df = pd.DataFrame() 
+        if str(suffix).isnumeric():
+            sformat = '03d'
+        else:
+            sformat = ''
         for i,key in enumerate(keylist):
             if isinstance(pro.keys, dict) and not isinstance(pro.keys,f90nml.namelist.Namelist):
                 keystrlist = [x for x in pro.keys.keys() if x.startswith(key)]
@@ -92,13 +96,13 @@ class RunPipe():
                     sec = section[i]
                     val_old = pro.keys[sec][keystr]
                 if isinstance(val_old,list):
-                    val_new = ['{}_{:03d}'.format(x.strip(),suffix) for x in val_old]
+                    val_new = ['{}_{:{sformat}}'.format(x.strip(),suffix,sformat=sformat) for x in val_old]
                 elif isinstance(val_old,dict):
                     val_new = {}
                     for dictkey in val_old:
-                        val_new[dictkey] = '{}_{:03d}'.format(val_old.strip(),suffix)
+                        val_new[dictkey] = '{}_{:{sformat}}'.format(val_old.strip(),suffix,sformat=sformat)
                 else:
-                    val_new = '{}_{:03d}'.format(val_old.strip(),suffix)
+                    val_new = '{}_{:{sformat}}'.format(val_old.strip(),suffix,sformat=sformat)
                 df = pd.concat([df,pd.DataFrame([{'section':sec,'key':keystr,'value':val_new,'label':add_label}])])
         return df
     
@@ -232,7 +236,7 @@ class RunPipe():
                         df_sim = self._add_suffix(self.pipe.Simulation,['GENVERSION','GENPREFIX'],self.num)
                         self._reconfig_w_suffix(self.pipe.Simulation,df_sim,self.num)
                     if any([p.startswith('biascorsim') for p in self.pipe.pipepros]):
-                        df_sim_biascor = self._add_suffix(self.pipe.BiascorSim,['GENVERSION','GENPREFIX'],self.num)
+                        df_sim_biascor = self._add_suffix(self.pipe.BiascorSim,['GENVERSION','GENPREFIX'],'biascor_{:03d}'.format(self.num))
                         self._reconfig_w_suffix(self.pipe.BiascorSim,df_sim_biascor,self.num)
                     if any([p.startswith('train') for p in self.pipe.pipepros]): 
                         df_train = self._add_suffix(self.pipe.Training,['outputdir'],self.num,section=['iodata'],add_label='main')

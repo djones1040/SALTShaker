@@ -115,7 +115,7 @@ class SALTResids:
 		# initialize the model
 		self.components = self.SALTModel(guess)
 		self.salterr = self.ErrModel(guess)
-		
+
 		self.m0guess = -19.49 #10**(-0.4*(-19.49-27.5))
 		self.extrapolateDecline=0.015
 		# set up the filters
@@ -269,18 +269,18 @@ class SALTResids:
 		self.im1new = np.where(self.parlist == 'm1')[0][np.array(wavemin) > 8500]
 		
 		self.iCL = np.where(self.parlist == 'cl')[0]
-		self.ix1 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x1')])
-		self.ix0 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x0') or si.startswith('specx0')])
-		self.ic	 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('c_')])
-		self.itpk = np.array([i for i, si in enumerate(self.parlist) if si.startswith('tpkoff')])
-		self.ispcrcl_norm = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specx0')])
+		self.ix1 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x1')],dtype=int)
+		self.ix0 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x0') or si.startswith('specx0')],dtype=int)
+		self.ic	 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('c_')],dtype=int)
+		self.itpk = np.array([i for i, si in enumerate(self.parlist) if si.startswith('tpkoff')],dtype=int)
+		self.ispcrcl_norm = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specx0')],dtype=int)
 		if self.ispcrcl_norm.size==0: self.ispcrcl_norm=np.zeros(self.npar,dtype=bool)
-		self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('spec')]) # used to be specrecal
+		self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('spec')],dtype=int) # used to be specrecal
 		if self.ispcrcl.size==0: self.ispcrcl=np.zeros(self.npar,dtype=bool)
-		self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr')])
-		self.imodelerr0 = np.array([i for i, si in enumerate(self.parlist) if si ==('modelerr_0')])
-		self.imodelerr1 = np.array([i for i, si in enumerate(self.parlist) if si==('modelerr_1')])
-		self.imodelcorr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelcorr')])
+		self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr')],dtype=int)
+		self.imodelerr0 = np.array([i for i, si in enumerate(self.parlist) if si ==('modelerr_0')],dtype=int)
+		self.imodelerr1 = np.array([i for i, si in enumerate(self.parlist) if si==('modelerr_1')],dtype=int)
+		self.imodelcorr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelcorr')],dtype=int)
 		self.iclscat = np.where(self.parlist=='clscat')[0]
 
 		self.iModelParam=np.ones(self.npar,dtype=bool)

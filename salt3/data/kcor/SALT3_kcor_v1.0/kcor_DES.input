@@ -1,0 +1,89 @@
+
+  Generate K-corrections for DES-SN
+  to use with MLCS2k2 or SALT2 model.
+ 
+  Genreated K-correction tables with
+
+    kcor.exe  kcor_DES_mlcs2k2.input >! kcor_DES_mlcs2k2.log &
+
+
+ Dec 30 2012: rerun with both HBOOK and FITS output
+ Feb 19 2014: use DES filters x atmos from Anne Baur
+ Dec 06 2014: update after filter re-org
+
+# ======================== BEGIN INPUT  =========================
+
+# specify spectral template for supernova
+
+SN_SED: Hsiao07.dat   # see $SNDATA_ROOT/snsed
+
+# primary refs
+BD17_SED:  bd_17d4708_stisnic_007.dat
+VEGA_SED:  alpha_lyr_stis_003.dat   
+
+# specify filters :  
+
+MAGSYSTEM: AB     (define mag system for filters below)
+FILTSYSTEM: COUNT
+FILTPATH: DES/20130322
+FILTER: DES-u   20130322_u.dat   0.0  (name, file, zero-point)
+FILTER: DES-g   20130322_g.dat   0.0  (name, file, zero-point)
+FILTER: DES-r   20130322_r.dat   0.0
+FILTER: DES-i   20130322_i.dat   0.0
+FILTER: DES-z   20130322_z.dat   0.0
+FILTER: DES-Y   20130322_y.dat   0.0
+
+
+# Define OBS-Bessell filters to use with FITRESTMAG option.
+# Any system will work, but more convenenient to put on 
+# AB, same as for DES. 
+MAGSYSTEM: AB     (define mag system for filters below)
+FILTSYSTEM:  COUNT
+FILTPATH: JLA/JLA-Landolt
+FILTER: BessJLA-B  sb-shifted.dat_5A   0
+FILTER: BessJLA-V  sv-shifted.dat_5A   0
+FILTER: BessJLA-R  sr-shifted.dat_5A   0
+
+
+# define rest-frame Bessell filters for K-corrections
+#MAGSYSTEM: VEGA
+#FILTSYSTEM: ENERGY   ("ENERGY" => Trans -> Trans/lambda)
+#FILTPATH: Bessell90/Bessell90_K09
+#FILTER: Bessell-U   Bessell90_U.dat   0.017  (Bolin2006: astro-ph/0608715)  
+#FILTER: Bessell-B   Bessell90_B.dat   0.031   # 0.021
+#FILTER: Bessell-V   Bessell90_V.dat   0.023
+#FILTER: Bessell-R   Bessell90_R.dat   0.030 
+#FILTER: Bessell-I   Bessell90_I.dat   0.026
+#FILTER: Bessell-BX  Bessell90_BX.dat  0.021
+
+# give list of K correction matrices to compute
+# First filter is rest-frame;
+# 2nd filter is observers [redshifted] frame
+# 3rd arg is short-hand name for table storage
+
+
+# define redshift grid for Kcor matrtix.
+# Note that the "epoch" grid is taken automatically from the SN template.
+
+REDSHIFT_RANGE:   0.0  1.40
+REDSHIFT_BINSIZE: 0.1    # reduce to 0.05
+
+# define AV grid
+RV:          3.1   A(V)/E(B-V) in LMC
+AV_RANGE:   -6.0  6.0
+AV_BINSIZE:  0.5      # reduce be 0.5
+
+AV_OPTION:   2   [1 => use AV at avg lambda in filter  (with CCM89)]
+                 [2 => convolve spectrum and extinction with CCM89 law]
+
+
+# define lambda range for SN templates; 
+# template lambda binning is used internally
+LAMBDA_RANGE: 2100 12000
+
+# define output file for kcor grid
+OUTFILE: kcor_DECam.fits
+
+
+
+

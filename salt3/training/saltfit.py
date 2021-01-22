@@ -631,6 +631,7 @@ class GaussNewton(saltresids.SALTResids):
 		except Exception as e:
 			logging.critical('Color scatter crashed during fitting, finishing writing output')
 			logging.critical(e, exc_info=True)
+		#print('HACK NO SATISFY DEFS')
 		Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
 		logging.info('Checking that rescaling components to satisfy definitions did not modify photometry')
 		

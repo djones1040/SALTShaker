@@ -45,12 +45,17 @@ def init_salt2(m0file=None,m1file=None,M0triplet=None,M1triplet=None,
 							   7389., 7492., 7598., 7709., 7825., 7946., 8072., 8205., 8345.,
 							   8494., 8652., 8821., 9003.,9200.,9200.,9200.,9200.])
 	if m1file is not None:
-			m1flux = np.loadtxt(m1file,unpack=True)[2][iGood]
+			m1phase,m1wave,m1flux = np.loadtxt(m1file,unpack=True) #[2][iGood]
+			iGood = np.where((m1phase >= phaserange[0]-phasesplineres*0) & (m1phase <= phaserange[1]+phasesplineres*0) &
+					         (m1wave >= waverange[0]-wavesplineres*0) & (m1wave <= waverange[1]+wavesplineres*0))[0]
+			m1phase,m1wave,m1flux = m1phase[iGood],m1wave[iGood],m1flux[iGood]
 	else: m1flux = M1triplet[2]
 
 	# extend the wavelength range using the hsiao model
 	# and a bunch of zeros for M1
 	if waverange[1] > 9200:
+		if len(m1phase) != len(phase): raise RuntimeError('M0 and M1 phases must match')
+		if len(m1wave) != len(wave): raise RuntimeError('M0 and M1 wavelengths must match')
 		delwave = wave[1]-wave[0]
 		delphase = np.unique(phase)[1]-np.unique(phase)[0]
 		new_wave_grid = np.arange(waverange[0],waverange[1],delwave)
@@ -84,7 +89,7 @@ def init_salt2(m0file=None,m1file=None,M0triplet=None,M1triplet=None,
 	
 	else:
 		bspl = bisplrep(phase,wave,m0flux,kx=order,ky=order, tx=splinephase,ty=splinewave,task=-1)
-		bsplm1 = bisplrep(phase,wave,
+		bsplm1 = bisplrep(m1phase,m1wave,
 						  m1flux,kx=order,ky=order,
 						  tx=splinephase,ty=splinewave,task=-1)
 
@@ -104,7 +109,7 @@ def init_salt2(m0file=None,m1file=None,M0triplet=None,M1triplet=None,
 		plt.legend()
 		plt.plot(intwave,m0test,label='interp')
 		bspltmp = bspl[2].reshape([len(splinephase)-4,len(splinewave)-4])
-	#import pdb; pdb.set_trace()
+
 	return intphase,intwave,m0,m1,bspl[0],bspl[1],bspl[2],bsplm1[2]
 
 

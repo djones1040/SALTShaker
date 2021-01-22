@@ -89,7 +89,7 @@ def SpecRecal(photdata,specdata,kcordict,survey,specrange_wavescale_specrecal,nr
 
 	md = minimize(chifunc,np.array([0.]*(nrecalpars+1)),args=(
 		photflux,specflux,photfluxerr,specfluxerr,photwave,specrange_wavescale_specrecal))
-	if doplot: # or sn == '5999409':
+	if doplot: # or sn == '06D1ab': #5999409':
 		plt.plot(specdata['wavelength'],specdata['flux']/recalfunc(md.x,specdata['wavelength'],specrange_wavescale_specrecal),
 				 label='recalibrated spec.')
 		plt.errorbar(photwave,photflux/photcorr/md.x[0],yerr=photfluxerr/photcorr/md.x[0],fmt='D',label='original phot. (scaled)')
@@ -99,7 +99,7 @@ def SpecRecal(photdata,specdata,kcordict,survey,specrange_wavescale_specrecal,nr
 						 md.x,photwave,specrange_wavescale_specrecal),
 					 fmt='o',label='warped phot.')
 		plt.legend()
-		import pdb; pdb.set_trace()
+		#import pdb; pdb.set_trace()
 	if md.success: return md.x
 	else: return [0.]*(nrecalpars+1)
 	
