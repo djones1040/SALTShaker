@@ -10,7 +10,6 @@ def getScaleForSN(spectrum,photdata,kcordict,survey,colorcut=0.1):
 
 	dwave = np.median(spectrum['wavelength'][1:]-spectrum['wavelength'][:-1])
 	primarywave = kcordict[survey]['primarywave']
-	filtwave = kcordict[survey]['filtwave']
 	maxwave = np.max(spectrum['wavelength'])
 	minwave = np.min(spectrum['wavelength'])
 	
@@ -25,13 +24,13 @@ def getScaleForSN(spectrum,photdata,kcordict,survey,colorcut=0.1):
 		elif kcordict[survey][flt]['magsys'] == 'BD17': primarykey = 'BD17'
 		stdmag = synphot(
 			primarywave,kcordict[survey][primarykey],
-			filtwave=kcordict[survey]['filtwave'],
+			filtwave=kcordict[survey][flt]['filtwave'],
 			filttp=kcordict[survey][flt]['filttrans'],
 			zpoff=0) - kcordict[survey][flt]['primarymag']
 		fluxfactor = 10**(0.4*(stdmag+27.5))
 		wht = np.sum(kcordict[survey][flt]['filttrans'][
-			(kcordict[survey]['filtwave'] > maxwave) |
-			(kcordict[survey]['filtwave'] < minwave)])/np.sum(kcordict[survey][flt]['filttrans'])
+			(kcordict[survey][flt]['filtwave'] > maxwave) |
+			(kcordict[survey][flt]['filtwave'] < minwave)])/np.sum(kcordict[survey][flt]['filttrans'])
 		if wht > 0.02: continue
 		if len(photdata['filt'][photdata['filt'] == flt]) == 1: continue
 		flt_out += [flt]
@@ -90,7 +89,6 @@ def getColorsForSN(spectrum,photdata,kcordict,survey,colorcut=0.1):
 
 	dwave = np.median(spectrum['wavelength'][1:]-spectrum['wavelength'][:-1])
 	primarywave = kcordict[survey]['primarywave']
-	filtwave = kcordict[survey]['filtwave']
 	maxwave = np.max(spectrum['wavelength'])
 	minwave = np.min(spectrum['wavelength'])
 	
@@ -105,17 +103,17 @@ def getColorsForSN(spectrum,photdata,kcordict,survey,colorcut=0.1):
 		elif kcordict[survey][flt]['magsys'] == 'BD17': primarykey = 'BD17'
 		stdmag = synphot(
 			primarywave,kcordict[survey][primarykey],
-			filtwave=kcordict[survey]['filtwave'],
+			filtwave=kcordict[survey][flt]['filtwave'],
 			filttp=kcordict[survey][flt]['filttrans'],
 			zpoff=0) - kcordict[survey][flt]['primarymag']
 		fluxfactor = 10**(0.4*(stdmag+27.5))
 		wht = np.sum(kcordict[survey][flt]['filttrans'][
-			(kcordict[survey]['filtwave'] > maxwave) |
-			(kcordict[survey]['filtwave'] < minwave)])/np.sum(kcordict[survey][flt]['filttrans'])
+			(kcordict[survey][flt]['filtwave'] > maxwave) |
+			(kcordict[survey][flt]['filtwave'] < minwave)])/np.sum(kcordict[survey][flt]['filttrans'])
 		if wht > 0.02: continue
 		if len(photdata['filt'][photdata['filt'] == flt]) == 1: continue
 		flt_out += [flt]
-
+		filtwave=kcordict[survey][flt]['filtwave']
 		filttrans = kcordict[survey][flt]['filttrans']
 		pbspl = np.interp(spectrum['wavelength'],filtwave,filttrans)
 		denom = np.trapz(pbspl,spectrum['wavelength'])
