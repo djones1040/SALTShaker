@@ -43,7 +43,6 @@ def rdkcor(surveylist,options):
 			kcorkey = '%s(%s)'%(survey,subsurvey)
 			if not subsurvey: kcorkey = survey[:]
 			kcordict[kcorkey] = {}
-			kcordict[kcorkey]['filtwave'] = filtertrans['wavelength (A)']
 			kcordict[kcorkey]['primarywave'] = primarysed['wavelength (A)']
 			kcordict[kcorkey]['snflux'] = snsed['SN Flux (erg/s/cm^2/A)']
 
@@ -56,19 +55,44 @@ def rdkcor(surveylist,options):
 			if 'BD17' in primarysed.names:
 				kcordict[kcorkey]['BD17'] = primarysed['BD17']
 			for filt in zpoff['Filter Name']:
-				kcordict[kcorkey][filt.split('-')[-1].split('/')[-1]] = {}
-				kcordict[kcorkey][filt.split('-')[-1].split('/')[-1]]['fullname'] = filt.split('/')[0][1:]
-				kcordict[kcorkey][filt.split('-')[-1].split('/')[-1]]['filttrans'] = filtertrans[filt]
-				lambdaeff = np.sum(kcordict[kcorkey]['filtwave']*filtertrans[filt])/np.sum(filtertrans[filt])
-				kcordict[kcorkey][filt.split('-')[-1].split('/')[-1]]['lambdaeff'] = lambdaeff
-				kcordict[kcorkey][filt.split('-')[-1].split('/')[-1]]['zpoff'] = \
-					zpoff['ZPOff(Primary)'][zpoff['Filter Name'] == filt][0]
-				kcordict[kcorkey][filt.split('-')[-1].split('/')[-1]]['magsys'] = \
+				filtlabel=filt.split('-')[-1].split('/')[-1]
+				kcordict[kcorkey][filtlabel] = {}
+				kcordict[kcorkey][filtlabel]['filtwave'] = filtertrans['wavelength (A)']
+				kcordict[kcorkey][filtlabel]['fullname'] = filt.split('/')[0][1:]
+				kcordict[kcorkey][filtlabel]['filttrans'] = filtertrans[filt]
+				lambdaeff = np.sum(kcordict[kcorkey][filtlabel]['filtwave']*filtertrans[filt])/np.sum(filtertrans[filt])
+				kcordict[kcorkey][filtlabel]['lambdaeff'] = lambdaeff
+				kcordict[kcorkey][filtlabel]['magsys'] = \
 					zpoff['Primary Name'][zpoff['Filter Name'] == filt][0]
-				kcordict[kcorkey][filt.split('-')[-1].split('/')[-1]]['primarymag'] = \
+				kcordict[kcorkey][filtlabel]['primarymag'] = \
 					zpoff['Primary Mag'][zpoff['Filter Name'] == filt][0]
-
-		
+				kcordict[kcorkey][filtlabel]['zpoff'] = \
+					zpoff['ZPoff(Primary)'][zpoff['Filter Name'] == filt][0]
+					
+					
+	if (options.calibrationshiftfile):
+		log.info('Calibration shift file provided, applying offsets:')
+		#Calibration dictionary:
+		with open(options.calibrationshiftfile) as file:
+			for line in file:
+				log.info(line)
+				try:
+					shifttype,survey,filter,shift=line.split()
+					shift=float(shift)
+					if shifttype=='MAGSHIFT':
+						kcordict[kcorkey][filtlabel]['zpoff'] +=shift
+						kcordict[survey][filter]['primarymag']+=shift
+					elif shifttype=='LAMSHIFT':
+						kcordict[survey][filter]['filtwave']+=shift
+						kcordict[survey][filter]['lambdaeff']+=shift
+					else:
+						raise ValueError(f'Invalid calibration shift: {shifttype}')
+				except Exception as e:
+					log.critical(f'Could not apply calibration offset \"{line[:-1]}\"')
+					raise e
+			log.info('Calibration offsets applied')
+	else:
+		log.info('No calibration shift file provided, continuing')
 	primarywave,primarysed = np.genfromtxt('%s/flatnu.dat'%init_rootdir,unpack=True)
 	
 	kcordict['default'] = {}
@@ -179,7 +203,7 @@ def rdSpecData(datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspe
 
 						
 						#wavebins = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/binspecres)
-						wavebins = np.linspace(np.min(wavelength),np.max(wavelength),(np.max(wavelength)-np.min(wavelength))/(binspecres*(1+z)))
+						wavebins = (np.linspace(np.min(wavelength),np.max(wavelength),int((np.max(wavelength)-np.min(wavelength))/(binspecres*(1+z)))))
 						binned_flux = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_avg).statistic
 						binned_fluxerr = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_err).statistic
 

@@ -33,7 +33,6 @@ import pylab as plt
 import extinction
 import copy
 import warnings
-import pyParz
 
 import logging
 log=logging.getLogger(__name__)
@@ -151,12 +150,12 @@ class SALTResids:
 				elif self.kcordict[survey][flt]['magsys'] == 'BD17': primarykey = 'BD17'
 				self.stdmag[survey][flt] = synphot(
 					primarywave,self.kcordict[survey][primarykey],
-					filtwave=self.kcordict[survey]['filtwave'],
+					filtwave=self.kcordict[survey][flt]['filtwave'],
 					filttp=self.kcordict[survey][flt]['filttrans'],
 					zpoff=0) - self.kcordict[survey][flt]['primarymag']
 				self.fluxfactor[survey][flt] = 10**(0.4*(self.stdmag[survey][flt]+27.5))
-				self.kcordict[survey][flt]['minlam'] = np.min(self.kcordict[survey]['filtwave'][self.kcordict[survey][flt]['filttrans'] > 0.01])
-				self.kcordict[survey][flt]['maxlam'] = np.max(self.kcordict[survey]['filtwave'][self.kcordict[survey][flt]['filttrans'] > 0.01])
+				self.kcordict[survey][flt]['minlam'] = np.min(self.kcordict[survey][flt]['filtwave'][self.kcordict[survey][flt]['filttrans'] > 0.01])
+				self.kcordict[survey][flt]['maxlam'] = np.max(self.kcordict[survey][flt]['filtwave'][self.kcordict[survey][flt]['filttrans'] > 0.01])
 				
 		#Count number of photometric and spectroscopic points
 		
@@ -168,7 +167,6 @@ class SALTResids:
 			photdata = self.datadict[sn]['photdata']
 			specdata = self.datadict[sn]['specdata']
 			survey = self.datadict[sn]['survey']
-			filtwave = self.kcordict[survey]['filtwave']
 			z = self.datadict[sn]['zHelio']
 			self.num_spec += sum([specdata[key]['flux'].size for key in specdata])
 			for key in specdata:
@@ -335,7 +333,6 @@ class SALTResids:
 		for sn in self.datadict.keys():
 			z = self.datadict[sn]['zHelio']
 			survey = self.datadict[sn]['survey']
-			filtwave = self.kcordict[survey]['filtwave']
 			obswave=self.wave*(1+z)
 			self.datadict[sn]['obswave'] = obswave
 			
@@ -346,6 +343,7 @@ class SALTResids:
 			self.datadict[sn]['lambdaeff']={}
 			self.datadict[sn]['dwave'] = self.wave[1]*(1+z) - self.wave[0]*(1+z)
 			for flt in np.unique(self.datadict[sn]['photdata']['filt']):
+				filtwave = self.kcordict[survey][flt]['filtwave']
 
 				filttrans = self.kcordict[survey][flt]['filttrans']
 
@@ -719,7 +717,6 @@ class SALTResids:
 	def photValsForSN(self,x,sn,storedResults,temporaryResults,varyParams):
 		z = self.datadict[sn]['zHelio']
 		survey = self.datadict[sn]['survey']
-		filtwave = self.kcordict[survey]['filtwave']
 		obswave = self.datadict[sn]['obswave'] #self.wave*(1+z)
 		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
 		wavedelt = obswave[1]-obswave[0]
@@ -830,7 +827,6 @@ class SALTResids:
 	def specValsForSN(self,x,sn,storedResults,temporaryResults,varyParams):
 		z = self.datadict[sn]['zHelio']
 		survey = self.datadict[sn]['survey']
-		filtwave = self.kcordict[survey]['filtwave']
 		obswave = self.datadict[sn]['obswave'] #self.wave*(1+z)
 		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
 		wavedelt = obswave[1]-obswave[0]
@@ -961,7 +957,6 @@ class SALTResids:
 	def specVarianceForSN(self,x,sn,storedResults,temporaryResults,varyParams):
 		z = self.datadict[sn]['zHelio']
 		survey = self.datadict[sn]['survey']
-		filtwave = self.kcordict[survey]['filtwave']
 		obswave = self.datadict[sn]['obswave'] #self.wave*(1+z)
 		wavedelt = obswave[1]-obswave[0]
 		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
@@ -1044,7 +1039,6 @@ class SALTResids:
 		"""Currently calculated only at the effective wavelength of the filter, not integrated over."""
 		z = self.datadict[sn]['zHelio']
 		survey = self.datadict[sn]['survey']
-		filtwave = self.kcordict[survey]['filtwave']
 		obswave = self.datadict[sn]['obswave'] #self.wave*(1+z)
 		wavedelt = obswave[1]-obswave[0]
 		obsphase = self.datadict[sn]['obsphase'] #self.phase*(1+z)
@@ -1556,7 +1550,6 @@ class SALTResids:
 			photdata = self.datadict[sn]['photdata']
 			specdata = self.datadict[sn]['specdata']
 			survey = self.datadict[sn]['survey']
-			filtwave = self.kcordict[survey]['filtwave']
 			z = self.datadict[sn]['zHelio']
 			pbspl = self.datadict[sn]['pbspl']
 			obswave=self.datadict[sn]['obswave']
