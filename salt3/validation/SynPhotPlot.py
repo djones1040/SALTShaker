@@ -55,21 +55,23 @@ def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
 	salt3model.set(t0=0)
 	salt3model.set(c=0)
 
-	plotmjd = np.linspace(-20, 55,100)
+	plotmjd = np.linspace(-20, 50,100)
 	
 	fig = plt.figure(figsize=(15, 5))
 	m0axes = [fig.add_subplot(2,len(filters),1+i) for i in range(len(filters))]
 	m1axes = [fig.add_subplot(2,len(filters),len(filters)+ 1+i,sharex=ax) for i,ax in enumerate(m0axes)]
 	xmin,xmax=-2,2
+	handles=[]
 	for flt,ax0,ax1 in zip(filters,m0axes,m1axes):
 		
 			salt2model.set(x1=1)
 			salt3model.set(x1=1)
+			
 			try:
 				salt2stretchedflux = salt2model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')
 				salt2model.set(x1=0)
 				salt2flux = salt2model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')
-				ax0.plot(plotmjd,salt2flux,color='b',label='SALT2')
+				salt2handle=ax0.plot(plotmjd,salt2flux,color='b',label='SALT2')
 				ax1.plot(plotmjd,salt2stretchedflux-salt2flux,color='b',label='SALT2')
 			except: pass
 
@@ -78,21 +80,24 @@ def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
 				salt3model.set(x1=0)
 
 				salt3flux = salt3model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')
-				ax0.plot(plotmjd,salt3flux,color='r',label='SALT3')
+				salt3handle=ax0.plot(plotmjd,salt3flux,color='r',label='SALT3')
 				ax1.plot(plotmjd,salt3stretchedflux-salt3flux,color='r',label='SALT3')
 			except: pass
-				
+
 			ax0.set_yticks([])
 			ax1.set_yticks([])
 
-	
-			ax0.set_title(flt,fontsize=20)
+		
+			title=flt
+			if 'bessell' in title:
+				title= 'Bessell '+ flt[len('bessell')].upper()
+			ax0.set_title(title,fontsize=20)
 			#ax.set_xlim([-30,55])
 	fig.subplots_adjust(right=0.8,bottom=0.15,left=0.05)
 	m0axes[0].set_ylabel('M0 Flux',fontsize=20)
 	m1axes[0].set_ylabel('M1 Flux',fontsize=20)
-	
 	fig.text(0.5,0.04,'Time since peak (days)',ha='center',fontsize=20)
+	fig.legend(salt2handle+salt3handle,['SALT2.JLA','SALT3.K20'],fontsize=20,loc=(.825,.55))
 	#axes[0].legend()
 	plt.savefig(outfile)
 	plt.close(fig)
@@ -226,7 +231,6 @@ def overPlotSynthPhotByComponentCustom(
 	fig.text(0.5,0.04,'Time since peak (days)',ha='center',fontsize=20)
 	#axes[0].legend()
 	plt.savefig(outfile)
-	import pdb; pdb.set_trace()
 	plt.close(fig)
 	
 
@@ -298,7 +302,7 @@ def plotSynthPhotOverStretchRange(outfile,salt3dir,filterset='SDSS',
 			if includeSALT2: ax2.set_yticks([])
 			ax3.set_yticks([])
 
-	
+
 			title=flt
 			if 'bessell' in title:
 				title= 'Bessell '+ flt[len('bessell')].upper()

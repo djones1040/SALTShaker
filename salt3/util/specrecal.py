@@ -18,7 +18,6 @@ def SpecRecal(photdata,specdata,kcordict,survey,specrange_wavescale_specrecal,nr
 	# if nothing exists, relax to four days
 	dwave = np.median(specdata['wavelength'][1:]-specdata['wavelength'][:-1])
 	primarywave = kcordict[survey]['primarywave']
-	filtwave = kcordict[survey]['filtwave']
 	maxwave = np.max(specdata['wavelength'])
 	minwave = np.min(specdata['wavelength'])
 
@@ -26,19 +25,20 @@ def SpecRecal(photdata,specdata,kcordict,survey,specrange_wavescale_specrecal,nr
 
 	specflux,photflux,photwave,specfluxerr,photfluxerr,photcorr = [],[],[],[],[],[]
 	for flt in np.unique(photdata['filt']):
+		filtwave = kcordict[survey][flt]['filtwave']
 		# preliminaries
 		if kcordict[survey][flt]['magsys'] == 'AB': primarykey = 'AB'
 		elif kcordict[survey][flt]['magsys'].upper() == 'VEGA': primarykey = 'Vega'
 		elif kcordict[survey][flt]['magsys'] == 'BD17': primarykey = 'BD17'
 		stdmag = synphot(
 			primarywave,kcordict[survey][primarykey],
-			filtwave=kcordict[survey]['filtwave'],
+			filtwave=filtwave,
 			filttp=kcordict[survey][flt]['filttrans'],
 			zpoff=0) - kcordict[survey][flt]['primarymag']
 		fluxfactor = 10**(0.4*(stdmag+27.5))
 		wht = np.sum(kcordict[survey][flt]['filttrans'][
-			(kcordict[survey]['filtwave'] > maxwave) |
-			(kcordict[survey]['filtwave'] < minwave)])/np.sum(kcordict[survey][flt]['filttrans'])
+			(filtwave > maxwave) |
+			(filtwave < minwave)])/np.sum(kcordict[survey][flt]['filttrans'])
 		if wht > 0.02: continue
 		if len(photdata['filt'][photdata['filt'] == flt]) == 1: continue
 

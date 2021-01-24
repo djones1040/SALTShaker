@@ -499,7 +499,7 @@ class GaussNewton(saltresids.SALTResids):
 			spline_derivs[:,:,i]=bisplev(self.phaseout,self.waveout,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
 		spline2d=sparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))
 		
-		#Smooth things, since this is supposed to be for broadband photometry
+		#Smooth things a bit, since this is supposed to be for broadband photometry
 		if smoothingfactor>0:
 			smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
 			spline2d=smoothingmatrix*spline2d
@@ -729,7 +729,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 		return X,-result.fval
 	
-	def fitcolorscatter(self,X,fitcolorlaw=False,rescaleerrs=False,maxiter=2000):
+	def fitcolorscatter(self,X,fitcolorlaw=False,rescaleerrs=True,maxiter=2000):
 		message='Optimizing color scatter'
 		if rescaleerrs:
 			message+=' and scaling model uncertainties'

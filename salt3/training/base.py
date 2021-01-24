@@ -22,7 +22,7 @@ class TrainSALTBase:
 	def __init__(self):
 		self.verbose = False
 		
-
+		
 	def add_user_options(self, parser=None, usage=None, config=None):
 		if parser == None:
 			parser = argparse.ArgumentParser(usage=usage, conflict_handler="resolve")
@@ -80,6 +80,8 @@ class TrainSALTBase:
 							help='Mass of filter transmission allowed outside of model wavelength range (default=%default)')
 		parser.add_argument('--trainingconfig', default=config.get('iodata','trainingconfig'), type=str,
 							help='config file for the detailed training params')
+		parser.add_argument('--calibrationshiftfile', default=config.get('iodata','calibrationshiftfile'), type=str,
+							help='file containing a list of changes to zeropoint and central wavelength of filters by survey')
 		parser.add_argument('--fix_salt2modelpars', default=config.get('iodata','fix_salt2modelpars'), type=boolean_string,
 							help="""if set, fix M0/M1 for wavelength/phase range of original SALT2 model (default=%default)""")
 
@@ -395,7 +397,7 @@ class TrainSALTBase:
 			phase=(photdata['tobs'])/(1+z)
 			def checkFilterMass(flt):
 				survey = datadict[sn]['survey']
-				filtwave = self.kcordict[survey]['filtwave']
+				filtwave = self.kcordict[survey][flt]['filtwave']
 				try:
 					filttrans = self.kcordict[survey][flt]['filttrans']
 				except:

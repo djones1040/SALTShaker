@@ -185,6 +185,7 @@ $med. \chi^2_{{\nu}}$ = {med_chi3:.2f}""",
     ax1.set_xlabel('$z_{CMB}$',fontsize=15)
     ax1.set_ylabel('$\mu-\mu_{\Lambda CDM}$',fontsize=15)
     ax2.xaxis.set_ticks([])
+<<<<<<< HEAD
     plt.savefig('hubblediagjlasim.pdf',bbox_inches='tight')
     
     import pdb; pdb.set_trace()
@@ -267,6 +268,8 @@ $med. \chi^2_{{\nu}}$ = {med_chi3:.2f}""",
     ax2.xaxis.set_ticks([])
     
     import pdb; pdb.set_trace()
+
+    plt.savefig('hubblediag_sim.pdf')
 
     
 if __name__ == "__main__":

@@ -605,7 +605,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 		if 'FLT' not in sn.__dict__.keys():
 			sn.FLT = sn.BAND[:]
 		for flt in np.unique(sn.FLT):
-			filtwave = self.kcordict[sn.SURVEY]['filtwave']
+			filtwave = self.kcordict[sn.SURVEY][flt]['filtwave']
 			filttrans = self.kcordict[sn.SURVEY][flt]['filttrans']
 
 			band = sncosmo.Bandpass(
@@ -695,11 +695,10 @@ SIGMA_INT: 0.106  # used in simulation"""
 					elif self.kcordict[k][k2]['magsys'] == 'BD17': primarykey = 'BD17'
 
 					kcordict[k2] = self.kcordict[k][k2]
-					kcordict[k2]['filtwave'] = self.kcordict[k]['filtwave']
 					kcordict[k2]['stdmag'] = synphot(
 						self.kcordict[k]['primarywave'],
 						self.kcordict[k][primarykey],
-						filtwave=self.kcordict[k]['filtwave'],
+						filtwave=self.kcordict[k][k2]['filtwave'],
 						filttp=self.kcordict[k][k2]['filttrans'],
 						zpoff=0) - self.kcordict[k][k2]['primarymag']
 
