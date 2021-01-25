@@ -868,6 +868,9 @@ class Simulation(PipeProcedure):
                 kcor_dict[label] = value
 
         findkey = [key for key,value in self.keys.items() if key.startswith('SIMGEN_INFILE_Ia')]
+        n_genversion = len([key for key,value in self.keys.items() if key.startswith('GENVERSION')])
+        if len(findkey) > n_genversion:
+            findkey = findkey[0:n_genversion]
         for key in findkey:
             label = key.split('[')[1].split(']')[0]
             if label in kcor_dict.keys():
