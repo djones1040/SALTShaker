@@ -873,7 +873,7 @@ class Simulation(PipeProcedure):
             if label in kcor_dict.keys():
                 continue
             else:
-                sim_input = self.keys[key]
+                sim_input = finput_abspath(os.path.expandvars(self.keys[key]))
                 config,delimiter = _read_simple_config_file(sim_input,sep=':')
                 kcorfile = config['KCOR_FILE'].strip()
                 if '#' in kcorfile:
@@ -892,12 +892,15 @@ class Simulation(PipeProcedure):
                 simlib_dict[label] = value
 
         findkey = [key for key,value in self.keys.items() if key.startswith('SIMGEN_INFILE_Ia')]
+        n_genversion = len([key for key,value in self.keys.items() if key.startswith('GENVERSION')])
+        if len(findkey) > n_genversion:
+            findkey = findkey[0:n_genversion]
         for key in findkey:
             label = key.split('[')[1].split(']')[0]
             if label in simlib_dict.keys():
                 continue
             else:
-                sim_input = self.keys[key]
+                sim_input = finput_abspath(os.path.expandvars(self.keys[key]))
                 config,delimiter = _read_simple_config_file(sim_input,sep=':')
                 simlib_file = config['SIMLIB_FILE'].strip()
                 simlib_dict[label] = simlib_file
@@ -921,7 +924,7 @@ class Simulation(PipeProcedure):
             if label in genmodel_dict.keys():
                 continue
             else:
-                sim_input = self.keys[key]
+                sim_input = finput_abspath(os.path.expandvars(self.keys[key]))
                 config,delimiter = _read_simple_config_file(sim_input,sep=':')
                 genmodel_file = config['GENMODEL'].strip()
                 genmodel_dict[label] = genmodel_file
@@ -1599,7 +1602,9 @@ def _gen_training_inputs(basefilenames=None,setkeys=None,
         if basefilename == '':
             continue
         if not label in ['main','logging','training']:
-            raise ValueError("{} is not a valid label, check input file".format(label))     
+            raise ValueError("{} is not a valid label, check input file".format(label))
+        if '$' in basefilename:
+            basefilename = os.path.expandvars(basefilename)
         if not os.path.isfile(basefilename):
             raise ValueError("File does not exist",basefilename)
         if not os.path.exists(os.path.dirname(outname)):
