@@ -511,7 +511,8 @@ def main(**kwargs):
                    success_list=p.success_list,load_from_pickle=p.load_from_pickle)
     pipe.run()
     
-    atexit.register(exit_handler,pipe.pipe,pipe.num)        
+    if hasattr(pipe,'pipe'):
+        atexit.register(exit_handler,pipe.pipe,pipe.num)        
     
     
 if __name__== "__main__":

@@ -130,7 +130,9 @@ class SALT3pipe():
         self.n_lcfit = n_lcfit
         self.n_biascorlcfit = n_biascorlcfit
         self.plotdir = plotdir
-        if not os.path.exists(plotdir): os.mkdir(plotdir)
+        while not os.path.exists(plotdir): 
+            try: os.mkdir(plotdir)
+            except: time.sleep(2)
         self.genversion_split = self._get_config_option(config,'pipeline','genversion_split')
         self.genversion_split_biascor = self._get_config_option(config,'pipeline','genversion_split_biascor')
 
@@ -1442,6 +1444,30 @@ class CosmoFit(PipeProcedure):
             with open(outname,'w') as f:
                 f.write("INPUTFILES: {}\n".format(','.join(self.validplot_inputfiles)))
                 f.write("INPUTBASES: {}\n".format(','.join(self.validplot_inputbases)))
+                
+    def run(self,batch=None,translate=None):
+#         arglist = [self.proargs] + [finput_abspath(self.finput)] +[self.prooptions]
+        if hasattr(self,'success') and self.success:
+            print("Skip a previously successful stage")
+            return
+        else:
+            self.success = False
+            
+        time_start = time.time()
+        arglist = [self.proargs] + [finput_abspath(self.finput)] +[self.prooptions]
+        arglist = list(filter(None,arglist))
+        args = []
+        for arg in arglist:
+            if arg is not None:
+                for argitem in arg.split(' '):
+                    args.append(argitem)
+        
+        if batch: self.success = _run_batch_pro(self.pro, args, done_file=self.done_file)
+        else: self.success = _run_external_pro(self.pro, args)
+            
+        time_end = time.time()
+        time_taken = (time_end - time_start)/60. #in minutes
+        print("this took {} minutes".format(time_taken))
                 
     
 def _run_external_pro(pro,args):
