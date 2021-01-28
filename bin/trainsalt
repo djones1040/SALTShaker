@@ -17,11 +17,12 @@ if sys.version_info < (3,0):
 	
 salt = TrainSALT()
 
-parser = argparse.ArgumentParser(usage=usagestring, conflict_handler="resolve")
+parser = argparse.ArgumentParser(usage=usagestring, conflict_handler="resolve",add_help=False)
 parser.add_argument('-c','--configfile', default=None, type=str,
 		    help='configuration file')
-options, args = parser.parse_known_args()
 
+options, args = parser.parse_known_args()
+	
 if options.configfile:
 	config = configparser.ConfigParser()
 	if not os.path.exists(options.configfile):
@@ -44,9 +45,10 @@ if not os.path.exists(user_options.trainingconfig):
 
 trainingconfig = configparser.ConfigParser()
 trainingconfig.read(user_options.trainingconfig)
-training_parser = salt.add_training_options(
+training_parser = salt.add_training_options(parser=user_parser,
 	usage=usagestring,config=trainingconfig)
-training_options = training_parser.parse_known_args(namespace=user_options)[0]
+training_parser.addhelp()
+training_options = training_parser.parse_known_args()[0]
 
 salt.options = training_options
 salt.verbose = training_options.verbose

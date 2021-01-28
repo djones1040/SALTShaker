@@ -4,7 +4,7 @@ import configparser
 import numpy as np
 from salt3.config import config_rootdir
 from salt3.util.specSynPhot import getColorsForSN
-
+from argparse import SUPPRESS
 import logging
 log=logging.getLogger(__name__)
 
@@ -30,7 +30,14 @@ class ConfigWithCommandLineOverrideParser(EnvAwareArgumentParser):
 	
 	def __init__(self,*args,**kwargs):
 		super().__init__(*args,**kwargs)
-		
+	
+	def addhelp(self):
+		default_prefix='-'
+		self.add_argument(
+				default_prefix+'h', default_prefix*2+'help',
+				action='help', default=SUPPRESS,
+				help=('show this help message and exit'))
+
 	def add_argument_with_config_default(self,config,section,*keys,**kwargs):
 		"""Given a ConfigParser and a section header, scans the section for matching keys and sets them as the default value for a command line argument added to self. If a default is provided, it is used if there is no matching key in the config, otherwise this method will raise a KeyError"""
 		if 'clargformat' in kwargs:
@@ -53,8 +60,7 @@ class ConfigWithCommandLineOverrideParser(EnvAwareArgumentParser):
 			if 'default' in kwargs:
 				pass
 			else:
-				import pdb;pdb.set_trace()
-				raise KeyError(f'Key not found in {str(config)}, section {section}; valid keys include: '+', '.join(keys))
+				raise KeyError(f'Key not found in {(config)}, section {section}; valid keys include: '+', '.join(keys))
 		if 'nargs' in kwargs and ((type(kwargs['nargs']) is int and kwargs['nargs']>1) or (type(kwargs['nargs'] is str and (kwargs['nargs'] in ['+','*'])))):
 			if not 'type' in kwargs:
 				kwargs['default']=kwargs['default'].split(',')
@@ -66,7 +72,7 @@ class ConfigWithCommandLineOverrideParser(EnvAwareArgumentParser):
 				except:
 					nargs=kwargs['nargs']
 					numfound=len(kwargs['default'])
-					raise ValueError(f"Incorrect number of arguments in {str(config)}, section {section}, key {includedkey}, {nargs} arguments required {numfound} found")
+					raise ValueError(f"Incorrect number of arguments in {(config)}, section {section}, key {includedkey}, {nargs} arguments required while {numfound} were found")
 		return super().add_argument(*clargs,**kwargs)
 		
 
@@ -88,7 +94,7 @@ class TrainSALTBase:
 		
 	def add_user_options(self, parser=None, usage=None, config=None):
 		if parser == None:
-			parser = ConfigWithCommandLineOverrideParser(usage=usage, conflict_handler="resolve")
+			parser = ConfigWithCommandLineOverrideParser(usage=usage, conflict_handler="resolve",add_help=False)
 
 		# The basics
 		parser.add_argument('-v', '--verbose', action="count", dest="verbose",
@@ -106,35 +112,35 @@ class TrainSALTBase:
 		# input files
 		parser.add_argument_with_config_default(config,'iodata','calibrationshiftfile',  type=str,action=FullPaths,
 							help='file containing a list of changes to zeropoint and central wavelength of filters by survey')
-		parser.add_argument_with_config_default(config,'iodata','loggingconfig','loggingconfigfile',  type=str,action=FullPaths,
+		parser.add_argument_with_config_default(config,'iodata','loggingconfig','loggingconfigfile',  type=str,action=FullPaths,default=None,
 							help='logging config file')
 		parser.add_argument_with_config_default(config,'iodata','trainingconfig','modelconfigfile',  type=str,action=FullPaths,
 							help='Configuration file describing the construction of the model')
 		parser.add_argument_with_config_default(config,'iodata','snlists','snlistfiles',  type=str,action=FullPaths,
-							help="""list of SNANA-formatted SN data files, including both photometry and spectroscopy. Can be multiple comma-separated lists. (default=%default)""")
+							help="""list of SNANA-formatted SN data files, including both photometry and spectroscopy. Can be multiple comma-separated lists. (default=%(default)s)""")
 		parser.add_argument_with_config_default(config,'iodata','snparlist', 'snparlistfile', type=str,action=FullPaths,
 							help="""optional list of initial SN parameters.  Needs columns SNID, zHelio, x0, x1, c""")
 		parser.add_argument_with_config_default(config,'iodata','specrecallist','specrecallistfile',  type=str,action=FullPaths,
 							help="""optional list giving number of spectral recalibration params.  Needs columns SNID, N, phase, ncalib where N is the spectrum number for a given SN, starting at 1""")
 		parser.add_argument_with_config_default(config,'iodata','tmaxlist','tmaxlistfile',  type=str,action=FullPaths,
-							help="""optional space-delimited list with SN ID, tmax, tmaxerr (default=%default)""")
+							help="""optional space-delimited list with SN ID, tmax, tmaxerr (default=%(default)s)""")
 	
 		#output files
 		parser.add_argument_with_config_default(config,'iodata','outputdir',  type=str,action=FullPaths,
 							help="""data directory for spectroscopy, format should be ASCII 
-							with columns wavelength, flux, fluxerr (optional) (default=%default)""")
+							with columns wavelength, flux, fluxerr (optional) (default=%(default)s)""")
 		parser.add_argument_with_config_default(config,'iodata','yamloutputfile', default='/dev/null',type=str,action=FullPaths,
 							help='File to which to output a summary of the fitting process')
 		
 		#options to configure cuts
 		parser.add_argument_with_config_default(config,'iodata','dospec',  type=boolean_string,
-							help="""if set, look for spectra in the snlist files (default=%default)""")
+							help="""if set, look for spectra in the snlist files (default=%(default)s)""")
 		parser.add_argument_with_config_default(config,'iodata','maxsn',  type=nonetype_or_int,
-							help="""sets maximum number of SNe to fit for debugging (default=%default)""")
+							help="""sets maximum number of SNe to fit for debugging (default=%(default)s)""")
 		parser.add_argument_with_config_default(config,'iodata','keeponlyspec',  type=boolean_string,
-							help="""if set, only train on SNe with spectra (default=%default)""")
+							help="""if set, only train on SNe with spectra (default=%(default)s)""")
 		parser.add_argument_with_config_default(config,'iodata','filter_mass_tolerance',  type=float,
-							help='Mass of filter transmission allowed outside of model wavelength range (default=%default)')
+							help='Mass of filter transmission allowed outside of model wavelength range (default=%(default)s)')
 
 		#Initialize from SALT2.4		
 		parser.add_argument_with_config_default(config,'iodata','initsalt2model',  type=boolean_string,
@@ -144,46 +150,46 @@ class TrainSALTBase:
 		#Initialize from user defined files				
 		parser.add_argument_with_config_default(config,'iodata','initm0modelfile',  type=str,action=FullPaths,
 							help="""initial M0 model to begin training, ASCII with columns
-							phase, wavelength, flux (default=%default)""")
+							phase, wavelength, flux (default=%(default)s)""")
 		parser.add_argument_with_config_default(config,'iodata','initm1modelfile',  type=str,action=FullPaths,
 							help="""initial M1 model with x1=1 to begin training, ASCII with columns
-							phase, wavelength, flux (default=%default)""")
+							phase, wavelength, flux (default=%(default)s)""")
 		#Choose B filter definition
 		parser.add_argument_with_config_default(config,'iodata','initbfilt',  type=str,action=FullPaths,
-							help="""initial B-filter to get the normalization of the initial model (default=%default)""")
+							help="""initial B-filter to get the normalization of the initial model (default=%(default)s)""")
 							
 		parser.add_argument_with_config_default(config,'iodata','resume_from_outputdir',  type=str,action=FullPaths,
 							help='if set, initialize using output parameters from previous run. If directory, initialize using ouptut parameters from specified directory')
 		parser.add_argument_with_config_default(config,'iodata','fix_salt2modelpars',  type=boolean_string,
-							help="""if set, fix M0/M1 for wavelength/phase range of original SALT2 model (default=%default)""")
+							help="""if set, fix M0/M1 for wavelength/phase range of original SALT2 model (default=%(default)s)""")
 
 
 		parser.add_argument_with_config_default(config,'trainparams','do_mcmc',  type=boolean_string,
-							help='do MCMC fitting (default=%default)')
+							help='do MCMC fitting (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainparams','do_gaussnewton',  type=boolean_string,
-							help='do Gauss-Newton least squares (default=%default)')
+							help='do Gauss-Newton least squares (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainparams','gaussnewton_maxiter',  type=int,
-							help='maximum iterations for Gauss-Newton (default=%default)')
+							help='maximum iterations for Gauss-Newton (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainparams','regularize',  type=boolean_string,
-							help='turn on regularization if set (default=%default)')
+							help='turn on regularization if set (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainparams','fitsalt2',  type=boolean_string,
-							help='fit SALT2 as a validation check (default=%default)')
+							help='fit SALT2 as a validation check (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainparams','n_repeat',  type=int,
-							help='repeat mcmc and/or gauss newton n times (default=%default)')
+							help='repeat mcmc and/or gauss newton n times (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainparams','fit_model_err',  type=boolean_string,
-							help='fit for model error if set (default=%default)')
+							help='fit for model error if set (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainparams','fit_cdisp_only',  type=boolean_string,
-							help='fit for color dispersion component of model error if set (default=%default)')
+							help='fit for color dispersion component of model error if set (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainparams','fit_tpkoff',  type=boolean_string,
-							help='fit for time of max in B-band if set (default=%default)')
+							help='fit for time of max in B-band if set (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainparams','fitting_sequence',  type=str,
-							help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn, tpk (default=%default)")
+							help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn, tpk (default=%(default)s)")
 
 		# mcmc parameters
 		parser.add_argument_with_config_default(config,'mcmcparams','n_steps_mcmc',  type=int,
-							help='number of accepted MCMC steps (default=%default)')
+							help='number of accepted MCMC steps (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'mcmcparams','n_burnin_mcmc',  type=int,
-							help='number of burn-in MCMC steps	(default=%default)')
+							help='number of burn-in MCMC steps	(default=%(default)s)')
 
 
 		# survey definitions
@@ -204,128 +210,128 @@ class TrainSALTBase:
 
 		# training params
 		parser.add_argument_with_config_default(config,'trainingparams','specrecal',  type=int,
-							help='number of parameters defining the spectral recalibration (default=%default)')
+							help='number of parameters defining the spectral recalibration (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainingparams','n_processes',  type=int,
-							help='number of processes to use in calculating chi2 (default=%default)')
+							help='number of processes to use in calculating chi2 (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainingparams','estimate_tpk',  type=boolean_string,
-							help='if set, estimate time of max with quick least squares fitting (default=%default)')
+							help='if set, estimate time of max with quick least squares fitting (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainingparams','fix_t0',  type=boolean_string,
-							help='if set, don\'t allow time of max to float (default=%default)')
+							help='if set, don\'t allow time of max to float (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainingparams','regulargradientphase',  type=float,
-							help='Weighting of phase gradient chi^2 regularization during training of model parameters (default=%default)')
+							help='Weighting of phase gradient chi^2 regularization during training of model parameters (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainingparams','regulargradientwave',  type=float,
-							help='Weighting of wave gradient chi^2 regularization during training of model parameters (default=%default)')
+							help='Weighting of wave gradient chi^2 regularization during training of model parameters (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainingparams','regulardyad',  type=float,
-							help='Weighting of dyadic chi^2 regularization during training of model parameters (default=%default)')
+							help='Weighting of dyadic chi^2 regularization during training of model parameters (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainingparams','m1regularization',  type=float,
-							help='Scales regularization weighting of M1 component relative to M0 weighting (>1 increases smoothing of M1)  (default=%default)')
+							help='Scales regularization weighting of M1 component relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainingparams','spec_chi2_scaling',  type=float,
-							help='scaling of spectral chi^2 so it doesn\'t dominate the total chi^2 (default=%default)')
+							help='scaling of spectral chi^2 so it doesn\'t dominate the total chi^2 (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainingparams','n_min_specrecal',  type=int,
-							help='Minimum order of spectral recalibration polynomials (default=%default)')
+							help='Minimum order of spectral recalibration polynomials (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainingparams','specrange_wavescale_specrecal',  type=float,
-							help='Wavelength scale (in angstroms) for determining additional orders of spectral recalibration from wavelength range of spectrum (default=%default)')
+							help='Wavelength scale (in angstroms) for determining additional orders of spectral recalibration from wavelength range of spectrum (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainingparams','n_specrecal_per_lightcurve',  type=float,
-							help='Number of additional spectral recalibration orders per lightcurve (default=%default)')
+							help='Number of additional spectral recalibration orders per lightcurve (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainingparams','regularizationScaleMethod',  type=str,
-							help='Choose how scale for regularization is calculated (default=%default)')
+							help='Choose how scale for regularization is calculated (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainingparams','binspec',  type=boolean_string,
-							help='bin the spectra if set (default=%default)')
+							help='bin the spectra if set (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainingparams','binspecres',  type=int,
-							help='binning resolution (default=%default)')
+							help='binning resolution (default=%(default)s)')
 		
    		#neff parameters
 		parser.add_argument_with_config_default(config,'trainingparams','wavesmoothingneff',  type=float,
-							help='Smooth effective # of spectral points along wave axis (in units of waveoutres) (default=%default)')
+							help='Smooth effective # of spectral points along wave axis (in units of waveoutres) (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainingparams','phasesmoothingneff',  type=float,
-							help='Smooth effective # of spectral points along phase axis (in units of phaseoutres) (default=%default)')
+							help='Smooth effective # of spectral points along phase axis (in units of phaseoutres) (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainingparams','nefffloor',  type=float,
-							help='Minimum number of effective points (has to be > 0 to prevent divide by zero errors).(default=%default)')
+							help='Minimum number of effective points (has to be > 0 to prevent divide by zero errors).(default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainingparams','neffmax',  type=float,
-							help='Threshold for spectral coverage at which regularization will be turned off (default=%default)')
+							help='Threshold for spectral coverage at which regularization will be turned off (default=%(default)s)')
 
 		# training model parameters
 		parser.add_argument_with_config_default(config,'modelparams','waverange', type=int, nargs=2,
-							help='wavelength range over which the model is defined (default=%default)')
+							help='wavelength range over which the model is defined (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','colorwaverange',  type=int, nargs=2,
-							help='wavelength range over which the color law is fit to data (default=%default)')
+							help='wavelength range over which the color law is fit to data (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','interpfunc',  type=str,
-							help='function to interpolate between control points in the fitting (default=%default)')
+							help='function to interpolate between control points in the fitting (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','errinterporder',  type=int,
-							help='for model uncertainty splines/polynomial funcs, order of the function (default=%default)')
+							help='for model uncertainty splines/polynomial funcs, order of the function (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','interporder',  type=int,
-							help='for model splines/polynomial funcs, order of the function (default=%default)')
+							help='for model splines/polynomial funcs, order of the function (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','wavesplineres',  type=float,
-							help='number of angstroms between each wavelength spline knot (default=%default)')
+							help='number of angstroms between each wavelength spline knot (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','phasesplineres',  type=float,
-							help='number of angstroms between each phase spline knot (default=%default)')
+							help='number of angstroms between each phase spline knot (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','waveinterpres',  type=float,
-							help='wavelength resolution in angstroms, used for internal interpolation (default=%default)')
+							help='wavelength resolution in angstroms, used for internal interpolation (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','phaseinterpres',  type=float,
-							help='phase resolution in angstroms, used for internal interpolation (default=%default)')
+							help='phase resolution in angstroms, used for internal interpolation (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','waveoutres',  type=float,
-							help='wavelength resolution in angstroms of the output file (default=%default)')
+							help='wavelength resolution in angstroms of the output file (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','phaseoutres',  type=float,
-							help='phase resolution in angstroms of the output file (default=%default)')
+							help='phase resolution in angstroms of the output file (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','phaserange', type=int, nargs=2,
-							help='phase range over which model is trained (default=%default)')
+							help='phase range over which model is trained (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','n_components',  type=int,
-							help='number of principal components of the SALT model to fit for (default=%default)')
+							help='number of principal components of the SALT model to fit for (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','n_colorpars',  type=int,
-							help='number of degrees of the phase-independent color law polynomial (default=%default)')
+							help='number of degrees of the phase-independent color law polynomial (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','n_colorscatpars',  type=int,
-							help='number of parameters in the broadband scatter model (default=%default)')
+							help='number of parameters in the broadband scatter model (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','error_snake_phase_binsize',  type=float,
-							help='number of days over which to compute scaling of error model (default=%default)')
+							help='number of days over which to compute scaling of error model (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','error_snake_wave_binsize',  type=float,
-							help='number of angstroms over which to compute scaling of error model (default=%default)')
+							help='number of angstroms over which to compute scaling of error model (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','use_snpca_knots',  type=boolean_string,
-							help='if set, define model on SNPCA knots (default=%default)')
+							help='if set, define model on SNPCA knots (default=%(default)s)')
 		
 		
 		# mcmc parameters
 		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_magscale_M0',  type=float,
-							help='initial MCMC step size for M0, in mag	 (default=%default)')
+							help='initial MCMC step size for M0, in mag	 (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_magadd_M0',  type=float,
-							help='initial MCMC step size for M0, in mag	 (default=%default)')
+							help='initial MCMC step size for M0, in mag	 (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_magscale_err',  type=float,
-							help='initial MCMC step size for the model err spline knots, in mag  (default=%default)')
+							help='initial MCMC step size for the model err spline knots, in mag  (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_errcorr',  type=float,
-							help='initial MCMC step size for the correlation between model error terms, in mag  (default=%default)')
+							help='initial MCMC step size for the correlation between model error terms, in mag  (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_magscale_M1',  type=float,
-							help='initial MCMC step size for M1, in mag - need both mag and flux steps because M1 can be negative (default=%default)')
+							help='initial MCMC step size for M1, in mag - need both mag and flux steps because M1 can be negative (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_magadd_M1',  type=float,
-							help='initial MCMC step size for M1, in flux - need both mag and flux steps because M1 can be negative (default=%default)')
+							help='initial MCMC step size for M1, in flux - need both mag and flux steps because M1 can be negative (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_cl',  type=float,
-							help='initial MCMC step size for color law	(default=%default)')
+							help='initial MCMC step size for color law	(default=%(default)s)')
 		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_magscale_clscat',  type=float,
-							help='initial MCMC step size for color law	(default=%default)')
+							help='initial MCMC step size for color law	(default=%(default)s)')
 		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_specrecal',  type=float,
-							help='initial MCMC step size for spec recal. params	 (default=%default)')
+							help='initial MCMC step size for spec recal. params	 (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_x0',  type=float,
-							help='initial MCMC step size for x0, in mag	 (default=%default)')
+							help='initial MCMC step size for x0, in mag	 (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_x1',  type=float,
-							help='initial MCMC step size for x1	 (default=%default)')
+							help='initial MCMC step size for x1	 (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_c',  type=float,
-							help='initial MCMC step size for c	(default=%default)')
+							help='initial MCMC step size for c	(default=%(default)s)')
 		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_tpk',  type=float,
-							help='initial MCMC step size for tpk  (default=%default)')
+							help='initial MCMC step size for tpk  (default=%(default)s)')
 
 		# adaptive MCMC parameters
 		parser.add_argument_with_config_default(config,'mcmcparams','nsteps_before_adaptive',  type=float,
-							help='number of steps before starting adaptive step sizes (default=%default)')
+							help='number of steps before starting adaptive step sizes (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'mcmcparams','nsteps_adaptive_memory',  type=float,
-							help='number of steps to use to estimate adaptive steps (default=%default)')
+							help='number of steps to use to estimate adaptive steps (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'mcmcparams','modelpar_snpar_tradeoff_nstep',  type=float,
-							help='number of steps when trading between adjusting model params and SN params (default=%default)')
+							help='number of steps when trading between adjusting model params and SN params (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'mcmcparams','nsteps_before_modelpar_tradeoff',  type=float,
-							help='number of steps when trading between adjusting model params and SN params (default=%default)')
+							help='number of steps when trading between adjusting model params and SN params (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'mcmcparams','nsteps_between_lsqfit',  type=float,
-							help='every x number of steps, adjust the SN params via least squares fitting (default=%default)')
+							help='every x number of steps, adjust the SN params via least squares fitting (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'mcmcparams','use_lsqfit',  type=boolean_string,
-							help='if set, periodically adjust the SN params via least squares fitting (default=%default)')
+							help='if set, periodically adjust the SN params via least squares fitting (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'mcmcparams','adaptive_sigma_opt_scale',  type=float,
-							help='scaling the adaptive step sizes (default=%default)')
+							help='scaling the adaptive step sizes (default=%(default)s)')
 		
 				
 
