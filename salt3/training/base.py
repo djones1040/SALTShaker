@@ -8,6 +8,12 @@ from salt3.util.specSynPhot import getColorsForSN
 import logging
 log=logging.getLogger(__name__)
 
+def acceptmultiplekeys(parser,section,keys):
+	for key in keys:
+		if key in parser[section]:
+			return parser[section][key]
+	raise KeyError(f'Key not found in {str(parser)}, section {section}; valid keys include: '+', '.join(keys))
+	
 def boolean_string(s):
 	if s not in {'False', 'True', 'false', 'true', '1', '0'}:
 		raise ValueError('Not a valid boolean string')
@@ -40,48 +46,57 @@ class TrainSALTBase:
 							help='stage - options are train and validate')
 
 		
-		# input/output files
-		parser.add_argument('--loggingconfig', default=config.get('iodata','loggingconfig'), type=str,
+		# input files
+		parser.add_argument('--calibrationshiftfile', default=config.get('iodata','calibrationshiftfile'), type=str,
+							help='file containing a list of changes to zeropoint and central wavelength of filters by survey')
+		parser.add_argument('--loggingconfig', default=acceptmultiplekeys(config,'iodata',['loggingconfigfile','loggingconfig']), type=str,
 							help='logging config file')
-		parser.add_argument('--trainingconfig', default=config.get('iodata','trainingconfig'), type=str,
-							help='training config file')
-		parser.add_argument('--snlists', default=config.get('iodata','snlists'), type=str,
+		parser.add_argument('--trainingconfig', default=acceptmultiplekeys(config,'iodata',['modelconfigfile','trainingconfig']), type=str,
+							help='Configuration file describing the construction of the model')
+		parser.add_argument('--snlists', default=acceptmultiplekeys(config,'iodata',['snlistfiles','snlists']), type=str,
 							help="""list of SNANA-formatted SN data files, including both photometry and spectroscopy. Can be multiple comma-separated lists. (default=%default)""")
-		parser.add_argument('--snparlist', default=config.get('iodata','snparlist'), type=str,
+		parser.add_argument('--snparlist', default=acceptmultiplekeys(config,'iodata',['snparlistfile','snparlist']), type=str,
 							help="""optional list of initial SN parameters.  Needs columns SNID, zHelio, x0, x1, c""")
-		parser.add_argument('--specrecallist', default=config.get('iodata','specrecallist'), type=str,
+		parser.add_argument('--specrecallist', default=acceptmultiplekeys(config,'iodata',['specrecallistfile','specrecallist']), type=str,
 							help="""optional list giving number of spectral recalibration params.  Needs columns SNID, N, phase, ncalib where N is the spectrum number for a given SN, starting at 1""")
-		parser.add_argument('--tmaxlist', default=config.get('iodata','tmaxlist'), type=str,
+		parser.add_argument('--tmaxlist', default=acceptmultiplekeys(config,'iodata',['tmaxlistfile','tmaxlist']), type=str,
 							help="""optional space-delimited list with SN ID, tmax, tmaxerr (default=%default)""")
+	
+		#output files
+		parser.add_argument('--outputdir', default=config.get('iodata','outputdir'), type=str,
+							help="""data directory for spectroscopy, format should be ASCII 
+							with columns wavelength, flux, fluxerr (optional) (default=%default)""")
+		parser.add_argument('--yamloutputfile', default=config.get('iodata','yamloutputfile') if 'yamloutputfile' in config['iodata'] else '/dev/null', type=str,
+							help='File to which to output a summary of the fitting process')
+		
+		#options to configure cuts
 		parser.add_argument('--dospec', default=config.get('iodata','dospec'), type=boolean_string,
 							help="""if set, look for spectra in the snlist files (default=%default)""")
 		parser.add_argument('--maxsn', default=config.get('iodata','maxsn'), type=nonetype_or_int,
 							help="""sets maximum number of SNe to fit for debugging (default=%default)""")
 		parser.add_argument('--keeponlyspec', default=config.get('iodata','keeponlyspec'), type=boolean_string,
 							help="""if set, only train on SNe with spectra (default=%default)""")
-		parser.add_argument('--outputdir', default=config.get('iodata','outputdir'), type=str,
-							help="""data directory for spectroscopy, format should be ASCII 
-							with columns wavelength, flux, fluxerr (optional) (default=%default)""")
+		parser.add_argument('--filter_mass_tolerance', default=config.get('iodata','filter_mass_tolerance'), type=float,
+							help='Mass of filter transmission allowed outside of model wavelength range (default=%default)')
+
+		#Initialize from SALT2.4		
 		parser.add_argument('--initsalt2model', default=config.get('iodata','initsalt2model'), type=boolean_string,
 							help="""If true, initialize model parameters from prior SALT2 model""")
 		parser.add_argument('--initsalt2var', default=config.get('iodata','initsalt2var'), type=boolean_string,
 							help="""If true, initialize model uncertainty parameters from prior SALT2 model""")
+		#Initialize from user defined files				
 		parser.add_argument('--initm0modelfile', default=config.get('iodata','initm0modelfile'), type=str,
 							help="""initial M0 model to begin training, ASCII with columns
 							phase, wavelength, flux (default=%default)""")
 		parser.add_argument('--initm1modelfile', default=config.get('iodata','initm1modelfile'), type=str,
 							help="""initial M1 model with x1=1 to begin training, ASCII with columns
 							phase, wavelength, flux (default=%default)""")
+		#Choose B filter definition
 		parser.add_argument('--initbfilt', default=config.get('iodata','initbfilt'), type=str,
 							help="""initial B-filter to get the normalization of the initial model (default=%default)""")
+							
 		parser.add_argument('--resume_from_outputdir', default=config.get('iodata','resume_from_outputdir'), type=str,
 							help='if set, initialize using output parameters from previous run. If directory, initialize using ouptut parameters from specified directory')
-		parser.add_argument('--filter_mass_tolerance', default=config.get('iodata','filter_mass_tolerance'), type=float,
-							help='Mass of filter transmission allowed outside of model wavelength range (default=%default)')
-		parser.add_argument('--trainingconfig', default=config.get('iodata','trainingconfig'), type=str,
-							help='config file for the detailed training params')
-		parser.add_argument('--calibrationshiftfile', default=config.get('iodata','calibrationshiftfile'), type=str,
-							help='file containing a list of changes to zeropoint and central wavelength of filters by survey')
 		parser.add_argument('--fix_salt2modelpars', default=config.get('iodata','fix_salt2modelpars'), type=boolean_string,
 							help="""if set, fix M0/M1 for wavelength/phase range of original SALT2 model (default=%default)""")
 
@@ -121,7 +136,7 @@ class TrainSALTBase:
 			
 			parser.add_argument("--%s_kcorfile"%survey.replace('survey_',''),default=config.get(survey,'kcorfile'),type=str,
 								help="kcor file for survey %s"%survey)
-			parser.add_argument("--%s_subsurveylist"%survey.replace('survey_',''),default=config.get(survey,'subsurveylist'),type=str,
+			parser.add_argument("--%s_subsurveylist"%survey.replace('survey_',''),default=acceptmultiplekeys(config,survey,['subsurveylistfile','subsurveylist']),type=str,
 								help="comma-separated list of subsurveys for survey %s"%survey)
 			self.surveylist += [survey.replace('survey_','')]
 

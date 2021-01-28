@@ -160,6 +160,8 @@ class SALTResids:
 		#Count number of photometric and spectroscopic points
 		
 		self.num_spec=0
+		self.num_spectra=0
+		self.num_lc=0
 		self.num_phot=0
 		self.phot_snr = 0
 		self.spec_snr = 0
@@ -169,9 +171,11 @@ class SALTResids:
 			survey = self.datadict[sn]['survey']
 			z = self.datadict[sn]['zHelio']
 			self.num_spec += sum([specdata[key]['flux'].size for key in specdata])
+			self.num_spectra+=len(specdata)
 			for key in specdata:
 				self.spec_snr += np.sum(specdata[key]['flux']/specdata[key]['fluxerr'])
 			self.phot_snr += np.sum(photdata['fluxcal']/photdata['fluxcalerr'])
+			self.num_lc+=np.unique(photdata['filt']).size
 			for flt in np.unique(photdata['filt']):
 				self.num_phot+=(photdata['filt']==flt).sum()
 			#While we're at it, calculate the extinction curve for the milky way
@@ -1344,15 +1348,14 @@ class SALTResids:
 		resultsdict = {}
 		n_sn = len(self.datadict.keys())
 		for k in self.datadict.keys():
-			resultsdict[k] = {'x0':x[self.parlist == f'x0_{k}'],
-							  'x1':x[self.parlist == f'x1_{k}'],# - np.mean(x[self.ix1]),
-							  'c':x[self.parlist == f'c_{k}'],
-							  'tpkoff':x[self.parlist == f'tpkoff_{k}'],
-							  'x0err':x[self.parlist == f'x0_{k}'],
-							  'x1err':x[self.parlist == f'x1_{k}'],
-							  'cerr':x[self.parlist == f'c_{k}'],
-							  'tpkofferr':x[self.parlist == f'tpkoff_{k}']}
-
+			resultsdict[k] = {'x0':x[self.parlist == f'x0_{k}'][0],
+							  'x1':x[self.parlist == f'x1_{k}'][0],# - np.mean(x[self.ix1]),
+							  'c':x[self.parlist == f'c_{k}'][0],
+							  'tpkoff':x[self.parlist == f'tpkoff_{k}'][0],
+							  'x0err':x[self.parlist == f'x0_{k}'][0],
+							  'x1err':x[self.parlist == f'x1_{k}'][0],
+							  'cerr':x[self.parlist == f'c_{k}'][0],
+							  'tpkofferr':x[self.parlist == f'tpkoff_{k}'][0]}				
 
 		m0,m1=self.SALTModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)
 
