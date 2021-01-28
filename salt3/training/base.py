@@ -110,11 +110,11 @@ class TrainSALTBase:
 
 		
 		# input files
-		parser.add_argument_with_config_default(config,'iodata','calibrationshiftfile',  type=str,action=FullPaths,
+		parser.add_argument_with_config_default(config,'iodata','calibrationshiftfile',  type=str,action=FullPaths,default='',
 							help='file containing a list of changes to zeropoint and central wavelength of filters by survey')
-		parser.add_argument_with_config_default(config,'iodata','loggingconfig','loggingconfigfile',  type=str,action=FullPaths,default=None,
+		parser.add_argument_with_config_default(config,'iodata','loggingconfig','loggingconfigfile',  type=str,action=FullPaths,default='',
 							help='logging config file')
-		parser.add_argument_with_config_default(config,'iodata','trainingconfig','modelconfigfile',  type=str,action=FullPaths,
+		parser.add_argument_with_config_default(config,'iodata','trainingconfig','trainingconfigfile','modelconfigfile',  type=str,action=FullPaths,
 							help='Configuration file describing the construction of the model')
 		parser.add_argument_with_config_default(config,'iodata','snlists','snlistfiles',  type=str,action=FullPaths,
 							help="""list of SNANA-formatted SN data files, including both photometry and spectroscopy. Can be multiple comma-separated lists. (default=%(default)s)""")
