@@ -75,8 +75,6 @@ class ConfigWithCommandLineOverrideParser(EnvAwareArgumentParser):
 					raise ValueError(f"Incorrect number of arguments in {(config)}, section {section}, key {includedkey}, {nargs} arguments required while {numfound} were found")
 		return super().add_argument(*clargs,**kwargs)
 		
-
-		
 def boolean_string(s):
 	if s not in {'False', 'True', 'false', 'true', '1', '0'}:
 		raise ValueError('Not a valid boolean string')
@@ -449,8 +447,8 @@ class TrainSALTBase:
 			#Remove spectra outside phase range
 			for k in list(specdata.keys()):
 				# remove spectra with bad colors
-				colordiffs = getColorsForSN(
-					specdata[k],photdata,self.kcordict,datadict[sn]['survey'])
+				# colordiffs = getColorsForSN(
+				#	specdata[k],photdata,self.kcordict,datadict[sn]['survey'])
 				
 				#if colordiffs is None or len(colordiffs[np.abs(colordiffs) > 0.1]):
 				#	specdata.pop(k)
