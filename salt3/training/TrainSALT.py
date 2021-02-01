@@ -7,6 +7,7 @@ import configparser
 import numpy as np
 import sys
 import multiprocessing
+import pickle
 
 import os
 from os import path
@@ -35,6 +36,8 @@ from salt3.config import config_rootdir
 
 import astropy.units as u
 import sncosmo
+import yaml
+
 from astropy.table import Table
 from salt3.initfiles import init_rootdir as salt2dir
 _flatnu=f'{init_rootdir}/flatnu.dat'
@@ -120,6 +123,7 @@ def specflux(obsphase,obswave,m0phase,m0wave,m0flux,m1flux,colorlaw,z,x0,x1,c,mw
 class TrainSALT(TrainSALTBase):
 	def __init__(self):
 		self.warnings = []
+		self.initializationtime=time()
 	
 	def initialParameters(self,datadict):
 		from salt3.initfiles import init_rootdir
@@ -420,11 +424,10 @@ class TrainSALT(TrainSALTBase):
 				saltfitkwargs['fix_salt2modelpars'] = self.options.fix_salt2modelpars
 				saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)
 				# do the fitting
-				x_modelpars,x_unscaled,phase,wave,M0,M0modelerr,M0dataerr,M1,M1modelerr,M1dataerr,cov_M0_M1_model,cov_M0_M1_data,\
-					modelerr,clpars,clerr,clscat,SNParams,laststepsize,message = fitter.gaussnewton(
+				trainingresult,message = fitter.gaussnewton(
 						saltfitter,x_modelpars,
 						self.options.gaussnewton_maxiter)
-
+				
 				#if not 'hi': #self.options.fit_model_err:
 				#	M0dataerr,M1dataerr,cov_M0_M1_data = fitter.gaussnewton(
 				#		saltfitter,x_modelpars,
@@ -435,16 +438,16 @@ class TrainSALT(TrainSALTBase):
 			for k in datadict.keys():
 				try:
 					tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
-					SNParams[k]['t0'] = -SNParams[k]['tpkoff'] + tpk_init
+					SNParams[k]['t0'] = -trainingresult.SNParams[k]['tpkoff'] + tpk_init
 				except:
-					SNParams[k]['t0'] = -99
+					trainingresult.SNParams[k]['t0'] = -99
 		
 		log.info('message: %s'%message)
 		#print('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
 		#	  saltfitter.regularizationChi2(x_modelpars,0,1,0),saltfitter.regularizationChi2(x_modelpars,0,0,1))
-		log.info('Final loglike'); saltfitter.maxlikefit(x_unscaled)
+		log.info('Final loglike'); saltfitter.maxlikefit(trainingresult.X_raw)
 
-		log.info(x_modelpars.size)
+		log.info(trainingresult.X.size)
 
 
 		#print('Finishing...To write files, hit c')
@@ -454,15 +457,10 @@ class TrainSALT(TrainSALTBase):
 			chain = saltfitter.chain
 			loglikes = saltfitter.loglikes
 		else: chain,loglikes = None,None
+		#with open('trainingresult.pickle','wb') as file: pickle.dump(trainingresult,file)
+		return trainingresult,chain,loglikes
 
-		return phase,wave,M0,M0modelerr,M0dataerr,M1,M1modelerr,M1dataerr,cov_M0_M1_model,cov_M0_M1_data,\
-			modelerr,clpars,clerr,clscat,SNParams,x_modelpars,x_unscaled,parlist,chain,loglikes
-
-	def wrtoutput(self,outdir,phase,wave,
-				  M0,M0modelerr,M0dataerr,M1,M1modelerr,M1dataerr,cov_M0_M1_model,cov_M0_M1_data,
-				  modelerr,clpars,
-				  clerr,clscat,SNParams,pars,
-				  pars_unscaled,parlist,chain,
+	def wrtoutput(self,outdir,trainingresult,chain,
 				  loglikes,datadict):
 		if not os.path.exists(outdir):
 			raise RuntimeError('desired output directory %s doesn\'t exist'%outdir)
@@ -471,13 +469,13 @@ class TrainSALT(TrainSALTBase):
 		
 		with  open('{}/salt3_parameters.dat'.format(outdir),'w') as foutpars:
 			foutpars.write('{: <30} {}\n'.format('Parameter Name','Value'))
-			for name,par in zip(parlist,pars):
+			for name,par in zip(trainingresult.parlist,trainingresult.X):
 
 				foutpars.write('{: <30} {:.15e}\n'.format(name,par))
 
 		with  open('{}/salt3_parameters_unscaled.dat'.format(outdir),'w') as foutpars:
 			foutpars.write('{: <30} {}\n'.format('Parameter Name','Value'))
-			for name,par in zip(parlist,pars_unscaled):
+			for name,par in zip(trainingresult.parlist,trainingresult.X_raw):
 
 				foutpars.write('{: <30} {:.15e}\n'.format(name,par))
 		
@@ -485,7 +483,6 @@ class TrainSALT(TrainSALTBase):
 		
 		np.save('{}/salt3_mcmcchain.npy'.format(outdir),chain)
 		np.save('{}/salt3_loglikes.npy'.format(outdir),loglikes)
-		
 		# principal components and color law
 		with open(f'{outdir}/salt3_template_0.dat','w') as foutm0, open('%s/salt3_template_1.dat'%outdir,'w') as foutm1,\
 			 open(f'{outdir}/salt3_lc_model_variance_0.dat','w') as foutm0modelerr,\
@@ -496,25 +493,25 @@ class TrainSALT(TrainSALTBase):
 			 open(f'{outdir}/salt3_lc_variance_0.dat','w') as foutm0dataerr,\
 			 open(f'{outdir}/salt3_lc_variance_1.dat','w') as foutm1dataerr:
 		
-			for i,p in enumerate(phase):
-				for j,w in enumerate(wave):
-					print(f'{p:.1f} {w:.2f} {M0[i,j]:8.15e}',file=foutm0)
-					print(f'{p:.1f} {w:.2f} {M1[i,j]:8.15e}',file=foutm1)
-					print(f'{p:.1f} {w:.2f} {M0modelerr[i,j]**2.:8.15e}',file=foutm0modelerr)
-					print(f'{p:.1f} {w:.2f} {M1modelerr[i,j]**2.:8.15e}',file=foutm1modelerr)
-					print(f'{p:.1f} {w:.2f} {cov_M0_M1_model[i,j]:8.15e}',file=foutmodelcov)
-					print(f'{p:.1f} {w:.2f} {cov_M0_M1_data[i,j]+cov_M0_M1_model[i,j]:8.15e}',file=foutdatacov)
-					print(f'{p:.1f} {w:.2f} {modelerr[i,j]:8.15e}',file=fouterrmod)
-					print(f'{p:.1f} {w:.2f} {M0dataerr[i,j]**2.+M0modelerr[i,j]**2.:8.15e}',file=foutm0dataerr)
-					print(f'{p:.1f} {w:.2f} {M1dataerr[i,j]**2.+M1modelerr[i,j]**2.:8.15e}',file=foutm1dataerr)
+			for i,p in enumerate(trainingresult.phase):
+				for j,w in enumerate(trainingresult.wave):
+					print(f'{p:.1f} {w:.2f} {trainingresult.M0[i,j]:8.15e}',file=foutm0)
+					print(f'{p:.1f} {w:.2f} {trainingresult.M1[i,j]:8.15e}',file=foutm1)
+					print(f'{p:.1f} {w:.2f} {trainingresult.M0modelerr[i,j]**2.:8.15e}',file=foutm0modelerr)
+					print(f'{p:.1f} {w:.2f} {trainingresult.M1modelerr[i,j]**2.:8.15e}',file=foutm1modelerr)
+					print(f'{p:.1f} {w:.2f} {trainingresult.cov_M0_M1_model[i,j]:8.15e}',file=foutmodelcov)
+					print(f'{p:.1f} {w:.2f} {trainingresult.cov_M0_M1_data[i,j]+trainingresult.cov_M0_M1_model[i,j]:8.15e}',file=foutdatacov)
+					print(f'{p:.1f} {w:.2f} {trainingresult.modelerr[i,j]:8.15e}',file=fouterrmod)
+					print(f'{p:.1f} {w:.2f} {trainingresult.M0dataerr[i,j]**2.+trainingresult.M0modelerr[i,j]**2.:8.15e}',file=foutm0dataerr)
+					print(f'{p:.1f} {w:.2f} {trainingresult.M1dataerr[i,j]**2.+trainingresult.M1modelerr[i,j]**2.:8.15e}',file=foutm1dataerr)
 					
 		with open(f'{outdir}/salt3_color_dispersion.dat','w') as foutclscat:
-			for j,w in enumerate(wave):
-				print(f'{w:.2f} {clscat[j]:8.15e}',file=foutclscat)
+			for j,w in enumerate(trainingresult.wave):
+				print(f'{w:.2f} {trainingresult.clscat[j]:8.15e}',file=foutclscat)
 
 		foutinfotext = f"""RESTLAMBDA_RANGE: {self.options.colorwaverange[0]} {self.options.colorwaverange[1]}
 COLORLAW_VERSION: 1
-COLORCOR_PARAMS: {self.options.colorwaverange[0]:.0f} {self.options.colorwaverange[1]:.0f}	{len(clpars)}  {' '.join(['%8.10e'%cl for cl in clpars])}
+COLORCOR_PARAMS: {self.options.colorwaverange[0]:.0f} {self.options.colorwaverange[1]:.0f}	{len(trainingresult.clpars)}  {' '.join(['%8.10e'%cl for cl in trainingresult.clpars])}
 
 COLOR_OFFSET:  0.0
 
@@ -532,19 +529,10 @@ SIGMA_INT: 0.106  # used in simulation"""
 		with open(f'{outdir}/SALT3.INFO','w') as foutinfo:
 			print(foutinfotext,file=foutinfo)
 		
-		foutm0.close()
-		foutm1.close()
-		foutm0modelerr.close()
-		foutm1modelerr.close()
-		foutmodelcov.close()
-		foutm0dataerr.close()
-		foutm1dataerr.close()
-		foutdatacov.close()
-		fouterrmod.close()
 
 		with open(f'{outdir}/salt3_color_correction.dat','w') as foutcl:
-			print(f'{len(clpars):.0f}',file=foutcl)
-			for c in clpars:
+			print(f'{len(trainingresult.clpars):.0f}',file=foutcl)
+			for c in trainingresult.clpars:
 				print(f'{c:8.10e}',file=foutcl)
 			print(f"""Salt2ExtinctionLaw.version 1
 			Salt2ExtinctionLaw.min_lambda {self.options.colorwaverange[0]:.0f}
@@ -566,7 +554,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 				snfiles = np.genfromtxt(snlist,dtype='str')
 				snfiles = np.atleast_1d(snfiles)
 
-				for k in SNParams.keys():
+				for k in trainingresult.SNParams.keys():
 					foundfile = False
 					for l in snfiles:
 						if str(k) not in l: continue
@@ -593,11 +581,16 @@ SIGMA_INT: 0.106  # used in simulation"""
 					else:
 						salt2x0,salt2x1,salt2c,salt2t0 = -99,-99,-99,-99
 
-					if 't0' not in SNParams[k].keys():
-						SNParams[k]['t0'] = 0.0
+					if 't0' not in trainingresult.SNParams[k].keys():
+						trainingresult.SNParams[k]['t0'] = 0.0
 
-					print(f"{k} {SNParams[k]['x0'][0]:8.10e} {SNParams[k]['x1'][0]:.10f} {SNParams[k]['c'][0]:.10f} {SNParams[k]['t0'][0]:.10f} {SNParams[k]['tpkoff'][0]:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",file=foutsn)
-
+					print(f"{k} {trainingresult.SNParams[k]['x0']:8.10e} {trainingresult.SNParams[k]['x1']:.10f} {trainingresult.SNParams[k]['c']:.10f} {trainingresult.SNParams[k]['t0']:.10f} {trainingresult.SNParams[k]['tpkoff']:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",file=foutsn)
+		
+		keys=['num_lightcurves','num_spectra','num_sne']
+		yamloutputdict={key.upper():trainingresult.__dict__[key] for key in keys}
+		yamloutputdict['CPU_MINUTES']=(time()-self.initializationtime)/60
+		with open(f'{self.options.yamloutputfile}','w') as file: yaml.dump(yamloutputdict,file)
+		
 		return
 
 	def salt2fit(self,sn,datadict):
@@ -605,7 +598,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 		if 'FLT' not in sn.__dict__.keys():
 			sn.FLT = sn.BAND[:]
 		for flt in np.unique(sn.FLT):
-			filtwave = self.kcordict[sn.SURVEY]['filtwave']
+			filtwave = self.kcordict[sn.SURVEY][flt]['filtwave']
 			filttrans = self.kcordict[sn.SURVEY][flt]['filttrans']
 
 			band = sncosmo.Bandpass(
@@ -695,11 +688,10 @@ SIGMA_INT: 0.106  # used in simulation"""
 					elif self.kcordict[k][k2]['magsys'] == 'BD17': primarykey = 'BD17'
 
 					kcordict[k2] = self.kcordict[k][k2]
-					kcordict[k2]['filtwave'] = self.kcordict[k]['filtwave']
 					kcordict[k2]['stdmag'] = synphot(
 						self.kcordict[k]['primarywave'],
 						self.kcordict[k][primarykey],
-						filtwave=self.kcordict[k]['filtwave'],
+						filtwave=self.kcordict[k][k2]['filtwave'],
 						filttp=self.kcordict[k][k2]['filttrans'],
 						zpoff=0) - self.kcordict[k][k2]['primarymag']
 
@@ -897,13 +889,10 @@ SIGMA_INT: 0.106  # used in simulation"""
 				# read the data
 				stage='training'
 
-				phase,wave,M0,M0modelerr,M0dataerr,M1,M1modelerr,M1dataerr,cov_M0_M1_model,cov_M0_M1_data,\
-					modelerr,clpars,clerr,clscat,SNParams,pars,pars_unscaled,parlist,chain,loglikes = self.fitSALTModel(datadict)
+				trainingresult,chain,loglikes = self.fitSALTModel(datadict)
 				stage='output'
 				# write the output model - M0, M1, c
-				self.wrtoutput(self.options.outputdir,phase,wave,M0,M0modelerr,M0dataerr,M1,M1modelerr,M1dataerr,cov_M0_M1_model,cov_M0_M1_data,
-							   modelerr,clpars,clerr,clscat,SNParams,
-							   pars,pars_unscaled,parlist,chain,loglikes,datadict)
+				self.wrtoutput(self.options.outputdir,trainingresult,chain,loglikes,datadict)
 			log.info('successful SALT2 training!  Output files written to %s'%self.options.outputdir)
 			if self.options.stage == "all" or self.options.stage == "validate":
 				stage='validation'

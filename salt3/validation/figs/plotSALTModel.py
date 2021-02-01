@@ -142,11 +142,6 @@ def mkModelPlot(salt3dir='modelfiles/salt3',
 		salt3m1flux_0 = int_salt3m1(salt3m1wave,plotphase)
 		salt3m1fluxerr_0 = int_salt3m1err(salt3m1wave,plotphase)
 		ax2.plot(salt2m1wave,salt2m1flux_0+spacing*i,color='b',label='SALT2')
-		if plotErr: 
-			ax2.fill_between(salt2m1wave,
-							 salt2m1flux_0-np.sqrt(salt2m1fluxerr_0)+spacing*i,
-							 salt2m1flux_0+np.sqrt(salt2m1fluxerr_0)+spacing*i,
-							 color='b',alpha=0.5)
 		m1scale = np.mean(np.abs(salt2m1flux_0[(salt2m1wave > 4000) & (salt2m1wave < 7000)]))/np.mean(np.abs(salt3m1flux_0[(salt3m1wave > 4000) & (salt3m1wave < 7000)]))
 		ax2.plot(salt3m1wave,salt3m1flux_0+spacing*i,color='r',label='SALT3')
 		if plotErr:

@@ -2,10 +2,11 @@
 # D. Jones, M. Dai - 9/16/19
 
 from salt3.pipeline.pipeline import *
+import sys
 
 def runpipe():
-    pipe = SALT3pipe(finput='pipeline_training.txt')
-    pipe.build(data=False,mode='customize',onlyrun=['train','lcfit'])
+    pipe = SALT3pipe(finput=sys.argv[1])
+    pipe.build(data=False,mode='customize',onlyrun=['lcfit'])
     pipe.configure()
 
     pipe.run(onlyrun=['lcfit'])

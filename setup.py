@@ -56,5 +56,6 @@ setup(
 					  'f90nml',
 					  'iminuit',
 					  'tqdm',
+					  'pyyaml',
 					  'pyParz'],
 	)

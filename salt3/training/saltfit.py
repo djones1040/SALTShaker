@@ -44,6 +44,11 @@ log=logging.getLogger(__name__)
 #Which integer code corresponds to which reason for LSMR terminating
 stopReasons=['x=0 solution','atol approx. solution','atol+btol approx. solution','ill conditioned','machine precision limit','machine precision limit','machine precision limit','max # of iteration']
 
+class SALTTrainingResult(object):
+     def __init__(self, **kwargs):
+         self.__dict__.update(kwargs)
+
+
 def ensurepositivedefinite(matrix,maxiter=5):
     mineigenval=np.linalg.eigvalsh(matrix)[0]
     print(mineigenval)
@@ -135,13 +140,11 @@ class fitting:
 					only_data_errs=False):
 
 		gn.debug = False
-		xfinal,xunscaled,phase,wave,M0,M0modelerr,M0dataerr,M1,M1modelerr,M1dataerr,cov_M0_M1_model,cov_M0_M1_data,\
-			modelerr,clpars,clerr,clscat,SNParams,stepsizes = \
+		convergenceresult = \
 				gn.convergence_loop(
 				guess,loop_niter=gaussnewton_maxiter)
 			
-		return xfinal,xunscaled,phase,wave,M0,M0modelerr,M0dataerr,M1,M1modelerr,M1dataerr,cov_M0_M1_model,cov_M0_M1_data,\
-			modelerr,clpars,clerr,clscat,SNParams,stepsizes,\
+		return convergenceresult,\
 			'Gauss-Newton MCMC was successful'
 		
 	def mcmc(self,saltfitter,guess,
@@ -499,7 +502,7 @@ class GaussNewton(saltresids.SALTResids):
 			spline_derivs[:,:,i]=bisplev(self.phaseout,self.waveout,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
 		spline2d=sparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))
 		
-		#Smooth things, since this is supposed to be for broadband photometry
+		#Smooth things a bit, since this is supposed to be for broadband photometry
 		if smoothingfactor>0:
 			smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
 			spline2d=smoothingmatrix*spline2d
@@ -527,7 +530,7 @@ class GaussNewton(saltresids.SALTResids):
 		log.info("determining M0/M1 errors by bootstrapping")
 		snlist=list(self.datadict.keys())
 		removesnindices=np.random.choice(len(snlist),n_bootstrapsamples)
-		samples=[self.convergence_loop(X,max_iter, snlist[:i]+snlist[i+1:], getdatauncertainties=False)[0] for i in  removesnindices]
+		samples=[self.convergence_loop(X,max_iter, snlist[:i]+snlist[i+1:], getdatauncertainties=False).X for i in  removesnindices]
 		deviation=(samples-X)
 		sigma=ensurepositivedefinite(np.dot(deviation.T,deviation)/(deviation.shape[0]-1))
 		L=linalg.cholesky(sigma,lower=True)
@@ -665,9 +668,13 @@ class GaussNewton(saltresids.SALTResids):
 		#M0dataerr,M1dataerr,cov_M0_M1_data = self.getErrsGN(m0var,m1var,m0m1cov)
 
 		log.info('Total time spent in convergence loop: {}'.format(datetime.now()-start))
+		
 
-		return xfinal,X,phase,wave,M0,M0modelerr,M0dataerr,M1,M1modelerr,M1dataerr,cov_M0_M1_model,cov_M0_M1_data,\
-			modelerr,clpars,clerr,clscat,SNParams,stepsizes
+		
+		return SALTTrainingResult(num_lightcurves=self.num_lc,num_spectra=self.num_spectra,num_sne=len(self.datadict),
+				parlist=self.parlist,X=xfinal,X_raw=X,phase=phase,wave=wave,M0=M0,M0modelerr=M0modelerr,M0dataerr=M0dataerr,
+				M1=M1,M1modelerr=M1modelerr,M1dataerr=M1dataerr,cov_M0_M1_model=cov_M0_M1_model,cov_M0_M1_data=cov_M0_M1_data,
+				modelerr=modelerr,clpars=clpars,clerr=clerr,clscat=clscat,SNParams=SNParams,stepsizes=stepsizes)
 		
 		#raise RuntimeError("convergence_loop reached 100000 iterations without convergence")
 	def fitOneSN(self,X,sn):
@@ -729,7 +736,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 		return X,-result.fval
 	
-	def fitcolorscatter(self,X,fitcolorlaw=False,rescaleerrs=False,maxiter=2000):
+	def fitcolorscatter(self,X,fitcolorlaw=False,rescaleerrs=True,maxiter=2000):
 		message='Optimizing color scatter'
 		if rescaleerrs:
 			message+=' and scaling model uncertainties'
