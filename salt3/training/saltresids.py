@@ -120,6 +120,10 @@ class SALTResids:
 		# set up the filters
 		self.stdmag = {}
 		self.fluxfactor = {}
+		for sn in self.datadict:
+			if sn.survey not in kcordict.keys():
+				raise ValueError(f'Could not find corresponding kcor for survey {sn.SURVEY} for SN {sn.SNID} ')
+
 		for survey in self.kcordict.keys():
 			if survey == 'default': 
 				self.stdmag[survey] = {}
@@ -165,19 +169,20 @@ class SALTResids:
 		self.num_phot=0
 		self.phot_snr = 0
 		self.spec_snr = 0
-		for sn in self.datadict.keys():
-			photdata = self.datadict[sn]['photdata']
-			specdata = self.datadict[sn]['specdata']
-			survey = self.datadict[sn]['survey']
-			z = self.datadict[sn]['zHelio']
+		for snid in self.datadict:
+			sn=self.datadict[snid]
+			photdata = sn.photdata
+			specdata = sn.specdata
+			survey = sn.survey
+			z = sn.zHelio
 			self.num_spec += sum([specdata[key]['flux'].size for key in specdata])
 			self.num_spectra+=len(specdata)
 			for key in specdata:
 				self.spec_snr += np.sum(specdata[key]['flux']/specdata[key]['fluxerr'])
-			self.phot_snr += np.sum(photdata['fluxcal']/photdata['fluxcalerr'])
-			self.num_lc+=np.unique(photdata['filt']).size
-			for flt in np.unique(photdata['filt']):
-				self.num_phot+=(photdata['filt']==flt).sum()
+			self.phot_snr += np.sum(photdata.fluxcal']/photdata.fluxcalerr'])
+			self.num_lc+=np.unique(photdata.filt']).size
+			for flt in np.unique(photdata.filt']):
+				self.num_phot+=(photdata.filt']==flt).sum()
 			#While we're at it, calculate the extinction curve for the milky way
 			self.datadict[sn]['mwextcurve']   = 10**(-0.4*extinction.fitzpatrick99(self.wave*(1+z),self.datadict[sn]['MWEBV']*3.1))
 			self.datadict[sn]['mwextcurveint'] = interp1d(self.wave*(1+z),self.datadict[sn]['mwextcurve'] ,kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
@@ -311,10 +316,10 @@ class SALTResids:
 				phase=specdata[k]['tobs']+tpkoff
 				self.pcderivsparse[f'pcDeriv_spec_{sn}_{k}']=sparse.csr_matrix(self.spline_deriv_interp((phase/(1+z),specdata[k]['wavelength']/(1+z)),method=self.interpMethod))
 				
-			for flt in np.unique(photdata['filt']):
+			for flt in np.unique(photdata.filt']):
 				#Select data from the appropriate filter filter
-				selectFilter=(photdata['filt']==flt)
-				phase=photdata['tobs']+tpkoff
+				selectFilter=(photdata.filt']==flt)
+				phase=photdata.tobs']+tpkoff
 				phase=phase[selectFilter]
 				clippedPhase=np.clip(phase,obsphase.min(),obsphase.max())
 				#Array output indices match time along 0th axis, wavelength along 1st axis
@@ -743,11 +748,11 @@ class SALTResids:
 		colorlaw,colorexp=storedResults['colorLaw'],temporaryResults['colorexp']
 		reddenedsalt2flux=colorexp*temporaryResults['fluxInterp']
 		photresultsdict={}
-		for flt in np.unique(photdata['filt']):
-			selectFilter=(photdata['filt']==flt)
+		for flt in np.unique(photdata.filt']):
+			selectFilter=(photdata.filt']==flt)
 			filtresultsdict={}
 			photresultsdict[flt]=filtresultsdict
-			filtresultsdict['dataflux'] = photdata['fluxcal'][selectFilter]
+			filtresultsdict['dataflux'] = photdata.fluxcal'][selectFilter]
 			filtresultsdict['modelflux_jacobian'] = np.zeros((filtresultsdict['dataflux'].size,varyParams.sum()))
 
 			pcderivkey=f'pcDeriv_phot_{sn}_{flt}'
@@ -756,7 +761,7 @@ class SALTResids:
 
 			intmult = dwave*self.fluxfactor[survey][flt]*_SCALE_FACTOR/(1+z)*x0
 			#Select data from the appropriate filter filter
-			phase=photdata['tobs']+tpkoff
+			phase=photdata.tobs']+tpkoff
 			phase=phase[selectFilter]
 			clippedPhase=np.clip(phase,obsphase.min(),obsphase.max())
 			nphase = len(phase)
@@ -1062,15 +1067,15 @@ class SALTResids:
 		
 		photresultsdict={}
 
-		for flt in np.unique(photdata['filt']):
+		for flt in np.unique(photdata.filt']):
 			filtresultsdict={}
-			selectFilter=(photdata['filt']==flt)
+			selectFilter=(photdata.filt']==flt)
 
 			photresultsdict[flt]=filtresultsdict
 
 			lameff= self.datadict[sn]['lambdaeff'][flt]
 			#Select data from the appropriate filter filter
-			phase=photdata['tobs']+tpkoff
+			phase=photdata.tobs']+tpkoff
 			phase=phase[selectFilter]
 			clippedPhase=np.clip(phase,obsphase.min(),obsphase.max())
 			nphase = len(phase)
@@ -1105,7 +1110,7 @@ class SALTResids:
 			modelUncertainty=uncertaintyNoX0*x0**2
 			negativevariance=modelUncertainty<0
 			modelUncertainty[negativevariance]=0
-			filtresultsdict['fluxvariance'] = photdata['fluxcalerr'][selectFilter]**2
+			filtresultsdict['fluxvariance'] = photdata.fluxcalerr'][selectFilter]**2
 			filtresultsdict['modelvariance']=  modelUncertainty
 			filtresultsdict['modelvariance_jacobian']=np.zeros((filtresultsdict['fluxvariance'].size,varyparlist.size))
 

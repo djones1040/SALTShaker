@@ -871,9 +871,9 @@ SIGMA_INT: 0.106  # used in simulation"""
 				binspecres = None
 
 			tdstart = time()
-			datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,self.kcordict,
+			datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,
 										   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
-										   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
+										   peakmjdlist=self.options.tmaxlist,
 										   binspecres=binspecres,snparlist=self.options.snparlist,maxsn=self.options.maxsn)
 			log.info(f'took {time()-tdstart:.3f} to read in data files')
 			tcstart = time()

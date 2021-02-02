@@ -48,7 +48,7 @@ trainingconfig.read(user_options.trainingconfig)
 training_parser = salt.add_training_options(parser=user_parser,
 	usage=usagestring,config=trainingconfig)
 training_parser.addhelp()
-training_options = training_parser.parse_known_args()[0]
+training_options = training_parser.parse_args()
 
 salt.options = training_options
 salt.verbose = training_options.verbose

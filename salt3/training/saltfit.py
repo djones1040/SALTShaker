@@ -375,7 +375,7 @@ class GaussNewton(saltresids.SALTResids):
 		self.iModelParam[self.imodelerr]=False
 		self.iModelParam[self.imodelcorr]=False
 		self.iModelParam[self.iclscat]=False
-		self.uncertaintyKeys=set(['photvariances_' +sn for sn in self.datadict]+['specvariances_' +sn for sn in self.datadict]+sum([[f'photCholesky_{sn}_{flt}' for flt in np.unique(self.datadict[sn]['photdata']['filt'])] for sn in self.datadict],[]))
+		self.uncertaintyKeys=set(['photvariances_' +sn for sn in self.datadict]+['specvariances_' +sn for sn in self.datadict]+sum([[f'photCholesky_{sn}_{flt}' for flt in np.unique(self.datadict[sn].photdata.filt)] for sn in self.datadict],[]))
 		
 		self.Xhistory=[]
 		self.tryFittingAllParams=True

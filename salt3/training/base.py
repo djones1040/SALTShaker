@@ -194,7 +194,7 @@ class TrainSALTBase:
 		self.surveylist = [section.replace('survey_','') for section in config.sections() if section.startswith('survey_')]
 		for survey in self.surveylist:
 			
-			parser.add_argument_with_config_default(config,f'survey_{survey}',"kcorfile" ,type=str,clargformat=f"--{survey}" +"_{key}",
+			parser.add_argument_with_config_default(config,f'survey_{survey}',"kcorfile" ,type=str,clargformat=f"--{survey}" +"_{key}",action=FullPaths,
 								help="kcor file for survey %s"%survey)
 			parser.add_argument_with_config_default(config,f'survey_{survey}',"subsurveylist" ,type=str,clargformat=f"--{survey}" +"_{key}",
 								help="comma-separated list of subsurveys for survey %s"%survey)
@@ -415,6 +415,8 @@ class TrainSALTBase:
 			photdata = datadict[sn]['photdata']
 			specdata = datadict[sn]['specdata']
 			z = datadict[sn]['zHelio']
+			if sn.survey not in kcordict.keys():
+				raise SNDataReadError(f'Could not find corresponding kcor for survey {sn.SURVEY} for SN {sn.SNID} ')
 
 			# cuts
 			# 4 epochs at -10 < phase < 35
