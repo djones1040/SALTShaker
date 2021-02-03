@@ -872,13 +872,13 @@ SIGMA_INT: 0.106  # used in simulation"""
 
 			tdstart = time()
 			datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,
-										   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
+										   dospec=self.options.dospec,
 										   peakmjdlist=self.options.tmaxlist,
 										   binspecres=binspecres,snparlist=self.options.snparlist,maxsn=self.options.maxsn)
 			log.info(f'took {time()-tdstart:.3f} to read in data files')
 			tcstart = time()
 
-			datadict = self.mkcuts(datadict,KeepOnlySpec=self.options.keeponlyspec)
+			datadict = self.mkcuts(datadict)[0]
 			log.info(f'took {time()-tcstart:.3f} to apply cuts')
 			with open('tmp','w') as fout:
 				for k in datadict.keys():

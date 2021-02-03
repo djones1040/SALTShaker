@@ -175,14 +175,14 @@ class SALTResids:
 			specdata = sn.specdata
 			survey = sn.survey
 			z = sn.zHelio
-			self.num_spec += sum([specdata[key]['flux'].size for key in specdata])
+			self.num_spec += sum([specdata[key].flux.size for key in specdata])
 			self.num_spectra+=len(specdata)
 			for key in specdata:
-				self.spec_snr += np.sum(specdata[key]['flux']/specdata[key]['fluxerr'])
-			self.phot_snr += np.sum(photdata.fluxcal']/photdata.fluxcalerr'])
-			self.num_lc+=np.unique(photdata.filt']).size
-			for flt in np.unique(photdata.filt']):
-				self.num_phot+=(photdata.filt']==flt).sum()
+				self.spec_snr += np.sum(specdata[key].flux/specdata[key].fluxerr)
+			self.phot_snr += np.sum(photdata.fluxcal/photdata.fluxcalerr)
+			self.num_lc+=np.unique(photdata.filt).size
+			for flt in np.unique(photdata.filt):
+				self.num_phot+=(photdata.filt==flt).sum()
 			#While we're at it, calculate the extinction curve for the milky way
 			self.datadict[sn]['mwextcurve']   = 10**(-0.4*extinction.fitzpatrick99(self.wave*(1+z),self.datadict[sn]['MWEBV']*3.1))
 			self.datadict[sn]['mwextcurveint'] = interp1d(self.wave*(1+z),self.datadict[sn]['mwextcurve'] ,kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
@@ -316,10 +316,10 @@ class SALTResids:
 				phase=specdata[k]['tobs']+tpkoff
 				self.pcderivsparse[f'pcDeriv_spec_{sn}_{k}']=sparse.csr_matrix(self.spline_deriv_interp((phase/(1+z),specdata[k]['wavelength']/(1+z)),method=self.interpMethod))
 				
-			for flt in np.unique(photdata.filt']):
+			for flt in np.unique(photdata.filt):
 				#Select data from the appropriate filter filter
-				selectFilter=(photdata.filt']==flt)
-				phase=photdata.tobs']+tpkoff
+				selectFilter=(photdata.filt==flt)
+				phase=photdata.tobs+tpkoff
 				phase=phase[selectFilter]
 				clippedPhase=np.clip(phase,obsphase.min(),obsphase.max())
 				#Array output indices match time along 0th axis, wavelength along 1st axis
@@ -748,11 +748,11 @@ class SALTResids:
 		colorlaw,colorexp=storedResults['colorLaw'],temporaryResults['colorexp']
 		reddenedsalt2flux=colorexp*temporaryResults['fluxInterp']
 		photresultsdict={}
-		for flt in np.unique(photdata.filt']):
-			selectFilter=(photdata.filt']==flt)
+		for flt in np.unique(photdata.filt):
+			selectFilter=(photdata.filt==flt)
 			filtresultsdict={}
 			photresultsdict[flt]=filtresultsdict
-			filtresultsdict['dataflux'] = photdata.fluxcal'][selectFilter]
+			filtresultsdict['dataflux'] = photdata.fluxcal[selectFilter]
 			filtresultsdict['modelflux_jacobian'] = np.zeros((filtresultsdict['dataflux'].size,varyParams.sum()))
 
 			pcderivkey=f'pcDeriv_phot_{sn}_{flt}'
@@ -761,7 +761,7 @@ class SALTResids:
 
 			intmult = dwave*self.fluxfactor[survey][flt]*_SCALE_FACTOR/(1+z)*x0
 			#Select data from the appropriate filter filter
-			phase=photdata.tobs']+tpkoff
+			phase=photdata.tobs+tpkoff
 			phase=phase[selectFilter]
 			clippedPhase=np.clip(phase,obsphase.min(),obsphase.max())
 			nphase = len(phase)
@@ -854,7 +854,7 @@ class SALTResids:
 		
 		varyParList=self.parlist[varyParams]
         
-		nspecdata = sum([specdata[key]['flux'].size for key in specdata])
+		nspecdata = sum([specdata[key].flux.size for key in specdata])
 		resultsdict={}
 		if requiredPCDerivs.all() and not f'pcDeriv_spec_{sn}' in storedResults:
 			interpCache={}
@@ -863,7 +863,7 @@ class SALTResids:
 			spectrum=specdata[k]
 			specresultsdict={}
 			resultsdict[k]=specresultsdict
-			specresultsdict['dataflux'] = specdata[k]['flux']
+			specresultsdict['dataflux'] = specdata[k].flux
 			specresultsdict['modelflux_jacobian'] = np.zeros((specresultsdict['dataflux'].size,varyParams.sum()))
 			#colorlawinterp=storedResults['colorLawInterp'](spectrum['wavelength']/(1+z))
 			#colorexpinterp=10**(c*colorlawinterp)
@@ -873,7 +873,7 @@ class SALTResids:
 			x0=x[self.parlist==f'specx0_{sn}_{k}']
 			x0Deriv=varyParams[self.parlist==f'specx0_{sn}_{k}'][0]
 			
-			SpecLen = specdata[k]['flux'].size
+			SpecLen = specdata[k].flux.size
 			phase=specdata[k]['tobs']+tpkoff
 
 			#Define recalibration factor
@@ -906,7 +906,7 @@ class SALTResids:
 
 			#plt.ion()
 			#plt.clf()
-			#plt.plot(spectrum['wavelength'],spectrum['flux'],label='data')
+			#plt.plot(spectrum['wavelength'],spectrum.flux,label='data')
 			#plt.plot(spectrum['wavelength'],modulatedFlux/recalexp,label='uncalibrated model')
 			#plt.plot(spectrum['wavelength'],modulatedFlux,label='calibrated model')
 			#plt.legend()
@@ -988,11 +988,11 @@ class SALTResids:
 			x0Deriv=varyParams[self.parlist==f'specx0_{sn}_{k}'][0]
 			
 			spectrum=specdata[k]
-			nspecdata = spectrum['flux'].size
+			nspecdata = spectrum.flux.size
 			
 			specresultsdict={}
 			resultsdict[k]=specresultsdict
-			specresultsdict['fluxvariance'] =  spectrum['fluxerr']**2
+			specresultsdict['fluxvariance'] =  spectrum.fluxerr**2
 			specresultsdict['modelvariance_jacobian']=np.zeros([nspecdata,varyParams.sum()])
 
 			phase=spectrum['tobs']+tpkoff
@@ -1020,7 +1020,7 @@ class SALTResids:
 			#uncertaintyNoX0=  recalexp**2 *  interp1d( obswave, temporaryResults['modelUncertaintyInterp'](phase)[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(spectrum['wavelength'])
 			modelUncertainty=uncertaintyNoX0*x0**2
 
-			specresultsdict['modelvariance'] = modelUncertainty # np.clip(modelUncertainty, (spectrum['flux']*1e-3)**2,None)
+			specresultsdict['modelvariance'] = modelUncertainty # np.clip(modelUncertainty, (spectrum.flux*1e-3)**2,None)
 
 			if x0Deriv:
 				specresultsdict['modelvariance_jacobian'][:,(varyParlist == f'specx0_{sn}_{k}')] = uncertaintyNoX0[:,np.newaxis]*2*x0
@@ -1067,15 +1067,15 @@ class SALTResids:
 		
 		photresultsdict={}
 
-		for flt in np.unique(photdata.filt']):
+		for flt in np.unique(photdata.filt):
 			filtresultsdict={}
-			selectFilter=(photdata.filt']==flt)
+			selectFilter=(photdata.filt==flt)
 
 			photresultsdict[flt]=filtresultsdict
 
 			lameff= self.datadict[sn]['lambdaeff'][flt]
 			#Select data from the appropriate filter filter
-			phase=photdata.tobs']+tpkoff
+			phase=photdata.tobs+tpkoff
 			phase=phase[selectFilter]
 			clippedPhase=np.clip(phase,obsphase.min(),obsphase.max())
 			nphase = len(phase)
@@ -1110,7 +1110,7 @@ class SALTResids:
 			modelUncertainty=uncertaintyNoX0*x0**2
 			negativevariance=modelUncertainty<0
 			modelUncertainty[negativevariance]=0
-			filtresultsdict['fluxvariance'] = photdata.fluxcalerr'][selectFilter]**2
+			filtresultsdict['fluxvariance'] = photdata.fluxcalerr[selectFilter]**2
 			filtresultsdict['modelvariance']=  modelUncertainty
 			filtresultsdict['modelvariance_jacobian']=np.zeros((filtresultsdict['fluxvariance'].size,varyparlist.size))
 
@@ -1566,13 +1566,13 @@ class SALTResids:
 	# 			spectime-=time.time()
 			for k in specdata.keys():
 				# weight by ~mag err?
-				err=specdata[k]['fluxerr']/specdata[k]['flux']
-				snr=specdata[k]['flux']/specdata[k]['fluxerr']
+				err=specdata[k].fluxerr/specdata[k].flux
+				snr=specdata[k].flux/specdata[k].fluxerr
 				restWave=specdata[k]['wavelength']/(1+z)
 				err=err[(restWave>self.waveRegularizationBins[0])&(restWave<self.waveRegularizationBins[-1])]
 				snr=snr[(restWave>self.waveRegularizationBins[0])&(restWave<self.waveRegularizationBins[-1])]
-				flux=specdata[k]['flux'][(restWave>self.waveRegularizationBins[0])&(restWave<self.waveRegularizationBins[-1])]
-				fluxerr=specdata[k]['fluxerr'][(restWave>self.waveRegularizationBins[0])&(restWave<self.waveRegularizationBins[-1])]
+				flux=specdata[k].flux[(restWave>self.waveRegularizationBins[0])&(restWave<self.waveRegularizationBins[-1])]
+				fluxerr=specdata[k].fluxerr[(restWave>self.waveRegularizationBins[0])&(restWave<self.waveRegularizationBins[-1])]
 				restWave=restWave[(restWave>self.waveRegularizationBins[0])&(restWave<self.waveRegularizationBins[-1])]
 				
 				phase=(specdata[k]['tobs']+tpkoff)/(1+z)

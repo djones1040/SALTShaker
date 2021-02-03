@@ -13,6 +13,9 @@ from time import time
 import scipy.stats as ss
 import astropy.table as at
 import logging
+import abc
+from copy import deepcopy
+
 log=logging.getLogger(__name__)
 
 class SNDataReadError(ValueError):
@@ -22,22 +25,42 @@ class BreakLoopException(RuntimeError):
 
 def checksize(a,b):
 	assert(a.size==b.size)
-class SALTtrainingphotdata:
-	def __init__(self,tpk_guess,sn ):
-		self.tobs=sn.MJD-tpk_guess
-		self.mjd=sn.MJD
-		self.fluxcal=sn.FLUXCAL
-		self.fluxcalerr=sn.FLUXCALERR
-		self.filt=sn.FLT
+	
+class SALTtrainingdata(metaclass=abc.ABCMeta):
+
+	@property
+	@abc.abstractmethod
+	def __listdatakeys__(self):
+		pass
+		
+	def clip(self,clipcriterion):
+		copy=deepcopy(self)
+		for key in self.__listdatakeys__:
+			copy.__dict__[key]=self.__dict__[key][clipcriterion]
+		return copy
+	
+class SALTtraininglightcurve(SALTtrainingdata):
+	def __init__(self,z,tpk_guess,flt,sn ):
+		assert((sn.FLT==flt).sum()>0)
+		inlightcurve= (sn.FLT==flt)
+		self.mjd=sn.MJD[inlightcurve]
+		self.tobs=self.mjd-tpk_guess
+		self.phase=(self.mjd-tpk_guess)/(1+z)
+		self.fluxcal=sn.FLUXCAL[inlightcurve]
+		self.fluxcalerr=sn.FLUXCALERR[inlightcurve]
+		self.filt=flt
 		checksize(self.tobs,self.mjd)
-		checksize(self.tobs,self.fluxcal)
-		checksize(self.tobs,self.fluxcalerr)
-		checksize(self.tobs,self.filt)
+		checksize(self.mjd,self.fluxcal)
+		checksize(self.mjd,self.fluxcalerr)
+		
+	__listdatakeys__={'tobs','mjd','phase','fluxcal','fluxcalerr'}
 		
 	def __len__(self):
 		return len(self.tobs)
-class SALTtrainingspecdata:
-	def __init__(self,snanaspec,tpk_guess,binspecres=None ):
+
+		
+class SALTtrainingspecdata(SALTtrainingdata):
+	def __init__(self,snanaspec,z,tpk_guess,binspecres=None ):
 			m=snanaspec['SPECTRUM_MJD']
 			if snanaspec['FLAM'].size==0:
 				raise SNDataReadError(f'Spectrum has no observations')
@@ -54,7 +77,7 @@ class SALTtrainingspecdata:
 			self.flux=snanaspec['FLAM']
 			self.tobs=m - self.tpk_guess
 			self.mjd=m
-		
+			self.phase=self.tobs/(1+z)
 			z = datadict[s]['zHelio']
 			if 'DQ' in snanaspec:
 				iGood=(snanaspec['DQ']==1)
@@ -89,8 +112,6 @@ class SALTtrainingspecdata:
 					variance = np.average((flux[indices]/fluxmax-average)**2, weights=weights[indices])  # Fast and numerically precise
 					return np.sqrt(variance) #/np.sqrt(len(indices))
 
-
-
 				#wavebins = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/binspecres)
 				wavebins = np.linspace(np.min(wavelength),np.max(wavelength),int((np.max(wavelength)-np.min(wavelength))/(binspecres*(1+z))))
 				binned_flux = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_avg).statistic
@@ -111,6 +132,11 @@ class SALTtrainingspecdata:
 			self.fluxerr = np.hypot(self.fluxerr, 5e-3*np.max(self.flux))
 			checksize(self.wavelength,self.flux)
 			checksize(self.wavelength,self.fluxerr)
+	
+	__listdatakeys__={'wavelength','flux','fluxerr'}
+
+	def __len__(self):
+		return len(self.wavelength)
 			
 class SALTtrainingSN:
 	def __init__(self,sn,
@@ -119,8 +145,6 @@ class SALTtrainingSN:
 
 		if 'FLT' not in sn.__dict__.keys():
 			raise SNDataReadError('can\'t find SN filters!')
-	
-		sn.SNID=str(sn.SNID)
 
 		if 'SURVEY' in sn.__dict__.keys():
 			self.survey=sn.SURVEY
@@ -186,9 +210,9 @@ class SALTtrainingSN:
 
 		self.snid=sn.SNID
 		self.tpk_guess=tpk
-		self.salt2_fitprob=fitprob
-
-		self.photdata=SALTtrainingphotdata(tpk_guess= tpk, sn=sn)
+		self.salt2fitprob=fitprob
+		
+		self.photdata = {flt:SALTtraininglightcurve(self.zHelio,tpk_guess= self.tpk_guess,flt=flt, sn=sn) for flt in np.unique(sn.FLT)}
 # 		try:
 # 			for key in self.photdata:
 # 				assert( len(self.photdata[key])>0)
@@ -196,15 +220,33 @@ class SALTtrainingSN:
 # 			raise SNDataReadError(f'All lightcurves empty for SN {sn.SNID}')
 		try: assert(len(self.photdata)>0)
 		except AssertionError:
-			raise SNDataReadError(f'All lightcurves empty for SN {sn.SNID}')
+			raise SNDataReadError(f'No lightcurves for SN {sn.SNID}')
 		self.specdata = {}
-		import pdb;pdb.set_trace()
-		for speccount,k in enumerate(sn.SPECTRA):
-			try:
-				self.specdata[speccount]=SALTtrainingspectrum(sn.SPECTRA[k],self.tpk_guess,binspecres=binspecres)
-			except SNDataReadError as e:
-				log.warning(f'{e.message}, skipping spectrum {k} for SN {self.snid}')
+		if 'SPECTRA' in sn.__dict__:
+			for speccount,k in enumerate(sn.SPECTRA):
+				try:
+					self.specdata[speccount]=SALTtrainingspectrum(sn.SPECTRA[k],self.zHelio,self.tpk_guess,binspecres=binspecres)
+				except SNDataReadError as e:
+					log.warning(f'{e.message}, skipping spectrum {k} for SN {self.snid}')
+	@property
+	def num_lc(self):
+		return len(self.photdata)
+	
+	@property
+	def num_photobs(self):
+		return sum([len(self.photdata[filt]) for filt in self.photdata])
 
+	@property
+	def num_specobs(self):
+		return len(self.specdata)
+		
+	@property
+	def num_spec(self):
+		return sum([len(self.specdata[key]) for key in self.specdata])
+		
+	@property
+	def filt(self):
+		return list(self.photdata.keys())
 	
 def rdkcor(surveylist,options):
 
@@ -271,7 +313,7 @@ def rdkcor(surveylist,options):
 					shifttype,survey,filter,shift=line.split()
 					shift=float(shift)
 					if shifttype=='MAGSHIFT':
-						kcordict[kcorkey][filtlabel]['zpoff'] +=shift
+						kcordict[kcorkey][filter]['zpoff'] +=shift
 						kcordict[survey][filter]['primarymag']+=shift
 					elif shifttype=='LAMSHIFT':
 						kcordict[survey][filter]['filtwave']+=shift
@@ -304,7 +346,7 @@ def rdkcor(surveylist,options):
 
 	
 def rdAllData(snlists,estimate_tpk,
-			  dospec=False,KeepOnlySpec=False,peakmjdlist=None,
+			  dospec=False,peakmjdlist=None,
 			  waverange=[2000,9200],binspecres=None,snparlist=None,maxsn=None):
 	datadict = {}
 	if peakmjdlist:
@@ -360,13 +402,10 @@ def rdAllData(snlists,estimate_tpk,
 				pkmjddict=pkmjddict,snpar=snpar,
 				binspecres=binspecres)
 		except SNDataReadError as e:
-			log.warning(e.message)
+			log.warning(e.args[0])
 			return False
 		if len(saltformattedsn.specdata) is 0:
 			log.debug(f'SN {sn.SNID} has no supernova spectra')
-			if KeepOnlySpec: 
-				log.debug('Discarding SN {sn.SNID} ')
-				return False
 		outputdict[saltformattedsn.snid]=saltformattedsn
 		return True
 	
