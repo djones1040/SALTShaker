@@ -1,5 +1,4 @@
 import numpy as np
-from salt3.training import saltresids
 from inspect import signature
 from functools import partial
 from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
@@ -11,7 +10,7 @@ log=logging.getLogger(__name__)
 __priors__=dict()
 def prior(prior):
 	"""Decorator to register a given function as a valid prior"""
-	#Check that the method accepts 4 inputs: a SALTResids object, a width, parameter vector, model components
+	#Check that the method accepts 4 inputs: a saltresids object, a width, parameter vector, model components
 	assert(len(signature(prior).parameters)==4 or len(signature(prior).parameters)==5)
 	__priors__[prior.__name__]=prior
 	return prior

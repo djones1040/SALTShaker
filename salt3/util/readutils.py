@@ -59,13 +59,12 @@ class SALTtraininglightcurve(SALTtrainingdata):
 		return len(self.tobs)
 
 		
-class SALTtrainingspecdata(SALTtrainingdata):
+class SALTtrainingspectrum(SALTtrainingdata):
 	def __init__(self,snanaspec,z,tpk_guess,binspecres=None ):
 			m=snanaspec['SPECTRUM_MJD']
 			if snanaspec['FLAM'].size==0:
 				raise SNDataReadError(f'Spectrum has no observations')
 				
-			self.specdata[speccount] = {}
 			if 'LAMAVG' in snanaspec:
 				wavelength = snanaspec['LAMAVG']
 			elif 'LAMMIN' in snanaspec and 'LAMMAX' in snanaspec:
@@ -75,12 +74,14 @@ class SALTtrainingspecdata(SALTtrainingdata):
 			self.wavelength=wavelength
 			self.fluxerr=snanaspec['FLAMERR']
 			self.flux=snanaspec['FLAM']
-			self.tobs=m - self.tpk_guess
+			self.tobs=m -tpk_guess
 			self.mjd=m
 			self.phase=self.tobs/(1+z)
-			z = datadict[s]['zHelio']
+
 			if 'DQ' in snanaspec:
 				iGood=(snanaspec['DQ']==1)
+			else:
+				iGood=np.ones(len(self),dtype=bool)
 			if (snanaspec['DQ']==1).sum() is 0:
 				raise SNDataReadError('Spectrum is all marked as invalid data')
 			if binspecres is not None:
@@ -238,11 +239,11 @@ class SALTtrainingSN:
 
 	@property
 	def num_specobs(self):
-		return len(self.specdata)
+		return sum([len(self.specdata[key]) for key in self.specdata])
 		
 	@property
 	def num_spec(self):
-		return sum([len(self.specdata[key]) for key in self.specdata])
+		return len(self.specdata)
 		
 	@property
 	def filt(self):
@@ -451,7 +452,7 @@ def rdAllData(snlists,estimate_tpk,
 				else:
 					if '/' not in f:
 						f = '%s/%s'%(os.path.dirname(snlist),f)
-					sn = snana.SuperNova(f,readspec=False)
+					sn = snana.SuperNova(f,readspec=dospec)
 					skipcount+=not processsupernovaobject(snreadinfromlist,sn,maxct)
 		except BreakLoopException:
 			pass

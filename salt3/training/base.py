@@ -5,6 +5,7 @@ import numpy as np
 from salt3.config import config_rootdir
 from salt3.util.specSynPhot import getColorsForSN
 from argparse import SUPPRESS
+from salt3.training.priors import __priors__
 import logging
 log=logging.getLogger(__name__)
 
@@ -92,6 +93,7 @@ class SNCut:
 
 	def passescut(self,sn):
 		return self.cutvalue(sn)>=self.requirement
+
 class TrainSALTBase:
 	def __init__(self):
 		self.verbose = False
@@ -341,9 +343,9 @@ class TrainSALTBase:
 				
 
 		# priors
-		for prior,val in config.items('priors'):
+		for prior in __priors__:
 			parser.add_argument_with_config_default(config,'priors',prior ,type=float,clargformat="--prior_{key}",
-								help=f"prior on {prior}")
+								help=f"prior on {prior}",default=SUPPRESS)
 
 		# bounds
 		for bound,val in config.items('bounds'):
