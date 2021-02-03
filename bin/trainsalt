@@ -24,7 +24,7 @@ parser.add_argument('-c','--configfile', default=None, type=str,
 options, args = parser.parse_known_args()
 	
 if options.configfile:
-	config = configparser.ConfigParser()
+	config = configparser.ConfigParser(inline_comment_prefixes='#')
 	if not os.path.exists(options.configfile):
 		raise RuntimeError('Configfile doesn\'t exist!')
 	config.read(options.configfile)
@@ -43,7 +43,7 @@ if not os.path.exists(user_options.trainingconfig):
 if not os.path.exists(user_options.trainingconfig):
 	raise RuntimeError('can\'t find training config file!  Checked %s'%user_options.trainingconfig)
 
-trainingconfig = configparser.ConfigParser()
+trainingconfig = configparser.ConfigParser(inline_comment_prefixes='#')
 trainingconfig.read(user_options.trainingconfig)
 training_parser = salt.add_training_options(parser=user_parser,
 	usage=usagestring,config=trainingconfig)
