@@ -45,7 +45,8 @@ def _MyPipe(mypipe):
 class RunPipe():
     def __init__(self, pipeinput, mypipe=False, batch_mode=False,batch_script=None,start_id=None,
                  randseed=None,fseeds=None,num=None,norun=None,debug=False,timeout=None,
-                 make_summary=False,validplots_only=False,success_list=None,load_from_pickle=None):
+                 make_summary=False,validplots_only=False,success_list=None,load_from_pickle=None,
+                 run_background_jobs=False):
         if mypipe is None:
             self.pipedef = self.__DefaultPipe
         else:
@@ -70,6 +71,7 @@ class RunPipe():
         self.validplots_only = validplots_only
         self.success_list = success_list
         self.load_from_pickle = load_from_pickle
+        self.run_background_jobs = run_background_jobs
  
     def __DefaultPipe(self):
         pipe = SALT3pipe(finput=self.pipeinput)
@@ -350,11 +352,13 @@ class RunPipe():
                     os.system('echo FAILED > PIPELINE_{}.DONE'.format(self.num))                           
                                
         else:
-            if self.batch_script is None:
-                raise RuntimeError("batch script is None")
-            f = open(self.batch_script,'r')
-            lines = f.read()
-            f.close()
+            if not self.run_background_jobs:
+                if self.batch_script is None:
+                    raise RuntimeError("batch script is None")
+                else:
+                    f = open(self.batch_script,'r')
+                    lines = f.read()
+                    f.close()
             if self.fseeds is None:
                 print("No randseed file provided. A random list generated")
                 self.randseeds = random.sample(range(100000), self.batch_mode)
@@ -371,24 +375,33 @@ class RunPipe():
                 pycommand_base = 'python {} -c {} --mypipe {} --batch_mode 0'.format(pypro,self.pipeinput,self.mypipe)
             else:
                 pycommand_base = 'runpipe -c {} --mypipe {} --batch_mode 0'.format(self.pipeinput,self.mypipe)
+            shellrun_list = []
             for i in range(self.batch_mode):
                 pycommand = pycommand_base + ' --randseed {} --num {}'.format(self.randseeds[i],i+self.start_id)
                 if self.norun:
                     pycommand += ' --norun'
-                cwd = os.getcwd()
-                outfname = os.path.join(cwd,'test_pipeline_batch_script_{:03d}'.format(i+self.start_id))
-                outf = open(outfname,'w')
-                outf.write(lines)
-                outf.write('\n')
-                outf.write(pycommand)
-                outf.write('\n')
-                outf.close()
-                print('Submitting batch job...')
-                shellcommand = "sbatch {}".format(outfname) 
-                print(shellcommand)
-                
-                shellrun = subprocess.run(args=shlex.split(shellcommand))
-                
+                if not self.run_background_jobs:
+                    cwd = os.getcwd()
+                    outfname = os.path.join(cwd,'test_pipeline_batch_script_{:03d}'.format(i+self.start_id))
+                    outf = open(outfname,'w')
+                    outf.write(lines)
+                    outf.write('\n')
+                    outf.write(pycommand)
+                    outf.write('\n')
+                    outf.close()
+                    print('Submitting batch job...')
+                    shellcommand = "sbatch {}".format(outfname) 
+                    print(shellcommand)
+
+                    shellrun = subprocess.run(args=shlex.split(shellcommand))
+                else:
+                    pycommand += ' --timeout {}'.format(self.timeout)
+                    logfile = 'log{}_single'.format(i+self.start_id)
+                    fstdout = open(logfile.strip()+'.out','w') 
+                    fstderr = open(logfile.strip()+'.err','w')
+                    print("Running: ", pycommand)
+                    shellrun_list.append(subprocess.Popen(args=shlex.split(pycommand),stdout=fstdout, stderr=fstderr))         
+            
             if not self.norun:
                 #wait for all jobs to finish
                 time_start = time.time()
@@ -502,13 +515,15 @@ def main(**kwargs):
                         help='success list file from a previous run for making validplots')  
     parser.add_argument('--load_from_pickle',dest='load_from_pickle',default=None,
                         help='load a saved pipeline object from a pickle file previously generated. only used for batch_mode=0')  
+    parser.add_argument('--run_background_jobs',dest='run_background_jobs',action='store_true',
+                        help='use this option to run individual jobs in background instead of submitting a parent slurm job')  
     
     p = parser.parse_args()
     
     pipe = RunPipe(p.pipeinput,mypipe=p.mypipe,batch_mode=p.batch_mode,batch_script=p.batch_script,
                    start_id=p.start_id,randseed=p.randseed,fseeds=p.fseeds,num=p.num,norun=p.norun,
                    debug=p.debug,timeout=p.timeout,make_summary=p.make_summary,validplots_only=p.validplots_only,
-                   success_list=p.success_list,load_from_pickle=p.load_from_pickle)
+                   success_list=p.success_list,load_from_pickle=p.load_from_pickle,run_background_jobs=p.run_background_jobs)
     pipe.run()
     
     if hasattr(pipe,'pipe'):
