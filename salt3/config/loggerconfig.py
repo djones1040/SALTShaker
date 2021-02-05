@@ -1,10 +1,12 @@
 import yaml
 from logging import config
+import logging
 import os.path
 
 def dictconfigfromYAML(filename,outputdir):
 	if not os.path.exists(filename):
-		print(f"warning: logger config file {user_options.loggingconfig} doesn't exist, default logger configuration will be used (everything above debug to console)")
+		print(f"warning: logger config file {filename} doesn't exist, default logger configuration will be used (everything above debug to console)")
+		logging.basicConfig(format='%(message)s',level=logging.INFO)
 		return False
 	else:
 		if not os.path.exists(outputdir):

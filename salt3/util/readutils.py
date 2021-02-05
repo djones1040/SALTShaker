@@ -130,6 +130,9 @@ def rdSpecSingle(sn,datadict,KeepOnlySpec=False,binspecres=None,waverange=None):
 		for k in sn.SPECTRA:
 			spec=sn.SPECTRA[k]
 			m=spec['SPECTRUM_MJD']
+			if spec['FLAM'].size==0:
+				log.warning(f'Spectrum {k} from SN {sn.SNID} has no observations')
+				continue
 			if m-tpk < -19 or m-tpk > 49:
 				speccount += 1
 				continue
@@ -142,7 +145,7 @@ def rdSpecSingle(sn,datadict,KeepOnlySpec=False,binspecres=None,waverange=None):
 				datadict[s]['specdata'][speccount]['wavelength'] = (spec['LAMMIN']+spec['LAMMAX'])/2
 			else:
 				raise RuntimeError('couldn\t find wavelength data in photometry file')
-
+			
 			datadict[s]['specdata'][speccount]['flux'] = spec['FLAM']
 			datadict[s]['specdata'][speccount]['tobs'] = m - tpk
 			datadict[s]['specdata'][speccount]['mjd'] = m
