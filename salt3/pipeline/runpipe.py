@@ -438,7 +438,7 @@ class RunPipe():
                 
                 #combine validplots here
                 
-                if make_summary:
+                if self.make_summary:
                     self.pipeinit = self.pipedef(skip_config=True)
                     self.gen_validplots()                 
 
