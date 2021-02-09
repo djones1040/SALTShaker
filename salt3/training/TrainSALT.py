@@ -204,25 +204,17 @@ class TrainSALT(TrainSALTBase):
 			
 		# spectral params
 		for sn in datadict.keys():
-			specdata=datadict[sn]['specdata']
-			photdata=datadict[sn]['photdata']
+			specdata=datadict[sn].specdata
+			photdata=datadict[sn].photdata
 			for k in specdata.keys():
 				if not self.options.specrecallist:
-					try:
-						order=self.options.n_min_specrecal+int(np.log((specdata[k]['wavelength'].max() - \
-							specdata[k]['wavelength'].min())/self.options.specrange_wavescale_specrecal) + \
-							np.unique(photdata['filt']).size* self.options.n_specrecal_per_lightcurve)
-					except:
-						import pdb; pdb.set_trace()
+					order=self.options.n_min_specrecal+int(np.log((specdata[k].wavelength.max() - \
+						specdata[k].wavelength.min())/self.options.specrange_wavescale_specrecal) + \
+						len(datadict[sn].filt)* self.options.n_specrecal_per_lightcurve)
 				else:
 					spcrclcopy = spcrcldata[spcrcldata['SNID'] == sn]
 					order = int(spcrclcopy['ncalib'][spcrclcopy['N'] == k+1])
-					#print(spcrclcopy['phase'][spcrclcopy['N'] == k+1],specdata[k]['tobs'],float(spcrclcopy['phase'][spcrclcopy['N'] == k+1])-specdata[k]['tobs'])
-					#if np.abs(float(spcrclcopy['phase'][spcrclcopy['N'] == k+1])-specdata[k]['tobs']) > 1:
-					#	import pdb; pdb.set_trace()
-
-				order-=1
-				recalParams=[f'specx0_{sn}_{k}']+['specrecal_{}_{}'.format(sn,k)]*order
+				recalParams=[f'specx0_{sn}_{k}']+[f'specrecal_{sn}_{k}']*(order-1)
 				parlist=np.append(parlist,recalParams)
 		# initial guesses
 		n_params=parlist.size
@@ -298,7 +290,6 @@ class TrainSALT(TrainSALTBase):
 				snpar = Table.read(self.options.snparlist,format='ascii')
 				snpar['SNID'] = snpar['SNID'].astype(str)
 				
-			i=0
 			for sn in datadict.keys():
 				if self.options.snparlist:
 					# hacky matching, but SN names are a mess as usual
@@ -310,14 +301,13 @@ class TrainSALT(TrainSALTBase):
 						guess[parlist == 'c_%s'%sn] = snpar['c'][iSN]
 					else:
 						log.warning(f'SN {sn} not found in SN par list {self.options.snparlist}')
-						guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn]['zHelio']).value-19.36-10.635))
+						guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
 
 				else:
-					guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn]['zHelio']).value-19.36-10.635))
+					guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
 				
-				for k in datadict[sn]['specdata'] : 
+				for k in datadict[sn].specdata : 
 					guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]
-				i+=1
 
             # let's redefine x1 before we start
 			ratio = RatioToSatisfyDefinitions(phase,wave,self.kcordict,[m0,m1])
@@ -331,65 +321,31 @@ class TrainSALT(TrainSALTBase):
 
 			# spectral params
 			for sn in datadict.keys():
-				specdata=datadict[sn]['specdata']
-				photdata=datadict[sn]['photdata']
+				specdata=datadict[sn].specdata
+				photdata=datadict[sn].photdata
 				for k in specdata.keys():
-					if not self.options.specrecallist:
-						order=self.options.n_min_specrecal+int(np.log((specdata[k]['wavelength'].max() - \
-							specdata[k]['wavelength'].min())/self.options.specrange_wavescale_specrecal) + \
-							np.unique(photdata['filt']).size* self.options.n_specrecal_per_lightcurve)
-					else:
-						spcrclcopy = spcrcldata[spcrcldata['SNID'] == sn]
-						order = int(spcrclcopy['ncalib'][spcrclcopy['N'] == k+1])
-					order-=1
-
-					specpars_init = SpecRecal(datadict[sn]['photdata'],datadict[sn]['specdata'][k],self.kcordict,
-											  datadict[sn]['survey'],self.options.specrange_wavescale_specrecal,
-											  nrecalpars=order,sn=sn)
-
-
-					# or we can use the model to recalibrate
-					#coeffs=parval[parname=='specrecal_{}_{}'.format(sn.SNID,0)]
+					order=(parlist == 'specrecal_{}_{}'.format(sn,k)).sum()
+					
 					pow=(order)-np.arange(order) #coeffs.size-np.arange(coeffs.size)
-					recalCoord=(specdata[k]['wavelength']-np.mean(specdata[k]['wavelength']))/2500
+					recalCoord=(specdata[k].wavelength-np.mean(specdata[k].wavelength))/2500
 					drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
 
-					zHel,x0,x1,c = datadict[sn]['zHelio'],guess[parlist == f'x0_{sn}'],guess[parlist == f'x1_{sn}'],guess[parlist == f'c_{sn}']
-					mwebv = datadict[sn]['MWEBV']
+					zHel,x0,x1,c = datadict[sn].zHelio,guess[parlist == f'x0_{sn}'],guess[parlist == f'x1_{sn}'],guess[parlist == f'c_{sn}']
+					mwebv = datadict[sn].MWEBV
 					colorlaw = SALT2ColorLaw(self.options.colorwaverange,guess[parlist == 'cl'])
-					uncalledModel = specflux(specdata[k]['tobs'],specdata[k]['wavelength'],phase,wave,
+					
+					uncalledModel = specflux(specdata[k].tobs,specdata[k].wavelength,phase,wave,
 											 m0,m1,colorlaw,zHel,x0,x1,c,mwebv=mwebv)
 					#import pdb; pdb.set_trace()
 		
 					def recalpars(x):
 						recalexp=np.exp((drecaltermdrecal*x[1:][np.newaxis,:]).sum(axis=1))
-						return (x[0]*uncalledModel*recalexp - specdata[k]['flux'])/specdata[k]['fluxerr']
-					def recalfunc(x):
-						recalexp=np.exp((drecaltermdrecal*x[1:][np.newaxis,:]).sum(axis=1))
-						return x[0]*uncalledModel*recalexp
+						return (x[0]*uncalledModel*recalexp - specdata[k].flux)/specdata[k].fluxerr
 
-					try:
-						md = least_squares(recalpars,[np.median(specdata[k]['flux'])/np.median(uncalledModel)]+list(guess[parlist == 'specrecal_{}_{}'.format(sn,k)]))
-						recalexp=np.exp((drecaltermdrecal*md.x[1:][np.newaxis,:]).sum(axis=1))
-						guess[parlist==f'specx0_{sn}_{k}']= md.x[0]*x0 #guess[parlist == 'x0_%s'%sn]/specpars_init[0]
-						guess[parlist == 'specrecal_{}_{}'.format(sn,k)] = md.x[1:]
-						#import pdb; pdb.set_trace()
-					except:
-						log.warning('couldn\'t estimate spectral recalibration!')
-						import pdb; pdb.set_trace()
-                        
-					#plt.ion()
-					#plt.clf()
-					#plt.plot(specdata[k]['wavelength'],specdata[k]['flux'],color='k')
-					#plt.plot(specdata[k]['wavelength'],uncalledModel,color='r')
-					#plt.plot(specdata[k]['wavelength'],recalfunc(md.x))
-					#import pdb; pdb.set_trace()
-                    # 0.03802382
-                    # 0.0469286]), array([-0.38700634, 0.3495, 0.00424
-					# old code
-					#if specpars_init[0] != 0:
-					#	guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]/specpars_init[0]
-					#	if self.options.specrecal: guess[parlist == 'specrecal_{}_{}'.format(sn,k)] = specpars_init[1:]
+					md = least_squares(recalpars,[np.median(specdata[k].flux)/np.median(uncalledModel)]+list(guess[parlist == 'specrecal_{}_{}'.format(sn,k)]))
+
+					guess[parlist == f'specx0_{sn}_{k}' ]= md.x[0]*x0 #guess[parlist == 'x0_%s'%sn]/specpars_init[0]
+					guess[parlist == f'specrecal_{sn}_{k}'] = md.x[1:]
 
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	

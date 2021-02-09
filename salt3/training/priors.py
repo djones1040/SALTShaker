@@ -317,17 +317,18 @@ class SALTPriors:
 	def recalprior(self,width,x,components):
 		"""Prior on all spectral recalibration"""
 		results=[]
-		for sn in self.datadict:
-			specdata=self.datadict[sn]['specdata']
-			for k in specdata:
-				spectrum=specdata[k]
-				ispcrcl=np.where(self.parlist=='specrecal_{}_{}'.format(sn,k))[0]
+		for snid,sn in self.datadict.items():
+			for k,spectrum in sn.specdata.items():
+				ispcrcl=np.where(self.parlist==f'specrecal_{snid}_{k}')[0]
 				coeffs=x[ispcrcl]
 				pow=coeffs.size-np.arange(coeffs.size)
-				wavepoints=spectrum['wavelength'][np.round(np.linspace(0,spectrum['wavelength'].size-1,coeffs.size+2,True)).astype(int)]
-				recalCoord=((wavepoints-np.mean(spectrum['wavelength']))/self.specrange_wavescale_specrecal)
+				#Select equidistantly spaced points along the recalibration exponent equal to 2+the number of coefficients
+				wavepoints=np.percentile(spectrum.wavelength,100.*np.arange(coeffs.size+3)/(coeffs.size+2))
+				
+				recalCoord=((wavepoints-np.mean(spectrum.wavelength))/self.specrange_wavescale_specrecal)
 				drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
 				recalterm=(drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1)
+				
 				jacobian=np.zeros((recalterm.size,self.npar))
 				jacobian[:,ispcrcl]=drecaltermdrecal
 				results+=[(recalterm/width,recalterm,jacobian/width)]

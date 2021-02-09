@@ -382,8 +382,7 @@ def rdAllData(snlists,estimate_tpk,
 
 	#Check whether to add the supernova to a dictionary of results; if not return False, otherwise do so and return True 
 	def processsupernovaobject(outputdict,sn,maxnum):
-		if len(outputdict) +1 > maxnum:
-			raise BreakLoopException('Maximum number of SNe in list')
+		
 		if 'FLT' not in sn.__dict__.keys() and \
 		   'BAND' in sn.__dict__.keys():
 			sn.FLT = sn.BAND
@@ -408,6 +407,8 @@ def rdAllData(snlists,estimate_tpk,
 		if len(saltformattedsn.specdata) is 0:
 			log.debug(f'SN {sn.SNID} has no supernova spectra')
 		outputdict[saltformattedsn.snid]=saltformattedsn
+		if len(outputdict)  >= maxnum:
+			raise BreakLoopException('Maximum number of SNe read in')
 		return True
 	
 	
@@ -416,7 +417,6 @@ def rdAllData(snlists,estimate_tpk,
 		snlist = os.path.expandvars(snlist)
 		snfiles = np.genfromtxt(snlist,dtype='str')
 		snfiles = np.atleast_1d(snfiles)
-		sncount = 0
 		snreadinfromlist={}
 			
 		try:

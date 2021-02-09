@@ -484,8 +484,8 @@ class TrainSALTBase:
 			for k in list(specdata.keys()):
 				#Remove spectra outside phase range
 				spectrum=specdata[k]
-				if (spectrum.phase<min(self.options.phaserange[0] ,np.min([photdata[flt].phase.min() for flt in photdata]) )) or \
-				   (spectrum.phase>max(self.options.phaserange[1]-3 , np.max([photdata[flt].phase.max() for flt in photdata]) )):
+				if (spectrum.phase<max(self.options.phaserange[0] ,np.min([photdata[flt].phase.min() for flt in photdata]) )) or \
+				   (spectrum.phase>min(self.options.phaserange[1]-3 , np.max([photdata[flt].phase.max() for flt in photdata]) )):
 					specdata.pop(k)
 					continue
 				#remove spectral data outside wavelength range
