@@ -130,7 +130,7 @@ class RunPipe():
                           batch=proname.batch,translate=proname.translate,validplots=proname.validplots,
                           outname=proname.outname,
                           proargs=proname.proargs,plotdir=proname.plotdir,labels=proname.labels,
-                          done_file=done_file,**kwargs)  
+                          done_file=done_file,drop_sim_versions=proname.drop_sim_versions,**kwargs)  
     
     def make_validplots_sum(self,prostr,inputfile_sum,outputdir,prefix_sum='sum_valid'):
         if prostr.startswith('lcfit'):

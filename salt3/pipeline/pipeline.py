@@ -186,6 +186,7 @@ class SALT3pipe():
                 prooptions = self._get_config_option(config,prostr,'prooptions')
                 snlists = self._get_config_option(config,prostr,'snlists')
                 labels = self._get_config_option(config,prostr,'labels')
+                drop_sim_versions = self._get_config_option(config,prostr,'drop_sim_versions')
                 
                 if labels is not None:
                     labels = labels.split(',')
@@ -209,7 +210,9 @@ class SALT3pipe():
                                      batch_info = batch_info,
                                      validplots=validplots,
                                      plotdir=self.plotdir,
-                                     labels=labels)
+                                     labels=labels,
+                                     drop_sim_versions=drop_sim_versions
+                                     )
 #                 if hasattr(pipepro[i], 'biascor') and pipepro[i].biascor:
 #                     pipepro[i].done_file = "{}_{}".format(pipepro[i].done_file,'biascor')
 #                 if niter > 1:
@@ -342,12 +345,16 @@ class SALT3pipe():
                     elif isinstance(pro2, Training):
                         pro2_in = pro2._get_input_info()
                         for tag in ['io','kcor','subsurvey_list']:     
-                            pro1_out = pro1_out_dict[tag]    
+                            pro1_out = pro1_out_dict[tag]
                             if isinstance(pro1_out,list) or isinstance(pro1_out,np.ndarray): 
                                 if tag == 'io':
+                                    if pro2.drop_sim_versions is not None:
+                                        pro1_out = [pro1_out[i] for i in range(len(pro1_out)) if str(i) not in pro2.drop_sim_versions.split(',')]
                                     pro2_in.loc[pro2_in['tag']==tag,'value'] = ','.join(pro1_out)
                                 elif tag == 'kcor':
                                     for i,survey in zip(pro1_out_dict['ind'],pro1_out_dict['survey']):
+                                        if str(i) in pro2.drop_sim_versions.split(','):
+                                            continue
                                         section = 'survey_{}'.format(survey.strip())
                                         if section not in pro2_in.loc[pro2_in['tag']==tag,'section'].values:
                                             df_newrow = pd.DataFrame([{'section':'survey_{}'.format(survey),'key':'kcorfile',
@@ -356,6 +363,8 @@ class SALT3pipe():
                                         pro2_in.loc[(pro2_in['tag']==tag) & (pro2_in['section']==section),'value'] = pro1_out[int(i)]
                                 elif tag == 'subsurvey_list':
                                     for i,survey in zip(pro1_out_dict['ind'],pro1_out_dict['survey']):
+                                        if str(i) in pro2.drop_sim_versions.split(','):
+                                            continue
                                         section = 'survey_{}'.format(survey.strip())
                                         if section not in pro2_in.loc[pro2_in['tag']==tag,'section'].values:
                                             df_newrow = pd.DataFrame([{'section':'survey_{}'.format(survey),'key':'subsurveylist',
@@ -411,7 +420,8 @@ class SALT3pipe():
                                    translate=pro1.translate,
                                    validplots=pro1.validplots,
                                    plotdir=pro1.plotdir,
-                                   labels=pro1.labels)
+                                   labels=pro1.labels,
+                                   drop_sim_versions=pro1.drop_sim_versions)
 
                 if not pipepros[1].lower().startswith('cosmofit'):
                     pro2.configure(setkeys = setkeys,
@@ -425,7 +435,8 @@ class SALT3pipe():
                                    validplots=pro2.validplots,
                                    done_file=pro2.done_file,
                                    plotdir=pro2.plotdir,
-                                   labels=pro2.labels)
+                                   labels=pro2.labels,
+                                   drop_sim_versions=pro2.drop_sim_versions)
                 else:
 #                     version_photometry = '/'+self.LCFitting[0].keys['SNLCINP']['VERSION_PHOTOMETRY']+'/'
 #                     vinput = version_photometry.strip().join(setkeys['value'].values[0])
@@ -439,7 +450,8 @@ class SALT3pipe():
                                    translate=pro2.translate,
                                    validplots=pro2.validplots,
                                    plotdir=pro2.plotdir,
-                                   labels=pro2.labels)
+                                   labels=pro2.labels,
+                                   drop_sim_versions=pro2.drop_sim_versions)
 
         self.gluepairs.append(pipepros)
 
@@ -525,7 +537,7 @@ class PipeProcedure():
 
     def configure(self,pro=None,baseinput=None,setkeys=None,
                   proargs=None,prooptions=None,batch=False,batch_info=None,
-                  translate=False,
+                  translate=False,drop_sim_versions=None,
                   validplots=False,plotdir=None,labels=None,**kwargs):  
         if pro is not None and "$" in pro:
             self.pro = os.path.expandvars(pro)
@@ -544,6 +556,7 @@ class PipeProcedure():
         self.validplots = validplots
         self.plotdir = plotdir
         self.labels = labels
+        self.drop_sim_versions = drop_sim_versions
 
         if self.outname is not None:
 #             print(self.outname)
@@ -961,13 +974,14 @@ class Training(PyPipeProcedure):
 
     def configure(self,pro=None,baseinput=None,setkeys=None,proargs=None,
                   prooptions=None,outname="pipeline_train_input.input",
-                  labels=None,**kwargs):
+                  labels=None,drop_sim_versions=None,**kwargs):
         self.done_file = None
         self.outname = outname
         self.proargs = proargs
         self.prooptions = prooptions
         super().configure(pro=pro,baseinput=baseinput,setkeys=setkeys,
-                          proargs=proargs,prooptions=prooptions,labels=labels)
+                          proargs=proargs,prooptions=prooptions,labels=labels,
+                          drop_sim_versions=drop_sim_versions)
 
     def glueto(self,pipepro):
         if not isinstance(pipepro,str):
