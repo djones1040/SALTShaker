@@ -573,6 +573,7 @@ class GaussNewton(saltresids.SALTResids):
 			for fit in ['x0','color','x0','color','x1']:
 				X,chi2_init,chi2=self.process_fit(X,self.fitOptions[fit][1],{},fit=fit,doPriors=False,doSpecResids=  (fit=='x0'),allowjacupdate=False)
 		else:
+			import pdb;pdb.set_trace()
 			chi2_init=(self.lsqwrap(X,{},usesns=usesns)**2).sum()
 		log.info(f'starting loop; {loop_niter} iterations')
 		chi2results=self.getChi2Contributions(X,{})

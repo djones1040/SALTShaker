@@ -102,8 +102,8 @@ class SALTfitcachespectrum(SALTtrainingspectrum):
 		z = sn.zHelio
 		self.pcderivsparse=sparse.csr_matrix(residsobj.spline_deriv_interp((spectrum.phase,spectrum.wavelength/(1+z)),method=residsobj.interpMethod))
 		self.spectrumid=key
-		self.ispecx0=np.where(self.parlist=='specx0_{}_{}'.format(sn,key))[0]
-		self.ispcrcl=np.where(self.parlist=='specrecal_{}_{}'.format(sn,key))[0]
+		self.ispecx0=np.where(residsobj.parlist=='specx0_{}_{}'.format(sn,key))[0]
+		self.ispcrcl=np.where(residsobj.parlist=='specrecal_{}_{}'.format(sn,key))[0]
 		
 class SALTfitcacheSN(SALTtrainingSN):
 	"""Class to store SN data in addition to cached results useful in speeding up the fitter
@@ -399,11 +399,11 @@ class SALTResids:
 
 			priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,guess)
 			residuals+=[priorResids]
-			jacobian+=[priorJac[:,varyParams]]
+			jacobian+=[priorJac]
 			BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
 				self.priors.BoundedPriorResids(self.bounds,self.boundedParams,guess)
 			residuals+=[BoundedPriorResids]
-			jacobian+=[sparse.csr_matrix(BoundedPriorJac[:,varyParams])]
+			jacobian+=[sparse.csr_matrix(BoundedPriorJac)]
 
 		if self.regularize:
 			for regularization, weight,regKey in [(self.phaseGradientRegularization, self.regulargradientphase,'regresult_phase'),
@@ -413,7 +413,7 @@ class SALTResids:
 					continue
 				if regKey in storedResults and not (varyParams[self.im0].any() or varyParams[self.im1].any()):
 					residuals += storedResults[regKey]
-					jacobian +=  [sparse.csr_matrix((r.size,varyParams.sum())) for r in storedResults[regKey]]
+					jacobian +=  [sparse.csr_matrix((r.size,self.parlist.size)) for r in storedResults[regKey]]
 				else:
 					for regResids,regJac,relativeweight in zip( *regularization(guess,storedResults,varyParams),[1,self.m1regularization]):
 						residuals += [regResids*np.sqrt(weight*relativeweight)]
@@ -480,12 +480,12 @@ class SALTResids:
 			priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,x)	
 			logp -=(priorResids**2).sum()/2
 			if computeDerivatives:
-				grad-= (priorResids [:,np.newaxis] * priorJac[:,varyParams]).sum(axis=0)
+				grad-= (priorResids [:,np.newaxis] * priorJac).sum(axis=0)
 			BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
 			self.priors.BoundedPriorResids(self.bounds,self.boundedParams,x)
 			logp -=(BoundedPriorResids**2).sum()/2
 			if computeDerivatives:
-				grad-= (BoundedPriorResids [:,np.newaxis] * BoundedPriorJac[:,varyParams]).sum(axis=0)
+				grad-= (BoundedPriorResids [:,np.newaxis] * BoundedPriorJac).sum(axis=0)
 
 
 		if self.regularize:
@@ -537,7 +537,7 @@ class SALTResids:
 				
 			if not fixUncertainty: 
 				filtresids['lognorm']=0
-				filtresids['lognorm_grad']=np.zeros(varyParams.sum())
+				filtresids['lognorm_grad']=np.zeros(self.parlist.size)
 		
 			#More stable to solve by backsubstitution than to invert and multiply
 			fluxdiff=filtmodel['modelflux']-filtmodel['dataflux']
@@ -555,9 +555,8 @@ class SALTResids:
 					filtresids['resid_jacobian']=sparse.csr_matrix(filtmodel['modelflux_jacobian'].shape)
 				if not fixUncertainty:
 					raise NotImplementedError('Derivative of variance is still a work in progress')
-					varyParlist=self.parlist[varyParams]
 					#Cut out zeroed jacobian entries to save time
-					nonzero=(~((filtmodel['modelvariance_jacobian']==0) & (filtmodel['modelflux_jacobian']==0 if not fixFluxes else True)).all(axis=0)) | (self.parlist[varyParams]=='clscat')
+					nonzero=(~((filtmodel['modelvariance_jacobian']==0) & (filtmodel['modelflux_jacobian']==0 if not fixFluxes else True)).all(axis=0)) | (self.parlist=='clscat')
 					reducedJac=filtmodel['modelvariance_jacobian'][:,nonzero]
 					#import pdb;pdb.set_trace()
 					#Calculate L^-1 (necessary for the diagonal derivative)
@@ -570,7 +569,7 @@ class SALTResids:
 					fractionalLDeriv=np.dot(invL,np.swapaxes(reducedJac[:,np.newaxis,:]* invL.T[:,:,np.newaxis],0,1))
 		
 					fluxPrime= linalg.solve_triangular(L,filtmodel['modelflux'])
-					fractionalLDeriv[:,:,varyParlist[nonzero]=='clscat']+= 2*clscat*dclscat[np.newaxis,np.newaxis,:]* np.outer(fluxPrime,fluxPrime)[:,:,np.newaxis]
+					fractionalLDeriv[:,:,self.iclscat]+= 2*clscat*dclscat[np.newaxis,np.newaxis,:]* np.outer(fluxPrime,fluxPrime)[:,:,np.newaxis]
 					if not fixFluxes:
 						jacPrime = linalg.solve_triangular(L,filtmodel['modelflux_jacobian'][:,nonzero])
 						#Derivative w.r.t  color scatter 
@@ -613,7 +612,7 @@ class SALTResids:
 		
 			#Create a diagonal matrix with the inverse uncertainty on the diagonal
 			if not fixFluxes: spectralresids['resid_jacobian']= sparse.diags([spectralSuppression/uncertainty],offsets=[0])*spectralmodel['modelflux_jacobian']
-			else: spectralresids['resid_jacobian']=sparse.csr_matrix((spectralmodel['modelflux'].size,varyParams.sum()))
+			else: spectralresids['resid_jacobian']=sparse.csr_matrix((spectralmodel['modelflux'].size,self.parlist.size))
 
 			if not fixUncertainty:
 				#Calculate jacobian of total spectral uncertainty including reported uncertainties
@@ -639,7 +638,6 @@ class SALTResids:
 	def modelvalsforSN(self,x,sn,storedResults,varyParams):		
 		
 		temporaryResults={}
-		x1Deriv= varyParams[self.parlist=='x1_{}'.format(sn)][0] 
 		self.fillStoredResults(x,storedResults)
 
 		fluxphotkey='phot'+'fluxes_{}'.format(sn)
@@ -648,16 +646,17 @@ class SALTResids:
 		varspeckey= 'spec'+'variances_{}'.format(sn)
 		z = self.datadict[sn].zHelio
 		sndata=self.datadict[sn]
+		x1Deriv= varyParams[sndata.ix1] 
 		obsphase = sndata.obsphase #self.phase*(1+z)
-		x1,c,tpkoff = x[self.parlist == f'x1_{sn}'],\
-						 x[self.parlist == f'c_{sn}'],x[self.parlist == f'tpkoff_{sn}']
+		x1,c,tpkoff = x[sndata.ix1],\
+						 x[sndata.ic],x[sndata.itpkoff]
 		colorexp= 10. ** (storedResults['colorLaw'] * c)
 		temporaryResults['colorexp'] =colorexp
 		
 		calculateFluxes= not ('photfluxes_{}'.format(sn) in storedResults  and  'specfluxes_{}'.format(sn) in storedResults)
 		calculateVariances= not ('photvariances_{}'.format(sn) in storedResults and  'specvariances_{}'.format(sn) in storedResults)
 		if calculateFluxes and not fluxphotkey in storedResults and not fluxspeckey in storedResults:
-			tpkDerivs=varyParams[self.parlist=='tpkoff_{}'.format(sn)][0]
+			tpkDerivs=varyParams[sndata.itpkoff]
 			
 			#Apply MW extinction
 			M0,M1 = storedResults['components']
@@ -716,16 +715,16 @@ class SALTResids:
 		obsphase = sndata.obsphase #self.phase*(1+z)
 		wavedelt = obswave[1]-obswave[0]
 		phasedelt = obsphase[1]-obsphase[0]
-		x0,x1,c,tpkoff = x[self.parlist == f'x0_{sn}'],x[self.parlist == f'x1_{sn}'],\
-						 x[self.parlist == f'c_{sn}'],x[self.parlist == f'tpkoff_{sn}']
+		x0,x1,c,tpkoff = x[sndata.ix0],x[sndata.ix1],\
+						 x[sndata.ic],x[sndata.itpkoff]
 		
-		x0Deriv= varyParams[self.parlist==f'x0_{sn}']
-		x1Deriv= varyParams[self.parlist==f'x1_{sn}'][0] 
-		tpkDeriv=varyParams[self.parlist==f'tpkoff_{sn}'][0]
-		cDeriv=  varyParams[self.parlist==f'c_{sn}'][0]
+		x0Deriv= varyParams[sndata.ix0]
+		x1Deriv= varyParams[sndata.ix1]
+		tpkDeriv=varyParams[sndata.itpkoff]
+		cDeriv=  varyParams[sndata.ic]
 		requiredPCDerivs=varyParams[self.im0]|varyParams[self.im1]
 		
-		varyparlist=self.parlist[varyParams]
+		
 		
 		colorlaw,colorexp=storedResults['colorLaw'],temporaryResults['colorexp']
 		reddenedsalt2flux=colorexp*temporaryResults['fluxInterp']
@@ -738,7 +737,7 @@ class SALTResids:
 			filtresultsdict={}
 			photresultsdict[flt]=filtresultsdict
 			filtresultsdict['dataflux'] = lcdata.fluxcal
-			filtresultsdict['modelflux_jacobian'] = np.zeros((filtresultsdict['dataflux'].size,varyParams.sum()))
+			filtresultsdict['modelflux_jacobian'] = np.zeros((filtresultsdict['dataflux'].size,self.parlist.size))
 
 			pcderivkey=f'pcDeriv_phot_{sn}_{flt}'
 			if requiredPCDerivs.all() and not pcderivkey in storedResults:
@@ -760,7 +759,7 @@ class SALTResids:
 
 			modulatedFlux*=(dwave*fluxfactor*x0)
 			if  x0Deriv:
-				filtresultsdict['modelflux_jacobian'][:,(varyparlist == 'x0_{}'.format(sn))] = dmodelfluxdx0[:,np.newaxis]
+				filtresultsdict['modelflux_jacobian'][:,(sndata.ix0)] = dmodelfluxdx0
 			if x1Deriv:
 				int1dM1=temporaryResults['M1Interp']
 				M1interp = int1dM1(clippedPhase)
@@ -768,21 +767,22 @@ class SALTResids:
 				if ( (phase>obsphase.max())).any():
 					decayFactor=10**(-0.4*self.extrapolateDecline*(phase[phase>obsphase.max()]-obsphase.max()))
 					modulatedM1[np.where(phase>obsphase.max())[0]] *= decayFactor[:,np.newaxis]
-				filtresultsdict['modelflux_jacobian'][:,(varyparlist == 'x1_{}'.format(sn))] = (np.sum(modulatedM1, axis=1)*(dwave*fluxfactor*x0))[:,np.newaxis]
+				filtresultsdict['modelflux_jacobian'][:,(sndata.ix1)] = (np.sum(modulatedM1, axis=1)*(dwave*fluxfactor*x0))[:,np.newaxis]
 			
 			if tpkDeriv:
 				#Need to figure out how to handle derivatives wrt time when dealing with nearest neighbor interpolation; maybe require linear?
 				modulatedPhaseDeriv= lcdata.pbspl*temporaryResults['phaseDerivInterp'](clippedPhase)[:,idx]
-				filtresultsdict['modelflux_jacobian'][:,(varyparlist == 'tpkoff_{}'.format(sn))] =(np.sum(modulatedPhaseDeriv, axis=1)*(dwave*fluxfactor*x0) )[:,np.newaxis]
+				filtresultsdict['modelflux_jacobian'][:,sndata.itpkoff] =(np.sum(modulatedPhaseDeriv, axis=1)*(dwave*fluxfactor*x0) )[:,np.newaxis]
 				for p in np.where(phase>obsphase.max())[0]:
-					filtresultsdict['modelflux_jacobian'][p,(varyparlist=='tpkoff_{}'.format(sn))]=-0.4*np.log(10)*self.extrapolateDecline*modelflux[p]
+					filtresultsdict['modelflux_jacobian'][p,sndata.itpkoff]=-0.4*np.log(10)*self.extrapolateDecline*modelflux[p]
 			
 			if cDeriv:
 				#d model / dc is total flux (M0 and M1 components (already modulated with passband)) times the color law and a factor of ln(10)
-				filtresultsdict['modelflux_jacobian'][:,(varyparlist == 'c_{}'.format(sn))]=np.sum((modulatedFlux)*np.log(10)*colorlaw[np.newaxis,idx], axis=1)[:,np.newaxis]
+				filtresultsdict['modelflux_jacobian'][:,(sndata.ic)]=np.sum((modulatedFlux)*np.log(10)*colorlaw[np.newaxis,idx], axis=1)[:,np.newaxis]
 				
 			#Multiply M0 and M1 components (already modulated with passband) by c* d colorlaw / d cl_i, with associated normalizations
-			filtresultsdict['modelflux_jacobian'][:,varyparlist=='cl']= (np.sum((modulatedFlux)[:,:,np.newaxis]*self.colorLawDeriv[:,varyParams[self.iCL]][np.newaxis,idx,:], axis=1))*-0.4*np.log(10)*c	
+			if varyParams[self.iCL].any():
+				filtresultsdict['modelflux_jacobian'][:,self.iCL[varyParams]]= (np.sum((modulatedFlux)[:,:,np.newaxis]*self.colorLawDeriv[:,varyParams[self.iCL]][np.newaxis,idx,:], axis=1))*-0.4*np.log(10)*c	
 			
 			if requiredPCDerivs.any():
 					passbandColorExp=lcdata.pbspl*colorexp[idx]*sndata.mwextcurve[idx]
@@ -799,8 +799,8 @@ class SALTResids:
 							derivInterp=lcdata.pcderivsparse[p][:,requiredPCDerivs]
 							summation=derivInterp.T.dot(passbandColorExp[0])
 
-						filtresultsdict['modelflux_jacobian'][p,(varyparlist=='m0')]=summation[varyParams[self.im0][requiredPCDerivs]]*intmult
-						filtresultsdict['modelflux_jacobian'][p,(varyparlist=='m1')]=summation[varyParams[self.im1][requiredPCDerivs]]*intmult*x1
+						filtresultsdict['modelflux_jacobian'][p,self.im0[varyParams[self.im0]]]=summation[varyParams[self.im0]]*intmult
+						filtresultsdict['modelflux_jacobian'][p,self.im1[varyParams[self.im1]]]=summation[varyParams[self.im1]]*intmult*x1
 					
 			filtresultsdict['modelflux_jacobian']=sparse.csr_matrix(filtresultsdict['modelflux_jacobian'])
 			if np.isnan(filtresultsdict['modelflux']).any() or np.isinf(filtresultsdict['modelflux']).any():
@@ -817,37 +817,33 @@ class SALTResids:
 		obsphase = sndata.obsphase #self.phase*(1+z)
 		wavedelt = obswave[1]-obswave[0]
 		phasedelt = obsphase[1]-obsphase[0]
-		x1,c,tpkoff = x[self.parlist == f'x1_{sn}'],\
-						 x[self.parlist == f'c_{sn}'],x[self.parlist == f'tpkoff_{sn}']
+		x1,c,tpkoff = x[sndata.ix1],\
+						 x[sndata.ic],x[sndata.itpkoff]
 
-		x1Deriv= varyParams[self.parlist=='x1_{}'.format(sn)][0] 
-		tpkDeriv=varyParams[self.parlist=='tpkoff_{}'.format(sn)][0]
-		cDeriv=varyParams[self.parlist=='c_{}'.format(sn)][0]
+		x1Deriv= varyParams[sndata.ix1]
+		tpkDeriv=varyParams[sndata.itpkoff]
+		cDeriv=  varyParams[sndata.ic]
 		requiredPCDerivs=varyParams[self.im0]|varyParams[self.im1]
 		
-		varyParList=self.parlist[varyParams]
-        
 		resultsdict={}
-		if requiredPCDerivs.all() and not f'pcDeriv_spec_{sn}' in storedResults:
-			interpCache={}
 	
 		for k,spectrum in sndata.specdata.items():
 			specresultsdict={}
 			resultsdict[k]=specresultsdict
 			specresultsdict['dataflux'] = spectrum.flux
-			specresultsdict['modelflux_jacobian'] = np.zeros((specresultsdict['dataflux'].size,varyParams.sum()))
+			specresultsdict['modelflux_jacobian'] = np.zeros((specresultsdict['dataflux'].size,self.parlist.size))
 			#colorlawinterp=storedResults['colorLawInterp'](spectrum.wavelength/(1+z))
 			#colorexpinterp=10**(c*colorlawinterp)
 		
 
 
-			x0=x[self.parlist==f'specx0_{sn}_{k}']
-			x0Deriv=varyParams[self.parlist==f'specx0_{sn}_{k}'][0]
+			x0=x[spectrum.ispecx0]
+			x0Deriv=varyParams[spectrum.ispecx0]
 			
 			phase=spectrum.tobs+tpkoff
 
 			#Define recalibration factor
-			coeffs=x[self.parlist=='specrecal_{}_{}'.format(sn,k)]
+			coeffs=x[sndata.ispcrcl]
 			pow=coeffs.size-np.arange(coeffs.size)
 			recalCoord=(spectrum.wavelength-np.mean(spectrum.wavelength))/self.specrange_wavescale_specrecal
 			drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
@@ -885,26 +881,26 @@ class SALTResids:
 
             
 			if x0Deriv:
-				specresultsdict['modelflux_jacobian'][:,varyParList==f'specx0_{sn}_{k}'] = dmodelfluxdx0[:,np.newaxis]
+				specresultsdict['modelflux_jacobian'][:,sndata.ispecx0] = dmodelfluxdx0[:,np.newaxis]
 			
 			if x1Deriv:
 				M1interp = temporaryResults['M1Interp'](phase)
 				M1int = interp1d(obswave,M1interp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
 				M1interp = M1int(spectrum.wavelength)*recalexp
-				specresultsdict['modelflux_jacobian'][:,(varyParList == 'x1_{}'.format(sn))] = x0*M1interp[:,np.newaxis]
+				specresultsdict['modelflux_jacobian'][:,(sndata.ix1)] = x0*M1interp[:,np.newaxis]
 			
 			if tpkDeriv:
 				phaseDerivInterp = temporaryResults['phaseDerivInterp'](phase)
 				phaseDerivInterp = interp1d(obswave,phaseDerivInterp[0],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(spectrum.wavelength)
 				modPhaseDeriv = phaseDerivInterp*recalexp*x0
-				specresultsdict['modelflux_jacobian'][:,varyParList == 'tpkoff_{}'.format(sn)] = modPhaseDeriv[:,np.newaxis]
+				specresultsdict['modelflux_jacobian'][:,self.parlist == 'tpkoff_{}'.format(sn)] = modPhaseDeriv[:,np.newaxis]
 
 			#Check spectrum is inside proper phase range, extrapolate decline if necessary
 			#	saltfluxinterp*=10**(-0.4* self.extrapolateDecline* (phase-obsphase.max()))
 
 			if self.specrecal:
 				varySpecRecal=varyParams[self.parlist == 'specrecal_{}_{}'.format(sn,k)]
-				specresultsdict['modelflux_jacobian'][:,(varyParList == 'specrecal_{}_{}'.format(sn,k))]  = modulatedFlux[:,np.newaxis] * drecaltermdrecal[:,varySpecRecal]
+				specresultsdict['modelflux_jacobian'][:,(self.parlist == 'specrecal_{}_{}'.format(sn,k))]  = modulatedFlux[:,np.newaxis] * drecaltermdrecal[:,varySpecRecal]
 
 
 			# M0, M1
@@ -912,12 +908,12 @@ class SALTResids:
 				intmult = _SCALE_FACTOR/(1+z)*recalexp*sndata.mwextcurveint(spectrum.wavelength)
 				if self.fitTpkOff:
 					derivInterp=self.spline_deriv_interp((phase[0]/(1+z),spectrum.wavelength/(1+z)),method=self.interpMethod)*intmult[:,np.newaxis]
-					specresultsdict['modelflux_jacobian'][:,(varyParList=='m0')]  = derivInterp[:,varyParams[self.im0]]*(x0)
-					specresultsdict['modelflux_jacobian'][:,(varyParList=='m1')] =  derivInterp[:,varyParams[self.im1]]*(x1*x0)
+					specresultsdict['modelflux_jacobian'][:,(self.parlist=='m0')]  = derivInterp[:,varyParams[self.im0]]*(x0)
+					specresultsdict['modelflux_jacobian'][:,(self.parlist=='m1')] =  derivInterp[:,varyParams[self.im1]]*(x1*x0)
 				else:
 					derivInterp=spectrum.pcderivsparse.multiply(intmult[:,np.newaxis]).tocsc()
-					specresultsdict['modelflux_jacobian'][:,(varyParList=='m0')]  = (derivInterp[:,varyParams[self.im0]]*(x0[0])).toarray()
-					specresultsdict['modelflux_jacobian'][:,(varyParList=='m1')] = ( derivInterp[:,varyParams[self.im1]]*(x1[0]*x0[0])).toarray()
+					specresultsdict['modelflux_jacobian'][:,(self.parlist=='m0')]  = (derivInterp[:,varyParams[self.im0]]*(x0[0])).toarray()
+					specresultsdict['modelflux_jacobian'][:,(self.parlist=='m1')] = ( derivInterp[:,varyParams[self.im1]]*(x1[0]*x0[0])).toarray()
 			resultsdict[k]['modelflux_jacobian']=sparse.csr_matrix(resultsdict[k]['modelflux_jacobian'])
 
 		return resultsdict
@@ -931,29 +927,29 @@ class SALTResids:
 		obsphase = sndata.obsphase #self.phase*(1+z)
 		wavedelt = obswave[1]-obswave[0]
 		phasedelt = obsphase[1]-obsphase[0]
-		x1,c,tpkoff = x[self.parlist == f'x1_{sn}'],\
-						 x[self.parlist == f'c_{sn}'],x[self.parlist == f'tpkoff_{sn}']
+		x1,c,tpkoff = x[sndata.ix1],\
+						 x[sndata.ic],x[sndata.itpkoff]
 
-		x1Deriv= varyParams[self.parlist=='x1_{}'.format(sn)][0] 
-		tpkDeriv=varyParams[self.parlist=='tpkoff_{}'.format(sn)][0]
-		cDeriv=varyParams[self.parlist=='c_{}'.format(sn)][0]
-		varyParlist=self.parlist[varyParams]
+		x1Deriv= varyParams[sndata.ix1]
+		tpkDeriv=varyParams[sndata.itpkoff]
+		cDeriv=  varyParams[sndata.ic]
+		
 		
 		resultsdict={}
 		for k,spectrum in sndata.specdata.items():
-			x0=x[self.parlist==f'specx0_{sn}_{k}']
-			x0Deriv=varyParams[self.parlist==f'specx0_{sn}_{k}'][0]
+			x0=x[sndata.ispecx0]
+			x0Deriv=varyParams[sndata.ispecx0][0]
 						
 			specresultsdict={}
 			resultsdict[k]=specresultsdict
 			specresultsdict['fluxvariance'] =  spectrum.fluxerr**2
-			specresultsdict['modelvariance_jacobian']=np.zeros([len(spectrum),varyParams.sum()])
+			specresultsdict['modelvariance_jacobian']=np.zeros([len(spectrum),self.parlist.size])
 
 			phase=spectrum.tobs+tpkoff*(1+z)
 			
 			#Define recalibration factor
 			if self.specrecal:
-				coeffs=x[self.parlist=='specrecal_{}_{}'.format(sn,k)]
+				coeffs=x[spectrum.ispcrcl]
 				pow=coeffs.size-np.arange(coeffs.size)
 				recalCoord=(spectrum.wavelength-np.mean(spectrum.wavelength))/self.specrange_wavescale_specrecal
 				drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
@@ -977,22 +973,22 @@ class SALTResids:
 			specresultsdict['modelvariance'] = modelUncertainty # np.clip(modelUncertainty, (spectrum.flux*1e-3)**2,None)
 
 			if x0Deriv:
-				specresultsdict['modelvariance_jacobian'][:,(varyParlist == f'specx0_{sn}_{k}')] = uncertaintyNoX0[:,np.newaxis]*2*x0
+				specresultsdict['modelvariance_jacobian'][:,spectrum.ispecx0] = uncertaintyNoX0[:,np.newaxis]*2*x0
 			if x1Deriv:
-				specresultsdict['modelvariance_jacobian'][:,(varyParlist == 'x1_{}'.format(sn))] = x0**2 * 2*(modelerrnox[0]*modelerrnox[1]*corr[0]+ x1* modelerrnox[1]**2)[:,np.newaxis]
+				specresultsdict['modelvariance_jacobian'][:,(sndata.ix1)] = x0**2 * 2*(modelerrnox[0]*modelerrnox[1]*corr[0]+ x1* modelerrnox[1]**2)[:,np.newaxis]
 
 			if self.specrecal : 
-				varySpecRecal=varyParams[self.parlist == 'specrecal_{}_{}'.format(sn,k)]
-				specresultsdict['modelvariance_jacobian'][:,varyParlist == 'specrecal_{}_{}'.format(sn,k)]  =  modelUncertainty[:,np.newaxis] * drecaltermdrecal[:,varySpecRecal] * 2
+				varySpecRecal=varyParams[spectrum.ispcrcl]
+				specresultsdict['modelvariance_jacobian'][:,spectrum.ispcrcl[varySpecRecal]]  =  modelUncertainty[:,np.newaxis] * drecaltermdrecal[:,varySpecRecal] * 2
 
 			if varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any():
 				interpresult=  self.errorspline_deriv_interp((phase[0]/(1+z),spectrum.wavelength/(1+z)),method=self.interpMethod) 
 				extinctionexp=(recalexp* _SCALE_FACTOR/(1+z)*sndata.mwextcurveint(spectrum.wavelength))
-				specresultsdict['modelvariance_jacobian'][:,(varyParlist=='modelerr_0'  )]   = \
+				specresultsdict['modelvariance_jacobian'][:,(self.parlist=='modelerr_0'  )]   = \
 					2* x0**2  * (extinctionexp *( modelerrnox[0] + corr[0]*modelerrnox[1]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_0']]
-				specresultsdict['modelvariance_jacobian'][:,(varyParlist=='modelerr_1'  )]   = \
+				specresultsdict['modelvariance_jacobian'][:,(self.parlist=='modelerr_1'  )]   = \
 					2* x0**2  * (extinctionexp *(modelerrnox[1]*x1**2 + corr[0]*modelerrnox[0]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_1']]
-				specresultsdict['modelvariance_jacobian'][:,(varyParlist=='modelcorr_01')] = \
+				specresultsdict['modelvariance_jacobian'][:,(self.parlist=='modelcorr_01')] = \
 					2* x0**2  * (modelerrnox[1]*modelerrnox[0]*x1)[:,np.newaxis]  * interpresult[:,varyParams[self.parlist=='modelcorr_01']]
 
 			
@@ -1009,14 +1005,13 @@ class SALTResids:
 		obsphase = sndata.obsphase #self.phase*(1+z)
 		wavedelt = obswave[1]-obswave[0]
 		phasedelt = obsphase[1]-obsphase[0]
-		x0,x1,c,tpkoff = x[self.parlist == f'x0_{sn}'],x[self.parlist == f'x1_{sn}'],\
-						 x[self.parlist == f'c_{sn}'],x[self.parlist == f'tpkoff_{sn}']
+		x0,x1,c,tpkoff = x[self.parlist == f'x0_{sn}'],x[sndata.ix1],\
+						 x[sndata.ic],x[sndata.itpkoff]
 		
-		x0Deriv= varyParams[self.parlist=='x0_{}'.format(sn)][0] 
-		x1Deriv= varyParams[self.parlist=='x1_{}'.format(sn)][0] 
-		tpkDeriv=varyParams[self.parlist=='tpkoff_{}'.format(sn)][0]
-		cDeriv=varyParams[self.parlist=='c_{}'.format(sn)][0]
-		varyparlist=self.parlist[varyParams]
+		x0Deriv= varyParams[sndata.ix0]
+		x1Deriv= varyParams[sndata.ix1]
+		tpkDeriv=varyParams[sndata.itpkoff]
+		cDeriv=  varyParams[sndata.ic]		
 		
 		photresultsdict={}
 
@@ -1061,28 +1056,28 @@ class SALTResids:
 			modelUncertainty[negativevariance]=0
 			filtresultsdict['fluxvariance'] = lcdata.fluxcalerr**2
 			filtresultsdict['modelvariance']=  modelUncertainty
-			filtresultsdict['modelvariance_jacobian']=np.zeros((filtresultsdict['fluxvariance'].size,varyparlist.size))
+			filtresultsdict['modelvariance_jacobian']=np.zeros((filtresultsdict['fluxvariance'].size,self.parlist.size))
 
 			if x0Deriv:
-				filtresultsdict['modelvariance_jacobian'][:,(varyparlist == 'x0_{}'.format(sn))] = (uncertaintyNoX0*2*x0)[:,np.newaxis]
+				filtresultsdict['modelvariance_jacobian'][:,(sndata.ix0)] = (uncertaintyNoX0*2*x0)[:,np.newaxis]
 			if x1Deriv:
-				filtresultsdict['modelvariance_jacobian'][:,(varyparlist == 'x1_{}'.format(sn))] = (x0**2 *fluxfactor * 2*(modelerrnox[0]*modelerrnox[1]*corr[0]+ x1* modelerrnox[1]**2))[:,np.newaxis]
+				filtresultsdict['modelvariance_jacobian'][:,(sndata.ix1)] = (x0**2 *fluxfactor * 2*(modelerrnox[0]*modelerrnox[1]*corr[0]+ x1* modelerrnox[1]**2))[:,np.newaxis]
 
 			if cDeriv:
-				filtresultsdict['modelvariance_jacobian'][:,(varyparlist == 'c_{}'.format(sn))] = (modelUncertainty * 2 *np.log(10)*colorlawinterp)[:,np.newaxis]
+				filtresultsdict['modelvariance_jacobian'][:,(sndata.ic)] = (modelUncertainty * 2 *np.log(10)*colorlawinterp)[:,np.newaxis]
 
-			for i,varIndex in enumerate(np.where(varyparlist=='cl')[0]): 
+			for i,varIndex in enumerate(np.where(self.parlist=='cl')[0]): 
 				filtresultsdict['modelvariance_jacobian'][:,varIndex] =  2* (-0.4 *np.log(10)*c)*modelUncertainty*self.colorLawDerivInterp(lcdata.lambdaeff/(1+z))[varyParams[self.iCL]][i]
 			
 			if varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any():
 				extinctionexp=(colorexpinterp* _SCALE_FACTOR/(1+z)*sndata.mwextcurveint(lcdata.lambdaeff))
 			
 				interpresult =  self.errorspline_deriv_interp((clippedPhase/(1+z),lcdata.lambdaeff/(1+z)),method=self.interpMethod) 
-				filtresultsdict['modelvariance_jacobian'][:,(varyparlist=='modelerr_0') ]  =\
+				filtresultsdict['modelvariance_jacobian'][:,(self.parlist=='modelerr_0') ]  =\
 					( 2* fluxfactor* x0**2  * extinctionexp) *((( modelerrnox[0] + corr[0]*modelerrnox[1]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_0']])
-				filtresultsdict['modelvariance_jacobian'][:,(varyparlist=='modelerr_1')  ]  =\
+				filtresultsdict['modelvariance_jacobian'][:,(self.parlist=='modelerr_1')  ]  =\
 					( 2* fluxfactor* x0**2  * extinctionexp )*(((modelerrnox[1]*x1**2 + corr[0]*modelerrnox[0]*x1))[:,np.newaxis] * interpresult[:,varyParams[self.parlist=='modelerr_1']])
-				filtresultsdict['modelvariance_jacobian'][:,(varyparlist=='modelcorr_01')]  =\
+				filtresultsdict['modelvariance_jacobian'][:,(self.parlist=='modelcorr_01')]  =\
 					( 2*fluxfactor* x0**2 *x1) * ((modelerrnox[1]*modelerrnox[0])[:,np.newaxis]  * interpresult[:,varyParams[self.parlist=='modelcorr_01']])
 
 		return photresultsdict
@@ -1628,7 +1623,7 @@ class SALTResids:
 			dnumerator=( self.regularizationDerivs[1][:,:,varyParams[indices]]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2][:,:,varyParams[indices]]* dfluxdphase[i][:,:,np.newaxis] 
 				- self.regularizationDerivs[3][:,:,varyParams[indices]]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0][:,:,varyParams[indices]]* d2fluxdphasedwave[i][:,:,np.newaxis] )			
 			resids += [normalization* (numerator / (scale[i]**2 * self.neff)).flatten()]
-			jacobian=np.zeros((resids[-1].size,varyParams.sum()))
+			jacobian=jacobian=sparse.csr_matrix((resids[-1].size,self.parlist.size))
 			
 			if boolIndex[varyParams].any():
 				jacobian[:,boolIndex[varyParams]]=((dnumerator*(scale[i]**2 )- scaleDeriv[i][np.newaxis,np.newaxis,varyParams[indices]]*2*scale[i]*numerator[:,:,np.newaxis])/self.neff[:,:,np.newaxis]*normalization / scale[i]**4  ).reshape(-1, varyParams[indices].sum())
@@ -1659,7 +1654,7 @@ class SALTResids:
 			dnumerator=( self.regularizationDerivs[1][:,:,varyParams[indices]]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2][:,:,varyParams[indices]]* dfluxdphase[i][:,:,np.newaxis] 
 				- self.regularizationDerivs[3][:,:,varyParams[indices]]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0][:,:,varyParams[indices]]* d2fluxdphasedwave[i][:,:,np.newaxis] )			
 			resids += [normalization* (numerator).flatten()]
-			jacobian=np.zeros((resids[-1].size,varyParams.sum()))
+			jacobian=sparse.csr_matrix((resids[-1].size,self.parlist.size))
 			if boolIndex[varyParams].any():
 				jacobian[:,boolIndex[varyParams]]=(dnumerator).reshape(-1, varyParams[indices].sum())
 			jac += [jacobian]
@@ -1686,7 +1681,7 @@ class SALTResids:
 			normalization=np.sqrt(1/((self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
 			#Minimize model derivative w.r.t wavelength in unconstrained regions
 			resids+= [normalization* ( normedGrad /	self.neff).flatten()]
-			jacobian=np.zeros((resids[-1].size,varyParams.sum()))
+			jacobian=sparse.csr_matrix((resids[-1].size,self.parlist.size))
 			if boolIndex[varyParams].any():
 				jacobian[:,boolIndex[varyParams]]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
 			jac+= [jacobian]
@@ -1715,7 +1710,7 @@ class SALTResids:
 			normalization=np.sqrt(1/((self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
 			#Minimize model derivative w.r.t wavelength in unconstrained regions
 			waveGradResids+= [normalization* ( normedGrad /	self.neff).flatten()]
-			jacobian=np.zeros((waveGradResids[-1].size,varyParams.sum()))
+			jacobian=sparse.csr_matrix((waveGradResids[-1].size,self.parlist.size))
 			if boolIndex[varyParams].any():
 				jacobian[:,boolIndex[varyParams]]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
 			jac+= [jacobian]
@@ -1824,7 +1819,7 @@ class SALTResids:
 			normalization=27467.69325
 			#Minimize model derivative w.r.t wavelength in unconstrained regions
 			waveGradResids+= [normalization* ( normedGrad /	self.neff).flatten()]
-			jacobian=np.zeros((waveGradResids[-1].size,varyParams.sum()))
+			jacobian=sparse.csr_matrix((waveGradResids[-1].size,self.parlist.size))
 			if boolIndex[varyParams].any():
 				jacobian[:,boolIndex[varyParams]]=normalization*((normedGradDerivs)).reshape(-1, varyParams[indices].sum())
 			jac+= [jacobian]
