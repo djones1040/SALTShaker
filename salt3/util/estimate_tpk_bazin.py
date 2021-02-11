@@ -43,4 +43,4 @@ def estimate_tpk_bazin(time, flux, fluxerr, t0=None, max_nfev=10000000):
 	tpk = scaled_time_bettersamp[bazin(
 		scaled_time_bettersamp, *result.x).argmax()]
 
-	return tpk+time.min(),result.message
+	return tpk+time.min(),f"{'success' if status>0 else ''}:{result.message}"
