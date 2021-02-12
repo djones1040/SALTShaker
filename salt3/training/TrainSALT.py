@@ -25,7 +25,7 @@ from salt3.util.txtobj import txtobj
 from salt3.util.specSynPhot import getScaleForSN
 from salt3.util.specrecal import SpecRecal
 
-from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs,init_custom,init_salt2
+from salt3.training.init_hsiao import init_hsiao, init_kaepora, init_errs,init_errs_percent,init_custom,init_salt2
 from salt3.training.base import TrainSALTBase
 from salt3.training.saltfit import fitting
 from salt3.training import saltfit as saltfit
@@ -174,8 +174,15 @@ class TrainSALT(TrainSALTBase):
 			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs(
 				 *['%s/%s'%(init_rootdir,x) for x in ['salt2_lc_relative_variance_0.dat','salt2_lc_relative_covariance_01.dat','salt2_lc_relative_variance_1.dat','salt2_lc_dispersion_scaling.dat','salt2_color_dispersion.dat']],**init_options)
 		else:
-			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs(**init_options)
-
+			#errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs(**init_options)
+			init_options['phase'] = phase
+			init_options['wave'] = wave
+			init_options['phaseknotloc'] = phaseknotloc
+			init_options['waveknotloc'] = waveknotloc
+			init_options['m0knots'] = m0knots
+			init_options['m1knots'] = m1knots
+			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs_percent(**init_options)
+			
 		# number of parameters
 		n_phaseknots,n_waveknots = len(phaseknotloc)-self.options.interporder-1,len(waveknotloc)-self.options.interporder-1
 		n_errphaseknots,n_errwaveknots = len(errphaseknotloc)-self.options.errinterporder-1,len(errwaveknotloc)-self.options.errinterporder-1
@@ -309,7 +316,7 @@ class TrainSALT(TrainSALTBase):
 				for k in datadict[sn].specdata : 
 					guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]
 
-            # let's redefine x1 before we start
+			# let's redefine x1 before we start
 			ratio = RatioToSatisfyDefinitions(phase,wave,self.kcordict,[m0,m1])
 			ix1 = np.array([i for i, si in enumerate(parlist) if si.startswith('x1')],dtype=int)
 			guess[ix1]/=1+ratio*guess[ix1]
@@ -317,7 +324,7 @@ class TrainSALT(TrainSALTBase):
 			x1std = np.std(guess[ix1])
 			if x1std == x1std and x1std != 0.0:
 				guess[ix1]/= x1std
-                
+				
 
 			# spectral params
 			for sn in datadict.keys():
@@ -350,6 +357,7 @@ class TrainSALT(TrainSALTBase):
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
 	def fitSALTModel(self,datadict):
+
 		parlist,x_modelpars,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc = self.initialParameters(datadict)
 
 		saltfitkwargs = self.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
@@ -392,11 +400,12 @@ class TrainSALT(TrainSALTBase):
 				#	M0dataerr = M1dataerr = cov_M0_M1_data = np.zeros(len(M0))
 					
 			for k in datadict.keys():
-				try:
-					tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
-					SNParams[k]['t0'] = -trainingresult.SNParams[k]['tpkoff'] + tpk_init
-				except:
-					trainingresult.SNParams[k]['t0'] = -99
+				#try:
+				#	tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
+				#	SNParams[k]['t0'] = -trainingresult.SNParams[k]['tpkoff'] + tpk_init
+				#except:
+				#tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
+				trainingresult.SNParams[k]['t0'] = -trainingresult.SNParams[k]['tpkoff'] + datadict[k].tpk_guess
 		
 		log.info('message: %s'%message)
 		#print('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
@@ -717,13 +726,16 @@ SIGMA_INT: 0.106  # used in simulation"""
 			else:
 				binspecres = None
 			
-			#try:
-			datadict = readutils.rdAllData(snlist,self.options.estimate_tpk,self.kcordict,
-										   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
-										   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
-										   binspecres=binspecres,maxsn=self.options.maxsn)
-			#except Exception as e:
-			#	log.warning("An exception occured: {}".format(str(e)))
+			datadict = readutils.rdAllData(snlist,self.options.estimate_tpk,
+										   dospec=self.options.dospec,
+										   peakmjdlist=self.options.tmaxlist,
+										   binspecres=binspecres,snparlist=self.options.snparlist,
+										   maxsn=self.options.maxsn)
+
+			#datadict = readutils.rdAllData(snlist,self.options.estimate_tpk,self.kcordict,
+			#							   dospec=self.options.dospec,KeepOnlySpec=self.options.keeponlyspec,
+			#							   peakmjdlist=self.options.tmaxlist,waverange=self.options.waverange,
+			#							   binspecres=binspecres,maxsn=self.options.maxsn)
 				
 			tlc = time()
 			count = 0

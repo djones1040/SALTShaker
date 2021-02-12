@@ -571,9 +571,10 @@ class GaussNewton(saltresids.SALTResids):
 			#If snparams are totally uninitialized
 			log.info('Estimating supernova parameters x0,x1,c and spectral normalization')
 			for fit in ['x0','color','x0','color','x1']:
-				X,chi2_init,chi2=self.process_fit(X,self.fitOptions[fit][1],{},fit=fit,doPriors=False,doSpecResids=  (fit=='x0'),allowjacupdate=False)
+				X,chi2_init,chi2=self.process_fit(
+                    X,self.fitOptions[fit][1],{},fit=fit,doPriors=False,
+                    doSpecResids=  (fit=='x0'),allowjacupdate=False)
 		else:
-			import pdb;pdb.set_trace()
 			chi2_init=(self.lsqwrap(X,{},usesns=usesns)**2).sum()
 		log.info(f'starting loop; {loop_niter} iterations')
 		chi2results=self.getChi2Contributions(X,{})
@@ -1166,7 +1167,7 @@ class GaussNewton(saltresids.SALTResids):
 			#Exclude any parameters that are not currently affecting the fit (column in jacobian zeroed for that index)
 			includePars= np.diff(jacobian.indptr) != 0
 		if not includePars.all():
-			varyingParams[varyingParams]=varyingParams[varyingParams] & includePars
+			varyingParams=varyingParams & includePars
 			jacobian=jacobian[:,includePars]		
 		
 		#Exclude any residuals unaffected by the current fit (column in jacobian zeroed for that index)
@@ -1305,6 +1306,5 @@ class GaussNewton(saltresids.SALTResids):
 		log.info('Chi2 diff, % diff')
 		log.info(' '.join(['{:.2f}'.format(x) for x in [oldChi-chi2,(100*(oldChi-chi2)/oldChi)] ]))
 		print('')
-		#if fit == 'colorlaw': import pdb; pdb.set_trace()
 		return X,chi2,oldChi
 
