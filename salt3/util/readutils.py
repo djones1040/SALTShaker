@@ -82,7 +82,7 @@ class SALTtrainingspectrum(SALTtrainingdata):
 				iGood=(snanaspec['DQ']==1)
 			else:
 				iGood=np.ones(len(self),dtype=bool)
-			if (snanaspec['DQ']==1).sum() is 0:
+			if 'DQ' in snanaspec and (snanaspec['DQ']==1).sum() is 0:
 				raise SNDataReadError('Spectrum is all marked as invalid data')
 			if binspecres is not None:
 				flux = self.flux[iGood]
