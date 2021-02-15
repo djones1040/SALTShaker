@@ -1,0 +1,32 @@
+DOCUMENTATION:
+    PURPOSE: collect calibration info for PS1
+    REF: 
+    - AUTHOR:  Scolnic et al, 2014 (PS1 cosmology systematics)
+      ADS:     https://ui.adsabs.harvard.edu/abs/2014ApJ...795...45S
+    - AUTHOR:  Rest et al.. 2014
+      ADS:     https://ui.adsabs.harvard.edu/abs/2014ApJ...795...44R
+    INTENT:  Nominal
+    USAGE_CODE: kcor.exe PS1_gkcor_none.input
+    VALIDATE_SCIENCE: used in PS1 1st-year cosmology analysis 
+    DATA_VERSION:     PS1s_PS1_RS14
+    NOTES:
+    - none  in file name means AB offsets are zero
+DOCUMENTATION_END:
+
+# - - - - - -
+
+SN_SED:    Hsiao07.dat   # spectral template for SN
+MAGSYSTEM:  AB
+FILTSYSTEM: COUNT
+FILTPATH: PS1/PS1s_RS14/PS1_tonry
+FILTER: PS1-g   g_filt_tonry.txt   0.0
+FILTER: PS1-r   r_filt_tonry.txt   0.0
+FILTER: PS1-i   i_filt_tonry.txt   0.0
+FILTER: PS1-z   z_filt_tonry.txt   0.0
+FILTER: PS1-y   y_filt_tonry.txt   0.0
+
+LAMBDA_RANGE: 2100 15000  # for SN templates
+
+OUTFILE:  kcor_PS1_none_spec.fits
+
+SPECTROGRAPH:  spectrograph_table_new.dat

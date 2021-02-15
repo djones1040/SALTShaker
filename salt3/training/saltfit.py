@@ -52,12 +52,13 @@ class SALTTrainingResult(object):
 def ensurepositivedefinite(matrix,maxiter=5):
     mineigenval=np.linalg.eigvalsh(matrix)[0]
     print(mineigenval)
+    #import pdb; pdb.set_trace()
     if mineigenval>0:
         return matrix
     else:
         if maxiter==0: 
             raise ValueError('Unable to make matrix positive semidefinite')
-        return ensurepositivedefinite(matrix+np.diag(-mineigenval*2* np.ones(matrix.shape[0])),maxiter-1)
+        return ensurepositivedefinite(matrix+np.diag(-mineigenval*4* np.ones(matrix.shape[0])),maxiter-1)
         
 
 def getgaussianfilterdesignmatrix(shape,smoothing):
