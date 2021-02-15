@@ -1,0 +1,44 @@
+# Combined kcor file create by
+#   ['/project2/rkessler/PRODUCTS/SNANA/SNANA/util/combine_dataVersions.py', 'combine_jla_lowz_after_split.input']
+# User = midai 
+# Host = midway2-login2.rcc.local
+# Tue Dec  8 13:53:52 2020
+
+SN_SED:       Hsiao07.dat 
+BD17_SED:     bd_17d4708_stisnic_005.dat
+LAMBDA_RANGE: 2100 12600 
+OUTFILE:      kcor_JLA_LOWZ_COMBINED_add_spectrograph.fits 
+SPECTROGRAPH:  spectrograph_table_lowz.dat
+
+# Start filters for VERSION = Hamuy1996_LC_Bessell
+MAGSYSTEM:   BD17 
+FILTSYSTEM:  COUNT 
+FILTPATH:    PS1/Pantheon/SNLS3-Landolt 
+SURVEY:      CALAN_TOLOLO,CFA3,CFA2,OTHER,CFA1 
+FILTER:  Bessell-U/a          sux-shifted.dat_5A  9.72400 
+FILTER:  Bessell-B/b          sb-shifted.dat_5A  9.90700 
+FILTER:  Bessell-V/c          sv-shifted.dat_5A  9.46400 
+FILTER:  Bessell-R/d          sr-shifted.dat_5A  9.16600 
+FILTER:  Bessell-I/e          si-shifted.dat_5A  8.84600 
+
+# Start filters for VERSION = Hicken2009_LC_4Shooter2
+MAGSYSTEM:   BD17 
+FILTSYSTEM:  COUNT 
+FILTPATH:    filters/4Shooter2 
+SURVEY:      CFA3 
+FILTER:  CFA3S-U/f            U_4Shooter2.txt  9.6930 
+FILTER:  CFA3S-B/g            B_4Shooter2.txt  9.87400-0.0345 
+FILTER:  CFA3S-V/h            V_4Shooter2.txt  9.47900-0.0087 
+FILTER:  CFA3S-R/i            R_4Shooter2.txt  9.15500-0.021 
+FILTER:  CFA3S-I/j            I_4Shooter2.txt  8.85100-0.0136 
+
+# Start filters for VERSION = Hicken2009_LC_Keplercam
+MAGSYSTEM:   BD17 
+FILTSYSTEM:  COUNT 
+FILTPATH:    filters/Keplercam 
+SURVEY:      CFA3,OTHER 
+FILTER:  CFA3K-U/k            Us_Keplercam.txt  9.724 
+FILTER:  CFA3K-B/l            B_Keplercam.txt  9.88605-0.024 
+FILTER:  CFA3K-V/m            V_Keplercam.txt  9.47432-0.0012 
+FILTER:  CFA3K-r/n            r_Keplercam.txt  9.35252+0.0025 
+FILTER:  CFA3K-i/o            i_Keplercam.txt  9.25465-0.004 

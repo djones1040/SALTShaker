@@ -1,0 +1,234 @@
+##SALT3 INPUT
+[pipeline]
+n_lcfit = 10 
+n_biascorlcfit = 10 
+genversion_split = 0,1,2,3,4,5,6,7,8,9,10
+genversion_split_biascor = 0,1,2,3,4,5,6,7,8,9,10
+plotdir = figs
+
+[data]
+snlists=/home/midai/salt3_local/SALT3/examples/pipelinetest/training/data/SALT3TEST_SIMPLE.LIST
+
+[byosed]
+baseinput=byosed/BYOSED_base.params
+outinput=pipelinetest/TEST_BYOSED.params
+set_key= FLAGS COLOR False
+    FLAGS STRETCH False
+    
+[simulation]
+pro=submit_batch_jobs.sh
+baseinput=sim/SALT3_TRAINING_MASTER.INPUT
+outinput=pipeline/SALT3_TRAINING_MASTER.INPUT
+batch=True
+translate=True
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 10
+prooptions=
+set_key=2
+        FORMAT_MASK 48
+
+[training]
+pro=trainsalt
+proargs = -c 
+baseinput=training/SALT_SNANA.conf
+prooptions = 
+#--stage validate
+outinput=pipeline/SALT_SNANA.conf
+set_key=3
+        trainparams fitsalt2 False
+        trainparams fit_tpkoff False
+        trainparams gaussnewton_maxiter 2
+        iodata maxsn 25
+
+[lcfitting]
+pro=submit_batch_jobs.sh
+baseinput=lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml
+outinput=pipeline/Hamuy1996_LC.NML,pipeline/Hicken2009_LC.NML,pipeline/Jha2006_LC.NML,pipeline/OTHER_LOWZ_LC.NML,pipeline/Riess1999_LC.NML,pipeline/SDSS.NML,pipeline/SNLS3_LC.NML,pipeline/Pantheon_PS1MD_TEXT.NML,pipeline/DES-SN3YR_DES.NML,pipeline/Foundation_DR1.NML
+batch=True
+translate=True
+validplots=True
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 20
+prooptions=
+set_key=4
+    0 HEADER OUTDIR Hamuy1996_LC
+    0 FITINP FILTLIST_FIT UBVRIfhjkl
+    
+    1 HEADER OUTDIR Hicken2009_LC
+    1 FITINP FILTLIST_FIT UBVRIfhjklabcde
+
+    2 HEADER OUTDIR Jha2006_LC
+    2 FITINP FILTLIST_FIT UBVRIfhjkl
+
+    3 HEADER OUTDIR OTHER_LOWZ_LC
+    3 FITINP FILTLIST_FIT UBVRIfhjkl
+
+    4 HEADER OUTDIR Riess1999_LC
+    4 FITINP FILTLIST_FIT UBVRIfhjkl
+
+    5 HEADER OUTDIR SDSS
+    5 FITINP FILTLIST_FIT ugriz
+
+    6 HEADER OUTDIR SNLS3_LC
+    6 FITINP FILTLIST_FIT griz
+
+    7 HEADER OUTDIR Pantheon_PS1MD_TEXT
+    7 FITINP FILTLIST_FIT griz
+
+    8 HEADER OUTDIR DES-SN3YR_DES
+    8 FITINP FILTLIST_FIT griz
+
+    9 HEADER OUTDIR Foundation_DR1
+    9 FITINP FILTLIST_FIT griz
+
+
+[biascorsim]
+pro=submit_batch_jobs.sh
+baseinput=sim/SALT3_TRAINING_MASTER.INPUT
+outinput=pipeline/SALT3_TRAINING_MASTER_biascor.INPUT
+batch=True
+translate=True
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 10
+prooptions=--fast
+set_key=2
+        GENPREFIX SIM_SALT3TRAIN_BIASCOR
+
+        NGENTOT_LC[0] 500
+        GENSIGMA_SALT2ALPHA[0] 1.E8 1.E8  
+        GENSIGMA_SALT2BETA[0] 1.E8 1.E8
+        GENRANGE_SALT2ALPHA[0]  0.09  0.2
+        GENGRID_SALT2ALPHA[0]   2
+        GENRANGE_SALT2BETA[0]  2.0  4.0
+        GENGRID_SALT2BETA[0]  2
+        
+        NGENTOT_LC[1] 5100
+        GENSIGMA_SALT2ALPHA[1] 1.E8 1.E8  
+        GENSIGMA_SALT2BETA[1] 1.E8 1.E8
+        GENRANGE_SALT2ALPHA[1]  0.09  0.2
+        GENGRID_SALT2ALPHA[1]   2
+        GENRANGE_SALT2BETA[1]  2.0  4.0
+        GENGRID_SALT2BETA[1]  2
+        
+        NGENTOT_LC[2] 1400
+        GENSIGMA_SALT2ALPHA[2] 1.E8 1.E8  
+        GENSIGMA_SALT2BETA[2] 1.E8 1.E8
+        GENRANGE_SALT2ALPHA[2]  0.09  0.2
+        GENGRID_SALT2ALPHA[2]   2
+        GENRANGE_SALT2BETA[2]  2.0  4.0
+        GENGRID_SALT2BETA[2]  2
+
+        NGENTOT_LC[3] 1100
+        GENSIGMA_SALT2ALPHA[3] 1.E8 1.E8  
+        GENSIGMA_SALT2BETA[3] 1.E8 1.E8
+        GENRANGE_SALT2ALPHA[3]  0.09  0.2
+        GENGRID_SALT2ALPHA[3]   2
+        GENRANGE_SALT2BETA[3]  2.0  4.0
+        GENGRID_SALT2BETA[3]  2
+
+        NGENTOT_LC[4] 800
+        GENSIGMA_SALT2ALPHA[4] 1.E8 1.E8  
+        GENSIGMA_SALT2BETA[4] 1.E8 1.E8
+        GENRANGE_SALT2ALPHA[4]  0.09  0.2
+        GENGRID_SALT2ALPHA[4]   2
+        GENRANGE_SALT2BETA[4]  2.0  4.0
+        GENGRID_SALT2BETA[4]  2
+        
+        NGENTOT_LC[5] 11300
+        GENSIGMA_SALT2ALPHA[5] 1.E8 1.E8  
+        GENSIGMA_SALT2BETA[5] 1.E8 1.E8
+        GENRANGE_SALT2ALPHA[5]  0.09  0.2
+        GENGRID_SALT2ALPHA[5]   2
+        GENRANGE_SALT2BETA[5]  2.0  4.0
+        GENGRID_SALT2BETA[5]  2
+        
+        NGENTOT_LC[6] 6250
+        GENSIGMA_SALT2ALPHA[6] 1.E8 1.E8  
+        GENSIGMA_SALT2BETA[6] 1.E8 1.E8
+        GENRANGE_SALT2ALPHA[6]  0.09  0.2
+        GENGRID_SALT2ALPHA[6]   2
+        GENRANGE_SALT2BETA[6]  2.0  4.0
+        GENGRID_SALT2BETA[6]  2
+
+        NGENTOT_LC[7] 40000
+        GENSIGMA_SALT2ALPHA[7] 1.E8 1.E8  
+        GENSIGMA_SALT2BETA[7] 1.E8 1.E8
+        GENRANGE_SALT2ALPHA[7]  0.09  0.2
+        GENGRID_SALT2ALPHA[7]   2
+        GENRANGE_SALT2BETA[7]  2.0  4.0
+        GENGRID_SALT2BETA[7]  2
+
+        NGENTOT_LC[8] 1500000
+        GENSIGMA_SALT2ALPHA[8] 1.E8 1.E8  
+        GENSIGMA_SALT2BETA[8] 1.E8 1.E8
+        GENRANGE_SALT2ALPHA[8]  0.09  0.2
+        GENGRID_SALT2ALPHA[8]   2
+        GENRANGE_SALT2BETA[8]  2.0  4.0
+        GENGRID_SALT2BETA[8]  2
+
+        NGENTOT_LC[9] 40000
+        GENSIGMA_SALT2ALPHA[9] 1.E8 1.E8  
+        GENSIGMA_SALT2BETA[9] 1.E8 1.E8
+        GENRANGE_SALT2ALPHA[9]  0.09  0.2
+        GENGRID_SALT2ALPHA[9]   2
+        GENRANGE_SALT2BETA[9]  2.0  4.0
+        GENGRID_SALT2BETA[9]  2
+        
+[biascorlcfit]
+pro=submit_batch_jobs.sh
+baseinput=lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml
+outinput=pipeline/Hamuy1996_LC_biascor.NML,pipeline/Hicken2009_LC_biascor.NML,pipeline/Jha2006_LC_biascor.NML,pipeline/OTHER_LOWZ_LC_biascor.NML,pipeline/Riess1999_LC_biascor.NML,pipeline/SDSS_biascor.NML,pipeline/SNLS3_LC_biascor.NML,pipeline/Pantheon_PS1MD_TEXT_biascor.NML,pipeline/DES-SN3YR_DES_biascor.NML,pipeline/Foundation_DR1_biascor.NML
+batch=True
+translate=True
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 80
+validplots=True
+prooptions=
+set_key=4
+    0 HEADER OUTDIR Hamuy1996_LC_BIASCOR
+    0 FITINP FILTLIST_FIT UBVRIfhjkl
+    
+    1 HEADER OUTDIR Hicken2009_LC_BIASCOR
+    1 FITINP FILTLIST_FIT UBVRIfhjklabcde
+
+    2 HEADER OUTDIR Jha2006_LC_BIASCOR
+    2 FITINP FILTLIST_FIT UBVRIfhjkl
+
+    3 HEADER OUTDIR OTHER_LOWZ_LC_BIASCOR
+    3 FITINP FILTLIST_FIT UBVRIfhjkl
+
+    4 HEADER OUTDIR Riess1999_LC_BIASCOR
+    4 FITINP FILTLIST_FIT UBVRIfhjkl
+
+    5 HEADER OUTDIR SDSS_BIASCOR
+    5 FITINP FILTLIST_FIT ugriz
+
+    6 HEADER OUTDIR SNLS3_LC_BIASCOR
+    6 FITINP FILTLIST_FIT griz
+
+    7 HEADER OUTDIR Pantheon_PS1MD_TEXT_BIASCOR
+    7 FITINP FILTLIST_FIT griz
+
+    8 HEADER OUTDIR DES-SN3YR_DES_BIASCOR
+    8 FITINP FILTLIST_FIT griz
+
+    9 HEADER OUTDIR Foundation_DR1_BIASCOR
+    9 FITINP FILTLIST_FIT griz
+
+        
+[getmu]
+pro=submit_batch_jobs.sh
+baseinput=getmu/BBC.input
+outinput=pipeline/BBC.input
+batch=True
+translate=True
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 20
+validplots=True
+prooptions=
+set_key=2
+        opt_biascor 240
+#        surveygroup_biascor 'CFA3S+CFA3K+CFA4p1+CFA4p2(zbin=0.01),PS1MD(zbin=0.05)'
+
+[cosmofit]
+pro=wfit.exe
+outinput=SALT2mu_FITOPT000_MUOPT000.M0DIF
+prooptions= -ompri 0.307 -dompri 0.01
+baseinput=
+batch=False
+validplots=True

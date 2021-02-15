@@ -23,3 +23,6 @@ v
 *.BATCH
 #*#
 *.png
+*.DONE
+SIMLOGS_SIM*
+*temp*

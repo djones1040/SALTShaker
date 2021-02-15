@@ -515,7 +515,6 @@ class TrainSALTBase:
 			else:
 				outdict[snid]=sn
 			
-			
 		finaldemos =[sumattr(attr,outdict) for attr in attrs]
 		sncutdemos =[sumattr(attr,cutdict) for attr in attrs]
 		for attr,desc,initial,final,cut in zip(attrs,descriptions,initialdemos,finaldemos,sncutdemos):

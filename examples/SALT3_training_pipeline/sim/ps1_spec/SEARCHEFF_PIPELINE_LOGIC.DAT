@@ -1,0 +1,36 @@
+# ------------------
+# May 22, 2008 R.Kessler
+#
+# Default pipeline logic that includes image-subtraction 
+# and detection using software (Human scanning and 
+# spectro follow-up are NOT included here).
+# First number after "SURVEY:" is the number of epochs 
+# required; second argument is the logic for a single-epoch
+# detection. 'gr' => g.and.r are required.  A plus-sign '+' 
+# => logical-OR. The SDSS pipeline required two of three gri 
+# filters, and is represented by 'gr+ri+gi'. The pipeline 
+# logic can be over-written in the sim-input file with 
+#
+#   SEARCH_PIPELINE_LOGIC: <Nepoch>  <single-detection-logic>
+#
+# Note that the SEARCH_[SNR,MAG]_[SURVEY]-<flt>.DAT files
+# specify the efficiency for a single-band detection.
+#
+# Jan 27 2017: add PS1 logic
+# Apr 27 2017: add LSST
+# ----------------------------
+
+
+SDSS: 3 gr+ri+gi  # require 3 epochs, each with detection in two bands.
+
+HST:  1 6         # require 1 epoch with detection in filter '6' = F850LP_ACS
+
+DES: 2 g+r+i+z       # 2 epochs in any filter, 2 Nights (Jan 2014, RK)
+
+LOWZ: 2 V           # 1 epoch with V-band
+
+WFIRST: 1 YJ+HJ 
+
+PS1MD: 3 g+r+i+z   # 3 detections w/i 10 days
+
+LSST: 2 u+g+r+i+z+Y     # 2 epochs in any filter
