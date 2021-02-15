@@ -353,7 +353,7 @@ class SALT3pipe():
                                     pro2_in.loc[pro2_in['tag']==tag,'value'] = ','.join(pro1_out)
                                 elif tag == 'kcor':
                                     for i,survey in zip(pro1_out_dict['ind'],pro1_out_dict['survey']):
-                                        if str(i) in pro2.drop_sim_versions.split(','):
+                                        if pro2.drop_sim_versions is not None and str(i) in pro2.drop_sim_versions.split(','):
                                             continue
                                         section = 'survey_{}'.format(survey.strip())
                                         if section not in pro2_in.loc[pro2_in['tag']==tag,'section'].values:
@@ -363,7 +363,7 @@ class SALT3pipe():
                                         pro2_in.loc[(pro2_in['tag']==tag) & (pro2_in['section']==section),'value'] = pro1_out[int(i)]
                                 elif tag == 'subsurvey_list':
                                     for i,survey in zip(pro1_out_dict['ind'],pro1_out_dict['survey']):
-                                        if str(i) in pro2.drop_sim_versions.split(','):
+                                        if pro2.drop_sim_versions is not None and str(i) in pro2.drop_sim_versions.split(','):
                                             continue
                                         section = 'survey_{}'.format(survey.strip())
                                         if section not in pro2_in.loc[pro2_in['tag']==tag,'section'].values:
