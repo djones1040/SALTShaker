@@ -60,7 +60,7 @@ def main(outfile,lcfile,salt3dir,
 	sn.REDSHIFT_HELIO = float(sn.REDSHIFT_HELIO.split('+-')[0])
 	try: sn.FLT = sn.FLT.astype('U20')
 	except: sn.FLT = sn.BAND.astype('U20')
-    
+	
 	if bandpassdict:
 		bandlist = []
 		for k in bandpassdict.keys():
@@ -313,11 +313,14 @@ def customfilt(outfile,lcfile,salt3dir,
 	#else:
 	salt2model.set(z=sn.REDSHIFT_HELIO,mwebv=sn.MWEBV)
 	fitparams = ['t0', 'x0', 'x1', 'c']
-	result, fitted_model = sncosmo.fit_lc(
-		data, salt2model, fitparams,
-		bounds={'t0':(t0-10, t0+10),
-				'z':(0.0,0.7),'x1':(-3,3),'c':(-0.3,0.3)})
-		
+
+	try:
+		result, fitted_model = sncosmo.fit_lc(
+			data, salt2model, fitparams,
+			bounds={'t0':(t0-10, t0+10),
+					'z':(0.0,0.7),'x1':(-3,3),'c':(-0.3,0.3)})
+		has_salt2 = True
+	except: has_salt2 = False
 	salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,
 								m1file=m1file,
 								clfile=clfile,cdfile=cdfile,
@@ -388,14 +391,15 @@ def customfilt(outfile,lcfile,salt3dir,
 		if bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+sn.REDSHIFT_HELIO) > 2800 and \
 		   bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+sn.REDSHIFT_HELIO) < 9000:
 			try:
-				chi2 = np.sum((sn.FLUXCAL[iFLT]-fitted_model.bandflux(
-					flt, sn.MJD[iFLT], zp=27.5-bandpassdict[sn.SURVEY][flt]['primarymag'],zpsys=sysdict[flt]))**2./sn.FLUXCALERR[iFLT]**2.)
-				chi2red = chi2/(len(sn.FLUXCAL[iFLT])-3)
-				ax.plot(plotmjd-t0,fitted_model.bandflux(
-					flt, plotmjd, zp=27.5-bandpassdict[sn.SURVEY][flt]['primarymag'],zpsys=sysdict[flt]),color='C1',
-						label='SALT2; $x_1 = %.2f$, $c = %.2f$,\n$\chi_{red}^2 = %.1f$'%(
-							result['parameters'][3],result['parameters'][4],chi2red))
-				salt2_chi2tot += chi2
+				if has_salt2:
+					chi2 = np.sum((sn.FLUXCAL[iFLT]-fitted_model.bandflux(
+						flt, sn.MJD[iFLT], zp=27.5-bandpassdict[sn.SURVEY][flt]['primarymag'],zpsys=sysdict[flt]))**2./sn.FLUXCALERR[iFLT]**2.)
+					chi2red = chi2/(len(sn.FLUXCAL[iFLT])-3)
+					ax.plot(plotmjd-t0,fitted_model.bandflux(
+						flt, plotmjd, zp=27.5-bandpassdict[sn.SURVEY][flt]['primarymag'],zpsys=sysdict[flt]),color='C1',
+							label='SALT2; $x_1 = %.2f$, $c = %.2f$,\n$\chi_{red}^2 = %.1f$'%(
+								result['parameters'][3],result['parameters'][4],chi2red))
+					salt2_chi2tot += chi2
 			except ValueError: pass
 
 		ax.errorbar(sn.MJD[sn.FLT == flt]-t0,sn.FLUXCAL[sn.FLT == flt],
