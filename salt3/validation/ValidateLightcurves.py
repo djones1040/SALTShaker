@@ -356,12 +356,7 @@ def customfilt(outfile,lcfile,salt3dir,
 		deltawave = salt3wave[g][1]-salt3wave[g][0]
 		denom = np.sum(pbspl)*deltawave
 		salt3synflux=np.sum(pbspl[np.newaxis,:]*salt3fluxnew[:,g],axis=1)*deltawave/HC_ERG_AA/denom
-<<<<<<< HEAD
-		salt3synflux *= 10**(0.4*bandpassdict[sn.SURVEY][flt]['stdmag'])*10**(0.4*27.5)/(1+float(sn.REDSHIFT_HELIO.split('+-')[0].replace(' ','')))
-=======
-		#salt3synflux=np.trapz(pbspl[np.newaxis,:]*salt3fluxnew[:,g]/HC_ERG_AA,salt3wave[g],axis=1)/denom
 		salt3synflux *= 10**(0.4*bandpassdict[sn.SURVEY][flt]['stdmag'])*10**(0.4*27.5)/(1+sn.REDSHIFT_HELIO)
->>>>>>> origin/master
 		
 
 		iFLT = (sn.FLT == flt) & (sn.MJD-t0 > -20) & (sn.MJD-t0 < 50)
