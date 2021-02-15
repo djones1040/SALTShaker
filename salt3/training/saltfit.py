@@ -375,7 +375,7 @@ class GaussNewton(saltresids.SALTResids):
 		self.iModelParam[self.imodelerr]=False
 		self.iModelParam[self.imodelcorr]=False
 		self.iModelParam[self.iclscat]=False
-		self.uncertaintyKeys=set(['photvariances_' +sn for sn in self.datadict]+['specvariances_' +sn for sn in self.datadict]+sum([[f'photCholesky_{sn}_{flt}' for flt in np.unique(self.datadict[sn]['photdata']['filt'])] for sn in self.datadict],[]))
+		self.uncertaintyKeys=set(['photvariances_' +sn for sn in self.datadict]+['specvariances_' +sn for sn in self.datadict]+sum([[f'photCholesky_{sn}_{flt}' for flt in self.datadict[sn].filt] for sn in self.datadict],[]))
 		
 		self.Xhistory=[]
 		self.tryFittingAllParams=True
@@ -573,6 +573,7 @@ class GaussNewton(saltresids.SALTResids):
 			for fit in ['x0','color','x0','color','x1']:
 				X,chi2_init,chi2=self.process_fit(X,self.fitOptions[fit][1],{},fit=fit,doPriors=False,doSpecResids=  (fit=='x0'),allowjacupdate=False)
 		else:
+			import pdb;pdb.set_trace()
 			chi2_init=(self.lsqwrap(X,{},usesns=usesns)**2).sum()
 		log.info(f'starting loop; {loop_niter} iterations')
 		chi2results=self.getChi2Contributions(X,{})
@@ -634,7 +635,7 @@ class GaussNewton(saltresids.SALTResids):
 		except Exception as e:
 			logging.critical('Color scatter crashed during fitting, finishing writing output')
 			logging.critical(e, exc_info=True)
-		#print('HACK NO SATISFY DEFS')
+
 		Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
 		logging.info('Checking that rescaling components to satisfy definitions did not modify photometry')
 		
@@ -819,6 +820,8 @@ class GaussNewton(saltresids.SALTResids):
 					Xnew[self.imodelerr]*=Y[-1]
 					result=-self.maxlikefit(Xnew,storedResults.copy(),**kwargs)
 					return 1e10 if np.isnan(result) else result
+				except KeyboardInterrupt as e:
+					raise e
 				except:
 					logging.warning('Error caught in minuit loop')
 					return 1e10
@@ -848,7 +851,11 @@ class GaussNewton(saltresids.SALTResids):
 			minuitkwargs['limit_'+extrapar]=(0,2)
 		
 		m=Minuit(fn,use_array_call=True,forced_parameters=params,errordef=.5,**minuitkwargs)
-		result,paramResults=m.migrad(ncall=maxiter)
+		try:
+			result,paramResults=m.migrad(ncall=maxiter)
+		except KeyboardInterrupt:
+			logging.info('Keyboard interrupt, exiting minuit loop')
+			return X,None
 		X=X.copy()
 		
 		paramresults=np.array([x.value for x  in paramResults])
