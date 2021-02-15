@@ -367,18 +367,9 @@ def customfilt(outfile,lcfile,salt3dir,
 				label='SALT3, $x_0$ = %8.5e, \nx1=%.2f, z=%.3f\nc=%.3f\n$\chi_{red}^2=%.1f$'%(
 					x0,x1,sn.REDSHIFT_HELIO,c,chi2red_salt3))
 		salt3_chi2tot += chi2_salt3
-<<<<<<< HEAD
-
-		if bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split()[0])) > 2800 and \
-		   bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+float(sn.REDSHIFT_HELIO.split()[0])) < 9000:
-=======
-		#if 'SIM_SALT2x0' in sn.__dict__.keys():
-		#	ax.plot(plotmjd-t0,salt2synflux,color='C1',
-		#			label='SALT2')
-		#else:
 		if bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+sn.REDSHIFT_HELIO) > 2800 and \
 		   bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+sn.REDSHIFT_HELIO) < 9000:
->>>>>>> origin/master
+
 			try:
 				if has_salt2:
 					chi2 = np.sum((sn.FLUXCAL[iFLT]-fitted_model.bandflux(
