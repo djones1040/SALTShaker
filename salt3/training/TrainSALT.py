@@ -867,5 +867,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 				self.validate(self.options.outputdir,datadict)
 		except:
 			log.exception(f'Exception raised during {stage}')
+			if stage != 'validation':
+				raise RuntimeError("Training exited unexpectedly")
 		
 	
