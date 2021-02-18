@@ -1014,12 +1014,11 @@ class SALTResids:
 				
 			if	x1Deriv or varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any():
 				modelErrInt = [ interp1d(
-					obswave, interr(phase)[0],kind=self.interpMethod,bounds_error=False,
+					obswave, interr(phase),kind=self.interpMethod,bounds_error=False,
 					fill_value=0,assume_sorted=True)  for interr in temporaryResults['uncertaintyComponentsInterp']]
 				modelCorrInt= [ interp1d(
-					obswave, intcorr(phase)[0],kind=self.interpMethod,bounds_error=False,
+					obswave, intcorr(phase),kind=self.interpMethod,bounds_error=False,
 					fill_value=0,assume_sorted=True) for intcorr in temporaryResults['uncertaintyCorrelationsInterp']]
-				
 				modelerrnox = [	 interr( spectrum.wavelength) *recalexp for interr in (modelErrInt)]
 				corr=  [intcorr(spectrum.wavelength) for intcorr in modelCorrInt]
 				
@@ -1035,7 +1034,7 @@ class SALTResids:
 				specresultsdict['modelvariance_jacobian'][:,spectrum.ispecx0] = uncertaintyNoX0[:,np.newaxis]*2*x0
 			if x1Deriv:
 				specresultsdict['modelvariance_jacobian'][:,(sndata.ix1)] = \
-					x0**2 * 2*(modelerrnox[0]*modelerrnox[1]*corr[0]+ x1* modelerrnox[1]**2)[:,np.newaxis]
+					x0**2 * 2*(modelerrnox[0]*modelerrnox[1]*corr[0]+ x1* modelerrnox[1]**2) #[:,np.newaxis]
 
 			if self.specrecal : 
 				varySpecRecal=varyParams[spectrum.ispcrcl]
