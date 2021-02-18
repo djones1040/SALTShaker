@@ -171,7 +171,7 @@ class SALTtrainingSN:
 					sn.MJD[sn.FLT == 'c'],sn.FLUXCAL[sn.FLT == 'c'],sn.FLUXCALERR[sn.FLT == 'c'],max_nfev=100000,t0=sn.SEARCH_PEAKMJD)
 			else:
 				raise SNDataReadError(f'need a blue filter to estimate tmax')
-		elif len(pkmjddict):
+		elif len(pkmjddict.keys()):
 			try:
 				tpk = pkmjddict[sn.SNID]
 				tpkmsg = 'success: peak MJD provided'
@@ -354,7 +354,7 @@ def rdAllData(snlists,estimate_tpk,
 		pksnid,pkmjd = np.loadtxt(peakmjdlist,unpack=True,dtype=str,usecols=[0,1])
 		pkmjd = pkmjd.astype('float')
 		pkmjddict={key:val for key,val in zip(pksnid,pkmjd)}
-	else: pkmjd,pksnid=[],[]
+	else: pkmjd,pksnid,pkmjddict=[],[],{}
 	if snparlist:
 		snpar = at.Table.read(snparlist,format='ascii')
 		snpar['SNID'] = snpar['SNID'].astype(str)
