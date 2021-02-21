@@ -1,0 +1,87 @@
+# MUOPT000:  ABCD fit with NBZ=11
+# MUOPT001:  idem with NBZ=22
+# MUOPT002:  legacy chi2 fit with no biasCor and no log(sigma),NBZ=11
+#
+
+BATCH_INFO: sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 1
+
+
+INPDIR+:  $WFIRST_USERS/rhounsell/CYCLE8/PHOTO_Z/Dan/A1_SHALLOW
+INPDIR+:  $WFIRST_USERS/rhounsell/CYCLE8/PHOTO_Z/Dan/A1_MEDIUM
+INPDIR+:  $WFIRST_USERS/rhounsell/CYCLE8/PHOTO_Z/Dan/A1_DEEP
+INPDIR+:  $WFIRST_ROOT/SALT3/examples/wfirst/foundation/data/fit/A1_SHALLOW/Foundation_BBC
+#INPDIR+:  /project2/rkessler/SURVEYS/WFIRST/USERS/rhounsell/CYCLE8/PHOTO_Z/FOUND/FOUND_2019
+
+STRINGMATCH_IGNORE: Shallow_Spec Medium_Spec Deep_Spec BYO_ Foundation_
+STRINGMATCH: _BBC
+VERSION_EXCLUDE_STRING:  BIASCOR 
+
+
+#WFITMUDIF_OPT:  -dompri 0.02 -wmin -1.5 -wmax -0.5 -wsteps 401 -hsteps 241
+#HST,SNAP,CANDELS,CLASH,PS1_HST_COMBINED
+# ------------------
+dumpflag_nobiascor=1  # added by RK, 4/18/2017
+
+fieldgroup_biascor='SHALLOW,MEDIUM,DEEP'
+
+#Info for Foundation survey
+#surveygroup_biascor='WFIRST(zbin=0.05)' #This refers to /project/rkessler/dscolnic/Foundation/sim_foundation8_gp2_rah.input #My Foundation sim input file
+
+blindflag=0
+opt_biascor=2
+file=SALT2mu_SHALLOW+MEDIUM+DEEP/DMS/FITOPT000.FITRES
+#Info for WFIRST survey
+simfile_biascor=$WFIRST_USERS/rhounsell/CYCLE8/PHOTO_Z/Dan/BIASCOR.FITRES, $WFIRST_ROOT/SALT3/examples/wfirst/foundation/biascor/FITOPT000.FITRES
+#simfile_biascor=$WFIRST_ROOT/SALT3/examples/wfirst/biascor_output/BIASCOR_Spec_DMS/FITOPT000.FITRES
+prefix=SALT2mu_fitopt
+vpecerr=150
+min_per_zbin=1
+varname_pIa=NN_PROB_IA
+redchi2_tol=.01
+fitflag_sigmb=1
+iflag_duplicate=2
+sig1=0.05
+zmin=0.01
+zmax=2.99
+powzbin=0.0 #dan added
+bins=50 #dan changed
+x1min=-3.0
+x1max=+3.0
+cmax=+0.3
+cmin=-0.3
+CUTWIN  x1ERR     0. 1.0
+CUTWIN  PKMJDERR  0. 2.0
+#CUTWIN FITPROB 0.00 1.0
+#CUTWIN HOST_LOGMASS -100 100
+errmask_write=0
+p1=0.14
+p2=3.1
+p3=0.0
+p4=0.0
+p5=0.0
+p6=0.0
+p7=10.0
+p8=0.01
+p9=0.70
+p10=0.0
+p11=-1.0
+p12=0.0
+p13=0.0
+u1=1
+u2=1
+u3=0
+u4=0
+u5=0
+u6=0
+u7=0
+u8=0
+u9=0
+u10=0
+u11=0
+u12=0
+u13=0
+h0=70.0
+mag0=-30.00
+uave=1
+hgtype=-1
+lensing_zpar=0.055

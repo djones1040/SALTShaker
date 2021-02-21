@@ -1,0 +1,26 @@
+[pipeline]
+n_lcfit = 2
+n_biascorlcfit = 2
+genversion_split = 0,1,2
+genversion_split_biascor = 0,1,2
+plotdir = figs
+
+[data]
+snlists=/home/midai/salt3_local/SALT3/examples/pipelinetest/training/data/SALT3TEST_SIMPLE.LIST
+
+[byosed]
+baseinput=byosed/BYOSED_base.params
+outinput=pipelinetest/TEST_BYOSED.params
+set_key= FLAGS COLOR False
+    FLAGS STRETCH False
+    
+[simulation]
+pro=submit_batch_jobs.sh
+baseinput=SALT3_TRAINING_MASTER.INPUT
+outinput=pipeline/SALT3_TRAINING_MASTER.INPUT
+batch=True
+translate=True
+batch_info=sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 10
+prooptions=
+set_key=2
+        FORMAT_MASK 48

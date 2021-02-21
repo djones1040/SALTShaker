@@ -1,0 +1,27 @@
+version:
+  1
+formatters:
+  brief:
+    format: "%(message)s"
+  standard:
+    format: "%(asctime)s - %(levelname)s - %(message)s"
+  error:
+    format: "%(levelname)s <PID %(process)d:%(processName)s> %(name)s.%(funcName)s(): %(message)s"
+
+handlers:
+  console:
+    class : logging.StreamHandler
+    formatter: brief
+    level   : INFO
+    stream  : ext://sys.stdout
+  file:
+    class : logging.FileHandler
+    formatter: standard
+    filename: testing.log
+    level: DEBUG
+    mode: w
+loggers:
+  salt3:
+    handlers: [console,file]
+    level: DEBUG
+    propagate: False

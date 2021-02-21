@@ -2,7 +2,7 @@ from __future__ import print_function
 
 import os
 import time
-from astropy.io import fits as pyfits
+from astropy.io import fits
 import numpy as np
 import glob
 from collections import Sequence
@@ -65,23 +65,69 @@ IIMODELS = {
 	'002':['IIL','Nugent+ScolnicIIL'],
 	}
 
-class SuperNovaSpectrum( object ):
+class SuperNovaSpectrum( object ) :
+	""" object class for a single SN spectrum from spectrum-sname-#.list file
+	"""
+	def __init__( self, datfile=None, verbose=False) : 
+		if not (datfile) : 
+			if verbose:	 print("No spec file provided. Returning an empty SuperNovaSpectrum object.")
+		if verbose: print("Reading in data from spec file %s"%(datfile))
+		self.readspecfile( datfile )
 
-	"""object class for spectra extracted from a SNANA-style .DAT file"""
+	@property
+	def z(self):
+		if 'Redshift' in self.__dict__ :
+			return( self.Redshift )
+		else : 
+			return( '' )
 
-	def __init__( self, datfile=None):
-		self.datfile = datfile
-		if datfile and os.path.exists(datfile):
-			self.readspecfromdatfile(datfile)
-		else:
-			print('Warning : data file not provided or doesn\'t exist')
-				
+	@property
+	def mjdspec(self):
+		if 'Date' in self.__dict__ :
+			return( self.Date )
+		else : 
+			return( '' )
+
+	def readspecfile(self, datfile ):
+		""" read spectrum from a JLA file.
+		Metadata in the header are in "@ value"
+		column names are given with "# value", will add manually 
+		Observation data lines are the rest 
+		"""
+		from numpy import array,log10,unique,where
+		if not os.path.isfile(datfile): raise RuntimeError( "%s does not exist."%datfile) 
+		self.datfile = os.path.abspath(datfile)
+		fin = open(datfile,'r')
+		data = fin.readlines()
+		fin.close()
+		colnames=['WAVE','FLUX','FLUXERR','VALID']
+		for col in colnames:
+			self.__dict__[ col ] = []
+		for i in range(len(data)):
+			line = data[i]
+			if(len(line.strip())==0) : continue
+			if line.startswith("@") :
+				metadata_name = line.split()[0][1:]
+				metadata_value = line.split()[1]
+				self.__dict__[ metadata_name ] = str2num(metadata_value)
+			elif line.startswith("#") : continue
+			else :
+				obsdat = line.split()
+				self.__dict__['WAVE'].append( str2num(obsdat[0]) )
+				self.__dict__['FLUX'].append( str2num(obsdat[1]) )
+				self.__dict__['FLUXERR'].append( str2num(obsdat[2]) )
+				if len(obsdat) >= 4: self.__dict__['VALID'].append( str2num(obsdat[3]) )
+				else: self.__dict__['VALID'].append( 1.0 )
+		for col in colnames : 
+			self.__dict__[col] = array( self.__dict__[col] )
+		return( None )
+
 class SuperNova( object ) : 
 	""" object class for a single SN extracted from SNANA sim tables
 		or from a SNANA-style .DAT file
 	"""
 	
-	def __init__( self, datfile=None, simname=None, snid=None, verbose=False, simdir=None ) : 
+	def __init__( self, datfile=None, headfitsfile=None, photfitsfile=None, specfitsfile=None, snid=None, verbose=False, simdir=None, readspec=True ) : 
 		""" Read in header info (z,type,etc) and full light curve data.
 		For simulated SNe stored in fits tables, user must provide the simname and snid,
 		and the data are collected from binary fits tables, assumed to exist 
@@ -89,27 +135,19 @@ class SuperNova( object ) :
 		For observed or simulated SNe stored in ascii .dat files, user must provide 
 		the full path to the datfile.
 		"""
-		if not (datfile or (snid and simname)) : 
+		if not (datfile or (snid and headfitsfile and photfitsfile)) : 
 			if verbose:	 print("No datfile or simname provided. Returning an empty SuperNova object.")
-			
-		if simname and snid :
-			if verbose : print("Reading in data from binary fits tables for %s %s"%(simname, str(snid)))
-			self.simname = simname
+		
+		if headfitsfile and photfitsfile and snid :
 			self.snid = snid
-
-			if not simdir: self.simdir = simname
-			else: self.simdir = simdir
-			
 			# read in header and light curve data from binary fits tables 
-			gothd = self.getheadfits( )
-			gotphot = self.getphotfits( )
-			if not (gothd and gotphot) : 
-				gotgrid = self.getgridfits()
-				if not gotgrid : 
-					print("Unable to read in data for %s %s.  No sim product .fits files found."%(simname, str(snid)))
+			gothd = self.getheadfits( headfitsfile )
+			gotphot = self.getphotfits( photfitsfile )
+			if specfitsfile is not None and readspec: gotspec = self.getspecfits( specfitsfile )
+			else: self.SPECTRA = {}
 		elif datfile :	
 			if verbose : print("Reading in data from light curve file %s"%(datfile))
-			self.readdatfile( datfile ) 
+			self.readdatfile( datfile, readspec=readspec ) 
 
 	@property
 	def name(self):
@@ -366,7 +404,7 @@ class SuperNova( object ) :
 		else : 
 			return( 0 ) 
 
-	def readdatfile(self, datfile ):
+	def readdatfile(self, datfile, readspec=True ):
 		""" read the light curve data from the SNANA-style .dat file.
 		Metadata in the header are in "key: value" pairs
 		Observation data lines are marked with OBS: 
@@ -415,36 +453,42 @@ class SuperNova( object ) :
 		for col in colnames : 
 			self.__dict__[col] = array( self.__dict__[col] )
 
-		self.readspecfromlcfile(datfile)
+		if readspec: self.readspecfromlcfile(datfile)
 		
 		return( None )
 
 	def readspecfromlcfile(self,datfile):
 		"""read spectroscopy from the SNANA lightcurve file"""
-		fin = open(datfile)
-		self.SPECTRA = {}
-		startSpec = False
-		for line in fin:
-			if line.startswith('SPECTRUM_ID'):
-				startSpec = True
-				specid = int(line.split()[1])-1
-				self.SPECTRA[specid] = {}
-				for v in specvarnames:
-					self.SPECTRA[specid][v] = np.array([])
-			elif line.startswith('END_SPECTRUM') and startSpec:
-				startSpec = False
-			elif line.startswith('VARNAMES_SPEC'):
-				specvarnames = line.split()[1:]
-			elif startSpec and not line.startswith('SPEC:'):
-				try:
-					self.SPECTRA[specid][line.split()[0][:-1]] = float(line.split('#')[0].split()[1])
-				except:
-					self.SPECTRA[specid][line.split()[0][:-1]] = line.split('#')[0].split()[1]
-			elif startSpec and line.startswith('SPEC'):
-				specvals = line.split('#')[0].split()[1:]
-				for v,sv in zip(specvarnames,specvals):
-					self.SPECTRA[specid][v] = np.append(self.SPECTRA[specid][v],float(sv))
 
+		with open(datfile) as fin:
+			reader = [x.split()[1:] for x in fin if x.startswith('SPEC:')]
+
+		with open(datfile) as fin:			
+			self.SPECTRA = {}
+			startSpec = False
+			i = 0
+			for line in fin:
+				if line.startswith('SPECTRUM_ID'):
+					startSpec = True
+					specid = int(line.split()[1])-1
+					self.SPECTRA[specid] = {}
+					istart = i
+				elif (line.startswith('END_SPECTRUM') or line.startswith('SPECTRUM_END')) and startSpec:
+					startSpec = False; iend = i
+					j = 0
+					for column in zip(*reader):
+						self.SPECTRA[specid][specvarnames[j]] = np.array(column[:][istart:iend]).astype(float)
+						j += 1
+				elif line.startswith('VARNAMES_SPEC'):
+					specvarnames = line.split()[1:]
+				elif startSpec and not line.startswith('SPEC:'):
+					try:
+						self.SPECTRA[specid][line.split()[0][:-1]] = float(line.split('#')[0].split()[1])
+					except:
+						self.SPECTRA[specid][line.split()[0][:-1]] = line.split('#')[0].split()[1]
+				elif startSpec and line.startswith('SPEC'):
+					i += 1
+				
 	def readnewspec(self,datfile):
 		"""read spectroscopy from an ascii file with columns wavelength, flux, (fluxerr)
 Header must include one of two following lines at the top:
@@ -529,7 +573,7 @@ Each file should contain only one spectrum
 		print('\nNOBS: %i'%len(self.FLUXCAL),file=fout)
 		if 'MAG' in self.__dict__.keys():
 			print('NVAR: 7',file=fout)
-			print('VARLIST:  MJD	FLT FIELD	FLUXCAL	  FLUXCALERR	MAG		MAGERR\n',file=fout)
+			print('VARLIST:	 MJD	FLT FIELD	FLUXCAL	  FLUXCALERR	MAG		MAGERR\n',file=fout)
 			
 			for i in range(self.nobs):
 				print('OBS: %9.3f  %s  %s %8.3f %8.3f %8.3f %8.3f'%(
@@ -537,7 +581,7 @@ Each file should contain only one spectrum
 					self.FLUXCALERR[i], self.MAG[i], self.MAGERR[i] ),file=fout)
 		else:
 			print('NVAR: 5',file=fout)
-			print('VARLIST:  MJD	FLT FIELD	FLUXCAL	  FLUXCALERR\n',file=fout)
+			print('VARLIST:	 MJD	FLT FIELD	FLUXCAL	  FLUXCALERR\n',file=fout)
 			
 			for i in range(self.nobs):
 				print('OBS: %9.3f  %s  %s %8.3f %8.3f'%(
@@ -582,68 +626,181 @@ NSPECTRA:  %i
 		fout.close()
 		return( datfile )
 
-	def getheadfits( self ) :
+	def appendspec2snanafile(self, outfile, specdir, verbose=False, ps=False, **kwarg ):
+		""" function to write jla data in snana format. Use as
+		sn_lc=jla.SuperNova(full_path_of_jla_data/lc-sn_name.list)
+		sn_lc.writesnanafile(full_path_of_jla_data/lc-sn_name.list)
+		"""
+		from numpy import array,log10,unique,where,absolute
+		if 'FLT' not in self.__dict__.keys():
+			self.FLT = self.BAND[:]
+		#if verbose:	 print("Writing data from light curve file %s to snana format"%(datfile))
+		fout = open(outfile,'w')
+		list_snana_headers=['SURVEY','SNID','RA','DEC','MWEBV','REDSHIFT_HELIO','MJDPK']
+		list_jla_headers=['SURVEY','SN','RA','DEC','MWEBV','Z_HELIO','DayMax']
+		non_header_keys = ['NOBS','NVAR','MJD','FLT','FIELD','FLUXCAL','FLUXCALERR','MAG','MAGERR','datfile']
+		for key in self.__dict__.keys(): #list_jla_headers : 
+			if key not in non_header_keys:
+				#icol = list_jla_headers.index(key)
+				if key == 'Z_HELIO' :
+					print('%s: %s +- %s'%(key,str(self.__dict__[key]),str(self.__dict__['Redshift_err'])),file=fout)
+				else :
+					print('%s: %s'%(key,str(self.__dict__[key])),file=fout)				
+		print('\nNOBS: %i'%len(self.MJD),file=fout)
+		print('NVAR: 6',file=fout)
+		print('VARLIST:	 MJD	FLT FIELD	FLUXCAL	  FLUXCALERR\n',file=fout)
+		for i in range(self.nobs):
+			#Factor_275=(27.5-self.ZP[i])/(-2.5)
+			#flux_275=self.Flux[i]/(10**Factor_275)
+			#fluxerr_275=absolute(1.0/10**Factor_275)*self.Fluxerr[i]
+			print('OBS: %9.3f  %s  %s %8.7f %8.7f'%(
+				self.MJD[i], self.FLT[i], 'NULL', self.FLUXCAL[i], 
+				self.FLUXCALERR[i]),file=fout)
+		print('END_PHOTOMETRY:\n',file=fout)
+		print('# =============================================',file=fout)
+		#self.datfile = os.path.abspath(datfile)
+		#folder_data=datfile[0:datfile.rfind('/')]+'/'
+		#import pdb; pdb.set_trace()
+		if ps: self.SNID = '%06i'%self.SNID
+		if type(self.SNID) == float: self.SNID == str(int(self.SNID))
+
+		list_file_spec=glob.glob(specdir+'/spectrum*'+str(self.__dict__['SNID'])+'*.list')
+		num_spec = [int(l.split('-')[-1].split('.')[0]) for l in list_file_spec]
+		if not len(list_file_spec) and isinstance(self.SNID,str):
+			snid2 = self.SNID[:]
+			snid2 = snid2[:-1]+snid2[-1].lower()
+			list_file_spec=glob.glob(specdir+'/spectrum*'+snid2+'*.list')
+			num_spec = [int(l.split('-')[-1].split('.')[0]) for l in list_file_spec]
+		#if verbose and len(list_file_spec) > 1:
+		#	import pdb; pdb.set_trace()
+		if not len(list_file_spec):
+			if verbose:
+				print('warning: no spectrum for SNID %s'%self.SNID)
+			return( None )
+		#else:
+		#	print(self.SNID,list_file_spec[0])
+		print('\nNSPECTRA: %i \n'%len(list_file_spec),file=fout)
+		print('\nNVAR_SPEC: 5',file=fout)
+		print('VARNAMES_SPEC: LAMMIN LAMMAX	 FLAM  FLAMERR DQ\n',file=fout)
+		counter=0
+		for specfile in np.array(list_file_spec)[np.argsort(num_spec)]:
+			counter=counter+1
+			sn_spectrum=SuperNovaSpectrum(specfile)
+			print('SPECTRUM_ID: %i'%counter,file=fout)
+			print('SPECTRUM_MJD: %9.2f'%sn_spectrum.mjdspec,file=fout)
+			resolution=sn_spectrum.WAVE[1]-sn_spectrum.WAVE[0]
+			for wl,fl,flerr,dq in zip(sn_spectrum.WAVE,sn_spectrum.FLUX,sn_spectrum.FLUXERR,sn_spectrum.VALID):
+				wl_l=wl-resolution/2.0
+				wl_u=wl+resolution/2.0
+				if fl == fl and flerr == flerr: print('SPEC: %9.2f %9.2f %9.5e %9.5e %i'%(wl_l,wl_u,fl,flerr,dq),file=fout)
+			print('SPECTRUM_END:\n',file=fout)	
+		fout.close()
+
+		return( None )
+
+	
+	def getheadfits( self, headfitsfile ) :
 		""" read header data for the given SN from a binary fits table
 		generated using the SNANA Monte Carlo simulator (GENSOURCE=RANDOM)
 		"""
 		# read in the fits bin table headers and data
-		sndataroot = os.environ['SNDATA_ROOT']
-		simdatadir = os.path.join( sndataroot,'SIM/%s'%self.simdir )
-		headfitsfiles = glob.glob(os.path.join( simdatadir, '%s_*-????_HEAD.FITS.gz'%self.simname))
-		print(headfitsfiles)
-		self.simnum = None
-		if not len( headfitsfiles ) : return(False)
-		for headfits in headfitsfiles:
-			hhead = pyfits.getheader( headfits, ext=1 ) 
-			hdata = pyfits.getdata( headfits, ext=1 ) 
+		#sndataroot = os.environ['SNDATA_ROOT']
+		#simdatadir = os.path.join( sndataroot,'SIM/%s'%self.simdir )
+		#headfitsfiles = glob.glob(os.path.join( simdatadir, '%s_*-????_HEAD.FITS.gz'%self.simname))
+		#print(headfitsfiles)
+		#self.simnum = None
+		#if not len( headfitsfiles ) : return(False)
+		#for headfits in headfitsfiles:
+		hhead = fits.getheader( headfitsfile, ext=1 ) 
+		hdata = fits.getdata( headfitsfile, ext=1 ) 
 
-			self.simnum = int(headfits.split('-')[-1].split('_HEAD')[0])
-			self.headfitswithsnid = headfits			
+		#self.simnum = int(headfitsfile.split('-')[-1].split('_HEAD')[0])
+		self.headfitswithsnid = headfitsfile
 
-			# collect header data into object properties.
-			Nsn = hhead['NAXIS2']	 # num. of rows in the table = num. of simulated SNe
-			Nhcol = hhead['TFIELDS'] # num. of table columns  = num. of data arrays
-			snidlist = np.array([ int( hdata[isn]['SNID'] ) for isn in range(Nsn) ])
+		# collect header data into object properties.
+		Nsn = hhead['NAXIS2']	 # num. of rows in the table = num. of simulated SNe
+		Nhcol = hhead['TFIELDS'] # num. of table columns  = num. of data arrays
+		snidlist = np.array([ int( hdata[isn]['SNID'] ) for isn in range(Nsn) ])
 
-			if self.snid not in snidlist : 
-				continue
-			isn = np.where( snidlist== self.snid )[0][0]
-			for ihcol in range( Nhcol ) : 
-				self.__dict__[ hhead['TTYPE%i'%(ihcol+1)] ] = hdata[isn][ihcol] 
-		
-			# Make some shortcut aliases to most useful metadata
-			for alias, fullname in ( [['z','SIM_REDSHIFT'], ['type','SNTYPE'],['mjdpk','SIM_PEAKMJD'],
-									  ['Hpk','SIM_PEAKMAG_H'],['Jpk','SIM_PEAKMAG_J'],['Wpk','SIM_PEAKMAG_W'],
-									  ['Zpk','SIM_PEAKMAG_Z'],['Ipk','SIM_PEAKMAG_I'],['Xpk','SIM_PEAKMAG_X'],['Vpk','SIM_PEAKMAG_V'],
-			]) : 
-				if fullname in self.__dict__.keys() : 
-					if alias=='type' : self.__dict__[alias] = SNTYPEDICT[self.__dict__[fullname]]
-					else : self.__dict__[alias] = self.__dict__[fullname]
-			return(True)
+		if self.snid not in snidlist : 
+			raise RuntimeError(f'SNID {self.snid} not in list')
+		isn = np.where( snidlist== self.snid )[0][0]
+		for ihcol in range( Nhcol ) : 
+			self.__dict__[ hhead['TTYPE%i'%(ihcol+1)] ] = hdata[isn][ihcol] 
+
+		# Make some shortcut aliases to most useful metadata
+		for alias, fullname in ( [['z','SIM_REDSHIFT'], ['type','SNTYPE'],['mjdpk','SIM_PEAKMJD'],
+								  ['Hpk','SIM_PEAKMAG_H'],['Jpk','SIM_PEAKMAG_J'],['Wpk','SIM_PEAKMAG_W'],
+								  ['Zpk','SIM_PEAKMAG_Z'],['Ipk','SIM_PEAKMAG_I'],['Xpk','SIM_PEAKMAG_X'],['Vpk','SIM_PEAKMAG_V'],
+		]) : 
+			if fullname in self.__dict__.keys() : 
+				if alias=='type' : self.__dict__[alias] = SNTYPEDICT[self.__dict__[fullname]]
+				else : self.__dict__[alias] = self.__dict__[fullname]
+		return(True)
 		raise RuntimeError( "SNID %s is not in %s"%(self.snid,headfits) )
 		
-	def getphotfits( self ) :
+	def getphotfits( self, photfitsfile ) :
 		""" read phot data for the given SN from the photometry fits table
 		generated using the SNANA Monte Carlo simulator (GENSOURCE=RANDOM)
 		"""
 		# read in the fits bin table headers and data
-		sndataroot = os.environ['SNDATA_ROOT']
-		simdatadir = os.path.join( sndataroot,'SIM/%s'%self.simdir )
-		photfitsfiles = glob.glob(os.path.join( simdatadir, self.headfitswithsnid.replace('HEAD','PHOT')))
-		if not len( photfitsfiles ) : return(False)
-		for photfits in photfitsfiles:
-			phead = pyfits.getheader( photfits, ext=1 ) 
-			pdata = pyfits.getdata( photfits, ext=1 ) 
+		#sndataroot = os.environ['SNDATA_ROOT']
+		#simdatadir = os.path.join( sndataroot,'SIM/%s'%self.simdir )
+		#photfitsfiles = glob.glob(os.path.join( simdatadir, self.headfitswithsnid.replace('HEAD','PHOT')))
+		#if not len( photfitsfiles ) : return(False)
+		#for photfits in photfitsfiles:
+		phead = fits.getheader( photfitsfile, ext=1 ) 
+		pdata = fits.getdata( photfitsfile, ext=1 ) 
 
-			# find pointers to beginning and end of the obs sequence
-			sndata = pdata[ self.PTROBS_MIN-1:self.PTROBS_MAX ]
+		# find pointers to beginning and end of the obs sequence
+		sndata = pdata[ self.PTROBS_MIN-1:self.PTROBS_MAX ]
 
-			# collect phot data into object properties.
-			Npcol = phead['TFIELDS'] # num. of table columns  = num. of data arrays
-			for ipcol in range( Npcol ) : 
-				self.__dict__[ phead['TTYPE%i'%(ipcol+1)] ] = np.array( [ sndata[irow][ipcol] for irow in range(self.NOBS) ] )
-			return( True )
-		
+		# collect phot data into object properties.
+		Npcol = phead['TFIELDS'] # num. of table columns  = num. of data arrays
+		for ipcol in range( Npcol ) : 
+			self.__dict__[ phead['TTYPE%i'%(ipcol+1)] ] = np.array( [ sndata[irow][ipcol] for irow in range(self.NOBS) ] )
+		return( True )
+
+	def getspecfits( self, specfitsfile ) :
+		""" read phot data for the given SN from the photometry fits table
+		generated using the SNANA Monte Carlo simulator (GENSOURCE=RANDOM)
+		"""
+		# read in the fits bin table headers and data
+		#sndataroot = os.environ['SNDATA_ROOT']
+		#simdatadir = os.path.join( sndataroot,'SIM/%s'%self.simdir )
+		#photfitsfiles = glob.glob(os.path.join( simdatadir, self.headfitswithsnid.replace('HEAD','PHOT')))
+		#if not len( photfitsfiles ) : return(False)
+		#for photfits in photfitsfiles:
+
+		hdu = fits.open(specfitsfile)
+
+
+		# collect phot data into object properties.
+		#Npcol = phead['TFIELDS'] # num. of table columns  = num. of data arrays
+		#for ipcol in range( Npcol ) : 
+		#	self.__dict__[ phead['TTYPE%i'%(ipcol+1)] ] = np.array( [ sndata[irow][ipcol] for irow in range(self.NOBS) ] )
+		#import pdb; pdb.set_trace()
+
+		self.SPECTRA = {}
+		specid = 0
+		for i,snid in enumerate(hdu[2].data['SNID']):
+			if self.SNID != snid: continue
+			if hdu[2].data['NBIN_LAM'][i] == 0: continue
+			self.SPECTRA[specid] = {}
+			#self.SPECTRA[specid]['LAMINDEX'] = hdu[1].data['LAMINDEX']
+
+			self.SPECTRA[specid]['LAMMIN'] = np.array([hdu[1].data['LAMMIN'][hdu[1].data['LAMINDEX'] == hdu[3].data['LAMINDEX'][i]][0] \
+                                                       for i in range(hdu[2].data['PTRSPEC_MIN'][i]-1,hdu[2].data['PTRSPEC_MAX'][i])])
+			self.SPECTRA[specid]['LAMMAX'] = np.array([hdu[1].data['LAMMAX'][hdu[1].data['LAMINDEX'] == hdu[3].data['LAMINDEX'][i]][0] \
+                                                       for i in range(hdu[2].data['PTRSPEC_MIN'][i]-1,hdu[2].data['PTRSPEC_MAX'][i])])
+			self.SPECTRA[specid]['FLAM'] = hdu[3].data['FLAM'][hdu[2].data['PTRSPEC_MIN'][i]-1:hdu[2].data['PTRSPEC_MAX'][i]]
+			self.SPECTRA[specid]['FLAMERR'] = hdu[3].data['FLAMERR'][hdu[2].data['PTRSPEC_MIN'][i]-1:hdu[2].data['PTRSPEC_MAX'][i]]
+			self.SPECTRA[specid]['SPECTRUM_MJD'] = hdu[2].data['MJD'][i]
+			specid += 1
+
+		return( True )
+
+	
 	def plotLightCurve(self, ytype='flux', xtype='mjd', bands='all', mjdpk=None,
 					   showlegend=False, showpkmjdrange=False, 
 					   showsalt2fit=False, showclassfit=False, 
@@ -945,5 +1102,5 @@ def str2num(s) :
 		except ValueError: return( s )
 
 def date_to_mjd(date):
-    time = Time(date,scale='utc')
-    return time.mjd
+	time = Time(date,scale='utc')
+	return time.mjd

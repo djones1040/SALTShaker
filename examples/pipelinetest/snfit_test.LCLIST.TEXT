@@ -1,0 +1,21 @@
+# column defintion in each lightcurve file: 
+# col  1 -> CID            :  Candidate ID 
+# col  2 -> MJD            :  time of observation 
+# col  3 -> Tobs           :  MJD-PKMJD 
+# col  4 -> FLUXCAL        :  calibrated flux 
+# col  5 -> FLUXCAL_ERR    :  error on calibrated flux 
+# col  6 -> DATAFLAG       :  1=>data, 0=>fit, -1=>data rejected in fit 
+# col  7 -> BAND           :  1 char band/filter 
+# col  8 -> CHI2           :  data-fit chi2 
+# col  9 -> IFIT           :  fit number out of 1 fits per SN 
+# col 10 -> BAND_REST      :  optional rest-frame band 
+# col 11 -> FLUX_REST      :  optional rest-frame flux 
+# col 12 -> SIM_FLUX_REST  :  optional rest-frame SIM flux 
+VARNAMES: CID IFIT
+SN: 5999390  1 
+SN: 5999391  1 
+SN: 5999396  1 
+SN: 5999403  1 
+SN: 5999404  1 
+SN: 5999405  1 
+SN: 5999406  1 

@@ -1,0 +1,8 @@
+# Variables extracted from 
+#   FILE:  FITOPT000.ROOT 
+#   TABLE: FITRES 
+# 
+# REJECT=1 --> excluded from fit.
+# 
+NVAR: 6
+VARNAMES:  CID RA DECL zHEL zHELERR TrestMIN 

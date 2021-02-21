@@ -1,0 +1,16 @@
+BATCH_INFO: sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 10
+PATH_SNDATA_SIM:  $SCRATCH_SIMDIR
+
+
+GENVERSION: SALT3TRAIN_LOWZ
+SIMGEN_INFILE_Ia: sim/JLA_TRAINING_COMBINED_LOWZ.INPUT
+
+ENDLIST_GENVERSION:
+
+RESET_CIDOFF:  2  # uniqe random CID among all versions
+
+# Define required global items to ensure uniformity among all jobs
+SIMGEN_INFILE_Ia: sim/found_spec/sim_found.input
+GENPREFIX:   SIM_SALT3TRAIN
+FORMAT_MASK: 48          # 2=TERSE    16=RanCID  32=FITS-FORMAT
+RANSEED_REPEAT: 10 123459

@@ -1,0 +1,12 @@
+# --------------------------------------------
+#  ZVARIATION_FILE: SIMGEN_LOWZ_ZVARIATION.PAR
+#
+# This was used in the magSmear (K13) paper.
+# ==============================
+PARAMETER: GENPEAK_SALT2c
+ZPOLY: 0.0,-2.099,7.029,-6.787 # <c> = A0 + A1*z + A2*z^2 + A3*z^3
+
+# -------------------------
+# Add x1 vs. z that was not in the magSmear paper
+PARAMETER: GENPEAK_SALT2x1
+ZPOLY: 0.0,0.593,-7.648,11.955

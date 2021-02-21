@@ -1,0 +1,68 @@
+GENVERSION: JLA_TRAINING_Hamuy96
+GENRANGE_REDSHIFT: 0.01 0.08
+SIMLIB_FILE: sim/simlib/Hamuy96.SIMLIB
+KCOR_FILE: kcor/kcor_Other_LOWZ.fits
+GENRANGE_PEAKMJD: 40150 59000
+GENFILTERS: UBVRIfhjkl
+NGENTOT_LC: 5
+SIMLIB_MSKOPT: 6
+
+#SOLID_ANGLE:  0.021   # 70 sq deg
+
+USE_SIMLIB_PEAKMJD: 1
+USE_SIMLIB_REDSHIFT: 1
+USE_SIMLIB_SPECTRA: 1
+USE_SIMLIB_SALT2: 1
+CIDOFF: 0
+EFFERR_STOPGEN: 0.0000000001
+
+
+GENSOURCE:  RANDOM
+GENMODEL:   saltmodels/SALT2.JLA-B14-ext
+
+
+APPLY_SEARCHEFF_OPT: 0
+
+APPLY_CUTWIN_OPT: 1
+CUTWIN_TRESTMIN: -25 +5 # at least 1 epoch before -5 d (rest-frame)
+CUTWIN_TRESTMAX: +5 +1000000
+CUTWIN_SNRMAX:   5 UBVRIfhjkl 2 -20. 80.  # require 1 of griz with S/N > 5
+
+# selection criteria for generation
+GENRANGE_RA:      -1.0     +1.0   deg
+GENRANGE_DECL:    -1.258    +1.258  deg
+
+FUDGE_MAGERR: 0.005
+
+GENSIGMA_SEARCH_PEAKMJD:  1.0     # sigma-smearing for  SEARCH_PEAKMJD (days)
+
+GENSIGMA_REDSHIFT:  0.0
+
+GENRANGE_TREST:   -20.0    60.0     # rest epoch relative to peak (days)
+OPT_MWEBV:    1                 # 0,1 => MW extinction off,on
+
+GENRANGE_DMPEVENT:    0  0     # screen dump events in this NGEN range
+
+DNDZ: POWERLAW  2.6E-5  2.2    # SNLS result
+
+# smear flags: 0=off, 1=on
+SMEARFLAG_FLUX:    1  # photo-stat smearing of signal, sky, etc ...
+SMEARFLAG_ZEROPT:  1  # smear zero-point with zptsig
+
+FORMAT_MASK:   2  # terse format
+
+GENPEAK_SALT2ALPHA: 0.14
+GENPEAK_SALT2BETA: 3.1
+
+RANSEED: 58474       # random number seed
+
+GENMAG_SMEAR_MODELNAME: C11
+
+GENMEAN_SALT2x1:    0.0
+GENRANGE_SALT2x1:   -4.0  +4.0     # x1 (stretch) range
+GENSIGMA_SALT2x1:    3.0   3.0     # bifurcated sigmas
+
+GENMEAN_SALT2c:    0.0
+GENRANGE_SALT2c:   -0.4   0.4       # color range
+GENSIGMA_SALT2c:   0.05   0.05     # bifurcated sigmas
+

@@ -1,0 +1,72 @@
+
+BATCH_MEM:   8000
+OUTDIR:   $WFIRST_ROOT/SALT3/examples/wfirst/foundation/data/fit/Foundation_BBC
+BATCH_INFO:   sbatch $SBATCH_TEMPLATES/SNANA.TEMPLATE 20
+DONE_STAMP: ALL.DONE
+VERSION: Foundation_BBC
+
+xxxSNCID_LIST_FILE	  = ''
+
+  &SNLCINP
+
+	 VERSION_PHOTOMETRY = 'Foundation_BBC'
+	 KCOR_FILE		   = '$PS1_ROOT/kcor/PS1/PS1_DS18/kcor_PS1_none.fits'
+	 !HFILE_OUT                 = 'ps1_final.hbook'
+
+	 NFIT_ITERATION = 3
+	 INTERP_OPT		= 1
+
+	 SNTABLE_LIST = 'SNANA FITRES LCPLOT(text:col)'
+	 TEXTFILE_PREFIX  = 'Foundation_BBC'
+
+	 LDMP_SNFAIL = T
+	 USE_MWCOR = F
+
+	 H0_REF	  = 70.0
+	 OLAM_REF =	 0.70
+	 OMAT_REF =	 0.30
+	 W0_REF	  = -1.00
+
+	 SNCID_LIST	   =  0
+	 CUTWIN_CID	   =  0, 20000000
+	 SNCCID_LIST   =  ''
+	 SNCCID_IGNORE =  
+
+         cutwin_redshift   = 0.001, 2.0
+         cutwin_Nepoch    =      1
+
+         RV_MWCOLORLAW = 3.1
+         OPT_MWCOLORLAW = 99
+         OPT_MWEBV = 1
+         MWEBV_SCALE = 1.00
+         MWEBV_SHIFT = 0.0
+         FUDGE_MAG_ERROR = 'g .015 r .015 i .015'
+
+	 MAGOBS_SHIFT_PRIMARY = ' '
+	 EPCUT_SNRMIN = ''
+	 ABORT_ON_NOEPOCHS = F
+	 VPEC_FILE= '$WFIRST_ROOT/SALT3/examples/wfirst/foundation/data/fit/vpec_baseline.list'
+
+  &END
+
+
+
+  &FITINP
+
+         FITMODEL_NAME  = 'SALT2.JLA-B14'
+	 RESTLAMBDA_FITRANGE =  2800, 7800
+
+         PRIOR_MJDSIG            = 5.0
+         PRIOR_LUMIPAR_RANGE = -5.0, 5.0
+         PRIOR_LUMIPAR_SIGMA = 0.1
+
+         OPT_COVAR = 1
+         OPT_XTMW_ERR = 1
+
+         TREST_REJECT  = -15.0, 45.0
+         NGRID_PDF         = 0
+
+         FUDGEALL_ITER1_MAXFRAC = 0.02
+         FILTLIST_FIT = 'gri'
+
+  &END

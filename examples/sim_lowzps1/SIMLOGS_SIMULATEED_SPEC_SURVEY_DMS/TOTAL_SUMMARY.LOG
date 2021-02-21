@@ -1,0 +1,14 @@
+                                                SUM-SNIa  : 
+  GENVERSION                                  NGEN     NWRITE  NSPEC   
+# ----------------------------------------------------------------- 
+AllSurveys_LOWZ                                170     166    166
+ALLSurveys_PS1                                8000     212    212
+
+
+                                                SUM-NONIa : 
+  GENVERSION                                  NGEN     NWRITE  NSPEC   
+# ----------------------------------------------------------------- 
+AllSurveys_LOWZ                                  0       0      0
+ALLSurveys_PS1                                   0       0      0
+
+

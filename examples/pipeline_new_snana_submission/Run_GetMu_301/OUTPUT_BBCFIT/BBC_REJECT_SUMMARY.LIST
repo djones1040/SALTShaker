@@ -1,0 +1,10 @@
+# BBC-FF = BBC FITRES file.
+# Total number of BBC-FF: 1 (FITOPT x MUOPT). 
+# 0 of 1343 CIDs (0.0000) fail cuts in 1 or more BBC-FF
+#  and also pass cuts in 1 or more BBC-FF.
+#
+# These CIDs can be rejected in SALT2mu.exe with
+#    reject_list_file=BBC_REJECT_SUMMARY.LIST 
+
+VARNAMES: CID NJOB_REJECT 
+

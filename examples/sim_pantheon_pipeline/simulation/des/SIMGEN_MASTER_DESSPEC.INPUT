@@ -1,0 +1,32 @@
+B0;95;0c# Generate 10 data sets with 10k each after fitting, cuts and NN cut.
+
+BATCH_INFO:  sbatch  $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 20
+
+# nominal generation
+
+GENVERSION: DES_RAISIN_SALT2
+GENOPT:     GENMAG_SMEAR_MODELNAME G10
+GENOPT:     GENMODEL SALT2.JLA-B14
+
+GENVERSION: DES_RAISIN_SALT2_OIR
+GENOPT:     GENMAG_SMEAR_MODELNAME OIR.J19
+GENOPT:     GENMODEL SALT2.JLA-B14
+
+GENVERSION: DES_RAISIN_SIM
+GENOPT:     GENMAG_SMEAR_MODELNAME OIR.J19
+
+
+ENDLIST_GENVERSION:
+
+# specify sim-input files for snlc_sim.exe
+SIMGEN_INFILE_Ia:       $RAISIN_ROOT/cosmo/sim/inputs/DES/sim_DES_SNOOPY.input
+#NGEN_UNIT:  5
+#CIDOFF:     5999386
+
+# define required global items to ensure uniformity among all jobs
+GENOPT_GLOBAL: GENRANGE_REDSHIFT 0.05 1.0
+GENPREFIX:   DES_SPEC     # prefix of all data filenames
+FORMAT_MASK: 48           # 2=TERSE    16=RanCID  32=FITS-FORMAT
+PATH_SNDATA_SIM: $SCRATCH_SIMDIR
+
+RANSEED_REPEAT:  10 123459

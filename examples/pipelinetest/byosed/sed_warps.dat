@@ -1,0 +1,15 @@
+[functions]
+
+stretch = salt2_m1.dat
+	   
+color = salt2_colorlaw.dat
+
+
+[distributions]
+
+#stretch and color from mosher et al. 2014
+stretch = {mu:0.5, sigma_left:1.0, sigma_right:0.7,lower_lim:-2.5, upper_lim:2.5}
+
+color = {mu:0.0,sigma_left:0.07, sigma_right:0.1,lower_lim:-0.3, upper_lim:0.3}
+
+dust = {mu:0.0,sigma_left:0.07, sigma_right:0.1,lower_lim:-0.3, upper_lim:0.3}

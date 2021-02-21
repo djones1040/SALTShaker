@@ -1,0 +1,50 @@
+##SALT3 INPUT
+
+[data]
+snlists=/home/midai/salt3_local/SALT3/examples/pipelinetest/training/data/SALT3TEST_SIMPLE.LIST
+
+[byosed]
+baseinput=byosed/BYOSED_base.params
+outinput=pipelinetest/TEST_BYOSED.params
+set_key= FLAGS COLOR False
+    FLAGS STRETCH False
+    
+[simulation]
+pro=sim_SNmix.pl
+baseinput=simulation/MASTER_LOWZ_PS1.INPUT
+outinput=pipeline/MASTER_LOWZ_PS1.INPUT
+batch=True
+prooptions=
+set_key=
+
+[training]
+pro=trainsalt
+proargs = -c 
+baseinput=training/SALT_SNANA.conf
+prooptions = 
+#--stage validate
+outinput=pipeline/SALT_SNANA.conf
+set_key=
+
+[lcfitting]
+pro=snlc_fit.exe
+baseinput=lcfitting/snfit_base.nml
+outinput=pipeline/snfit_TEST.nml
+batch=False
+validplots=True
+prooptions=
+set_key=
+
+[getmu]
+pro=SALT2mu.exe
+baseinput=getmu/SALT2mu.default
+outinput=pipeline/test_salt2mu.input
+batch=False
+validplots=True
+prooptions=
+set_key=
+
+[cosmofit]
+pro=wfit.exe
+outinput=cosmofit/test.M0DIF
+prooptions= -ompri 0.3 -dompri 0.01

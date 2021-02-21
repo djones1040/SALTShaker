@@ -1,0 +1,50 @@
+# Translated automatically from legacy input file LEGACY_SALT3_TRAINING_MASTER.INPUT.temp.1609362621.522742_103
+CONFIG:
+  BATCH_INFO: sbatch $SBATCH_TEMPLATES/SBATCH_Midway2b.TEMPLATE 10
+  PATH_SNDATA_SIM: $SCRATCH_SIMDIR
+  DONE_STAMP: /project2/rkessler/SURVEYS/WFIRST/USERS/mdai/salt3_local/SALT3/examples/SALT3_training_pipeline/SIMLOGS_SIM_SALT3TRAIN_103/Sim.DONE
+  RESET_CIDOFF: 2
+  SIMGEN_INFILE_Ia:
+  - sim/found_spec/sim_found.input
+  GENPREFIX:  RICK_DEBUG
+  FORMAT_MASK: 48
+  RANSEED_REPEAT: 10 63030
+
+GENVERSION_LIST:
+- GENVERSION: SALT3TRAIN_LOWZ_103
+  GENOPT:
+    GENMODEL: /project2/rkessler/SURVEYS/WFIRST/USERS/mdai/salt3_local/SALT3/examples/SALT3_training_pipeline/saltmodels/SALT2.JLA-B14-ext
+    SIMLIB_MSKOPT: 6
+    NGENTOT_LC: 150
+  SIMGEN_INFILE_Ia:
+  - sim/JLA_TRAINING_COMBINED_LOWZ.INPUT
+- GENVERSION: SALT3TRAIN_SDSS_103
+  GENOPT:
+    GENMODEL: /project2/rkessler/SURVEYS/WFIRST/USERS/mdai/salt3_local/SALT3/examples/SALT3_training_pipeline/saltmodels/SALT2.JLA-B14-ext
+    SIMLIB_MSKOPT: 6
+  SIMGEN_INFILE_Ia:
+  - sim/JLA_TRAINING_SDSS.INPUT
+- GENVERSION: SALT3TRAIN_SNLS3_103
+  GENOPT:
+    GENMODEL: /project2/rkessler/SURVEYS/WFIRST/USERS/mdai/salt3_local/SALT3/examples/SALT3_training_pipeline/saltmodels/SALT2.JLA-B14-ext
+    SIMLIB_MSKOPT: 6
+  SIMGEN_INFILE_Ia:
+  - sim/JLA_TRAINING_SNLS3.INPUT
+- GENVERSION: SALT3TRAIN_PS1_103
+  GENOPT:
+    GENMODEL: /project2/rkessler/SURVEYS/WFIRST/USERS/mdai/salt3_local/SALT3/examples/SALT3_training_pipeline/saltmodels/SALT2.JLA-B14-ext
+  SIMGEN_INFILE_Ia:
+  - sim/ps1_spec/SIMGEN_PS1SPEC.INPUT
+- GENVERSION: SALT3TRAIN_DES_103
+  GENOPT:
+    GENMODEL: /project2/rkessler/SURVEYS/WFIRST/USERS/mdai/salt3_local/SALT3/examples/SALT3_training_pipeline/saltmodels/SALT2.JLA-B14-ext
+    NGENTOT_LC: 1500
+  SIMGEN_INFILE_Ia:
+  - sim/des_spec/sim_DES.input
+- GENVERSION: SALT3TRAIN_Foundation_103
+  GENOPT:
+    GENMODEL: /project2/rkessler/SURVEYS/WFIRST/USERS/mdai/salt3_local/SALT3/examples/SALT3_training_pipeline/saltmodels/SALT2.JLA-B14-ext
+  SIMGEN_INFILE_Ia:
+  - sim/found_spec/sim_found.input
+
+#END_YAML

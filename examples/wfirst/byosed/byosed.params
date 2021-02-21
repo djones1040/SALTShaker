@@ -1,0 +1,75 @@
+[MAIN]
+sed_file=Hsiao07.dat
+#sed_file=test_mangled.dat
+#sed_file= salt2_p18_m0.dat
+#sed_file=salt2_template_0.dat
+#norm=0.0
+norm=-19.365
+#magsmear= 0.2
+magsmear=0.0
+noRescale=True
+
+# hsiao 
+#magoff=.09
+#stretch,color
+#magoff=.2144
+magoff=.2
+
+[FLAGS]
+color= True
+stretch= True
+velocity= False
+sfr= False
+host_mass= False
+
+[SFR]
+host_function= gridded_ssfr_hsiao.dat
+host_param_dist_file= ssfr_dist.dat
+scale_dist_peak= 1
+scale_dist_sigma= 0 0
+scale_dist_limits= 1 1
+
+
+[METALLICITY]
+host_function= gridded_metallicity.dat
+scale_dist_peak= 1
+scale_dist_sigma= .000001 .000001
+scale_dist_limits= .99999 1.00001
+
+[HOST_MASS]
+host_function= gridded_hostmass_hsiao.dat
+host_param_dist_file= mass_dist.dat
+scale_dist_peak= 1
+scale_dist_sigma= 0 0
+scale_dist_limits= 1 1
+scale_type=inner
+
+[VELOCITY]
+sn_function= gridded_velocity_hsiao.dat
+sn_param_dist_file= velocity_hist_data.txt
+scale_dist_peak= 1
+scale_dist_sigma= .000001 .000001
+scale_dist_limits= .99999 1.00001
+
+[STRETCH]
+sn_function=gridded_stretch_hsiao.dat
+#sn_function= gridded_salt2_stretch.dat
+#sn_function=salt2_m1.dat
+scale_dist_peak= 1.11
+#scale_dist_peak= 0.973
+scale_dist_sigma= 1.472 0.222
+scale_dist_limits= -2.863 2.137
+#scale_dist_limits= -3 2
+scale_type=inner
+
+[COLOR]
+sn_function=gridded_color.dat
+#sn_function=gridded_salt2_colorlaw.dat
+#scale_dist_peak= -.054
+scale_dist_peak=-.009
+#scale_dist_peak=.02
+scale_dist_sigma= .043 .101
+#scale_dist_limits= -.3 .5
+#scale_dist_limits= -0.2444 0.5556
+scale_dist_limits=-.2542 .5458
+scale_type=outer

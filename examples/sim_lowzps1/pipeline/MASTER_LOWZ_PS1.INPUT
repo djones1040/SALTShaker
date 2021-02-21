@@ -1,0 +1,27 @@
+BATCH_INFO: sbatch $SBATCH_TEMPLATES/SBATCH_Midway2.TEMPLATE 100
+PATH_SNDATA_SIM:  $SCRATCH_SIMDIR
+# specify the three survey tiers: SHALLOW,MEDIUM,DEEP
+
+# SHALLOW Survey Data
+GENVERSION: AllSurveys_LOWZ
+GENOPT: GENRANGE_REDSHIFT 0.02 0.08
+SIMGEN_INFILE_Ia: simulation/lowz/SIMGEN_SALT3TEST.INPUT
+
+# SALT2
+GENVERSION: ALLSurveys_PS1
+GENOPT: GENRANGE_REDSHIFT 0.05 0.7
+SIMGEN_INFILE_Ia: simulation/ps1_spec/SIMGEN_PS1SPEC.INPUT
+ENDLIST_GENVERSION:
+
+DONE_STAMP: /project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/examples/sim_lowzps1/SIMLOGS_SIMULATEED_SPEC_SURVEY_DMS/Sim.DONE
+
+RESET_CIDOFF:  2  # uniqe random CID among all versions
+# specify sim-input files for snlc_sim.exe
+#SIMGEN_INFILE_Ia: simulation/SIMGEN_WFIRST_SALT2_Specz.INPUT
+#NGEN_UNIT:  0.05  SURVEY   # each job is 0.1 of a WFIRST survey
+
+# Define required global items to ensure uniformity among all jobs
+SIMGEN_INFILE_Ia: simulation/ps1_spec/SIMGEN_PS1SPEC.INPUT
+GENPREFIX:   SIMULATEED_SPEC_SURVEY_DMS
+FORMAT_MASK: 18          # 2=TERSE    16=RanCID  32=FITS-FORMAT
+RANSEED_REPEAT: 20 123459
