@@ -292,7 +292,7 @@ def rdkcor(surveylist,options):
 				filtlabel=filt.split('-')[-1].split('/')[-1]
 				kcordict[kcorkey][filtlabel] = {}
 				kcordict[kcorkey][filtlabel]['filtwave'] = filtertrans['wavelength (A)']
-				kcordict[kcorkey][filtlabel]['fullname'] = filt.split('/')[0][1:]
+				kcordict[kcorkey][filtlabel]['fullname'] = filt.split('/')[0].replace(' ','')
 				kcordict[kcorkey][filtlabel]['filttrans'] = filtertrans[filt]
 				lambdaeff = np.sum(kcordict[kcorkey][filtlabel]['filtwave']*filtertrans[filt])/np.sum(filtertrans[filt])
 				kcordict[kcorkey][filtlabel]['lambdaeff'] = lambdaeff
