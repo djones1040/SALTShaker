@@ -45,45 +45,42 @@ log=logging.getLogger(__name__)
 stopReasons=['x=0 solution','atol approx. solution','atol+btol approx. solution','ill conditioned','machine precision limit','machine precision limit','machine precision limit','max # of iteration']
 
 class SALTTrainingResult(object):
-     def __init__(self, **kwargs):
-         self.__dict__.update(kwargs)
+	 def __init__(self, **kwargs):
+		 self.__dict__.update(kwargs)
 
 
 def ensurepositivedefinite(matrix,maxiter=5):
     mineigenval=np.linalg.eigvalsh(matrix)[0]
-    print(mineigenval)
-    #import pdb; pdb.set_trace()
     if mineigenval>0:
         return matrix
     else:
         if maxiter==0: 
             raise ValueError('Unable to make matrix positive semidefinite')
         return ensurepositivedefinite(matrix+np.diag(-mineigenval*4* np.ones(matrix.shape[0])),maxiter-1)
-        
 
 def getgaussianfilterdesignmatrix(shape,smoothing):
-    windowsize=10+shape%2
-    window=gaussian_filter1d(1.*(np.arange(windowsize)==windowsize//2),smoothing)
-    while ~(np.any(window==0)):
-        windowsize=2*windowsize+shape%2
-        window=gaussian_filter1d(1.*(np.arange(windowsize)==windowsize//2),smoothing)
-    window=window[window>0]
+	windowsize=10+shape%2
+	window=gaussian_filter1d(1.*(np.arange(windowsize)==windowsize//2),smoothing)
+	while ~(np.any(window==0)):
+		windowsize=2*windowsize+shape%2
+		window=gaussian_filter1d(1.*(np.arange(windowsize)==windowsize//2),smoothing)
+	window=window[window>0]
 
-    diagonals=[]
-    offsets=list(range(-(window.size//2),window.size//2+1))
-    for i,offset in enumerate(offsets):
-        diagonals+=[np.tile(window[i],shape-np.abs(offset))]
-    design=sparse.diags(diagonals,offsets).tocsr()
-    for i in range(window.size//2+1):
-        design[i,:window.size//2+1]=gaussian_filter1d(1.*(np.arange(design.shape[0])== i ),5)[:window.size//2+1]
-        design[-i-1,-(window.size//2+1) : ]=gaussian_filter1d(1.*(np.arange(design.shape[0])== i ),5)[:window.size//2+1][::-1]    
-    return design
+	diagonals=[]
+	offsets=list(range(-(window.size//2),window.size//2+1))
+	for i,offset in enumerate(offsets):
+		diagonals+=[np.tile(window[i],shape-np.abs(offset))]
+	design=sparse.diags(diagonals,offsets).tocsr()
+	for i in range(window.size//2+1):
+		design[i,:window.size//2+1]=gaussian_filter1d(1.*(np.arange(design.shape[0])== i ),5)[:window.size//2+1]
+		design[-i-1,-(window.size//2+1) : ]=gaussian_filter1d(1.*(np.arange(design.shape[0])== i ),5)[:window.size//2+1][::-1]	  
+	return design
 
 def isDiag(M):
-    i, j = M.shape
-    assert i == j 
-    test = M.reshape(-1)[:-1].reshape(i-1, j+1)
-    return ~np.any(test[:, 1:])
+	i, j = M.shape
+	assert i == j 
+	test = M.reshape(-1)[:-1].reshape(i-1, j+1)
+	return ~np.any(test[:, 1:])
 
 def ridders(f,central,h,maxn,tol):
 	"""Iterative method to evaluate the second derivative of a function f based on a stepsize h and a relative tolerance tol"""
@@ -100,7 +97,7 @@ def ridders(f,central,h,maxn,tol):
 		return result
 	def AwithErr(n):
 		diff=A(n,1)-A(n-1,1)
-		return A(n,1),  norm(diff)/ min(norm(A(n,1)),norm(A(n-1,1)))
+		return A(n,1),	norm(diff)/ min(norm(A(n,1)),norm(A(n-1,1)))
 	best=AwithErr(2)
 	result,err=best
 	prev=best[1]
@@ -531,7 +528,7 @@ class GaussNewton(saltresids.SALTResids):
 		log.info("determining M0/M1 errors by bootstrapping")
 		snlist=list(self.datadict.keys())
 		removesnindices=np.random.choice(len(snlist),n_bootstrapsamples)
-		samples=[self.convergence_loop(X,max_iter, snlist[:i]+snlist[i+1:], getdatauncertainties=False).X for i in  removesnindices]
+		samples=[self.convergence_loop(X,max_iter, snlist[:i]+snlist[i+1:], getdatauncertainties=False).X for i in	removesnindices]
 		deviation=(samples-X)
 		sigma=ensurepositivedefinite(np.dot(deviation.T,deviation)/(deviation.shape[0]-1))
 		L=linalg.cholesky(sigma,lower=True)
@@ -573,8 +570,8 @@ class GaussNewton(saltresids.SALTResids):
 			log.info('Estimating supernova parameters x0,x1,c and spectral normalization')
 			for fit in ['x0','color','x0','color','x1']:
 				X,chi2_init,chi2=self.process_fit(
-                    X,self.fitOptions[fit][1],{},fit=fit,doPriors=False,
-                    doSpecResids=  (fit=='x0'),allowjacupdate=False)
+					X,self.fitOptions[fit][1],{},fit=fit,doPriors=False,
+					doSpecResids=  (fit=='x0'),allowjacupdate=False)
 		else:
 			chi2_init=(self.lsqwrap(X,{},usesns=usesns)**2).sum()
 		log.info(f'starting loop; {loop_niter} iterations')
@@ -654,14 +651,19 @@ class GaussNewton(saltresids.SALTResids):
 			Xredefined=X.copy()
 		
 		if getdatauncertainties:
-			M0dataerr, M1dataerr,cov_M0_M1_data=self.datauncertaintiesfromhessianapprox(Xredefined)
+			try:
+				M0dataerr, M1dataerr,cov_M0_M1_data=self.datauncertaintiesfromhessianapprox(Xredefined)
+			except:
+				print('uncertainties failed!!')
+				M0dataerr, M1dataerr,cov_M0_M1_data=None,None,None
 		else:
 			M0dataerr, M1dataerr,cov_M0_M1_data=None,None,None
 		# M0/M1 errors
 		xfinal,phase,wave,M0,M0modelerr,M1,M1modelerr,cov_M0_M1_model,\
 			modelerr,clpars,clerr,clscat,SNParams = \
 			self.getParsGN(Xredefined)
-
+		if M0dataerr is None:
+			M0dataerr, M1dataerr,cov_M0_M1_data = np.zeros(len(M0)),np.zeros(len(M0)),np.zeros(len(M0))
 		#log.info("using Minuit to determine the uncertainties on M0 and M1")
 		#if self.fit_model_err:
 		#	log.info('Optimizing model error')
@@ -729,11 +731,11 @@ class GaussNewton(saltresids.SALTResids):
 		kwargs.update({params[i]: initVals[i] for i in range(includePars.sum())})
 		m=Minuit(fn,use_array_call=True,forced_parameters=params,grad=grad,errordef=1,**kwargs)
 		result,paramResults=m.migrad()#includePars.sum()*6)
-		#if np.allclose(np.array([x.value for x  in paramResults]),X[includePars]):
+		#if np.allclose(np.array([x.value for x	 in paramResults]),X[includePars]):
 		X=X.copy()
-		X[includePars]=np.array([x.value for x  in paramResults])
+		X[includePars]=np.array([x.value for x	in paramResults])
 
-		# 		if np.allclose(X[includePars],initVals):
+		#		if np.allclose(X[includePars],initVals):
 
 		log.info('Final log likelihood: {:.2f}'.format( -result.fval))
 		
@@ -808,7 +810,7 @@ class GaussNewton(saltresids.SALTResids):
 		X=X.copy()
 		if not self.fitTpkOff: includePars[self.itpk]=False
 		if storedResults is None: storedResults={}
-		if  not rescaleerrs:
+		if	not rescaleerrs:
 			def fn(Y):
 				Xnew=X.copy()
 				Xnew[includePars]=Y
@@ -1145,7 +1147,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 		
 	def process_fit(self,X,iFit,storedResults,fit='all',allowjacupdate=True,**kwargs):
-        
+		
 		X=X.copy()
 		varyingParams=iFit&self.iModelParam
 		if 'usesns' in kwargs :
