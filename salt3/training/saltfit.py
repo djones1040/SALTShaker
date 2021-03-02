@@ -50,13 +50,13 @@ class SALTTrainingResult(object):
 
 
 def ensurepositivedefinite(matrix,maxiter=5):
-    mineigenval=np.linalg.eigvalsh(matrix)[0]
-    if mineigenval>0:
-        return matrix
-    else:
-        if maxiter==0: 
-            raise ValueError('Unable to make matrix positive semidefinite')
-        return ensurepositivedefinite(matrix+np.diag(-mineigenval*4* np.ones(matrix.shape[0])),maxiter-1)
+	mineigenval=np.linalg.eigvalsh(matrix)[0]
+	if mineigenval>0:
+		return matrix
+	else:
+		if maxiter==0: 
+			raise ValueError('Unable to make matrix positive semidefinite')
+		return ensurepositivedefinite(matrix+np.diag(-mineigenval*4* np.ones(matrix.shape[0])),maxiter-1)
 
 def getgaussianfilterdesignmatrix(shape,smoothing):
 	windowsize=10+shape%2
@@ -187,7 +187,6 @@ class mcmc(saltresids.SALTResids):
 	def generate_AM_candidate(self, current, n, steps_from_gn=False):
 		prop_std,adjust_flag = self.get_proposal_cov(n)
 		
-		#tstart = time.time()
 		candidate = np.zeros(self.npar)
 		candidate = np.random.normal(loc=current,scale=np.diag(prop_std))
 		for i,par in zip(range(self.npar),self.parlist):
@@ -651,11 +650,11 @@ class GaussNewton(saltresids.SALTResids):
 			Xredefined=X.copy()
 		
 		if getdatauncertainties:
-			try:
-				M0dataerr, M1dataerr,cov_M0_M1_data=self.datauncertaintiesfromhessianapprox(Xredefined)
-			except:
-				print('uncertainties failed!!')
-				M0dataerr, M1dataerr,cov_M0_M1_data=None,None,None
+			#try:
+			M0dataerr, M1dataerr,cov_M0_M1_data=self.datauncertaintiesfromhessianapprox(Xredefined)
+			#except:
+			#	print('uncertainties failed!!')
+			#	M0dataerr, M1dataerr,cov_M0_M1_data=None,None,None
 		else:
 			M0dataerr, M1dataerr,cov_M0_M1_data=None,None,None
 		# M0/M1 errors
@@ -1032,7 +1031,7 @@ class GaussNewton(saltresids.SALTResids):
 				guess,sn,storedResults,varyParams,fixUncertainty=True)
 			photresids+=[photresidsdict[k]['resid'] for k in photresidsdict]
 			specresids+=[specresidsdict[k]['resid'] for k in specresidsdict]
-
+		
 		priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,guess)
 		priorResids=[priorResids]
 
@@ -1053,12 +1052,14 @@ class GaussNewton(saltresids.SALTResids):
 					for resids,regJac in zip( *regularization(guess,storedResults,varyParams)):
 						regResids += [resids*np.sqrt(weight)]
 					storedResults[regKey]=priorResids[-self.n_components:]
+
 		chi2Results=[]
 		for name,x in [('Photometric',photresids),('Spectroscopic',specresids),('Prior',priorResids),('Regularization',regResids)]:
 			if ((len(regResids) and name == 'Regularization') or name != 'Regularization') and len(x):
 				x=np.concatenate(x)
 			else: x=np.array([0.0])
 			chi2Results+=[(name,(x**2).sum(),x.size)]
+
 		return chi2Results
 	
 	def robust_process_fit(self,X_init,uncertainties,chi2_init,niter,usesns=None):
@@ -1147,7 +1148,7 @@ class GaussNewton(saltresids.SALTResids):
 		
 		
 	def process_fit(self,X,iFit,storedResults,fit='all',allowjacupdate=True,**kwargs):
-		
+
 		X=X.copy()
 		varyingParams=iFit&self.iModelParam
 		if 'usesns' in kwargs :
@@ -1160,9 +1161,10 @@ class GaussNewton(saltresids.SALTResids):
 				varyingParams=varyingParams&~sndependentparams
 		if not self.fitTpkOff: varyingParams[self.itpk]=False
 		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,**kwargs)
+
 		oldChi=(residuals**2).sum()
 		jacobian=jacobian.tocsc()
-		
+
 		if fit=='highestresids':
 			#Fit only the parameters affecting the highest residual points
 			includePars=np.diff(jacobian[ (residuals**2 > np.percentile(residuals**2,100-1e-3)) ,:].indptr) != 0
@@ -1171,11 +1173,10 @@ class GaussNewton(saltresids.SALTResids):
 			includePars= np.diff(jacobian.indptr) != 0
 		if not includePars.all():
 			varyingParams=varyingParams & includePars
-			jacobian=jacobian[:,includePars]		
-		
+			jacobian=jacobian[:,includePars]
+
 		#Exclude any residuals unaffected by the current fit (column in jacobian zeroed for that index)
 		jacobian=jacobian.tocsr()
-
 		log.info('Number of parameters fit this round: {}'.format(includePars.sum()))
 		log.info('Initial chi2: {:.2f} '.format(oldChi))
 		#Simple diagonal preconditioning matrix designed to make the jacobian better conditioned. Seems to do well enough! If output is showing significant condition number in J, consider improving this

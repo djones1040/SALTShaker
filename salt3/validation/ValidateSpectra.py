@@ -102,7 +102,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 		print('reading data took %.1f seconds'%(time()-trd))
 		
 	tc = time()
-	if base: datadict = base.mkcuts(datadict,KeepOnlySpec=True)
+	if base: datadict = base.mkcuts(datadict)[0]
 	print('making cuts took %.1f seconds'%(time()-tc))
 
 	salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,
@@ -122,8 +122,8 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 	fig = plt.figure()
 	axcount = 0
 	for sn in datadict.keys():
-		specdata=datadict[sn]['specdata']
-		snPars={'z':datadict[sn]['zHelio']}
+		specdata=datadict[sn].specdata
+		snPars={'z':datadict[sn].zHelio}
 
 #		if np.abs(snPars['x1'])<2.23: 
 #			log.warning(f'Skipping {sn} because x1 is not extreme')
@@ -146,7 +146,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 
 			model.update({'x0':pars[parlist==f'specx0_{sn}_{k}'][0]})
 			if 'hi': #try:
-				wave=specdata[k]['wavelength']
+				wave=specdata[k].wavelength
 				restwave=wave/(1+snPars['z'])
 				coeffs=pars[parlist=='specrecal_{}_{}'.format(sn,k)]
 				pow=coeffs.size-np.arange(coeffs.size)
@@ -154,8 +154,8 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 				drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
 				recalexp=np.exp((drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1))
 
-				uncalledModel = flux(salt3dir,specdata[k]['tobs']+snPars['t0'],specdata[k]['wavelength'],
-									  snPars['z'],snPars['x0'],snPars['x1'],snPars['c'],mwebv=datadict[sn]['MWEBV'])
+				uncalledModel = flux(salt3dir,specdata[k].tobs+snPars['t0'],specdata[k].wavelength,
+									  snPars['z'],snPars['x0'],snPars['x1'],snPars['c'],mwebv=datadict[sn].MWEBV)
 				modelflux = uncalledModel*recalexp
 				if not axcount % 3 and axcount != 0:
 					fig = plt.figure()
@@ -163,11 +163,11 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
 				
 				if len(coeffs): ax.plot(wave,modelflux,'r-',label='recalibrated model spectrum for z = %.3f, $x_1$ = %.3f'%(
 						snPars['z'],snPars['x1']),zorder=500)
-				ax.plot(wave,specdata[k]['flux'],'b-',label='%s spectral data, phase = %.1f'%(sn,specdata[k]['tobs']-snPars['t0']))
+				ax.plot(wave,specdata[k].flux,'b-',label='%s spectral data, phase = %.1f'%(sn,specdata[k].tobs-snPars['t0']))
 				ax.plot(wave,uncalledModel,'g-',label='SALT3 Model spectrum\n(no calibration)')
 				ax.set_xlim(wave.min(),wave.max())
 
-				ax.set_ylim(0,specdata[k]['flux'].max()*1.25)
+				ax.set_ylim(0,specdata[k].flux.max()*1.25)
 				ax.set_xlabel('Wavelength $\AA$')
 				ax.set_ylabel('Flux')
 				ax.legend(loc='upper right',prop={'size':8})
