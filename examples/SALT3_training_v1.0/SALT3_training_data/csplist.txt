@@ -1,0 +1,26 @@
+# SNID other_data
+2004ef None
+2004eo OTHER_LOWZ_LC
+2004ey None
+2004gu None
+2005be None
+2005bo None
+2005el Hicken2009_LC
+2005eq Hicken2009_LC
+2005iq Hicken2009_LC
+2005kc Hicken2009_LC
+2005M  None
+2006bh None
+2006ef None
+2006ej None
+2006eq None
+2006et None
+2006ev None
+2006lu None
+2006py None
+2007bc Hicken2009_LC
+2007ca Hicken2009_LC
+2007nq CFA4p1
+2008bq None
+2008gp None
+2008hv CFA4p1
