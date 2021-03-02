@@ -490,6 +490,7 @@ class SALTResids:
 		chi2: float
 			Goodness of fit of model to training data	
 		"""
+        
 		if storedResults is None: storedResults={}
 		if varyParams is None:
 			varyParams=np.zeros(self.npar,dtype=bool)
@@ -556,7 +557,7 @@ class SALTResids:
 		""" This method should be the only one required for any fitter to process the supernova data. 
 		Find the residuals of a set of parameters to the photometric and spectroscopic data of a given supernova. 
 		Photometric residuals are first decorrelated to diagonalize color scatter"""
-		
+
 		if varyParams is None:
 			varyParams=np.zeros(self.npar,dtype=bool)
 		self.fillStoredResults(x,storedResults)	
@@ -668,9 +669,11 @@ class SALTResids:
 
 			if not fixUncertainty:
 				#Calculate jacobian of total spectral uncertainty including reported uncertainties
-				uncertainty_jac=  spectralmodel['modelvariance_jacobian'] / (2*uncertainty[:,np.newaxis])
+				uncertainty_jac=  spectralmodel['modelvariance_jacobian'][:,varyParams] / (2*uncertainty[:,np.newaxis])
 				spectralresids['lognorm_grad']= - (uncertainty_jac/uncertainty[:,np.newaxis]).sum(axis=0)
-				spectralresids['resid_jacobian']-=	 uncertainty_jac*(spectralresids['resid'] /uncertainty)[:,np.newaxis]
+				spectralresids['resid_jacobian'][:,varyParams] -= uncertainty_jac*(spectralresids['resid'] /uncertainty)[:,np.newaxis]
+
+		tstart = time.time()
 
 		return photresids,specresids
 	
@@ -1006,7 +1009,7 @@ class SALTResids:
 			specresultsdict={}
 			resultsdict[k]=specresultsdict
 			specresultsdict['fluxvariance'] =  spectrum.fluxerr**2
-			specresultsdict['modelvariance_jacobian']=sparse.csr_matrix([len(spectrum),self.parlist.size])
+			specresultsdict['modelvariance_jacobian']=np.zeros([len(spectrum),self.parlist.size]) #sparse.csr_matrix([len(spectrum),self.parlist.size])
 
 			phase=spectrum.tobs+tpkoff*(1+z)
 			
@@ -1062,7 +1065,7 @@ class SALTResids:
 					2* x0**2  * (modelerrnox[1]*modelerrnox[0]*x1)[:,np.newaxis]  * \
 					interpresult[:,varyParams[self.parlist=='modelcorr_01']]
 
-			
+		#import pdb; pdb.set_trace()
 		return resultsdict
 
 	def photVarianceForSN(self,x,sn,storedResults,temporaryResults,varyParams):
@@ -1142,12 +1145,12 @@ class SALTResids:
 
 			if cDeriv:
 				filtresultsdict['modelvariance_jacobian'][:,(sndata.ic)] = \
-					(modelUncertainty * 2 *np.log(10)*colorlawinterp)
+					(modelUncertainty * 2 *np.log(10)*colorlawinterp)[np.newaxis].transpose()
 
 			for i,varIndex in enumerate(np.where(self.parlist=='cl')[0]):
 				if varyParams[self.iCL][i]:
 					filtresultsdict['modelvariance_jacobian'][:,varIndex] =	 \
-						2* (-0.4 *np.log(10)*c)*modelUncertainty*self.colorLawDerivInterp(lcdata.lambdaeff/(1+z))[varyParams[self.iCL]][i]
+						(2* (-0.4 *np.log(10)*c)*modelUncertainty*self.colorLawDerivInterp(lcdata.lambdaeff/(1+z))[varyParams[self.iCL]][i])[np.newaxis].transpose()
 
 			if varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any():
 				extinctionexp=(colorexpinterp* _SCALE_FACTOR/(1+z)*sndata.mwextcurveint(lcdata.lambdaeff))
@@ -1215,8 +1218,10 @@ class SALTResids:
 		chi2: float
 			Model chi2 relative to training data	
 		"""
+
 		photResidsDict,specResidsDict = self.ResidsForSN(
 			x,sn,storedResults,varyParams,fixUncertainty=False,fixFluxes=True,SpecErrScale=SpecErrScale)
+
 		loglike=0
 		grad_loglike=0
 		calculategrad=(not varyParams is None) and np.any(varyParams)
@@ -1226,6 +1231,7 @@ class SALTResids:
 				loglike+= resids['lognorm']- (resids['resid']**2).sum() / 2.  
 				if calculategrad:
 					grad_loglike+=resids['lognorm_grade']-resids['resid_jacobian'].T.dot(resids['resid'])
+
 		if calculategrad:
 			return loglike,grad_loglike
 		else:

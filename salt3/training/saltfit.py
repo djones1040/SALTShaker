@@ -650,11 +650,11 @@ class GaussNewton(saltresids.SALTResids):
 			Xredefined=X.copy()
 		
 		if getdatauncertainties:
-			try:
-				M0dataerr, M1dataerr,cov_M0_M1_data=self.datauncertaintiesfromhessianapprox(Xredefined)
-			except:
-				print('uncertainties failed!!')
-				M0dataerr, M1dataerr,cov_M0_M1_data=None,None,None
+			#try:
+			M0dataerr, M1dataerr,cov_M0_M1_data=self.datauncertaintiesfromhessianapprox(Xredefined)
+			#except:
+			#	print('uncertainties failed!!')
+			#	M0dataerr, M1dataerr,cov_M0_M1_data=None,None,None
 		else:
 			M0dataerr, M1dataerr,cov_M0_M1_data=None,None,None
 		# M0/M1 errors

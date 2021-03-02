@@ -421,7 +421,7 @@ class TrainSALTBase:
 		return not all(passescuts)
 
 	def checkFilterMass(self,z,survey,flt):
-		
+		#print(survey,flt)
 		filtwave = self.kcordict[survey][flt]['filtwave']
 		try:
 			filttrans = self.kcordict[survey][flt]['filttrans']
@@ -497,6 +497,7 @@ class TrainSALTBase:
 					specdata.pop(k)
 				
 			for flt in sn.filt:
+				print(sn.snid)
 				#Remove light-curves outside wavelength range
 				if self.checkFilterMass(z,sn.survey,flt):
 					lightcurve=sn.photdata[flt]
