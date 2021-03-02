@@ -1265,7 +1265,7 @@ class SALTResids:
 			import pdb; pdb.set_trace()
 
 		# make sure M0 is positive - (clunky)
-		m0[m0 < 0] = 0
+		#m0[m0 < 0] = 0
 		
 		if self.n_components == 2:
 			m1pars = x[self.im1]

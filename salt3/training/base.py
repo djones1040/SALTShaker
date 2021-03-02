@@ -421,7 +421,7 @@ class TrainSALTBase:
 		return not all(passescuts)
 
 	def checkFilterMass(self,z,survey,flt):
-		print(survey,flt)
+		#print(survey,flt)
 		filtwave = self.kcordict[survey][flt]['filtwave']
 		try:
 			filttrans = self.kcordict[survey][flt]['filttrans']
