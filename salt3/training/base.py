@@ -497,7 +497,7 @@ class TrainSALTBase:
 					specdata.pop(k)
 				
 			for flt in sn.filt:
-				print(sn.snid)
+				#print(sn.snid)
 				#Remove light-curves outside wavelength range
 				if self.checkFilterMass(z,sn.survey,flt):
 					lightcurve=sn.photdata[flt]
