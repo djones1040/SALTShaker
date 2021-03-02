@@ -554,6 +554,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 		keys=['num_lightcurves','num_spectra','num_sne']
 		yamloutputdict={key.upper():trainingresult.__dict__[key] for key in keys}
 		yamloutputdict['CPU_MINUTES']=(time()-self.initializationtime)/60
+		yamloutputdict['ABORT_IF_ZERO']=1
 		with open(f'{self.options.yamloutputfile}','w') as file: yaml.dump(yamloutputdict,file)
 		
 		return
