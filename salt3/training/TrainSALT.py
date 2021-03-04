@@ -522,6 +522,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 				for k in trainingresult.SNParams.keys():
 					foundfile = False
 					for l in snfiles:
+						if '.fits' in l.lower(): continue
 						if str(k) not in l: continue
 						foundfile = True
 						if '/' not in l:
