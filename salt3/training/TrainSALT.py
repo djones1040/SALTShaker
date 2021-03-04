@@ -522,6 +522,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 				for k in trainingresult.SNParams.keys():
 					foundfile = False
 					for l in snfiles:
+						if '.fits' in l.lower(): continue
 						if str(k) not in l: continue
 						foundfile = True
 						if '/' not in l:
@@ -868,5 +869,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 				self.validate(self.options.outputdir,datadict)
 		except:
 			log.exception(f'Exception raised during {stage}')
+			if stage != 'validation':
+				raise RuntimeError("Training exited unexpectedly")
 		
 	

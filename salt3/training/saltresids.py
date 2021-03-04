@@ -1141,8 +1141,7 @@ class SALTResids:
 				filtresultsdict['modelvariance_jacobian'][:,(sndata.ix0)] = (uncertaintyNoX0*2*x0)[np.newaxis].transpose()
 			if x1Deriv:
 				filtresultsdict['modelvariance_jacobian'][:,(sndata.ix1)] = \
-					(x0**2 *fluxfactor * 2*(modelerrnox[0]*modelerrnox[1]*corr[0]+ x1* modelerrnox[1]**2))
-
+					(x0**2 *fluxfactor * 2*(modelerrnox[0]*modelerrnox[1]*corr[0]+ x1* modelerrnox[1]**2))[np.newaxis].transpose()
 			if cDeriv:
 				filtresultsdict['modelvariance_jacobian'][:,(sndata.ic)] = \
 					(modelUncertainty * 2 *np.log(10)*colorlawinterp)[np.newaxis].transpose()
