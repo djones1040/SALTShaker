@@ -82,7 +82,8 @@ class SALTtrainingspectrum(SALTtrainingdata):
 				iGood=(snanaspec['DQ']==1)
 			else:
 				iGood=np.ones(len(self),dtype=bool)
-			if 'DQ' in snanaspec and (snanaspec['DQ']==1).sum() is 0:
+			iGood = iGood & (~np.isnan(self.flux))
+			if ('DQ' in snanaspec and (snanaspec['DQ']==1).sum() is 0) or np.all(np.isnan(self.flux)):
 				raise SNDataReadError('Spectrum is all marked as invalid data')
 			if binspecres is not None:
 				flux = self.flux[iGood]
@@ -90,7 +91,7 @@ class SALTtrainingspectrum(SALTtrainingdata):
 				fluxerr = self.fluxerr[iGood]
 				fluxmax = np.max(flux)
 				weights = 1/(fluxerr/fluxmax)**2.
-
+				
 				def weighted_avg(indices):
 					"""
 					Return the weighted average and standard deviation.
@@ -228,7 +229,11 @@ class SALTtrainingSN:
 				try:
 					self.specdata[speccount]=SALTtrainingspectrum(sn.SPECTRA[k],self.zHelio,self.tpk_guess,binspecres=binspecres)
 				except SNDataReadError as e:
-					log.warning(f'{e.message}, skipping spectrum {k} for SN {self.snid}')
+					if hasattr(e,'message'):
+						log.warning(f'{e.message}, skipping spectrum {k} for SN {self.snid}')
+					else:
+						log.warning(f'DataReadError, skipping spectrum {k} for SN {self.snid}')
+
 	@property
 	def num_lc(self):
 		return len(self.photdata)
