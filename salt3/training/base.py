@@ -114,6 +114,8 @@ class TrainSALTBase:
 							help='configuration file')
 		parser.add_argument('-s','--stage', default='all', type=str,
 							help='stage - options are train and validate')
+		parser.add_argument('--skip_validation', default=False, action="store_true",
+							help='skip making validation plots')
 
 		
 		# input files
@@ -169,6 +171,9 @@ class TrainSALTBase:
 							help='if set, initialize using output parameters from previous run. If directory, initialize using ouptut parameters from specified directory')
 		parser.add_argument_with_config_default(config,'iodata','fix_salt2modelpars',  type=boolean_string,
 							help="""if set, fix M0/M1 for wavelength/phase range of original SALT2 model (default=%(default)s)""")
+		#validation option
+		parser.add_argument_with_config_default(config,'iodata','validate_modelonly',  type=boolean_string,
+							help="""if set, only make model plots in the validation stage""")
 
 
 		parser.add_argument_with_config_default(config,'trainparams','do_mcmc',  type=boolean_string,

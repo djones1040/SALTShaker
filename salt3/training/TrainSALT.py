@@ -602,7 +602,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 
 		return result['parameters'][2],result['parameters'][3],result['parameters'][4],result['parameters'][1]
 	
-	def validate(self,outputdir,datadict):
+	def validate(self,outputdir,datadict,modelonly=False):
 
 		# prelims
 		plt.subplots_adjust(left=None, bottom=None, right=None, top=0.85, wspace=0.025, hspace=0)
@@ -665,6 +665,9 @@ SIGMA_INT: 0.106  # used in simulation"""
 		from matplotlib.backends.backend_pdf import PdfPages
 		plt.close('all')
 
+		if modelonly:
+			return
+		
 		pdf_pages = PdfPages(f'{outputdir}/lcfits.pdf')
 		import matplotlib.gridspec as gridspec
 		gs1 = gridspec.GridSpec(3, 5)
@@ -864,9 +867,13 @@ SIGMA_INT: 0.106  # used in simulation"""
 				# write the output model - M0, M1, c
 				self.wrtoutput(self.options.outputdir,trainingresult,chain,loglikes,datadict)
 			log.info('successful SALT2 training!  Output files written to %s'%self.options.outputdir)
-			if self.options.stage == "all" or self.options.stage == "validate":
-				stage='validation'
-				self.validate(self.options.outputdir,datadict)
+			if not self.options.skip_validation:
+				if self.options.stage == "all" or self.options.stage == "validate":
+					stage='validation'
+					if self.options.validate_modelonly:
+						self.validate(self.options.outputdir,datadict,modelonly=True)
+					else:
+						self.validate(self.options.outputdir,datadict,modelonly=False)
 		except:
 			log.exception(f'Exception raised during {stage}')
 			if stage != 'validation':
