@@ -175,6 +175,7 @@ class TrainSALT(TrainSALTBase):
 				 *['%s/%s'%(init_rootdir,x) for x in ['salt2_lc_relative_variance_0.dat','salt2_lc_relative_covariance_01.dat','salt2_lc_relative_variance_1.dat','salt2_lc_dispersion_scaling.dat','salt2_color_dispersion.dat']],**init_options)
 		else:
 			#errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs(**init_options)
+			#if not 'hi':
 			init_options['phase'] = phase
 			init_options['wave'] = wave
 			init_options['phaseknotloc'] = phaseknotloc
@@ -271,10 +272,6 @@ class TrainSALT(TrainSALTBase):
 							return cl_init-salt2cl
 
 						md = least_squares(bestfit,[0,0,0,0,0])
-						# test
-						#clnew = SALT2ColorLaw(self.options.colorwaverange, md.x)(clwave)
-						#plt.plot(clwave,salt2cl,color='b')
-						#plt.plot(clwave,clnew,color='r')
 						if 'termination conditions are satisfied' not in md.message:
 							raise RuntimeError('problem initializing color law!')
 						guess[parlist == 'cl'] = md.x
@@ -282,8 +279,6 @@ class TrainSALT(TrainSALTBase):
 					guess[parlist == 'cl'] =[0.]*self.options.n_colorpars 
 			if self.options.n_colorscatpars:
 
-				#guess[parlist == 'clscat'] = cdisp_coeffs #[1e-6]*self.options.n_colorscatpars
-				#guess[np.where(parlist == 'clscat')[0][-1]]=-np.inf
 				guess[parlist == 'clscat'] = clscatcoeffs
 
 			guess[(parlist == 'm0') & (guess < 0)] = 1e-4
@@ -391,32 +386,16 @@ class TrainSALT(TrainSALTBase):
 				trainingresult,message = fitter.gaussnewton(
 						saltfitter,x_modelpars,
 						self.options.gaussnewton_maxiter)
-				
-				#if not 'hi': #self.options.fit_model_err:
-				#	M0dataerr,M1dataerr,cov_M0_M1_data = fitter.gaussnewton(
-				#		saltfitter,x_modelpars,
-				#		self.options.gaussnewton_maxiter,only_data_errs=True)
-				#else:
-				#	M0dataerr = M1dataerr = cov_M0_M1_data = np.zeros(len(M0))
-					
+									
 			for k in datadict.keys():
-				#try:
-				#	tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
-				#	SNParams[k]['t0'] = -trainingresult.SNParams[k]['tpkoff'] + tpk_init
-				#except:
-				#tpk_init = datadict[k]['photdata']['mjd'][0] - datadict[k]['photdata']['tobs'][0]
 				trainingresult.SNParams[k]['t0'] = -trainingresult.SNParams[k]['tpkoff'] + datadict[k].tpk_guess
 		
 		log.info('message: %s'%message)
-		#print('Final regularization chi^2 terms:', saltfitter.regularizationChi2(x_modelpars,1,0,0),
-		#	  saltfitter.regularizationChi2(x_modelpars,0,1,0),saltfitter.regularizationChi2(x_modelpars,0,0,1))
 		log.info('Final loglike'); saltfitter.maxlikefit(trainingresult.X_raw)
 
 		log.info(trainingresult.X.size)
 
 
-		#print('Finishing...To write files, hit c')
-		#import pdb; pdb.set_trace()
 
 		if 'chain' in saltfitter.__dict__.keys():
 			chain = saltfitter.chain
@@ -715,7 +694,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 				#print('hack!  no spectral plotting')
 				ValidateSpectra.compareSpectra(
 					snlist,self.options.outputdir,specfile=f'{self.options.outputdir}/speccomp_{j:.0f}.pdf',
-					maxspec=50,base=self,verbose=self.verbose,datadict=datadict,binspecres=binspecres)
+					maxspec=2000,base=self,verbose=self.verbose,datadict=datadict,binspecres=binspecres)
 			log.info(f'plotting spectra took {time()-tspec:.1f}')
 				
 			snfiles = np.genfromtxt(snlist,dtype='str')
