@@ -406,7 +406,7 @@ class TrainSALTBase:
 						 'fit_model_err':self.options.fit_model_err,
 						 'fit_cdisp_only':self.options.fit_cdisp_only,
                          'model_err_max_chisq':self.options.model_err_max_chisq,
-                         'steps_between_errorfit':self.options.steps_until_errorfit,
+                         'steps_between_errorfit':self.options.steps_between_errorfit,
 						 'fitTpkOff':self.options.fit_tpkoff,
 						 'spec_chi2_scaling':self.options.spec_chi2_scaling}
 		
