@@ -948,12 +948,18 @@ class Simulation(PipeProcedure):
                 genmodel_dict[label] = genmodel_file
         
         genmodel_dict_new = {}
+        isbyosed = False
         for label in genmodel_dict.keys():
             genmodel_file = genmodel_dict[label] 
+            if 'BYOSED' in genmodel_file and len(genmodel_file.split(' '))>1:
+                genmodel_file = genmodel_file.split(' ')[1]
+                isbyosed = True
             if (not genmodel_file.startswith('$') and not genmodel_file.startswith('/')) and \
               ('.' not in genmodel_file or os.path.split(genmodel_file)[0] != '' or \
               (not os.path.exists(os.path.expandvars('$SNDATA_ROOT/models/{}/{}'.format(genmodel_file.split('.')[0],genmodel_file))))):
                 genmodel_file = '%s/%s'%(cwd,genmodel_file)
+            if isbyosed:
+                genmodel_file = 'BYOSED %s'%genmodel_file
             label = 'GENMODEL[{}]'.format(label)
             genmodel_dict_new[label] = genmodel_file
                 
