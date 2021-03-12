@@ -187,7 +187,7 @@ class TrainSALTBase:
 							help='fit for model error if set (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainparams','fit_cdisp_only',	type=boolean_string,
 							help='fit for color dispersion component of model error if set (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainparams','steps_until_errorfit', type=int,
+		parser.add_argument_with_config_default(config,'trainparams','steps_between_errorfit', type=int,
 							help='fit for error model every x steps (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainparams','model_err_max_chisq', type=int,
 							help='max photometric chi2/dof below which model error estimation is done (default=%(default)s)')
@@ -406,7 +406,7 @@ class TrainSALTBase:
 						 'fit_model_err':self.options.fit_model_err,
 						 'fit_cdisp_only':self.options.fit_cdisp_only,
                          'model_err_max_chisq':self.options.model_err_max_chisq,
-                         'steps_until_errorfit':self.options.steps_until_errorfit,
+                         'steps_between_errorfit':self.options.steps_until_errorfit,
 						 'fitTpkOff':self.options.fit_tpkoff,
 						 'spec_chi2_scaling':self.options.spec_chi2_scaling}
 		
