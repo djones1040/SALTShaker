@@ -582,7 +582,7 @@ class GaussNewton(saltresids.SALTResids):
 		for superloop in range(loop_niter):
 			tstartloop = time.time()
 			try:
-				if not superloop % self.steps_until_errorfit  and  self.fit_model_err and not \
+				if not superloop % self.steps_between_errorfit  and  self.fit_model_err and not \
                    self.fit_cdisp_only and photochi2perdof<self.model_err_max_chisq :# and not superloop == 0:
 					X=self.iterativelyfiterrmodel(X)
 					storedResults={}
