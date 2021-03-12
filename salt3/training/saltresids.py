@@ -674,7 +674,7 @@ class SALTResids:
 				spectralresids['resid_jacobian'][:,varyParams] -= uncertainty_jac*(spectralresids['resid'] /uncertainty)[:,np.newaxis]
 
 		tstart = time.time()
-
+		#import pdb; pdb.set_trace()
 		return photresids,specresids
 	
 	def bestfitsinglebandnormalizationsforSN(self,x,sn,storedResults):

@@ -582,7 +582,8 @@ class GaussNewton(saltresids.SALTResids):
 		for superloop in range(loop_niter):
 			tstartloop = time.time()
 			try:
-				if not superloop % 5 and  self.fit_model_err and not self.fit_cdisp_only and photochi2perdof<3 :# and not superloop == 0:
+				if not superloop % self.steps_between_errorfit  and  self.fit_model_err and not \
+                   self.fit_cdisp_only and photochi2perdof<self.model_err_max_chisq :# and not superloop == 0:
 					X=self.iterativelyfiterrmodel(X)
 					storedResults={}
 					chi2results=self.getChi2Contributions(X,storedResults)
@@ -650,11 +651,7 @@ class GaussNewton(saltresids.SALTResids):
 			Xredefined=X.copy()
 		
 		if getdatauncertainties:
-			#try:
 			M0dataerr, M1dataerr,cov_M0_M1_data=self.datauncertaintiesfromhessianapprox(Xredefined)
-			#except:
-			#	print('uncertainties failed!!')
-			#	M0dataerr, M1dataerr,cov_M0_M1_data=None,None,None
 		else:
 			M0dataerr, M1dataerr,cov_M0_M1_data=None,None,None
 		# M0/M1 errors
@@ -680,7 +677,6 @@ class GaussNewton(saltresids.SALTResids):
 				M1=M1,M1modelerr=M1modelerr,M1dataerr=M1dataerr,cov_M0_M1_model=cov_M0_M1_model,cov_M0_M1_data=cov_M0_M1_data,
 				modelerr=modelerr,clpars=clpars,clerr=clerr,clscat=clscat,SNParams=SNParams,stepsizes=stepsizes)
 		
-		#raise RuntimeError("convergence_loop reached 100000 iterations without convergence")
 	def fitOneSN(self,X,sn):
 		X=X.copy()
 		includePars=self.fitOptions[sn][1] 

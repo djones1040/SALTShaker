@@ -57,9 +57,11 @@ def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
 
 	plotmjd = np.linspace(-20, 50,100)
 	
-	fig = plt.figure(figsize=(15, 5))
-	m0axes = [fig.add_subplot(2,len(filters),1+i) for i in range(len(filters))]
-	m1axes = [fig.add_subplot(2,len(filters),len(filters)+ 1+i,sharex=ax) for i,ax in enumerate(m0axes)]
+# 	fig = plt.figure(figsize=)
+	fig,(m0axes,m1axes,familyaxes)=plt.subplots(3,len(filters),sharex=True,figsize=(15, 7))
+# 	m0axes = [fig.add_subplot(3,len(filters),1+i) for i in range(len(filters))]
+# 	m1axes = [fig.add_subplot(3,len(filters),len(filters)+ 1+i,sharex=ax) for i,ax in enumerate(m0axes)]
+# 	familyaxes = [fig.add_subplot(3,len(filters),2*len(filters)+ 1+i,sharex=ax) for i,ax in enumerate(m0axes)]
 	xmin,xmax=-2,2
 	handles=[]
 	for flt,ax0,ax1 in zip(filters,m0axes,m1axes):
@@ -86,18 +88,48 @@ def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
 
 			ax0.set_yticks([])
 			ax1.set_yticks([])
-
+			ax0.plot([plotmjd.min(),plotmjd.max()],[0,0],'k--')
+			ax1.plot([plotmjd.min(),plotmjd.max()],[0,0],'k--')
 		
 			title=flt
 			if 'bessell' in title:
 				title= 'Bessell '+ flt[len('bessell')].upper()
 			ax0.set_title(title,fontsize=20)
 			#ax.set_xlim([-30,55])
+	xmin,xmax=-2,2
+	norm=colors.Normalize(vmin=xmin,vmax=xmax)
+	cmap=plt.get_cmap('RdBu')
+	#line = plt.Line2D([0,1],[275./422]*2, transform=fig.transFigure, color="black")
+
+	for flt,ax in zip(filters,familyaxes):
+		
+		for x1 in np.linspace(xmin,xmax,100,True):
+			salt3model.set(x1=x1)
+			color=cmap(norm(x1))
+			try:
+				salt3flux = salt3model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')
+				ax.plot(plotmjd,salt3flux,color=color,label='SALT3',linewidth=0.1)
+			except: pass
+			
+			ax.set_yticks([])
+
+
+			#ax.set_xlim([-30,55])
+	sm=plt.cm.ScalarMappable(norm=norm,cmap=cmap)
+	sm._A=[]
 	fig.subplots_adjust(right=0.8,bottom=0.15,left=0.05)
+	cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.35])
+	familyaxes[0].set_ylabel('SALT3 Flux',fontsize=20)
+	for ax in familyaxes: ax.set_xlim(plotmjd.min(),plotmjd.max())
+	fig.colorbar(sm,cax=cbar_ax)
+	cbar_ax.set_ylabel('Stretch	 ($x_1$ parameter)',fontsize=20)
+
+	#axes[0].legend()
+	
 	m0axes[0].set_ylabel('M0 Flux',fontsize=20)
 	m1axes[0].set_ylabel('M1 Flux',fontsize=20)
 	fig.text(0.5,0.04,'Time since peak (days)',ha='center',fontsize=20)
-	fig.legend(salt2handle+salt3handle,['SALT2.JLA','SALT3.K20'],fontsize=20,loc=(.825,.55))
+	fig.legend(salt2handle+salt3handle,['SALT2.JLA','SALT3.K21'],fontsize=20,loc=(.825,.75))
 	#axes[0].legend()
 	plt.savefig(outfile)
 	plt.close(fig)
