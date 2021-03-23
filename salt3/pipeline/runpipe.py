@@ -46,7 +46,7 @@ class RunPipe():
     def __init__(self, pipeinput, mypipe=False, batch_mode=False,batch_script=None,start_id=None,
                  randseed=None,fseeds=None,num=None,norun=None,debug=False,timeout=None,
                  make_summary=False,validplots_only=False,success_list=None,load_from_pickle=None,
-                 run_background_jobs=False):
+                 run_background_jobs=False,batch_job_mem_limit=None):
         if mypipe is None:
             self.pipedef = self.__DefaultPipe
         else:
@@ -72,6 +72,7 @@ class RunPipe():
         self.success_list = success_list
         self.load_from_pickle = load_from_pickle
         self.run_background_jobs = run_background_jobs
+        self.batch_job_mem_limit = batch_job_mem_limit
  
     def __DefaultPipe(self):
         pipe = SALT3pipe(finput=self.pipeinput)
@@ -384,6 +385,11 @@ class RunPipe():
                     cwd = os.getcwd()
                     outfname = os.path.join(cwd,'test_pipeline_batch_script_{:03d}'.format(i+self.start_id))
                     outf = open(outfname,'w')
+                    if self.batch_job_mem_limit is not None:
+                        lines = lines.split('\n')
+                        line_idx = [i for i in range(len(lines)) if '--mem-per-cpu' in lines[i]][0]
+                        lines[line_idx] = lines[line_idx].split('=')[0]+"="+str(self.batch_job_mem_limit)
+                        lines = "\n".join(lines)
                     outf.write(lines)
                     outf.write('\n')
                     outf.write(pycommand)
@@ -493,6 +499,8 @@ def main(**kwargs):
                         help='>0 to specify how many batch jobs to submit')
     parser.add_argument('--batch_script',dest='batch_script',default=None,
                         help='base batch submission script')
+    parser.add_argument('--batch_job_mem_limit',dest='batch_job_mem_limit',default=None,
+                        help='--mem-per-cpu in batch submission script')
     parser.add_argument('--start_id',dest='start_id',default=0,type=int,
                         help='starting id for naming suffix')
     parser.add_argument('--randseed',dest='randseed',default=None,type=int,
@@ -523,7 +531,8 @@ def main(**kwargs):
     pipe = RunPipe(p.pipeinput,mypipe=p.mypipe,batch_mode=p.batch_mode,batch_script=p.batch_script,
                    start_id=p.start_id,randseed=p.randseed,fseeds=p.fseeds,num=p.num,norun=p.norun,
                    debug=p.debug,timeout=p.timeout,make_summary=p.make_summary,validplots_only=p.validplots_only,
-                   success_list=p.success_list,load_from_pickle=p.load_from_pickle,run_background_jobs=p.run_background_jobs)
+                   success_list=p.success_list,load_from_pickle=p.load_from_pickle,run_background_jobs=p.run_background_jobs,
+                   batch_job_mem_limit=p.batch_job_mem_limit)
     pipe.run()
     
     if hasattr(pipe,'pipe'):
