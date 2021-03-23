@@ -88,6 +88,8 @@ def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
 
 			ax0.set_yticks([])
 			ax1.set_yticks([])
+
+			ax0.axhline(0,color='k')
 			ax0.plot([plotmjd.min(),plotmjd.max()],[0,0],'k--')
 			ax1.plot([plotmjd.min(),plotmjd.max()],[0,0],'k--')
 		
@@ -95,7 +97,7 @@ def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
 			if 'bessell' in title:
 				title= 'Bessell '+ flt[len('bessell')].upper()
 			ax0.set_title(title,fontsize=20)
-			#ax.set_xlim([-30,55])
+
 	xmin,xmax=-2,2
 	norm=colors.Normalize(vmin=xmin,vmax=xmax)
 	cmap=plt.get_cmap('RdBu')
@@ -131,6 +133,7 @@ def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
 	fig.text(0.5,0.04,'Time since peak (days)',ha='center',fontsize=20)
 	fig.legend(salt2handle+salt3handle,['SALT2.JLA','SALT3.K21'],fontsize=20,loc=(.825,.75))
 	#axes[0].legend()
+
 	plt.savefig(outfile)
 	plt.close(fig)
 
@@ -354,7 +357,80 @@ def plotSynthPhotOverStretchRange(outfile,salt3dir,filterset='SDSS',
 	#axes[0].legend()
 	plt.savefig(outfile)
 	plt.close(fig)
+
+def plotSynthPhotOverStretchRangeNIR(
+        outfile,salt3dir,filterset='CSP',
+        m0file='salt3_template_0.dat',
+        m1file='salt3_template_1.dat',
+		clfile='salt3_color_correction.dat',
+		cdfile='salt3_color_dispersion.dat',
+		errscalefile='salt3_lc_dispersion_scaling.dat',
+		lcrv00file='salt3_lc_variance_0.dat',
+		lcrv11file='salt3_lc_variance_1.dat',
+		lcrv01file='salt3_lc_covariance_01.dat',includeSALT2=False):
 	
+	plt.clf()
+
+
+
+	filtdict = {'SDSS':['sdss%s'%s for s in	 'ugri']+['desz'],'Bessell':['bessell%s'%s +('x' if s=='u' else '')for s in	'ubvri'],
+                'CSP':['csp%s'%s for s in ['ys','js']]}
+	filters=filtdict[filterset]
+	
+	zpsys='AB'
+	
+	salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,
+								m1file=m1file,
+								clfile=clfile,cdfile=cdfile,
+								errscalefile=errscalefile,
+								lcrv00file=lcrv00file,
+								lcrv11file=lcrv11file,
+								lcrv01file=lcrv01file)
+	salt3model =  sncosmo.Model(salt3)
+		
+	salt3model.set(z=0)
+	salt3model.set(x0=1)
+	salt3model.set(t0=0)
+	salt3model.set(c=0)
+
+	plotmjd = np.linspace(-20, 55,100)
+	
+	fig = plt.figure(figsize=(15, 5))
+	salt3axes = [fig.add_subplot(1,len(filters),1+i) for i in range(len(filters))]
+	xmin,xmax=-2,2
+	norm=colors.Normalize(vmin=xmin,vmax=xmax)
+	cmap=plt.get_cmap('RdBu')
+	for flt,ax3 in zip(filters,salt3axes):
+		
+		for x1 in np.linspace(xmin,xmax,100,True):
+			salt3model.set(x1=x1)
+			color=cmap(norm(x1))
+			salt3flux = salt3model.bandflux(flt, plotmjd,zp=27.5,zpsys='AB')
+			ax3.plot(plotmjd,salt3flux,color=color,label='SALT3',linewidth=0.1)
+			
+			ax3.set_yticks([])
+
+
+			title=flt
+			if 'bessell' in title:
+				title= 'Bessell '+ flt[len('bessell')].upper()
+			ax3.set_title(title,fontsize=20)
+			#ax.set_xlim([-30,55])
+	sm=plt.cm.ScalarMappable(norm=norm,cmap=cmap)
+	sm._A=[]
+	fig.subplots_adjust(right=0.8,bottom=0.15,left=0.05)
+	cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+	salt3axes[0].set_ylabel('SALT3 Flux',fontsize=20)
+
+	fig.colorbar(sm,cax=cbar_ax)
+	cbar_ax.set_ylabel('Stretch	 ($x_1$ parameter)',fontsize=20)
+	
+	fig.text(0.5,0.04,'Time since peak (days)',ha='center',fontsize=20)
+	#axes[0].legend()
+	plt.savefig(outfile)
+	plt.close(fig)
+
+    
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='Plot synthetic photometry for a range of x1 values')
 	parser.add_argument('salt3dir',type=str,help='File with supernova fit parameters')
@@ -366,5 +442,5 @@ if __name__ == "__main__":
 		parser.outdir=(parser.salt3dir)
 	plotSynthPhotOverStretchRange('{}/synthphotrange.pdf'.format(parser.outdir),parser.salt3dir,parser.filterset)
 	overPlotSynthPhotByComponent('{}/synthphotoverplot.pdf'.format(parser.outdir),parser.salt3dir,parser.filterset)
-	
-	
+	plotSynthPhotOverStretchRangeNIR('{}/synthphotrangeNIR.pdf'.format(parser.outdir),parser.salt3dir)	
+

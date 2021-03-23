@@ -228,6 +228,7 @@ class TrainSALT(TrainSALTBase):
 		n_params=parlist.size
 		guess = np.zeros(parlist.size)
 		if self.options.resume_from_outputdir:
+			log.info(f"resuming from output directory {self.options.outputdir}")
 			names=None
 			for possibleDir in [self.options.resume_from_outputdir,self.options.outputdir]:
 				for possibleFile in ['salt3_parameters_unscaled.dat','salt3_parameters.dat']:	
@@ -237,14 +238,8 @@ class TrainSALT(TrainSALTBase):
 							break
 						except:
 							continue
-			# HACK!
-			#guess[parlist == 'm0'] = m0knots
-			#guess[parlist == 'm1'] = m1knots
 			for key in np.unique(parlist):
 				try:
-					#if key not in ['m0','m1']: 
-					#	guess[parlist == key] = pars[names == key]
-					#else:
 					guess[parlist == key] = pars[names == key]
 				except:
 					log.critical(f'Problem while initializing parameter {key} from previous training')
@@ -262,9 +257,6 @@ class TrainSALT(TrainSALTBase):
 					if self.options.n_colorpars == 4:
 						guess[parlist == 'cl'] = [-0.504294,0.787691,-0.461715,0.0815619]
 					else:
-						#import pylab as plt
-						#plt.ion()
-						#plt.clf()
 						clwave = np.linspace(self.options.waverange[0],self.options.waverange[1],1000)
 						salt2cl = SALT2ColorLaw([2800.,7000.], [-0.504294,0.787691,-0.461715,0.0815619])(clwave)
 						def bestfit(p):
@@ -382,24 +374,34 @@ class TrainSALT(TrainSALTBase):
 				saltfitkwargs['fitting_sequence'] = self.options.fitting_sequence
 				saltfitkwargs['fix_salt2modelpars'] = self.options.fix_salt2modelpars
 				saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)
+
 				# do the fitting
 				trainingresult,message = fitter.gaussnewton(
 						saltfitter,x_modelpars,
-						self.options.gaussnewton_maxiter)
-									
+						self.options.gaussnewton_maxiter,getdatauncertainties=False)
+				#saltfitter_errs = saltfitter
+				del saltfitter # free up memory before the uncertainty estimation
+
+				# get the errors
+				log.info('beginning error estimation loop')
+				saltfitter_errs = saltfit.GaussNewton(trainingresult.X_raw,datadict,parlist,**saltfitkwargs)
+				trainingresult,message = fitter.gaussnewton(
+						saltfitter_errs,trainingresult.X_raw,
+						0,getdatauncertainties=True)
+				
 			for k in datadict.keys():
 				trainingresult.SNParams[k]['t0'] = -trainingresult.SNParams[k]['tpkoff'] + datadict[k].tpk_guess
 		
 		log.info('message: %s'%message)
-		log.info('Final loglike'); saltfitter.maxlikefit(trainingresult.X_raw)
+		log.info('Final loglike'); saltfitter_errs.maxlikefit(trainingresult.X_raw)
 
 		log.info(trainingresult.X.size)
 
 
 
-		if 'chain' in saltfitter.__dict__.keys():
-			chain = saltfitter.chain
-			loglikes = saltfitter.loglikes
+		if 'chain' in saltfitter_errs.__dict__.keys():
+			chain = saltfitter_errs.chain
+			loglikes = saltfitter_errs.loglikes
 		else: chain,loglikes = None,None
 		#with open('trainingresult.pickle','wb') as file: pickle.dump(trainingresult,file)
 		return trainingresult,chain,loglikes

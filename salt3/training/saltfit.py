@@ -48,15 +48,16 @@ class SALTTrainingResult(object):
 	 def __init__(self, **kwargs):
 		 self.__dict__.update(kwargs)
 
-
 def ensurepositivedefinite(matrix,maxiter=5):
-	mineigenval=np.linalg.eigvalsh(matrix)[0]
-	if mineigenval>0:
-		return matrix
-	else:
-		if maxiter==0: 
-			raise ValueError('Unable to make matrix positive semidefinite')
-		return ensurepositivedefinite(matrix+np.diag(-mineigenval*4* np.ones(matrix.shape[0])),maxiter-1)
+
+	for i in range(maxiter):
+		mineigenval=np.linalg.eigvalsh(matrix)[0]
+		if mineigenval>0:
+			return matrix
+		else:
+			if maxiter==0: 
+				raise ValueError('Unable to make matrix positive semidefinite')
+		matrix+=np.diag(-mineigenval*4* np.ones(matrix.shape[0]))
 
 def getgaussianfilterdesignmatrix(shape,smoothing):
 	windowsize=10+shape%2
@@ -135,12 +136,12 @@ class fitting:
 
 	def gaussnewton(self,gn,guess,
 					gaussnewton_maxiter,
-					only_data_errs=False):
+					getdatauncertainties=True):
 
 		gn.debug = False
 		convergenceresult = \
 				gn.convergence_loop(
-				guess,loop_niter=gaussnewton_maxiter)
+					guess,loop_niter=gaussnewton_maxiter,getdatauncertainties=getdatauncertainties)
 			
 		return convergenceresult,\
 			'Gauss-Newton MCMC was successful'
@@ -472,23 +473,28 @@ class GaussNewton(saltresids.SALTResids):
 		else:
 			self.fitlist = [f for f in kwargs['fitting_sequence'].split(',')]
 
-	def datauncertaintiesfromhessianapprox(self,X,suppressregularization=True,smoothingfactor=150):
+	def datauncertaintiesfromhessianapprox(self,X,storedResults,suppressregularization=True,smoothingfactor=150):
 		"""Approximate Hessian by jacobian times own transpose to determine uncertainties in flux surfaces"""
 		log.info("determining M0/M1 errors by approximated Hessian")
-		itpk=np.zeros(X.size,dtype=bool)
-		itpk[self.itpk]=True
+		import time
+		tstart = time.time()
+		#itpk=np.zeros(X.size,dtype=bool)
+		#itpk[self.itpk]=True
 		varyingParams=self.fitOptions['components'][1]|self.fitOptions['color'][1]|self.fitOptions['spectralrecalibration'][1]|self.fitOptions['colorlaw'][1]
 		logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
 		if suppressregularization:
 			self.neff[self.neff<self.neffMax]=10
-		residuals,jac=self.lsqwrap(X,{},varyingParams,True,doSpecResids=True)
+        
+		residuals,jac=self.lsqwrap(X,storedResults,varyingParams,True,doSpecResids=True)
+
 		self.updateEffectivePoints(X)
 		#Simple preconditioning of the jacobian before attempting to invert
 		precondition=sparse.diags(1/np.sqrt(np.asarray((jac.power(2)).sum(axis=0))),[0])
 		precondjac=(jac*precondition)
-		
+        
 		#Define the matrix sigma^-1=J^T J
-		square=ensurepositivedefinite(precondjac.T*precondjac.toarray())
+		square=ensurepositivedefinite((precondjac.T*precondjac).toarray())
+        
 		#Inverting cholesky matrix for speed
 		L=linalg.cholesky(square,lower=True)
 		invL=(linalg.solve_triangular(L,np.diag(np.ones(L.shape[0])),lower=True))
@@ -498,15 +504,16 @@ class GaussNewton(saltresids.SALTResids):
 			if self.bsorder == 0: continue
 			spline_derivs[:,:,i]=bisplev(self.phaseout,self.waveout,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
 		spline2d=sparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))
-		
+        
 		#Smooth things a bit, since this is supposed to be for broadband photometry
 		if smoothingfactor>0:
 			smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
 			spline2d=smoothingmatrix*spline2d
 		#Uncorrelated effect of parameter uncertainties on M0 and M1
 		varyparlist= self.parlist[varyingParams]
-		m0pulls=invL*precondition.tocsr()[:,varyparlist=='m0']*spline2d.T
-		m1pulls=invL*precondition.tocsr()[:,varyparlist=='m1']*spline2d.T 
+		m0pulls=invL.astype('float16')*precondition.tocsr()[:,varyparlist=='m0'].astype('float16')*spline2d.T.astype('float16')
+		m1pulls=invL.astype('float16')*precondition.tocsr()[:,varyparlist=='m1'].astype('float16')*spline2d.T.astype('float16')
+        
 		M0dataerr = np.sqrt((m0pulls**2).sum(axis=0).reshape((self.phaseout.size,self.waveout.size)))
 		cov_M0_M1_data = (m0pulls*m1pulls).sum(axis=0).reshape((self.phaseout.size,self.waveout.size))
 		del m0pulls
@@ -578,12 +585,13 @@ class GaussNewton(saltresids.SALTResids):
 		for name,chi2component,dof in chi2results:
 			if name.lower()=='photometric':
 				photochi2perdof=chi2component/dof
-		
+
+		storedResults={}
 		for superloop in range(loop_niter):
 			tstartloop = time.time()
 			try:
-				if not superloop % self.steps_between_errorfit  and  self.fit_model_err and not \
-                   self.fit_cdisp_only and photochi2perdof<self.model_err_max_chisq :# and not superloop == 0:
+				if not superloop % self.steps_between_errorfit	and	 self.fit_model_err and not \
+				   self.fit_cdisp_only and photochi2perdof<self.model_err_max_chisq :# and not superloop == 0:
 					X=self.iterativelyfiterrmodel(X)
 					storedResults={}
 					chi2results=self.getChi2Contributions(X,storedResults)
@@ -651,7 +659,7 @@ class GaussNewton(saltresids.SALTResids):
 			Xredefined=X.copy()
 		
 		if getdatauncertainties:
-			M0dataerr, M1dataerr,cov_M0_M1_data=self.datauncertaintiesfromhessianapprox(Xredefined)
+			M0dataerr, M1dataerr,cov_M0_M1_data=self.datauncertaintiesfromhessianapprox(Xredefined,storedResults)
 		else:
 			M0dataerr, M1dataerr,cov_M0_M1_data=None,None,None
 		# M0/M1 errors
@@ -1157,7 +1165,6 @@ class GaussNewton(saltresids.SALTResids):
 				varyingParams=varyingParams&~sndependentparams
 		if not self.fitTpkOff: varyingParams[self.itpk]=False
 		residuals,jacobian=self.lsqwrap(X,storedResults,varyingParams,**kwargs)
-
 		oldChi=(residuals**2).sum()
 		jacobian=jacobian.tocsc()
 
@@ -1305,6 +1312,6 @@ class GaussNewton(saltresids.SALTResids):
 		with open(path.join(self.outputdir,'gaussnewtonhistory.pickle'),'wb') as file: pickle.dump(self.Xhistory,file)
 		log.info('Chi2 diff, % diff')
 		log.info(' '.join(['{:.2f}'.format(x) for x in [oldChi-chi2,(100*(oldChi-chi2)/oldChi)] ]))
-		print('')
+		log.info('')
 		return X,chi2,oldChi
 
