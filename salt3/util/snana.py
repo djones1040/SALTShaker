@@ -626,7 +626,7 @@ NSPECTRA:  %i
 		fout.close()
 		return( datfile )
 
-	def appendspec2snanafile(self, outfile, specdir, verbose=False, ps=False, **kwarg ):
+	def appendspec2snanafile(self, outfile, specdir=None, specfile=None, verbose=False, ps=False, mjd=None, **kwarg ):
 		""" function to write jla data in snana format. Use as
 		sn_lc=jla.SuperNova(full_path_of_jla_data/lc-sn_name.list)
 		sn_lc.writesnanafile(full_path_of_jla_data/lc-sn_name.list)
@@ -664,15 +664,18 @@ NSPECTRA:  %i
 		if ps: self.SNID = '%06i'%self.SNID
 		if type(self.SNID) == float: self.SNID == str(int(self.SNID))
 
-		list_file_spec=glob.glob(specdir+'/spectrum*'+str(self.__dict__['SNID'])+'*.list')
+		if specfile is None:
+			list_file_spec=glob.glob(specdir+'/spectrum*'+str(self.__dict__['SNID'])+'*.list')
+		else:
+			list_file_spec = np.atleast_1d(specfile)
+        
 		num_spec = [int(l.split('-')[-1].split('.')[0]) for l in list_file_spec]
 		if not len(list_file_spec) and isinstance(self.SNID,str):
 			snid2 = self.SNID[:]
 			snid2 = snid2[:-1]+snid2[-1].lower()
 			list_file_spec=glob.glob(specdir+'/spectrum*'+snid2+'*.list')
 			num_spec = [int(l.split('-')[-1].split('.')[0]) for l in list_file_spec]
-		#if verbose and len(list_file_spec) > 1:
-		#	import pdb; pdb.set_trace()
+        
 		if not len(list_file_spec):
 			if verbose:
 				print('warning: no spectrum for SNID %s'%self.SNID)

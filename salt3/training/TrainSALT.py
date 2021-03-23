@@ -228,6 +228,7 @@ class TrainSALT(TrainSALTBase):
 		n_params=parlist.size
 		guess = np.zeros(parlist.size)
 		if self.options.resume_from_outputdir:
+			log.info(f"resuming from output directory {self.options.outputdir}")
 			names=None
 			for possibleDir in [self.options.resume_from_outputdir,self.options.outputdir]:
 				for possibleFile in ['salt3_parameters_unscaled.dat','salt3_parameters.dat']:	
@@ -237,14 +238,8 @@ class TrainSALT(TrainSALTBase):
 							break
 						except:
 							continue
-			# HACK!
-			#guess[parlist == 'm0'] = m0knots
-			#guess[parlist == 'm1'] = m1knots
 			for key in np.unique(parlist):
 				try:
-					#if key not in ['m0','m1']: 
-					#	guess[parlist == key] = pars[names == key]
-					#else:
 					guess[parlist == key] = pars[names == key]
 				except:
 					log.critical(f'Problem while initializing parameter {key} from previous training')
@@ -252,6 +247,7 @@ class TrainSALT(TrainSALTBase):
 					
 
 		else:
+			import pdb; pdb.set_trace()
 			m0knots[m0knots == 0] = 1e-4
 			guess[parlist == 'm0'] = m0knots
 			for i in range(3): guess[parlist == 'modelerr_{}'.format(i)] = 1e-6 
@@ -262,9 +258,6 @@ class TrainSALT(TrainSALTBase):
 					if self.options.n_colorpars == 4:
 						guess[parlist == 'cl'] = [-0.504294,0.787691,-0.461715,0.0815619]
 					else:
-						#import pylab as plt
-						#plt.ion()
-						#plt.clf()
 						clwave = np.linspace(self.options.waverange[0],self.options.waverange[1],1000)
 						salt2cl = SALT2ColorLaw([2800.,7000.], [-0.504294,0.787691,-0.461715,0.0815619])(clwave)
 						def bestfit(p):
@@ -394,7 +387,7 @@ class TrainSALT(TrainSALTBase):
 				log.info('beginning error estimation loop')
 				saltfitter_errs = saltfit.GaussNewton(trainingresult.X_raw,datadict,parlist,**saltfitkwargs)
 				trainingresult,message = fitter.gaussnewton(
-						saltfitter_errs,x_modelpars,
+						saltfitter_errs,trainingresult.X_raw,
 						0,getdatauncertainties=True)
 				
 			for k in datadict.keys():
