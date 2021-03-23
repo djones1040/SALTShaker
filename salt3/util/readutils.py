@@ -98,7 +98,7 @@ class SALTtrainingspectrum(SALTtrainingdata):
 					"""
 					#try:
 					average = np.average(flux[indices]/fluxmax, weights=weights[indices])
-					variance = np.average((flux[indices]/fluxmax-average)**2, weights=weights[indices])  # Fast and numerically precise
+					variance = np.average((flux[indices]/fluxmax-average)**2, weights=weights[indices])	 # Fast and numerically precise
 					#except:
 					#	import pdb; pdb.set_trace()
 
@@ -110,7 +110,7 @@ class SALTtrainingspectrum(SALTtrainingdata):
 					indices, weights -- Numpy ndarrays with the same shape.
 					"""
 					average = np.average(flux[indices]/fluxmax, weights=weights[indices])
-					variance = np.average((flux[indices]/fluxmax-average)**2, weights=weights[indices])  # Fast and numerically precise
+					variance = np.average((flux[indices]/fluxmax-average)**2, weights=weights[indices])	 # Fast and numerically precise
 					return np.sqrt(variance) #/np.sqrt(len(indices))
 
 				#wavebins = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/binspecres)
@@ -214,11 +214,11 @@ class SALTtrainingSN:
 		self.salt2fitprob=fitprob
 		
 		self.photdata = {flt:SALTtraininglightcurve(self.zHelio,tpk_guess= self.tpk_guess,flt=flt, sn=sn) for flt in np.unique(sn.FLT)}
-# 		try:
-# 			for key in self.photdata:
-# 				assert( len(self.photdata[key])>0)
-# 		except AssertionError:
-# 			raise SNDataReadError(f'All lightcurves empty for SN {sn.SNID}')
+#		try:
+#			for key in self.photdata:
+#				assert( len(self.photdata[key])>0)
+#		except AssertionError:
+#			raise SNDataReadError(f'All lightcurves empty for SN {sn.SNID}')
 		try: assert(len(self.photdata)>0)
 		except AssertionError:
 			raise SNDataReadError(f'No lightcurves for SN {sn.SNID}')
@@ -389,9 +389,9 @@ def rdAllData(snlists,estimate_tpk,
 
 		sn.SNID=str(sn.SNID)
 
-		if sn.SNID in datadict:     duplicatesurvey=datadict[sn.SNID].survey
+		if sn.SNID in datadict:		duplicatesurvey=datadict[sn.SNID].survey
 		elif sn.SNID in outputdict: duplicatesurvey=outputdict[sn.SNID].survey
-		else:                       duplicatesurvey=None
+		else:						duplicatesurvey=None
 		if not duplicatesurvey is None:
 			log.warning(f'SNID {sn.SNID} is a duplicate! Keeping version from survey {duplicatesurvey}, discarding version from survey {sn.SURVEY}')
 			return False
@@ -407,7 +407,7 @@ def rdAllData(snlists,estimate_tpk,
 		if len(saltformattedsn.specdata) is 0:
 			log.debug(f'SN {sn.SNID} has no supernova spectra')
 		outputdict[saltformattedsn.snid]=saltformattedsn
-		if len(outputdict)  >= maxnum:
+		if len(outputdict)	>= maxnum:
 			raise BreakLoopException('Maximum number of SNe read in')
 		return True
 	
