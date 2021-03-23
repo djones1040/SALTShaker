@@ -382,24 +382,34 @@ class TrainSALT(TrainSALTBase):
 				saltfitkwargs['fitting_sequence'] = self.options.fitting_sequence
 				saltfitkwargs['fix_salt2modelpars'] = self.options.fix_salt2modelpars
 				saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)
+
 				# do the fitting
 				trainingresult,message = fitter.gaussnewton(
 						saltfitter,x_modelpars,
-						self.options.gaussnewton_maxiter)
-									
+						self.options.gaussnewton_maxiter,getdatauncertainties=False)
+				#saltfitter_errs = saltfitter
+				del saltfitter # free up memory before the uncertainty estimation
+
+				# get the errors
+				log.info('beginning error estimation loop')
+				saltfitter_errs = saltfit.GaussNewton(trainingresult.X_raw,datadict,parlist,**saltfitkwargs)
+				trainingresult,message = fitter.gaussnewton(
+						saltfitter_errs,x_modelpars,
+						0,getdatauncertainties=True)
+				
 			for k in datadict.keys():
 				trainingresult.SNParams[k]['t0'] = -trainingresult.SNParams[k]['tpkoff'] + datadict[k].tpk_guess
 		
 		log.info('message: %s'%message)
-		log.info('Final loglike'); saltfitter.maxlikefit(trainingresult.X_raw)
+		log.info('Final loglike'); saltfitter_errs.maxlikefit(trainingresult.X_raw)
 
 		log.info(trainingresult.X.size)
 
 
 
-		if 'chain' in saltfitter.__dict__.keys():
-			chain = saltfitter.chain
-			loglikes = saltfitter.loglikes
+		if 'chain' in saltfitter_errs.__dict__.keys():
+			chain = saltfitter_errs.chain
+			loglikes = saltfitter_errs.loglikes
 		else: chain,loglikes = None,None
 		#with open('trainingresult.pickle','wb') as file: pickle.dump(trainingresult,file)
 		return trainingresult,chain,loglikes
