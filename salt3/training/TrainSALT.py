@@ -247,7 +247,6 @@ class TrainSALT(TrainSALTBase):
 					
 
 		else:
-			import pdb; pdb.set_trace()
 			m0knots[m0knots == 0] = 1e-4
 			guess[parlist == 'm0'] = m0knots
 			for i in range(3): guess[parlist == 'modelerr_{}'.format(i)] = 1e-6 
