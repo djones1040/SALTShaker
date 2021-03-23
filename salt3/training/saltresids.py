@@ -434,9 +434,8 @@ class SALTResids:
 			for residsdict in ([photresidsdict,specresidsdict] if doSpecResids else [photresidsdict]):
 				residuals+=[residsdict[k]['resid'] for k in residsdict]
 				jacobian+=[residsdict[k]['resid_jacobian'] for k in residsdict]
-				
-		if doPriors:
 
+		if doPriors:
 			priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,guess)
 			residuals+=[priorResids]
 			jacobian+=[priorJac]
@@ -461,7 +460,7 @@ class SALTResids:
 						if np.isnan(residuals[-1]).any(): import pdb;pdb.set_trace()
 						jacobian+=[sparse.csr_matrix(regJac)*np.sqrt(weight*relativeweight)]
 					storedResults[regKey]=residuals[-self.n_components:]
-		
+
 		if varyParams.any():
 			return np.concatenate(residuals),sparse.vstack(jacobian)
 		else:
@@ -490,7 +489,7 @@ class SALTResids:
 		chi2: float
 			Goodness of fit of model to training data	
 		"""
-        
+		
 		if storedResults is None: storedResults={}
 		if varyParams is None:
 			varyParams=np.zeros(self.npar,dtype=bool)
@@ -674,7 +673,6 @@ class SALTResids:
 				spectralresids['resid_jacobian'][:,varyParams] -= uncertainty_jac*(spectralresids['resid'] /uncertainty)[:,np.newaxis]
 
 		tstart = time.time()
-		#import pdb; pdb.set_trace()
 		return photresids,specresids
 	
 	def bestfitsinglebandnormalizationsforSN(self,x,sn,storedResults):
@@ -1141,7 +1139,7 @@ class SALTResids:
 				filtresultsdict['modelvariance_jacobian'][:,(sndata.ix0)] = (uncertaintyNoX0*2*x0)[np.newaxis].transpose()
 			if x1Deriv:
 				filtresultsdict['modelvariance_jacobian'][:,(sndata.ix1)] = \
-					(x0**2 *fluxfactor * 2*(modelerrnox[0]*modelerrnox[1]*corr[0]+ x1* modelerrnox[1]**2))
+					(x0**2 *fluxfactor * 2*(modelerrnox[0]*modelerrnox[1]*corr[0]+ x1* modelerrnox[1]**2))[np.newaxis].transpose()
 
 			if cDeriv:
 				filtresultsdict['modelvariance_jacobian'][:,(sndata.ic)] = \
