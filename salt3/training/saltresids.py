@@ -366,7 +366,6 @@ class SALTResids:
 		if self.fitTpkOff:
 			raise NotImplementedError('Fitting the peak of the lightcurve simultaneously with the model is not currently implemented')
 			
-		self.datadictnocache=datadict
 		log.info('Calculating cached quantities for speed in fitting loop')
 		start=time.time()
 		self.datadict={snid: SALTfitcacheSN(sn,self,self.kcordict) for snid,sn in self.datadict.items()}

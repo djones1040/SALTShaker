@@ -48,16 +48,11 @@ class SALTTrainingResult(object):
 	 def __init__(self, **kwargs):
 		 self.__dict__.update(kwargs)
 
-def ensurepositivedefinite(matrix,maxiter=5):
-
-	for i in range(maxiter):
-		mineigenval=np.linalg.eigvalsh(matrix)[0]
-		if mineigenval>0:
-			return matrix
-		else:
-			if maxiter==0: 
-				raise ValueError('Unable to make matrix positive semidefinite')
-		matrix+=np.diag(-mineigenval*4* np.ones(matrix.shape[0]))
+def ensurepositivedefinite(matrix,condition=1e-10):
+	vals,vecs=linalg.eigh(matrix)
+	if (vals>=vals.max()*condition).all(): return matrix
+	covclipped=np.dot(vecs,np.dot(np.diag(np.clip(vals,vals.max()*condition,None)),vecs.T))
+	return covclipped 
 
 def getgaussianfilterdesignmatrix(shape,smoothing):
 	windowsize=10+shape%2
