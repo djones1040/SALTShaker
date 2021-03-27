@@ -31,13 +31,13 @@ def fromsnpca():
 	import subprocess
 	from subprocess import Popen, PIPE
 	
-	snorig = np.loadtxt('/Users/David/Dropbox/research/salt2/trainsalt/trainingsample_snls_sdss_v5.list',unpack=True,usecols=[0],dtype=str)
-	snlcs = np.loadtxt('JLA_training_orig/JLA_training_orig.LIST',unpack=True,dtype=str)
+	snorig = np.loadtxt('/Users/David/Dropbox/research/salt2/trainsalt/trainingsample_snls_sdss_v6.list',unpack=True,usecols=[0],dtype=str)
+	snlcs = np.loadtxt('JLA_training_origlc/JLA_training_origlc.LIST',unpack=True,dtype=str)
 	
 	snidlist,newsnidlist = [],[]
 	tmaxlist,tmaxerrlist = [],[]
 	for s in snlcs:
-		sn = SuperNova('JLA_training_orig/%s'%s)
+		sn = SuperNova('JLA_training_origlc/%s'%s)
 		if isinstance(sn.SNID,float) or isinstance(sn.SNID,int): snid = 'SDSS%i'%sn.SNID
 		else: snid = sn.SNID[:]
 		if snid not in snorig and 'sn'+snid not in snorig and snid.lower() not in snorig and 'sn'+snid.lower() not in snorig:
@@ -49,10 +49,10 @@ def fromsnpca():
 			newsnidlist += [sn.SNID]
 			if 'SDSS' not in snorig[idx][0]:
 				grep_out = subprocess.check_output(
-					"grep @DayMax /Users/David/Dropbox/research/salt2/trainsalt/salt2-SNLS3-SDSS3_v5/lc*%s*list"%snorig[idx][0],shell=True).decode('utf-8')
+					"grep @DayMax /Users/David/Dropbox/research/salt2/trainsalt/v6/lc*%s*list"%snorig[idx][0],shell=True).decode('utf-8')
 			else:
 				grep_out = subprocess.check_output(
-					"grep @DayMax /Users/David/Dropbox/research/salt2/trainsalt/salt2-SNLS3-SDSS3_v5/SDSS3*%06i*"%int(snorig[idx][0][4:]),shell=True).decode('utf-8')
+					"grep @DayMax /Users/David/Dropbox/research/salt2/trainsalt/v6/SDSS3*%06i*"%int(snorig[idx][0][4:]),shell=True).decode('utf-8')
 				
 			tmaxlist += [float(grep_out.split()[1])]
 			tmaxerrlist += [float(grep_out.split()[2].replace('\n',''))]

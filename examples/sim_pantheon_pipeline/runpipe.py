@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # D. Jones, M. Dai - 9/16/19
 
-from salt3.pipeline.pipeline import *
+from saltshaker.pipeline.pipeline import *
 
 def runpipe():
     pipe = SALT3pipe(finput='pipeline_training.txt')
