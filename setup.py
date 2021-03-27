@@ -26,7 +26,7 @@ setup(
 	packages=['saltshaker','saltshaker.tests','saltshaker.data','saltshaker.simulation',
 			  'saltshaker.training','saltshaker.util','saltshaker.initfiles',
 			  'saltshaker.validation','saltshaker.pipeline','saltshaker.config'],
-	cmdclass={'test': SALTSHAKERTest},
+	cmdclass={'test': SALTShakerTest},
 	scripts=['bin/trainsalt','bin/runpipe','saltshaker/validation/SynPhotPlot.py','saltshaker/validation/ValidateLightcurves.py','saltshaker/validation/ValidateModel.py','saltshaker/validation/ValidateSpectra.py','saltshaker/validation/figs/plotSALTModel.py'],
 	package_data={'': ['initfiles/*.dat','initfiles/*.txt','data/kcor/*.fits','config/*conf']},
 	include_package_data=True,
