@@ -179,10 +179,6 @@ class TrainSALTBase:
 							help="""if set, only make model plots in the validation stage""")
 
 
-		parser.add_argument_with_config_default(config,'trainparams','do_mcmc',	 type=boolean_string,
-							help='do MCMC fitting (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainparams','do_gaussnewton',	type=boolean_string,
-							help='do Gauss-Newton least squares (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainparams','gaussnewton_maxiter',	 type=int,
 							help='maximum iterations for Gauss-Newton (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainparams','regularize',	type=boolean_string,
@@ -190,7 +186,7 @@ class TrainSALTBase:
 		parser.add_argument_with_config_default(config,'trainparams','fitsalt2',  type=boolean_string,
 							help='fit SALT2 as a validation check (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainparams','n_repeat',  type=int,
-							help='repeat mcmc and/or gauss newton n times (default=%(default)s)')
+							help='repeat gauss newton n times (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainparams','fit_model_err',  type=boolean_string,
 							help='fit for model error if set (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainparams','fit_cdisp_only',	type=boolean_string,
@@ -203,12 +199,6 @@ class TrainSALTBase:
 							help='fit for time of max in B-band if set (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainparams','fitting_sequence',  type=str,
 							help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn, tpk (default=%(default)s)")
-
-		# mcmc parameters
-		parser.add_argument_with_config_default(config,'mcmcparams','n_steps_mcmc',	 type=int,
-							help='number of accepted MCMC steps (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'mcmcparams','n_burnin_mcmc',  type=int,
-							help='number of burn-in MCMC steps	(default=%(default)s)')
 
 
 		# survey definitions
@@ -305,54 +295,7 @@ class TrainSALTBase:
 		parser.add_argument_with_config_default(config,'modelparams','error_snake_wave_binsize',  type=float,
 							help='number of angstroms over which to compute scaling of error model (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','use_snpca_knots',	 type=boolean_string,
-							help='if set, define model on SNPCA knots (default=%(default)s)')
-		
-		
-		# mcmc parameters
-		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_magscale_M0',	 type=float,
-							help='initial MCMC step size for M0, in mag	 (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_magadd_M0',  type=float,
-							help='initial MCMC step size for M0, in mag	 (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_magscale_err',  type=float,
-							help='initial MCMC step size for the model err spline knots, in mag	 (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_errcorr',	 type=float,
-							help='initial MCMC step size for the correlation between model error terms, in mag	(default=%(default)s)')
-		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_magscale_M1',	 type=float,
-							help='initial MCMC step size for M1, in mag - need both mag and flux steps because M1 can be negative (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_magadd_M1',  type=float,
-							help='initial MCMC step size for M1, in flux - need both mag and flux steps because M1 can be negative (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_cl',	type=float,
-							help='initial MCMC step size for color law	(default=%(default)s)')
-		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_magscale_clscat',	 type=float,
-							help='initial MCMC step size for color law	(default=%(default)s)')
-		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_specrecal',  type=float,
-							help='initial MCMC step size for spec recal. params	 (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_x0',	type=float,
-							help='initial MCMC step size for x0, in mag	 (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_x1',	type=float,
-							help='initial MCMC step size for x1	 (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_c',  type=float,
-							help='initial MCMC step size for c	(default=%(default)s)')
-		parser.add_argument_with_config_default(config,'mcmcparams','stepsize_tpk',	 type=float,
-							help='initial MCMC step size for tpk  (default=%(default)s)')
-
-		# adaptive MCMC parameters
-		parser.add_argument_with_config_default(config,'mcmcparams','nsteps_before_adaptive',  type=float,
-							help='number of steps before starting adaptive step sizes (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'mcmcparams','nsteps_adaptive_memory',  type=float,
-							help='number of steps to use to estimate adaptive steps (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'mcmcparams','modelpar_snpar_tradeoff_nstep',  type=float,
-							help='number of steps when trading between adjusting model params and SN params (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'mcmcparams','nsteps_before_modelpar_tradeoff',	type=float,
-							help='number of steps when trading between adjusting model params and SN params (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'mcmcparams','nsteps_between_lsqfit',  type=float,
-							help='every x number of steps, adjust the SN params via least squares fitting (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'mcmcparams','use_lsqfit',  type=boolean_string,
-							help='if set, periodically adjust the SN params via least squares fitting (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'mcmcparams','adaptive_sigma_opt_scale',	 type=float,
-							help='scaling the adaptive step sizes (default=%(default)s)')
-		
-				
+							help='if set, define model on SNPCA knots (default=%(default)s)')		
 
 		# priors
 		for prior in __priors__:

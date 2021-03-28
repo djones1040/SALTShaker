@@ -144,7 +144,7 @@ class fitting:
 					guess,loop_niter=gaussnewton_maxiter,getdatauncertainties=getdatauncertainties)
 			
 		return convergenceresult,\
-			'Gauss-Newton MCMC was successful'
+			'Gauss-Newton was successful'
 		
 	def mcmc(self,saltfitter,guess,
 			 n_processes,n_mcmc_steps,
@@ -316,21 +316,11 @@ class mcmc(saltresids.SALTResids):
 			self.update_moments(self.chain[-1], n_adaptive)
 			if not n_adaptive % self.nsteps_adaptive_memory:
 				n_adaptive = 0
-				#ix,iy = np.where(self.M2 < 1e-5)
-				#iLow = np.where(ix == iy)[0]
-				#self.M2[ix[iLow],iy[iLow]] = 1e-5
-				#if self.adjust_snpars and 'M2_snpars' in self.__dict__.keys(): M2_recent = copy.deepcopy(self.M2_snpars)
-				#elif self.adjust_snpars and 'M2_snpars' not in self.__dict__.keys(): M2_recent = copy.deepcopy(self.M2_allpars)
-				#elif self.adjust_modelpars and 'M2_modelpars' in self.__dict__.keys(): M2_recent = copy.deepcopy(self.M2_modelpars)
-				#elif self.adjust_modelpars and 'M2_modelpars' not in self.__dict__.keys(): M2_recent = copy.deepcopy(self.M2_allpars)
-				#else:
 				
 				self.M2_recent = np.empty_like(self.M2)
 				self.M2_recent[:] = self.M2
 				self.mean = self.chain[-1][:]
 				self.M2 = np.empty_like(self.M2)
-				#if self.adjust_snpars: self.M2_snpars = copy.deepcopy(M2_recent)
-				#elif self.adjust_modelpars: self.M2_modelpars = copy.deepcopy(M2_recent)
 
 		log.info('acceptance = %.3f'%(accept/float(nstep)))
 		if nstep < nburn:

@@ -363,16 +363,6 @@ class TrainSALT(TrainSALTBase):
 		for i in range(self.options.n_repeat):
 			if i == 0: laststepsize = None
 			
-			if self.options.do_mcmc:
-				saltfitkwargs['regularize'] = False
-				saltfitter = saltfit.mcmc(x_modelpars,datadict,parlist,**saltfitkwargs)
-				log.info('initial loglike: %.1f'%saltfitter.maxlikefit(x_modelpars,{},np.zeros(len(x_modelpars),dtype=bool)))
-				# do the fitting
-				x_modelpars,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-					modelerr,clpars,clerr,clscat,SNParams,message = fitter.mcmc(
-						saltfitter,x_modelpars,self.options.n_processes,
-						self.options.n_steps_mcmc,self.options.n_burnin_mcmc)
-
 			if self.options.do_gaussnewton:
 				saltfitkwargs['regularize'] = self.options.regularize
 				saltfitkwargs['fitting_sequence'] = self.options.fitting_sequence
