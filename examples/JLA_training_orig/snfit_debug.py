@@ -7,7 +7,7 @@ from astropy.table import Table
 import os
 import snana
 import astropy.units as u
-from salt3.initfiles import init_rootdir as salt2dir
+from saltshaker.initfiles import init_rootdir as salt2dir
 print(salt2dir)
 
 def main():
