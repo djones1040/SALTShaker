@@ -498,6 +498,8 @@ def exit_handler(pipe,num):
     
     
 def main(**kwargs):
+    print("Starting pipeline run..")
+    
     parser = argparse.ArgumentParser(description='Run SALT3 Pipe.')
     parser.add_argument('-c',dest='pipeinput',default=None,
                         help='pipeline input file')
