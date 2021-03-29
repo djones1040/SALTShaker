@@ -55,14 +55,6 @@ def rankOneCholesky(variance,beta,v):
 		b+=beta*v[j]**2/variance[j]
 	return Lprime
 
-#			
-#			idx = self.sncachedresults[snid]['idx']
-#			tpkoff=X[self.parlist == f'tpkoff_{snid}']
-#			obsphase = self.sncachedresults[snid]['obsphase']
-#			for k,spectrum in sn.specdata.items():
-#				self.pcderivsparse[f'pcDeriv_spec_{snid}_{k}']=sparse.csr_matrix(self.spline_deriv_interp((spectrum.phase,spectrum.wavelength/(1+z)),method=self.interpMethod))
-#				
-#			for flt in sn.filt:
 
 class SALTfitcachelightcurve(SALTtraininglightcurve):
 
@@ -104,8 +96,6 @@ class SALTfitcachespectrum(SALTtrainingspectrum):
 	__slots__ = ['spectrum','pcderivsparse','ispecx0','ispcrcl','phase','wavelength','flux','fluxerr','tobs']
 	
 	def __init__(self,sn,spectrum,k,residsobj,kcordict):
-		#for key,val in spectrum.__dict__.items():
-		#	self.__dict__[key]=copy.deepcopy(val)
 
 		self.flux = spectrum.flux
 		self.phase = spectrum.phase
@@ -181,8 +171,6 @@ class SALTResids:
 				self.boundedParams += [opt[len('bound_'):]]
 				self.bounds += [tuple([float(x) for x in self.__dict__[opt]])]
 				
-			#self.usePriors=[x.split('prior_')[-1] for x in ] #self.usePriors.split(',')
-			#self.priorWidths=[float(x) for x in self.priorWidths.split(',')]
 
 		# pre-set some indices
 		self.set_param_indices()
@@ -319,9 +307,6 @@ class SALTResids:
 		#Find the iqr of the phase/wavelength basis functions
 		self.phaseRegularizationBins=np.linspace(self.phase[0],self.phase[-1],self.phaseBins[0].size*2+1,True)
 		self.waveRegularizationBins=np.linspace(self.wave[0],self.wave[-1],self.waveBins[0].size*2+1,True)
-		# HACK to match snpca
-		#self.phaseRegularizationBins=np.linspace(self.phase[0],self.phase[-1],self.phaseBins[0].size+1,True)
-		#self.waveRegularizationBins=np.linspace(self.wave[0],self.wave[-1],self.waveBins[0].size+1,True)
 
 		
 		self.phaseRegularizationPoints=(self.phaseRegularizationBins[1:]+self.phaseRegularizationBins[:-1])/2
@@ -345,7 +330,7 @@ class SALTResids:
 		phase=self.phaseRegularizationPoints
 		wave=self.waveRegularizationPoints
 		fluxes=self.SALTModel(guess,evaluatePhase=self.phaseRegularizationPoints,evaluateWave=self.waveRegularizationPoints)
-		# HACK
+
 		self.guessScale=[1.0 for f in fluxes]
 
 		self.colorLawDeriv=np.empty((self.wave.size,self.n_colorpars))
@@ -495,22 +480,20 @@ class SALTResids:
 			varyParams=np.zeros(self.npar,dtype=bool)
 		computeDerivatives=np.any(varyParams)
 		#Set up SALT model
-		# HACK
 		self.fillStoredResults(x,storedResults)	
-		# timing stuff
 		
 		chi2 = 0
 		#Construct arguments for maxlikeforSN method
 		#If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
 		args=[(x,sn,storedResults,varyParams,debug,SpecErrScale,fixFluxes,dospec) \
 			  for sn in (self.datadict.keys() if usesns is None else usesns)]
-		#args2 = (x,components,componentderivs,salterr,saltcorr,colorLaw,debug,timeit,computeDerivatives,computePCDerivs,SpecErrScale)
+
 		mapFun=pool.map if pool else starmap
 
-		#result = list(pyParz.foreach(self.datadict.keys(),self.loglikeforSN,args2))
+
 		result=list(mapFun(self.loglikeforSN,args))
 
-		# hack!
+
 		loglike=sum(result)
 		logp = loglike
 
@@ -716,7 +699,7 @@ class SALTResids:
 					
 			prefactor=_SCALE_FACTOR/(1+z)*(sndata.mwextcurve[np.newaxis,:])
 			mod = prefactor*(M0 + x1*M1)
-			#temporaryResults['fluxInterp'] = interp1d(obsphase,mod,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
+
 			temporaryResults['fluxInterp'] = mod #interp1d(obsphase,mod,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
 			if x1Deriv:
 				int1dM1 = interp1d(obsphase,prefactor*M1,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
@@ -744,8 +727,6 @@ class SALTResids:
 			saltCorr=storedResults['saltCorr'] 
 			modelUncertainty= prefactor**2 *(saltErr[0]**2	+ 2*x1* saltCorr[0]*saltErr[0]*saltErr[1] + x1**2 *saltErr[1]**2)
 
-			#interr1d=interp1d(obsphase,modelUncertainty ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
-			#temporaryResults['modelUncertaintyInterp']=interr1d
 			temporaryResults['modelUncertainty']=modelUncertainty
 
 		returndicts=[]
@@ -904,8 +885,6 @@ class SALTResids:
 				specresultsdict['modelflux_jacobian'] = np.zeros((specresultsdict['dataflux'].size,self.parlist.size))
 			else:
 				specresultsdict['modelflux_jacobian'] = sparse.csr_matrix((specresultsdict['dataflux'].size,self.parlist.size))
-			#colorlawinterp=storedResults['colorLawInterp'](spectrum.wavelength/(1+z))
-			#colorexpinterp=10**(c*colorlawinterp)
 		
 
 
@@ -1063,7 +1042,6 @@ class SALTResids:
 					2* x0**2  * (modelerrnox[1]*modelerrnox[0]*x1)[:,np.newaxis]  * \
 					interpresult[:,varyParams[self.parlist=='modelcorr_01']]
 
-		#import pdb; pdb.set_trace()
 		return resultsdict
 
 	def photVarianceForSN(self,x,sn,storedResults,temporaryResults,varyParams):
@@ -1124,7 +1102,6 @@ class SALTResids:
 				modelerrnox = [	 interr( lcdata.lambdaeff)	for interr in (modelErrInt)]
 				corr=  [intcorr(lcdata.lambdaeff) for intcorr in modelCorrInt]
 			
-			#modelErrInt = interp1d( obswave, temporaryResults['modelUncertaintyInterp'](clippedPhase),kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)(lameff)
 			modelErrInt =  temporaryResults['modelUncertainty'][np.round((clippedPhase-obsphase[0])/phasedelt).astype(int),
 																int(np.round((lcdata.lambdaeff-obswave[0])/wavedelt))]
 			uncertaintyNoX0=  fluxfactor *	modelErrInt
@@ -1243,27 +1220,23 @@ class SALTResids:
 		"""Returns flux surfaces of SALT model"""
 		try: m0pars = x[self.m0min:self.m0max+1]
 		except: import pdb; pdb.set_trace()
-		try:
-			if self.bsorder != 0:
-				m0 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
-							 self.wave if evaluateWave is None else evaluateWave,
-							 (self.phaseknotloc,self.waveknotloc,m0pars,self.bsorder,self.bsorder))
-			else:
-				phase = self.phase if evaluatePhase is None else evaluatePhase
-				wave = self.wave if evaluateWave is None else evaluateWave
-				n_repeat_phase = int(phase.size/(self.phaseknotloc.size-1))+1
-				n_repeat_phase_extra = -1*(n_repeat_phase*(self.phaseknotloc.size-1) % phase.size)
-				if n_repeat_phase_extra == 0: n_repeat_phase_extra = None
-				n_repeat_wave = int(wave.size/(self.waveknotloc.size-1))+1
-				n_repeat_wave_extra = -1*(n_repeat_wave*(self.waveknotloc.size-1) % wave.size)
-				if n_repeat_wave_extra == 0: n_repeat_wave_extra = None
-				m0 = np.repeat(np.repeat(m0pars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),n_repeat_phase,axis=0),
-							   n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]
-		except:
-			import pdb; pdb.set_trace()
 
-		# make sure M0 is positive - (clunky)
-		#m0[m0 < 0] = 0
+		if self.bsorder != 0:
+			m0 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
+						 self.wave if evaluateWave is None else evaluateWave,
+						 (self.phaseknotloc,self.waveknotloc,m0pars,self.bsorder,self.bsorder))
+		else:
+			phase = self.phase if evaluatePhase is None else evaluatePhase
+			wave = self.wave if evaluateWave is None else evaluateWave
+			n_repeat_phase = int(phase.size/(self.phaseknotloc.size-1))+1
+			n_repeat_phase_extra = -1*(n_repeat_phase*(self.phaseknotloc.size-1) % phase.size)
+			if n_repeat_phase_extra == 0: n_repeat_phase_extra = None
+			n_repeat_wave = int(wave.size/(self.waveknotloc.size-1))+1
+			n_repeat_wave_extra = -1*(n_repeat_wave*(self.waveknotloc.size-1) % wave.size)
+			if n_repeat_wave_extra == 0: n_repeat_wave_extra = None
+			m0 = np.repeat(np.repeat(m0pars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),n_repeat_phase,axis=0),
+						   n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]
+
 		
 		if self.n_components == 2:
 			m1pars = x[self.im1]
@@ -1279,7 +1252,7 @@ class SALTResids:
 			components = (m0,)
 		else:
 			raise RuntimeError('A maximum of two principal components is allowed')
-		#if self.bsorder == 0: import pdb; pdb.set_trace()
+
 		return components
 
 	def SALTModelDeriv(self,x,dx,dy,evaluatePhase=None,evaluateWave=None):
@@ -1377,21 +1350,18 @@ class SALTResids:
 	def getParsGN(self,x):
 
 		m0pars = x[self.parlist == 'm0']
-		#m0err = np.zeros(len(x[self.parlist == 'm0']))
 		m1pars = x[self.parlist == 'm1']
-		#m1err = np.zeros(len(x[self.parlist == 'm1']))
 		
 		clpars = x[self.parlist == 'cl']
 		clerr = np.zeros(len(x[self.parlist == 'cl']))
 		
 
-		#clscaterr = x[self.parlist == 'clscaterr']
 		clscat=self.colorscatter(x,self.wave)
 		resultsdict = {}
 		n_sn = len(self.datadict.keys())
 		for k in self.datadict.keys():
 			resultsdict[k] = {'x0':x[self.parlist == f'x0_{k}'][0],
-							  'x1':x[self.parlist == f'x1_{k}'][0],# - np.mean(x[self.ix1]),
+							  'x1':x[self.parlist == f'x1_{k}'][0],
 							  'c':x[self.parlist == f'c_{k}'][0],
 							  'tpkoff':x[self.parlist == f'tpkoff_{k}'][0],
 							  'x0err':x[self.parlist == f'x0_{k}'][0],
@@ -1401,7 +1371,6 @@ class SALTResids:
 
 		m0,m1=self.SALTModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)
 
-		#clscat = splev(self.wave,(self.errwaveknotloc,clscatpars,3))
 		if not len(clpars): clpars = []
 
 		# model errors
@@ -1442,8 +1411,8 @@ class SALTResids:
 		m0pars = np.array([])
 		m0err = np.array([])
 		for i in self.im0:
-			m0pars = np.append(m0pars,x[i,nburn:].mean())#/_SCALE_FACTOR)
-			m0err = np.append(m0err,x[i,nburn:].std())#/_SCALE_FACTOR)
+			m0pars = np.append(m0pars,x[i,nburn:].mean())
+			m0err = np.append(m0err,x[i,nburn:].std())
 			if mkplots:
 				if not parcount % 9:
 					subnum = axcount%9+1
@@ -1517,7 +1486,7 @@ class SALTResids:
 		n_sn = len(self.datadict.keys())
 		for k in self.datadict.keys():
 			resultsdict[k] = {'x0':x[self.parlist == f'x0_{k}',nburn:].mean(),
-							  'x1':x[self.parlist == f'x1_{k}',nburn:].mean(),# - x[self.ix1,nburn:].mean(),
+							  'x1':x[self.parlist == f'x1_{k}',nburn:].mean(),
 							  'c':x[self.parlist == f'c_{k}',nburn:].mean(),
 							  'tpkoff':x[self.parlist == f'tpkoff_{k}',nburn:].mean(),
 							  'x0err':x[self.parlist == f'x0_{k}',nburn:].std(),
@@ -1541,16 +1510,7 @@ class SALTResids:
 
 		cov_m0_m1 = bisplev(self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,m0_m1_cov,self.bsorder,self.bsorder))
 		modelerr = bisplev(self.phase,self.wave,(self.errphaseknotloc,self.errwaveknotloc,modelerrpars,self.bsorder,self.bsorder))
-		#phaseout,waveout,fluxout = np.array([]),np.array([]),np.array([])
-		#for i in range(len(self.phase)):
-		#	for j in range(len(self.wave)):
-		#		phaseout = np.append(phaseout,self.phase[i])
-		#		waveout = np.append(waveout,self.wave[j])
-		#		fluxout = np.append(fluxout,modelerr[i,j])
-		#bspl = bisplrep(phaseout,waveout,fluxout,kx=3,ky=3,tx=self.errphaseknotloc,ty=self.errwaveknotloc,task=-1)
-		#modelerr2 = bisplev(self.phase,self.wave,bspl)
-		#plt.plot(self.wave,modelerr[self.phase == 0,:].flatten())
-		#plt.plot(self.wave,modelerr2[self.phase == 0,:].flatten())
+
 		clscat = self.colorscatter(np.mean(x[:,nburn:],axis=1),self.wave)
 		if not len(clpars): clpars = []
 
@@ -1615,25 +1575,13 @@ class SALTResids:
 		self.neffRaw=gaussian_filter1d(self.neffRaw,self.phaseSmoothingNeff,0)
 		self.neffRaw=gaussian_filter1d(self.neffRaw,self.waveSmoothingNeff,1)
 
-		# hack!
-		# D. Jones - just testing this out
-		#for j,p in enumerate(self.phaseBinCenters):
-		#	if np.max(self.neffRaw[j,:]) > 0: self.neffRaw[j,:] /= np.max(self.neffRaw[j,:])
-		# HACK
-		#self.neffRaw[self.neffRaw > 1] = 1
-		#self.neffRaw[self.neffRaw < 1e-6] = 1e-6
-
-#		self.plotEffectivePoints([-12.5,0.5,16.5,26],'neff.png')
-#		self.plotEffectivePoints(None,'neff-heatmap.png')
 		self.neff=self.neffRaw.copy()
 		self.neff[self.neff>self.neffMax]=np.inf
-		# HACK!
-		#self.neff[self.neff<self.neffMax]=1e-6 #self.nefffloor
-		#self.neff/=self.neffMax
+
 		if not np.any(np.isinf(self.neff)): log.warning('Regularization is being applied to the entire phase/wavelength space: consider lowering neffmax (currently {:.2e})'.format(self.neffMax))
 		
 		self.neff=np.clip(self.neff,self.neffFloor,None)
-		#self.neff=np.sqrt(self.neff)
+
 		
 	def plotEffectivePoints(self,phases=None,output=None):
 		import matplotlib.pyplot as plt
@@ -1647,7 +1595,7 @@ class SALTResids:
 			plt.ylabel('Phase / days')
 		else:
 			inds=np.searchsorted(self.phaseRegularizationPoints,phases)
-			# hack!
+
 			for i in inds:
 				plt.plot(self.waveRegularizationPoints[:],self.neffRaw[i,:],label='{:.1f} days'.format(self.phaseRegularizationPoints[i]))
 			plt.ylabel('$N_eff$')
@@ -1735,7 +1683,7 @@ class SALTResids:
 		dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
 		dfluxdphase=self.SALTModelDeriv(x,1,0,phase,wave)
 		d2fluxdphasedwave=self.SALTModelDeriv(x,1,1,phase,wave)
-		#scale,scaleDeriv=self.regularizationScale(storedResults['components'],fluxes,regmethod='dyadic')
+
 		resids=[]
 		jac=[]
 		for i in range(len(fluxes)):
@@ -1783,7 +1731,7 @@ class SALTResids:
 
 			if boolIndex[varyParams].any():
 				jacobian[:,boolIndex]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
-				#jacobian[:,boolIndex[varyParams]]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
+
 			jac+= [sparse.csr_matrix(jacobian)]
 				
 		return resids,jac
@@ -1810,15 +1758,15 @@ class SALTResids:
 			normalization=np.sqrt(1/((self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
 			#Minimize model derivative w.r.t wavelength in unconstrained regions
 			waveGradResids+= [normalization* ( normedGrad /	self.neff).flatten()]
-			#jacobian=np.zeros((waveGradResids[-1].size,self.parlist.size)) #sparse.csr_matrix((waveGradResids[-1].size,self.parlist.size))
+
 			if boolIndex[varyParams].any(): jacobian=jacobian=np.zeros((waveGradResids[-1].size,self.parlist.size))
 			else: jacobian = jacobian = sparse.csr_matrix((waveGradResids[-1].size,self.parlist.size))
 
 			if boolIndex[varyParams].any():
 				jacobian[:,boolIndex]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
-				#jacobian[:,boolIndex[varyParams]]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
+
 			jac+= [jacobian]
-		#if len(waveGradResids[waveGradResids != waveGradResids]): import pdb; pdb.set_trace()
+
 		return waveGradResids,jac
 
 	#def waveGradientRegularization_snpca(self, x, storedResults,varyParams):
@@ -1907,7 +1855,7 @@ class SALTResids:
 		wave=self.waveRegularizationPoints
 		fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
 		dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
-		#scale,scaleDeriv=self.regularizationScale(storedResults['components'],fluxes,regmethod='gradient')
+
 		waveGradResids=[]
 		jac=[]
 		for i in range(len(fluxes)):
