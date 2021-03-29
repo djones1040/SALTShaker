@@ -2,8 +2,8 @@
 # D. Jones - 8/5/20
 import pylab as plt
 from matplotlib.gridspec import GridSpec
-from salt3.util import snana
-from salt3.validation.ValidateSpectra import flux
+from saltshaker.util import snana
+from saltshaker.validation.ValidateSpectra import flux
 import numpy as np
 plt.ion()
 import glob

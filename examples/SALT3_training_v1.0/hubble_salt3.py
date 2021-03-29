@@ -81,11 +81,46 @@ def concatfitres():
                                 
                 count2 += 1
 
+def concatfitres_valid():
+    frfiles = glob.glob('fit_output_valid/*FITRES.TEXT')
+
+    count2,count3 = 0,0
+    with open('fit_output_valid/JLA_TRAINING_SALT2.FITRES','w') as fout2,open('fit_output_valid/JLA_TRAINING_SALT3.FITRES','w') as fout3:
+        print(frfiles)
+        for f in frfiles:
+            if 'SALT2' not in f:
+                with open(f) as fin:
+                    for line in fin:
+                        if (not line.startswith('#') and not line.startswith('VARNAMES')) or count3 == 0:
+                            #if line.startswith('SN') and float(line.split()[8]) > 0:
+                            #    print(line.replace('\n',''),file=fout3)
+                            #elif not line.startswith('SN'):
+                            print(line.replace('\n',''),file=fout3)
+
+                count3 += 1
+            else:
+                with open(f) as fin:
+                    for line in fin:
+                        if (not line.startswith('#') and not line.startswith('VARNAMES')) or count2 == 0:
+                            #if line.startswith('SN') and float(line.split()[8]) > 0:
+                            #    print(line.replace('\n',''),file=fout2)
+                            #elif not line.startswith('SN'):
+                            print(line.replace('\n',''),file=fout2)
+                                
+                count2 += 1
+
+                
 def run_salt2mu():
     # run SALT2mu
     os.system('SALT2mu.exe SALT2mu.default file=fit_output/JLA_TRAINING_SALT2.FITRES prefix=SALT2mu_SALT2')
     os.system('SALT2mu.exe SALT2mu.default file=fit_output/JLA_TRAINING_SALT3.FITRES prefix=SALT2mu_SALT3')    
 
+def run_salt2mu_valid():
+    # run SALT2mu
+    os.system('SALT2mu.exe SALT2mu.default file=fit_output_valid/JLA_TRAINING_SALT2.FITRES prefix=SALT2mu_VALID_SALT2')
+    os.system('SALT2mu.exe SALT2mu.default file=fit_output_valid/JLA_TRAINING_SALT3.FITRES prefix=SALT2mu_VALID_SALT3')    
+
+    
 def errfnc(x):
     return(np.std(x)/np.sqrt(len(x)))
     
@@ -104,8 +139,10 @@ def main():
             if line.startswith('#  sigint'): salt3sigint = float(line.split()[3])
 
     # avg chi2/SN
-    fr2 = txtobj('fit_output/JLA_TRAINING_SALT2.FITRES',fitresheader=True)
-    fr3 = txtobj('fit_output/JLA_TRAINING_SALT3.FITRES',fitresheader=True)
+    #fr2 = txtobj('fit_output/JLA_TRAINING_SALT2.FITRES',fitresheader=True)
+    #fr3 = txtobj('fit_output/JLA_TRAINING_SALT3.FITRES',fitresheader=True)
+    fr2 = txtobj('SALT2mu_SALT2.FITRES',fitresheader=True)
+    fr3 = txtobj('SALT2mu_SALT3.FITRES',fitresheader=True)
     
     # hubble diagram w/ bins
     fr2 = getmu.getmu(fr2,salt2alpha=salt2alpha,salt2beta=salt2beta,sigint=0.0)
@@ -127,7 +164,7 @@ def main():
         fr3.__dict__[k] = fr3.__dict__[k][iGood3]
     
     mn2,md2,std2 = sigma_clipped_stats(fr2.mures)
-    mn3,md3,std3 = sigma_clipped_stats(fr2.mures)
+    mn3,md3,std3 = sigma_clipped_stats(fr3.mures)
     iOut2 = len(np.where(((fr2.mures < md2-3*std2) | (fr2.mures > md2+3*std2)) & (fr2.zCMB > 0.015))[0])/float(len(fr2.CID))
     iOut3 = len(np.where(((fr3.mures < md3-3*std3) | (fr3.mures > md3+3*std3)) & (fr3.zCMB > 0.015))[0])/float(len(fr3.CID))
     #iClip2 = np.where((fr2.mures > md2-3*std2) & (fr2.mures < md2+3*std2))[0]
@@ -209,7 +246,7 @@ $med. \chi^2_{{\nu}}$ = {med_chi3:.2f}""",
     ax1.set_ylabel('$\mu-\mu_{\Lambda CDM}$',fontsize=15)
     ax2.xaxis.set_ticks([])
     plt.savefig('hubblediagsalt3.pdf')
-    #import pdb; pdb.set_trace()
+    import pdb; pdb.set_trace()
 
 def plot_outliers():
 
@@ -665,9 +702,11 @@ def salt2to3_disp():
     
 
 if __name__ == "__main__":
-    concatfitres()
-    run_salt2mu()
-    main()
+    #concatfitres()
+    #run_salt2mu()
+    concatfitres_valid()
+    run_salt2mu_valid()
+    #main()
     #plot_outliers()
     #plot_91t()
     #salt2to3_disp()

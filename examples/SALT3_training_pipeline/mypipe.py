@@ -1,4 +1,4 @@
-from salt3.pipeline.pipeline import SALT3pipe
+from saltshaker.pipeline.pipeline import SALT3pipe
 import numpy as np
 
 def MyPipe(finput,**kwargs):

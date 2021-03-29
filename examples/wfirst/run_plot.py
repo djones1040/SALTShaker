@@ -1,5 +1,5 @@
 import sys,scipy
-sys.path.append('/project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/salt3')
+sys.path.append('/project2/rkessler/SURVEYS/WFIRST/ROOT/SALT3/saltshaker')
 import pandas as pd
 from importlib import reload
 import matplotlib.pyplot as plt
