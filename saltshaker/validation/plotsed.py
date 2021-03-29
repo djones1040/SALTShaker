@@ -8,7 +8,7 @@ from astropy.table import Table
 import logging
 log=logging.getLogger(__name__)
 
-def plot_io_sed(inputfile='../initfiles/Hsiao07.dat',
+def plot_io_sed(inputfile='../initfiles/hsiao07.dat',
 				outputfile='../../examples/output/salt3_template_0.dat',phase=None):
 
 	iphase,iwave,iflux = np.loadtxt(inputfile,unpack=True)

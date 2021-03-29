@@ -15,7 +15,7 @@ _SCALE_FACTOR = 1e-12
 def init_salt2(m0file=None,m1file=None,M0triplet=None,M1triplet=None,
 			   Bfilt='initfiles/Bessell90_B.dat',
 			   flatnu='initfiles/flatnu.dat',
-			   hsiaofile=f'{init_rootdir}/Hsiao07.dat',
+			   hsiaofile=f'{init_rootdir}/hsiao07.dat',
 			   phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
 			   waveinterpres=2.0,phasesplineres=3.2,wavesplineres=72,
 			   days_interp=5,debug=False,normalize=True,order=3,use_snpca_knots=True):
@@ -113,7 +113,7 @@ def init_salt2(m0file=None,m1file=None,M0triplet=None,M1triplet=None,
 	return intphase,intwave,m0,m1,bspl[0],bspl[1],bspl[2],bsplm1[2]
 
 
-def init_hsiao(hsiaofile='initfiles/Hsiao07.dat',
+def init_hsiao(hsiaofile='initfiles/hsiao07.dat',
 			   Bfilt='initfiles/Bessell90_B.dat',
 			   flatnu='initfiles/flatnu.dat',
 			   phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
@@ -438,7 +438,7 @@ def init_salt2_cdisp(cdfile=None,order=4):
 	wave,scale=loadfilewithdefault(cdfile,1)
 	return np.polyfit(wave/1000,np.log(scale),order-1)
 
-def get_hsiao(hsiaofile='initfiles/Hsiao07.dat',
+def get_hsiao(hsiaofile='initfiles/hsiao07.dat',
 			  Bfilt='initfiles/Bessell90_B.dat',
 			  phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
 			  waveinterpres=2.0,phasesplineres=3.2,wavesplineres=72,

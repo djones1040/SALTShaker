@@ -62,7 +62,7 @@ class RdTest(unittest.TestCase):
 
 		
 	def test_read_hsiao(self):
-		initmodelfile = 'salt3/initfiles/Hsiao07.dat'
+		initmodelfile = 'salt3/initfiles/hsiao07.dat'
 		waverange = [2000,9200]
 		phaserange = [-14,50]
 		phasesplineres = 3.2
