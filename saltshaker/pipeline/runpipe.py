@@ -117,21 +117,25 @@ class RunPipe():
                 df = pd.concat([df,pd.DataFrame([{'section':sec,'key':keystr,'value':val_new,'label':add_label}])])
         return df
     
-    def _reconfig_w_suffix(self,proname,df,suffix,done_file=None,**kwargs):
+    def _reconfig_w_suffix(self,proname,df,suffix,done_file=None,byosed=False,**kwargs):
         outname_orig = copy.copy(proname.outname)
-        if isinstance(outname_orig,list):
-            proname.outname = ['{}_{:03d}'.format(x,self.num) for x in outname_orig]
-        elif isinstance(outname_orig,dict):
-            for dictkey in outname_orig:
-                proname.outname[dictkey] = '{}_{:03d}'.format(outname_orig[dictkey],self.num)
-        else:
-            proname.outname = '{}_{:03d}'.format(outname_orig,self.num)
+        if not byosed:            
+            if isinstance(outname_orig,list):
+                proname.outname = ['{}_{:03d}'.format(x,self.num) for x in outname_orig]
+            elif isinstance(outname_orig,dict):
+                for dictkey in outname_orig:
+                    proname.outname[dictkey] = '{}_{:03d}'.format(outname_orig[dictkey],self.num)
+            else:
+                proname.outname = '{}_{:03d}'.format(outname_orig,self.num)
+#         else:
+#             proname.byosed_dir = '{}_{:03d}'.format(proname.byosed_dir,self.num)
 
         proname.configure(pro=proname.pro,baseinput=outname_orig,setkeys=df,prooptions=proname.prooptions,
                           batch=proname.batch,translate=proname.translate,validplots=proname.validplots,
                           outname=proname.outname,
                           proargs=proname.proargs,plotdir=proname.plotdir,labels=proname.labels,
-                          done_file=done_file,drop_sim_versions=proname.drop_sim_versions,**kwargs)  
+                          done_file=done_file,drop_sim_versions=proname.drop_sim_versions,
+                          byosed_dir=proname.byosed_dir,**kwargs)  
     
     def make_validplots_sum(self,prostr,inputfile_sum,outputdir,prefix_sum='sum_valid'):
         if prostr.startswith('lcfit'):
@@ -252,10 +256,14 @@ class RunPipe():
                     print('randseed = {}'.format(self.randseed)) 
 
                     if self.num is not None:
+#                         if any([p.startswith('byosed') for p in self.pipe.pipepros]):
+#                             self._reconfig_w_suffix(self.pipe.BYOSED,None,self.num,done_file=None,byosed=True)
                         if any([p.startswith('sim') for p in self.pipe.pipepros]):
                             df_sim = self._add_suffix(self.pipe.Simulation,['GENVERSION','GENPREFIX'],self.num)
                             done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.Simulation.done_file.strip()),self.num)
                             self._reconfig_w_suffix(self.pipe.Simulation,df_sim,self.num,done_file=done_file)
+#                             if ['byosed','sim'] in self.pipe.gluepairs: 
+#                                 self.pipe.glue(['byosed','sim'])
                         if any([p.startswith('biascorsim') for p in self.pipe.pipepros]):
                             df_sim_biascor = self._add_suffix(self.pipe.BiascorSim,['GENVERSION','GENPREFIX'],'biascor_{:03d}'.format(self.num))
                             done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.BiascorSim.done_file.strip()),self.num)
@@ -490,6 +498,8 @@ def exit_handler(pipe,num):
     
     
 def main(**kwargs):
+    print("Starting pipeline run..")
+    
     parser = argparse.ArgumentParser(description='Run SALT3 Pipe.')
     parser.add_argument('-c',dest='pipeinput',default=None,
                         help='pipeline input file')

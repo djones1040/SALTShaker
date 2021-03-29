@@ -10,7 +10,7 @@ from matplotlib import pyplot as p
 from matplotlib import patches
 from astropy.time import Time
 
-SNTYPEDICT = {1:'Ia',10:'Ia',2:'II',3:'Ibc',32:'Ib',33:'Ic',20:'IIP',21:'IIn',22:'IIL',23:'IIb',42:'Ia',101:'Ia' }
+SNTYPEDICT = {1:'Ia',10:'Ia',2:'II',3:'Ibc',32:'Ib',33:'Ic',20:'IIP',21:'IIn',22:'IIL',23:'IIb',42:'Ia',101:'Ia',0:'Ia' }
 
 BANDCOLOR = {'g':'b','r':'g','i':'r','z':'darkorange'}
 BANDMARKER = {'g':'o','r':'o','i':'o','z':'o'}

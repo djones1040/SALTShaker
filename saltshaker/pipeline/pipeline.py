@@ -187,6 +187,7 @@ class SALT3pipe():
                 snlists = self._get_config_option(config,prostr,'snlists')
                 labels = self._get_config_option(config,prostr,'labels')
                 drop_sim_versions = self._get_config_option(config,prostr,'drop_sim_versions')
+                byosed_dir = self._get_config_option(config,prostr,'byosed_dir')
                 
                 if labels is not None:
                     labels = labels.split(',')
@@ -198,6 +199,11 @@ class SALT3pipe():
                         if len(baseinput)>0:
                             baseinput = baseinput[i]
                         outname=outname[i]
+                if byosed_dir is not None:
+                    byosed_default = '{}/byosed.params'.format(byosed_dir)
+                    print("BYOSED param location: {}".format(byosed_default))
+                else:
+                    byosed_default = None
                 pipepro[i].configure(baseinput=baseinput,
                                      setkeys=pipepro[i].setkeys,
                                      outname=outname,
@@ -211,7 +217,8 @@ class SALT3pipe():
                                      validplots=validplots,
                                      plotdir=self.plotdir,
                                      labels=labels,
-                                     drop_sim_versions=drop_sim_versions
+                                     drop_sim_versions=drop_sim_versions,
+                                     byosed_dir=byosed_dir
                                      )
 #                 if hasattr(pipepro[i], 'biascor') and pipepro[i].biascor:
 #                     pipepro[i].done_file = "{}_{}".format(pipepro[i].done_file,'biascor')
@@ -400,6 +407,12 @@ class SALT3pipe():
                                 continue                            
                         else:
                             pro2_in['value'] += [pro1_out]
+                            
+                elif isinstance(pro1, BYOSED):
+                    pro2_in = pro2._get_input_info()
+                    pro2_in['value'] = pro1_out
+#                     print(pro2_in)
+                    
                 else:
                     pro2_in = pro2._get_input_info().loc[0]
                     pro2_in['value'] = pro1_out
@@ -537,7 +550,7 @@ class PipeProcedure():
 
     def configure(self,pro=None,baseinput=None,setkeys=None,
                   proargs=None,prooptions=None,batch=False,batch_info=None,
-                  translate=False,drop_sim_versions=None,
+                  translate=False,drop_sim_versions=None,byosed_dir=None,
                   validplots=False,plotdir=None,labels=None,**kwargs):  
         if pro is not None and "$" in pro:
             self.pro = os.path.expandvars(pro)
@@ -557,6 +570,7 @@ class PipeProcedure():
         self.plotdir = plotdir
         self.labels = labels
         self.drop_sim_versions = drop_sim_versions
+        self.byosed_dir = byosed_dir
 
         if self.outname is not None:
 #             print(self.outname)
@@ -684,18 +698,22 @@ class Data(PipeProcedure):
 class BYOSED(PyPipeProcedure):
 
     def configure(self,baseinput=None,setkeys=None,
-                  outname="pipeline_byosed_input.input",byosed_default="BYOSED/BYOSED.params",
+                  outname="pipeline_byosed_input.input",byosed_dir="BYOSED/",
                   bkp_orig_param=False,**kwargs):   
         self.done_file = None
         self.outname = outname
-        super().configure(pro=None,baseinput=baseinput,setkeys=setkeys)
+        self.byosed_dir = byosed_dir
+        super().configure(pro=None,baseinput=baseinput,setkeys=setkeys,byosed_dir=byosed_dir)
+        byosed_default = '{}/byosed.params'.format(byosed_dir)
         #rename current byosed param
         if os.path.exists(os.path.dirname(byosed_default)):
             byosed_default = byosed_default
         elif os.path.exists(os.path.dirname(byosed_default.lower())):
             byosed_default = byosed_default.lower()
         else:
-            raise ValueError("Directory {} does not exists".format(os.path.dirname(byosed_default)))
+            os.makedirs(os.path.dirname(byosed_default))
+#             raise ValueError("Directory {} does not exists".format(os.path.dirname(byosed_default)))
+        self.byosed_default = byosed_default
 
         if bkp_orig_param:
             byosed_rename = "{}.{}".format(byosed_default,int(time.time()))
@@ -715,7 +733,15 @@ class BYOSED(PyPipeProcedure):
             print("{} is copied to {}".format(outname,byosed_default))
 
     def run(self,**kwargs):
-        pass
+        self.success = True
+    
+    def glueto(self,pipepro):
+        if not isinstance(pipepro,str):
+            pipepro = type(pipepro).__name__
+        if pipepro.lower().startswith('sim'):
+            return "BYOSED {}/".format(os.path.dirname(self.byosed_default))
+        else:
+            raise ValueError("byosed can only glue to sim")
 
 class Simulation(PipeProcedure):
     
@@ -753,6 +779,30 @@ class Simulation(PipeProcedure):
                                                                     outname=outname,done_file=self.done_file,
                                                                     batch_info=self.batch_info)
 
+    def _get_input_info(self):
+        df = pd.DataFrame()
+        key = 'GENMODEL'
+        keystrs = [x.split('[')[0] for x in self.keys.keys()]
+        keyarr = [x for x in self.keys.keys() if x.startswith(key)]    
+        df0 = {}
+        if len(keyarr ) > 0:
+            for ki in keyarr:
+                df0['key'] = key
+                if '[' in ki:
+                    ind = ki.split('[')[1].split(']')[0]
+                    df0['value'] = self.keys[ki]
+                    df0['ind'] = ind
+                else:
+                    df0['value'] = self.keys[ki]
+                    df0['ind'] = None
+                df = df.append(df0, ignore_index=True)
+        else:
+            df0['value'] = ''
+            df0['ind'] = None
+            df = df.append(df0, ignore_index=True) 
+        df['key'] = df.apply(lambda row: '{}[{}]'.format(row['key'],row['ind']),axis=1)
+        return df
+        
     def _get_output_info(self):
         if self.batch:
             keys = ['PATH_SNDATA_SIM','GENVERSION','GENPREFIX']
@@ -948,12 +998,18 @@ class Simulation(PipeProcedure):
                 genmodel_dict[label] = genmodel_file
         
         genmodel_dict_new = {}
+        isbyosed = False
         for label in genmodel_dict.keys():
             genmodel_file = genmodel_dict[label] 
+            if 'BYOSED' in genmodel_file and len(genmodel_file.split(' '))>1:
+                genmodel_file = genmodel_file.split(' ')[1]
+                isbyosed = True
             if (not genmodel_file.startswith('$') and not genmodel_file.startswith('/')) and \
               ('.' not in genmodel_file or os.path.split(genmodel_file)[0] != '' or \
               (not os.path.exists(os.path.expandvars('$SNDATA_ROOT/models/{}/{}'.format(genmodel_file.split('.')[0],genmodel_file))))):
                 genmodel_file = '%s/%s'%(cwd,genmodel_file)
+            if isbyosed:
+                genmodel_file = 'BYOSED %s'%genmodel_file
             label = 'GENMODEL[{}]'.format(label)
             genmodel_dict_new[label] = genmodel_file
                 
