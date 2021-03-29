@@ -371,7 +371,7 @@ class RunPipe():
                     seeds = f.readlines()
                     self.randseeds=[int(x) for x in seeds[0:self.batch_mode]]
                     print('randseeds = ',self.randseeds)
-            pypro = os.path.expandvars('$MY_SALT3_DIR/SALT3/salt3/pipeline/runpipe.py')
+            pypro = os.path.expandvars('$MY_SALT3_DIR/SALTShaker/saltshaker/pipeline/runpipe.py')
             if self.debug:
                 pycommand_base = 'python {} -c {} --mypipe {} --batch_mode 0'.format(pypro,self.pipeinput,self.mypipe)
             else:
