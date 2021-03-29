@@ -38,6 +38,8 @@ import warnings
 import logging
 log=logging.getLogger(__name__)
 
+import gc
+
 _SCALE_FACTOR = 1e-12
 _B_LAMBDA_EFF = np.array([4302.57])	 # B-band-ish wavelength
 _V_LAMBDA_EFF = np.array([5428.55])	 # V-band-ish wavelength
@@ -419,7 +421,6 @@ class SALTResids:
 				self.iclscat_0 = np.append(self.iclscat_0,np.where(self.parlist == parname)[0][-1])
 				self.iclscat_poly = np.append(self.iclscat_poly,np.where(self.parlist == parname)[0][:-1])
 		
-	
 	def lsqwrap(self,guess,storedResults,varyParams=None,doPriors=True,doSpecResids=True,usesns=None):
 		if varyParams is None:
 			varyParams=np.zeros(self.npar,dtype=bool)
@@ -434,6 +435,9 @@ class SALTResids:
 			for residsdict in ([photresidsdict,specresidsdict] if doSpecResids else [photresidsdict]):
 				residuals+=[residsdict[k]['resid'] for k in residsdict]
 				jacobian+=[residsdict[k]['resid_jacobian'] for k in residsdict]
+		del photresidsdict
+		del specresidsdict
+		gc.collect()
 
 		if doPriors:
 			priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,guess)

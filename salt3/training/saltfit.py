@@ -41,6 +41,8 @@ import iminuit,warnings
 import logging
 log=logging.getLogger(__name__)
 
+import gc
+
 #Which integer code corresponds to which reason for LSMR terminating
 stopReasons=['x=0 solution','atol approx. solution','atol+btol approx. solution','ill conditioned','machine precision limit','machine precision limit','machine precision limit','max # of iteration']
 
@@ -136,12 +138,14 @@ class fitting:
 
 	def gaussnewton(self,gn,guess,
 					gaussnewton_maxiter,
-					getdatauncertainties=True):
+					getdatauncertainties=True,
+					fit_model_err=True):
 
 		gn.debug = False
 		convergenceresult = \
 				gn.convergence_loop(
-					guess,loop_niter=gaussnewton_maxiter,getdatauncertainties=getdatauncertainties)
+					guess,loop_niter=gaussnewton_maxiter,getdatauncertainties=getdatauncertainties,
+					fit_model_err=fit_model_err)
 			
 		return convergenceresult,\
 			'Gauss-Newton MCMC was successful'
@@ -486,25 +490,35 @@ class GaussNewton(saltresids.SALTResids):
 			self.neff[self.neff<self.neffMax]=10
         
 		residuals,jac=self.lsqwrap(X,storedResults,varyingParams,True,doSpecResids=True)
-
+		
 		self.updateEffectivePoints(X)
 		#Simple preconditioning of the jacobian before attempting to invert
 		precondition=sparse.diags(1/np.sqrt(np.asarray((jac.power(2)).sum(axis=0))),[0])
 		precondjac=(jac*precondition)
-        
+		
+		log.debug("xxxMIDEBUG-precondjac=(jac*precondition)")
+
 		#Define the matrix sigma^-1=J^T J
 		square=ensurepositivedefinite((precondjac.T*precondjac).toarray())
         
 		#Inverting cholesky matrix for speed
 		L=linalg.cholesky(square,lower=True)
 		invL=(linalg.solve_triangular(L,np.diag(np.ones(L.shape[0])),lower=True))
+		del square
+		del L
+		
+		log.debug("xxxMIDEBUG-invL=(linalg.solve_triangular(L,np.diag(np.ones(L.shape[0])),lower=True))")
+		
 		#Turning spline_derivs into a sparse matrix for speed
 		spline_derivs = np.zeros([len(self.phaseout),len(self.waveout),self.im0.size])
 		for i in range(self.im0.size):
 			if self.bsorder == 0: continue
 			spline_derivs[:,:,i]=bisplev(self.phaseout,self.waveout,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
 		spline2d=sparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))
+		del spline_derivs
         
+		log.debug("xxxMIDEBUG-spline2d=sparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))")
+		
 		#Smooth things a bit, since this is supposed to be for broadband photometry
 		if smoothingfactor>0:
 			smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
@@ -513,19 +527,39 @@ class GaussNewton(saltresids.SALTResids):
 		varyparlist= self.parlist[varyingParams]
 		m0pulls=invL.astype('float16')*precondition.tocsr()[:,varyparlist=='m0'].astype('float16')*spline2d.T.astype('float16')
 		m1pulls=invL.astype('float16')*precondition.tocsr()[:,varyparlist=='m1'].astype('float16')*spline2d.T.astype('float16')
-        
+		del invL
+		gc.collect()
+		
+		log.debug("xxxMIDEBUG-m1pulls=invL.astype('float16')*precondition.tocsr()[:,varyparlist=='m1'].astype('float16')*spline2d.T.astype('float16')")
+		
 		M0dataerr = np.sqrt((m0pulls**2).sum(axis=0).reshape((self.phaseout.size,self.waveout.size)))
 		cov_M0_M1_data = (m0pulls*m1pulls).sum(axis=0).reshape((self.phaseout.size,self.waveout.size))
 		del m0pulls
+		gc.collect()
+		
+		log.debug("xxxMIDEBUG-del m0pulls")
+		
 		M1dataerr = np.sqrt((m1pulls**2).sum(axis=0).reshape((self.phaseout.size,self.waveout.size)))
 		del m1pulls
+		gc.collect()
+		
+		log.debug("xxxMIDEBUG-del m1pulls")
+		
 		correlation=cov_M0_M1_data/(M0dataerr*M1dataerr)
+		
+		log.debug("xxxMIDEBUG-correlation=cov_M0_M1_data/(M0dataerr*M1dataerr)")
+		
 		correlation[np.isnan(correlation)]=0
 		M0,M1=self.SALTModel(X)
 		M0dataerr=np.clip(M0dataerr,0,np.abs(M0).max()*2)
 		M1dataerr=np.clip(M1dataerr,0,np.abs(M1).max()*2)
 		correlation=np.clip(correlation,-1,1)
+		
+		log.debug("xxxMIDEBUG-correlation=np.clip(correlation,-1,1)")
+		
 		cov_M0_M1_data=correlation*(M0dataerr*M1dataerr)
+		
+		log.info("Finished determining M0/M1 errors")
 		
 		return M0dataerr, M1dataerr,cov_M0_M1_data
 
@@ -550,7 +584,7 @@ class GaussNewton(saltresids.SALTResids):
 
 		return M0dataerr, M1dataerr,cov_M0_M1_data
 	
-	def convergence_loop(self,guess,loop_niter=3,usesns=None,getdatauncertainties=True):
+	def convergence_loop(self,guess,loop_niter=3,usesns=None,getdatauncertainties=True,fit_model_err=True):
 		lastResid = 1e20
 		log.info('Initializing')
 		start=datetime.now()
@@ -571,6 +605,9 @@ class GaussNewton(saltresids.SALTResids):
 
 
 		Xlast = copy.deepcopy(guess[:])
+		del guess
+		gc.collect()
+		
 		if np.all(X[self.ix1]==0) or np.all(X[self.ic]==0):
 			#If snparams are totally uninitialized
 			log.info('Estimating supernova parameters x0,x1,c and spectral normalization')
@@ -590,7 +627,7 @@ class GaussNewton(saltresids.SALTResids):
 		for superloop in range(loop_niter):
 			tstartloop = time.time()
 			try:
-				if not superloop % self.steps_between_errorfit	and	 self.fit_model_err and not \
+				if not superloop % self.steps_between_errorfit	and	 fit_model_err and not \
 				   self.fit_cdisp_only and photochi2perdof<self.model_err_max_chisq :# and not superloop == 0:
 					X=self.iterativelyfiterrmodel(X)
 					storedResults={}
@@ -638,7 +675,7 @@ class GaussNewton(saltresids.SALTResids):
 				raise e
 		X[self.iclscat[-1]]=clscatzeropoint
 		try:
-			if self.fit_model_err: X= self.fitcolorscatter(X)
+			if fit_model_err: X= self.fitcolorscatter(X)
 		except Exception as e:
 			logging.critical('Color scatter crashed during fitting, finishing writing output')
 			logging.critical(e, exc_info=True)

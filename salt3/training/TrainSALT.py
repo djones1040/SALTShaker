@@ -64,6 +64,9 @@ import extinction
 import logging
 log=logging.getLogger(__name__)
 
+import gc
+from memory_profiler import profile
+
 def RatioToSatisfyDefinitions(phase,wave,kcordict,components):
 	"""Ensures that the definitions of M1,M0,x0,x1 are satisfied"""
 
@@ -343,6 +346,7 @@ class TrainSALT(TrainSALTBase):
 
 		return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 	
+	@profile
 	def fitSALTModel(self,datadict):
 
 		parlist,x_modelpars,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc = self.initialParameters(datadict)
@@ -378,16 +382,17 @@ class TrainSALT(TrainSALTBase):
 				# do the fitting
 				trainingresult,message = fitter.gaussnewton(
 						saltfitter,x_modelpars,
-						self.options.gaussnewton_maxiter,getdatauncertainties=False)
+						self.options.gaussnewton_maxiter,getdatauncertainties=False,fit_model_err=saltfitter.fit_model_err)
 				#saltfitter_errs = saltfitter
 				del saltfitter # free up memory before the uncertainty estimation
+				gc.collect()
 
 				# get the errors
 				log.info('beginning error estimation loop')
 				saltfitter_errs = saltfit.GaussNewton(trainingresult.X_raw,datadict,parlist,**saltfitkwargs)
 				trainingresult,message = fitter.gaussnewton(
 						saltfitter_errs,trainingresult.X_raw,
-						0,getdatauncertainties=True)
+						0,getdatauncertainties=True,fit_model_err=False)
 				
 			for k in datadict.keys():
 				trainingresult.SNParams[k]['t0'] = -trainingresult.SNParams[k]['tpkoff'] + datadict[k].tpk_guess
