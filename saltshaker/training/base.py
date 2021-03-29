@@ -331,27 +331,7 @@ class TrainSALTBase:
 						 'specrange_wavescale_specrecal':self.options.specrange_wavescale_specrecal,
 						 'n_components':self.options.n_components,'n_colorpars':self.options.n_colorpars,
 						 'n_colorscatpars':self.options.n_colorscatpars,
-						 'nsteps_before_adaptive':self.options.nsteps_before_adaptive,
-						 'nsteps_adaptive_memory':self.options.nsteps_adaptive_memory,
-						 'adaptive_sigma_opt_scale':self.options.adaptive_sigma_opt_scale,
-						 'stepsize_magscale_M0':self.options.stepsize_magscale_M0,
-						 'stepsize_magadd_M0':self.options.stepsize_magadd_M0,
-						 'stepsize_magscale_err':self.options.stepsize_magscale_err,
-						 'stepsize_errcorr':self.options.stepsize_errcorr,
-						 'stepsize_magscale_M1':self.options.stepsize_magscale_M1,
-						 'stepsize_magadd_M1':self.options.stepsize_magadd_M1,
-						 'stepsize_cl':self.options.stepsize_cl,
-						 'stepsize_magscale_clscat':self.options.stepsize_magscale_clscat,
-						 'stepsize_specrecal':self.options.stepsize_specrecal,
-						 'stepsize_x0':self.options.stepsize_x0,
-						 'stepsize_x1':self.options.stepsize_x1,
-						 'stepsize_c':self.options.stepsize_c,
-						 'stepsize_tpk':self.options.stepsize_tpk,
 						 'fix_t0':self.options.fix_t0,
-						 'nsteps_before_modelpar_tradeoff':self.options.nsteps_before_modelpar_tradeoff,
-						 'modelpar_snpar_tradeoff_nstep':self.options.modelpar_snpar_tradeoff_nstep,
-						 'nsteps_between_lsqfit':self.options.nsteps_between_lsqfit,
-						 'use_lsqfit':self.options.use_lsqfit,
 						 'regularize':self.options.regularize,
 						 'outputdir':self.options.outputdir,
 						 'fit_model_err':self.options.fit_model_err,
@@ -377,7 +357,7 @@ class TrainSALTBase:
 		return not all(passescuts)
 
 	def checkFilterMass(self,z,survey,flt):
-		#print(survey,flt)
+
 		filtwave = self.kcordict[survey][flt]['filtwave']
 		try:
 			filttrans = self.kcordict[survey][flt]['filttrans']
@@ -398,7 +378,7 @@ class TrainSALTBase:
 			if	hasvalidfitprob:
 				return sn.salt2fitprob
 			else:
-				log.warning(f'SN {sn} does not have a valid salt2 fitprob, including in sample')
+				log.warning(f'SN {sn.snid} does not have a valid salt2 fitprob, including in sample')
 				return 1
 			
 		cuts= [SNCut('total epochs',4,lambda sn: sum([ ((sn.photdata[flt].phase > -10) & (sn.photdata[flt].phase < 35)).sum() for flt in sn.photdata])),
