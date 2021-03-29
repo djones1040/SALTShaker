@@ -80,6 +80,8 @@ class SALTtrainingspectrum(SALTtrainingdata):
 
 			if 'DQ' in snanaspec:
 				iGood=(snanaspec['DQ']==1)
+			elif 'SPECFLAG' in snanaspec:
+				iGood=(snanaspec['SPECFLAG']==1)
 			else:
 				iGood=np.ones(len(self),dtype=bool)
 			iGood = iGood & (~np.isnan(self.flux))
@@ -97,11 +99,9 @@ class SALTtrainingspectrum(SALTtrainingdata):
 					Return the weighted average and standard deviation.
 					indices, weights -- Numpy ndarrays with the same shape.
 					"""
-					#try:
+
 					average = np.average(flux[indices]/fluxmax, weights=weights[indices])
 					variance = np.average((flux[indices]/fluxmax-average)**2, weights=weights[indices])	 # Fast and numerically precise
-					#except:
-					#	import pdb; pdb.set_trace()
 
 					return average
 
@@ -112,14 +112,14 @@ class SALTtrainingspectrum(SALTtrainingdata):
 					"""
 					average = np.average(flux[indices]/fluxmax, weights=weights[indices])
 					variance = np.average((flux[indices]/fluxmax-average)**2, weights=weights[indices])	 # Fast and numerically precise
-					return np.sqrt(variance) #/np.sqrt(len(indices))
+					return np.sqrt(variance)
 
-				#wavebins = np.linspace(waverange[0],waverange[1],(waverange[1]-waverange[0])/binspecres)
+
 				wavebins = np.linspace(np.min(wavelength),np.max(wavelength),int((np.max(wavelength)-np.min(wavelength))/(binspecres*(1+z))))
 				binned_flux = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_avg).statistic
 				binned_fluxerr = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_err).statistic
 
-				iGood = (binned_flux == binned_flux) #& (binned_flux/binned_fluxerr > 3)
+				iGood = (binned_flux == binned_flux)
 
 				self.flux = binned_flux[iGood]
 				self.wavelength = (wavebins[1:][iGood]+wavebins[:-1][iGood])/2.
@@ -176,12 +176,8 @@ class SALTtrainingSN:
 			try:
 				tpk = pkmjddict[sn.SNID]
 				tpkmsg = 'success: peak MJD provided'
-				#tpkerr = pkmjderr[str(sn.SNID) == pksnid][0]
-				#if tpkerr < 2: tpkmsg = 'termination condition is satisfied'
-				#else: tpkmsg = 'time of max uncertainty of +/- %.1f days is too uncertain!'%tpkerr
 			except KeyError:
 				tpkmsg = f'can\'t find tmax in pkmjd file'
-				#raise RuntimeError('SN ID %s not found in peak MJD list'%sn.SNID)
 		else:
 			tpk = sn.SEARCH_PEAKMJD
 			if type(tpk) == str:
@@ -215,11 +211,6 @@ class SALTtrainingSN:
 		self.salt2fitprob=fitprob
 		
 		self.photdata = {flt:SALTtraininglightcurve(self.zHelio,tpk_guess= self.tpk_guess,flt=flt, sn=sn) for flt in np.unique(sn.FLT)}
-#		try:
-#			for key in self.photdata:
-#				assert( len(self.photdata[key])>0)
-#		except AssertionError:
-#			raise SNDataReadError(f'All lightcurves empty for SN {sn.SNID}')
 		try: assert(len(self.photdata)>0)
 		except AssertionError:
 			raise SNDataReadError(f'No lightcurves for SN {sn.SNID}')
@@ -400,7 +391,7 @@ def rdAllData(snlists,estimate_tpk,
 		if not duplicatesurvey is None:
 			log.warning(f'SNID {sn.SNID} is a duplicate! Keeping version from survey {duplicatesurvey}, discarding version from survey {sn.SURVEY}')
 			return False
-		#datadict,speclist,KeepOnlySpec=False,waverange=[2000,9200],binspecres=None
+
 		try:
 			saltformattedsn=SALTtrainingSN(
 				sn,estimate_tpk=estimate_tpk,

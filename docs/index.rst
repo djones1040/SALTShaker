@@ -4,21 +4,69 @@
       th { display:none; }
     </style>
 
-**********
-SALT3 (**Under Development**)
-**********
+********************
+SALTShaker and SALT3
+********************
 
 Overview
 ==========================================
 
-    SALT is a model of Type Ia supernovae
-    that accounts for spectral variations as
-    a function of shape and color (Guy et al., 
-    2007; Guy et al., 2010; Betoule et al., 2014).  The goal
-    of the SALT3 software is to retrain the SALT model
-    from 2800 to 11,000 Angstroms to make use
-    of izY data from PS1, LSST, and WFIRST.
+SALT is a model of Type Ia supernovae (SNe Ia)
+that accounts for spectral variations as
+a function of shape and color (Guy et al., 
+2007; Guy et al., 2010; Betoule et al., 2014).
+With SALTShaker we have developed an open-source
+model training framework and created the "SALT3" model.
+We more than double the amount of data used for model training and
+have extended the SALT framework to 11,000 Angstroms.  SALT3 will make use
+of *iz* data from PS1, the Vera Rubin Observatory,
+and the *Nancy Grace Roman Space Telescope* and can be re-trained easily in
+the coming years as more SN Ia data become available.
+
+Please report bugs, issues and requests via the SALTShaker GitHub page.
+
+SALT3 Model and Training Data
+==========================================
+
+The first version of the SALT3 model has been released in:
     
+Kenworthy et al., 2021, ApJ, submitted
+
+The model files created in this paper are linked `here <_static/salt3-k21.tar.gz>`_.
+SALT3 light curve fits can be performed using `sncosmo <https://sncosmo.readthedocs.io/en/latest/>`_ or `SNANA <https://snana.uchicago.edu/>`_ with the SALT3.K21
+model, with a brief sncosmo example given below.
+
+The SALT3 training data is also fully public and included `here <_static/SALT3TRAIN_K21_PUBLIC.tgz>`_.  This release includes all photometry and spectra
+along with everything required to run the code.  Once SALTShaker has been installed via the instructions in :ref:`install`, the SALT3 model can be
+(re)trained with the following command::
+
+  trainsalt -c Train_SALT3_public.conf
+
+
+  
+Example SALT3 Fit
+=================
+
+Fitting SN Ia data with SALT3 can be done through the sncosmo or
+SNANA software packages.  With sncosmo, the fitting can be performed
+in nearly the exact same way as SALT2.  Here is the example from the sncosmo
+documentation, altered to use the SALT3 model::
+
+  import sncosmo
+  data = sncosmo.load_example_data()
+  model = sncosmo.Model(source='salt3')
+  res, fitted_model = sncosmo.fit_lc(data, model,
+                                    ['z', 't0', 'x0', 'x1', 'c'],
+                                    bounds={'z':(0.3, 0.7)})
+  sncosmo.plot_lc(data, model=fitted_model, errors=res.errors)
+
+
+Pipeline
+========
+
+We are developing a pipeline to fully test and validate the
+SALT3 model in the context of cosmological measurements.  Defails
+are given in :ref:`pipeline`.
 
     .. image:: _static/schematic.png
 
@@ -31,7 +79,6 @@ Overview
    data
    training
    simulation
-   validation
    pipeline
    
 

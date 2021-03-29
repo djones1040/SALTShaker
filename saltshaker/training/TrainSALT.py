@@ -363,26 +363,25 @@ class TrainSALT(TrainSALTBase):
 		for i in range(self.options.n_repeat):
 			if i == 0: laststepsize = None
 			
-			if self.options.do_gaussnewton:
-				saltfitkwargs['regularize'] = self.options.regularize
-				saltfitkwargs['fitting_sequence'] = self.options.fitting_sequence
-				saltfitkwargs['fix_salt2modelpars'] = self.options.fix_salt2modelpars
-				saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)
+			saltfitkwargs['regularize'] = self.options.regularize
+			saltfitkwargs['fitting_sequence'] = self.options.fitting_sequence
+			saltfitkwargs['fix_salt2modelpars'] = self.options.fix_salt2modelpars
+			saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)
 
-				# do the fitting
-				trainingresult,message = fitter.gaussnewton(
-						saltfitter,x_modelpars,
-						self.options.gaussnewton_maxiter,getdatauncertainties=False)
-				del saltfitter # free up memory before the uncertainty estimation
+			# do the fitting
+			trainingresult,message = fitter.gaussnewton(
+					saltfitter,x_modelpars,
+					self.options.gaussnewton_maxiter,getdatauncertainties=False)
+			del saltfitter # free up memory before the uncertainty estimation
 
-				# get the errors
-				log.info('beginning error estimation loop')
-				self.fit_model_err = False
-				saltfitter_errs = saltfit.GaussNewton(trainingresult.X_raw,datadict,parlist,**saltfitkwargs)
-				trainingresult,message = fitter.gaussnewton(
-						saltfitter_errs,trainingresult.X_raw,
-						0,getdatauncertainties=True)
-				
+			# get the errors
+			log.info('beginning error estimation loop')
+			self.fit_model_err = False
+			saltfitter_errs = saltfit.GaussNewton(trainingresult.X_raw,datadict,parlist,**saltfitkwargs)
+			trainingresult,message = fitter.gaussnewton(
+					saltfitter_errs,trainingresult.X_raw,
+					0,getdatauncertainties=True)
+
 			for k in datadict.keys():
 				trainingresult.SNParams[k]['t0'] = -trainingresult.SNParams[k]['tpkoff'] + datadict[k].tpk_guess
 		
@@ -814,9 +813,6 @@ SIGMA_INT: 0.106  # used in simulation"""
 
 			datadict = self.mkcuts(datadict)[0]
 			log.info(f'took {time()-tcstart:.3f} to apply cuts')
-			with open('tmp','w') as fout:
-				for k in datadict.keys():
-					print(k,file=fout)
 			
 			# fit the model - initial pass
 			if self.options.stage == "all" or self.options.stage == "train":

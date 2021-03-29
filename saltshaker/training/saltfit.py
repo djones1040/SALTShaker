@@ -23,7 +23,7 @@ from sncosmo.utils import integration_grid
 
 from saltshaker.util.synphot import synphot
 from saltshaker.util.query import query_yes_no
-from saltshaker.training import saltresids #_master as saltresids
+from saltshaker.training import saltresids
 
 from multiprocessing import Pool, get_context
 from emcee.interruptible_pool import InterruptiblePool
@@ -658,13 +658,6 @@ class GaussNewton(saltresids.SALTResids):
 			self.getParsGN(Xredefined)
 		if M0dataerr is None:
 			M0dataerr, M1dataerr,cov_M0_M1_data = np.zeros(len(M0)),np.zeros(len(M0)),np.zeros(len(M0))
-		#log.info("using Minuit to determine the uncertainties on M0 and M1")
-		#if self.fit_model_err:
-		#	log.info('Optimizing model error')
-		#	m0var,m1var,m0m1cov=self.iterativelyfitdataerrmodel(X)
-		#else:
-		#	m0var = m1var = m0m1cov = np.zeros(len(M0))
-		#M0dataerr,M1dataerr,cov_M0_M1_data = self.getErrsGN(m0var,m1var,m0m1cov)
 
 		log.info('Total time spent in convergence loop: {}'.format(datetime.now()-start))
 		
@@ -700,8 +693,6 @@ class GaussNewton(saltresids.SALTResids):
 				import pdb; pdb.set_trace()
 			Xnew=X.copy()
 			Xnew[includePars]=Y
-			#log.info(self.maxlikefit(Xnew,computeDerivatives=True)[1])
-			#import pdb; pdb.set_trace()
 			return - self.loglikeforSN(Xnew,sn,{},varyParams=includePars)[1]
 		log.info('Initialized log likelihood: {:.2f}'.format(self.loglikeforSN(X,sn,{},varyParams=None)))
 		params=['x'+str(i) for i in range(includePars.sum())]
@@ -723,12 +714,10 @@ class GaussNewton(saltresids.SALTResids):
 
 		kwargs.update({params[i]: initVals[i] for i in range(includePars.sum())})
 		m=Minuit(fn,use_array_call=True,forced_parameters=params,grad=grad,errordef=1,**kwargs)
-		result,paramResults=m.migrad()#includePars.sum()*6)
-		#if np.allclose(np.array([x.value for x	 in paramResults]),X[includePars]):
+		result,paramResults=m.migrad()
+
 		X=X.copy()
 		X[includePars]=np.array([x.value for x	in paramResults])
-
-		#		if np.allclose(X[includePars],initVals):
 
 		log.info('Final log likelihood: {:.2f}'.format( -result.fval))
 		
@@ -825,7 +814,6 @@ class GaussNewton(saltresids.SALTResids):
 		params=['x'+str(i) for i in range(includePars.sum())]
 		initVals=X[includePars].copy()
 
-		#kwargs={'limit_'+params[i] : self.bounds[np.where(includePars)[0][i]] for i in range(includePars.sum()) if }
 		minuitkwargs=({params[i]: initVals[i] for i in range(includePars.sum())})
 		minuitkwargs.update({'error_'+params[i]: 1e-2 for i in range(includePars.sum())})
 		clscatindices=np.where(self.parlist[includePars] == 'clscat')[0]
@@ -935,7 +923,7 @@ class GaussNewton(saltresids.SALTResids):
 		for i,parindices in enumerate(tqdm(pars)):
 			waverange=self.errwaveknotloc[[i%(self.errwaveknotloc.size-self.errbsorder-1),i%(self.errwaveknotloc.size-self.errbsorder-1)+self.errbsorder+1]]
 			phaserange=self.errphaseknotloc[[i//(self.errwaveknotloc.size-self.errbsorder-1),i//(self.errwaveknotloc.size-self.errbsorder-1)+self.errbsorder+1]]
-			#if phaserange[0] < 0 and phaserange[1] > 0 and waverange[0] <= 5000 and waverange[1] > 5000:
+
 			includeM0Pars=np.zeros(self.parlist.size,dtype=bool)
 			includeM1Pars=np.zeros(self.parlist.size,dtype=bool)
 			# could be slow (and ugly), but should work.....
@@ -951,14 +939,13 @@ class GaussNewton(saltresids.SALTResids):
 					includeM1Pars[self.im1[j]] = True
 					m0idx = np.append(m0idx,j)
 			varyParams = includeM0Pars | includeM1Pars
-			#storedResults=fluxes.copy()
 
 			m0var_single,m1var_single,m01cov_single = self.minuitoptimize_components(
 				X,includeM0Pars,includeM1Pars,fluxes,fixFluxes=False,dospec=True,varyParams=varyParams)
 			m0var[m0idx] = m0var_single*len(m0idx)
 			m1var[m0idx] = m1var_single*len(m0idx)
 			m01cov[m0idx] = m01cov_single*len(m0idx)
-			#if m0var > 0: 
+
 		return m0var,m1var,m01cov
 
 	def minuitoptimize_components(self,X,includeM0Pars,includeM1Pars,storedResults=None,varyParams=None,**kwargs):
@@ -972,7 +959,7 @@ class GaussNewton(saltresids.SALTResids):
 			storedCopy = storedResults.copy()
 			if 'components' in storedCopy.keys():
 				storedCopy.pop('components')
-			result=-self.maxlikefit(Xnew,{})#storedCopy)#,**kwargs)
+			result=-self.maxlikefit(Xnew,{})
 			return 1e10 if np.isnan(result) else result
 			
 		params=['x0','x1']
@@ -992,13 +979,6 @@ class GaussNewton(saltresids.SALTResids):
 	
 	def getstepsizes(self,X,Xlast):
 		stepsizes = X-Xlast
-		#stepsizes[self.parlist == 'm0'] = \
-		#	(X[self.parlist == 'm0']-Xlast[self.parlist == 'm0'])/Xlast[self.parlist == 'm0']
-		#stepsizes[self.parlist == 'modelerr'] = \
-		#	(X[self.parlist == 'modelerr']-Xlast[self.parlist == 'modelerr'])/Xlast[self.parlist == 'modelerr']
-		#stepsizes[self.parlist == 'clscat'] = \
-		#	(X[self.parlist == 'clscat']-Xlast[self.parlist == 'clscat'])/Xlast[self.parlist == 'clscat']
-		#import pdb; pdb.set_trace()
 		return stepsizes
 		
 	def getChi2Contributions(self,guess,storedResults):
@@ -1060,7 +1040,7 @@ class GaussNewton(saltresids.SALTResids):
 		X,chi2=X_init.copy(),chi2_init
 		storedResults=uncertainties.copy()
 		for fit in self.fitlist:
-			if 'all-grouped' in fit :continue #
+			if 'all-grouped' in fit :continue
 			if 'modelerr' in fit: continue
 			if 'tpk'==fit and not self.fitTpkOff: continue
 			log.info('fitting '+self.fitOptions[fit][0])
@@ -1097,9 +1077,6 @@ class GaussNewton(saltresids.SALTResids):
 							includeParsPhase[self.__dict__[f'im{fit[-1]}'][iFit]] = True
 						Xprop,chi2prop,chi2 = self.process_fit(Xprop,includeParsPhase,storedResults,fit=fit,usesns=usesns)
 
-						#includeParsPhase[self.__dict__['im%s'%fit[-1]][iFit]] = True
-						#Xprop,chi2prop = self.process_fit(X,includeParsPhase,storedResults,fit=fit)
-
 						if np.isnan(Xprop).any() or np.isnan(chi2prop) or ~np.isfinite(chi2prop):
 							log.error('NaN detected, breaking out of loop')
 							break;
@@ -1131,7 +1108,7 @@ class GaussNewton(saltresids.SALTResids):
 					continue
 		#In this case GN optimizer can do no better
 		return X,chi2,(X is X_init)
-		 #_init
+
 	def linesearch(self,X,searchdir,uncertainties,**kwargs):
 		def opFunc(x):
 			return ((self.lsqwrap(X-(x*searchdir),uncertainties.copy(),None,**kwargs))**2).sum()

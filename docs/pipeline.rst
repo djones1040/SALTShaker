@@ -1,3 +1,5 @@
+.. _pipeline:
+
 ********************
 Running the Pipeline
 ********************
