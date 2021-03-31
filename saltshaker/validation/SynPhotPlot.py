@@ -14,6 +14,8 @@ from saltshaker.initfiles import init_rootdir
 from saltshaker.training.init_hsiao import synphotB
 from sncosmo.salt2utils import SALT2ColorLaw
 import os
+
+plt.rcParams['font.size'] = 10
 _SCALE_FACTOR = 1e-12
 
 def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
@@ -58,7 +60,7 @@ def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
 	plotmjd = np.linspace(-20, 50,100)
 	
 # 	fig = plt.figure(figsize=)
-	fig,(m0axes,m1axes,familyaxes)=plt.subplots(3,len(filters),sharex=True,figsize=(15, 7))
+	fig,(m0axes,m1axes,familyaxes)=plt.subplots(3,len(filters),sharex=True,figsize=(7,3.4),gridspec_kw={'hspace':0})
 # 	m0axes = [fig.add_subplot(3,len(filters),1+i) for i in range(len(filters))]
 # 	m1axes = [fig.add_subplot(3,len(filters),len(filters)+ 1+i,sharex=ax) for i,ax in enumerate(m0axes)]
 # 	familyaxes = [fig.add_subplot(3,len(filters),2*len(filters)+ 1+i,sharex=ax) for i,ax in enumerate(m0axes)]
@@ -96,7 +98,7 @@ def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
 			title=flt
 			if 'bessell' in title:
 				title= 'Bessell '+ flt[len('bessell')].upper()
-			ax0.set_title(title,fontsize=20)
+			ax0.set_title(title)
 
 	xmin,xmax=-2,2
 	norm=colors.Normalize(vmin=xmin,vmax=xmax)
@@ -121,17 +123,17 @@ def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
 	sm._A=[]
 	fig.subplots_adjust(right=0.8,bottom=0.15,left=0.05)
 	cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.35])
-	familyaxes[0].set_ylabel('SALT3 Flux',fontsize=20)
+	familyaxes[0].set_ylabel('SALT3 Flux')
 	for ax in familyaxes: ax.set_xlim(plotmjd.min(),plotmjd.max())
 	fig.colorbar(sm,cax=cbar_ax)
-	cbar_ax.set_ylabel('Stretch	 ($x_1$ parameter)',fontsize=20)
+	cbar_ax.set_ylabel('Stretch	 ($x_1$ parameter)')
 
 	#axes[0].legend()
 	
-	m0axes[0].set_ylabel('M0 Flux',fontsize=20)
-	m1axes[0].set_ylabel('M1 Flux',fontsize=20)
-	fig.text(0.5,0.04,'Time since peak (days)',ha='center',fontsize=20)
-	fig.legend(salt2handle+salt3handle,['SALT2.JLA','SALT3.K21'],fontsize=20,loc=(.825,.75))
+	m0axes[0].set_ylabel('M0 Flux')
+	m1axes[0].set_ylabel('M1 Flux')
+	fig.text(0.5,0.04,'Time since peak (days)',ha='center')
+	fig.legend(salt2handle+salt3handle,['SALT2.JLA','SALT3.K21'],loc=(.825,.75))
 	#axes[0].legend()
 
 	plt.savefig(outfile)
