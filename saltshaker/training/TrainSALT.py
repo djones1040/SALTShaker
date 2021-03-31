@@ -445,6 +445,7 @@ class TrainSALT(TrainSALTBase):
 					print(f'{p:.1f} {w:.2f} {trainingresult.M1dataerr[i,j]**2.+trainingresult.M1modelerr[i,j]**2.:8.15e}',file=foutm1dataerr)
 					
 		with open(f'{outdir}/salt3_color_dispersion.dat','w') as foutclscat:
+			trainingresult.clscat = np.clip(trainingresult.clscat,0.,5.)
 			for j,w in enumerate(trainingresult.wave):
 				print(f'{w:.2f} {trainingresult.clscat[j]:8.15e}',file=foutclscat)
 
