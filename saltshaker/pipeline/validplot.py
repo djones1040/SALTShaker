@@ -49,6 +49,9 @@ class lcfitting_validplots(ValidPlots):
 		if 'SIM_mB' not in fr.__dict__.keys():
 			print('not a simulation!  skipping simvfit')
 			return
+		elif 'SIM_x1' not in fr.__dict__.keys() or 'SIM_c' not in fr.__dict__.keys():
+			print('not a salt2-like simulation!  skipping simvfit')
+			return
             
 		ax1,ax2,ax3 = plt.subplot(131),plt.subplot(132),plt.subplot(133)
 
@@ -171,8 +174,12 @@ class getmu_validplots(ValidPlots):
 			return
         
 		fr = txtobj(self.inputfile,fitresheader=True)
-		sim_alpha = fr.SIM_alpha[0]
-		sim_beta = fr.SIM_beta[0]
+		if 'SIM_alpha' not in fr.__dict__.keys() and 'SIM_beta' not in fr.__dict__.keys():
+			sim_alpha = -99.
+			sim_beta = -99.
+		else:
+			sim_alpha = fr.SIM_alpha[0]
+			sim_beta = fr.SIM_beta[0]
 		plt.clf()
 		ax = plt.axes()
 		ax.set_ylabel('Nuisance Parameters',fontsize=15)
