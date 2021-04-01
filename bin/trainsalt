@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-from salt3.training.TrainSALT import TrainSALT
+from saltshaker.training.TrainSALT import TrainSALT
 import sys, argparse, configparser, os
-from salt3.config import config_rootdir,loggerconfig
+from saltshaker.config import config_rootdir,loggerconfig
 
 
 usagestring = """SALT3 Training

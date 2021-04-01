@@ -3,7 +3,7 @@
 
 import glob
 import numpy as np
-from salt3.util import snana
+from saltshaker.util import snana
 import pylab as plt
 plt.ion()
 

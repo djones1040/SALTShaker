@@ -185,7 +185,7 @@ $med. \chi^2_{{\nu}}$ = {med_chi3:.2f}""",
     ax1.set_xlabel('$z_{CMB}$',fontsize=15)
     ax1.set_ylabel('$\mu-\mu_{\Lambda CDM}$',fontsize=15)
     ax2.xaxis.set_ticks([])
-<<<<<<< HEAD
+
     plt.savefig('hubblediagjlasim.pdf',bbox_inches='tight')
     
     import pdb; pdb.set_trace()
@@ -271,6 +271,88 @@ $med. \chi^2_{{\nu}}$ = {med_chi3:.2f}""",
 
     plt.savefig('hubblediag_sim.pdf')
 
+def main_large_notext():
+    
+    # figure out alpha, beta for each.  comp against simulation
+    with open('SALT2mu_SALT2_LARGE.FITRES') as fin:
+        for line in fin:
+            if line.startswith('#  alpha0'): salt2alpha,salt2alphaerr = float(line.split()[3]),float(line.split()[5].replace('\n',''))
+            if line.startswith('#  beta0'): salt2beta,salt2betaerr = float(line.split()[3]),float(line.split()[5].replace('\n',''))
+            if line.startswith('#  sigint'): salt2sigint = float(line.split()[3])
+    with open('SALT2mu_SALT3_LARGE.FITRES') as fin:
+        for line in fin:
+            if line.startswith('#  alpha0'): salt3alpha,salt3alphaerr = float(line.split()[3]),float(line.split()[5].replace('\n',''))
+            if line.startswith('#  beta0'): salt3beta,salt3betaerr = float(line.split()[3]),float(line.split()[5].replace('\n',''))
+            if line.startswith('#  sigint'): salt3sigint = float(line.split()[3])
+
+    # avg chi2/SN
+    fr2 = txtobj('JLA_TRAINING_SALT2_LARGE.FITRES',fitresheader=True)
+    fr3 = txtobj('JLA_TRAINING_SALT3_LARGE.FITRES',fitresheader=True)
+    med_chi2 = np.median(fr2.FITCHI2/fr2.NDOF)
+    med_chi3 = np.median(fr3.FITCHI2/fr3.NDOF)
+    
+    # hubble diagram w/ bins
+    fr2 = getmu.getmu(fr2,salt2alpha=salt2alpha,salt2beta=salt2beta,sigint=0.0)
+    fr3 = getmu.getmu(fr3,salt2alpha=salt3alpha,salt2beta=salt3beta,sigint=0.0)
+    zbins = np.logspace(np.log10(0.01),np.log10(1.0),20)
+    salt2mubins = binned_statistic(fr2.zCMB,fr2.mures,bins=zbins,statistic='mean').statistic
+    salt2muerrbins = binned_statistic(fr2.zCMB,fr2.mures,bins=zbins,statistic=errfnc).statistic
+    salt3mubins = binned_statistic(fr3.zCMB,fr3.mures,bins=zbins,statistic='mean').statistic
+    salt3muerrbins = binned_statistic(fr3.zCMB,fr3.mures,bins=zbins,statistic=errfnc).statistic
+
+    plt.subplots_adjust(wspace=0)
+    fig = plt.figure()
+    gs = GridSpec(1, 5, figure=fig)
+    gs.update(wspace=0.0, hspace=0.0,bottom=0.2)
+    ax1 = fig.add_subplot(gs[0, 0:4])
+    ax2 = fig.add_subplot(gs[0, 4])
+    ax1.tick_params(top="on",bottom="on",left="on",right="off",direction="inout",length=8, width=1.5)
+    ax2.tick_params(top="on",bottom="on",left="on",right="off",direction="inout",length=8, width=1.5)
+    
+    ax1.axhline(0,lw=2,color='k')
+    ax1.errorbar(fr2.zCMB,fr2.mures,yerr=fr2.muerr,fmt='o',color='b',alpha=0.04)
+    ax1.errorbar(fr3.zCMB,fr3.mures,yerr=fr3.muerr,fmt='D',color='r',alpha=0.04)
+    ax1.errorbar((zbins[1:]+zbins[:-1])/2.,salt2mubins,yerr=salt2muerrbins,fmt='o-',color='b')
+    ax1.errorbar((zbins[1:]+zbins[:-1])/2.,salt3mubins,yerr=salt3muerrbins,fmt='D-',color='r')
+    ax1.set_xscale('log')
+    ax1.xaxis.set_major_formatter(NullFormatter())
+    ax1.xaxis.set_minor_formatter(NullFormatter())
+    ax1.xaxis.set_ticks([0.01,0.02,0.05,0.1,0.3,0.7])
+    ax1.xaxis.set_ticklabels(['0.01','0.02','0.05','0.1','0.3','0.7'])
+    ax1.set_title('Simulated Data',fontsize=15)
+    
+    muresbins = np.linspace(-1,1,40)
+    ax2.hist(fr2.mures,bins=muresbins,orientation='horizontal',color='b',alpha=0.5)
+    ax2.hist(fr3.mures,bins=muresbins,orientation='horizontal',color='r',alpha=0.5)
+
+#    ax1.text(0.03,0.97,fr"""SALT2
+#$\alpha = {salt2alpha:.3f}\pm{salt2alphaerr:.3f}$
+#$\beta = {salt2beta:.2f}\pm{salt2betaerr:.2f}$
+#$\sigma_{{int}}$ = {salt2sigint:.3f}
+#$med. \chi^2_{{\nu}}$ = {med_chi2:.2f}""",
+#             ha='left',va='top',color='b',transform=ax1.transAxes,bbox={'facecolor':'1.0','edgecolor':'1.0','alpha':0.8})
+
+#    ax1.text(0.3,0.97,fr"""SALT3
+#$\alpha = {salt3alpha:.3f}\pm{salt3alphaerr:.3f}$
+#$\beta = {salt3beta:.2f}\pm{salt3betaerr:.2f}$
+#$\sigma_{{int}}$ = {salt3sigint:.3f}
+#$med. \chi^2_{{\nu}}$ = {med_chi3:.2f}""",
+#             ha='left',va='top',color='r',transform=ax1.transAxes,bbox={'facecolor':'1.0','edgecolor':'1.0','alpha':0.8})
+
+    ax1.text(0.025,0.95,f"""SALT2.JLA RMS = {np.std(fr2.mures):.3f}""",transform=ax1.transAxes,ha='left',va='top',color='b')
+    ax1.text(0.025,0.88,f"""SALT3.simJLA RMS = {np.std(fr3.mures):.3f}""",transform=ax1.transAxes,ha='left',va='top',color='r')
+    ax2.yaxis.tick_right()
+    ax1.set_ylim([-0.5,0.5])
+    ax2.set_ylim([-0.5,0.5])
+    ax1.set_xlabel('$z_{CMB}$',fontsize=15)
+    ax1.set_ylabel('$\mu-\mu_{\Lambda CDM}$ (mag)',fontsize=15)
+    ax2.xaxis.set_ticks([])
+    
+    import pdb; pdb.set_trace()
+
+    plt.savefig('hubblediag_sim.pdf',dpi=200)
+
+    
     
 if __name__ == "__main__":
     #concatfitres()
@@ -279,4 +361,5 @@ if __name__ == "__main__":
 
     #concatfitres_large()
     #run_salt2mu_large()
-    main_large()
+    #main_large()
+    main_large_notext()
