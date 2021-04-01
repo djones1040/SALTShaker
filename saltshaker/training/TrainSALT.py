@@ -270,7 +270,9 @@ class TrainSALT(TrainSALTBase):
 							return cl_init-salt2cl
 
 						md = least_squares(bestfit,[0,0,0,0,0])
-						if 'termination conditions are satisfied' not in md.message:
+						if 'termination conditions are satisfied' not in md.message and \
+						   'termination condition is satisfied' not in md.message:
+							
 							raise RuntimeError('problem initializing color law!')
 						guess[parlist == 'cl'] = md.x
 				else:
