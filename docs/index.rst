@@ -33,7 +33,9 @@ The first version of the SALT3 model has been released in:
 Kenworthy et al., 2021, ApJ, submitted
 
 The SALT3 model files are linked `here <_static/salt3-k21.tar.gz>`_.
-SALT3 light curve fits can be performed using `sncosmo <https://sncosmo.readthedocs.io/en/latest/>`_ or `SNANA <https://snana.uchicago.edu/>`_ with the SALT3.K21
+SALT3 light curve fits can be performed using `sncosmo <https://sncosmo.readthedocs.io/en/latest/>`_ 
+(currently the `latest version <https://github.com/sncosmo/sncosmo>`_ on GitHub is required)
+or `SNANA <https://snana.uchicago.edu/>`_ with the SALT3.K21
 model, with a brief sncosmo example given below.
 
 The SALT3 training data is also fully public and included `here <_static/SALT3TRAIN_K21_PUBLIC.tgz>`_.  This release includes all photometry and spectra
