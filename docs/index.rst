@@ -52,7 +52,15 @@ Example SALT3 Fit
 Fitting SN Ia data with SALT3 can be done through the sncosmo or
 SNANA software packages.  With sncosmo, the fitting can be performed
 in nearly the exact same way as SALT2.  Here is the example from the sncosmo
-documentation, altered to use the SALT3 model::
+documentation, altered to use the SALT3 model.  First, install the latest
+development version of sncosmo from source (SALT3 will be included in an official
+release soon)::
+
+  git clone git://github.com/sncosmo/sncosmo.git
+  cd sncosmo
+  ./setup.py install
+
+Then, in a python terminal::
 
   import sncosmo
   data = sncosmo.load_example_data()
