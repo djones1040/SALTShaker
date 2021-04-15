@@ -1,0 +1,53 @@
+
+  Generate K-corrections for DES-SN
+  to use with MLCS2k2 or SALT2 model.
+ 
+  Genreated K-correction tables with
+
+    kcor.exe  kcor_DES_mlcs2k2.input >! kcor_DES_mlcs2k2.log &
+
+
+ Dec 30 2012: rerun with both HBOOK and FITS output
+ Feb 19 2014: use DES filters x atmos from Anne Baur
+ Dec 06 2014: update after filter re-org
+
+# ======================== BEGIN INPUT  =========================
+
+# specify spectral template for supernova
+
+SN_SED: Hsiao07.dat   # see $SNDATA_ROOT/snsed
+
+# primary refs
+BD17_SED:  bd_17d4708_stisnic_007.dat
+VEGA_SED:  alpha_lyr_stis_003.dat   
+
+# specify filters :  
+
+MAGSYSTEM: AB     (define mag system for filters below)
+FILTSYSTEM: COUNT
+SURVEY: DES
+FILTPATH: $SNDATA_ROOT/filters/DES/DES-SN3YR_DECam
+FILTER: DES-g   DECam_g.dat   0.0  (name, file, zero-point)
+FILTER: DES-r   DECam_r.dat   0.0
+FILTER: DES-i   DECam_i.dat   0.0
+FILTER: DES-z   DECam_z.dat   0.0
+FILTER: DES-Y   DECam_Y.dat   0.0
+
+REDSHIFT_RANGE:   0.0  1.40
+REDSHIFT_BINSIZE: 0.1    # reduce to 0.05
+
+# define AV grid
+RV:          3.1   A(V)/E(B-V) in LMC
+AV_RANGE:   -6.0  6.0
+AV_BINSIZE:  0.5      # reduce be 0.5
+
+AV_OPTION:   2   [1 => use AV at avg lambda in filter  (with CCM89)]
+                 [2 => convolve spectrum and extinction with CCM89 law]
+
+
+# define lambda range for SN templates; 
+# template lambda binning is used internally
+LAMBDA_RANGE: 2100 12000
+
+# define output file for kcor grid
+OUTFILE: kcor_DESSN3YR.fits
