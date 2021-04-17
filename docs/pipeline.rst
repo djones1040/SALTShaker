@@ -7,7 +7,7 @@ Running the Pipeline
 Pipeline Discription
 ====================
 
-The SALT3 Training pipeline consists of several procedures that will be run in series. The pipeline modifies a base input file to create a customized one and calls the external program with the customized input. Details are described below.
+The SALT3 Training pipeline consists of several procedures that will be run in series. The pipeline modifies a base input file to create a customized one and calls the external program with the customized input. Details are described below and the pipeline will be described and published in Dai et al. (in prep.).
 
 Param File
 ==========

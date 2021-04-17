@@ -13,11 +13,14 @@ Overview
 
 SALT is a model of Type Ia supernovae (SNe Ia)
 that accounts for spectral variations as
-a function of shape and color (Guy et al., 
-2007; Guy et al., 2010; Betoule et al., 2014).
+a function of shape and color
+(`Guy et al., 2007 <https://ui.adsabs.harvard.edu/abs/2007A%26A...466...11G/abstract>`_;
+`Guy et al., 2010 <https://ui.adsabs.harvard.edu/abs/2010A%26A...523A...7G/abstract>`_;
+`Betoule et al., 2014 <https://ui.adsabs.harvard.edu/abs/2014A%26A...568A..22B/abstract>`_).
 With SALTShaker we have developed an open-source
 model training framework and created the "SALT3" model.
-We more than doubled the amount of photometric and spectroscopic data used for model training and
+We more than doubled the amount of photometric and
+spectroscopic data used for model training and
 have extended the SALT framework to 11,000 Angstroms.  SALT3 will make use
 of *iz* data from PS1, the Vera Rubin Observatory,
 and the *Nancy Grace Roman Space Telescope* and can be re-trained easily in
