@@ -19,6 +19,7 @@ the code::
   conda install numpy
   conda install cython
 
-In your local directory::
+Finally, install the code with::
   
+  cd SALTShaker
   python setup.py install

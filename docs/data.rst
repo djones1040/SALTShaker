@@ -2,41 +2,54 @@
 Spectroscopic and Photometric Training Data
 *******************************************
 
-A number of light curves and spectra are provided
-in the :code:`examples/exampledata/` directory
+SALTShaker input files use `SNANA <http://http://snana.uchicago.edu/>`_ format,
+which allows easy synergy between model training and SN simulations, light-curve
+fitting, and systematic uncertainty estimation.  The SNANA-formatted data
+necessary for training includes photometry, spectroscopy, and filter
+functions/photometric system information.
+
+For photometry and spectroscopy, a number of light curves and spectra are provided
+in the :code:`examples/SALT3TRAIN_K21_PUBLIC/` directory
 for training.  Light curves and spectra are
-combined into a single `SNANA-formatted <http://http://snana.uchicago.edu/>`_
-file.
+combined into a single file.  The training data themselves are described
+in Kenworthy et al., 2021.
+
+For the photometric information, so-called "kcor" files - which confusingly contain no *k*-corrections - are given in the
+:code:`examples/SALT3TRAIN_K21_PUBLIC/kcor` directory.  These FITS-formatted files define
+the photometric system associated with each survey that comprises the training sample.
+The SNANA function :code:`kcor.exe` will create these files from the :code:`.input` files in the
+same directory if anything needs to be adjusted.  "kcor" files contain filter transmission
+functions, AB, BD17, or Vega spectra depending on the photometric system of the data, zeropoint offsets,
+and optional shifts to the central wavelength of each filter.
 
 .. _data-format:
 
-===================
-Data Format
-===================
+==================================
+Photometry and Spectroscopy Format
+==================================
 
 `SNANA <http://http://snana.uchicago.edu/>`_ file format
 consists of a number of header keys giving information
 about each SN, followed by photometry and spectroscopy.
-Example SNANA-formatted data with both photometry and
-spectra are provided in the :code:`examples/exampledata/phot+specdata/`
-directory.
 
 An example of the minimum required header is below::
 
-  SURVEY:  PS1MD # matches SN to the filter functions given by each kcor file
-  SNID:  ASASSN-16bc # SN identifier
-  REDSHIFT_HELIO:  0.05 +- 0.01 # needed so that SALT model can be redshifted to match the data
-
+  SURVEY: FOUNDATION
+  SNID: ASASSN-15bc
+  RA: 61.5609874
+  DEC: -8.8856098
+  MWEBV: 0.037 # Schlafly & Finkbeiner MW E(B-V)
+    
 Below the header, the photometry is included in the following
 format::
 
   NOBS: 64
   NVAR:   7
   VARLIST:  MJD  FLT FIELD   FLUXCAL   FLUXCALERR    MAG     MAGERR
-  OBS: 57422.54 g NULL  21576.285 214.793 16.665 0.011
-  OBS: 57428.47 g NULL  30454.989 229.733 16.291 0.008
-  OBS: 57436.55 g NULL  26053.054 253.839 16.460 0.011
-  OBS: 57449.46 g NULL  11357.888 158.107 17.362 0.015
+  OBS: 57422.54 g VOID  21576.285 214.793 16.665 0.011
+  OBS: 57428.47 g VOID  30454.989 229.733 16.291 0.008
+  OBS: 57436.55 g VOID  26053.054 253.839 16.460 0.011
+  OBS: 57449.46 g VOID  11357.888 158.107 17.362 0.015
   ...
   END_PHOTOMETRY:
   
@@ -66,5 +79,3 @@ the following format::
   ...
   END_SPECTRUM:
 
-the :code:`salt3/util/` directory will soon include utilities for
-adding ASCII spectra to a pre-existing light curve file.
