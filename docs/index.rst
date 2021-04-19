@@ -33,7 +33,7 @@ SALT3 Model and Training Data
 
 The first version of the SALT3 model has been released in:
     
-Kenworthy et al., 2021, ApJ, submitted
+`Kenworthy et al., 2021, ApJ, submitted <https://arxiv.org/abs/2104.07795>`_
 
 The SALT3 model files are linked `here <_static/salt3-k21.tar.gz>`_.
 SALT3 light curve fits can be performed using `sncosmo <https://sncosmo.readthedocs.io/en/latest/>`_ 
