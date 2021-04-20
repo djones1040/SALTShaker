@@ -501,8 +501,8 @@ class GaussNewton(saltresids.SALTResids):
 			spline2d=smoothingmatrix*spline2d
 		#Uncorrelated effect of parameter uncertainties on M0 and M1
 		varyparlist= self.parlist[varyingParams]
-		m0pulls=invL.astype('float16')*precondition.tocsr()[:,varyparlist=='m0'].astype('float16')*spline2d.T.astype('float16')
-		m1pulls=invL.astype('float16')*precondition.tocsr()[:,varyparlist=='m1'].astype('float16')*spline2d.T.astype('float16')
+		m0pulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='m0'].astype('float32')*spline2d.T.astype('float32')
+		m1pulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='m1'].astype('float32')*spline2d.T.astype('float32')
         
 		M0dataerr = np.sqrt((m0pulls**2).sum(axis=0).reshape((self.phaseout.size,self.waveout.size)))
 		cov_M0_M1_data = (m0pulls*m1pulls).sum(axis=0).reshape((self.phaseout.size,self.waveout.size))
@@ -516,7 +516,6 @@ class GaussNewton(saltresids.SALTResids):
 		M1dataerr=np.clip(M1dataerr,0,np.abs(M1).max()*2)
 		correlation=np.clip(correlation,-1,1)
 		cov_M0_M1_data=correlation*(M0dataerr*M1dataerr)
-		
 		return M0dataerr, M1dataerr,cov_M0_M1_data
 
 	def datauncertaintiesfromjackknife(self,X,max_iter,n_bootstrapsamples):
@@ -581,7 +580,7 @@ class GaussNewton(saltresids.SALTResids):
 			tstartloop = time.time()
 			try:
 				if not superloop % self.steps_between_errorfit	and	 self.fit_model_err and not \
-				   self.fit_cdisp_only and photochi2perdof<self.model_err_max_chisq :# and not superloop == 0:
+				   self.fit_cdisp_only and photochi2perdof<self.model_err_max_chisq and not superloop == 0:
 					X=self.iterativelyfiterrmodel(X)
 					storedResults={}
 					chi2results=self.getChi2Contributions(X,storedResults)
