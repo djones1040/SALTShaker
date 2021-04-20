@@ -7,5 +7,5 @@ When using the SALT3 model, please cite arXiv 2104.07795 (<em>https://arxiv.org/
 
 We are also developing an additional testing and simulation framework.
 Please feel free to message us with any questions and see
-<em>https://salt3.readthedocs.io/en/latest/</em> for
+<em>https://saltshaker.readthedocs.io/en/latest/</em> for
 information on the ongoing work.
