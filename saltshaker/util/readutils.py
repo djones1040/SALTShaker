@@ -307,10 +307,13 @@ def rdkcor(surveylist,options):
 			for line in file:
 				log.info(line)
 				try:
-					shifttype,survey,filter,shift=line.split()
+					line=line.split('#')[0].split()
+					if len(line)==0:
+						continue
+					shifttype,survey,filter,shift=line
 					shift=float(shift)
 					if shifttype=='MAGSHIFT':
-						kcordict[kcorkey][filter]['zpoff'] +=shift
+						kcordict[survey][filter]['zpoff'] +=shift
 						kcordict[survey][filter]['primarymag']+=shift
 					elif shifttype=='LAMSHIFT':
 						kcordict[survey][filter]['filtwave']+=shift
