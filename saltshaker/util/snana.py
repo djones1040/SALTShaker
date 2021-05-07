@@ -445,7 +445,7 @@ class SuperNova( object ) :
                     icol = colnames.index(col)
                     if col in ['FLT','BAND'] and len(obsdat[icol]) > 1:
                         # for SALTShaker, we need to just look at the last character
-                        # simplest quick fix now that LC filters are intelligible
+                        # simplest quick fix now that filters in LC files are intelligible
                         self.__dict__[col].append( str2num(obsdat[icol][-1]) )
                     else:
                         self.__dict__[col].append( str2num(obsdat[icol]) )
