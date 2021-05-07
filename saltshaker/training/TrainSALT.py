@@ -295,6 +295,8 @@ class TrainSALT(TrainSALTBase):
 					# hacky matching, but SN names are a mess as usual
 					iSN = ((sn == snpar['SNID']) | ('sn'+sn == snpar['SNID']) |
 						   ('sn'+sn.lower() == snpar['SNID']) | (sn+'.0' == snpar['SNID']))
+					if len(snpar['SNID'][iSN]) > 1:
+						raise RuntimeError(f"found duplicate in parameter list for SN {snpar['SNID'][iSN][0]}")
 					if len(snpar[iSN]):
 						guess[parlist == 'x0_%s'%sn] = snpar['x0'][iSN]
 						guess[parlist == 'x1_%s'%sn] = snpar['x1'][iSN]
