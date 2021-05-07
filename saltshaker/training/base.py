@@ -358,8 +358,7 @@ class TrainSALTBase:
 
 	def checkFilterMass(self,z,survey,flt):
 
-		try: filtwave = self.kcordict[survey][flt]['filtwave']
-		except: import pdb; pdb.set_trace()
+		filtwave = self.kcordict[survey][flt]['filtwave']
 		try:
 			filttrans = self.kcordict[survey][flt]['filttrans']
 		except:
