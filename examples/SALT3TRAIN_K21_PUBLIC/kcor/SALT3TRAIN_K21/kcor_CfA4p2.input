@@ -26,4 +26,4 @@ AV_OPTION:   2
 LAMBDA_RANGE: 2100 12500  # for SN templates
 
 
-OUTFILE: kcor_CFA4p2.fits
+OUTFILE: kcor_CfA4p2.fits
