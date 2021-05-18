@@ -116,6 +116,8 @@ class TrainSALTBase:
 							help='stage - options are train and validate')
 		parser.add_argument('--skip_validation', default=False, action="store_true",
 							help='skip making validation plots')
+		parser.add_argument('--fast', default=False, action="store_true",
+							help='FAST option for debugging')
 
 		
 		# input files
