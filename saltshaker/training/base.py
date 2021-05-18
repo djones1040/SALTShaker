@@ -286,6 +286,8 @@ class TrainSALTBase:
 							help='phase range over which model is trained (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','n_components',  type=int,
 							help='number of principal components of the SALT model to fit for (default=%(default)s)')
+		parser.add_argument_with_config_default(config,'modelparams','host_component',	type=str,
+						    help="NOT IMPLEMENTED: if set, fit for a host component.  Must equal 'mass', for now (default=%(default)s)")
 		parser.add_argument_with_config_default(config,'modelparams','n_colorpars',	 type=int,
 							help='number of degrees of the phase-independent color law polynomial (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','n_colorscatpars',	 type=int,
@@ -329,7 +331,9 @@ class TrainSALTBase:
 						 'regulargradientwave':self.options.regulargradientwave,'regulardyad':self.options.regulardyad,
 						 'filter_mass_tolerance':self.options.filter_mass_tolerance,
 						 'specrange_wavescale_specrecal':self.options.specrange_wavescale_specrecal,
-						 'n_components':self.options.n_components,'n_colorpars':self.options.n_colorpars,
+						 'n_components':self.options.n_components,
+                         'host_component':self.options.host_component,
+                         'n_colorpars':self.options.n_colorpars,
 						 'n_colorscatpars':self.options.n_colorscatpars,
 						 'fix_t0':self.options.fix_t0,
 						 'regularize':self.options.regularize,
