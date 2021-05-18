@@ -59,6 +59,7 @@ if training_options.fast:
 	salt.options.fit_model_err = False
 	salt.options.fit_cdisp_only = False
 	salt.options.validate_modelonly = True
+	salt.options.maxsn = 10
 
 if salt.options.stage not in ['all','validate','train']:
     raise RuntimeError('stage must be one of all, validate, train')
