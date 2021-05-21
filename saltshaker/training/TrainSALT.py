@@ -228,7 +228,7 @@ class TrainSALT(TrainSALTBase):
 		n_params=parlist.size
 		guess = np.zeros(parlist.size)
 		if self.options.resume_from_outputdir:
-			log.info(f"resuming from output directory {self.options.outputdir}")
+			log.info(f"resuming from output directory {self.options.resume_from_outputdir}")
 			
 			names=None
 			for possibleDir in [self.options.resume_from_outputdir,self.options.outputdir]:
@@ -354,6 +354,10 @@ class TrainSALT(TrainSALTBase):
 	
 	def fitSALTModel(self,datadict):
 
+		# check for option inconsistency
+		if self.options.use_previous_errors and not self.options.resume_from_outputdir:
+			raise RuntimeError('resume_from_outputdir must be specified to use use_previous_errors option')
+
 		parlist,x_modelpars,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc = self.initialParameters(datadict)
 
 		saltfitkwargs = self.get_saltkw(phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc)
@@ -376,16 +380,16 @@ class TrainSALT(TrainSALTBase):
 			trainingresult,message = fitter.gaussnewton(
 					saltfitter,x_modelpars,
 					self.options.gaussnewton_maxiter,getdatauncertainties=False)
-			del saltfitter # free up memory before the uncertainty estimation
 
 			# get the errors
-			log.info('beginning error estimation loop')
-			self.fit_model_err = False
-			saltfitter_errs = saltfit.GaussNewton(trainingresult.X_raw,datadict,parlist,**saltfitkwargs)
-			trainingresult,message = fitter.gaussnewton(
+			if not self.options.use_previous_errors:
+				log.info('beginning error estimation loop')
+				self.fit_model_err = False
+				saltfitter_errs = saltfit.GaussNewton(trainingresult.X_raw,datadict,parlist,**saltfitkwargs)
+				trainingresult,message = fitter.gaussnewton(
 					saltfitter_errs,trainingresult.X_raw,
-					0,getdatauncertainties=True)
-
+					0,getdatauncertainties=not self.options.use_previous_errors)
+			else: saltfitter_errs = saltfitter
 			for k in datadict.keys():
 				trainingresult.SNParams[k]['t0'] = -trainingresult.SNParams[k]['tpkoff'] + datadict[k].tpk_guess
 		
@@ -440,14 +444,20 @@ class TrainSALT(TrainSALTBase):
 				for j,w in enumerate(trainingresult.wave):
 					print(f'{p:.1f} {w:.2f} {trainingresult.M0[i,j]:8.15e}',file=foutm0)
 					print(f'{p:.1f} {w:.2f} {trainingresult.M1[i,j]:8.15e}',file=foutm1)
-					print(f'{p:.1f} {w:.2f} {trainingresult.M0modelerr[i,j]**2.:8.15e}',file=foutm0modelerr)
-					print(f'{p:.1f} {w:.2f} {trainingresult.M1modelerr[i,j]**2.:8.15e}',file=foutm1modelerr)
-					print(f'{p:.1f} {w:.2f} {trainingresult.cov_M0_M1_model[i,j]:8.15e}',file=foutmodelcov)
-					print(f'{p:.1f} {w:.2f} {trainingresult.cov_M0_M1_data[i,j]+trainingresult.cov_M0_M1_model[i,j]:8.15e}',file=foutdatacov)
-					print(f'{p:.1f} {w:.2f} {trainingresult.modelerr[i,j]:8.15e}',file=fouterrmod)
-					print(f'{p:.1f} {w:.2f} {trainingresult.M0dataerr[i,j]**2.+trainingresult.M0modelerr[i,j]**2.:8.15e}',file=foutm0dataerr)
-					print(f'{p:.1f} {w:.2f} {trainingresult.M1dataerr[i,j]**2.+trainingresult.M1modelerr[i,j]**2.:8.15e}',file=foutm1dataerr)
-					
+					if not self.options.use_previous_errors:
+						print(f'{p:.1f} {w:.2f} {trainingresult.M0modelerr[i,j]**2.:8.15e}',file=foutm0modelerr)
+						print(f'{p:.1f} {w:.2f} {trainingresult.M1modelerr[i,j]**2.:8.15e}',file=foutm1modelerr)
+						print(f'{p:.1f} {w:.2f} {trainingresult.cov_M0_M1_model[i,j]:8.15e}',file=foutmodelcov)
+						print(f'{p:.1f} {w:.2f} {trainingresult.cov_M0_M1_data[i,j]+trainingresult.cov_M0_M1_model[i,j]:8.15e}',file=foutdatacov)
+						print(f'{p:.1f} {w:.2f} {trainingresult.modelerr[i,j]:8.15e}',file=fouterrmod)
+						print(f'{p:.1f} {w:.2f} {trainingresult.M0dataerr[i,j]**2.+trainingresult.M0modelerr[i,j]**2.:8.15e}',file=foutm0dataerr)
+						print(f'{p:.1f} {w:.2f} {trainingresult.M1dataerr[i,j]**2.+trainingresult.M1modelerr[i,j]**2.:8.15e}',file=foutm1dataerr)
+
+		if self.options.use_previous_errors:
+			for filename in ['salt3_lc_model_variance_0.dat','salt3_lc_model_variance_1.dat','salt3_lc_dispersion_scaling.dat',
+							 'salt3_lc_covariance_01.dat','salt3_lc_variance_0.dat','salt3_lc_variance_1.dat']:
+				os.system(f"cp {self.options.resume_from_outputdir}/{filename} {outdir}/{filename}")
+
 		with open(f'{outdir}/salt3_color_dispersion.dat','w') as foutclscat:
 			for j,w in enumerate(trainingresult.wave):
 				print(f'{w:.2f} {trainingresult.clscat[j]:8.15e}',file=foutclscat)

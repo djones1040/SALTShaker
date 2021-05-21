@@ -58,7 +58,7 @@ class ConfigWithCommandLineOverrideParser(EnvAwareArgumentParser):
 			if 'default' in kwargs:
 				pass
 			else:
-				raise KeyError(f'Key not found in {(config)}, section {section}; valid keys include: '+', '.join(keys))
+				raise KeyError(f'Key {includedkey} not found in {(config)}, section {section}; valid keys include: '+', '.join(keys))
 		if 'nargs' in kwargs and ((type(kwargs['nargs']) is int and kwargs['nargs']>1) or (type(kwargs['nargs'] is str and (kwargs['nargs'] in ['+','*'])))):
 			if not 'type' in kwargs:
 				kwargs['default']=kwargs['default'].split(',')
@@ -117,8 +117,7 @@ class TrainSALTBase:
 		parser.add_argument('--skip_validation', default=False, action="store_true",
 							help='skip making validation plots')
 		parser.add_argument('--fast', default=False, action="store_true",
-							help='FAST option for debugging')
-
+							help='if set, run in fast mode for debugging')
 		
 		# input files
 		parser.add_argument_with_config_default(config,'iodata','calibrationshiftfile',	 type=str,action=FullPaths,default='',
@@ -179,6 +178,9 @@ class TrainSALTBase:
 		#validation option
 		parser.add_argument_with_config_default(config,'iodata','validate_modelonly',  type=boolean_string,
 							help="""if set, only make model plots in the validation stage""")
+		# if resume_from_outputdir, use the errors from the previous run
+		parser.add_argument_with_config_default(config,'iodata','use_previous_errors',  type=boolean_string,
+							help="""if set, use the errors from the previous run instead of computing new ones (can be memory intensive)""")
 
 
 		parser.add_argument_with_config_default(config,'trainparams','gaussnewton_maxiter',	 type=int,
@@ -341,7 +343,8 @@ class TrainSALTBase:
 						 'model_err_max_chisq':self.options.model_err_max_chisq,
 						 'steps_between_errorfit':self.options.steps_between_errorfit,
 						 'fitTpkOff':self.options.fit_tpkoff,
-						 'spec_chi2_scaling':self.options.spec_chi2_scaling}
+						 'spec_chi2_scaling':self.options.spec_chi2_scaling,
+						 'use_previous_errors':self.options.use_previous_errors}
 		
 		for k in self.options.__dict__.keys():
 			if k.startswith('prior') or k.startswith('bound'):
