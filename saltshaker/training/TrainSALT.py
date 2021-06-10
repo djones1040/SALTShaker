@@ -29,7 +29,7 @@ from saltshaker.training.init_hsiao import init_hsiao, init_kaepora, init_errs,i
 from saltshaker.training.base import TrainSALTBase
 from saltshaker.training.saltfit import fitting
 from saltshaker.training import saltfit as saltfit
-from saltshaker.validation import ValidateParams
+from saltshaker.validation import ValidateParams,datadensity
 
 from saltshaker.data import data_rootdir
 from saltshaker.initfiles import init_rootdir
@@ -816,6 +816,10 @@ SIGMA_INT: 0.106  # used in simulation"""
 			datadict = self.mkcuts(datadict)[0]
 			log.info(f'took {time()-tcstart:.3f} to apply cuts')
 			
+			
+			phasebins=np.linspace(*self.options.phaserange,int((self.options.phaserange[1]-self.options.phaserange[0])/self.options.phasesplineres)+1,True)
+			wavebins=np.linspace(*self.options.waverange,int((self.options.waverange[1]-self.options.waverange[0])/self.options.wavesplineres)+1,True)
+			datadensity.datadensityplot(path.join(self.options.outputdir,'datadensity.pdf') ,phasebins,wavebins,datadict,self.kcordict)
 			# fit the model - initial pass
 			if self.options.stage == "all" or self.options.stage == "train":
 				# read the data
