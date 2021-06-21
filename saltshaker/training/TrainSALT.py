@@ -147,7 +147,9 @@ class TrainSALT(TrainSALTBase):
 				
 		phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
 			self.options.inithsiaofile,self.options.initbfilt,_flatnu,**init_options)
-
+		if self.options.host_component:
+			mhostknots = np.zeros(len(m0knots))
+		
 		if self.options.initsalt2model:
 			if self.options.initm0modelfile =='':
 				self.options.initm0modelfile=f'{init_rootdir}/salt2_template_0.dat'
@@ -169,7 +171,8 @@ class TrainSALT(TrainSALTBase):
 		init_options['wavesplineres'] = self.options.error_snake_wave_binsize
 		init_options['order']=self.options.errinterporder
 		init_options['n_colorscatpars']=self.options.n_colorscatpars
-
+			
+		
 		del init_options['use_snpca_knots']
 		if self.options.initsalt2var:
 			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs(
@@ -182,8 +185,14 @@ class TrainSALT(TrainSALTBase):
 			init_options['waveknotloc'] = waveknotloc
 			init_options['m0knots'] = m0knots
 			init_options['m1knots'] = m1knots
-			errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs_percent(**init_options)
-			
+			if self.options.host_component:
+				init_options['mhostknots'] = mhostknots
+
+			if not self.options.host_component:
+				errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs_percent(**init_options)
+			else:
+				errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,mhostvarknots,m0m1corrknots,clscatcoeffs=init_errs_percent(**init_options)
+				
 		# number of parameters
 		n_phaseknots,n_waveknots = len(phaseknotloc)-self.options.interporder-1,len(waveknotloc)-self.options.interporder-1
 		n_errphaseknots,n_errwaveknots = len(errphaseknotloc)-self.options.errinterporder-1,len(errwaveknotloc)-self.options.errinterporder-1
@@ -191,8 +200,10 @@ class TrainSALT(TrainSALTBase):
 
 		# set up the list of parameters
 		parlist = np.array(['m0']*(n_phaseknots*n_waveknots))
-		if self.options.n_components == 2:
+		if self.options.n_components >= 2:
 			parlist = np.append(parlist,['m1']*(n_phaseknots*n_waveknots))
+		if self.options.host_component:
+			parlist = np.append(parlist,['mhost']*(n_phaseknots*n_waveknots))
 		if self.options.n_colorpars:
 			parlist = np.append(parlist,['cl']*self.options.n_colorpars)
 		if self.options.error_snake_phase_binsize and self.options.error_snake_wave_binsize:
@@ -204,8 +215,12 @@ class TrainSALT(TrainSALTBase):
 			parlist = np.append(parlist,['clscat']*(self.options.n_colorscatpars))
 
 		# SN parameters
-		for k in datadict.keys():
-			parlist = np.append(parlist,['x0_%s'%k,'x1_%s'%k,'c_%s'%k,'tpkoff_%s'%k])
+		if self.options.host_component:
+			for k in datadict.keys():
+				parlist = np.append(parlist,[f'x0_{k}',f'x1_{k}',f'c_{k}',f'tpkoff_{k}'])
+		else:
+			for k in datadict.keys():
+				parlist = np.append(parlist,[f'x0_{k}',f'x1_{k}',f'xhost_{k}',f'c_{k}',f'tpkoff_{k}'])
 
 		if self.options.specrecallist:
 			spcrcldata = at.Table.read(self.options.specrecallist,format='ascii')
@@ -256,8 +271,10 @@ class TrainSALT(TrainSALTBase):
 			m0knots[m0knots == 0] = 1e-4
 			guess[parlist == 'm0'] = m0knots
 			for i in range(3): guess[parlist == 'modelerr_{}'.format(i)] = 1e-6 
-			if self.options.n_components == 2:
+			if self.options.n_components >= 2:
 				guess[parlist == 'm1'] = m1knots
+			if self.options.host_component:
+				guess[parlist == 'mhost'] = mhostknots
 			if self.options.n_colorpars:
 				if self.options.initsalt2model:
 					if self.options.n_colorpars == 4:
@@ -285,6 +302,7 @@ class TrainSALT(TrainSALTBase):
 			
 			guess[parlist=='modelerr_0']=m0varknots
 			guess[parlist=='modelerr_1']=m1varknots
+			if self.options.host_component: guess[parlist=='modelerr_host']=mhostvarknots
 			guess[parlist=='modelcorr_01']=m0m1corrknots
 
 			# if SN param list is provided, initialize with these params
@@ -302,6 +320,9 @@ class TrainSALT(TrainSALTBase):
 					if len(snpar[iSN]):
 						guess[parlist == 'x0_%s'%sn] = snpar['x0'][iSN]
 						guess[parlist == 'x1_%s'%sn] = snpar['x1'][iSN]
+						if self.options.host_component:
+							guess[parlist == f'x1_{sn}'] = snpar['xhost'][iSN]
+
 						guess[parlist == 'c_%s'%sn] = snpar['c'][iSN]
 					else:
 						log.warning(f'SN {sn} not found in SN par list {self.options.snparlist}')

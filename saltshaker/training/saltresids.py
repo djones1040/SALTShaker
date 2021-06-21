@@ -132,6 +132,7 @@ class SALTfitcacheSN(SALTtrainingSN):
 		
 		self.ix0=np.where(residsobj.parlist==f'x0_{self.snid}')[0][0]
 		self.ix1=np.where(residsobj.parlist==f'x1_{self.snid}')[0][0]
+		self.ixhost=np.where(residsobj.parlist==f'xhost_{self.snid}')[0][0]
 		self.ic=np.where(residsobj.parlist==f'c_{self.snid}')[0][0]
 		self.itpkoff=np.where(residsobj.parlist==f'tpkoff_{self.snid}')[0][0]
 		
@@ -359,7 +360,7 @@ class SALTResids:
 			
 	def set_param_indices(self):
 
-		self.parameters = ['x0','x1','c','m0','m1','spcrcl','spcrcl_norm','spcrcl_poly',
+		self.parameters = ['x0','x1','xhost','c','m0','m1','mhost','spcrcl','spcrcl_norm','spcrcl_poly',
 						   'modelerr','modelcorr','clscat','clscat_0','clscat_poly']
 		self.corrcombinations=sum([[(i,j) for j in range(i+1,self.n_components)]for i in range(self.n_components)] ,[])
 		self.m0min = np.min(np.where(self.parlist == 'm0')[0])
@@ -370,7 +371,8 @@ class SALTResids:
 		self.corrmax = tuple([np.max(np.where(self.parlist == 'modelcorr_{}{}'.format(i,j))[0]) for i,j in self.corrcombinations]) 
 		self.im0 = np.where(self.parlist == 'm0')[0]
 		self.im1 = np.where(self.parlist == 'm1')[0]
-
+		self.imhost = np.where(self.parlist == 'mhost')[0]
+		
 		wavemin = []
 		for i in range(self.im0.size):
 			wavemin += [self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),
@@ -379,8 +381,9 @@ class SALTResids:
 		self.im1new = np.where(self.parlist == 'm1')[0][np.array(wavemin) > 8500]
 		
 		self.iCL = np.where(self.parlist == 'cl')[0]
-		self.ix1 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x1')],dtype=int)
 		self.ix0 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x0') or si.startswith('specx0')],dtype=int)
+		self.ix1 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x1')],dtype=int)
+		self.ixhost = np.array([i for i, si in enumerate(self.parlist) if si.startswith('xhost')],dtype=int)
 		self.ic	 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('c_')],dtype=int)
 		self.itpk = np.array([i for i, si in enumerate(self.parlist) if si.startswith('tpkoff')],dtype=int)
 		self.ispcrcl_norm = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specx0')],dtype=int)
@@ -684,8 +687,8 @@ class SALTResids:
 		sndata=self.datadict[sn]
 		x1Deriv= varyParams[sndata.ix1] 
 		obsphase = sndata.obsphase #self.phase*(1+z)
-		x1,c,tpkoff = x[sndata.ix1],\
-						 x[sndata.ic],x[sndata.itpkoff]
+		x1,xhost,c,tpkoff = x[sndata.ix1],x[sndata.ixhost],\
+							x[sndata.ic],x[sndata.itpkoff]
 		colorexp= 10. ** (storedResults['colorLaw'] * c)
 		temporaryResults['colorexp'] =colorexp
 
@@ -695,16 +698,27 @@ class SALTResids:
 			tpkDerivs=varyParams[sndata.itpkoff]
 			
 			#Apply MW extinction
-			M0,M1 = storedResults['components']
+			
 					
 			prefactor=_SCALE_FACTOR/(1+z)*(sndata.mwextcurve[np.newaxis,:])
-			mod = prefactor*(M0 + x1*M1)
+			if self.host_component:
+				M0,M1,MHost = storedResults['components']
+				mod = prefactor*(M0 + x1*M1 + xhost*Mhost)
+			else:
+				M0,M1 = storedResults['components']
+				mod = prefactor*(M0 + x1*M1)
+				
 
-			temporaryResults['fluxInterp'] = mod #interp1d(obsphase,mod,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
+			temporaryResults['fluxInterp'] = mod
 			if x1Deriv:
 				int1dM1 = interp1d(obsphase,prefactor*M1,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
 				temporaryResults['M1Interp']=int1dM1
-				
+
+			# no fitting for xhost yet
+			#if xhostDeriv:
+			#	int1dMHost = interp1d(obsphase,prefactor*MHost,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
+			#	temporaryResults['MHostInterp']=int1dMHost
+			
 			if tpkDerivs:
 				M0phasederiv,M1phasederiv = storedResults['componentderivs']
 				phaseDeriv=prefactor*(M0phasederiv +x1*M1phasederiv)
@@ -726,7 +740,8 @@ class SALTResids:
 			saltErr=storedResults['saltErr']
 			saltCorr=storedResults['saltCorr'] 
 			modelUncertainty= prefactor**2 *(saltErr[0]**2	+ 2*x1* saltCorr[0]*saltErr[0]*saltErr[1] + x1**2 *saltErr[1]**2)
-
+			if self.host_component: modelUncertainty += prefactor**2.*xhost**2*saltErr[2]**2.
+			
 			temporaryResults['modelUncertainty']=modelUncertainty
 
 		returndicts=[]
@@ -744,7 +759,16 @@ class SALTResids:
 
 			uncertaintydict=storedResults[varkey]
 			returndicts+=[{key:{**valdict[key],**uncertaintydict[key]} for key in valdict}]
-		
+
+			#if self.debug:
+			#if sn == '1999ek' and name == 'phot' and len(np.where(varyParams)[0]):
+			#	import pylab as plt; plt.ion()
+			#	plt.clf()
+			#	plt.plot(valdict['O']['dataflux'],'o')
+			#	plt.plot(valdict['O']['modelflux'],'o')
+			#	plt.savefig('tmp.png')
+			#	import pdb; pdb.set_trace()
+            
 		return returndicts		
 	
 	def photValsForSN(self,x,sn,storedResults,temporaryResults,varyParams):
@@ -756,8 +780,8 @@ class SALTResids:
 		obsphase = sndata.obsphase #self.phase*(1+z)
 		wavedelt = obswave[1]-obswave[0]
 		phasedelt = obsphase[1]-obsphase[0]
-		x0,x1,c,tpkoff = x[sndata.ix0],x[sndata.ix1],\
-						 x[sndata.ic],x[sndata.itpkoff]
+		x0,x1,xhost,c,tpkoff = x[sndata.ix0],x[sndata.ix1],x[sndata.ixhost],\
+							   x[sndata.ic],x[sndata.itpkoff]
 		
 		x0Deriv= varyParams[sndata.ix0]
 		x1Deriv= varyParams[sndata.ix1]
@@ -866,8 +890,8 @@ class SALTResids:
 		obsphase = sndata.obsphase #self.phase*(1+z)
 		wavedelt = obswave[1]-obswave[0]
 		phasedelt = obsphase[1]-obsphase[0]
-		x1,c,tpkoff = x[sndata.ix1],\
-						 x[sndata.ic],x[sndata.itpkoff]
+		x1,xhost,c,tpkoff = x[sndata.ix1],x[sndata.ixhost],\
+						    x[sndata.ic],x[sndata.itpkoff]
 
 		x1Deriv= varyParams[sndata.ix1]
 		tpkDeriv=varyParams[sndata.itpkoff]
@@ -1238,20 +1262,35 @@ class SALTResids:
 						   n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]
 
 		
-		if self.n_components == 2:
+
+		if self.n_components >= 2 and self.n_components <= 3:
 			m1pars = x[self.im1]
 			if self.bsorder != 0:
 				m1 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
 							 self.wave if evaluateWave is None else evaluateWave,
 							 (self.phaseknotloc,self.waveknotloc,m1pars,self.bsorder,self.bsorder))
 			else:
-				m1 = np.repeat(np.repeat(m1pars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),n_repeat_phase,axis=0),n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]
+				m1 = np.repeat(
+					np.repeat(m1pars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),
+							  n_repeat_phase,axis=0),n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]
 
-			components = (m0,m1)
+			if self.n_components == 2:
+				components = (m0,m1)
+			else:
+				mhostpars = x[self.imhost]
+				if self.bsorder != 0:
+					m2 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
+								 self.wave if evaluateWave is None else evaluateWave,
+								 (self.phaseknotloc,self.waveknotloc,mhostpars,self.bsorder,self.bsorder))
+				else:
+					m2 = np.repeat(
+						np.repeat(mhostpars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),
+								  n_repeat_phase,axis=0),n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]
+				components = (m0,m1,mhost)
 		elif self.n_components == 1:
 			components = (m0,)
 		else:
-			raise RuntimeError('A maximum of two principal components is allowed')
+			raise RuntimeError('A maximum of three principal components is allowed')
 
 		return components
 
@@ -1267,17 +1306,26 @@ class SALTResids:
 		except:
 			import pdb; pdb.set_trace()
 			
-		if self.n_components == 2:
+		if self.n_components >= 2 and self.n_components <= 3:
 			m1pars = x[self.im1]
 			m1 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
 						 self.wave if evaluateWave is None else evaluateWave,
 						 (self.phaseknotloc,self.waveknotloc,m1pars,self.bsorder,self.bsorder),
 						 dx=dx,dy=dy)
-			components = (m0,m1)
+			if self.n_components == 2:
+				components = (m0,m1)
+			else:
+				mhostpars = x[self.imhost]
+				mhost = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
+							 self.wave if evaluateWave is None else evaluateWave,
+							 (self.phaseknotloc,self.waveknotloc,mhostpars,self.bsorder,self.bsorder),
+							 dx=dx,dy=dy)
+
+				components = (m0,m1,mhost)
 		elif self.n_components == 1:
 			components = (m0,)
 		else:
-			raise RuntimeError('A maximum of two principal components is allowed')
+			raise RuntimeError('A maximum of three principal components is allowed')
 			
 		return components
 
@@ -1369,8 +1417,11 @@ class SALTResids:
 							  'cerr':x[self.parlist == f'c_{k}'][0],
 							  'tpkofferr':x[self.parlist == f'tpkoff_{k}'][0]}				
 
-		m0,m1=self.SALTModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)
-
+		if self.host_component:
+			m0,m1,mhost=self.SALTModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)
+		else:
+			m0,m1=self.SALTModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)
+			
 		if not len(clpars): clpars = []
 
 		# model errors

@@ -201,6 +201,8 @@ class TrainSALTBase:
 							help='fit for time of max in B-band if set (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainparams','fitting_sequence',  type=str,
 							help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn, tpk (default=%(default)s)")
+		parser.add_argument_with_config_default(config,'trainparams','fitprobmin',  type=float,
+							help="Minimum FITPROB for including SNe (default=%(default)s)")
 
 
 		# survey definitions
@@ -345,7 +347,8 @@ class TrainSALTBase:
 						 'model_err_max_chisq':self.options.model_err_max_chisq,
 						 'steps_between_errorfit':self.options.steps_between_errorfit,
 						 'fitTpkOff':self.options.fit_tpkoff,
-						 'spec_chi2_scaling':self.options.spec_chi2_scaling}
+						 'spec_chi2_scaling':self.options.spec_chi2_scaling,
+						 'debug':self.options.debug}
 		
 		for k in self.options.__dict__.keys():
 			if k.startswith('prior') or k.startswith('bound'):
@@ -391,7 +394,7 @@ class TrainSALTBase:
 		SNCut('epochs near peak',1,lambda sn: sum([ ((sn.photdata[flt].phase > -10) & (sn.photdata[flt].phase < 5)).sum() for flt in sn.photdata])),
 		SNCut('epochs post peak',1,lambda sn: sum([	 ((sn.photdata[flt].phase > 5) & (sn.photdata[flt].phase < 20)).sum() for flt in sn.photdata])),
 		SNCut('filters near peak',2,lambda sn: sum([ (((sn.photdata[flt].phase > -8) & (sn.photdata[flt].phase < 10)).sum())>0 for flt in sn.photdata])),
-		SNCut('salt2 fitprob',1e-4,	 checkfitprob)]
+		SNCut('salt2 fitprob',self.options.fitprobmin,checkfitprob)]
 		if self.options.keeponlyspec:
 			cuts+=[ SNCut('spectra', 1, lambda sn: sn.num_spec)]
 		return cuts
@@ -456,7 +459,7 @@ class TrainSALTBase:
 				cutdict[snid]=sn
 			else:
 				outdict[snid]=sn
-			
+
 		finaldemos =[sumattr(attr,outdict) for attr in attrs]
 		sncutdemos =[sumattr(attr,cutdict) for attr in attrs]
 		for attr,desc,initial,final,cut in zip(attrs,descriptions,initialdemos,finaldemos,sncutdemos):
