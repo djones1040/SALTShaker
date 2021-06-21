@@ -475,14 +475,13 @@ class TrainSALT(TrainSALTBase):
 						print(f'{p:.1f} {w:.2f} {trainingresult.M1dataerr[i,j]**2.+trainingresult.M1modelerr[i,j]**2.:8.15e}',file=foutm1dataerr)
 
 		if self.options.use_previous_errors and self.options.resume_from_outputdir:
-			for filename in ['salt3_lc_model_variance_0.dat','salt3_lc_model_variance_1.dat','salt3_lc_dispersion_scaling.dat',
+			for filename in ['salt3_lc_variance_0.dat','salt3_lc_variance_1.dat',
 							 'salt3_lc_covariance_01.dat','salt3_lc_variance_0.dat','salt3_lc_variance_1.dat']:
 				os.system(f"cp {self.options.resume_from_outputdir}/{filename} {outdir}/{filename}")
 		elif self.options.use_previous_errors and self.options.error_dir:
-			for filename in ['salt3_lc_model_variance_0.dat','salt3_lc_model_variance_1.dat','salt3_lc_dispersion_scaling.dat',
+			for filename in ['salt3_lc_variance_0.dat','salt3_lc_variance_1.dat',
 							 'salt3_lc_covariance_01.dat','salt3_lc_variance_0.dat','salt3_lc_variance_1.dat']:
 				os.system(f"cp {self.options.error_dir}/{filename} {outdir}/{filename}")
-
 				
 		with open(f'{outdir}/salt3_color_dispersion.dat','w') as foutclscat:
 			for j,w in enumerate(trainingresult.wave):
