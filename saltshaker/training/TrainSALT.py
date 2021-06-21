@@ -376,7 +376,6 @@ class TrainSALT(TrainSALTBase):
 	def fitSALTModel(self,datadict):
 
 		# check for option inconsistency
-		import pdb; pdb.set_trace()
 		if self.options.use_previous_errors and not self.options.resume_from_outputdir and not self.options.error_dir:
 			raise RuntimeError('resume_from_outputdir or error_dir must be specified to use use_previous_errors option')
 
