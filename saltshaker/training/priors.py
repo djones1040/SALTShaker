@@ -312,7 +312,41 @@ class SALTPriors:
 		jacobian=fluxDeriv/ (bStdFlux* width)
 		
 		return residual,m1flux/bStdFlux,jacobian
-	
+
+	@prior
+	def hostpeakprior(self,width,x,components):
+		"""host component should have zero flux at t=0 in the B band.  Not sure if needed"""
+		pbspl=(self.kcordict['default']['Bpbspl']*(self.wave[1]-self.wave[0])*self.fluxfactor['default']['B'])[np.newaxis,:]
+		int1d = interp1d(self.phase,components[2],axis=0,assume_sorted=True)
+		m1flux = np.sum(pbspl*int1d([0]), axis=1)
+		bStdFlux=(10**((self.m0guess-27.5)/-2.5) )
+		residual = (m1flux) / (width*bStdFlux)
+		#This derivative is constant, and never needs to be recalculated, so I store it in a hidden attribute
+		try:
+			fluxDeriv= self.__m1priorfluxderiv__.copy()
+		except:
+			fluxDeriv= np.zeros((pbspl.shape[0],self.npar))
+			for i in range(self.im1.size):
+				waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+				phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
+				#Check if this filter is inside values affected by changes in knot i
+				minlam=min([np.min(self.kcordict['default'][filt+'wave'][self.kcordict['default'][filt+'tp'] > 0.01]) for filt in ['B']]) 
+				maxlam=max([np.max(self.kcordict['default'][filt+'wave'][self.kcordict['default'][filt+'tp'] > 0.01]) for filt in ['B']]) 
+				if waverange[0] > maxlam or waverange[1] < minlam:
+					pass
+				if (0>=phaserange[0] ) & (0<=phaserange[1]):
+					#Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
+					#Integrate only over wavelengths within the relevant range
+					inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
+					derivInterp = interp1d(self.phase,self.regularizationDerivs[0][:,inbounds,i],axis=0,kind=self.interpMethod,bounds_error=False,fill_value="extrapolate",assume_sorted=True)
+					fluxDeriv[:,self.im1[i]] = np.sum( pbspl[:,inbounds]* derivInterp([0]),axis=1) 
+			self.__m1priorfluxderiv__=fluxDeriv.copy()
+		
+		jacobian=fluxDeriv/ (bStdFlux* width)
+		
+		return residual,m1flux/bStdFlux,jacobian
+
+    
 	@prior
 	def recalprior(self,width,x,components):
 		"""Prior on all spectral recalibration"""
@@ -363,7 +397,19 @@ class SALTPriors:
 		jacobian=np.zeros(self.npar)
 		jacobian[self.ix1] = 1/len(self.datadict.keys())/width
 		return residual,x1mean,jacobian
-		
+
+    # for now host coords should be fixed
+    # but in future can allow these to change within their measurement uncertainties
+	#@prior
+	#def xhostmean(self,width,x,components):
+	#	"""Prior such that the host coordinate squared is 1"""
+	#	xhost=(x[self.ixhost]**2.-1)
+	#	residual = xhosttot/width
+	#	jacobian=np.zeros(self.npar)
+	#	jacobian[self.ixhost] = 2*x[self.ixhost]/width # 1/len(self.datadict.keys())/width
+	#	return residual,xhost,jacobian
+
+    
 	@prior
 	def x1std(self,width,x,components):
 		"""Prior such that the standard deviation of the x1 population is 1"""
