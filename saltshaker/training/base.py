@@ -58,7 +58,7 @@ class ConfigWithCommandLineOverrideParser(EnvAwareArgumentParser):
 			if 'default' in kwargs:
 				pass
 			else:
-				raise KeyError(f'Key {includedkey} not found in {(config)}, section {section}; valid keys include: '+', '.join(keys))
+				raise KeyError(f'Key {keys[0]} not found in section {section}; valid keys include: '+', '.join(keys))
 		if 'nargs' in kwargs and ((type(kwargs['nargs']) is int and kwargs['nargs']>1) or (type(kwargs['nargs'] is str and (kwargs['nargs'] in ['+','*'])))):
 			if not 'type' in kwargs:
 				kwargs['default']=kwargs['default'].split(',')
