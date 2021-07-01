@@ -1,0 +1,28 @@
+DOCUMENTATION:
+    PURPOSE: Keplercam filter transmissions used in training of SALT2.JLA-B14
+    REF:
+    - AUTHOR:  Kenworthy et al., 2021
+      ADS:     in pre.
+    INTENT:  Nominal
+    USAGE_KEY:  FILTER
+    USAGE_CODE: kcor.exe
+    VALIDATE_SCIENCE: Kenworthy et al. 2021 (SALT3) , Betoule et al. 2014 (SALT2.4)
+    NOTES
+    - Accurate measurements of the natural KeplerCam U-band are missing. We use measurements color corrected to the Landolt system, and call this band Us.
+    - used in calib-input files in $SNDATA_ROOT/kcor/SALT3TRAIN
+    VERSIONS:
+    - AUTHOR: D. Jones
+      DATE:  2021
+DOCUMENTATION_END:
+
+# ========================
+# Notes from SALT2.4 (instrument.cards)
+
+# hope mirror area does not matter
+@MIRROR_AREA 1.
+# transmission of the optics
+@OPTICS_TRANS 1
+# reflectivity of the mirror
+@MIRROR_REFLECTIVITY 1
+# QE of CCD's
+@QE 1

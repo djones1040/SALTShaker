@@ -13,11 +13,14 @@ Overview
 
 SALT is a model of Type Ia supernovae (SNe Ia)
 that accounts for spectral variations as
-a function of shape and color (Guy et al., 
-2007; Guy et al., 2010; Betoule et al., 2014).
+a function of shape and color
+(`Guy et al., 2007 <https://ui.adsabs.harvard.edu/abs/2007A%26A...466...11G/abstract>`_;
+`Guy et al., 2010 <https://ui.adsabs.harvard.edu/abs/2010A%26A...523A...7G/abstract>`_;
+`Betoule et al., 2014 <https://ui.adsabs.harvard.edu/abs/2014A%26A...568A..22B/abstract>`_).
 With SALTShaker we have developed an open-source
 model training framework and created the "SALT3" model.
-We more than doubled the amount of photometric and spectroscopic data used for model training and
+We more than doubled the amount of photometric and
+spectroscopic data used for model training and
 have extended the SALT framework to 11,000 Angstroms.  SALT3 will make use
 of *iz* data from PS1, the Vera Rubin Observatory,
 and the *Nancy Grace Roman Space Telescope* and can be re-trained easily in
@@ -30,10 +33,12 @@ SALT3 Model and Training Data
 
 The first version of the SALT3 model has been released in:
     
-Kenworthy et al., 2021, ApJ, submitted
+`Kenworthy et al., 2021, ApJ, submitted <https://arxiv.org/abs/2104.07795>`_
 
 The SALT3 model files are linked `here <_static/salt3-k21.tar.gz>`_.
-SALT3 light curve fits can be performed using `sncosmo <https://sncosmo.readthedocs.io/en/latest/>`_ or `SNANA <https://snana.uchicago.edu/>`_ with the SALT3.K21
+SALT3 light curve fits can be performed using `sncosmo <https://sncosmo.readthedocs.io/en/latest/>`_ 
+(currently the `latest version <https://github.com/sncosmo/sncosmo>`_ on GitHub is required)
+or `SNANA <https://snana.uchicago.edu/>`_ with the SALT3.K21
 model, with a brief sncosmo example given below.
 
 The SALT3 training data is also fully public and included `here <_static/SALT3TRAIN_K21_PUBLIC.tgz>`_.  This release includes all photometry and spectra
@@ -50,7 +55,16 @@ Example SALT3 Fit
 Fitting SN Ia data with SALT3 can be done through the sncosmo or
 SNANA software packages.  With sncosmo, the fitting can be performed
 in nearly the exact same way as SALT2.  Here is the example from the sncosmo
-documentation, altered to use the SALT3 model::
+documentation, altered to use the SALT3 model.  First, install the latest
+version of sncosmo; SALT3 is included beginning in version 2.5.0::
+
+  conda install -c conda-forge sncosmo
+
+or::
+  
+  pip install sncosmo
+
+Then, in a python terminal::
 
   import sncosmo
   data = sncosmo.load_example_data()

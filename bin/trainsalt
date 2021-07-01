@@ -54,6 +54,13 @@ salt.options = training_options
 salt.verbose = training_options.verbose
 salt.clobber = training_options.clobber
 
+if training_options.fast:
+	salt.options.gaussnewton_maxiter = 1
+	salt.options.fit_model_err = False
+	salt.options.fit_cdisp_only = False
+	salt.options.validate_modelonly = True
+	salt.options.maxsn = 10
+
 if salt.options.stage not in ['all','validate','train']:
     raise RuntimeError('stage must be one of all, validate, train')
 	

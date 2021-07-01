@@ -1,0 +1,168 @@
+##SALT3 INPUT
+[pipeline]
+n_lcfit = 20 
+n_biascorlcfit = 20 
+genversion_split = 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19
+genversion_split_biascor = 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19
+plotdir = figs
+[data]
+snlists=SALT3_training_data/SALT3_training.LIST
+[training]
+pro=trainsalt
+proargs = -c
+baseinput=Train_SALT3.conf,
+labels=main,
+prooptions =
+#--stage validate
+outinput=pipeline/Train_SALT3.conf,
+set_key=4
+        main trainparams fitsalt2 False
+        main trainparams fit_tpkoff False
+        main trainparams gaussnewton_maxiter 15
+        main iodata maxsn 500
+    
+[lcfitting]
+pro=snlc_fit.exe
+baseinput=lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml,lcfitting/snfit_base.nml
+outinput=pipeline/Hamuy1996_LC.NML,pipeline/Riess1999_LC.NML,pipeline/SNLS3_LC.NML,pipeline/SDSS.NML,pipeline/Hicken2009_LC.NML,pipeline/OTHER_LOWZ_LC.NML,pipeline/Jha2006_LC.NML,pipeline/Pantheon_PS1MD_TEXT.NML,pipeline/Foundation_DR1.NML,pipeline/DES-SN3YR_DES.NML,pipeline/Hamuy1996_LC_SALT2.NML,pipeline/Riess1999_LC_SALT2.NML,pipeline/SNLS3_LC_SALT2.NML,pipeline/SDSS_SALT2.NML,pipeline/Hicken2009_LC_SALT2.NML,pipeline/OTHER_LOWZ_LC_SALT2.NML,pipeline/Jha2006_LC_SALT2.NML,pipeline/Pantheon_PS1MD_TEXT_SALT2.NML,pipeline/Foundation_DR1_SALT2.NML,pipeline/DES-SN3YR_DES_SALT2.NML
+batch=False
+validplots=False
+prooptions=
+set_key=4
+     0 FITINP FILTLIST_FIT UBVRIfhjkl
+     0 SNLCINP KCOR_FILE /Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/kcor/SALT3TRAIN_K21/kcor_OTHER_LOWZ.fits
+     0 FITINP FITMODEL_NAME $SALT3/examples/SALT3_training_v1.0/SALT3.K21
+     0 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_Hamuy1996
+     0 SNLCINP TEXTFILE_PREFIX fit_output/Hamuy1996_LC
+     0 FITINP FILTLIST_FIT BVRI
+     1 HEADER OUTDIR Riess1999_LC
+     1 HEADER VERSION Riess1999_LC
+     1 FITINP FILTLIST_FIT UBVRI
+     1 SNLCINP KCOR_FILE /Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/kcor/SALT3TRAIN_K21/kcor_OTHER_LOWZ.fits
+     1 FITINP FITMODEL_NAME $SALT3/examples/SALT3_training_v1.0/SALT3.K21
+     1 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_Riess1999
+     1 SNLCINP TEXTFILE_PREFIX fit_output/Riess1999_LC
+     2 HEADER OUTDIR SNLS3_LC
+     2 HEADER VERSION SNLS3_LC
+     2 FITINP FILTLIST_FIT griz
+     2 SNLCINP KCOR_FILE /Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/kcor/SALT3TRAIN_K21/kcor_SNLS3.fits
+     2 FITINP FITMODEL_NAME $SALT3/examples/SALT3_training_v1.0/SALT3.K21
+     2 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_SNLS3
+     2 SNLCINP TEXTFILE_PREFIX fit_output/SNLS3_LC
+     3 HEADER OUTDIR SDSS
+     3 HEADER VERSION SDSS
+     3 FITINP FILTLIST_FIT ugriz
+     3 SNLCINP KCOR_FILE $SALT3/saltshaker/data/kcor/kcor_SDSS_Swope_Keplercam_stupidsnana.fits
+     3 FITINP FITMODEL_NAME $SALT3/examples/SALT3_training_v1.0/SALT3.K21
+     3 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_SDSS
+     3 SNLCINP TEXTFILE_PREFIX fit_output/SDSS
+     4 HEADER OUTDIR Hicken2009_LC
+     4 HEADER VERSION Hicken2009_LC
+     4 FITINP FILTLIST_FIT UBVRIfhjklabcde
+     4 SNLCINP KCOR_FILE /Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/kcor/SALT3TRAIN_K21/kcor_Hicken2009.fits
+     4 FITINP FITMODEL_NAME $SALT3/examples/SALT3_training_v1.0/SALT3.K21
+     4 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_Hicken2009
+     4 SNLCINP TEXTFILE_PREFIX fit_output/Hicken2009_LC
+     5 HEADER OUTDIR OTHER_LOWZ_LC
+     5 HEADER VERSION OTHER_LOWZ_LC
+     5 FITINP FILTLIST_FIT ABIRUVtuvyz
+     5 SNLCINP KCOR_FILE  /Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/kcor/SALT3TRAIN_K21/kcor_OTHER_LOWZ.fits
+     5 FITINP FITMODEL_NAME $SALT3/examples/SALT3_training_v1.0/SALT3.K21
+     5 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_OTHER_LOWZ
+     5 SNLCINP TEXTFILE_PREFIX fit_output/OTHER_LOWZ_LC
+     6 HEADER OUTDIR Jha2006_LC
+     6 HEADER VERSION Jha2006_LC
+     6 FITINP FILTLIST_FIT UBVRI
+     6 SNLCINP KCOR_FILE /Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/kcor/SALT3TRAIN_K21/kcor_OTHER_LOWZ.fits
+     6 FITINP FITMODEL_NAME $SALT3/examples/SALT3_training_v1.0/SALT3.K21
+     6 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_Jha2006
+     6 SNLCINP TEXTFILE_PREFIX fit_output/Jha2006_LC
+     7 HEADER OUTDIR Pantheon_PS1MD_TEXT
+     7 HEADER VERSION Pantheon_PS1MD_TEXT
+     7 FITINP FILTLIST_FIT griz
+     7 SNLCINP KCOR_FILE /Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/kcor/SALT3TRAIN_K21/kcor_PS1MD.fits
+     7 FITINP FITMODEL_NAME $SALT3/examples/SALT3_training_v1.0/SALT3.K21
+     7 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_PS1MD
+     7 SNLCINP TEXTFILE_PREFIX fit_output/Pantheon_PS1MD_TEXT
+     8 HEADER OUTDIR Foundation_DR1
+     8 HEADER VERSION Foundation_DR1
+     8 FITINP FILTLIST_FIT griz
+     8 SNLCINP KCOR_FILE /Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/kcor/SALT3TRAIN_K21/kcor_Foundation_DR1.fits
+     8 FITINP FITMODEL_NAME $SALT3/examples/SALT3_training_v1.0/SALT3.K21
+     8 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_Foundation_DR1
+     8 SNLCINP TEXTFILE_PREFIX fit_output/Foundation_DR1
+     9 HEADER OUTDIR DES-SN3YR_DES
+     9 HEADER VERSION DES-SN3YR_DES
+     9 FITINP FILTLIST_FIT griz
+     9 SNLCINP KCOR_FILE /Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/kcor/SALT3TRAIN_K21/kcor_DESSN3YR.fits
+     9 FITINP FITMODEL_NAME $SALT3/examples/SALT3_training_v1.0/SALT3.K21
+     9 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_DESSN3YR
+     9 SNLCINP TEXTFILE_PREFIX fit_output/DES-SN3YR_DES
+    10 FITINP FILTLIST_FIT BVRI
+    10 SNLCINP KCOR_FILE /Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/kcor/SALT3TRAIN_K21/kcor_OTHER_LOWZ.fits
+    10 FITINP FITMODEL_NAME SALT2.JLA-B14
+    10 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_Hamuy1996
+    10 SNLCINP TEXTFILE_PREFIX fit_output/Hamuy1996_LC_SALT2
+    11 HEADER OUTDIR Riess1999_LC
+    11 HEADER VERSION Riess1999_LC
+    11 FITINP FILTLIST_FIT UBVRI
+    11 SNLCINP KCOR_FILE /Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/kcor/SALT3TRAIN_K21/kcor_OTHER_LOWZ.fits
+    11 FITINP FITMODEL_NAME SALT2.JLA-B14
+    11 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_Riess1999
+    11 SNLCINP TEXTFILE_PREFIX fit_output/Riess1999_LC_SALT2
+    12 HEADER OUTDIR SNLS3_LC
+    12 HEADER VERSION SNLS3_LC
+    12 FITINP FILTLIST_FIT griz
+    12 SNLCINP KCOR_FILE /Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/kcor/SALT3TRAIN_K21/kcor_SNLS3.fits
+    12 FITINP FITMODEL_NAME SALT2.JLA-B14
+    12 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_SNLS3
+    12 SNLCINP TEXTFILE_PREFIX fit_output/SNLS3_LC_SALT2
+    13 HEADER OUTDIR SDSS
+    13 HEADER VERSION SDSS
+    13 FITINP FILTLIST_FIT ugriz
+    13 SNLCINP KCOR_FILE $SALT3/saltshaker/data/kcor/kcor_SDSS_Swope_Keplercam_stupidsnana.fits
+    13 FITINP FITMODEL_NAME SALT2.JLA-B14
+    13 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_SDSS
+    13 SNLCINP TEXTFILE_PREFIX fit_output/SDSS_SALT2
+    14 HEADER OUTDIR Hicken2009_LC
+    14 HEADER VERSION Hicken2009_LC
+    14 FITINP FILTLIST_FIT UBVRIfhjklabcde
+    14 SNLCINP KCOR_FILE /Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/kcor/SALT3TRAIN_K21/kcor_Hicken2009.fits
+    14 FITINP FITMODEL_NAME SALT2.JLA-B14
+    14 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_Hicken2009
+    14 SNLCINP TEXTFILE_PREFIX fit_output/Hicken2009_LC_SALT2
+    15 HEADER OUTDIR OTHER_LOWZ_LC
+    15 HEADER VERSION OTHER_LOWZ_LC
+    15 FITINP FILTLIST_FIT ABIRUVtuvy
+    15 SNLCINP KCOR_FILE /Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/kcor/SALT3TRAIN_K21/kcor_OTHER_LOWZ.fits
+    15 FITINP FITMODEL_NAME SALT2.JLA-B14
+    15 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_OTHER_LOWZ
+    15 SNLCINP TEXTFILE_PREFIX fit_output/OTHER_LOWZ_LC_SALT2
+    16 HEADER OUTDIR Jha2006_LC
+    16 HEADER VERSION Jha2006_LC
+    16 FITINP FILTLIST_FIT UBVRI
+    16 SNLCINP KCOR_FILE /Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/kcor/SALT3TRAIN_K21/kcor_OTHER_LOWZ.fits
+    16 FITINP FITMODEL_NAME SALT2.JLA-B14
+    16 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_Jha2006
+    16 SNLCINP TEXTFILE_PREFIX fit_output/Jha2006_LC_SALT2
+    17 HEADER OUTDIR Pantheon_PS1MD_TEXT
+    17 HEADER VERSION Pantheon_PS1MD_TEXT
+    17 FITINP FILTLIST_FIT griz
+    17 SNLCINP KCOR_FILE /Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/kcor/SALT3TRAIN_K21/kcor_PS1MD.fits
+    17 FITINP FITMODEL_NAME SALT2.JLA-B14
+    17 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_PS1MD
+    17 SNLCINP TEXTFILE_PREFIX fit_output/Pantheon_PS1MD_TEXT_SALT2
+    18 HEADER OUTDIR Foundation_DR1
+    18 HEADER VERSION Foundation_DR1
+    18 FITINP FILTLIST_FIT griz
+    18 SNLCINP KCOR_FILE /Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/kcor/SALT3TRAIN_K21/kcor_Foundation_DR1.fits
+    18 FITINP FITMODEL_NAME SALT2.JLA-B14
+    18 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_Foundation_DR1
+    18 SNLCINP TEXTFILE_PREFIX fit_output/Foundation_DR1_SALT2
+    19 HEADER OUTDIR DES-SN3YR_DES
+    19 HEADER VERSION DES-SN3YR_DES
+    19 FITINP FILTLIST_FIT griz
+    19 SNLCINP KCOR_FILE /Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/kcor/SALT3TRAIN_K21/kcor_DESSN3YR.fits
+    19 FITINP FITMODEL_NAME SALT2.JLA-B14
+    19 SNLCINP VERSION_PHOTOMETRY SALT3TRAIN_K21_DESSN3YR
+    19 SNLCINP TEXTFILE_PREFIX fit_output/DES-SN3YR_DES_SALT2

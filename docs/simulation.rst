@@ -1,14 +1,17 @@
-***********************
-Creating Simulated Data
-***********************
+***********************************
+Flexible Simulated Data with BYOSED
+***********************************
 
-BYO SED
-=======
+"Build Your Own" SED
+====================
 
 The BYOSED framework allows any spectrophotometric model to be used
 as the underlying template to generate simulated Type Ia light curve data
-with SNANA. By default, this model is the Hsiao+07 model (initfiles/Hsiao07.dat).
-This can be replaced by any model
+with SNANA. 
+This framework is published in 
+`Pierel et al., 2021 <https://ui.adsabs.harvard.edu/abs/2020arXiv201207811P/abstract>`_.
+By default, this model is the Hsiao+07 model (initfiles/Hsiao07.dat).
+This can be replaced by any model.
 
 
 Param File Basics

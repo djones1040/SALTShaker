@@ -51,14 +51,15 @@ class ConfigWithCommandLineOverrideParser(EnvAwareArgumentParser):
 			for key in keys:
 				if key in config[section]:
 					return key,config[section][key]
-			raise KeyError
+			raise KeyError(f'key {key} not found in section {section} of config file')
+
 		try:
 			includedkey,kwargs['default']=checkforflagsinconfig()
 		except KeyError:
 			if 'default' in kwargs:
 				pass
 			else:
-				raise KeyError(f'Key not found in {(config)}, section {section}; valid keys include: '+', '.join(keys))
+				raise KeyError(f'Key {keys[0]} not found in section {section}; valid keys include: '+', '.join(keys))
 		if 'nargs' in kwargs and ((type(kwargs['nargs']) is int and kwargs['nargs']>1) or (type(kwargs['nargs'] is str and (kwargs['nargs'] in ['+','*'])))):
 			if not 'type' in kwargs:
 				kwargs['default']=kwargs['default'].split(',')
@@ -116,7 +117,8 @@ class TrainSALTBase:
 							help='stage - options are train and validate')
 		parser.add_argument('--skip_validation', default=False, action="store_true",
 							help='skip making validation plots')
-
+		parser.add_argument('--fast', default=False, action="store_true",
+							help='if set, run in fast mode for debugging')
 		
 		# input files
 		parser.add_argument_with_config_default(config,'iodata','calibrationshiftfile',	 type=str,action=FullPaths,default='',
@@ -171,12 +173,18 @@ class TrainSALTBase:
 							help='if set, initialize using output parameters from previous run. If directory, initialize using ouptut parameters from specified directory')
 		parser.add_argument_with_config_default(config,'iodata','resume_from_gnhistory',  type=str,action=FullPaths,
 							help='if set, initialize using output parameters from previous run saved in gaussnewtonhistory.pickle file.')
+		parser.add_argument_with_config_default(config,'iodata','error_dir', default='',type=str,action=FullPaths,
+							help='directory with previous error files, to use with --use_previous_errors option')
 
+		
 		parser.add_argument_with_config_default(config,'iodata','fix_salt2modelpars',  type=boolean_string,
 							help="""if set, fix M0/M1 for wavelength/phase range of original SALT2 model (default=%(default)s)""")
 		#validation option
 		parser.add_argument_with_config_default(config,'iodata','validate_modelonly',  type=boolean_string,
 							help="""if set, only make model plots in the validation stage""")
+		# if resume_from_outputdir, use the errors from the previous run
+		parser.add_argument_with_config_default(config,'iodata','use_previous_errors',	type=boolean_string,
+							help="""if set, use the errors from the previous run instead of computing new ones (can be memory intensive)""")
 
 
 		parser.add_argument_with_config_default(config,'trainparams','gaussnewton_maxiter',	 type=int,
@@ -199,6 +207,8 @@ class TrainSALTBase:
 							help='fit for time of max in B-band if set (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'trainparams','fitting_sequence',  type=str,
 							help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn, tpk (default=%(default)s)")
+		parser.add_argument_with_config_default(config,'trainparams','fitprobmin',	type=float,
+							help="Minimum FITPROB for including SNe (default=%(default)s)")
 
 
 		# survey definitions
@@ -286,6 +296,8 @@ class TrainSALTBase:
 							help='phase range over which model is trained (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','n_components',  type=int,
 							help='number of principal components of the SALT model to fit for (default=%(default)s)')
+		parser.add_argument_with_config_default(config,'modelparams','host_component',	type=str,
+							help="NOT IMPLEMENTED: if set, fit for a host component.  Must equal 'mass', for now (default=%(default)s)")
 		parser.add_argument_with_config_default(config,'modelparams','n_colorpars',	 type=int,
 							help='number of degrees of the phase-independent color law polynomial (default=%(default)s)')
 		parser.add_argument_with_config_default(config,'modelparams','n_colorscatpars',	 type=int,
@@ -329,7 +341,9 @@ class TrainSALTBase:
 						 'regulargradientwave':self.options.regulargradientwave,'regulardyad':self.options.regulardyad,
 						 'filter_mass_tolerance':self.options.filter_mass_tolerance,
 						 'specrange_wavescale_specrecal':self.options.specrange_wavescale_specrecal,
-						 'n_components':self.options.n_components,'n_colorpars':self.options.n_colorpars,
+						 'n_components':self.options.n_components,
+						 'host_component':self.options.host_component,
+						 'n_colorpars':self.options.n_colorpars,
 						 'n_colorscatpars':self.options.n_colorscatpars,
 						 'fix_t0':self.options.fix_t0,
 						 'regularize':self.options.regularize,
@@ -339,7 +353,9 @@ class TrainSALTBase:
 						 'model_err_max_chisq':self.options.model_err_max_chisq,
 						 'steps_between_errorfit':self.options.steps_between_errorfit,
 						 'fitTpkOff':self.options.fit_tpkoff,
-						 'spec_chi2_scaling':self.options.spec_chi2_scaling}
+						 'spec_chi2_scaling':self.options.spec_chi2_scaling,
+						 'debug':self.options.debug,
+						 'use_previous_errors':self.options.use_previous_errors}
 		
 		for k in self.options.__dict__.keys():
 			if k.startswith('prior') or k.startswith('bound'):
@@ -385,7 +401,7 @@ class TrainSALTBase:
 		SNCut('epochs near peak',1,lambda sn: sum([ ((sn.photdata[flt].phase > -10) & (sn.photdata[flt].phase < 5)).sum() for flt in sn.photdata])),
 		SNCut('epochs post peak',1,lambda sn: sum([	 ((sn.photdata[flt].phase > 5) & (sn.photdata[flt].phase < 20)).sum() for flt in sn.photdata])),
 		SNCut('filters near peak',2,lambda sn: sum([ (((sn.photdata[flt].phase > -8) & (sn.photdata[flt].phase < 10)).sum())>0 for flt in sn.photdata])),
-		SNCut('salt2 fitprob',1e-4,	 checkfitprob)]
+		SNCut('salt2 fitprob',self.options.fitprobmin,checkfitprob)]
 		if self.options.keeponlyspec:
 			cuts+=[ SNCut('spectra', 1, lambda sn: sn.num_spec)]
 		return cuts
@@ -450,7 +466,7 @@ class TrainSALTBase:
 				cutdict[snid]=sn
 			else:
 				outdict[snid]=sn
-			
+
 		finaldemos =[sumattr(attr,outdict) for attr in attrs]
 		sncutdemos =[sumattr(attr,cutdict) for attr in attrs]
 		for attr,desc,initial,final,cut in zip(attrs,descriptions,initialdemos,finaldemos,sncutdemos):

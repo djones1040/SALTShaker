@@ -1,0 +1,16 @@
+DOCUMENTATION:
+    PURPOSE: Pan-STARRS filtered modified for the color bias caused by PSF photometry
+    REF:
+    - AUTHOR:  Jones et al., 2019
+      ADS:     https://ui.adsabs.harvard.edu/abs/2019ApJ...881...19J/abstract
+    INTENT:  Nominal
+    USAGE_KEY:  FILTER
+    USAGE_CODE: kcor.exe
+    VALIDATE_SCIENCE: Jones et al.  2019; Kenworthy et al., 2021
+    NOTES
+    - warped g-band corrects known color bias in PSF photometry (Guy et al. 2010, Jones et al. 2019)
+    - used in PS1/Foundation single-telescope analysis and in training of SALT3 model
+    VERSIONS:
+    - AUTHOR: D. Jones
+      DATE:  2021
+DOCUMENTATION_END:
