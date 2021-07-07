@@ -285,7 +285,7 @@ class SALT3pipe():
             try:
                 outnamelist = []
                 for p in self.pipepros:
-                    prooutname = self._get_pipepro_from_string(p).outname if not isinstance(p,list) else [pi.outname for pi in self._get_pipepro_from_string(p)]
+                    prooutname = self._get_pipepro_from_string(p).outname if not isinstance(self._get_pipepro_from_string(p),list) else [pi.outname for pi in self._get_pipepro_from_string(p)]
                     if isinstance(prooutname,list):
                         outnamelist += prooutname
                     else:
