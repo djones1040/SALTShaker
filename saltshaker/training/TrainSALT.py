@@ -526,6 +526,7 @@ class TrainSALT(TrainSALTBase):
                 os.system(f"cp {self.options.error_dir}/{filename} {outdir}/{filename}")
                 
         with open(f'{outdir}/salt3_color_dispersion.dat','w') as foutclscat:
+            trainingresult.clscat = np.clip(trainingresult.clscat,0.,5.)
             for j,w in enumerate(trainingresult.wave):
                 print(f'{w:.2f} {trainingresult.clscat[j]:8.15e}',file=foutclscat)
 
