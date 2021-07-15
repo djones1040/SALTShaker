@@ -70,8 +70,9 @@ class SALT3pipe():
     def __init__(self,finput=None):
         self.finput = finput
         self.BYOSED = BYOSED()
-        self.Simulation = Simulation()
+        self.TrainSim = Simulation()
         self.Training = Training()
+        self.TestSim = Simulation()
         self.LCFitting = LCFitting()
         self.GetMu = GetMu()
         self.CosmoFit = CosmoFit()
@@ -284,7 +285,7 @@ class SALT3pipe():
             try:
                 outnamelist = []
                 for p in self.pipepros:
-                    prooutname = self._get_pipepro_from_string(p).outname if not isinstance(p,list) else [pi.outname for pi in self._get_pipepro_from_string(p)]
+                    prooutname = self._get_pipepro_from_string(p).outname if not isinstance(self._get_pipepro_from_string(p),list) else [pi.outname for pi in self._get_pipepro_from_string(p)]
                     if isinstance(prooutname,list):
                         outnamelist += prooutname
                     else:
@@ -482,7 +483,7 @@ class SALT3pipe():
     def _get_pipepro_from_string(self,pipepro_str):
         if pipepro_str.lower().startswith("sim"):
             pipepro = self.Simulation
-        elif pipepro_str.lower().startswith("train"):
+        elif pipepro_str.lower().startswith("train") and "sim" not in pipepro_str.lower():
             pipepro = self.Training
         elif pipepro_str.lower().startswith("lcfit"):
             pipepro = self.LCFitting
@@ -498,6 +499,10 @@ class SALT3pipe():
             pipepro = self.BiascorSim
         elif pipepro_str.lower().startswith("biascorlcfit"):
             pipepro = self.BiascorLCFit
+        elif pipepro_str.lower().startswith("trainsim"):
+            pipepro = self.TrainSim
+        elif pipepro_str.lower().startswith("testsim"):
+            pipepro = self.TestSim
         else:
             raise ValueError("Unknow pipeline procedure:",pipepro.strip())
         return pipepro

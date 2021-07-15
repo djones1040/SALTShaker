@@ -301,9 +301,9 @@ def init_errs(m0varfile=None,m0m1file=None,m1varfile=None,scalefile=None,clscatf
 			clscatpars=np.polyfit((wave-5500)/1000,np.log(clscat),n_colorscatpars-1)*factorial(pow)#guess[resids.iclscat]
 
 	return m0varbspl[0],m0varbspl[1],m0varbspl[2],m1varbspl[2],m0m1corrbspl[2],clscatpars
-
+	
 def init_errs_percent(
-		phase,wave,phaseknotloc,waveknotloc,m0knots,m1knots,
+		phase,wave,phaseknotloc,waveknotloc,m0knots,m1knots,mhostknots=None,
 		m0file=None,m0m1file=None,m1file=None,scalefile=None,clscatfile=None,
 		Bfilt='initfiles/Bessell90_B.dat',
 		phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
@@ -319,7 +319,7 @@ def init_errs_percent(
 		m1 = bisplev(phase,
 					 wave,
 					 (phaseknotloc,waveknotloc,m1knots,3,3))
-		return (m0*0.005)**2.,(m1*0.005)**2.
+		return (m0*0.0000005)**2.,(m1*0.0000005)**2.
 		
 	def loadfilewithdefault(filename,fillval=0):
 		if filename is None:
@@ -380,9 +380,10 @@ def init_errs_percent(
 			wave,clscat=wave[wave<9200],clscat[wave<9200]
 			pow=n_colorscatpars-1-np.arange(n_colorscatpars)
 			clscatpars=np.polyfit((wave-5500)/1000,np.log(clscat),n_colorscatpars-1)*factorial(pow)#guess[resids.iclscat]
-
-	return m0varbspl[0],m0varbspl[1],m0varbspl[2],m1varbspl[2],m0m1corrbspl[2],clscatpars
-
+	if mhostknots is None:
+		return m0varbspl[0],m0varbspl[1],m0varbspl[2],m1varbspl[2],m0m1corrbspl[2],clscatpars
+	else:
+		return m0varbspl[0],m0varbspl[1],m0varbspl[2],m1varbspl[2],np.zeros(len(m0varbspl[2])),m0m1corrbspl[2],clscatpars
 
 def init_custom(M0,M1,
 				Bfilt='initfiles/Bessell90_B.dat',

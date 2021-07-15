@@ -21,7 +21,7 @@ handlers:
     level: DEBUG
     mode: w
 loggers:
-  salt3:
+  saltshaker:
     handlers: [console,file]
     level: DEBUG
     propagate: False
