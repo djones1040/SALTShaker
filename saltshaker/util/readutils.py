@@ -305,13 +305,15 @@ def rdkcor(surveylist,options):
 		#Calibration dictionary:
 		with open(options.calibrationshiftfile) as file:
 			for line in file:
-				log.info(line)
+				log.info(f'Applying shift: {line}')
 				try:
 					line=line.split('#')[0].split()
 					if len(line)==0:
 						continue
 					shifttype,survey,filter,shift=line
 					shift=float(shift)
+					if '/' in filter:
+						filter=filter[filter.index('/')+1:]
 					if shifttype=='MAGSHIFT':
 						kcordict[survey][filter]['zpoff'] +=shift
 						kcordict[survey][filter]['primarymag']+=shift
