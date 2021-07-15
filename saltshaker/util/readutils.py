@@ -312,8 +312,7 @@ def rdkcor(surveylist,options):
 						continue
 					shifttype,survey,filter,shift=line
 					shift=float(shift)
-					if '/' in filter:
-						filter=filter[filter.index('/')+1:]
+					filter=filter[-1]#filter=filter[filter.index('/')+1:]
 					if shifttype=='MAGSHIFT':
 						kcordict[survey][filter]['zpoff'] +=shift
 						kcordict[survey][filter]['primarymag']+=shift
