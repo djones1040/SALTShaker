@@ -27,7 +27,7 @@ KCOR file: $SNDATA_ROOT/kcor/SALT3TRAIN_K21/kcor_CFA4p2.fits
 FILTERMAP
 ---------
 short_name full_name mag_sys zpt_offset filename
-B            CFA41-B    BD17     9.8640 $SNDATA_ROOT/filters/PS1/PS1s_RS14/PS1_CFA4/cfa4_B_p2.dat
-V            CFA41-V    BD17     9.4731 $SNDATA_ROOT/filters/PS1/PS1s_RS14/PS1_CFA4/cfa4_V_p2.dat
-r            CFA41-r    BD17     9.3632 $SNDATA_ROOT/filters/PS1/PS1s_RS14/PS1_CFA4/cfa4_r_p2.dat
-i            CFA41-i    BD17     9.2510 $SNDATA_ROOT/filters/PS1/PS1s_RS14/PS1_CFA4/cfa4_i_p2.dat
+B            CFA42-B    BD17     9.8640 $SNDATA_ROOT/filters/PS1/PS1s_RS14/PS1_CFA4/cfa4_B_p2.dat
+V            CFA42-V    BD17     9.4731 $SNDATA_ROOT/filters/PS1/PS1s_RS14/PS1_CFA4/cfa4_V_p2.dat
+r            CFA42-r    BD17     9.3632 $SNDATA_ROOT/filters/PS1/PS1s_RS14/PS1_CFA4/cfa4_r_p2.dat
+i            CFA42-i    BD17     9.2510 $SNDATA_ROOT/filters/PS1/PS1s_RS14/PS1_CFA4/cfa4_i_p2.dat
