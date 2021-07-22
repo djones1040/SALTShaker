@@ -121,8 +121,10 @@ class TrainSALTBase:
 							help='if set, run in fast mode for debugging')
 		
 		# input files
-		parser.add_argument_with_config_default(config,'iodata','calibrationshiftfile',	 type=str,action=FullPaths,default='',
+		parser.add_argument_with_config_default(config,'iodata','calibrationshiftfile',type=str,action=FullPaths,default='',
 							help='file containing a list of changes to zeropoint and central wavelength of filters by survey')
+		parser.add_argument_with_config_default(config,'iodata','calib_survey_ignore',type=boolean_string,
+							help='if True, ignore survey names when applying shifts to filters')
 		parser.add_argument_with_config_default(config,'iodata','loggingconfig','loggingconfigfile',  type=str,action=FullPaths,default='',
 							help='logging config file')
 		parser.add_argument_with_config_default(config,'iodata','trainingconfig','trainingconfigfile','modelconfigfile',  type=str,action=FullPaths,
