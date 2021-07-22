@@ -376,7 +376,8 @@ class TrainSALTBase:
 
 	def checkFilterMass(self,z,survey,flt):
 
-		filtwave = self.kcordict[survey][flt]['filtwave']
+		try: filtwave = self.kcordict[survey][flt]['filtwave']
+		except: raise RuntimeError(f"filter {flt} not found in kcor file for survey {survey}.  Check your config file")
 		try:
 			filttrans = self.kcordict[survey][flt]['filttrans']
 		except:

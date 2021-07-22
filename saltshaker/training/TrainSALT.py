@@ -255,7 +255,7 @@ class TrainSALT(TrainSALTBase):
             parlist = np.append(parlist,['clscat']*(self.options.n_colorscatpars))
 
         # SN parameters
-        if self.options.host_component:
+        if not self.options.host_component:
             for k in datadict.keys():
                 parlist = np.append(parlist,[f'x0_{k}',f'x1_{k}',f'c_{k}',f'tpkoff_{k}'])
         else:
@@ -303,6 +303,7 @@ class TrainSALT(TrainSALTBase):
                 try:
                     guess[parlist == key] = pars[names == key]
                 except:
+                    print(key)
                     log.critical(f'Problem while initializing parameter {key} from previous training')
                     sys.exit(1)
                     
