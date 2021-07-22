@@ -285,20 +285,18 @@ def rdkcor(surveylist,options):
 			if 'BD17' in primarysed.names:
 				kcordict[kcorkey]['BD17'] = primarysed['BD17']
 			for filt in zpoff['Filter Name']:
-				filtlabel=filt.split('-')[-1].split('/')[-1]
-				kcordict[kcorkey][filtlabel] = {}
-				kcordict[kcorkey][filtlabel]['filtwave'] = filtertrans['wavelength (A)']
-				kcordict[kcorkey][filtlabel]['fullname'] = filt.split('/')[0].replace(' ','')
-				kcordict[kcorkey][filtlabel]['filttrans'] = filtertrans[filt]
-				lambdaeff = np.sum(kcordict[kcorkey][filtlabel]['filtwave']*filtertrans[filt])/np.sum(filtertrans[filt])
-				kcordict[kcorkey][filtlabel]['lambdaeff'] = lambdaeff
-				kcordict[kcorkey][filtlabel]['magsys'] = \
+				kcordict[kcorkey][filt] = {}
+				kcordict[kcorkey][filt]['filtwave'] = filtertrans['wavelength (A)']
+				kcordict[kcorkey][filt]['fullname'] = filt #.split('/')[0].replace(' ','')
+				kcordict[kcorkey][filt]['filttrans'] = filtertrans[filt]
+				lambdaeff = np.sum(kcordict[kcorkey][filt]['filtwave']*filtertrans[filt])/np.sum(filtertrans[filt])
+				kcordict[kcorkey][filt]['lambdaeff'] = lambdaeff
+				kcordict[kcorkey][filt]['magsys'] = \
 					zpoff['Primary Name'][zpoff['Filter Name'] == filt][0]
-				kcordict[kcorkey][filtlabel]['primarymag'] = \
+				kcordict[kcorkey][filt]['primarymag'] = \
 					zpoff['Primary Mag'][zpoff['Filter Name'] == filt][0]
-				kcordict[kcorkey][filtlabel]['zpoff'] = \
+				kcordict[kcorkey][filt]['zpoff'] = \
 					zpoff['ZPoff(Primary)'][zpoff['Filter Name'] == filt][0]
-					
 					
 	if (options.calibrationshiftfile):
 		log.info('Calibration shift file provided, applying offsets:')
@@ -312,15 +310,28 @@ def rdkcor(surveylist,options):
 						continue
 					shifttype,survey,filter,shift=line
 					shift=float(shift)
-					filter=filter[-1]#filter=filter[filter.index('/')+1:]
-					if shifttype=='MAGSHIFT':
-						kcordict[survey][filter]['zpoff'] +=shift
-						kcordict[survey][filter]['primarymag']+=shift
-					elif shifttype=='LAMSHIFT':
-						kcordict[survey][filter]['filtwave']+=shift
-						kcordict[survey][filter]['lambdaeff']+=shift
+					#filter=filter[-1]#filter=filter[filter.index('/')+1:]
+					if self.options.calib_survey_ignore:
+						if shifttype=='MAGSHIFT':
+							kcordict[survey][filter]['zpoff'] +=shift
+							kcordict[survey][filter]['primarymag']+=shift
+						elif shifttype=='LAMSHIFT':
+							kcordict[survey][filter]['filtwave']+=shift
+							kcordict[survey][filter]['lambdaeff']+=shift
+						else:
+							raise ValueError(f'Invalid calibration shift: {shifttype}')
 					else:
-						raise ValueError(f'Invalid calibration shift: {shifttype}')
+						for survey_forfilt in kcordict.keys():
+							if filter in kcordict[survey_forfilt].keys():
+								if shifttype=='MAGSHIFT':
+									kcordict[survey_forfilt][filter]['zpoff'] +=shift
+									kcordict[survey_forfilt][filter]['primarymag']+=shift
+								elif shifttype=='LAMSHIFT':
+									kcordict[survey_forfilt][filter]['filtwave']+=shift
+									kcordict[survey_forfilt][filter]['lambdaeff']+=shift
+								else:
+									raise ValueError(f'Invalid calibration shift: {shifttype}')
+
 				except Exception as e:
 					log.critical(f'Could not apply calibration offset \"{line[:-1]}\"')
 					raise e
