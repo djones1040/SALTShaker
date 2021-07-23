@@ -311,7 +311,7 @@ def rdkcor(surveylist,options):
 					shifttype,survey,filter,shift=line
 					shift=float(shift)
 					#filter=filter[-1]#filter=filter[filter.index('/')+1:]
-					if self.options.calib_survey_ignore:
+					if options.calib_survey_ignore:
 						if shifttype=='MAGSHIFT':
 							kcordict[survey][filter]['zpoff'] +=shift
 							kcordict[survey][filter]['primarymag']+=shift
