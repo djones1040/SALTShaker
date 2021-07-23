@@ -311,27 +311,31 @@ def rdkcor(surveylist,options):
 					shifttype,survey,filter,shift=line
 					shift=float(shift)
 					#filter=filter[-1]#filter=filter[filter.index('/')+1:]
-					if options.calib_survey_ignore:
+					if not options.calib_survey_ignore:
 						if shifttype=='MAGSHIFT':
 							kcordict[survey][filter]['zpoff'] +=shift
 							kcordict[survey][filter]['primarymag']+=shift
-						elif shifttype=='LAMSHIFT':
+						elif shifttype=='LAMSHIFT' or shifttype=='WAVESHIFT':
 							kcordict[survey][filter]['filtwave']+=shift
 							kcordict[survey][filter]['lambdaeff']+=shift
 						else:
 							raise ValueError(f'Invalid calibration shift: {shifttype}')
 					else:
+						has_filter = False
 						for survey_forfilt in kcordict.keys():
 							if filter in kcordict[survey_forfilt].keys():
 								if shifttype=='MAGSHIFT':
 									kcordict[survey_forfilt][filter]['zpoff'] +=shift
 									kcordict[survey_forfilt][filter]['primarymag']+=shift
-								elif shifttype=='LAMSHIFT':
+									has_filter = True
+								elif shifttype=='LAMSHIFT' or shifttype=='WAVESHIFT':
 									kcordict[survey_forfilt][filter]['filtwave']+=shift
 									kcordict[survey_forfilt][filter]['lambdaeff']+=shift
+									has_filter = True
 								else:
 									raise ValueError(f'Invalid calibration shift: {shifttype}')
-
+						if not has_filter:
+							raise ValueError(f'could not find filter {filter} in any kcor files')
 				except Exception as e:
 					log.critical(f'Could not apply calibration offset \"{line[:-1]}\"')
 					raise e
