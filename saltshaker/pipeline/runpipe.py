@@ -169,7 +169,7 @@ class RunPipe():
         for f in files:
             df = pd.read_csv(f,sep='\s+',comment='#')
             dflist.append(df)
-        data = pd.concat(dflist,ignore_index=True).fillna('NULL')
+        data = pd.concat(dflist,ignore_index=True,sort=False).fillna('NULL')
         data.to_csv(outname,index=False,sep=' ',float_format='%.5e')
         
     def _combine_cospar(self,files,pro='cosmofit',outsuffix=None):
