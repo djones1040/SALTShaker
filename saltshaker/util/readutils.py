@@ -285,19 +285,20 @@ def rdkcor(surveylist,options):
 			if 'BD17' in primarysed.names:
 				kcordict[kcorkey]['BD17'] = primarysed['BD17']
 			for filt in zpoff['Filter Name']:
-				kcordict[kcorkey][filt] = {}
-				kcordict[kcorkey][filt]['filtwave'] = filtertrans['wavelength (A)']
-				kcordict[kcorkey][filt]['fullname'] = filt #.split('/')[0].replace(' ','')
-				kcordict[kcorkey][filt]['filttrans'] = filtertrans[filt]
-				lambdaeff = np.sum(kcordict[kcorkey][filt]['filtwave']*filtertrans[filt])/np.sum(filtertrans[filt])
-				kcordict[kcorkey][filt]['lambdaeff'] = lambdaeff
-				kcordict[kcorkey][filt]['magsys'] = \
+				log.warning('Using only the last character of kcor-provided filter names')
+				internalfiltname=filt[-1]
+				kcordict[kcorkey][internalfiltname] = {}
+				kcordict[kcorkey][internalfiltname]['filtwave'] = filtertrans['wavelength (A)']
+				kcordict[kcorkey][internalfiltname]['fullname'] = filt #.split('/')[0].replace(' ','')
+				kcordict[kcorkey][internalfiltname]['filttrans'] = filtertrans[filt]
+				lambdaeff = np.sum(kcordict[kcorkey][internalfiltname]['filtwave']*filtertrans[filt])/np.sum(filtertrans[filt])
+				kcordict[kcorkey][internalfiltname]['lambdaeff'] = lambdaeff
+				kcordict[kcorkey][internalfiltname]['magsys'] = \
 					zpoff['Primary Name'][zpoff['Filter Name'] == filt][0]
-				kcordict[kcorkey][filt]['primarymag'] = \
+				kcordict[kcorkey][internalfiltname]['primarymag'] = \
 					zpoff['Primary Mag'][zpoff['Filter Name'] == filt][0]
-				kcordict[kcorkey][filt]['zpoff'] = \
+				kcordict[kcorkey][internalfiltname]['zpoff'] = \
 					zpoff['ZPoff(Primary)'][zpoff['Filter Name'] == filt][0]
-					
 	if (options.calibrationshiftfile):
 		log.info('Calibration shift file provided, applying offsets:')
 		#Calibration dictionary:

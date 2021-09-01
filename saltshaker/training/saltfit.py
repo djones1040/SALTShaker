@@ -26,7 +26,6 @@ from saltshaker.util.query import query_yes_no
 from saltshaker.training import saltresids
 
 from multiprocessing import Pool, get_context
-from emcee.interruptible_pool import InterruptiblePool
 from iminuit import Minuit
 from datetime import datetime
 from tqdm import tqdm
@@ -151,14 +150,14 @@ class fitting:
 			 n_burnin_mcmc,stepsizes=None):
 		
 		saltfitter.debug = False
-		if n_processes > 1:
-			with InterruptiblePool(n_processes) as pool:
-				x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
-					modelerr,clpars,clerr,clscat,SNParams = \
-					saltfitter.mcmcfit(
-						guess,n_mcmc_steps,n_burnin_mcmc,pool=pool,stepsizes=stepsizes)
-		else:
-			x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+# 		if n_processes > 1:
+# 			with InterruptiblePool(n_processes) as pool:
+# 				x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
+# 					modelerr,clpars,clerr,clscat,SNParams = \
+# 					saltfitter.mcmcfit(
+# 						guess,n_mcmc_steps,n_burnin_mcmc,pool=None,stepsizes=stepsizes)
+# 		else:
+		x,phase,wave,M0,M0err,M1,M1err,cov_M0_M1,\
 				modelerr,clpars,clerr,clscat,SNParams = \
 				saltfitter.mcmcfit(
 					guess,n_mcmc_steps,n_burnin_mcmc,pool=None,stepsizes=stepsizes)
