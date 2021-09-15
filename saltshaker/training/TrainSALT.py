@@ -257,10 +257,10 @@ class TrainSALT(TrainSALTBase):
         # SN parameters
         if not self.options.host_component:
             for k in datadict.keys():
-                parlist = np.append(parlist,[f'x0_{k}',f'x1_{k}',f'c_{k}',f'tpkoff_{k}'])
+                parlist = np.append(parlist,[f'x0_{k}',f'x1_{k}',f'c_{k}'])
         else:
             for k in datadict.keys():
-                parlist = np.append(parlist,[f'x0_{k}',f'x1_{k}',f'xhost_{k}',f'c_{k}',f'tpkoff_{k}'])
+                parlist = np.append(parlist,[f'x0_{k}',f'x1_{k}',f'xhost_{k}',f'c_{k}'])
 
         if self.options.specrecallist:
             spcrcldata = at.Table.read(self.options.specrecallist,format='ascii')
@@ -455,7 +455,7 @@ class TrainSALT(TrainSALTBase):
                     0,getdatauncertainties=not self.options.use_previous_errors)
             else: saltfitter_errs = saltfitter
             for k in datadict.keys():
-                trainingresult.SNParams[k]['t0'] = -trainingresult.SNParams[k]['tpkoff'] + datadict[k].tpk_guess
+                trainingresult.SNParams[k]['t0'] =  datadict[k].tpk_guess
         
         log.info('message: %s'%message)
         log.info('Final loglike'); saltfitter_errs.maxlikefit(trainingresult.X_raw)
@@ -563,7 +563,7 @@ SIGMA_INT: 0.106  # used in simulation"""
         
         # best-fit and simulated SN params
         with open(f'{outdir}/salt3train_snparams.txt','w') as foutsn:
-            print('# SN x0 x1 c t0 tpkoff SIM_x0 SIM_x1 SIM_c SIM_t0 SALT2_x0 SALT2_x1 SALT2_c SALT2_t0',file=foutsn)
+            print('# SN x0 x1 c t0 SIM_x0 SIM_x1 SIM_c SIM_t0 SALT2_x0 SALT2_x1 SALT2_c SALT2_t0',file=foutsn)
             for snlist in self.options.snlists.split(','):
                 snlist = os.path.expandvars(snlist)
                 if not os.path.exists(snlist):
@@ -607,7 +607,7 @@ SIGMA_INT: 0.106  # used in simulation"""
                     if 't0' not in trainingresult.SNParams[k].keys():
                         trainingresult.SNParams[k]['t0'] = 0.0
 
-                    print(f"{k} {trainingresult.SNParams[k]['x0']:8.10e} {trainingresult.SNParams[k]['x1']:.10f} {trainingresult.SNParams[k]['c']:.10f} {trainingresult.SNParams[k]['t0']:.10f} {trainingresult.SNParams[k]['tpkoff']:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",file=foutsn)
+                    print(f"{k} {trainingresult.SNParams[k]['x0']:8.10e} {trainingresult.SNParams[k]['x1']:.10f} {trainingresult.SNParams[k]['c']:.10f} {trainingresult.SNParams[k]['t0']:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",file=foutsn)
         
         keys=['num_lightcurves','num_spectra','num_sne']
         yamloutputdict={key.upper():trainingresult.__dict__[key] for key in keys}

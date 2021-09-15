@@ -44,10 +44,12 @@ class SALTtraininglightcurve(SALTtrainingdata):
 		assert((sn.FLT==flt).sum()>0)
 		inlightcurve= (sn.FLT==flt)
 		self.mjd=sn.MJD[inlightcurve]
-		self.tobs=self.mjd-tpk_guess
-		self.phase=(self.mjd-tpk_guess)/(1+z)
-		self.fluxcal=sn.FLUXCAL[inlightcurve]
-		self.fluxcalerr=sn.FLUXCALERR[inlightcurve]
+		sortinds=np.argsort(self.mjd)
+		self.mjd=self.mjd[sortinds]
+		self.tobs=(self.mjd-tpk_guess)
+		self.phase=self.tobs/(1+z)
+		self.fluxcal=sn.FLUXCAL[inlightcurve][sortinds]
+		self.fluxcalerr=sn.FLUXCALERR[inlightcurve][sortinds]
 		self.filt=flt
 		checksize(self.tobs,self.mjd)
 		checksize(self.mjd,self.fluxcal)

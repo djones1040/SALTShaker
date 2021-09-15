@@ -221,10 +221,8 @@ class TrainSALTBase:
 							help='fit for error model every x steps (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'trainparams','model_err_max_chisq', type=int,
 							help='max photometric chi2/dof below which model error estimation is done (default=%(default)s)')
-		successful=successful&wrapaddingargument(config,'trainparams','fit_tpkoff',	type=boolean_string,
-							help='fit for time of max in B-band if set (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'trainparams','fitting_sequence',  type=str,
-							help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn, tpk (default=%(default)s)")
+							help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn (default=%(default)s)")
 		successful=successful&wrapaddingargument(config,'trainparams','fitprobmin',	type=float,
 							help="Minimum FITPROB for including SNe (default=%(default)s)")
 
@@ -381,7 +379,6 @@ class TrainSALTBase:
 						 'fit_cdisp_only':self.options.fit_cdisp_only,
 						 'model_err_max_chisq':self.options.model_err_max_chisq,
 						 'steps_between_errorfit':self.options.steps_between_errorfit,
-						 'fitTpkOff':self.options.fit_tpkoff,
 						 'spec_chi2_scaling':self.options.spec_chi2_scaling,
 						 'debug':self.options.debug,
 						 'use_previous_errors':self.options.use_previous_errors}
