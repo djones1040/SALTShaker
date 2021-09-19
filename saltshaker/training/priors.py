@@ -426,10 +426,14 @@ class SALTPriors:
 	def m0endalllam(self,width,x,components):
 		"""Prior such that at early times there is no flux"""
 		thinning=4
-		jacobian=np.zeros((self.spline_derivs[:2,::thinning,0].size,self.npar))
-		jacobianm0=self.spline_derivs[:2,::thinning,:].reshape((-1, self.im0.size))
-		jacobian[:,self.im0] = jacobianm0
-		value=np.dot(jacobianm0,x[self.im0])
+		try:
+			jacobian= self.__m0endalllamderiv__.copy()
+		except:
+			jacobian=np.zeros((2*self.wave[::thinning].size,self.npar))
+			for i, jacind in enumerate(self.im0):
+				jacobian[:,jacind] = bisplev(self.phase[:2],self.wave[::thinning],(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder)).flatten()
+			self.__m0endalllamderiv__=jacobian.copy()
+		value=np.dot(jacobian[:,self.im0],x[self.im0])
 		residual = value/width
 		jacobian/=width
 		return residual,value,jacobian
@@ -438,10 +442,14 @@ class SALTPriors:
 	def m1endalllam(self,width,x,components):
 		"""Prior such that at early times there is no flux"""
 		thinning=4
-		jacobian=np.zeros((self.spline_derivs[:2,::thinning,0].size,self.npar))
-		jacobianm1=self.spline_derivs[:2,::thinning,:].reshape((-1, self.im1.size))
-		jacobian[:,self.im1] = jacobianm1
-		value=np.dot(jacobianm1,x[self.im1])
+		try:
+			jacobian= self.__m1endalllamderiv__.copy()
+		except:
+			jacobian=np.zeros((2*self.wave[::thinning].size,self.npar))
+			for i, jacind in enumerate(self.im1):
+				jacobian[:,jacind] = bisplev(self.phase[:2],self.wave[::thinning],(self.phaseknotloc,self.waveknotloc,np.arange(self.im1.size)==i,self.bsorder,self.bsorder)).flatten()
+			self.__m1endalllamderiv__=jacobian.copy()
+		value=np.dot(jacobian[:,self.im1],x[self.im1])
 		residual = value/width
 		jacobian/=width
 		return residual,value,jacobian	

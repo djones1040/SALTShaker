@@ -128,7 +128,7 @@ def datadensityplot(filename,phasebins,wavebins,datadict,kcordict):
 		ax.set_aspect('auto')
 
 	
-		label='Number of\n light curves' if name is 'phot' else 'Number of\n spectra'
+		label='Number of\n light curves' if (name == 'phot' )else 'Number of\n spectra'
 		cbar=fig.colorbar(image,ax=colorax,fraction=1, pad=0.04,label=label,ticks=tickspacing(top))
 		if name == 'phot':
 			cbar.ax.tick_params(labelsize=ticksize)
