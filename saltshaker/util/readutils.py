@@ -287,8 +287,8 @@ def rdkcor(surveylist,options):
 			if 'BD17' in primarysed.names:
 				kcordict[kcorkey]['BD17'] = primarysed['BD17']
 			for filt in zpoff['Filter Name']:
-				log.warning('Using only the last character of kcor-provided filter names')
-				internalfiltname=filt[-1]
+				#log.warning('Using only the last character of kcor-provided filter names')
+				internalfiltname=filt#[-1]
 				kcordict[kcorkey][internalfiltname] = {}
 				kcordict[kcorkey][internalfiltname]['filtwave'] = filtertrans['wavelength (A)']
 				kcordict[kcorkey][internalfiltname]['fullname'] = filt #.split('/')[0].replace(' ','')
