@@ -298,7 +298,6 @@ class TrainSALT(TrainSALTBase):
                 with open(f"{self.options.resume_from_gnhistory}/gaussnewtonhistory.pickle",'rb') as fin:
                     data = pickle.load(fin)
                     pars = data[-1][0]
-
             for key in np.unique(parlist):
                 try:
                     guess[parlist == key] = pars[names == key]
@@ -306,8 +305,6 @@ class TrainSALT(TrainSALTBase):
                     print(key)
                     log.critical(f'Problem while initializing parameter {key} from previous training')
                     sys.exit(1)
-                    
-
         else:
             m0knots[m0knots == 0] = 1e-4
             guess[parlist == 'm0'] = m0knots
@@ -443,30 +440,20 @@ class TrainSALT(TrainSALTBase):
             # do the fitting
             trainingresult,message = fitter.gaussnewton(
                     saltfitter,x_modelpars,
-                    self.options.gaussnewton_maxiter,getdatauncertainties=False)
-
-            # get the errors
-            if not self.options.use_previous_errors:
-                log.info('beginning error estimation loop')
-                self.fit_model_err = False
-                saltfitter_errs = saltfit.GaussNewton(trainingresult.X_raw,datadict,parlist,**saltfitkwargs)
-                trainingresult,message = fitter.gaussnewton(
-                    saltfitter_errs,trainingresult.X_raw,
-                    0,getdatauncertainties=not self.options.use_previous_errors)
-            else: saltfitter_errs = saltfitter
+                    self.options.gaussnewton_maxiter,getdatauncertainties=not self.options.use_previous_errors)
             for k in datadict.keys():
                 trainingresult.SNParams[k]['t0'] =  datadict[k].tpk_guess
         
         log.info('message: %s'%message)
-        log.info('Final loglike'); saltfitter_errs.maxlikefit(trainingresult.X_raw)
+        log.info('Final loglike'); saltfitter.maxlikefit(trainingresult.X_raw)
 
         log.info(trainingresult.X.size)
 
 
 
-        if 'chain' in saltfitter_errs.__dict__.keys():
-            chain = saltfitter_errs.chain
-            loglikes = saltfitter_errs.loglikes
+        if 'chain' in saltfitter.__dict__.keys():
+            chain = saltfitter.chain
+            loglikes = saltfitter.loglikes
         else: chain,loglikes = None,None
 
         return trainingresult,chain,loglikes

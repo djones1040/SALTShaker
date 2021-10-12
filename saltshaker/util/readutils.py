@@ -275,24 +275,24 @@ def rdkcor(surveylist,options):
 			kcorkey = '%s(%s)'%(survey,subsurvey)
 			if not subsurvey: kcorkey = survey[:]
 			kcordict[kcorkey] = {}
-			kcordict[kcorkey]['primarywave'] = primarysed['wavelength (A)']
-			kcordict[kcorkey]['snflux'] = snsed['SN Flux (erg/s/cm^2/A)']
+			kcordict[kcorkey]['primarywave'] = np.array(primarysed['wavelength (A)'])
+			kcordict[kcorkey]['snflux'] =  np.array(snsed['SN Flux (erg/s/cm^2/A)'])
 
 			if 'AB' in primarysed.names:
-				kcordict[kcorkey]['AB'] = primarysed['AB']
+				kcordict[kcorkey]['AB'] =  np.array(primarysed['AB'])
 			if 'Vega' in primarysed.names:
-				kcordict[kcorkey]['Vega'] = primarysed['Vega']
+				kcordict[kcorkey]['Vega'] =  np.array(primarysed['Vega'])
 			if 'VEGA' in primarysed.names:
-				kcordict[kcorkey]['Vega'] = primarysed['VEGA']
+				kcordict[kcorkey]['Vega'] =  np.array(primarysed['VEGA'])
 			if 'BD17' in primarysed.names:
-				kcordict[kcorkey]['BD17'] = primarysed['BD17']
+				kcordict[kcorkey]['BD17'] =  np.array(primarysed['BD17'])
 			for filt in zpoff['Filter Name']:
 				log.warning('Using only the last character of kcor-provided filter names')
 				internalfiltname=filt[-1]
 				kcordict[kcorkey][internalfiltname] = {}
-				kcordict[kcorkey][internalfiltname]['filtwave'] = filtertrans['wavelength (A)']
+				kcordict[kcorkey][internalfiltname]['filtwave'] = np.array(filtertrans['wavelength (A)'])
 				kcordict[kcorkey][internalfiltname]['fullname'] = filt #.split('/')[0].replace(' ','')
-				kcordict[kcorkey][internalfiltname]['filttrans'] = filtertrans[filt]
+				kcordict[kcorkey][internalfiltname]['filttrans'] = np.array(filtertrans[filt])
 				lambdaeff = np.sum(kcordict[kcorkey][internalfiltname]['filtwave']*filtertrans[filt])/np.sum(filtertrans[filt])
 				kcordict[kcorkey][internalfiltname]['lambdaeff'] = lambdaeff
 				kcordict[kcorkey][internalfiltname]['magsys'] = \
