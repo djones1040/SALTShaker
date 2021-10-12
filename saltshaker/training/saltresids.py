@@ -94,6 +94,7 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
 		for i in np.where(isrelevant)[0]:
 			if __anyinnonzeroareaforsplinebasis__(clippedPhase,residsobj.wave[self.idx],residsobj.phaseknotloc,residsobj.waveknotloc,residsobj.bsorder,i):
 				 derivInterp[:,:,i] = bisplev(clippedPhase ,residsobj.wave[self.idx],(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(residsobj.im0.size)==i, residsobj.bsorder,residsobj.bsorder),dx=1)
+
 		self.pcderivsparse=[]
 		for pdx in range(len(lc)):
 			if self.phase[pdx]>sn.obsphase.max():
