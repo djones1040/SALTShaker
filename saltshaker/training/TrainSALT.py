@@ -169,8 +169,8 @@ class TrainSALT(TrainSALTBase):
     def initialParameters(self,datadict):
         from saltshaker.initfiles import init_rootdir
         self.options.inithsiaofile = f'{init_rootdir}/hsiao07.dat'
-		if not os.path.exists(self.options.initbfilt)""
-        	self.options.initbfilt = f'{init_rootdir}/{self.options.initbfilt}'
+        if not os.path.exists(self.options.initbfilt):
+             self.options.initbfilt = f'{init_rootdir}/{self.options.initbfilt}'
         if self.options.initm0modelfile and not os.path.exists(self.options.initm0modelfile):
             if self.options.initm0modelfile:
                 self.options.initm0modelfile = f'{init_rootdir}/{self.options.initm0modelfile}'

@@ -93,7 +93,7 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
 		checkwave=np.array([residsobj.wave[self.idx].min(),residsobj.wave[self.idx].max()])
 		for i in np.where(isrelevant)[0]:
 			if __anyinnonzeroareaforsplinebasis__(clippedPhase,residsobj.wave[self.idx],residsobj.phaseknotloc,residsobj.waveknotloc,residsobj.bsorder,i):
-				 derivInterp[:,:,i] = bisplev(clippedPhase ,residsobj.wave[self.idx],(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(residsobj.im0.size)==i, residsobj.bsorder,residsobj.bsorder),dx=1)
+				 derivInterp[:,:,i] = bisplev(clippedPhase ,residsobj.wave[self.idx],(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(residsobj.im0.size)==i, residsobj.bsorder,residsobj.bsorder))
 
 		self.pcderivsparse=[]
 		for pdx in range(len(lc)):
@@ -120,7 +120,7 @@ class SALTfitcachespectrum(SALTtrainingspectrum):
 		derivInterp=np.zeros((spectrum.wavelength.size,residsobj.im0.size))
 		for i in range(residsobj.im0.size):
 			if __anyinnonzeroareaforsplinebasis__(spectrum.phase,spectrum.wavelength/(1+z),residsobj.phaseknotloc,residsobj.waveknotloc,residsobj.bsorder,i):
-				derivInterp[:,i] = bisplev(spectrum.phase,spectrum.wavelength/(1+z),(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(residsobj.im0.size)==i, residsobj.bsorder,residsobj.bsorder),dx=1)
+				derivInterp[:,i] = bisplev(spectrum.phase,spectrum.wavelength/(1+z),(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(residsobj.im0.size)==i, residsobj.bsorder,residsobj.bsorder))
 
 		self.pcderivsparse=sparse.csr_matrix(derivInterp)
 		self.spectrumid=k
