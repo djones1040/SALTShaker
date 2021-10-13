@@ -293,6 +293,7 @@ def rdkcor(surveylist,options):
 				kcordict[kcorkey][internalfiltname]['filtwave'] = np.array(filtertrans['wavelength (A)'])
 				kcordict[kcorkey][internalfiltname]['fullname'] = filt #.split('/')[0].replace(' ','')
 				kcordict[kcorkey][internalfiltname]['filttrans'] = np.array(filtertrans[filt])
+
 				lambdaeff = np.sum(kcordict[kcorkey][internalfiltname]['filtwave']*filtertrans[filt])/np.sum(filtertrans[filt])
 				kcordict[kcorkey][internalfiltname]['lambdaeff'] = lambdaeff
 				kcordict[kcorkey][internalfiltname]['magsys'] = \
