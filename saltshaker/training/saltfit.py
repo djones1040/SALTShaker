@@ -1023,7 +1023,6 @@ class GaussNewton(saltresids.SALTResids):
 		for sn in self.datadict.keys():
 			photresidsdict,specresidsdict=self.ResidsForSN(
 				guess,sn,storedResults,varyParams,fixUncertainty=True)
-			print(sn,np.max([photresidsdict[k]['resid'] for k in photresidsdict]))
 			photresids+=[photresidsdict[k]['resid'] for k in photresidsdict]
 			specresids+=[specresidsdict[k]['resid'] for k in specresidsdict]
 		

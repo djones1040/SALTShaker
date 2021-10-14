@@ -657,17 +657,19 @@ class SALTResids:
 			specresids[k]=spectralresids
 			if not fixUncertainty:
 				spectralresids['lognorm']=-np.log((np.sqrt(2*np.pi)*uncertainty)).sum()
-		
+			if varyParams.any():
 			#Create a diagonal matrix with the inverse uncertainty on the diagonal
-			if not fixFluxes: spectralresids['resid_jacobian']= \
-			   sparse.diags([spectralSuppression/uncertainty],offsets=[0])*spectralmodel['modelflux_jacobian']
-			else: spectralresids['resid_jacobian']=sparse.csr_matrix((spectralmodel['modelflux'].size,self.parlist.size))
-
-			if not fixUncertainty:
-				#Calculate jacobian of total spectral uncertainty including reported uncertainties
-				uncertainty_jac=  spectralmodel['modelvariance_jacobian'][:,varyParams] / (2*uncertainty[:,np.newaxis])
-				spectralresids['lognorm_grad']= - (uncertainty_jac/uncertainty[:,np.newaxis]).sum(axis=0)
-				spectralresids['resid_jacobian'][:,varyParams] -= uncertainty_jac*(spectralresids['resid'] /uncertainty)[:,np.newaxis]
+				if not fixFluxes: spectralresids['resid_jacobian']= \
+				   sparse.diags([spectralSuppression/uncertainty],offsets=[0])*spectralmodel['modelflux_jacobian']
+				else: spectralresids['resid_jacobian']=sparse.csr_matrix((spectralmodel['modelflux'].size,self.parlist.size))
+			
+				if not fixUncertainty:
+					#Calculate jacobian of total spectral uncertainty including reported uncertainties
+					uncertainty_jac=  spectralmodel['modelvariance_jacobian'][:,varyParams] / (2*uncertainty[:,np.newaxis])
+					spectralresids['lognorm_grad']= - (uncertainty_jac/uncertainty[:,np.newaxis]).sum(axis=0)
+					spectralresids['resid_jacobian'][:,varyParams] -= uncertainty_jac*(spectralresids['resid'] /uncertainty)[:,np.newaxis]
+			else: 
+				spectralresids['resid_jacobian']=sparse.csr_matrix(spectralmodel['modelflux_jacobian'].shape)
 
 		tstart = time.time()
 		return photresids,specresids
