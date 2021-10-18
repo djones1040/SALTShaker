@@ -132,7 +132,8 @@ class SALTfitcacheSN(SALTtrainingSN):
 		
 		self.ix0=np.where(residsobj.parlist==f'x0_{self.snid}')[0][0]
 		self.ix1=np.where(residsobj.parlist==f'x1_{self.snid}')[0][0]
-		self.ixhost=np.where(residsobj.parlist==f'xhost_{self.snid}')[0][0]
+		self.ixhost=np.where(residsobj.parlist==f'xhost_{self.snid}')[0]
+		if len(self.ixhost): self.ixhost = self.ixhost[0]
 		self.ic=np.where(residsobj.parlist==f'c_{self.snid}')[0][0]
 		self.itpkoff=np.where(residsobj.parlist==f'tpkoff_{self.snid}')[0][0]
 		

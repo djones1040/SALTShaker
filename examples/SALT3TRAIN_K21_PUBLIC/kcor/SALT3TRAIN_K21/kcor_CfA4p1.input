@@ -1,14 +1,14 @@
 SN_SED: Hsiao07.dat
 BD17_SED:    bd_17d4708_stisnic_007.dat
-MAGSYSTEM:  BD17
-FILTSYSTEM: COUNT
-FILTPATH:   $SNDATA_ROOT/filters/PS1/Pantheon/PS1_CFA4
-SURVEY: LOWZ
-FILTER: CFA3-U cfa4_B_p1.dat 19.0 #Total Fudge don't use u!
-FILTER: CFA3-B cfa4_B_p1.dat 9.8620
-FILTER: CFA3-V cfa4_V_p1.dat 9.4731
-FILTER: CFA3-r cfa4_r_p1.dat 9.3550
-FILTER: CFA3-i cfa4_i_p1.dat 9.2507
+#MAGSYSTEM:  BD17
+#FILTSYSTEM: COUNT
+#FILTPATH:   $SNDATA_ROOT/filters/PS1/Pantheon/PS1_CFA4
+#SURVEY: LOWZ
+#FILTER: CFA3-U cfa4_B_p1.dat 19.0 #Total Fudge don't use u!
+#FILTER: CFA3-B cfa4_B_p1.dat 9.8620
+#FILTER: CFA3-V cfa4_V_p1.dat 9.4731
+#FILTER: CFA3-r cfa4_r_p1.dat 9.3550
+#FILTER: CFA3-i cfa4_i_p1.dat 9.2507
 # 1st filter is rest-frame. 
 # 2nd filter is observer-frame. 
 # 3rd arg is short-hand name for table storage. 
@@ -26,6 +26,17 @@ FILTER:  CSP-n/x              V_LC9844_texas_WLcorr_atm.txt  9.47748+0.001766309
 FILTER:  CSP-g/y              g_texas_WLcorr_atm.txt  9.64406+0.0088273000
 FILTER:  CSP-r/z              r_texas_WLcorr_atm.txt  9.35160+0.0011820498
 FILTER:  CSP-i/A              i_texas_WLcorr_atm.txt  9.25000-0.016103720
+
+MAGSYSTEM:   BD17
+FILTSYSTEM:  COUNT
+FILTPATH:  $SNDATA_ROOT/filters/PS1/Pantheon/PS1_CFA4
+SURVEY:    LOWZ
+# Start filters for VERSION = PS1s_CFA4_p1_DS17
+FILTER:  CFA41-U            cfa4_U_p1.dat  9.724
+FILTER:  CFA41-B            cfa4_B_p1.dat  9.88605-0.024
+FILTER:  CFA41-V            cfa4_V_p1.dat  9.47432-0.0012
+FILTER:  CFA41-r            cfa4_r_p1.dat  9.35252+0.0025
+FILTER:  CFA41-i            cfa4_i_p1.dat  9.25465-0.004
 
 # Define generation grids. 
 REDSHIFT_RANGE:    0.0  0.46 
