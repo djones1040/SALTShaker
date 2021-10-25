@@ -44,10 +44,12 @@ class SALTtraininglightcurve(SALTtrainingdata):
 		assert((sn.FLT==flt).sum()>0)
 		inlightcurve= (sn.FLT==flt)
 		self.mjd=sn.MJD[inlightcurve]
-		self.tobs=self.mjd-tpk_guess
-		self.phase=(self.mjd-tpk_guess)/(1+z)
-		self.fluxcal=sn.FLUXCAL[inlightcurve]
-		self.fluxcalerr=sn.FLUXCALERR[inlightcurve]
+		sortinds=np.argsort(self.mjd)
+		self.mjd=self.mjd[sortinds]
+		self.tobs=(self.mjd-tpk_guess)
+		self.phase=self.tobs/(1+z)
+		self.fluxcal=sn.FLUXCAL[inlightcurve][sortinds]
+		self.fluxcalerr=sn.FLUXCALERR[inlightcurve][sortinds]
 		self.filt=flt
 		checksize(self.tobs,self.mjd)
 		checksize(self.mjd,self.fluxcal)
@@ -85,7 +87,7 @@ class SALTtrainingspectrum(SALTtrainingdata):
 			else:
 				iGood=np.ones(len(self),dtype=bool)
 			iGood = iGood & (~np.isnan(self.flux))
-			if ('DQ' in snanaspec and (snanaspec['DQ']==1).sum() is 0) or np.all(np.isnan(self.flux)):
+			if ('DQ' in snanaspec and (snanaspec['DQ']==1).sum() == 0) or np.all(np.isnan(self.flux)):
 				raise SNDataReadError('Spectrum is all marked as invalid data')
 			if binspecres is not None:
 				flux = self.flux[iGood]
@@ -273,53 +275,71 @@ def rdkcor(surveylist,options):
 			kcorkey = '%s(%s)'%(survey,subsurvey)
 			if not subsurvey: kcorkey = survey[:]
 			kcordict[kcorkey] = {}
-			kcordict[kcorkey]['primarywave'] = primarysed['wavelength (A)']
-			kcordict[kcorkey]['snflux'] = snsed['SN Flux (erg/s/cm^2/A)']
+			kcordict[kcorkey]['primarywave'] = np.array(primarysed['wavelength (A)'])
+			kcordict[kcorkey]['snflux'] =  np.array(snsed['SN Flux (erg/s/cm^2/A)'])
 
 			if 'AB' in primarysed.names:
-				kcordict[kcorkey]['AB'] = primarysed['AB']
+				kcordict[kcorkey]['AB'] =  np.array(primarysed['AB'])
 			if 'Vega' in primarysed.names:
-				kcordict[kcorkey]['Vega'] = primarysed['Vega']
+				kcordict[kcorkey]['Vega'] =  np.array(primarysed['Vega'])
 			if 'VEGA' in primarysed.names:
-				kcordict[kcorkey]['Vega'] = primarysed['VEGA']
+				kcordict[kcorkey]['Vega'] =  np.array(primarysed['VEGA'])
 			if 'BD17' in primarysed.names:
-				kcordict[kcorkey]['BD17'] = primarysed['BD17']
+				kcordict[kcorkey]['BD17'] =  np.array(primarysed['BD17'])
 			for filt in zpoff['Filter Name']:
-				filtlabel=filt.split('-')[-1].split('/')[-1]
-				kcordict[kcorkey][filtlabel] = {}
-				kcordict[kcorkey][filtlabel]['filtwave'] = filtertrans['wavelength (A)']
-				kcordict[kcorkey][filtlabel]['fullname'] = filt.split('/')[0].replace(' ','')
-				kcordict[kcorkey][filtlabel]['filttrans'] = filtertrans[filt]
-				lambdaeff = np.sum(kcordict[kcorkey][filtlabel]['filtwave']*filtertrans[filt])/np.sum(filtertrans[filt])
-				kcordict[kcorkey][filtlabel]['lambdaeff'] = lambdaeff
-				kcordict[kcorkey][filtlabel]['magsys'] = \
+				log.warning('Using only the last character of kcor-provided filter names')
+				internalfiltname=filt[-1]
+				kcordict[kcorkey][internalfiltname] = {}
+				kcordict[kcorkey][internalfiltname]['filtwave'] = np.array(filtertrans['wavelength (A)'])
+				kcordict[kcorkey][internalfiltname]['fullname'] = filt #.split('/')[0].replace(' ','')
+				kcordict[kcorkey][internalfiltname]['filttrans'] = np.array(filtertrans[filt])
+
+				lambdaeff = np.sum(kcordict[kcorkey][internalfiltname]['filtwave']*filtertrans[filt])/np.sum(filtertrans[filt])
+				kcordict[kcorkey][internalfiltname]['lambdaeff'] = lambdaeff
+				kcordict[kcorkey][internalfiltname]['magsys'] = \
 					zpoff['Primary Name'][zpoff['Filter Name'] == filt][0]
-				kcordict[kcorkey][filtlabel]['primarymag'] = \
+				kcordict[kcorkey][internalfiltname]['primarymag'] = \
 					zpoff['Primary Mag'][zpoff['Filter Name'] == filt][0]
-				kcordict[kcorkey][filtlabel]['zpoff'] = \
+				kcordict[kcorkey][internalfiltname]['zpoff'] = \
 					zpoff['ZPoff(Primary)'][zpoff['Filter Name'] == filt][0]
-					
-					
 	if (options.calibrationshiftfile):
 		log.info('Calibration shift file provided, applying offsets:')
 		#Calibration dictionary:
 		with open(options.calibrationshiftfile) as file:
 			for line in file:
-				log.info(line)
+				log.info(f'Applying shift: {line}')
 				try:
 					line=line.split('#')[0].split()
 					if len(line)==0:
 						continue
 					shifttype,survey,filter,shift=line
 					shift=float(shift)
-					if shifttype=='MAGSHIFT':
-						kcordict[survey][filter]['zpoff'] +=shift
-						kcordict[survey][filter]['primarymag']+=shift
-					elif shifttype=='LAMSHIFT':
-						kcordict[survey][filter]['filtwave']+=shift
-						kcordict[survey][filter]['lambdaeff']+=shift
+					#filter=filter[-1]#filter=filter[filter.index('/')+1:]
+					if not options.calib_survey_ignore:
+						if shifttype=='MAGSHIFT':
+							kcordict[survey][filter]['zpoff'] +=shift
+							kcordict[survey][filter]['primarymag']+=shift
+						elif shifttype=='LAMSHIFT' or shifttype=='WAVESHIFT':
+							kcordict[survey][filter]['filtwave']+=shift
+							kcordict[survey][filter]['lambdaeff']+=shift
+						else:
+							raise ValueError(f'Invalid calibration shift: {shifttype}')
 					else:
-						raise ValueError(f'Invalid calibration shift: {shifttype}')
+						has_filter = False
+						for survey_forfilt in kcordict.keys():
+							if filter in kcordict[survey_forfilt].keys():
+								if shifttype=='MAGSHIFT':
+									kcordict[survey_forfilt][filter]['zpoff'] +=shift
+									kcordict[survey_forfilt][filter]['primarymag']+=shift
+									has_filter = True
+								elif shifttype=='LAMSHIFT' or shifttype=='WAVESHIFT':
+									kcordict[survey_forfilt][filter]['filtwave']+=shift
+									kcordict[survey_forfilt][filter]['lambdaeff']+=shift
+									has_filter = True
+								else:
+									raise ValueError(f'Invalid calibration shift: {shifttype}')
+						if not has_filter:
+							raise ValueError(f'could not find filter {filter} in any kcor files')
 				except Exception as e:
 					log.critical(f'Could not apply calibration offset \"{line[:-1]}\"')
 					raise e

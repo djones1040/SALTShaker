@@ -18,19 +18,24 @@ if sys.version_info < (3,0):
 salt = TrainSALT()
 
 parser = argparse.ArgumentParser(usage=usagestring, conflict_handler="resolve",add_help=False)
+parser.add_argument('configpositional',nargs='?',default=None,type=str,help='configuration file')
 parser.add_argument('-c','--configfile', default=None, type=str,
 		    help='configuration file')
 
 options, args = parser.parse_known_args()
-	
+
 if options.configfile:
-	config = configparser.ConfigParser(inline_comment_prefixes='#')
-	if not os.path.exists(options.configfile):
-		raise RuntimeError('Configfile doesn\'t exist!')
-	config.read(options.configfile)
+	configfile= options.configfile
+elif options.configpositional:
+	configfile= options.configpositional
 else:
 	parser.print_help()
 	raise RuntimeError('Configuration file must be specified at command line')
+
+config = configparser.ConfigParser(inline_comment_prefixes='#')
+if not os.path.exists(configfile):
+	raise RuntimeError('Configfile doesn\'t exist!')
+config.read(configfile)
 
 user_parser = salt.add_user_options(usage=usagestring,config=config)
 user_options = user_parser.parse_known_args()[0]
