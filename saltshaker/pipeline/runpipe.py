@@ -292,6 +292,8 @@ class RunPipe():
                             self._reconfig_w_suffix(self.pipe.Training,df_train,self.num)
                             if ['trainsim','training'] in self.pipe.gluepairs: 
                                 self.pipe.glue(['trainsim','training'])
+                            if ['training', 'biascorsim'] in self.pipe.gluepairs:
+                                self.pipe.glue(['training', 'biascorsim'])
                         if any([p.startswith('lcfit') for p in self.pipe.pipepros]):    
                             for i in range(self.pipe.n_lcfit):
                                 df_lcfit = self._add_suffix(self.pipe.LCFitting[i],['outdir'],self.num,section=['header'])

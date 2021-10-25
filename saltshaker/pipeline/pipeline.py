@@ -415,8 +415,9 @@ class SALT3pipe():
 #                     print(pro2_in)
                     
                 else:
-                    pro2_in = pro2._get_input_info().loc[0]
-                    pro2_in['value'] = pro1_out
+#                     pro2_in = pro2._get_input_info().loc[0]
+                    pro2_in = pro2._get_input_info()
+                    pro2_in['value'] = pd.Series([pro1_out]*len(pro2_in['value']))
                 if isinstance(pro2_in,pd.DataFrame):
                     setkeys = pro2_in
                 else:
@@ -1047,7 +1048,7 @@ class Training(PyPipeProcedure):
     def glueto(self,pipepro):
         if not isinstance(pipepro,str):
             pipepro = type(pipepro).__name__
-        if pipepro.lower().startswith('lcfit'):
+        if pipepro.lower().startswith('lcfit') or pipepro.lower().startswith('sim'):
             outdir = self._get_output_info().value.values[0]
             ##copy necessary files to a model folder in SNDATA_ROOT
 #             modeldir = 'lcfitting/SALT3.test'
@@ -1056,9 +1057,9 @@ class Training(PyPipeProcedure):
 #             self.__copy_salt2info(modeldir,template_file='lcfitting/SALT2.INFO')
             self._set_output_info(modeldir)
 #             os.environ['SNANA_MODELPATH'] = os.path.join(os.getcwd(),'lcfitting') #caused a bug
-            return modeldir
+            return modeldir            
         else:
-            raise ValueError("training can only glue to lcfit")
+            raise ValueError("training can only glue to lcfit and sim")
 
     def gen_input(self,outname=[]):
         self.outname = outname
