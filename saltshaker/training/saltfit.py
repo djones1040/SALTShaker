@@ -468,7 +468,7 @@ class GaussNewton(saltresids.SALTResids):
 		if suppressregularization:
 			self.neff[self.neff<self.neffMax]=10
         
-		residuals,jac=self.lsqwrap(X,storedResults,varyingParams,True,doSpecResids=True)
+		residuals,jac=self.lsqwrap(X,{},varyingParams,True,doSpecResids=True)
 
 		self.updateEffectivePoints(X)
 		#Simple preconditioning of the jacobian before attempting to invert
