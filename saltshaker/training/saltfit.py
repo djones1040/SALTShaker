@@ -458,7 +458,7 @@ class GaussNewton(saltresids.SALTResids):
 				self.fitlist = [f for f in kwargs['fitting_sequence'].split(',')]
 		else:
 			self.__dict__=args[0].__dict__.copy()
-	def datauncertaintiesfromhessianapprox(self,X,storedResults,suppressregularization=True,smoothingfactor=150):
+	def datauncertaintiesfromhessianapprox(self,X,suppressregularization=True,smoothingfactor=150):
 		"""Approximate Hessian by jacobian times own transpose to determine uncertainties in flux surfaces"""
 		log.info("determining M0/M1 errors by approximated Hessian")
 		import time
@@ -672,7 +672,7 @@ class GaussNewton(saltresids.SALTResids):
 			Xredefined=X.copy()
 		
 		if getdatauncertainties:
-			M0dataerr, M1dataerr,cov_M0_M1_data=self.datauncertaintiesfromhessianapprox(Xredefined,{})
+			M0dataerr, M1dataerr,cov_M0_M1_data=self.datauncertaintiesfromhessianapprox(Xredefined)
 		else:
 			M0dataerr, M1dataerr,cov_M0_M1_data=None,None,None
 		# M0/M1 errors
