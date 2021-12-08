@@ -458,7 +458,7 @@ class GaussNewton(saltresids.SALTResids):
 				self.fitlist = [f for f in kwargs['fitting_sequence'].split(',')]
 		else:
 			self.__dict__=args[0].__dict__.copy()
-	def datauncertaintiesfromhessianapprox(self,X,storedResults,suppressregularization=True,smoothingfactor=150):
+	def datauncertaintiesfromhessianapprox(self,X,suppressregularization=True,smoothingfactor=150):
 		"""Approximate Hessian by jacobian times own transpose to determine uncertainties in flux surfaces"""
 		log.info("determining M0/M1 errors by approximated Hessian")
 		import time
@@ -468,7 +468,7 @@ class GaussNewton(saltresids.SALTResids):
 		if suppressregularization:
 			self.neff[self.neff<self.neffMax]=10
         
-		residuals,jac=self.lsqwrap(X,storedResults,varyingParams,True,doSpecResids=True)
+		residuals,jac=self.lsqwrap(X,{},varyingParams,True,doSpecResids=True)
 
 		self.updateEffectivePoints(X)
 		#Simple preconditioning of the jacobian before attempting to invert
@@ -515,6 +515,7 @@ class GaussNewton(saltresids.SALTResids):
 		M1dataerr=np.clip(M1dataerr,0,np.abs(M1).max()*2)
 		correlation=np.clip(correlation,-1,1)
 		cov_M0_M1_data=correlation*(M0dataerr*M1dataerr)
+
 		return M0dataerr, M1dataerr,cov_M0_M1_data
 
 	def datauncertaintiesfromjackknife(self,X,max_iter,n_bootstrapsamples):
@@ -671,7 +672,7 @@ class GaussNewton(saltresids.SALTResids):
 			Xredefined=X.copy()
 		
 		if getdatauncertainties:
-			M0dataerr, M1dataerr,cov_M0_M1_data=self.datauncertaintiesfromhessianapprox(Xredefined,storedResults)
+			M0dataerr, M1dataerr,cov_M0_M1_data=self.datauncertaintiesfromhessianapprox(Xredefined)
 		else:
 			M0dataerr, M1dataerr,cov_M0_M1_data=None,None,None
 		# M0/M1 errors
