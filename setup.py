@@ -23,7 +23,7 @@ URL = 'saltshaker.readthedocs.org'
 setup(
 	name='saltshaker',
 	version=VERSION,
-	packages=['saltshaker','saltshaker.tests','saltshaker.data','saltshaker.simulation',
+	packages=['bin','saltshaker','saltshaker.tests','saltshaker.data','saltshaker.simulation',
 			  'saltshaker.training','saltshaker.util','saltshaker.initfiles',
 			  'saltshaker.validation','saltshaker.pipeline','saltshaker.config'],
 	cmdclass={'test': SALTShakerTest},

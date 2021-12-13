@@ -1,4 +1,4 @@
-import os
+import os,sys
 import argparse
 import configparser
 import numpy as np
@@ -59,7 +59,10 @@ class ConfigWithCommandLineOverrideParser(EnvAwareArgumentParser):
 			if 'default' in kwargs:
 				pass
 			else:
-				raise KeyError(f'Key {includedkey} not found in {(config)}, section {section}; valid keys include: '+', '.join(keys))
+				message=f"Key {keys[0]} not found in section {section}; valid keys include: {', '.join(keys)}"
+				if 'help' in kwargs:
+					message+=f"\nHelp string: {kwargs['help'].format(**kwargs)}"
+				raise KeyError(message)
 		if 'nargs' in kwargs and ((type(kwargs['nargs']) is int and kwargs['nargs']>1) or (type(kwargs['nargs'] is str and (kwargs['nargs'] in ['+','*'])))):
 			if not 'type' in kwargs:
 				kwargs['default']=kwargs['default'].split(',')
@@ -111,6 +114,8 @@ class TrainSALTBase:
 							help='debug mode: more output and debug files')
 		parser.add_argument('--clobber', default=False, action="store_true",
 							help='clobber')
+		parser.add_argument('configpositional', nargs='?',default=None, type=str,
+							help='configuration file')
 		parser.add_argument('-c','--configfile', default=None, type=str,
 							help='configuration file')
 		parser.add_argument('-s','--stage', default='all', type=str,
@@ -120,94 +125,105 @@ class TrainSALTBase:
 		parser.add_argument('--fast', default=False, action="store_true",
 							help='if set, run in fast mode for debugging')
 		
+		
+		def wrapaddingargument(*args,**kwargs):
+			#Wrap this method to catch exceptions, providing a true if no exception was raised, False otherwise.
+			try:
+				parser.add_argument_with_config_default(*args,**kwargs)
+				return True
+			except Exception as e:
+				log.error('\n'.join(e.args))
+				return False
+			
 		# input files
-		parser.add_argument_with_config_default(config,'iodata','calibrationshiftfile',	 type=str,action=FullPaths,default='',
+		successful=True
+		successful=successful&wrapaddingargument(config,'iodata','calibrationshiftfile',type=str,action=FullPaths,default='',
 							help='file containing a list of changes to zeropoint and central wavelength of filters by survey')
-		parser.add_argument_with_config_default(config,'iodata','loggingconfig','loggingconfigfile',  type=str,action=FullPaths,default='',
+		successful=successful&wrapaddingargument(config,'iodata','calib_survey_ignore',type=boolean_string,
+							help='if True, ignore survey names when applying shifts to filters')
+		successful=successful&wrapaddingargument(config,'iodata','loggingconfig','loggingconfigfile',  type=str,action=FullPaths,default='',
 							help='logging config file')
-		parser.add_argument_with_config_default(config,'iodata','trainingconfig','trainingconfigfile','modelconfigfile',  type=str,action=FullPaths,
+		successful=successful&wrapaddingargument(config,'iodata','trainingconfig','trainingconfigfile','modelconfigfile',  type=str,action=FullPaths,
 							help='Configuration file describing the construction of the model')
-		parser.add_argument_with_config_default(config,'iodata','snlists','snlistfiles',  type=str,action=FullPaths,
+		successful=successful&wrapaddingargument(config,'iodata','snlists','snlistfiles',  type=str,action=FullPaths,
 							help="""list of SNANA-formatted SN data files, including both photometry and spectroscopy. Can be multiple comma-separated lists. (default=%(default)s)""")
-		parser.add_argument_with_config_default(config,'iodata','snparlist', 'snparlistfile', type=str,action=FullPaths,
+		successful=successful&wrapaddingargument(config,'iodata','snparlist', 'snparlistfile', type=str,action=FullPaths,
 							help="""optional list of initial SN parameters.	 Needs columns SNID, zHelio, x0, x1, c""")
-		parser.add_argument_with_config_default(config,'iodata','specrecallist','specrecallistfile',  type=str,action=FullPaths,
+		successful=successful&wrapaddingargument(config,'iodata','specrecallist','specrecallistfile',  type=str,action=FullPaths,
 							help="""optional list giving number of spectral recalibration params.  Needs columns SNID, N, phase, ncalib where N is the spectrum number for a given SN, starting at 1""")
-		parser.add_argument_with_config_default(config,'iodata','tmaxlist','tmaxlistfile',	type=str,action=FullPaths,
+		successful=successful&wrapaddingargument(config,'iodata','tmaxlist','tmaxlistfile',	type=str,action=FullPaths,
 							help="""optional space-delimited list with SN ID, tmax, tmaxerr (default=%(default)s)""")
 	
 		#output files
-		parser.add_argument_with_config_default(config,'iodata','outputdir',  type=str,action=FullPaths,
+		successful=successful&wrapaddingargument(config,'iodata','outputdir',  type=str,action=FullPaths,
 							help="""data directory for spectroscopy, format should be ASCII 
 							with columns wavelength, flux, fluxerr (optional) (default=%(default)s)""")
-		parser.add_argument_with_config_default(config,'iodata','yamloutputfile', default='/dev/null',type=str,action=FullPaths,
+		successful=successful&wrapaddingargument(config,'iodata','yamloutputfile', default='/dev/null',type=str,action=FullPaths,
 							help='File to which to output a summary of the fitting process')
 		
 		#options to configure cuts
-		parser.add_argument_with_config_default(config,'iodata','dospec',  type=boolean_string,
+		successful=successful&wrapaddingargument(config,'iodata','dospec',  type=boolean_string,
 							help="""if set, look for spectra in the snlist files (default=%(default)s)""")
-		parser.add_argument_with_config_default(config,'iodata','maxsn',  type=nonetype_or_int,
+		successful=successful&wrapaddingargument(config,'iodata','maxsn',  type=nonetype_or_int,
 							help="""sets maximum number of SNe to fit for debugging (default=%(default)s)""")
-		parser.add_argument_with_config_default(config,'iodata','keeponlyspec',	 type=boolean_string,
+		successful=successful&wrapaddingargument(config,'iodata','keeponlyspec',	 type=boolean_string,
 							help="""if set, only train on SNe with spectra (default=%(default)s)""")
-		parser.add_argument_with_config_default(config,'iodata','filter_mass_tolerance',  type=float,
+		successful=successful&wrapaddingargument(config,'iodata','filter_mass_tolerance',  type=float,
 							help='Mass of filter transmission allowed outside of model wavelength range (default=%(default)s)')
 
 		#Initialize from SALT2.4		
-		parser.add_argument_with_config_default(config,'iodata','initsalt2model',  type=boolean_string,
+		successful=successful&wrapaddingargument(config,'iodata','initsalt2model',  type=boolean_string,
 							help="""If true, initialize model parameters from prior SALT2 model""")
-		parser.add_argument_with_config_default(config,'iodata','initsalt2var',	 type=boolean_string,
+		successful=successful&wrapaddingargument(config,'iodata','initsalt2var',	 type=boolean_string,
 							help="""If true, initialize model uncertainty parameters from prior SALT2 model""")
 		#Initialize from user defined files				
-		parser.add_argument_with_config_default(config,'iodata','initm0modelfile',	type=str,action=FullPaths,
+		successful=successful&wrapaddingargument(config,'iodata','initm0modelfile',	type=str,action=FullPaths,
 							help="""initial M0 model to begin training, ASCII with columns
 							phase, wavelength, flux (default=%(default)s)""")
-		parser.add_argument_with_config_default(config,'iodata','initm1modelfile',	type=str,action=FullPaths,
+		successful=successful&wrapaddingargument(config,'iodata','initm1modelfile',	type=str,action=FullPaths,
 							help="""initial M1 model with x1=1 to begin training, ASCII with columns
 							phase, wavelength, flux (default=%(default)s)""")
 		#Choose B filter definition
-		parser.add_argument_with_config_default(config,'iodata','initbfilt',  type=str,action=FullPaths,
+		successful=successful&wrapaddingargument(config,'iodata','initbfilt',  type=str,action=FullPaths,
 							help="""initial B-filter to get the normalization of the initial model (default=%(default)s)""")
 							
-		parser.add_argument_with_config_default(config,'iodata','resume_from_outputdir',  type=str,action=FullPaths,
+		successful=successful&wrapaddingargument(config,'iodata','resume_from_outputdir',  type=str,action=FullPaths,
 							help='if set, initialize using output parameters from previous run. If directory, initialize using ouptut parameters from specified directory')
-		parser.add_argument_with_config_default(config,'iodata','resume_from_gnhistory',  type=str,action=FullPaths,
+		successful=successful&wrapaddingargument(config,'iodata','resume_from_gnhistory',  type=str,action=FullPaths,
 							help='if set, initialize using output parameters from previous run saved in gaussnewtonhistory.pickle file.')
-		parser.add_argument_with_config_default(config,'iodata','error_dir', default='',type=str,action=FullPaths,
+		successful=successful&wrapaddingargument(config,'iodata','error_dir', default='',type=str,action=FullPaths,
 							help='directory with previous error files, to use with --use_previous_errors option')
 
 		
-		parser.add_argument_with_config_default(config,'iodata','fix_salt2modelpars',  type=boolean_string,
+		successful=successful&wrapaddingargument(config,'iodata','fix_salt2modelpars',  type=boolean_string,
 							help="""if set, fix M0/M1 for wavelength/phase range of original SALT2 model (default=%(default)s)""")
 		#validation option
-		parser.add_argument_with_config_default(config,'iodata','validate_modelonly',  type=boolean_string,
+		successful=successful&wrapaddingargument(config,'iodata','validate_modelonly',  type=boolean_string,
 							help="""if set, only make model plots in the validation stage""")
 		# if resume_from_outputdir, use the errors from the previous run
-		parser.add_argument_with_config_default(config,'iodata','use_previous_errors',	type=boolean_string,
+		successful=successful&wrapaddingargument(config,'iodata','use_previous_errors',	type=boolean_string,
 							help="""if set, use the errors from the previous run instead of computing new ones (can be memory intensive)""")
 
 
-		parser.add_argument_with_config_default(config,'trainparams','gaussnewton_maxiter',	 type=int,
+		successful=successful&wrapaddingargument(config,'trainparams','gaussnewton_maxiter',	 type=int,
 							help='maximum iterations for Gauss-Newton (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainparams','regularize',	type=boolean_string,
+		successful=successful&wrapaddingargument(config,'trainparams','regularize',	type=boolean_string,
 							help='turn on regularization if set (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainparams','fitsalt2',  type=boolean_string,
+		successful=successful&wrapaddingargument(config,'trainparams','fitsalt2',  type=boolean_string,
 							help='fit SALT2 as a validation check (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainparams','n_repeat',  type=int,
+		successful=successful&wrapaddingargument(config,'trainparams','n_repeat',  type=int,
 							help='repeat gauss newton n times (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainparams','fit_model_err',  type=boolean_string,
+		successful=successful&wrapaddingargument(config,'trainparams','fit_model_err',  type=boolean_string,
 							help='fit for model error if set (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainparams','fit_cdisp_only',	type=boolean_string,
+		successful=successful&wrapaddingargument(config,'trainparams','fit_cdisp_only',	type=boolean_string,
 							help='fit for color dispersion component of model error if set (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainparams','steps_between_errorfit', type=int,
+		successful=successful&wrapaddingargument(config,'trainparams','steps_between_errorfit', type=int,
 							help='fit for error model every x steps (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainparams','model_err_max_chisq', type=int,
+		successful=successful&wrapaddingargument(config,'trainparams','model_err_max_chisq', type=int,
 							help='max photometric chi2/dof below which model error estimation is done (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainparams','fit_tpkoff',	type=boolean_string,
-							help='fit for time of max in B-band if set (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainparams','fitting_sequence',  type=str,
-							help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn, tpk (default=%(default)s)")
-		parser.add_argument_with_config_default(config,'trainparams','fitprobmin',	type=float,
+		successful=successful&wrapaddingargument(config,'trainparams','fitting_sequence',  type=str,
+							help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn (default=%(default)s)")
+		successful=successful&wrapaddingargument(config,'trainparams','fitprobmin',	type=float,
 							help="Minimum FITPROB for including SNe (default=%(default)s)")
 
 
@@ -215,110 +231,121 @@ class TrainSALTBase:
 		self.surveylist = [section.replace('survey_','') for section in config.sections() if section.startswith('survey_')]
 		for survey in self.surveylist:
 			
-			parser.add_argument_with_config_default(config,f'survey_{survey}',"kcorfile" ,type=str,clargformat=f"--{survey}" +"_{key}",action=FullPaths,
+			successful=successful&wrapaddingargument(config,f'survey_{survey}',"kcorfile" ,type=str,clargformat=f"--{survey}" +"_{key}",action=FullPaths,
 								help="kcor file for survey %s"%survey)
-			parser.add_argument_with_config_default(config,f'survey_{survey}',"subsurveylist" ,type=str,clargformat=f"--{survey}" +"_{key}",
+			successful=successful&wrapaddingargument(config,f'survey_{survey}',"subsurveylist" ,type=str,clargformat=f"--{survey}" +"_{key}",
 								help="comma-separated list of subsurveys for survey %s"%survey)
-
+		if not successful: sys.exit(1)
 		return parser
 
 
 	def add_training_options(self, parser=None, usage=None, config=None):
 		if parser == None:
 			parser = ConfigWithCommandLineOverrideParser(usage=usage, conflict_handler="resolve")
+		def wrapaddingargument(*args,**kwargs):
+			#Wrap this method to catch exceptions, providing a true if no exception was raised, False otherwise.
+			try:
+				parser.add_argument_with_config_default(*args,**kwargs)
+				return True
+			except Exception as e:
+				log.error('\n'.join(e.args))
+				return False
+			
+		# input files
+		successful=True
 
 		# training params
-		parser.add_argument_with_config_default(config,'trainingparams','specrecal',  type=int,
+		successful=successful&wrapaddingargument(config,'trainingparams','specrecal',  type=int,
 							help='number of parameters defining the spectral recalibration (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainingparams','n_processes',	type=int,
+		successful=successful&wrapaddingargument(config,'trainingparams','n_processes',	type=int,
 							help='number of processes to use in calculating chi2 (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainingparams','estimate_tpk',	 type=boolean_string,
+		successful=successful&wrapaddingargument(config,'trainingparams','estimate_tpk',	 type=boolean_string,
 							help='if set, estimate time of max with quick least squares fitting (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainingparams','fix_t0',  type=boolean_string,
+		successful=successful&wrapaddingargument(config,'trainingparams','fix_t0',  type=boolean_string,
 							help='if set, don\'t allow time of max to float (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainingparams','regulargradientphase',	 type=float,
+		successful=successful&wrapaddingargument(config,'trainingparams','regulargradientphase',	 type=float,
 							help='Weighting of phase gradient chi^2 regularization during training of model parameters (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainingparams','regulargradientwave',	type=float,
+		successful=successful&wrapaddingargument(config,'trainingparams','regulargradientwave',	type=float,
 							help='Weighting of wave gradient chi^2 regularization during training of model parameters (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainingparams','regulardyad',	type=float,
+		successful=successful&wrapaddingargument(config,'trainingparams','regulardyad',	type=float,
 							help='Weighting of dyadic chi^2 regularization during training of model parameters (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainingparams','m1regularization',	 type=float,
+		successful=successful&wrapaddingargument(config,'trainingparams','m1regularization',	 type=float,
 							help='Scales regularization weighting of M1 component relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainingparams','spec_chi2_scaling',  type=float,
+		successful=successful&wrapaddingargument(config,'trainingparams','spec_chi2_scaling',  type=float,
 							help='scaling of spectral chi^2 so it doesn\'t dominate the total chi^2 (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainingparams','n_min_specrecal',	type=int,
+		successful=successful&wrapaddingargument(config,'trainingparams','n_min_specrecal',	type=int,
 							help='Minimum order of spectral recalibration polynomials (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainingparams','specrange_wavescale_specrecal',  type=float,
+		successful=successful&wrapaddingargument(config,'trainingparams','specrange_wavescale_specrecal',  type=float,
 							help='Wavelength scale (in angstroms) for determining additional orders of spectral recalibration from wavelength range of spectrum (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainingparams','n_specrecal_per_lightcurve',  type=float,
+		successful=successful&wrapaddingargument(config,'trainingparams','n_specrecal_per_lightcurve',  type=float,
 							help='Number of additional spectral recalibration orders per lightcurve (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainingparams','regularizationScaleMethod',  type=str,
+		successful=successful&wrapaddingargument(config,'trainingparams','regularizationScaleMethod',  type=str,
 							help='Choose how scale for regularization is calculated (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainingparams','binspec',	type=boolean_string,
+		successful=successful&wrapaddingargument(config,'trainingparams','binspec',	type=boolean_string,
 							help='bin the spectra if set (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainingparams','binspecres',  type=int,
+		successful=successful&wrapaddingargument(config,'trainingparams','binspecres',  type=int,
 							help='binning resolution (default=%(default)s)')
 		
 		#neff parameters
-		parser.add_argument_with_config_default(config,'trainingparams','wavesmoothingneff',  type=float,
+		successful=successful&wrapaddingargument(config,'trainingparams','wavesmoothingneff',  type=float,
 							help='Smooth effective # of spectral points along wave axis (in units of waveoutres) (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainingparams','phasesmoothingneff',  type=float,
+		successful=successful&wrapaddingargument(config,'trainingparams','phasesmoothingneff',  type=float,
 							help='Smooth effective # of spectral points along phase axis (in units of phaseoutres) (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainingparams','nefffloor',  type=float,
+		successful=successful&wrapaddingargument(config,'trainingparams','nefffloor',  type=float,
 							help='Minimum number of effective points (has to be > 0 to prevent divide by zero errors).(default=%(default)s)')
-		parser.add_argument_with_config_default(config,'trainingparams','neffmax',	type=float,
+		successful=successful&wrapaddingargument(config,'trainingparams','neffmax',	type=float,
 							help='Threshold for spectral coverage at which regularization will be turned off (default=%(default)s)')
 
 		# training model parameters
-		parser.add_argument_with_config_default(config,'modelparams','waverange', type=int, nargs=2,
+		successful=successful&wrapaddingargument(config,'modelparams','waverange', type=int, nargs=2,
 							help='wavelength range over which the model is defined (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'modelparams','colorwaverange',	type=int, nargs=2,
+		successful=successful&wrapaddingargument(config,'modelparams','colorwaverange',	type=int, nargs=2,
 							help='wavelength range over which the color law is fit to data (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'modelparams','interpfunc',	type=str,
+		successful=successful&wrapaddingargument(config,'modelparams','interpfunc',	type=str,
 							help='function to interpolate between control points in the fitting (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'modelparams','errinterporder',	type=int,
+		successful=successful&wrapaddingargument(config,'modelparams','errinterporder',	type=int,
 							help='for model uncertainty splines/polynomial funcs, order of the function (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'modelparams','interporder',	 type=int,
+		successful=successful&wrapaddingargument(config,'modelparams','interporder',	 type=int,
 							help='for model splines/polynomial funcs, order of the function (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'modelparams','wavesplineres',  type=float,
+		successful=successful&wrapaddingargument(config,'modelparams','wavesplineres',  type=float,
 							help='number of angstroms between each wavelength spline knot (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'modelparams','phasesplineres',	type=float,
+		successful=successful&wrapaddingargument(config,'modelparams','phasesplineres',	type=float,
 							help='number of angstroms between each phase spline knot (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'modelparams','waveinterpres',  type=float,
+		successful=successful&wrapaddingargument(config,'modelparams','waveinterpres',  type=float,
 							help='wavelength resolution in angstroms, used for internal interpolation (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'modelparams','phaseinterpres',	type=float,
+		successful=successful&wrapaddingargument(config,'modelparams','phaseinterpres',	type=float,
 							help='phase resolution in angstroms, used for internal interpolation (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'modelparams','waveoutres',	type=float,
+		successful=successful&wrapaddingargument(config,'modelparams','waveoutres',	type=float,
 							help='wavelength resolution in angstroms of the output file (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'modelparams','phaseoutres',	 type=float,
+		successful=successful&wrapaddingargument(config,'modelparams','phaseoutres',	 type=float,
 							help='phase resolution in angstroms of the output file (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'modelparams','phaserange', type=int, nargs=2,
+		successful=successful&wrapaddingargument(config,'modelparams','phaserange', type=int, nargs=2,
 							help='phase range over which model is trained (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'modelparams','n_components',  type=int,
+		successful=successful&wrapaddingargument(config,'modelparams','n_components',  type=int,
 							help='number of principal components of the SALT model to fit for (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'modelparams','host_component',	type=str,
+		successful=successful&wrapaddingargument(config,'modelparams','host_component',	type=str,
 							help="NOT IMPLEMENTED: if set, fit for a host component.  Must equal 'mass', for now (default=%(default)s)")
-		parser.add_argument_with_config_default(config,'modelparams','n_colorpars',	 type=int,
+		successful=successful&wrapaddingargument(config,'modelparams','n_colorpars',	 type=int,
 							help='number of degrees of the phase-independent color law polynomial (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'modelparams','n_colorscatpars',	 type=int,
+		successful=successful&wrapaddingargument(config,'modelparams','n_colorscatpars',	 type=int,
 							help='number of parameters in the broadband scatter model (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'modelparams','error_snake_phase_binsize',  type=float,
+		successful=successful&wrapaddingargument(config,'modelparams','error_snake_phase_binsize',  type=float,
 							help='number of days over which to compute scaling of error model (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'modelparams','error_snake_wave_binsize',  type=float,
+		successful=successful&wrapaddingargument(config,'modelparams','error_snake_wave_binsize',  type=float,
 							help='number of angstroms over which to compute scaling of error model (default=%(default)s)')
-		parser.add_argument_with_config_default(config,'modelparams','use_snpca_knots',	 type=boolean_string,
+		successful=successful&wrapaddingargument(config,'modelparams','use_snpca_knots',	 type=boolean_string,
 							help='if set, define model on SNPCA knots (default=%(default)s)')		
 
 		# priors
 		for prior in __priors__:
-			parser.add_argument_with_config_default(config,'priors',prior ,type=float,clargformat="--prior_{key}",
+			successful=successful&wrapaddingargument(config,'priors',prior ,type=float,clargformat="--prior_{key}",
 								help=f"prior on {prior}",default=SUPPRESS)
 
 		# bounds
 		for bound,val in config.items('bounds'):
-			parser.add_argument_with_config_default(config,'bounds', bound, type=float,nargs=3,clargformat="--bound_{key}",
+			successful=successful&wrapaddingargument(config,'bounds', bound, type=float,nargs=3,clargformat="--bound_{key}",
 								help="bound on %s"%bound)
-
+		if not successful: sys.exit(1)
 		return parser
 
 	def get_saltkw(self,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc):
@@ -352,7 +379,6 @@ class TrainSALTBase:
 						 'fit_cdisp_only':self.options.fit_cdisp_only,
 						 'model_err_max_chisq':self.options.model_err_max_chisq,
 						 'steps_between_errorfit':self.options.steps_between_errorfit,
-						 'fitTpkOff':self.options.fit_tpkoff,
 						 'spec_chi2_scaling':self.options.spec_chi2_scaling,
 						 'debug':self.options.debug,
 						 'use_previous_errors':self.options.use_previous_errors}
@@ -374,7 +400,8 @@ class TrainSALTBase:
 
 	def checkFilterMass(self,z,survey,flt):
 
-		filtwave = self.kcordict[survey][flt]['filtwave']
+		try: filtwave = self.kcordict[survey][flt]['filtwave']
+		except: raise RuntimeError(f"filter {flt} not found in kcor file for survey {survey}.  Check your config file")
 		try:
 			filttrans = self.kcordict[survey][flt]['filttrans']
 		except:
