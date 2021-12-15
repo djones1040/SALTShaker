@@ -1,0 +1,37 @@
+DOCUMENTATION:
+    PURPOSE:  Training sample for the SALT3.K21 model, the SALT3TRAIN_K21_CSPDR2 subset
+    REF: 
+    - AUTHOR: Kenworthy et al., 2021, ApJ, submitted
+      ADS:    TBD
+    - AUTHOR: Supernova Standardization Team
+      ADS:    github.com/djones1040/SALTShaker; saltshaker.readthedocs.io
+    INTENT:    Nominal
+    USAGE_KEY: VERSION_PHOTOMETRY
+    USAGE_CODE: snlc_fit.exe
+    VALIDATE_SCIENCE: Kenworthy+2021, Dai+2021 (in prep.)
+    METADATA:
+    - MWEBV: from SFD98 with SF2011 corrections (uncertainties are 5%)
+    - VPEC: from $SNANA_DIR/util/get_vpec.py, SNANA version 11_02j
+    - REDSHIFT_CMB: from $SNANA_DIR/util/get_vpec.py, SNANA version 11_02j
+    NOTES:
+    - FILTERMAP: see below for filters, zeropoints, and kcor files used with these data for SALT3.K21
+    - "KCOR" and filter files below are given with their SNDATA_ROOT paths, but they are also included in subdirectories
+      SALT3TRAIN_K21_kcor and SALT3TRAIN_K21_filters in the public data release at https://readthedocs.org/projects/saltshaker/
+    VERSION:
+    - DATE: 2021-04
+      AUTHOR: D. Jones
+DOCUMENTATION_END:
+
+KCOR file: $SNDATA_ROOT/kcor/SALT3TRAIN_K21/kcor_CSPDR2.fits
+
+FILTERMAP
+---------
+short_name full_name mag_sys zpt_offset filename
+t              CSP-u    BD17    10.5195 $SNDATA_ROOT/filters/PS1/Pantheon/CSP_Str11/u_texas_WLcorr_atm.txt
+u              CSP-B    BD17     9.8682 $SNDATA_ROOT/filters/PS1/Pantheon/CSP_Str11/B_texas_WLcorr_atm.txt
+v              CSP-o    BD17     9.4784 $SNDATA_ROOT/filters/PS1/Pantheon/CSP_Str11/V_LC3009_texas_WLcorr_atm.txt
+w              CSP-m    BD17     9.4730 $SNDATA_ROOT/filters/PS1/Pantheon/CSP_Str11/V_LC3014_texas_WLcorr_atm.txt
+x              CSP-n    BD17     9.4792 $SNDATA_ROOT/filters/PS1/Pantheon/CSP_Str11/V_LC9844_texas_WLcorr_atm.txt
+y              CSP-g    BD17     9.6529 $SNDATA_ROOT/filters/PS1/Pantheon/CSP_Str11/g_texas_WLcorr_atm.txt
+z              CSP-r    BD17     9.3528 $SNDATA_ROOT/filters/PS1/Pantheon/CSP_Str11/r_texas_WLcorr_atm.txt
+A              CSP-i    BD17     9.2339 $SNDATA_ROOT/filters/PS1/Pantheon/CSP_Str11/i_texas_WLcorr_atm.txt

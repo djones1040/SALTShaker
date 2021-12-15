@@ -271,6 +271,8 @@ class TrainSALTBase:
 							help='Weighting of dyadic chi^2 regularization during training of model parameters (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'trainingparams','m1regularization',	 type=float,
 							help='Scales regularization weighting of M1 component relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
+		successful=successful&wrapaddingargument(config,'trainingparams','mhostregularization',	 type=float,
+							help='Scales regularization weighting of host component relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'trainingparams','spec_chi2_scaling',  type=float,
 							help='scaling of spectral chi^2 so it doesn\'t dominate the total chi^2 (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'trainingparams','n_min_specrecal',	type=int,
@@ -351,7 +353,8 @@ class TrainSALTBase:
 	def get_saltkw(self,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc):
 
 
-		saltfitkwargs = {'m1regularization':self.options.m1regularization,'bsorder':self.options.interporder,'errbsorder':self.options.errinterporder,
+		saltfitkwargs = {'m1regularization':self.options.m1regularization,'mhostregularization':self.options.mhostregularization,
+                         'bsorder':self.options.interporder,'errbsorder':self.options.errinterporder,
 						 'waveSmoothingNeff':self.options.wavesmoothingneff,'phaseSmoothingNeff':self.options.phasesmoothingneff,
 						 'neffFloor':self.options.nefffloor, 'neffMax':self.options.neffmax,
 						 'specrecal':self.options.specrecal, 'regularizationScaleMethod':self.options.regularizationScaleMethod,

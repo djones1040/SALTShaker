@@ -189,7 +189,7 @@ class TrainSALT(TrainSALTBase):
         phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
             self.options.inithsiaofile,self.options.initbfilt,_flatnu,**init_options)
         if self.options.host_component:
-            mhostknots = np.zeros(len(m0knots))
+            mhostknots = m0knots*0.01 # 1% of M0?  why not
         
         if self.options.initsalt2model:
             if self.options.initm0modelfile =='':
@@ -249,6 +249,7 @@ class TrainSALT(TrainSALTBase):
             parlist = np.append(parlist,['cl']*self.options.n_colorpars)
         if self.options.error_snake_phase_binsize and self.options.error_snake_wave_binsize:
             for i in range(self.options.n_components): parlist = np.append(parlist,['modelerr_{}'.format(i)]*n_errphaseknots*n_errwaveknots)
+            if self.options.host_component: parlist = np.append(parlist,['modelerr_host']*len(mhostvarknots))
             if self.options.n_components == 2:
                 parlist = np.append(parlist,['modelcorr_01']*n_errphaseknots*n_errwaveknots)
         
@@ -360,7 +361,7 @@ class TrainSALT(TrainSALTBase):
                         guess[parlist == 'x0_%s'%sn] = snpar['x0'][iSN]
                         guess[parlist == 'x1_%s'%sn] = snpar['x1'][iSN]
                         if self.options.host_component:
-                            guess[parlist == f'x1_{sn}'] = snpar['xhost'][iSN]
+                            guess[parlist == f'xhost_{sn}'] = snpar['xhost'][iSN]
 
                         guess[parlist == 'c_%s'%sn] = snpar['c'][iSN]
                     else:
@@ -484,18 +485,21 @@ class TrainSALT(TrainSALTBase):
         np.save('{}/salt3_loglikes.npy'.format(outdir),loglikes)
         # principal components and color law
         with open(f'{outdir}/salt3_template_0.dat','w') as foutm0, open('%s/salt3_template_1.dat'%outdir,'w') as foutm1,\
+             open(f'{outdir}/salt3_template_host.dat','w') as foutmhost,\
              open(f'{outdir}/salt3_lc_model_variance_0.dat','w') as foutm0modelerr,\
              open(f'{outdir}/salt3_lc_model_variance_1.dat','w') as foutm1modelerr,\
              open(f'{outdir}/salt3_lc_dispersion_scaling.dat','w') as fouterrmod,\
              open(f'{outdir}/salt3_lc_model_covariance_01.dat','w') as foutmodelcov,\
              open(f'{outdir}/salt3_lc_covariance_01.dat','w') as foutdatacov,\
              open(f'{outdir}/salt3_lc_variance_0.dat','w') as foutm0dataerr,\
-             open(f'{outdir}/salt3_lc_variance_1.dat','w') as foutm1dataerr:
+             open(f'{outdir}/salt3_lc_variance_1.dat','w') as foutm1dataerr,\
+             open(f'{outdir}/salt3_lc_variance_host.dat','w') as foutmhostdataerr:
         
             for i,p in enumerate(trainingresult.phase):
                 for j,w in enumerate(trainingresult.wave):
                     print(f'{p:.1f} {w:.2f} {trainingresult.M0[i,j]:8.15e}',file=foutm0)
                     print(f'{p:.1f} {w:.2f} {trainingresult.M1[i,j]:8.15e}',file=foutm1)
+                    print(f'{p:.1f} {w:.2f} {trainingresult.Mhost[i,j]:8.15e}',file=foutmhost)
                     if not self.options.use_previous_errors:
                         print(f'{p:.1f} {w:.2f} {trainingresult.M0modelerr[i,j]**2.:8.15e}',file=foutm0modelerr)
                         print(f'{p:.1f} {w:.2f} {trainingresult.M1modelerr[i,j]**2.:8.15e}',file=foutm1modelerr)
@@ -504,9 +508,10 @@ class TrainSALT(TrainSALTBase):
                         print(f'{p:.1f} {w:.2f} {trainingresult.modelerr[i,j]:8.15e}',file=fouterrmod)
                         print(f'{p:.1f} {w:.2f} {trainingresult.M0dataerr[i,j]**2.+trainingresult.M0modelerr[i,j]**2.:8.15e}',file=foutm0dataerr)
                         print(f'{p:.1f} {w:.2f} {trainingresult.M1dataerr[i,j]**2.+trainingresult.M1modelerr[i,j]**2.:8.15e}',file=foutm1dataerr)
-
+                        print(f'{p:.1f} {w:.2f} {trainingresult.Mhostdataerr[i,j]**2.:8.15e}',file=foutmhostdataerr)
+                        
         if self.options.use_previous_errors and self.options.resume_from_outputdir:
-            for filename in ['salt3_lc_variance_0.dat','salt3_lc_variance_1.dat',
+            for filename in ['salt3_lc_variance_0.dat','salt3_lc_variance_1.dat','salt3_lc_variance_host.dat',
                              'salt3_lc_covariance_01.dat','salt3_lc_variance_0.dat','salt3_lc_variance_1.dat']:
                 os.system(f"cp {self.options.resume_from_outputdir}/{filename} {outdir}/{filename}")
         elif self.options.use_previous_errors and self.options.error_dir:
@@ -663,7 +668,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 
         plotSALTModel.mkModelPlot(outputdir,outfile=f'{outputdir}/SALTmodelcomp.png',
                                   xlimits=[self.options.waverange[0],self.options.waverange[1]],
-                                  n_colorpars=self.options.n_colorpars)
+                                  n_colorpars=self.options.n_colorpars,host_component=self.options.host_component)
         SynPhotPlot.plotSynthPhotOverStretchRange(
             '{}/synthphotrange.pdf'.format(outputdir),outputdir,'SDSS')
         SynPhotPlot.overPlotSynthPhotByComponent(
