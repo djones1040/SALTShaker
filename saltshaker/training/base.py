@@ -197,7 +197,9 @@ class TrainSALTBase:
 		
 		successful=successful&wrapaddingargument(config,'iodata','fix_salt2modelpars',  type=boolean_string,
 							help="""if set, fix M0/M1 for wavelength/phase range of original SALT2 model (default=%(default)s)""")
-		#validation option
+		successful=successful&wrapaddingargument(config,'iodata','fix_salt2components',  type=boolean_string,
+							help="""if set, fix M0/M1 for *all* wavelength/phases (default=%(default)s)""")
+#validation option
 		successful=successful&wrapaddingargument(config,'iodata','validate_modelonly',  type=boolean_string,
 							help="""if set, only make model plots in the validation stage""")
 		# if resume_from_outputdir, use the errors from the previous run
@@ -384,8 +386,10 @@ class TrainSALTBase:
 						 'steps_between_errorfit':self.options.steps_between_errorfit,
 						 'spec_chi2_scaling':self.options.spec_chi2_scaling,
 						 'debug':self.options.debug,
-						 'use_previous_errors':self.options.use_previous_errors}
-		
+						 'use_previous_errors':self.options.use_previous_errors,
+                         'fix_salt2modelpars':self.options.fix_salt2modelpars,
+                         'fix_salt2components':self.options.fix_salt2components}
+
 		for k in self.options.__dict__.keys():
 			if k.startswith('prior') or k.startswith('bound'):
 				saltfitkwargs[k] = self.options.__dict__[k]

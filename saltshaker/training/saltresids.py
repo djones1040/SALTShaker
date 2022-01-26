@@ -805,9 +805,10 @@ class SALTResids:
         x0Deriv= varyParams[sndata.ix0]
         x1Deriv= varyParams[sndata.ix1]
         cDeriv=  varyParams[sndata.ic]
-        requiredPCDerivs=varyParams[self.im0]|varyParams[self.im1]|varyParams[self.imhost]
-        
-        
+        if self.host_component:
+            requiredPCDerivs=varyParams[self.im0]|varyParams[self.im1]|varyParams[self.imhost]
+        else:
+            requiredPCDerivs=varyParams[self.im0]|varyParams[self.im1]
         
         colorlaw,colorexp=storedResults['colorLaw'],temporaryResults['colorexp']
         reddenedsalt2flux=colorexp*temporaryResults['fluxInterp']
@@ -897,7 +898,10 @@ class SALTResids:
 
         x1Deriv= varyParams[sndata.ix1]
         cDeriv=  varyParams[sndata.ic]
-        requiredPCDerivs=varyParams[self.im0]|varyParams[self.im1]|varyParams[self.imhost]
+        if self.host_component:
+            requiredPCDerivs=varyParams[self.im0]|varyParams[self.im1]|varyParams[self.imhost]
+        else:
+            requiredPCDerivs=varyParams[self.im0]|varyParams[self.im1]
         
         resultsdict={}
 
@@ -965,12 +969,16 @@ class SALTResids:
             if (requiredPCDerivs).any():
                 intmult = _SCALE_FACTOR/(1+z)*recalexp*sndata.mwextcurveint(spectrum.wavelength)
                 derivInterp=spectrum.pcderivsparse.multiply(intmult[:,np.newaxis]).tocsc()
-                specresultsdict['modelflux_jacobian'][:,(self.parlist=='m0')]  = \
-                    (derivInterp[:,varyParams[self.im0]]*(x0[0])).toarray()
-                specresultsdict['modelflux_jacobian'][:,(self.parlist=='m1')] = \
-                    ( derivInterp[:,varyParams[self.im1]]*(x1*x0[0])).toarray()
-                specresultsdict['modelflux_jacobian'][:,(self.parlist=='mhost')] = \
-                    ( derivInterp[:,varyParams[self.imhost]]*(xhost*x0[0])).toarray()
+                #import pdb; pdb.set_trace()
+                if varyParams[self.im0].any():
+                    specresultsdict['modelflux_jacobian'][:,(self.parlist=='m0')]  = \
+                        (derivInterp[:,varyParams[self.im0]]*(x0[0])).toarray()
+                if varyParams[self.im1].any():
+                    specresultsdict['modelflux_jacobian'][:,(self.parlist=='m1')] = \
+                        ( derivInterp[:,varyParams[self.im1]]*(x1*x0[0])).toarray()
+                if self.host_component:
+                    specresultsdict['modelflux_jacobian'][:,(self.parlist=='mhost')] = \
+                        ( derivInterp[:,varyParams[self.imhost]]*(xhost*x0[0])).toarray()
 
             if (requiredPCDerivs).any():
                 resultsdict[k]['modelflux_jacobian']=sparse.csr_matrix(resultsdict[k]['modelflux_jacobian'])
@@ -1406,6 +1414,7 @@ class SALTResids:
             m0err,m1err,mhosterr = self.ErrModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)
         else:
             m0,m1=self.SALTModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)
+            mhost = None
             m0err,m1err = self.ErrModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)            
         if not len(clpars): clpars = []
 
@@ -1413,6 +1422,7 @@ class SALTResids:
 
         cov_m0_m1 = self.CorrelationModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)[0]*m0err*m1err
         modelerr=np.ones(m0err.shape)
+
         return(x,self.phaseout,self.waveout,m0,m0err,m1,m1err,mhost,cov_m0_m1,modelerr,
                clpars,clerr,clscat,resultsdict)
 

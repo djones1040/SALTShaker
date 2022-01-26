@@ -434,7 +434,6 @@ class TrainSALT(TrainSALTBase):
             
             saltfitkwargs['regularize'] = self.options.regularize
             saltfitkwargs['fitting_sequence'] = self.options.fitting_sequence
-            saltfitkwargs['fix_salt2modelpars'] = self.options.fix_salt2modelpars
             saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)
             if returnGN:
                 return fitter,saltfitter,x_modelpars
@@ -478,9 +477,7 @@ class TrainSALT(TrainSALTBase):
             for name,par in zip(trainingresult.parlist,trainingresult.X_raw):
 
                 foutpars.write('{: <30} {:.15e}\n'.format(name,par))
-        
-        #Save mcmc chain and log_likelihoods
-        
+
         np.save('{}/salt3_mcmcchain.npy'.format(outdir),chain)
         np.save('{}/salt3_loglikes.npy'.format(outdir),loglikes)
         # principal components and color law
@@ -499,7 +496,7 @@ class TrainSALT(TrainSALTBase):
                 for j,w in enumerate(trainingresult.wave):
                     print(f'{p:.1f} {w:.2f} {trainingresult.M0[i,j]:8.15e}',file=foutm0)
                     print(f'{p:.1f} {w:.2f} {trainingresult.M1[i,j]:8.15e}',file=foutm1)
-                    print(f'{p:.1f} {w:.2f} {trainingresult.Mhost[i,j]:8.15e}',file=foutmhost)
+                    if self.options.host_component: print(f'{p:.1f} {w:.2f} {trainingresult.Mhost[i,j]:8.15e}',file=foutmhost)
                     if not self.options.use_previous_errors:
                         print(f'{p:.1f} {w:.2f} {trainingresult.M0modelerr[i,j]**2.:8.15e}',file=foutm0modelerr)
                         print(f'{p:.1f} {w:.2f} {trainingresult.M1modelerr[i,j]**2.:8.15e}',file=foutm1modelerr)

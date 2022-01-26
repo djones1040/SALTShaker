@@ -418,8 +418,7 @@ class GaussNewton(saltresids.SALTResids):
                         includePars[self.ix1]=True
                         includePars[self.ic]=True
                         includePars[self.iCL]=True
-                        includePars[self.ispcrcl]=True
-                
+                        includePars[self.ispcrcl]=True                
                     elif fit=='x0':
                         self.damping[fit]=0
                         includePars[self.ix0]=True
@@ -450,9 +449,13 @@ class GaussNewton(saltresids.SALTResids):
         restricted parameter set has not been implemented: {}""".format(fit))
                 if self.fix_salt2modelpars:
                     includePars[self.im0]=False
-                    includePars[self.im1]=False     
+                    includePars[self.im1]=False
                     includePars[self.im0new]=True
                     includePars[self.im1new]=True
+                elif self.fix_salt2components:
+                    includePars[self.im0]=False
+                    includePars[self.im1]=False
+                
                 self.fitOptions[fit]=(message,includePars)
 
             if kwargs['fitting_sequence'].lower() == 'default' or not kwargs['fitting_sequence']:
@@ -678,6 +681,7 @@ class GaussNewton(saltresids.SALTResids):
         except AssertionError:
             logging.critical('Rescaling components failed; photometric residuals have changed. Will finish writing output using unscaled quantities')
             Xredefined=X.copy()
+
         log.info('hack - no data uncertainties while we sort out host component things')
         getdatauncertainties = False
         if getdatauncertainties:
@@ -1201,6 +1205,7 @@ class GaussNewton(saltresids.SALTResids):
         tol=1e-8
         #Convenience function to encapsulate the code to calculate LSMR results with varying damping
         def gaussNewtonFit(damping):
+            #import pdb; pdb.set_trace()
             result=sprslinalg.lsmr(precondjac,residuals,damp=damping,maxiter=2*min(jacobian.shape),atol=tol,btol=tol)
             gaussNewtonStep=np.zeros(X.size)
             gaussNewtonStep[varyingParams]=preconditoningMatrix*result[0]
