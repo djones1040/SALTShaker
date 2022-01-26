@@ -2108,11 +2108,11 @@ def _write_nml_to_file(nml,filename,headerlines=[],append=False):
             lines.append('&'+key.upper()+'\n')
             for key2 in nml[key].keys():
                 value = nmlval_to_abspath(key2,nml[key][key2])
-                if isinstance(value,str) and not value.replace(".","").isdigit():
+                if isinstance(value,str) and not value.replace(".","").replace(",","").isdigit():
                     value = "'{}'".format(value.replace("'",""))
                 elif isinstance(value,list):
                     vlist_to_join = [x for x in value if x is not None]
-                    value = ','.join(["'{}'".format(str(x.replace("'",""))) if isinstance(x,str) and not x.replace(".","").isdigit() else str(x) for x in vlist_to_join])
+                    value = ','.join(["'{}'".format(str(x.replace("'",""))) if isinstance(x,str) and not x.replace(".","").replace(",","").isdigit() else str(x) for x in vlist_to_join])
                 # outfile.write("  {} = {}".format(key2.upper(),value))
                 # outfile.write("\n")
                 valstr = "  {} = {}\n".format(key2.upper(),value)
