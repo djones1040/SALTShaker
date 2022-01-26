@@ -197,7 +197,9 @@ class TrainSALTBase:
 		
 		successful=successful&wrapaddingargument(config,'iodata','fix_salt2modelpars',  type=boolean_string,
 							help="""if set, fix M0/M1 for wavelength/phase range of original SALT2 model (default=%(default)s)""")
-		#validation option
+		successful=successful&wrapaddingargument(config,'iodata','fix_salt2components',  type=boolean_string,
+							help="""if set, fix M0/M1 for *all* wavelength/phases (default=%(default)s)""")
+#validation option
 		successful=successful&wrapaddingargument(config,'iodata','validate_modelonly',  type=boolean_string,
 							help="""if set, only make model plots in the validation stage""")
 		# if resume_from_outputdir, use the errors from the previous run
@@ -271,6 +273,8 @@ class TrainSALTBase:
 							help='Weighting of dyadic chi^2 regularization during training of model parameters (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'trainingparams','m1regularization',	 type=float,
 							help='Scales regularization weighting of M1 component relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
+		successful=successful&wrapaddingargument(config,'trainingparams','mhostregularization',	 type=float,
+							help='Scales regularization weighting of host component relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'trainingparams','spec_chi2_scaling',  type=float,
 							help='scaling of spectral chi^2 so it doesn\'t dominate the total chi^2 (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'trainingparams','n_min_specrecal',	type=int,
@@ -351,7 +355,8 @@ class TrainSALTBase:
 	def get_saltkw(self,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc):
 
 
-		saltfitkwargs = {'m1regularization':self.options.m1regularization,'bsorder':self.options.interporder,'errbsorder':self.options.errinterporder,
+		saltfitkwargs = {'m1regularization':self.options.m1regularization,'mhostregularization':self.options.mhostregularization,
+                         'bsorder':self.options.interporder,'errbsorder':self.options.errinterporder,
 						 'waveSmoothingNeff':self.options.wavesmoothingneff,'phaseSmoothingNeff':self.options.phasesmoothingneff,
 						 'neffFloor':self.options.nefffloor, 'neffMax':self.options.neffmax,
 						 'specrecal':self.options.specrecal, 'regularizationScaleMethod':self.options.regularizationScaleMethod,
@@ -381,8 +386,10 @@ class TrainSALTBase:
 						 'steps_between_errorfit':self.options.steps_between_errorfit,
 						 'spec_chi2_scaling':self.options.spec_chi2_scaling,
 						 'debug':self.options.debug,
-						 'use_previous_errors':self.options.use_previous_errors}
-		
+						 'use_previous_errors':self.options.use_previous_errors,
+                         'fix_salt2modelpars':self.options.fix_salt2modelpars,
+                         'fix_salt2components':self.options.fix_salt2components}
+
 		for k in self.options.__dict__.keys():
 			if k.startswith('prior') or k.startswith('bound'):
 				saltfitkwargs[k] = self.options.__dict__[k]

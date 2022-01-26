@@ -1,0 +1,9 @@
+5
+-5.2458597689e-01
+6.7012374148e-01
+-4.3598109078e-01
+1.1584334388e-01
+-1.0689128796e-02
+Salt2ExtinctionLaw.version 1
+            Salt2ExtinctionLaw.min_lambda 2800
+            Salt2ExtinctionLaw.max_lambda 8000
