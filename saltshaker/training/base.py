@@ -400,9 +400,9 @@ class TrainSALTBase:
 		passescuts= [cut.passescut(sn) for cut in cuts]
 		
 		if not all(passescuts): # or iPreMaxCut < 2 or medSNR < 10:
-			
-			log.debug('SN %s fails cuts'%sn)
+			log.debug('SN %s fails cuts'%sn.snid)
 			log.debug(', '.join([f'{cut.cutvalue(sn)} {cut.description} ({cut.requirement} needed)' for cut in cuts]))
+			import pdb; pdb.set_trace()
 		return not all(passescuts)
 
 	def checkFilterMass(self,z,survey,flt):

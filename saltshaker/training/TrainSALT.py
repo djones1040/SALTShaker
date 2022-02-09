@@ -488,6 +488,8 @@ class TrainSALT(TrainSALTBase):
              open(f'{outdir}/salt3_lc_dispersion_scaling.dat','w') as fouterrmod,\
              open(f'{outdir}/salt3_lc_model_covariance_01.dat','w') as foutmodelcov,\
              open(f'{outdir}/salt3_lc_covariance_01.dat','w') as foutdatacov,\
+             open(f'{outdir}/salt3_lc_covariance_0host.dat','w') as foutm0mhostcov,\
+             open(f'{outdir}/salt3_lc_covariance_1host.dat','w') as foutm1mhostcov,\
              open(f'{outdir}/salt3_lc_variance_0.dat','w') as foutm0dataerr,\
              open(f'{outdir}/salt3_lc_variance_1.dat','w') as foutm1dataerr,\
              open(f'{outdir}/salt3_lc_variance_host.dat','w') as foutmhostdataerr:
@@ -506,14 +508,19 @@ class TrainSALT(TrainSALTBase):
                         print(f'{p:.1f} {w:.2f} {trainingresult.M0dataerr[i,j]**2.+trainingresult.M0modelerr[i,j]**2.:8.15e}',file=foutm0dataerr)
                         print(f'{p:.1f} {w:.2f} {trainingresult.M1dataerr[i,j]**2.+trainingresult.M1modelerr[i,j]**2.:8.15e}',file=foutm1dataerr)
                         print(f'{p:.1f} {w:.2f} {trainingresult.Mhostdataerr[i,j]**2.:8.15e}',file=foutmhostdataerr)
+                        print(f'{p:.1f} {w:.2f} {trainingresult.cov_M0_Mhost_data[i,j]:8.15e}',file=foutm0mhostcov)
+                        print(f'{p:.1f} {w:.2f} {trainingresult.cov_M1_Mhost_data[i,j]:8.15e}',file=foutm1mhostcov)
                         
         if self.options.use_previous_errors and self.options.resume_from_outputdir:
             for filename in ['salt3_lc_variance_0.dat','salt3_lc_variance_1.dat','salt3_lc_variance_host.dat',
-                             'salt3_lc_covariance_01.dat','salt3_lc_variance_0.dat','salt3_lc_variance_1.dat']:
+                             'salt3_lc_covariance_01.dat','salt3_lc_covariance_0host.dat','salt3_lc_covariance_1host.dat',
+                             'salt3_lc_variance_0.dat','salt3_lc_variance_1.dat']:
                 os.system(f"cp {self.options.resume_from_outputdir}/{filename} {outdir}/{filename}")
         elif self.options.use_previous_errors and self.options.error_dir:
             for filename in ['salt3_lc_variance_0.dat','salt3_lc_variance_1.dat',
-                             'salt3_lc_covariance_01.dat','salt3_lc_variance_0.dat','salt3_lc_variance_1.dat']:
+                             'salt3_lc_covariance_01.dat','salt3_lc_variance_0.dat',
+                             'salt3_lc_covariance_0host.dat','salt3_lc_covariance_1host.dat',
+                             'salt3_lc_variance_1.dat']:
                 os.system(f"cp {self.options.error_dir}/{filename} {outdir}/{filename}")
                 
         with open(f'{outdir}/salt3_color_dispersion.dat','w') as foutclscat:
