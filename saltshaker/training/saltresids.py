@@ -809,7 +809,7 @@ class SALTResids:
             requiredPCDerivs=varyParams[self.im0]|varyParams[self.im1]|varyParams[self.imhost]
         else:
             requiredPCDerivs=varyParams[self.im0]|varyParams[self.im1]
-        
+            
         colorlaw,colorexp=storedResults['colorLaw'],temporaryResults['colorexp']
         reddenedsalt2flux=colorexp*temporaryResults['fluxInterp']
         photresultsdict={}
@@ -867,13 +867,14 @@ class SALTResids:
                     derivInterp=lcdata.pcderivsparse[p][:,requiredPCDerivs]
                     summation=derivInterp.T.dot(passbandColorExp[0])
 
+
                     filtresultsdict['modelflux_jacobian'][p,self.im0[varyParams[self.im0]]]=\
-                        summation[varyParams[self.im0]]*intmult
+                        summation[varyParams[self.im0[requiredPCDerivs]]]*intmult
                     filtresultsdict['modelflux_jacobian'][p,self.im1[varyParams[self.im1]]]=\
-                        summation[varyParams[self.im1]]*intmult*x1
+                        summation[varyParams[self.im1[requiredPCDerivs]]]*intmult*x1
                     if self.host_component:
                         filtresultsdict['modelflux_jacobian'][p,self.imhost[varyParams[self.imhost]]]=\
-                            summation[varyParams[self.imhost]]*intmult*xhost
+                            summation[varyParams[self.imhost[requiredPCDerivs]]]*intmult*xhost
                         
                     
             filtresultsdict['modelflux_jacobian']=sparse.csr_matrix(filtresultsdict['modelflux_jacobian'])
@@ -971,14 +972,14 @@ class SALTResids:
                 derivInterp=spectrum.pcderivsparse.multiply(intmult[:,np.newaxis]).tocsc()
                 #import pdb; pdb.set_trace()
                 if varyParams[self.im0].any():
-                    specresultsdict['modelflux_jacobian'][:,(self.parlist=='m0')]  = \
-                        (derivInterp[:,varyParams[self.im0]]*(x0[0])).toarray()
+                    specresultsdict['modelflux_jacobian'][:,(varyParams) & (self.parlist == 'm0')]  = \
+                        (derivInterp[:,varyParams[self.im0[requiredPCDerivs]]]*(x0[0])).toarray()
                 if varyParams[self.im1].any():
-                    specresultsdict['modelflux_jacobian'][:,(self.parlist=='m1')] = \
-                        ( derivInterp[:,varyParams[self.im1]]*(x1*x0[0])).toarray()
+                    specresultsdict['modelflux_jacobian'][:,(varyParams) & (self.parlist == 'm1')] = \
+                        ( derivInterp[:,varyParams[self.im1[requiredPCDerivs]]]*(x1*x0[0])).toarray()
                 if self.host_component:
-                    specresultsdict['modelflux_jacobian'][:,(self.parlist=='mhost')] = \
-                        ( derivInterp[:,varyParams[self.imhost]]*(xhost*x0[0])).toarray()
+                    specresultsdict['modelflux_jacobian'][:,(varyParams) & (self.parlist == 'mhost')] = \
+                        ( derivInterp[:,varyParams[self.imhost[requiredPCDerivs]]]*(xhost*x0[0])).toarray()
 
             if (requiredPCDerivs).any():
                 resultsdict[k]['modelflux_jacobian']=sparse.csr_matrix(resultsdict[k]['modelflux_jacobian'])
@@ -1709,7 +1710,7 @@ class SALTResids:
             else: jacobian = jacobian = sparse.csr_matrix((resids[-1].size,self.parlist.size))
             
             if boolIndex[varyParams].any():
-                jacobian[:,boolIndex]=((dnumerator*(scale[i]**2 )- scaleDeriv[i][np.newaxis,np.newaxis,varyParams[indices]]*2*scale[i]*numerator[:,:,np.newaxis])/self.neff[:,:,np.newaxis]*normalization / scale[i]**4  ).reshape(-1, varyParams[indices].sum())
+                jacobian[:,boolIndex & varyParams]=((dnumerator*(scale[i]**2 )- scaleDeriv[i][np.newaxis,np.newaxis,varyParams[indices]]*2*scale[i]*numerator[:,:,np.newaxis])/self.neff[:,:,np.newaxis]*normalization / scale[i]**4  ).reshape(-1, varyParams[indices].sum())
             jac += [sparse.csr_matrix(jacobian)]
             
         return resids,jac
@@ -1775,8 +1776,7 @@ class SALTResids:
             else: jacobian = jacobian = sparse.csr_matrix((resids[-1].size,self.parlist.size))
 
             if boolIndex[varyParams].any():
-                jacobian[:,boolIndex]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
-
+                jacobian[:,boolIndex & varyParams]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
             jac+= [sparse.csr_matrix(jacobian)]
                 
         return resids,jac
@@ -1810,7 +1810,7 @@ class SALTResids:
             else: jacobian = jacobian = sparse.csr_matrix((waveGradResids[-1].size,self.parlist.size))
 
             if boolIndex[varyParams].any():
-                jacobian[:,boolIndex]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
+                jacobian[:,boolIndex & varyParams]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
 
             jac+= [jacobian]
 

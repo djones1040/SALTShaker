@@ -501,18 +501,18 @@ class GaussNewton(saltresids.SALTResids):
         cov_M1_Mhost_data = np.empty((self.phaseout.size,self.waveout.size))
         
         for chunkindex in np.arange(self.waveout.size)[::chunksize]:
+            varyparlist= self.parlist[varyingParams]
             spline_derivs = np.empty([self.phaseout.size, min(self.waveout.size-chunkindex, chunksize),self.im0.size])
             for i in range(self.im0.size):
                 if self.bsorder == 0: continue
                 spline_derivs[:,:,i]=bisplev(self.phaseout,self.waveout[chunkindex:chunkindex+chunksize],(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
-            spline2d=sparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))
+            spline2d=sparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))[:,varyparlist=='m0']
         
             #Smooth things a bit, since this is supposed to be for broadband photometry
 #           if smoothingfactor>0:
 #               smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
 #               spline2d=smoothingmatrix*spline2d
             #Uncorrelated effect of parameter uncertainties on M0 and M1
-            varyparlist= self.parlist[varyingParams]
             m0pulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='m0'].astype('float32')*spline2d.T.astype('float32')
             m1pulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='m1'].astype('float32')*spline2d.T.astype('float32')
             if self.host_component:
@@ -1197,7 +1197,7 @@ class GaussNewton(saltresids.SALTResids):
 
         if not includePars.all():
             varyingParams=varyingParams & includePars
-            jacobian=jacobian[:,includePars]
+            jacobian=jacobian[:,varyingParams & includePars]
 
         #Exclude any residuals unaffected by the current fit (column in jacobian zeroed for that index)
         jacobian=jacobian.tocsr()
@@ -1222,7 +1222,10 @@ class GaussNewton(saltresids.SALTResids):
             #import pdb; pdb.set_trace()
             result=sprslinalg.lsmr(precondjac,residuals,damp=damping,maxiter=2*min(jacobian.shape),atol=tol,btol=tol)
             gaussNewtonStep=np.zeros(X.size)
-            gaussNewtonStep[varyingParams]=preconditoningMatrix*result[0]
+            try:
+                gaussNewtonStep[varyingParams]=preconditoningMatrix*result[0]
+            except:
+                import pdb; pdb.set_trace()
             postGN=(self.lsqwrap(X-gaussNewtonStep,uncertainties.copy(),None,**kwargs)**2).sum() #
             #if fit == 'all': import pdb; pdb.set_trace()
             if fit=='all': log.debug(f'Attempting fit with damping {damping} gave chi2 {postGN}')
