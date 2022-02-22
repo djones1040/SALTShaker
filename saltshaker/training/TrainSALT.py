@@ -249,7 +249,10 @@ class TrainSALT(TrainSALTBase):
             parlist = np.append(parlist,['cl']*self.options.n_colorpars)
         if self.options.error_snake_phase_binsize and self.options.error_snake_wave_binsize:
             for i in range(self.options.n_components): parlist = np.append(parlist,['modelerr_{}'.format(i)]*n_errphaseknots*n_errwaveknots)
-            if self.options.host_component: parlist = np.append(parlist,['modelerr_host']*len(mhostvarknots))
+            if self.options.host_component:
+                parlist = np.append(parlist,['modelerr_host']*len(mhostvarknots))
+                parlist = np.append(parlist,['modelcorr_0host']*len(mhostvarknots))
+                parlist = np.append(parlist,['modelcorr_1host']*len(mhostvarknots))
             if self.options.n_components == 2:
                 parlist = np.append(parlist,['modelcorr_01']*n_errphaseknots*n_errwaveknots)
         
@@ -342,7 +345,7 @@ class TrainSALT(TrainSALTBase):
             
             guess[parlist=='modelerr_0']=m0varknots
             guess[parlist=='modelerr_1']=m1varknots
-            if self.options.host_component: guess[parlist=='modelerr_host']=mhostvarknots
+            if self.options.host_component: guess[parlist=='modelerr_host']=1e-9 # something small...  #mhostvarknots
             guess[parlist=='modelcorr_01']=m0m1corrknots
 
             # if SN param list is provided, initialize with these params
@@ -489,7 +492,6 @@ class TrainSALT(TrainSALTBase):
              open(f'{outdir}/salt3_lc_model_covariance_01.dat','w') as foutmodelcov,\
              open(f'{outdir}/salt3_lc_covariance_01.dat','w') as foutdatacov,\
              open(f'{outdir}/salt3_lc_covariance_0host.dat','w') as foutm0mhostcov,\
-             open(f'{outdir}/salt3_lc_covariance_1host.dat','w') as foutm1mhostcov,\
              open(f'{outdir}/salt3_lc_variance_0.dat','w') as foutm0dataerr,\
              open(f'{outdir}/salt3_lc_variance_1.dat','w') as foutm1dataerr,\
              open(f'{outdir}/salt3_lc_variance_host.dat','w') as foutmhostdataerr:
@@ -507,9 +509,8 @@ class TrainSALT(TrainSALTBase):
                         print(f'{p:.1f} {w:.2f} {trainingresult.modelerr[i,j]:8.15e}',file=fouterrmod)
                         print(f'{p:.1f} {w:.2f} {trainingresult.M0dataerr[i,j]**2.+trainingresult.M0modelerr[i,j]**2.:8.15e}',file=foutm0dataerr)
                         print(f'{p:.1f} {w:.2f} {trainingresult.M1dataerr[i,j]**2.+trainingresult.M1modelerr[i,j]**2.:8.15e}',file=foutm1dataerr)
-                        print(f'{p:.1f} {w:.2f} {trainingresult.Mhostdataerr[i,j]**2.:8.15e}',file=foutmhostdataerr)
-                        print(f'{p:.1f} {w:.2f} {trainingresult.cov_M0_Mhost_data[i,j]:8.15e}',file=foutm0mhostcov)
-                        print(f'{p:.1f} {w:.2f} {trainingresult.cov_M1_Mhost_data[i,j]:8.15e}',file=foutm1mhostcov)
+                        print(f'{p:.1f} {w:.2f} {trainingresult.Mhostdataerr[i,j]**2.+trainingresult.Mhostmodelerr[i,j]**2.:8.15e}',file=foutmhostdataerr)
+                        print(f'{p:.1f} {w:.2f} {trainingresult.cov_M0_Mhost_data[i,j]+trainingresult.cov_M0_Mhost_model[i,j]**2.:8.15e}',file=foutm0mhostcov)
                         
         if self.options.use_previous_errors and self.options.resume_from_outputdir:
             for filename in ['salt3_lc_variance_0.dat','salt3_lc_variance_1.dat','salt3_lc_variance_host.dat',

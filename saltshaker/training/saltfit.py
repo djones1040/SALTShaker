@@ -498,7 +498,6 @@ class GaussNewton(saltresids.SALTResids):
         M1dataerr      = np.empty((self.phaseout.size,self.waveout.size))
         Mhostdataerr      = np.empty((self.phaseout.size,self.waveout.size))
         cov_M0_Mhost_data = np.empty((self.phaseout.size,self.waveout.size))
-        cov_M1_Mhost_data = np.empty((self.phaseout.size,self.waveout.size))
         
         for chunkindex in np.arange(self.waveout.size)[::chunksize]:
             varyparlist= self.parlist[varyingParams]
@@ -526,7 +525,6 @@ class GaussNewton(saltresids.SALTResids):
                 Mhostdataerr[mask] =  np.sqrt((mhostpulls**2     ).sum(axis=0))
                 # should we do host covariances?
                 cov_M0_Mhost_data[mask] =     (m0pulls*mhostpulls).sum(axis=0)
-                cov_M1_Mhost_data[mask] =     (m1pulls*mhostpulls).sum(axis=0)
                 
         correlation=cov_M0_M1_data/(M0dataerr*M1dataerr)
         correlation[np.isnan(correlation)]=0
@@ -539,7 +537,7 @@ class GaussNewton(saltresids.SALTResids):
         correlation=np.clip(correlation,-1,1)
         cov_M0_M1_data=correlation*(M0dataerr*M1dataerr)
 
-        return M0dataerr, M1dataerr, Mhostdataerr, cov_M0_M1_data, cov_M0_Mhost_data, cov_M1_Mhost_data
+        return M0dataerr, M1dataerr, Mhostdataerr, cov_M0_M1_data, cov_M0_Mhost_data
 
     def datauncertaintiesfromjackknife(self,X,max_iter,n_bootstrapsamples):
         """Determine uncertainties in flux surfaces by bootstrapping"""
@@ -697,11 +695,11 @@ class GaussNewton(saltresids.SALTResids):
         #log.info('hack - no data uncertainties while we sort out host component things')
         #getdatauncertainties = False
         if getdatauncertainties:
-            M0dataerr, M1dataerr, Mhostdataerr, cov_M0_M1_data, cov_M0_Mhost_data, cov_M1_Mhost_data=self.datauncertaintiesfromhessianapprox(Xredefined)
+            M0dataerr, M1dataerr, Mhostdataerr, cov_M0_M1_data, cov_M0_Mhost_data =self.datauncertaintiesfromhessianapprox(Xredefined)
         else:
-            M0dataerr, M1dataerr, Mhostdataerr, cov_M0_M1_data, cov_M0_Mhost_data, cov_M1_Mhost_data=None,None,None,None,None,None
+            M0dataerr, M1dataerr, Mhostdataerr, cov_M0_M1_data, cov_M0_Mhost_data =None,None,None,None,None
         # M0/M1 errors
-        xfinal,phase,wave,M0,M0modelerr,M1,M1modelerr,Mhost,cov_M0_M1_model,\
+        xfinal,phase,wave,M0,M0modelerr,M1,M1modelerr,Mhost,Mhostmodelerr,cov_M0_M1_model,cov_M0_Mhost_model,\
             modelerr,clpars,clerr,clscat,SNParams = \
             self.getParsGN(Xredefined)
         if M0dataerr is None:
@@ -709,10 +707,8 @@ class GaussNewton(saltresids.SALTResids):
             cov_M0_M1_data = np.zeros((self.phaseout.size,self.waveout.size))
             M1dataerr      = np.zeros((self.phaseout.size,self.waveout.size))
 
-            # temporary hack for host errors
             Mhostdataerr = np.zeros((self.phaseout.size,self.waveout.size))
             cov_M0_Mhost_data = np.zeros((self.phaseout.size,self.waveout.size))
-            cov_M1_Mhost_data = np.zeros((self.phaseout.size,self.waveout.size))
             
         log.info('Total time spent in convergence loop: {}'.format(datetime.now()-start))
         
@@ -720,8 +716,8 @@ class GaussNewton(saltresids.SALTResids):
         return SALTTrainingResult(
             num_lightcurves=self.num_lc,num_spectra=self.num_spectra,num_sne=len(self.datadict),
             parlist=self.parlist,X=xfinal,X_raw=X,phase=phase,wave=wave,M0=M0,M0modelerr=M0modelerr,M0dataerr=M0dataerr,
-            M1=M1,Mhost=Mhost,M1modelerr=M1modelerr,M1dataerr=M1dataerr,Mhostdataerr=Mhostdataerr,
-            cov_M0_M1_model=cov_M0_M1_model,cov_M0_M1_data=cov_M0_M1_data,cov_M0_Mhost_data=cov_M0_Mhost_data,cov_M1_Mhost_data=cov_M1_Mhost_data,
+            M1=M1,Mhost=Mhost,M1modelerr=M1modelerr,M1dataerr=M1dataerr,Mhostdataerr=Mhostdataerr,Mhostmodelerr=Mhostmodelerr,
+            cov_M0_M1_model=cov_M0_M1_model,cov_M0_M1_data=cov_M0_M1_data,cov_M0_Mhost_model=cov_M0_Mhost_model,cov_M0_Mhost_data=cov_M0_Mhost_data,
             modelerr=modelerr,clpars=clpars,clerr=clerr,clscat=clscat,SNParams=SNParams,stepsizes=stepsizes)
         
     def fitOneSN(self,X,sn):
@@ -805,7 +801,7 @@ class GaussNewton(saltresids.SALTResids):
         log.info('Finished optimizing color scatter')
         log.debug(str(minuitresult))
         return X
-         
+
     def iterativelyfiterrmodel(self,X):
         log.info('Optimizing model error')
         X=X.copy()
@@ -828,7 +824,10 @@ class GaussNewton(saltresids.SALTResids):
         args=[(X0,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
         result0=np.array(list(mapFun(self.loglikeforSN,args)))
         partriplets= list(zip(np.where(self.parlist=='modelerr_0')[0],np.where(self.parlist=='modelerr_1')[0],np.where(self.parlist=='modelcorr_01')[0]))
-
+        if self.host_component:
+            partriplets= list(zip(np.where(self.parlist=='modelerr_0')[0],np.where(self.parlist=='modelerr_1')[0],np.where(self.parlist=='modelcorr_01')[0],
+                                  np.where(self.parlist=='modelerr_host')[0],np.where(self.parlist=='modelcorr_0host')[0]))
+        
         for i,parindices in tqdm(enumerate(partriplets)):
             includePars=np.zeros(self.parlist.size,dtype=bool)
             includePars[list(parindices)]=True
@@ -878,6 +877,9 @@ class GaussNewton(saltresids.SALTResids):
         minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelerr_0')[0]})
         minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelerr_1')[0]})
         minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelcorr_01')[0]})
+        if self.host_component:
+            minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelerr_host')[0]})
+            minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelcorr_0host')[0]})
         
         minuitkwargs.update({'limit_'+params[i]: (-100,100) for i in np.where(self.parlist[includePars] == 'cl')[0]})
 
