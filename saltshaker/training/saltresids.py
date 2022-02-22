@@ -1432,14 +1432,15 @@ class SALTResids:
             m0err,m1err,mhosterr = self.ErrModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)
         else:
             m0,m1=self.SALTModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)
-            mhost = None
-            m0err,m1err = self.ErrModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)            
+            mhost = np.zeros(np.shape(m0))
+            m0err,m1err = self.ErrModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)
+            mhosterr = np.zeros(np.shape(m0err))
         if not len(clpars): clpars = []
 
         # model errors
         if not self.host_component:
             cov_m0_m1 = self.CorrelationModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)[0]*m0err*m1err
-            cov_m0_mhost = None
+            cov_m0_mhost = np.zeros(np.shape(cov_m0_m1))
         else:
             cov_m0_m1 = self.CorrelationModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)[0]*m0err*m1err
             cov_m0_mhost = self.CorrelationModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)[1]*m0err*mhosterr

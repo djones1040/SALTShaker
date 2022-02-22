@@ -239,11 +239,17 @@ class SALTPriors:
         ####This code will not work if the model uncertainties are not 0th order (simple interpolation)
         if self.errbsorder==0:
             m0variance=X[self.imodelerr0]**2
-            m0m1covariance=X[self.imodelerr1]*X[self.imodelerr0]*X[self.imodelcorr]
+            m0m1covariance=X[self.imodelerr1]*X[self.imodelerr0]*X[self.imodelcorr01]
             m1variance=X[self.imodelerr1]**2
             
-            m1variance+=-2*ratio*m0m1covariance+ratio**2*m0variance
-            m0m1covariance-=m0variance*ratio
+            if not self.host_component:
+                # re-scaling M1 isn't going to work in the host component case
+                m1variance+=-2*ratio*m0m1covariance+ratio**2*m0variance
+                m0m1covariance-=m0variance*ratio
+            else:
+                mhostvariance=X[self.imodelerrhost]**2
+                m0mhostcovariance=X[self.imodelerrhost]*X[self.imodelerr0]*X[self.imodelcorr0host]
+
         else:
             log.critical('RESCALING ERROR TO SATISFY DEFINITIONS HAS NOT BEEN IMPLEMENTED')
         
@@ -282,6 +288,9 @@ class SALTPriors:
             m1variance*=fluxratio**2
             m0variance*=fluxratio**2
             m0m1covariance*=fluxratio**2
+            if self.host_component:
+                mhostvariance*=fluxratio**2
+                m0mhostcovariance*=fluxratio**2
         else:
             log.critical('RESCALING ERROR TO SATISFY DEFINITIONS HAS NOT BEEN IMPLEMENTED')
         
@@ -294,8 +303,12 @@ class SALTPriors:
 #       X[self.ic]-=X[self.ix1]
         if self.errbsorder==0:
             X[self.imodelerr0]= np.sqrt(m0variance)
-            X[self.imodelcorr]= m0m1covariance/np.sqrt(m0variance*m1variance)
-            X[self.imodelerr1]=np.sqrt(m1variance) 
+            X[self.imodelcorr01]= m0m1covariance/np.sqrt(m0variance*m1variance)
+            X[self.imodelerr1]=np.sqrt(m1variance)
+            if self.host_component:
+                X[self.imodelerrhost]=np.sqrt(mhostvariance)
+                X[self.imodelcorr0host]= m0mhostcovariance/np.sqrt(m0variance*mhostvariance)
+
         return X
         
     @prior
