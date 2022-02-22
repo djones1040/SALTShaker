@@ -374,7 +374,10 @@ class SALTResids:
 
         self.parameters = ['x0','x1','xhost','c','m0','m1','mhost','spcrcl','spcrcl_norm','spcrcl_poly',
                            'modelerr','modelcorr','clscat','clscat_0','clscat_poly']
-        self.corrcombinations=sum([[(i,j) for j in range(i+1,self.n_components)]for i in range(self.n_components)] ,[])
+        if not self.host_component:
+            self.corrcombinations=sum([[(i,j) for j in range(i+1,self.n_components)]for i in range(self.n_components)] ,[])
+        else:
+            self.corrcombinations=[(0,1),(0,'host')]
         self.m0min = np.min(np.where(self.parlist == 'm0')[0])
         self.m0max = np.max(np.where(self.parlist == 'm0')[0])
 
@@ -385,7 +388,7 @@ class SALTResids:
             self.errmax += [np.max(np.where(self.parlist == 'modelerr_host')[0])]
         self.errmin = tuple(self.errmin)
         self.errmax = tuple(self.errmax)
-                        
+
         self.corrmin = tuple([np.min(np.where(self.parlist == 'modelcorr_{}{}'.format(i,j))[0]) for i,j in self.corrcombinations]) 
         self.corrmax = tuple([np.max(np.where(self.parlist == 'modelcorr_{}{}'.format(i,j))[0]) for i,j in self.corrcombinations]) 
         self.im0 = np.where(self.parlist == 'm0')[0]
@@ -411,7 +414,10 @@ class SALTResids:
         self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr')],dtype=int)
         self.imodelerr0 = np.array([i for i, si in enumerate(self.parlist) if si ==('modelerr_0')],dtype=int)
         self.imodelerr1 = np.array([i for i, si in enumerate(self.parlist) if si==('modelerr_1')],dtype=int)
+        self.imodelerrhost = np.array([i for i, si in enumerate(self.parlist) if si==('modelerr_host')],dtype=int)
         self.imodelcorr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelcorr')],dtype=int)
+        self.imodelcorr01 = np.array([i for i, si in enumerate(self.parlist) if si==('modelcorr_01')],dtype=int)
+        self.imodelcorr0host = np.array([i for i, si in enumerate(self.parlist) if si==('modelcorr_0host')],dtype=int)
         self.iclscat = np.where(self.parlist=='clscat')[0]
 
         self.iModelParam=np.ones(self.npar,dtype=bool)
@@ -752,7 +758,8 @@ class SALTResids:
             saltErr=storedResults['saltErr']
             saltCorr=storedResults['saltCorr'] 
             modelUncertainty= prefactor**2 *(saltErr[0]**2  + 2*x1* saltCorr[0]*saltErr[0]*saltErr[1] + x1**2 *saltErr[1]**2)
-            if self.host_component: modelUncertainty += prefactor**2.*xhost**2*saltErr[2]**2.
+            if self.host_component:
+                modelUncertainty += prefactor**2.*xhost**2*saltErr[2]**2. + 2*xhost*saltCorr[1]*saltErr[0]*saltErr[2]
             
             temporaryResults['modelUncertainty']=modelUncertainty
 
@@ -809,7 +816,7 @@ class SALTResids:
             requiredPCDerivs=varyParams[self.im0]|varyParams[self.im1]|varyParams[self.imhost]
         else:
             requiredPCDerivs=varyParams[self.im0]|varyParams[self.im1]
-        
+            
         colorlaw,colorexp=storedResults['colorLaw'],temporaryResults['colorexp']
         reddenedsalt2flux=colorexp*temporaryResults['fluxInterp']
         photresultsdict={}
@@ -867,13 +874,14 @@ class SALTResids:
                     derivInterp=lcdata.pcderivsparse[p][:,requiredPCDerivs]
                     summation=derivInterp.T.dot(passbandColorExp[0])
 
+
                     filtresultsdict['modelflux_jacobian'][p,self.im0[varyParams[self.im0]]]=\
-                        summation[varyParams[self.im0]]*intmult
+                        summation[varyParams[self.im0[requiredPCDerivs]]]*intmult
                     filtresultsdict['modelflux_jacobian'][p,self.im1[varyParams[self.im1]]]=\
-                        summation[varyParams[self.im1]]*intmult*x1
+                        summation[varyParams[self.im1[requiredPCDerivs]]]*intmult*x1
                     if self.host_component:
                         filtresultsdict['modelflux_jacobian'][p,self.imhost[varyParams[self.imhost]]]=\
-                            summation[varyParams[self.imhost]]*intmult*xhost
+                            summation[varyParams[self.imhost[requiredPCDerivs]]]*intmult*xhost
                         
                     
             filtresultsdict['modelflux_jacobian']=sparse.csr_matrix(filtresultsdict['modelflux_jacobian'])
@@ -971,14 +979,14 @@ class SALTResids:
                 derivInterp=spectrum.pcderivsparse.multiply(intmult[:,np.newaxis]).tocsc()
                 #import pdb; pdb.set_trace()
                 if varyParams[self.im0].any():
-                    specresultsdict['modelflux_jacobian'][:,(self.parlist=='m0')]  = \
-                        (derivInterp[:,varyParams[self.im0]]*(x0[0])).toarray()
+                    specresultsdict['modelflux_jacobian'][:,(varyParams) & (self.parlist == 'm0')]  = \
+                        (derivInterp[:,varyParams[self.im0[requiredPCDerivs]]]*(x0[0])).toarray()
                 if varyParams[self.im1].any():
-                    specresultsdict['modelflux_jacobian'][:,(self.parlist=='m1')] = \
-                        ( derivInterp[:,varyParams[self.im1]]*(x1*x0[0])).toarray()
+                    specresultsdict['modelflux_jacobian'][:,(varyParams) & (self.parlist == 'm1')] = \
+                        ( derivInterp[:,varyParams[self.im1[requiredPCDerivs]]]*(x1*x0[0])).toarray()
                 if self.host_component:
-                    specresultsdict['modelflux_jacobian'][:,(self.parlist=='mhost')] = \
-                        ( derivInterp[:,varyParams[self.imhost]]*(xhost*x0[0])).toarray()
+                    specresultsdict['modelflux_jacobian'][:,(varyParams) & (self.parlist == 'mhost')] = \
+                        ( derivInterp[:,varyParams[self.imhost[requiredPCDerivs]]]*(xhost*x0[0])).toarray()
 
             if (requiredPCDerivs).any():
                 resultsdict[k]['modelflux_jacobian']=sparse.csr_matrix(resultsdict[k]['modelflux_jacobian'])
@@ -1162,7 +1170,17 @@ class SALTResids:
                 filtresultsdict['modelvariance_jacobian'][:,(self.parlist=='modelcorr_01')]  =\
                     ( 2*fluxfactor* x0**2 *x1) * ((modelerrnox[1]*modelerrnox[0])[:,np.newaxis]  * \
                     interpresult[:,varyParams[self.parlist=='modelcorr_01']])
+                if self.host_component:
+                    filtresultsdict['modelvariance_jacobian'][:,(self.parlist=='modelerr_host') ]  =\
+                        ( 2* fluxfactor* x0**2  * extinctionexp )*(((modelerrnox[2]*xhost**2 + corr[1]*modelerrnox[0]*xhost))[:,np.newaxis] * \
+                        interpresult[:,varyParams[self.parlist=='modelerr_host']])
+                    filtresultsdict['modelvariance_jacobian'][:,(self.parlist=='modelcorr_0host')]  =\
+                        ( 2*fluxfactor* x0**2 *xhost) * ((modelerrnox[2]*modelerrnox[0])[:,np.newaxis]  * \
+                        interpresult[:,varyParams[self.parlist=='modelcorr_0host']])
 
+                #    filtresultsdict['modelvariance_jacobian'][:,(self.parlist=='modelcorr_0host') ]  =
+                #    filtresultsdict['modelvariance_jacobian'][:,(self.parlist=='modelcorr_1host') ]  =
+                    
         return photresultsdict
 
     
@@ -1419,11 +1437,15 @@ class SALTResids:
         if not len(clpars): clpars = []
 
         # model errors
-
-        cov_m0_m1 = self.CorrelationModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)[0]*m0err*m1err
+        if not self.host_component:
+            cov_m0_m1 = self.CorrelationModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)[0]*m0err*m1err
+            cov_m0_mhost = None
+        else:
+            cov_m0_m1 = self.CorrelationModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)[0]*m0err*m1err
+            cov_m0_mhost = self.CorrelationModel(x,evaluatePhase=self.phaseout,evaluateWave=self.waveout)[1]*m0err*mhosterr
         modelerr=np.ones(m0err.shape)
 
-        return(x,self.phaseout,self.waveout,m0,m0err,m1,m1err,mhost,cov_m0_m1,modelerr,
+        return(x,self.phaseout,self.waveout,m0,m0err,m1,m1err,mhost,mhosterr,cov_m0_m1,cov_m0_mhost,modelerr,
                clpars,clerr,clscat,resultsdict)
 
     def getErrsGN(self,m0var,m1var,m0m1cov):
@@ -1709,7 +1731,7 @@ class SALTResids:
             else: jacobian = jacobian = sparse.csr_matrix((resids[-1].size,self.parlist.size))
             
             if boolIndex[varyParams].any():
-                jacobian[:,boolIndex]=((dnumerator*(scale[i]**2 )- scaleDeriv[i][np.newaxis,np.newaxis,varyParams[indices]]*2*scale[i]*numerator[:,:,np.newaxis])/self.neff[:,:,np.newaxis]*normalization / scale[i]**4  ).reshape(-1, varyParams[indices].sum())
+                jacobian[:,boolIndex & varyParams]=((dnumerator*(scale[i]**2 )- scaleDeriv[i][np.newaxis,np.newaxis,varyParams[indices]]*2*scale[i]*numerator[:,:,np.newaxis])/self.neff[:,:,np.newaxis]*normalization / scale[i]**4  ).reshape(-1, varyParams[indices].sum())
             jac += [sparse.csr_matrix(jacobian)]
             
         return resids,jac
@@ -1775,8 +1797,7 @@ class SALTResids:
             else: jacobian = jacobian = sparse.csr_matrix((resids[-1].size,self.parlist.size))
 
             if boolIndex[varyParams].any():
-                jacobian[:,boolIndex]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
-
+                jacobian[:,boolIndex & varyParams]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
             jac+= [sparse.csr_matrix(jacobian)]
                 
         return resids,jac
@@ -1810,7 +1831,7 @@ class SALTResids:
             else: jacobian = jacobian = sparse.csr_matrix((waveGradResids[-1].size,self.parlist.size))
 
             if boolIndex[varyParams].any():
-                jacobian[:,boolIndex]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
+                jacobian[:,boolIndex & varyParams]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
 
             jac+= [jacobian]
 

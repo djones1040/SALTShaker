@@ -281,11 +281,11 @@ def rdkcor(surveylist,options):
 			if 'AB' in primarysed.names:
 				kcordict[kcorkey]['AB'] =  np.array(primarysed['AB'])
 			if 'Vega' in primarysed.names:
-				kcordict[kcorkey]['Vega'] =  np.array(primarysed['Vega'])
+				kcordict[kcorkey]['Vega'] =	 np.array(primarysed['Vega'])
 			if 'VEGA' in primarysed.names:
-				kcordict[kcorkey]['Vega'] =  np.array(primarysed['VEGA'])
+				kcordict[kcorkey]['Vega'] =	 np.array(primarysed['VEGA'])
 			if 'BD17' in primarysed.names:
-				kcordict[kcorkey]['BD17'] =  np.array(primarysed['BD17'])
+				kcordict[kcorkey]['BD17'] =	 np.array(primarysed['BD17'])
 			for filt in zpoff['Filter Name']:
 				#log.warning('Using only the last character of kcor-provided filter names')
 				internalfiltname=filt[:] #[-1]
@@ -299,9 +299,9 @@ def rdkcor(surveylist,options):
 				kcordict[kcorkey][internalfiltname]['magsys'] = \
 					zpoff['Primary Name'][zpoff['Filter Name'] == filt][0]
 				kcordict[kcorkey][internalfiltname]['primarymag'] = \
-					zpoff['Primary Mag'][zpoff['Filter Name'] == filt][0]
+					zpoff['Primary Mag'][zpoff['Filter Name'] == filt][0] - zpoff['ZPoff(SNpot)'][zpoff['Filter Name'] == filt][0]
 				kcordict[kcorkey][internalfiltname]['zpoff'] = \
-					zpoff['ZPoff(Primary)'][zpoff['Filter Name'] == filt][0]
+					zpoff['ZPoff(Primary)'][zpoff['Filter Name'] == filt][0] - zpoff['ZPoff(SNpot)'][zpoff['Filter Name'] == filt][0]
 	if (options.calibrationshiftfile):
 		log.info('Calibration shift file provided, applying offsets:')
 		#Calibration dictionary:
@@ -423,7 +423,7 @@ def rdAllData(snlists,estimate_tpk,
 		except SNDataReadError as e:
 			log.warning(e.args[0])
 			return False
-		if len(saltformattedsn.specdata) is 0:
+		if len(saltformattedsn.specdata) == 0:
 			log.debug(f'SN {sn.SNID} has no supernova spectra')
 		outputdict[saltformattedsn.snid]=saltformattedsn
 		if len(outputdict)	>= maxnum:

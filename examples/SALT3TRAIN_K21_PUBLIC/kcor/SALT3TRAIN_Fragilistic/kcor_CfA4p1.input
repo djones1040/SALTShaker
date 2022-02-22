@@ -9,14 +9,14 @@ MAGSYSTEM:   BD17
 FILTSYSTEM:  COUNT
 FILTPATH:  $SNDATA_ROOT/filters/CSP/CSP_TAMU_20180316
 SURVEY:   LOWZ,CSP
-FILTER: CSP-u/t  u_tel_ccd_atm_ext_1.2.dat       10.518
-FILTER: CSP-g/A  g_tel_ccd_atm_ext_1.2.dat        9.644+0.000
-FILTER: CSP-r/L  r_tel_ccd_atm_ext_1.2.dat        9.352-0.011
-FILTER: CSP-i/C  i_tel_ccd_atm_ext_1.2.dat        9.250-0.0237
-FILTER: CSP-B/u  B_tel_ccd_atm_ext_1.2.dat           9.896-0.0152 
-FILTER: CSP-n/x  V_LC9844_tel_ccd_atm_ext_1.2.dat    9.494-0.0218  # V for snoopy model
-FILTER: CSP-o/v  V_LC3009_tel_ccd_atm_ext_1.2.dat    9.488-0.0107  # V1
-FILTER: CSP-m/w  V_LC3014_tel_ccd_atm_ext_1.2.dat    9.492-0.0187  # V0
+FILTER: CSP-u/t  u_tel_ccd_atm_ext_1.2.dat       10.514
+FILTER: CSP-g/A  g_tel_ccd_atm_ext_1.2.dat       9.64806
+FILTER: CSP-r/L  r_tel_ccd_atm_ext_1.2.dat       9.35860
+FILTER: CSP-i/C  i_tel_ccd_atm_ext_1.2.dat       9.24100
+FILTER: CSP-B/u  B_tel_ccd_atm_ext_1.2.dat           9.88100
+FILTER: CSP-n/x  V_LC9844_tel_ccd_atm_ext_1.2.dat    9.472
+FILTER: CSP-o/v  V_LC3009_tel_ccd_atm_ext_1.2.dat    9.472
+FILTER: CSP-m/w  V_LC3014_tel_ccd_atm_ext_1.2.dat    9.472
 
 MAGSYSTEM:   BD17
 FILTSYSTEM:  COUNT

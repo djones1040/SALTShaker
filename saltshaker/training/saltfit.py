@@ -496,38 +496,48 @@ class GaussNewton(saltresids.SALTResids):
         M0dataerr      = np.empty((self.phaseout.size,self.waveout.size))
         cov_M0_M1_data = np.empty((self.phaseout.size,self.waveout.size))
         M1dataerr      = np.empty((self.phaseout.size,self.waveout.size))
-
+        Mhostdataerr      = np.empty((self.phaseout.size,self.waveout.size))
+        cov_M0_Mhost_data = np.empty((self.phaseout.size,self.waveout.size))
+        
         for chunkindex in np.arange(self.waveout.size)[::chunksize]:
+            varyparlist= self.parlist[varyingParams]
             spline_derivs = np.empty([self.phaseout.size, min(self.waveout.size-chunkindex, chunksize),self.im0.size])
             for i in range(self.im0.size):
                 if self.bsorder == 0: continue
                 spline_derivs[:,:,i]=bisplev(self.phaseout,self.waveout[chunkindex:chunkindex+chunksize],(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
-            spline2d=sparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))
+            spline2d=sparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))[:,varyparlist=='m0']
         
             #Smooth things a bit, since this is supposed to be for broadband photometry
 #           if smoothingfactor>0:
 #               smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
 #               spline2d=smoothingmatrix*spline2d
             #Uncorrelated effect of parameter uncertainties on M0 and M1
-            varyparlist= self.parlist[varyingParams]
             m0pulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='m0'].astype('float32')*spline2d.T.astype('float32')
             m1pulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='m1'].astype('float32')*spline2d.T.astype('float32')
+            if self.host_component:
+                mhostpulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='mhost'].astype('float32')*spline2d.T.astype('float32')
             mask=np.zeros((self.phaseout.size,self.waveout.size),dtype=bool)
             mask[:,chunkindex:chunkindex+chunksize]=True        
             M0dataerr[mask] =  np.sqrt((m0pulls**2     ).sum(axis=0))
             cov_M0_M1_data[mask] =     (m0pulls*m1pulls).sum(axis=0)
             M1dataerr[mask] =  np.sqrt((m1pulls**2     ).sum(axis=0))
-            
+            if self.host_component:
+                Mhostdataerr[mask] =  np.sqrt((mhostpulls**2     ).sum(axis=0))
+                # should we do host covariances?
+                cov_M0_Mhost_data[mask] =     (m0pulls*mhostpulls).sum(axis=0)
+                
         correlation=cov_M0_M1_data/(M0dataerr*M1dataerr)
         correlation[np.isnan(correlation)]=0
         if self.host_component: M0,M1,Mhost=self.SALTModel(X)
         else: M0,M1=self.SALTModel(X)
         M0dataerr=np.clip(M0dataerr,0,np.abs(M0).max()*2)
         M1dataerr=np.clip(M1dataerr,0,np.abs(M1).max()*2)
+        if self.host_component:
+            Mhostdataerr=np.clip(Mhostdataerr,0,np.abs(Mhost).max()*2)
         correlation=np.clip(correlation,-1,1)
         cov_M0_M1_data=correlation*(M0dataerr*M1dataerr)
 
-        return M0dataerr, M1dataerr,cov_M0_M1_data
+        return M0dataerr, M1dataerr, Mhostdataerr, cov_M0_M1_data, cov_M0_Mhost_data
 
     def datauncertaintiesfromjackknife(self,X,max_iter,n_bootstrapsamples):
         """Determine uncertainties in flux surfaces by bootstrapping"""
@@ -682,14 +692,14 @@ class GaussNewton(saltresids.SALTResids):
             logging.critical('Rescaling components failed; photometric residuals have changed. Will finish writing output using unscaled quantities')
             Xredefined=X.copy()
 
-        log.info('hack - no data uncertainties while we sort out host component things')
-        getdatauncertainties = False
+        #log.info('hack - no data uncertainties while we sort out host component things')
+        #getdatauncertainties = False
         if getdatauncertainties:
-            M0dataerr, M1dataerr,cov_M0_M1_data=self.datauncertaintiesfromhessianapprox(Xredefined)
+            M0dataerr, M1dataerr, Mhostdataerr, cov_M0_M1_data, cov_M0_Mhost_data =self.datauncertaintiesfromhessianapprox(Xredefined)
         else:
-            M0dataerr, M1dataerr,cov_M0_M1_data=None,None,None
+            M0dataerr, M1dataerr, Mhostdataerr, cov_M0_M1_data, cov_M0_Mhost_data =None,None,None,None,None
         # M0/M1 errors
-        xfinal,phase,wave,M0,M0modelerr,M1,M1modelerr,Mhost,cov_M0_M1_model,\
+        xfinal,phase,wave,M0,M0modelerr,M1,M1modelerr,Mhost,Mhostmodelerr,cov_M0_M1_model,cov_M0_Mhost_model,\
             modelerr,clpars,clerr,clscat,SNParams = \
             self.getParsGN(Xredefined)
         if M0dataerr is None:
@@ -697,17 +707,17 @@ class GaussNewton(saltresids.SALTResids):
             cov_M0_M1_data = np.zeros((self.phaseout.size,self.waveout.size))
             M1dataerr      = np.zeros((self.phaseout.size,self.waveout.size))
 
-        # temporary hack for host errors
-        Mhostdataerr = np.zeros((self.phaseout.size,self.waveout.size))
-                        
+            Mhostdataerr = np.zeros((self.phaseout.size,self.waveout.size))
+            cov_M0_Mhost_data = np.zeros((self.phaseout.size,self.waveout.size))
+            
         log.info('Total time spent in convergence loop: {}'.format(datetime.now()-start))
         
 
         return SALTTrainingResult(
             num_lightcurves=self.num_lc,num_spectra=self.num_spectra,num_sne=len(self.datadict),
             parlist=self.parlist,X=xfinal,X_raw=X,phase=phase,wave=wave,M0=M0,M0modelerr=M0modelerr,M0dataerr=M0dataerr,
-            M1=M1,Mhost=Mhost,M1modelerr=M1modelerr,M1dataerr=M1dataerr,Mhostdataerr=Mhostdataerr,
-            cov_M0_M1_model=cov_M0_M1_model,cov_M0_M1_data=cov_M0_M1_data,
+            M1=M1,Mhost=Mhost,M1modelerr=M1modelerr,M1dataerr=M1dataerr,Mhostdataerr=Mhostdataerr,Mhostmodelerr=Mhostmodelerr,
+            cov_M0_M1_model=cov_M0_M1_model,cov_M0_M1_data=cov_M0_M1_data,cov_M0_Mhost_model=cov_M0_Mhost_model,cov_M0_Mhost_data=cov_M0_Mhost_data,
             modelerr=modelerr,clpars=clpars,clerr=clerr,clscat=clscat,SNParams=SNParams,stepsizes=stepsizes)
         
     def fitOneSN(self,X,sn):
@@ -791,7 +801,7 @@ class GaussNewton(saltresids.SALTResids):
         log.info('Finished optimizing color scatter')
         log.debug(str(minuitresult))
         return X
-         
+
     def iterativelyfiterrmodel(self,X):
         log.info('Optimizing model error')
         X=X.copy()
@@ -814,7 +824,10 @@ class GaussNewton(saltresids.SALTResids):
         args=[(X0,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
         result0=np.array(list(mapFun(self.loglikeforSN,args)))
         partriplets= list(zip(np.where(self.parlist=='modelerr_0')[0],np.where(self.parlist=='modelerr_1')[0],np.where(self.parlist=='modelcorr_01')[0]))
-
+        if self.host_component:
+            partriplets= list(zip(np.where(self.parlist=='modelerr_0')[0],np.where(self.parlist=='modelerr_1')[0],np.where(self.parlist=='modelcorr_01')[0],
+                                  np.where(self.parlist=='modelerr_host')[0],np.where(self.parlist=='modelcorr_0host')[0]))
+        
         for i,parindices in tqdm(enumerate(partriplets)):
             includePars=np.zeros(self.parlist.size,dtype=bool)
             includePars[list(parindices)]=True
@@ -864,6 +877,9 @@ class GaussNewton(saltresids.SALTResids):
         minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelerr_0')[0]})
         minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelerr_1')[0]})
         minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelcorr_01')[0]})
+        if self.host_component:
+            minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelerr_host')[0]})
+            minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelcorr_0host')[0]})
         
         minuitkwargs.update({'limit_'+params[i]: (-100,100) for i in np.where(self.parlist[includePars] == 'cl')[0]})
 
@@ -1183,7 +1199,7 @@ class GaussNewton(saltresids.SALTResids):
 
         if not includePars.all():
             varyingParams=varyingParams & includePars
-            jacobian=jacobian[:,includePars]
+            jacobian=jacobian[:,varyingParams & includePars]
 
         #Exclude any residuals unaffected by the current fit (column in jacobian zeroed for that index)
         jacobian=jacobian.tocsr()
@@ -1208,7 +1224,10 @@ class GaussNewton(saltresids.SALTResids):
             #import pdb; pdb.set_trace()
             result=sprslinalg.lsmr(precondjac,residuals,damp=damping,maxiter=2*min(jacobian.shape),atol=tol,btol=tol)
             gaussNewtonStep=np.zeros(X.size)
-            gaussNewtonStep[varyingParams]=preconditoningMatrix*result[0]
+            try:
+                gaussNewtonStep[varyingParams]=preconditoningMatrix*result[0]
+            except:
+                import pdb; pdb.set_trace()
             postGN=(self.lsqwrap(X-gaussNewtonStep,uncertainties.copy(),None,**kwargs)**2).sum() #
             #if fit == 'all': import pdb; pdb.set_trace()
             if fit=='all': log.debug(f'Attempting fit with damping {damping} gave chi2 {postGN}')

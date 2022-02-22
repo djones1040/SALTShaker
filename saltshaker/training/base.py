@@ -162,7 +162,7 @@ class TrainSALTBase:
 							help='File to which to output a summary of the fitting process')
 		
 		#options to configure cuts
-		successful=successful&wrapaddingargument(config,'iodata','dospec',  type=boolean_string,
+		successful=successful&wrapaddingargument(config,'iodata','dospec',	type=boolean_string,
 							help="""if set, look for spectra in the snlist files (default=%(default)s)""")
 		successful=successful&wrapaddingargument(config,'iodata','maxsn',  type=nonetype_or_int,
 							help="""sets maximum number of SNe to fit for debugging (default=%(default)s)""")
@@ -172,7 +172,7 @@ class TrainSALTBase:
 							help='Mass of filter transmission allowed outside of model wavelength range (default=%(default)s)')
 
 		#Initialize from SALT2.4		
-		successful=successful&wrapaddingargument(config,'iodata','initsalt2model',  type=boolean_string,
+		successful=successful&wrapaddingargument(config,'iodata','initsalt2model',	type=boolean_string,
 							help="""If true, initialize model parameters from prior SALT2 model""")
 		successful=successful&wrapaddingargument(config,'iodata','initsalt2var',	 type=boolean_string,
 							help="""If true, initialize model uncertainty parameters from prior SALT2 model""")
@@ -195,12 +195,12 @@ class TrainSALTBase:
 							help='directory with previous error files, to use with --use_previous_errors option')
 
 		
-		successful=successful&wrapaddingargument(config,'iodata','fix_salt2modelpars',  type=boolean_string,
+		successful=successful&wrapaddingargument(config,'iodata','fix_salt2modelpars',	type=boolean_string,
 							help="""if set, fix M0/M1 for wavelength/phase range of original SALT2 model (default=%(default)s)""")
-		successful=successful&wrapaddingargument(config,'iodata','fix_salt2components',  type=boolean_string,
+		successful=successful&wrapaddingargument(config,'iodata','fix_salt2components',	 type=boolean_string,
 							help="""if set, fix M0/M1 for *all* wavelength/phases (default=%(default)s)""")
 #validation option
-		successful=successful&wrapaddingargument(config,'iodata','validate_modelonly',  type=boolean_string,
+		successful=successful&wrapaddingargument(config,'iodata','validate_modelonly',	type=boolean_string,
 							help="""if set, only make model plots in the validation stage""")
 		# if resume_from_outputdir, use the errors from the previous run
 		successful=successful&wrapaddingargument(config,'iodata','use_previous_errors',	type=boolean_string,
@@ -215,7 +215,7 @@ class TrainSALTBase:
 							help='fit SALT2 as a validation check (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'trainparams','n_repeat',  type=int,
 							help='repeat gauss newton n times (default=%(default)s)')
-		successful=successful&wrapaddingargument(config,'trainparams','fit_model_err',  type=boolean_string,
+		successful=successful&wrapaddingargument(config,'trainparams','fit_model_err',	type=boolean_string,
 							help='fit for model error if set (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'trainparams','fit_cdisp_only',	type=boolean_string,
 							help='fit for color dispersion component of model error if set (default=%(default)s)')
@@ -237,6 +237,9 @@ class TrainSALTBase:
 								help="kcor file for survey %s"%survey)
 			successful=successful&wrapaddingargument(config,f'survey_{survey}',"subsurveylist" ,type=str,clargformat=f"--{survey}" +"_{key}",
 								help="comma-separated list of subsurveys for survey %s"%survey)
+			successful=successful&wrapaddingargument(config,f'survey_{survey}',"ignore_filters" ,type=str,clargformat=f"--{survey}" +"_{key}",
+								help="comma-separated list of filters to ignore for survey %s"%survey)
+
 		if not successful: sys.exit(1)
 		return parser
 
@@ -263,7 +266,7 @@ class TrainSALTBase:
 							help='number of processes to use in calculating chi2 (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'trainingparams','estimate_tpk',	 type=boolean_string,
 							help='if set, estimate time of max with quick least squares fitting (default=%(default)s)')
-		successful=successful&wrapaddingargument(config,'trainingparams','fix_t0',  type=boolean_string,
+		successful=successful&wrapaddingargument(config,'trainingparams','fix_t0',	type=boolean_string,
 							help='if set, don\'t allow time of max to float (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'trainingparams','regulargradientphase',	 type=float,
 							help='Weighting of phase gradient chi^2 regularization during training of model parameters (default=%(default)s)')
@@ -274,26 +277,26 @@ class TrainSALTBase:
 		successful=successful&wrapaddingargument(config,'trainingparams','m1regularization',	 type=float,
 							help='Scales regularization weighting of M1 component relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'trainingparams','mhostregularization',	 type=float,
-							help='Scales regularization weighting of host component relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
+							help='Scales regularization weighting of host component relative to M0 weighting (>1 increases smoothing of M1)	 (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'trainingparams','spec_chi2_scaling',  type=float,
 							help='scaling of spectral chi^2 so it doesn\'t dominate the total chi^2 (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'trainingparams','n_min_specrecal',	type=int,
 							help='Minimum order of spectral recalibration polynomials (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'trainingparams','specrange_wavescale_specrecal',  type=float,
 							help='Wavelength scale (in angstroms) for determining additional orders of spectral recalibration from wavelength range of spectrum (default=%(default)s)')
-		successful=successful&wrapaddingargument(config,'trainingparams','n_specrecal_per_lightcurve',  type=float,
+		successful=successful&wrapaddingargument(config,'trainingparams','n_specrecal_per_lightcurve',	type=float,
 							help='Number of additional spectral recalibration orders per lightcurve (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'trainingparams','regularizationScaleMethod',  type=str,
 							help='Choose how scale for regularization is calculated (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'trainingparams','binspec',	type=boolean_string,
 							help='bin the spectra if set (default=%(default)s)')
-		successful=successful&wrapaddingargument(config,'trainingparams','binspecres',  type=int,
+		successful=successful&wrapaddingargument(config,'trainingparams','binspecres',	type=int,
 							help='binning resolution (default=%(default)s)')
 		
 		#neff parameters
 		successful=successful&wrapaddingargument(config,'trainingparams','wavesmoothingneff',  type=float,
 							help='Smooth effective # of spectral points along wave axis (in units of waveoutres) (default=%(default)s)')
-		successful=successful&wrapaddingargument(config,'trainingparams','phasesmoothingneff',  type=float,
+		successful=successful&wrapaddingargument(config,'trainingparams','phasesmoothingneff',	type=float,
 							help='Smooth effective # of spectral points along phase axis (in units of phaseoutres) (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'trainingparams','nefffloor',  type=float,
 							help='Minimum number of effective points (has to be > 0 to prevent divide by zero errors).(default=%(default)s)')
@@ -311,11 +314,11 @@ class TrainSALTBase:
 							help='for model uncertainty splines/polynomial funcs, order of the function (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'modelparams','interporder',	 type=int,
 							help='for model splines/polynomial funcs, order of the function (default=%(default)s)')
-		successful=successful&wrapaddingargument(config,'modelparams','wavesplineres',  type=float,
+		successful=successful&wrapaddingargument(config,'modelparams','wavesplineres',	type=float,
 							help='number of angstroms between each wavelength spline knot (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'modelparams','phasesplineres',	type=float,
 							help='number of angstroms between each phase spline knot (default=%(default)s)')
-		successful=successful&wrapaddingargument(config,'modelparams','waveinterpres',  type=float,
+		successful=successful&wrapaddingargument(config,'modelparams','waveinterpres',	type=float,
 							help='wavelength resolution in angstroms, used for internal interpolation (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'modelparams','phaseinterpres',	type=float,
 							help='phase resolution in angstroms, used for internal interpolation (default=%(default)s)')
@@ -333,7 +336,7 @@ class TrainSALTBase:
 							help='number of degrees of the phase-independent color law polynomial (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'modelparams','n_colorscatpars',	 type=int,
 							help='number of parameters in the broadband scatter model (default=%(default)s)')
-		successful=successful&wrapaddingargument(config,'modelparams','error_snake_phase_binsize',  type=float,
+		successful=successful&wrapaddingargument(config,'modelparams','error_snake_phase_binsize',	type=float,
 							help='number of days over which to compute scaling of error model (default=%(default)s)')
 		successful=successful&wrapaddingargument(config,'modelparams','error_snake_wave_binsize',  type=float,
 							help='number of angstroms over which to compute scaling of error model (default=%(default)s)')
@@ -356,7 +359,7 @@ class TrainSALTBase:
 
 
 		saltfitkwargs = {'m1regularization':self.options.m1regularization,'mhostregularization':self.options.mhostregularization,
-                         'bsorder':self.options.interporder,'errbsorder':self.options.errinterporder,
+						 'bsorder':self.options.interporder,'errbsorder':self.options.errinterporder,
 						 'waveSmoothingNeff':self.options.wavesmoothingneff,'phaseSmoothingNeff':self.options.phasesmoothingneff,
 						 'neffFloor':self.options.nefffloor, 'neffMax':self.options.neffmax,
 						 'specrecal':self.options.specrecal, 'regularizationScaleMethod':self.options.regularizationScaleMethod,
@@ -387,8 +390,8 @@ class TrainSALTBase:
 						 'spec_chi2_scaling':self.options.spec_chi2_scaling,
 						 'debug':self.options.debug,
 						 'use_previous_errors':self.options.use_previous_errors,
-                         'fix_salt2modelpars':self.options.fix_salt2modelpars,
-                         'fix_salt2components':self.options.fix_salt2components}
+						 'fix_salt2modelpars':self.options.fix_salt2modelpars,
+						 'fix_salt2components':self.options.fix_salt2components}
 
 		for k in self.options.__dict__.keys():
 			if k.startswith('prior') or k.startswith('bound'):
@@ -400,9 +403,9 @@ class TrainSALTBase:
 		passescuts= [cut.passescut(sn) for cut in cuts]
 		
 		if not all(passescuts): # or iPreMaxCut < 2 or medSNR < 10:
-			
-			log.debug('SN %s fails cuts'%sn)
+			log.debug('SN %s fails cuts'%sn.snid)
 			log.debug(', '.join([f'{cut.cutvalue(sn)} {cut.description} ({cut.requirement} needed)' for cut in cuts]))
+
 		return not all(passescuts)
 
 	def checkFilterMass(self,z,survey,flt):
@@ -484,7 +487,9 @@ class TrainSALTBase:
 
 			for flt in sn.filt:
 				#Remove light-curves outside wavelength range
-				if self.checkFilterMass(z,sn.survey,flt):
+				if flt in self.options.__dict__[f'{sn.survey}_ignore_filters'].split(','):
+					photdata.pop(flt)
+				elif self.checkFilterMass(z,sn.survey,flt):
 					lightcurve=sn.photdata[flt]
 					#Remove photometric data outside phase range
 					inphaserange=(lightcurve.phase>self.options.phaserange[0]) & (lightcurve.phase<self.options.phaserange[1])
