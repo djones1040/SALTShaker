@@ -759,7 +759,7 @@ class SALTResids:
             saltCorr=storedResults['saltCorr'] 
             modelUncertainty= prefactor**2 *(saltErr[0]**2  + 2*x1* saltCorr[0]*saltErr[0]*saltErr[1] + x1**2 *saltErr[1]**2)
             if self.host_component:
-                modelUncertainty += prefactor**2.*xhost**2*saltErr[2]**2. + 2*xhost*saltCorr[1]*saltErr[0]*saltErr[2]
+                modelUncertainty += prefactor**2.*(xhost**2*saltErr[2]**2. + 2*xhost*saltCorr[1]*saltErr[0]*saltErr[2])
             
             temporaryResults['modelUncertainty']=modelUncertainty
 
