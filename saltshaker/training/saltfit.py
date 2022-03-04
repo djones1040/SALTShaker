@@ -473,7 +473,14 @@ class GaussNewton(saltresids.SALTResids):
         log.info("determining M0/M1 errors by approximated Hessian")
         import time
         tstart = time.time()
+
         varyingParams=self.fitOptions['components'][1]|self.fitOptions['colorlaw'][1]
+        if self.fix_salt2components:
+            # generally I think we want to get real errors from our training sample
+            # even if these components are fixed in the training
+            varyingParams[self.im0]=True
+            varyingParams[self.im1]=True
+        
         logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
         if suppressregularization:
             self.neff[self.neff<self.neffMax]=10
@@ -516,6 +523,7 @@ class GaussNewton(saltresids.SALTResids):
             m1pulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='m1'].astype('float32')*spline2d.T.astype('float32')
             if self.host_component:
                 mhostpulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='mhost'].astype('float32')*spline2d.T.astype('float32')
+                
             mask=np.zeros((self.phaseout.size,self.waveout.size),dtype=bool)
             mask[:,chunkindex:chunkindex+chunksize]=True        
             M0dataerr[mask] =  np.sqrt((m0pulls**2     ).sum(axis=0))

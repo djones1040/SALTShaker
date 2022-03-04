@@ -580,10 +580,10 @@ class SALTResids:
             choleskykey=f'photCholesky_{sn}_{flt}'
             if not choleskykey in storedResults:
                 #Calculate cholesky matrix for each set of photometric measurements in each filter
-                if (filtmodel['modelvariance']<0).any():
+                if (filtmodel['modelvariance']<0).any() or (filtmodel['modelvariance'] == 0).any():
                     warnings.warn('Negative variance in photometry',RuntimeWarning)
                     negVals=filtmodel['modelvariance']<0
-                    filtmodel['modelvariance'][negVals]=0
+                    filtmodel['modelvariance'][negVals]=np.min(filtmodel['modelvariance'][filtmodel['modelvariance'] > 0])
                 variance=filtmodel['fluxvariance']+filtmodel['modelvariance']
                 clscat,dclscatdx=filtmodel['colorvariance']
                 #Find cholesky matrix as sqrt of diagonal uncertainties, then perform rank one update to incorporate color scatter
@@ -656,12 +656,13 @@ class SALTResids:
         specresids={}
         for k in specmodel:
             spectralmodel=specmodel[k]
-            variance=spectralmodel['fluxvariance'] + spectralmodel['modelvariance']
-            if (spectralmodel['modelvariance']<0).any():
+            if (spectralmodel['modelvariance']<0).any() or (spectralmodel['modelvariance']==0).any():
                 warnings.warn('Negative variance in spectra',RuntimeWarning)
                 negVals=spectralmodel['modelvariance']<0
-                spectralmodel['modelvariance'][negVals]=0
-
+                # zero causes NaNs in sqrt so just set zeros to the minumim of model variance elsewhere
+                spectralmodel['modelvariance'][negVals]= np.min(spectralmodel['modelvariance'][spectralmodel['modelvariance'] > 0]) #0
+            variance=spectralmodel['fluxvariance'] + spectralmodel['modelvariance']
+                
             uncertainty=np.sqrt(variance)*SpecErrScale
 
             spectralSuppression=np.sqrt(self.num_phot/self.num_spec)*self.spec_chi2_scaling
@@ -683,8 +684,11 @@ class SALTResids:
                     spectralresids['resid_jacobian'][:,varyParams] -= uncertainty_jac*(spectralresids['resid'] /uncertainty)[:,np.newaxis]
             else: 
                 spectralresids['resid_jacobian']=sparse.csr_matrix(spectralmodel['modelflux_jacobian'].shape)
-
+            #if len(specresids[k]['resid'][specresids[k]['resid'] != specresids[k]['resid']]): import pdb; pdb.set_trace()
         tstart = time.time()
+        #for k in specresids.keys():
+        #    if len(np.where(specresids[k]['resid'] != specresids[k]['resid'])[0]):
+        #        import pdb; pdb.set_trace()
         return photresids,specresids
     
     def bestfitsinglebandnormalizationsforSN(self,x,sn,storedResults):
