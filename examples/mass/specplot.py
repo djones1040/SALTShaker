@@ -18,7 +18,8 @@ snialines = [
 [8100,'CaII IR'],
 ]
 
-def main(plotphase=0):
+def main(plotphase=0,modelname='SALT3.',hostmodelname='output'):
+
     plt.clf()
     fig = plt.figure()
     gs = GridSpec(4, 1, figure=fig, hspace=0, wspace=0)
@@ -26,17 +27,17 @@ def main(plotphase=0):
     axresid = fig.add_subplot(gs[3,0])
     
     highmassphase,highmasswave,highmassflux = \
-        np.loadtxt('SALT3.HighMass/salt3_template_0.dat',unpack=True)
+        np.loadtxt(f'{modelname}HighMass/salt3_template_0.dat',unpack=True)
     lowmassphase,lowmasswave,lowmassflux = \
-        np.loadtxt('SALT3.LowMass/salt3_template_0.dat',unpack=True)
+        np.loadtxt(f'{modelname}LowMass/salt3_template_0.dat',unpack=True)
     highmassphase,highmasswave,highmassfluxvar = \
-        np.loadtxt('SALT3.HighMass/salt3_lc_variance_0.dat',unpack=True)
+        np.loadtxt(f'{modelname}HighMass/salt3_lc_variance_0.dat',unpack=True)
     lowmassphase,lowmasswave,lowmassfluxvar = \
-        np.loadtxt('SALT3.LowMass/salt3_lc_variance_0.dat',unpack=True)
+        np.loadtxt(f'{modelname}LowMass/salt3_lc_variance_0.dat',unpack=True)
     massphase,masswave,massflux = \
-        np.loadtxt('output/salt3_template_host.dat',unpack=True)
+        np.loadtxt(f'{hostmodelname}/salt3_template_host.dat',unpack=True)
     masserrphase,masserrwave,masserrflux = \
-        np.loadtxt('output/salt3_lc_variance_host.dat',unpack=True)
+        np.loadtxt(f'{hostmodelname}/salt3_lc_variance_host.dat',unpack=True)
 
     # mass flux - need to subtract off the B band flux
     #from saltshaker.training.init_hsiao import synphotBflux
@@ -50,9 +51,11 @@ def main(plotphase=0):
     lowmassfluxerr = np.sqrt(lowmassfluxvar)
     
     k21phase,k21wave,k21flux = \
-        np.loadtxt(os.path.expandvars('$SNDATA_ROOT/models/SALT3/SALT3.K21/salt3_template_0.dat'),unpack=True)
+        np.loadtxt(os.path.expandvars('/Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/SALT3.Fragilistic/salt3_template_0.dat'),unpack=True)
+        #np.loadtxt(os.path.expandvars('$SNDATA_ROOT/models/SALT3/SALT3.K21/salt3_template_0.dat'),unpack=True)
     k21m1phase,k21m1wave,k21m1flux = \
-        np.loadtxt(os.path.expandvars('$SNDATA_ROOT/models/SALT3/SALT3.K21/salt3_template_1.dat'),unpack=True)
+        np.loadtxt(os.path.expandvars('/Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/SALT3.Fragilistic/salt3_template_1.dat'),unpack=True)
+        #np.loadtxt(os.path.expandvars('$SNDATA_ROOT/models/SALT3/SALT3.K21/salt3_template_1.dat'),unpack=True)
 
     
     highmasswave = highmasswave[highmassphase == plotphase]
@@ -270,4 +273,4 @@ def sequence_resid(plotphase=0):
 if __name__ == "__main__":
     main()
     #sequence()
-    sequence_resid()
+    #sequence_resid()

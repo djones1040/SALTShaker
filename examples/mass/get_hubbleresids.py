@@ -93,33 +93,33 @@ class masshubbleresids():
         
         # measure the mass step, w/ and w/o SALT2mu
 
-    def edit_model(self,modeldir='output'):
+    def edit_model(self,modeldir='output',modelname='SALT3.fixedpars_'):
         #'SALT3.lowz_host'):
 
-        if not os.path.exists('SALT3.HighMass'):
-            os.makedirs('SALT3.HighMass')
-        if not os.path.exists('SALT3.LowMass'):
-            os.makedirs('SALT3.LowMass')
+        if not os.path.exists(f'{modelname}HighMass'):
+            os.makedirs(f'{modelname}HighMass')
+        if not os.path.exists(f'{modelname}LowMass'):
+            os.makedirs(f'{modelname}LowMass')
 
         #os.system(f'cp salt3_template_0.dat.gz ')
 
         # copy to HighMass dir
-        os.system(f'cp {modeldir}/SALT3.INFO SALT3.HighMass/')
-        #os.system(f'cp {modeldir}/salt3_lc_covariance_01.dat SALT3.HighMass/')
-        os.system(f'cp {modeldir}/salt3_color_correction.dat SALT3.HighMass/')
-        #os.system(f'cp {modeldir}/salt3_lc_variance_0.dat SALT3.HighMass/')
-        #os.system(f'cp {modeldir}/salt3_template_1.dat SALT3.HighMass/')
-        os.system(f'cp {modeldir}/salt3_color_dispersion.dat SALT3.HighMass/')
-        #os.system(f'cp {modeldir}/salt3_lc_variance_1.dat SALT3.HighMass/')
+        os.system(f'cp {modeldir}/SALT3.INFO {modelname}HighMass/')
+        #os.system(f'cp {modeldir}/salt3_lc_covariance_01.dat {modelname}HighMass/')
+        os.system(f'cp {modeldir}/salt3_color_correction.dat {modelname}HighMass/')
+        #os.system(f'cp {modeldir}/salt3_lc_variance_0.dat {modelname}HighMass/')
+        #os.system(f'cp {modeldir}/salt3_template_1.dat {modelname}HighMass/')
+        os.system(f'cp {modeldir}/salt3_color_dispersion.dat {modelname}HighMass/')
+        #os.system(f'cp {modeldir}/salt3_lc_variance_1.dat {modelname}HighMass/')
 
         # copy to LowMass Dir
-        os.system(f'cp {modeldir}/SALT3.INFO SALT3.LowMass/')
-        #os.system(f'cp {modeldir}/salt3_lc_covariance_01.dat SALT3.LowMass/')
-        os.system(f'cp {modeldir}/salt3_color_correction.dat SALT3.LowMass/')
-        #os.system(f'cp {modeldir}/salt3_lc_variance_0.dat SALT3.LowMass/')
-        #os.system(f'cp {modeldir}/salt3_template_1.dat SALT3.LowMass/')
-        os.system(f'cp {modeldir}/salt3_color_dispersion.dat SALT3.LowMass/')
-        #os.system(f'cp {modeldir}/salt3_lc_variance_1.dat SALT3.LowMass/')
+        os.system(f'cp {modeldir}/SALT3.INFO {modelname}LowMass/')
+        #os.system(f'cp {modeldir}/salt3_lc_covariance_01.dat {modelname}LowMass/')
+        os.system(f'cp {modeldir}/salt3_color_correction.dat {modelname}LowMass/')
+        #os.system(f'cp {modeldir}/salt3_lc_variance_0.dat {modelname}LowMass/')
+        #os.system(f'cp {modeldir}/salt3_template_1.dat {modelname}LowMass/')
+        os.system(f'cp {modeldir}/salt3_color_dispersion.dat {modelname}LowMass/')
+        #os.system(f'cp {modeldir}/salt3_lc_variance_1.dat {modelname}LowMass/')
 
         # now edit the M0 component for high vs. low-mass SNe
         m0phase,m0wave,m0flux = np.loadtxt(f"{modeldir}/salt3_template_0.dat",unpack=True)
@@ -177,34 +177,34 @@ class masshubbleresids():
         m01lowmasscovarflux = m01lowmasscovarflux*flux_adj_lowmass**2.
 
         
-        with open('SALT3.HighMass/salt3_template_0.dat','w') as fout:
+        with open(f'{modelname}HighMass/salt3_template_0.dat','w') as fout:
             for p,w,m in zip(m0phase,m0wave,m0highmassflux):
                 print(f'{p:.1f} {w:.2f} {m:8.15e}',file=fout)
-        with open('SALT3.LowMass/salt3_template_0.dat','w') as fout:
+        with open(f'{modelname}LowMass/salt3_template_0.dat','w') as fout:
             for p,w,m in zip(m0phase,m0wave,m0lowmassflux):
                 print(f'{p:.1f} {w:.2f} {m:8.15e}',file=fout)
-        with open('SALT3.HighMass/salt3_template_1.dat','w') as fout:
+        with open(f'{modelname}HighMass/salt3_template_1.dat','w') as fout:
             for p,w,m in zip(m0phase,m0wave,m1highmassflux):
                 print(f'{p:.1f} {w:.2f} {m:8.15e}',file=fout)
-        with open('SALT3.LowMass/salt3_template_1.dat','w') as fout:
+        with open(f'{modelname}LowMass/salt3_template_1.dat','w') as fout:
             for p,w,m in zip(m0phase,m0wave,m1lowmassflux):
                 print(f'{p:.1f} {w:.2f} {m:8.15e}',file=fout)
-        with open('SALT3.HighMass/salt3_lc_variance_0.dat','w') as fout:
+        with open(f'{modelname}HighMass/salt3_lc_variance_0.dat','w') as fout:
             for p,w,m in zip(m0phase,m0wave,m0highmassvarflux):
                 print(f'{p:.1f} {w:.2f} {m:8.15e}',file=fout)
-        with open('SALT3.LowMass/salt3_lc_variance_0.dat','w') as fout:
+        with open(f'{modelname}LowMass/salt3_lc_variance_0.dat','w') as fout:
             for p,w,m in zip(m0phase,m0wave,m0lowmassvarflux):
                 print(f'{p:.1f} {w:.2f} {m:8.15e}',file=fout)
-        with open('SALT3.HighMass/salt3_lc_variance_1.dat','w') as fout:
+        with open(f'{modelname}HighMass/salt3_lc_variance_1.dat','w') as fout:
             for p,w,m in zip(m0phase,m0wave,m1highmassvarflux):
                 print(f'{p:.1f} {w:.2f} {m:8.15e}',file=fout)
-        with open('SALT3.LowMass/salt3_lc_variance_1.dat','w') as fout:
+        with open(f'{modelname}LowMass/salt3_lc_variance_1.dat','w') as fout:
             for p,w,m in zip(m0phase,m0wave,m1lowmassvarflux):
                 print(f'{p:.1f} {w:.2f} {m:8.15e}',file=fout)
-        with open('SALT3.HighMass/salt3_lc_covariance_01.dat','w') as fout:
+        with open(f'{modelname}HighMass/salt3_lc_covariance_01.dat','w') as fout:
             for p,w,m in zip(m0phase,m0wave,m01highmasscovarflux):
                 print(f'{p:.1f} {w:.2f} {m:8.15e}',file=fout)
-        with open('SALT3.LowMass/salt3_lc_covariance_01.dat','w') as fout:
+        with open(f'{modelname}LowMass/salt3_lc_covariance_01.dat','w') as fout:
             for p,w,m in zip(m0phase,m0wave,m01lowmasscovarflux):
                 print(f'{p:.1f} {w:.2f} {m:8.15e}',file=fout)
 
@@ -653,5 +653,6 @@ def colorscat():
         
 if __name__ == "__main__":
     hr = masshubbleresids()
-    hr.main()
+    #hr.main()
+    hr.edit_model()
     #colorscat()

@@ -16,7 +16,7 @@ class lcplot:
     def __init__(self):
         pass
 
-    def main(self):
+    def main(self,modelname='SALT3.fixedpars_'):
         # let's plot UBVRI light curves for high vs. low-mass
         # models, and also show residuals
 
@@ -87,7 +87,7 @@ class lcplot:
         #    lcrv11file='salt3_lc_variance_1.dat',
         #    lcrv01file='salt3_lc_covariance_01.dat')
         salt3lowmasshost = SALT3Source(
-            modeldir='SALT3.LowMass',
+            modeldir=f'{modelname}LowMass',
             m0file='salt3_template_0.dat',
             m1file='salt3_template_1.dat',
             clfile='salt3_color_correction.dat',
@@ -97,7 +97,7 @@ class lcplot:
             lcrv01file='salt3_lc_covariance_01.dat')
         salt3lowmasshostmodel = sncosmo.Model(salt3lowmasshost)
         salt3highmasshost = SALT3Source(
-            modeldir='SALT3.HighMass',
+            modeldir=f'{modelname}HighMass',
             m0file='salt3_template_0.dat',
             m1file='salt3_template_1.dat',
             clfile='salt3_color_correction.dat',
@@ -109,7 +109,7 @@ class lcplot:
 
         
         salt3k21source = SALT3Source(
-            modeldir=os.path.expandvars('$SNDATA_ROOT/models/SALT3/SALT3.K21'),
+            modeldir='/Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/SALT3.Fragilistic', #os.path.expandvars('$SNDATA_ROOT/models/SALT3/SALT3.K21'),
             m0file='salt3_template_0.dat',
             m1file='salt3_template_1.dat',
             clfile='salt3_color_correction.dat',
@@ -357,7 +357,7 @@ class lcplot:
         plt.ion(); plt.show()
         import pdb; pdb.set_trace()
         
-    def m1diff(self):
+    def m1diff(self,modelname='SALT3.fixedpars_'):
 
         # first use GridSpec to set up the layout
         fig = plt.figure()
@@ -383,7 +383,7 @@ class lcplot:
         zpsys='AB'
     
         salt3lowmasshost = SALT3Source(
-            modeldir='SALT3.LowMass',
+            modeldir=f'{modelname}LowMass',
             m0file='salt3_template_0.dat',
             m1file='salt3_template_1.dat',
             clfile='salt3_color_correction.dat',
@@ -393,7 +393,7 @@ class lcplot:
             lcrv01file='salt3_lc_covariance_01.dat')
         salt3lowmasshostmodel = sncosmo.Model(salt3lowmasshost)
         salt3highmasshost = SALT3Source(
-            modeldir='SALT3.HighMass',
+            modeldir=f'{modelname}HighMass',
             m0file='salt3_template_0.dat',
             m1file='salt3_template_1.dat',
             clfile='salt3_color_correction.dat',
@@ -405,7 +405,7 @@ class lcplot:
 
         
         salt3k21source = SALT3Source(
-            modeldir=os.path.expandvars('$SNDATA_ROOT/models/SALT3/SALT3.K21'),
+            modeldir='/Users/David/Dropbox/research/SALTShaker/examples/SALT3TRAIN_K21_PUBLIC/SALT3.Fragilistic', #os.path.expandvars('$SNDATA_ROOT/models/SALT3/SALT3.K21'),
             m0file='salt3_template_0.dat',
             m1file='salt3_template_1.dat',
             clfile='salt3_color_correction.dat',
@@ -471,6 +471,6 @@ class lcplot:
         
 if __name__ == "__main__":
     lc = lcplot()
-    #lc.main()
+    lc.main()
     #lc.colors()
-    lc.m1diff()
+    #lc.m1diff()
