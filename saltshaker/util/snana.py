@@ -9,6 +9,7 @@ from collections import Sequence
 from matplotlib import pyplot as p
 from matplotlib import patches
 from astropy.time import Time
+import gzip
 
 SNTYPEDICT = {1:'Ia',10:'Ia',2:'II',3:'Ibc',32:'Ib',33:'Ic',20:'IIP',21:'IIn',22:'IIL',23:'IIb',42:'Ia',101:'Ia',0:'Ia' }
 
@@ -416,9 +417,17 @@ class SuperNova( object ) :
             
         from numpy import array,log10,unique,where
 
-        if not os.path.isfile(datfile): raise RuntimeError( "%s does not exist."%datfile) 
         self.datfile = os.path.abspath(datfile)
-        fin = open(datfile,'r')
+        if not os.path.isfile(datfile) and not os.path.isfile(datfile+'.gz'): raise RuntimeError( "%s does not exist."%datfile)
+        elif os.path.isfile(datfile+'.gz'):
+            datfile = datfile+'.gz'
+            fin = gzip.open(datfile,'rt')
+        elif datfile.endswith('.gz'):
+            fin = gzip.open(datfile,'rt')
+        else:
+            fin = open(datfile,'r')
+
+
         data = fin.readlines()
         fin.close()
         flt,mjd=[],[]
@@ -467,35 +476,41 @@ class SuperNova( object ) :
     def readspecfromlcfile(self,datfile):
         """read spectroscopy from the SNANA lightcurve file"""
 
-        with open(datfile) as fin:
-            reader = [x.split()[1:] for x in fin if x.startswith('SPEC:')]
+        if datfile.endswith('.gz'):
+            with gzip.open(datfile,'rt') as fin:
+                reader = [x.split()[1:] for x in fin if x.startswith('SPEC:')]
+            fin = gzip.open(datfile,'rt')
+        else:
+            with open(datfile) as fin:
+                reader = [x.split()[1:] for x in fin if x.startswith('SPEC:')]
+            fin = open(datfile)
 
-        with open(datfile) as fin:          
-            self.SPECTRA = {}
-            startSpec = False
-            i = 0
-            for line in fin:
-                if line.startswith('SPECTRUM_ID'):
-                    startSpec = True
-                    specid = int(line.split()[1])-1
-                    self.SPECTRA[specid] = {}
-                    istart = i
-                elif (line.startswith('END_SPECTRUM') or line.startswith('SPECTRUM_END')) and startSpec:
-                    startSpec = False; iend = i
-                    j = 0
-                    for column in zip(*reader):
-                        self.SPECTRA[specid][specvarnames[j]] = np.array(column[:][istart:iend]).astype(float)
-                        j += 1
-                elif line.startswith('VARNAMES_SPEC'):
-                    specvarnames = line.split()[1:]
-                elif startSpec and not line.startswith('SPEC:'):
-                    try:
-                        self.SPECTRA[specid][line.split()[0][:-1]] = float(line.split('#')[0].split()[1])
-                    except:
-                        self.SPECTRA[specid][line.split()[0][:-1]] = line.split('#')[0].split()[1]
-                elif startSpec and line.startswith('SPEC'):
-                    i += 1
-                
+        self.SPECTRA = {}
+        startSpec = False
+        i = 0
+        for line in fin:
+            if line.startswith('SPECTRUM_ID'):
+                startSpec = True
+                specid = int(line.split()[1])-1
+                self.SPECTRA[specid] = {}
+                istart = i
+            elif (line.startswith('END_SPECTRUM') or line.startswith('SPECTRUM_END')) and startSpec:
+                startSpec = False; iend = i
+                j = 0
+                for column in zip(*reader):
+                    self.SPECTRA[specid][specvarnames[j]] = np.array(column[:][istart:iend]).astype(float)
+                    j += 1
+            elif line.startswith('VARNAMES_SPEC'):
+                specvarnames = line.split()[1:]
+            elif startSpec and not line.startswith('SPEC:'):
+                try:
+                    self.SPECTRA[specid][line.split()[0][:-1]] = float(line.split('#')[0].split()[1])
+                except:
+                    self.SPECTRA[specid][line.split()[0][:-1]] = line.split('#')[0].split()[1]
+            elif startSpec and line.startswith('SPEC'):
+                i += 1
+        fin.close()
+        
     def readnewspec(self,datfile):
         """read spectroscopy from an ascii file with columns wavelength, flux, (fluxerr)
 Header must include one of two following lines at the top:
@@ -783,7 +798,7 @@ NSPECTRA:  %i
         #for photfits in photfitsfiles:
 
         hdu = fits.open(specfitsfile)
-        
+
         #to adapt to snana spectra format change
         headertbl_idx = [hdu[i].name for i in range(len(hdu))].index('SPECTRO_HEADER')
         fluxtbl_idx = [hdu[i].name for i in range(len(hdu))].index('SPECTRO_FLUX')
@@ -791,7 +806,7 @@ NSPECTRA:  %i
             lamidxtbl_idx =  [hdu[i].name for i in range(len(hdu))].index('SPECTRO_LAMINDEX')
         else:
             lamidxtbl_idx = None
-        
+
         # collect phot data into object properties.
         #Npcol = phead['TFIELDS'] # num. of table columns  = num. of data arrays
         #for ipcol in range( Npcol ) : 
@@ -811,9 +826,9 @@ NSPECTRA:  %i
                 self.SPECTRA[specid]['LAMMAX'] = hdu[fluxtbl_idx].data['LAMMAX'][hdu[headertbl_idx].data['PTRSPEC_MIN'][i]-1:hdu[headertbl_idx].data['PTRSPEC_MAX'][i]]
             else:
                 self.SPECTRA[specid]['LAMMIN'] = np.array([hdu[lamidxtbl_idx].data['LAMMIN'][hdu[lamidxtbl_idx].data['LAMINDEX'] == hdu[fluxtbl_idx].data['LAMINDEX'][i]][0] \
-                                                       for i in range(hdu[headertbl_idx].data['PTRSPEC_MIN'][i]-1,hdu[headertbl_idx].data['PTRSPEC_MAX'][i])])
+                    for i in range(hdu[headertbl_idx].data['PTRSPEC_MIN'][i]-1,hdu[headertbl_idx].data['PTRSPEC_MAX'][i])])
                 self.SPECTRA[specid]['LAMMAX'] = np.array([hdu[lamidxtbl_idx].data['LAMMAX'][hdu[lamidxtbl_idx].data['LAMINDEX'] == hdu[fluxtbl_idx].data['LAMINDEX'][i]][0] \
-                                                       for i in range(hdu[headertbl_idx].data['PTRSPEC_MIN'][i]-1,hdu[headertbl_idx].data['PTRSPEC_MAX'][i])])
+                    for i in range(hdu[headertbl_idx].data['PTRSPEC_MIN'][i]-1,hdu[headertbl_idx].data['PTRSPEC_MAX'][i])])
             self.SPECTRA[specid]['FLAM'] = hdu[fluxtbl_idx].data['FLAM'][hdu[headertbl_idx].data['PTRSPEC_MIN'][i]-1:hdu[headertbl_idx].data['PTRSPEC_MAX'][i]]
             self.SPECTRA[specid]['FLAMERR'] = hdu[fluxtbl_idx].data['FLAMERR'][hdu[headertbl_idx].data['PTRSPEC_MIN'][i]-1:hdu[headertbl_idx].data['PTRSPEC_MAX'][i]]
             self.SPECTRA[specid]['SPECTRUM_MJD'] = hdu[headertbl_idx].data['MJD'][i]
