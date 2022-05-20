@@ -45,7 +45,7 @@ _flatnu=f'{init_rootdir}/flatnu.dat'
 
 # validation utils
 import matplotlib as mpl
-# mpl.use('MacOSX')
+mpl.use('agg')
 import pylab as plt
 from saltshaker.validation import ValidateLightcurves
 from saltshaker.validation import ValidateSpectra
