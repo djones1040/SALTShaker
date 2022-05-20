@@ -303,6 +303,8 @@ class RunPipe():
                                 self._reconfig_w_suffix(self.pipe.LCFitting[i],df_lcfit,self.num,done_file=done_file)
                             if ['testsim','lcfit'] in self.pipe.gluepairs:
                                 self.pipe.glue(['testsim','lcfit'],on='phot')
+                            if ['trainsim','lcfit'] in self.pipe.gluepairs:
+                                self.pipe.glue(['trainsim','lcfit'],on='phot')
                             if ['training','lcfit'] in self.pipe.gluepairs:
                                 self.pipe.glue(['training','lcfit'],on='model')
     #                             self._reconfig_w_suffix(self.pipe.LCFitting[i],None,self.num)
