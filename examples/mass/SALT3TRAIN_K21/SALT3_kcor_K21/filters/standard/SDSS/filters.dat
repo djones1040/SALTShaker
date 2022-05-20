@@ -1,0 +1,5 @@
+u_prime SLOAN_SDSS_u_prime.dat abmag=0. u_prime band for SLOAN/SDSS at Apache Point. AB mag system.
+g_prime SLOAN_SDSS_g_prime.dat abmag=0. g_prime band for SLOAN/SDSS at Apache Point. AB mag system.
+r_prime SLOAN_SDSS_r_prime.dat abmag=0. r_prime band for SLOAN/SDSS at Apache Point. AB mag system.
+i_prime SLOAN_SDSS_i_prime.dat abmag=0. i_prime band for SLOAN/SDSS at Apache Point. AB mag system.
+z_prime SLOAN_SDSS_z_prime.dat abmag=0. z_prime band for SLOAN/SDSS at Apache Point. AB mag system.

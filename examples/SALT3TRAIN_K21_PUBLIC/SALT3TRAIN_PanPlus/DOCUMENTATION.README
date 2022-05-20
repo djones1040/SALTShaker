@@ -1,0 +1,25 @@
+DOCUMENTATION:
+    PURPOSE:  Training samples for the SALT3.K21 model
+    REF: 
+    - AUTHOR: Kenworthy et al., 2021, ApJ, submitted (SALTshaker)
+      ADS:    https://ui.adsabs.harvard.edu/abs/2021arXiv210407795K
+    - AUTHOR: Supernova Standardization Team
+      ADS:    github.com/djones1040/SALTShaker; saltshaker.readthedocs.io
+    INTENT:    Nominal
+    USAGE_KEY: VERSION_PHOTOMETRY = 'SALT3TRAIN_K21/SALT3TRAIN_K21_[subset]'
+    USAGE_CODE: snlc_fit.exe
+    VALIDATE_SCIENCE: Kenworthy+2021, Dai+2021 (in prep.)
+    METADATA:
+    - MWEBV: from SFD98 with SF2011 corrections (uncertainties are 5%)
+    - VPEC:  from $SNANA_DIR/util/get_vpec.py, SNANA version 11_02j
+    - REDSHIFT_CMB: from $SNANA_DIR/util/get_vpec.py, SNANA version 11_02j
+    NOTES:
+    - In K21 table 4, CfA4p1 and CfA4p2 are combined as CfA4
+    - kcor/calib files are in $SNDATA_ROOT/kcor/SALT3TRAIN_K21
+    - filter paths are in kcor/calib files.
+    VERSION:
+    - DATE: 2021-04
+      AUTHOR: D. Jones, D. Kenworthy, R. Kessler
+    - DATE: 2021-12 (modify a few filt chars to work with combine_dataVersions)
+      AUTHOR: D. Jones, R. Kessler
+DOCUMENTATION_END:

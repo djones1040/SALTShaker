@@ -1,0 +1,30 @@
+SN_SED: Hsiao07.dat
+BD17_SED:      bd_17d4708_stisnic_007.dat
+LAMBDA_RANGE: 2100 12500  # for SN templates
+OUTFILE: kcor_CfA4p1.fits
+
+
+# Start filters for VERSION = PS1s_CSPDR2_V_DS17
+MAGSYSTEM:   BD17
+FILTSYSTEM:  COUNT
+FILTPATH:  $SNDATA_ROOT/filters/PS1/Pantheon/CSP_Str11
+SURVEY:   LOWZ,CSP
+FILTER:  CSP-u/t              u_texas_WLcorr_atm.txt  10.51952
+FILTER:  CSP-B/u              B_texas_WLcorr_atm.txt  9.87643-0.0082722800
+FILTER:  CSP-o/v              V_LC3009_texas_WLcorr_atm.txt  9.47663+0.0017663098
+FILTER:  CSP-m/w              V_LC3014_texas_WLcorr_atm.txt  9.47128+0.0017663098
+FILTER:  CSP-n/x              V_LC9844_texas_WLcorr_atm.txt  9.47748+0.0017663098
+FILTER:  CSP-g/A              g_texas_WLcorr_atm.txt  9.64406+0.0088273000
+FILTER:  CSP-r/L              r_texas_WLcorr_atm.txt  9.35160+0.0011820498
+FILTER:  CSP-i/C              i_texas_WLcorr_atm.txt  9.25000-0.016103720
+
+MAGSYSTEM:   BD17
+FILTSYSTEM:  COUNT
+FILTPATH:  $SNDATA_ROOT/filters/PS1/Pantheon/PS1_CFA4
+SURVEY:    LOWZ,CFA4p1
+# Start filters for VERSION = PS1s_CFA4_p1_DS17
+#FILTER:  CFA41-U/C           cfa4_U_p1.dat  9.724  # not used
+FILTER:  CFA41-B/D          cfa4_B_p1.dat  9.88605-0.024
+FILTER:  CFA41-V/E          cfa4_V_p1.dat  9.47432-0.0012
+FILTER:  CFA41-r/F          cfa4_r_p1.dat  9.35252+0.0025
+FILTER:  CFA41-i/G          cfa4_i_p1.dat  9.25465-0.004
