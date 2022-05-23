@@ -799,6 +799,13 @@ NSPECTRA:  %i
 
         hdu = fits.open(specfitsfile)
 
+        #to adapt to snana spectra format change
+        headertbl_idx = [hdu[i].name for i in range(len(hdu))].index('SPECTRO_HEADER')
+        fluxtbl_idx = [hdu[i].name for i in range(len(hdu))].index('SPECTRO_FLUX')
+        if 'SPECTRO_LAMINDEX' in [hdu[i].name for i in range(len(hdu))]:
+            lamidxtbl_idx =  [hdu[i].name for i in range(len(hdu))].index('SPECTRO_LAMINDEX')
+        else:
+            lamidxtbl_idx = None
 
         # collect phot data into object properties.
         #Npcol = phead['TFIELDS'] # num. of table columns  = num. of data arrays
@@ -808,19 +815,23 @@ NSPECTRA:  %i
 
         self.SPECTRA = {}
         specid = 0
-        for i,snid in enumerate(hdu[2].data['SNID']):
+        for i,snid in enumerate(hdu[headertbl_idx].data['SNID']):
             if self.SNID != snid: continue
-            if hdu[2].data['NBIN_LAM'][i] == 0: continue
+            if hdu[headertbl_idx].data['NBIN_LAM'][i] == 0: continue
             self.SPECTRA[specid] = {}
-            #self.SPECTRA[specid]['LAMINDEX'] = hdu[1].data['LAMINDEX']
+            #self.SPECTRA[specid]['LAMINDEX'] = hdu[lamidxtbl_idx].data['LAMINDEX']
 
-            self.SPECTRA[specid]['LAMMIN'] = np.array([hdu[1].data['LAMMIN'][hdu[1].data['LAMINDEX'] == hdu[3].data['LAMINDEX'][i]][0] \
-                                                       for i in range(hdu[2].data['PTRSPEC_MIN'][i]-1,hdu[2].data['PTRSPEC_MAX'][i])])
-            self.SPECTRA[specid]['LAMMAX'] = np.array([hdu[1].data['LAMMAX'][hdu[1].data['LAMINDEX'] == hdu[3].data['LAMINDEX'][i]][0] \
-                                                       for i in range(hdu[2].data['PTRSPEC_MIN'][i]-1,hdu[2].data['PTRSPEC_MAX'][i])])
-            self.SPECTRA[specid]['FLAM'] = hdu[3].data['FLAM'][hdu[2].data['PTRSPEC_MIN'][i]-1:hdu[2].data['PTRSPEC_MAX'][i]]
-            self.SPECTRA[specid]['FLAMERR'] = hdu[3].data['FLAMERR'][hdu[2].data['PTRSPEC_MIN'][i]-1:hdu[2].data['PTRSPEC_MAX'][i]]
-            self.SPECTRA[specid]['SPECTRUM_MJD'] = hdu[2].data['MJD'][i]
+            if lamidxtbl_idx is None:
+                self.SPECTRA[specid]['LAMMIN'] = hdu[fluxtbl_idx].data['LAMMIN'][hdu[headertbl_idx].data['PTRSPEC_MIN'][i]-1:hdu[headertbl_idx].data['PTRSPEC_MAX'][i]]
+                self.SPECTRA[specid]['LAMMAX'] = hdu[fluxtbl_idx].data['LAMMAX'][hdu[headertbl_idx].data['PTRSPEC_MIN'][i]-1:hdu[headertbl_idx].data['PTRSPEC_MAX'][i]]
+            else:
+                self.SPECTRA[specid]['LAMMIN'] = np.array([hdu[lamidxtbl_idx].data['LAMMIN'][hdu[lamidxtbl_idx].data['LAMINDEX'] == hdu[fluxtbl_idx].data['LAMINDEX'][i]][0] \
+                    for i in range(hdu[headertbl_idx].data['PTRSPEC_MIN'][i]-1,hdu[headertbl_idx].data['PTRSPEC_MAX'][i])])
+                self.SPECTRA[specid]['LAMMAX'] = np.array([hdu[lamidxtbl_idx].data['LAMMAX'][hdu[lamidxtbl_idx].data['LAMINDEX'] == hdu[fluxtbl_idx].data['LAMINDEX'][i]][0] \
+                    for i in range(hdu[headertbl_idx].data['PTRSPEC_MIN'][i]-1,hdu[headertbl_idx].data['PTRSPEC_MAX'][i])])
+            self.SPECTRA[specid]['FLAM'] = hdu[fluxtbl_idx].data['FLAM'][hdu[headertbl_idx].data['PTRSPEC_MIN'][i]-1:hdu[headertbl_idx].data['PTRSPEC_MAX'][i]]
+            self.SPECTRA[specid]['FLAMERR'] = hdu[fluxtbl_idx].data['FLAMERR'][hdu[headertbl_idx].data['PTRSPEC_MIN'][i]-1:hdu[headertbl_idx].data['PTRSPEC_MAX'][i]]
+            self.SPECTRA[specid]['SPECTRUM_MJD'] = hdu[headertbl_idx].data['MJD'][i]
             specid += 1
 
         return( True )

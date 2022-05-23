@@ -45,7 +45,7 @@ _flatnu=f'{init_rootdir}/flatnu.dat'
 
 # validation utils
 import matplotlib as mpl
-# mpl.use('MacOSX')
+mpl.use('agg')
 import pylab as plt
 from saltshaker.validation import ValidateLightcurves
 from saltshaker.validation import ValidateSpectra
@@ -115,7 +115,7 @@ def specflux(obsphase,obswave,m0phase,m0wave,m0flux,m1flux,colorlaw,z,x0,x1,c,mw
     intwave = interp1d(np.unique(m0wave)*(1+z),modelflux_phase,kind='nearest',bounds_error=False,fill_value="extrapolate")
     modelflux_wave = intwave(obswave)
     modelflux_wave = x0*(m0interp + x1*m1interp)
-    mwextcurve = 10**(-0.4*extinction.fitzpatrick99(obswave,mwebv*3.1))
+    mwextcurve = 10**(-0.4*extinction.fitzpatrick99(obswave.astype(float),mwebv*3.1))
     modelflux_wave *= mwextcurve
 
     return modelflux_wave
