@@ -334,7 +334,6 @@ class SALT3pipe():
         for i,pro1 in enumerate(pro1list):
             for j,pro2 in enumerate(pro2list):
                 pro1_out = pro1.glueto(pro2)
-
                 if isinstance(pro1, Simulation):
                     pro1_out_dict = pro1_out.copy()
                     if isinstance(pro2, LCFitting):
@@ -352,7 +351,7 @@ class SALT3pipe():
                                 pro2_in.loc[pro2_in['tag']==tag,'value'] = pro1_out
                     elif isinstance(pro2, Training):
                         pro2_in = pro2._get_input_info()
-                        for tag in ['io','kcor','subsurvey_list']:     
+                        for tag in ['io','kcor','subsurvey_list','ignore_filters']:     
                             pro1_out = pro1_out_dict[tag]
                             if isinstance(pro1_out,list) or isinstance(pro1_out,np.ndarray): 
                                 if tag == 'io':
@@ -380,9 +379,18 @@ class SALT3pipe():
                                             pro2_in = pd.concat([pro2_in,df_newrow])
                                         if pro1_out[int(i)] is not None:
                                             pro2_in.loc[(pro2_in['tag']==tag) & (pro2_in['section']==section),'value'] = pro1_out[int(i)]
-                                        
                             else:
-                                pro2_in.loc[pro2_in['tag']==tag,'value'] = pro1_out
+                                if tag == 'ignore_filters':
+                                    for i,survey in zip(pro1_out_dict['ind'],pro1_out_dict['survey']):
+                                        if pro2.drop_sim_versions is not None and str(i) in pro2.drop_sim_versions.split(','):
+                                            continue
+                                        section = 'survey_{}'.format(survey.strip())
+                                        if section not in pro2_in.loc[pro2_in['tag']==tag,'section'].values:
+                                            df_newrow = pd.DataFrame([{'section':'survey_{}'.format(survey),'key':'ignore_filters',
+                                                                       'value':'','tag':tag,'label':'main'}])
+                                            pro2_in = pd.concat([pro2_in,df_newrow])
+                                else:
+                                    pro2_in.loc[pro2_in['tag']==tag,'value'] = pro1_out
 
                 elif isinstance(pro1, Training) and isinstance(pro2, LCFitting):
                     pro2_in = pro2._get_input_info().loc[on]
@@ -889,7 +897,7 @@ class Simulation(PipeProcedure):
                 survey = [surveynames[i]['SURVEY'] for i in ind]
                 subsurvey_list = [surveynames[i]['SUBSURVEY_LIST'] for i in ind]
                 
-            return {'io':output,'kcor':kcor,'ind':ind,'survey':survey,'subsurvey_list':subsurvey_list}
+            return {'io':output,'kcor':kcor,'ind':ind,'survey':survey,'subsurvey_list':subsurvey_list,'ignore_filters':''}
 #             return ["{}/{}.LIST".format(res,prefix) for res,prefix in zip(outdirs,df.loc[df.key=='GENVERSION','value'].values)]
         elif pipepro.lower().startswith('lcfit'):
 #             print(df)
