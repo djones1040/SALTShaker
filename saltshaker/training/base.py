@@ -199,7 +199,7 @@ class TrainSALTBase:
                                                         help="""if set, fix M0/M1 for wavelength/phase range of original SALT2 model (default=%(default)s)""")
                 successful=successful&wrapaddingargument(config,'iodata','fix_salt2components',  type=boolean_string,
                                                         help="""if set, fix M0/M1 for *all* wavelength/phases (default=%(default)s)""")
-#validation option
+                #validation option
                 successful=successful&wrapaddingargument(config,'iodata','validate_modelonly',  type=boolean_string,
                                                         help="""if set, only make model plots in the validation stage""")
                 # if resume_from_outputdir, use the errors from the previous run
