@@ -352,7 +352,7 @@ class TrainSALT(TrainSALTBase):
             if self.options.snparlist:
                 snpar = Table.read(self.options.snparlist,format='ascii')
                 snpar['SNID'] = snpar['SNID'].astype(str)
-                
+
             for sn in datadict.keys():
                 if self.options.snparlist:
                     # hacky matching, but SN names are a mess as usual
@@ -371,9 +371,16 @@ class TrainSALT(TrainSALTBase):
                         log.warning(f'SN {sn} not found in SN par list {self.options.snparlist}')
                         guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
 
+                #elif 'SIM_SALT2x1' in datadict[sn].__dict__.keys():
+                    # simulated samples need an initialization list also
+                    # initializing to sim. values is not the best but running SNANA fits adds a lot of overhead
+                #    guess[parlist == 'x0_%s'%sn] = datadict[sn].SIM_SALT2x0
+                #    guess[parlist == 'x1_%s'%sn] = datadict[sn].SIM_SALT2x1
+                #    guess[parlist == 'c_%s'%sn] = datadict[sn].SIM_SALT2c
                 else:
                     guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
-                
+
+                    
                 for k in datadict[sn].specdata : 
                     guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]
 
