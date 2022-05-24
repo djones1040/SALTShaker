@@ -374,6 +374,7 @@ class TrainSALT(TrainSALTBase):
                 elif 'SIM_SALT2x1' in datadict[sn].__dict__.keys():
                     # simulated samples need an initialization list also
                     # initializing to sim. values is not the best but running SNANA fits adds a lot of overhead
+                    log.info(f'initializing parameters using simulated values for SN {sn}')
                     guess[parlist == 'x0_%s'%sn] = datadict[sn].SIM_SALT2x0
                     guess[parlist == 'x1_%s'%sn] = datadict[sn].SIM_SALT2x1
                     guess[parlist == 'c_%s'%sn] = datadict[sn].SIM_SALT2c
