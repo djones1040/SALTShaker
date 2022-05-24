@@ -71,6 +71,7 @@ class SALT3pipe():
         self.finput = finput
         self.BYOSED = BYOSED()
         self.TrainSim = Simulation()
+        self.InitLCFit = LCFitting()
         self.Training = Training()
         self.TestSim = Simulation()
         self.LCFitting = LCFitting()
@@ -138,6 +139,7 @@ class SALT3pipe():
         self.genversion_split_biascor = self._get_config_option(config,'pipeline','genversion_split_biascor')
 
         if n_lcfit >= 1:
+            self.InitLCFit = [LCFitting() for i in range(n_lcfit)]
             self.LCFitting = [LCFitting() for i in range(n_lcfit)]
         if n_biascorlcfit >= 1:
             self.BiascorLCFit = [LCFitting(biascor=True) for i in range(n_biascorlcfit)]
@@ -254,10 +256,15 @@ class SALT3pipe():
                     else:
                         raise RuntimeError("Something went wrong..")
                 else:
+                    if 'initlcfit' in prostr.lower():
+                        saltpars_dflist = []
                     for i in range(len(pipepro)):
                         pipepro[i].run(batch=pipepro[i].batch,translate=pipepro[i].translate)
                         if pipepro[i].success:
                             pipepro[i].extract_gzfitres()
+                            if 'initlcfit' in prostr.lower(): #read in salt2pars from initial fit
+                                saltpars = pipepro[i].get_init_salt2pars()
+                                saltpars_dflist.append(salt2pars)
                             if pipepro[i].validplots:
                                 print('making validation plots in %s/'%self.plotdir)
                                 pipepro[i].validplot_run()
@@ -269,6 +276,12 @@ class SALT3pipe():
                 pickle.dump(self, open(picklename, "wb" ) )
                 print("Wrote pipeline object as {}".format(picklename))
                 raise RuntimeError("Something went wrong..")
+            if 'initlcfit' in prostr.lower():
+                #write out initpar file
+                df = pd.concat(saltpars_dflist)
+                outdir = self.Training._get_output_info()['outputdir'].values[0]
+                fname = os.path.join(outdir,'snparlist.txt')
+                df.to_csv(fname,index=False,sep=' ')
                 
         if not isinstance(self.lastpipepro,list):
             self.success = self.lastpipepro.success
@@ -552,7 +565,7 @@ class SALT3pipe():
     
     def _drop_empty_string(self,arr):
         return [x for x in arr if x != '']
-
+    
 
 class PipeProcedure():
     def __init__(self):
@@ -1368,6 +1381,13 @@ class LCFitting(PipeProcedure):
         gzfiles = glob.glob('%s/*/FITOPT000.FITRES.gz'%self.keys['header']['outdir'].strip())
         for gzfile in gzfiles:
             os.system('gunzip {}'.format(gzfile))
+            
+    def get_init_salt2pars(self):
+        f = self.get_outdirs()
+        df = pd.read_csv(f,sep='\s+',comment='#')
+        df = df.rename(columns={"zHEL": "zHelio","CID":"SNID"})
+        return df[['SNID','zHelio','x0','x1','c','FITPROB']]
+        
             
 class GetMu(PipeProcedure):
             
