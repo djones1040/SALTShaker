@@ -434,7 +434,7 @@ class TrainSALT(TrainSALTBase):
 
         # get initial job ids
         cmd = (f"squeue -u {USERNAME} -h -o '%i %j' ")
-	    ret = subprocess.run( [cmd], shell=True,
+        ret = subprocess.run( [cmd], shell=True,
                               capture_output=True, text=True )
         pid_init = ret.stdout.split()
 
@@ -455,28 +455,28 @@ class TrainSALT(TrainSALTBase):
                 os.system(f"sbatch /tmp/saltshaker_batch_{i}")
 
         # now let's get the current job ids
-	    cmd = (f"squeue -u {USERNAME} -h -o '%i %j' ")
+        cmd = (f"squeue -u {USERNAME} -h -o '%i %j' ")
         ret = subprocess.run( [cmd], shell=True,
                               capture_output=True, text=True )
-		pid_new = ret.stdout.split()
+        pid_new = ret.stdout.split()
         
         # while the jobs are running, sit there patiently....
-		tstart = time.time()
-		print('waiting for jobs to finish')
+        tstart = time.time()
+        print('waiting for jobs to finish')
         unfinished_jobs = True
-		while unfinished_jobs:
+        while unfinished_jobs:
             time.sleep(5)
-	        ret = subprocess.run( [cmd], shell=True,
-		                          capture_output=True, text=True )
-	        pid_all = ret.stdout.split()
+            ret = subprocess.run( [cmd], shell=True,
+                                  capture_output=True, text=True )
+            pid_all = ret.stdout.split()
             unfinished_jobs = False
             for p in pid_all:
-		        if p not in pid_init and p in pid_new: unfinished_jobs = True
+                if p not in pid_init and p in pid_new: unfinished_jobs = True
             # sometimes things just hang and there's nothing to be done
             # give it 12 hours and then give up (since Midway has long lags)
             if (time.time()-tstart)/60/60 > 12:
-		        print('warning : there were unfinished jobs!')
-		        unfinished_jobs = False
+                print('warning : there were unfinished jobs!')
+                unfinished_jobs = False
 
         # use all the output files to get the errors
         M0_bs,M1_bs,Mhost_bs = np.zeros([np.shape(trainingresult.M0)[0],np.shape(trainingresult.M0)[1],self.options.n_bootstrap]),\
