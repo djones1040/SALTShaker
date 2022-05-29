@@ -239,7 +239,7 @@ class TrainSALTBase:
                                                         help="batch template for bootstrap estimation (default=%(default)s)")
                 successful=successful&wrapaddingargument(config,'trainparams','bootstrap_batch_mode',     type=boolean_string,
                                                         help="batch mode for bootstrap estimation if set (default=%(default)s)")
-                successful=successful&wrapaddingargument(config,'trainparams','getbootstrap_output_only',     type=boolean_string,
+                successful=successful&wrapaddingargument(config,'trainparams','get_bootstrap_output_only',     type=boolean_string,
                                                         help="collect the output from bootstrapping in batch mode without running new jobs (default=%(default)s)")
 
 

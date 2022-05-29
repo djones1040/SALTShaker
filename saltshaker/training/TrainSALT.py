@@ -448,8 +448,8 @@ class TrainSALT(TrainSALTBase):
                         print(line.replace('REPLACE_JOB',cmd).\
                               replace('REPLACE_MEM','20000').\
                               replace('REPLACE_NAME',f'saltshaker_bootstrap_{i}').\
-                              replace('REPLACE_LOGFILE',f'saltshaker_bootstrap_log_{i]').
-                              replace('REPLACE_WALLTIME','04:00:00').
+                              replace('REPLACE_LOGFILE',f'saltshaker_bootstrap_log_{i}').\
+                              replace('REPLACE_WALLTIME','04:00:00').\
                               replace('REPLACE_CPUS_PER_TASK',1),file=fout)
                 print(f"submitting batch job /tmp/saltshaker_batch_{i}")
                 os.system(f"sbatch /tmp/saltshaker_batch_{i}")
