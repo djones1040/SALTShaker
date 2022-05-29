@@ -23,7 +23,7 @@ parser.add_argument('-c','--configfile', default=None, type=str,
 		    help='configuration file')
 parser.add_argument('-r','--runbatch', default=False, action="store_true",
 		    help='if true, run a bootstrap iteration in batch mode')
-parser.add_argument('--bootstrap_id', default=1, type=int
+parser.add_argument('--bootstrap_id', default=1, type=int,
 		    help='number of the bootstrap option')
 
 options, args = parser.parse_known_args()
