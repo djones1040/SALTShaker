@@ -1,0 +1,33 @@
+DOCUMENTATION:
+    PURPOSE:  Training sample for the SALT3.K21 model, the SALT3TRAIN_K21_SNLS3 subset
+    REF: 
+    - AUTHOR: Kenworthy et al., 2021, ApJ, submitted
+      ADS:    TBD
+    - AUTHOR: Supernova Standardization Team
+      ADS:    github.com/djones1040/SALTShaker; saltshaker.readthedocs.io
+    INTENT:    Nominal
+    USAGE_KEY: VERSION_PHOTOMETRY
+    USAGE_CODE: snlc_fit.exe
+    VALIDATE_SCIENCE: Kenworthy+2021, Dai+2021 (in prep.)
+    METADATA:
+    - MWEBV: from SFD98 with SF2011 corrections (uncertainties are 5%)
+    - VPEC: from $SNANA_DIR/util/get_vpec.py, SNANA version 11_02j
+    - REDSHIFT_CMB: from $SNANA_DIR/util/get_vpec.py, SNANA version 11_02j
+    NOTES:
+    - FILTERMAP: see below for filters, zeropoints, and kcor files used with these data for SALT3.K21
+    - "KCOR" and filter files below are given with their SNDATA_ROOT paths, but they are also included in subdirectories
+      SALT3TRAIN_K21_kcor and SALT3TRAIN_K21_filters in the public data release at https://readthedocs.org/projects/saltshaker/
+    VERSION:
+    - DATE: 2021-04
+      AUTHOR: D. Jones
+DOCUMENTATION_END:
+
+KCOR file: $SNDATA_ROOT/kcor/SALT3TRAIN_K21/kcor_SNLS3.fits
+
+FILTERMAP
+---------
+short_name full_name mag_sys zpt_offset filename
+g             SNLS-g      AB     0.0010 $SNDATA_ROOT/filters/PS1/Pantheon/SNLS3-Megacam/effMEGACAM-g.dat
+r             SNLS-r      AB    -0.0094 $SNDATA_ROOT/filters/PS1/Pantheon/SNLS3-Megacam/effMEGACAM-r.dat
+i             SNLS-i      AB    -0.0130 $SNDATA_ROOT/filters/PS1/Pantheon/SNLS3-Megacam/effMEGACAM-i.dat
+z             SNLS-z      AB    -0.0053 $SNDATA_ROOT/filters/PS1/Pantheon/SNLS3-Megacam/effMEGACAM-z.dat
