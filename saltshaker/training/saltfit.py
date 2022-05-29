@@ -700,8 +700,6 @@ class GaussNewton(saltresids.SALTResids):
             logging.critical('Rescaling components failed; photometric residuals have changed. Will finish writing output using unscaled quantities')
             Xredefined=X.copy()
 
-        #log.info('hack - no data uncertainties while we sort out host component things')
-        #getdatauncertainties = False
         if getdatauncertainties:
             M0dataerr, M1dataerr, Mhostdataerr, cov_M0_M1_data, cov_M0_Mhost_data =self.datauncertaintiesfromhessianapprox(Xredefined)
         else:

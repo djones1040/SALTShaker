@@ -229,6 +229,18 @@ class TrainSALTBase:
                                                         help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn (default=%(default)s)")
                 successful=successful&wrapaddingargument(config,'trainparams','fitprobmin',     type=float,
                                                         help="Minimum FITPROB for including SNe (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','errors_from_bootstrap',     type=boolean_string,
+                                                        help="if set, get model surface errors from bootstrapping (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','n_bootstrap',     type=int,
+                                                        help="number of bootstrap resamples (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','maxiter_bootstrap',     type=int,
+                                                        help="maximum number of gauss-newton iterations for bootstrap estimation (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','bootstrap_sbatch_template',     type=str,
+                                                        help="batch template for bootstrap estimation (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','bootstrap_batch_mode',     type=boolean_string,
+                                                        help="batch mode for bootstrap estimation if set (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','getbootstrap_output_only',     type=boolean_string,
+                                                        help="collect the output from bootstrapping in batch mode without running new jobs (default=%(default)s)")
 
 
                 # survey definitions
