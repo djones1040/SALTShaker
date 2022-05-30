@@ -109,22 +109,23 @@ class TrainSALTBase:
 
                 # The basics
                 parser.add_argument('-v', '--verbose', action="count", dest="verbose",
-                                                        default=0,help='verbosity level')
+                                    default=0,help='verbosity level')
                 parser.add_argument('--debug', default=False, action="store_true",
-                                                        help='debug mode: more output and debug files')
+                                    help='debug mode: more output and debug files')
                 parser.add_argument('--clobber', default=False, action="store_true",
-                                                        help='clobber')
+                                    help='clobber')
                 parser.add_argument('configpositional', nargs='?',default=None, type=str,
-                                                        help='configuration file')
+                                    help='configuration file')
                 parser.add_argument('-c','--configfile', default=None, type=str,
-                                                        help='configuration file')
+                                    help='configuration file')
                 parser.add_argument('-s','--stage', default='all', type=str,
-                                                        help='stage - options are train and validate')
+                                    help='stage - options are train and validate')
                 parser.add_argument('--skip_validation', default=False, action="store_true",
-                                                        help='skip making validation plots')
+                                    help='skip making validation plots')
                 parser.add_argument('--fast', default=False, action="store_true",
-                                                        help='if set, run in fast mode for debugging')
-                
+                                    help='if set, run in fast mode for debugging')
+                parser.add_argument('--bootstrap_single', default=False, action="store_true",
+                                    help='if set, run a single bootstrap iteration and save to outputdir')
                 
                 def wrapaddingargument(*args,**kwargs):
                         #Wrap this method to catch exceptions, providing a true if no exception was raised, False otherwise.

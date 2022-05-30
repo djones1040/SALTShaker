@@ -14,31 +14,27 @@ config file options can be overwridden at the command line
 
 if sys.version_info < (3,0):
     sys.exit('Sorry, Python 2 is not supported')
-	
+        
 salt = TrainSALT()
 
 parser = argparse.ArgumentParser(usage=usagestring, conflict_handler="resolve",add_help=False)
 parser.add_argument('configpositional',nargs='?',default=None,type=str,help='configuration file')
 parser.add_argument('-c','--configfile', default=None, type=str,
-		    help='configuration file')
-parser.add_argument('-r','--runbatch', default=False, action="store_true",
-		    help='if true, run a bootstrap iteration in batch mode')
-parser.add_argument('--bootstrap_id', default=1, type=int,
-		    help='number of the bootstrap option')
+                    help='configuration file')
 
 options, args = parser.parse_known_args()
 
 if options.configfile:
-	configfile= options.configfile
+        configfile= options.configfile
 elif options.configpositional:
-	configfile= options.configpositional
+        configfile= options.configpositional
 else:
-	parser.print_help()
-	raise RuntimeError('Configuration file must be specified at command line')
+        parser.print_help()
+        raise RuntimeError('Configuration file must be specified at command line')
 
 config = configparser.ConfigParser(inline_comment_prefixes='#')
 if not os.path.exists(configfile):
-	raise RuntimeError('Configfile doesn\'t exist!')
+        raise RuntimeError('Configfile doesn\'t exist!')
 config.read(configfile)
 
 user_parser = salt.add_user_options(usage=usagestring,config=config)
@@ -47,15 +43,15 @@ user_options = user_parser.parse_known_args()[0]
 loggerconfig.dictconfigfromYAML(user_options.loggingconfig,user_options.outputdir)
 
 if not os.path.exists(user_options.trainingconfig):
-	print('warning : training config file %s doesn\'t exist.  Trying package directory'%user_options.trainingconfig)
-	user_options.trainingconfig = '%s/%s'%(config_rootdir,user_options.trainingconfig)
+        print('warning : training config file %s doesn\'t exist.  Trying package directory'%user_options.trainingconfig)
+        user_options.trainingconfig = '%s/%s'%(config_rootdir,user_options.trainingconfig)
 if not os.path.exists(user_options.trainingconfig):
-	raise RuntimeError('can\'t find training config file!  Checked %s'%user_options.trainingconfig)
+        raise RuntimeError('can\'t find training config file!  Checked %s'%user_options.trainingconfig)
 
 trainingconfig = configparser.ConfigParser(inline_comment_prefixes='#')
 trainingconfig.read(user_options.trainingconfig)
 training_parser = salt.add_training_options(parser=user_parser,
-	usage=usagestring,config=trainingconfig)
+        usage=usagestring,config=trainingconfig)
 training_parser.addhelp()
 training_options = training_parser.parse_args()
 
@@ -64,20 +60,15 @@ salt.verbose = training_options.verbose
 salt.clobber = training_options.clobber
 
 if training_options.fast:
-	salt.options.gaussnewton_maxiter = 1
-	salt.options.fit_model_err = False
-	salt.options.fit_cdisp_only = False
-	salt.options.validate_modelonly = True
-	salt.options.maxsn = 10
+    if salt.options.gaussnewton_maxiter >= 1:
+        salt.options.gaussnewton_maxiter = 1
+    salt.options.fit_model_err = False
+    salt.options.fit_cdisp_only = False
+    salt.options.validate_modelonly = True
+    salt.options.maxsn = 10
 
 if salt.options.stage not in ['all','validate','train']:
     raise RuntimeError('stage must be one of all, validate, train')
-
-if options.runbatch:
-    salt.options.n_bootstrap = 1
-    salt.options.outputdir = f"{salt.options.outputdir}/bootstrap_{options.bootstrap_id}"
-    salt.options.gaussnewton_maxiter = 0
-    salt.options.fit_model_err = False
     
 salt.main()
 

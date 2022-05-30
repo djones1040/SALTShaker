@@ -12,6 +12,7 @@ import copy
 
 import os
 from os import path
+import subprocess
 
 from scipy.linalg import lstsq
 from scipy.optimize import minimize, least_squares, differential_evolution
@@ -56,7 +57,7 @@ from saltshaker.validation.figs import plotSALTModel
 from saltshaker.util.synphot import synphot
 from saltshaker.initfiles import init_rootdir as salt2dir
 from saltshaker.validation import SynPhotPlot
-from time import time
+import time
 from sncosmo.salt2utils import SALT2ColorLaw
 from scipy.interpolate import interp1d
 from scipy.optimize import least_squares
@@ -125,7 +126,7 @@ def specflux(obsphase,obswave,m0phase,m0wave,m0flux,m1flux,colorlaw,z,x0,x1,c,mw
 class TrainSALT(TrainSALTBase):
     def __init__(self,configfile=None):
         self.warnings = []
-        self.initializationtime=time()
+        self.initializationtime=time.time()
 
         if configfile is not None:
 
@@ -425,8 +426,9 @@ class TrainSALT(TrainSALTBase):
 
         return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 
-    def bootstrapSALTModel_batch(self,datadict,trainingresult,returnGN=False):
+    def bootstrapSALTModel_batch(self,datadict,trainingresult,saltfitter,returnGN=False):
         # runs bootstrapping in batch mode via calls to trainsalt
+        USERNAME = os.environ['USER']
 
         sbatch_file = os.path.expandvars(self.options.bootstrap_sbatch_template)
         if not os.path.exists(sbatch_file):
@@ -440,19 +442,21 @@ class TrainSALT(TrainSALTBase):
 
         # worried that jobs will fail, we need a workaround
         if not self.options.get_bootstrap_output_only:
-            for i in self.options.n_bootstrap:
-
-                cmd = f"trainsalt -c {self.options.configfile} -r --bootstrap_id {i}"
-                with open(sbatch_file) as fin, open(f"/tmp/saltshaker_batch_{i}","w") as fout:
+            for i in range(self.options.n_bootstrap):
+                if self.options.fast: faststr = '--fast'
+                else: faststr = ''
+                cmd = f"trainsalt -c {self.options.configfile} --outputdir {self.options.outputdir}/bootstrap_{i} --use_previous_errors True --error_dir {self.options.outputdir} --gaussnewton_maxiter {self.options.maxiter_bootstrap} --errors_from_bootstrap False {faststr} --validate_modelonly True --bootstrap_single"
+                with open(sbatch_file) as fin, open(f"saltshaker_batch_{i}","w") as fout:
                     for line in fin:
+                        line = line.replace('\n','')
                         print(line.replace('REPLACE_JOB',cmd).\
                               replace('REPLACE_MEM','20000').\
                               replace('REPLACE_NAME',f'saltshaker_bootstrap_{i}').\
                               replace('REPLACE_LOGFILE',f'saltshaker_bootstrap_log_{i}').\
                               replace('REPLACE_WALLTIME','04:00:00').\
-                              replace('REPLACE_CPUS_PER_TASK',1),file=fout)
-                print(f"submitting batch job /tmp/saltshaker_batch_{i}")
-                os.system(f"sbatch /tmp/saltshaker_batch_{i}")
+                              replace('REPLACE_CPUS_PER_TASK','1'),file=fout)
+                print(f"submitting batch job saltshaker_batch_{i}")
+                os.system(f"sbatch saltshaker_batch_{i}")
 
         # now let's get the current job ids
         cmd = (f"squeue -u {USERNAME} -h -o '%i %j' ")
@@ -463,6 +467,7 @@ class TrainSALT(TrainSALTBase):
         # while the jobs are running, sit there patiently....
         tstart = time.time()
         print('waiting for jobs to finish')
+        time.sleep(120)
         unfinished_jobs = True
         while unfinished_jobs:
             time.sleep(5)
@@ -483,15 +488,19 @@ class TrainSALT(TrainSALTBase):
             np.zeros([np.shape(trainingresult.M0)[0],np.shape(trainingresult.M0)[1],self.options.n_bootstrap]),\
             np.zeros([np.shape(trainingresult.M0)[0],np.shape(trainingresult.M0)[1],self.options.n_bootstrap])
 
-        for i in self.options.n_bootstrap:
-            params,parvals = np.loadtxt(f"{self.options.outputdir}/bootstrap_{i}",unpack=True,dtype=str)
+        for i in range(self.options.n_bootstrap):
+            params,parvals = np.loadtxt(f"{self.options.outputdir}/bootstrap_{i}/salt3_parameters.dat",unpack=True,dtype=str,skiprows=1)
             parvals = parvals.astype(float)
             
             # save each result
-            M0_bs[:,:,j] = parvals[params == 'm0'].reshape(np.shape(M0_bs))
-            M1_bs[:,:,j] = parvals[params == 'm1'].reshape(np.shape(M0_bs))
+            if not self.options.host_component:
+                M0,M1 = saltfitter.SALTModel(parvals,evaluatePhase=saltfitter.phaseout,evaluateWave=saltfitter.waveout)
+            else:
+                M0,M1,Mhost = saltfitter.SALTModel(parvals,evaluatePhase=saltfitter.phaseout,evaluateWave=saltfitter.waveout)
+            M0_bs[:,:,i] = M0 #parvals[params == 'm0'].reshape(np.shape(trainingresult.M0))
+            M1_bs[:,:,i] = M1 #parvals[params == 'm1'].reshape(np.shape(trainingresult.M0))
             if len(parvals[params == 'mhost']):
-                Mhost_bs[:,:,j] = parvals[params == 'mhost'].reshape(np.shape(M0_bs))
+                Mhost_bs[:,:,i] = Mhost #parvals[params == 'mhost'].reshape(np.shape(trainingresult.M0))
 
 
         trainingresult.M0bootstraperr = np.std(M0_bs,axis=2)
@@ -619,6 +628,40 @@ class TrainSALT(TrainSALTBase):
         n_phaseknots,n_waveknots = len(phaseknotloc)-4,len(waveknotloc)-4
         n_errphaseknots,n_errwaveknots = len(errphaseknotloc)-4,len(errwaveknotloc)-4
 
+        if self.options.bootstrap_single:
+            new_keys = np.random.choice(list(datadict.keys()),size=len(datadict.keys()))
+
+            # make a new dictionary, ensure names are unique
+            datadict_bootstrap = {}
+            for nid,k in enumerate(new_keys):
+                datadict_bootstrap[str(nid)] = copy.deepcopy(datadict[k])
+                datadict_bootstrap[str(nid)].snid_orig = datadict[k].snid[:]
+                datadict_bootstrap[str(nid)].snid = str(nid)
+                
+            # construct the new parlist
+            x_modelpars_bs,parlist_bs,keys_done = np.array([]),np.array([]),np.array([])
+            for i,xm in enumerate(x_modelpars):
+                if '_' not in parlist[i] or 'modelerr' in parlist[i] or 'modelcorr' in parlist[i]:
+                    x_modelpars_bs = np.append(x_modelpars_bs,xm)
+                    parlist_bs = np.append(parlist_bs,parlist[i])
+            for i,k in enumerate(new_keys):
+                snidpars = [(x,p) for x,p in zip(x_modelpars,parlist) if '_' in p and p.split('_')[1] == k]
+                for xp in snidpars:
+                    x,p = xp
+                    parlist_parts = p.split('_')
+                    snid = p.split('_')[1]
+                    if len(parlist_parts) == 2:
+                        x_modelpars_bs = np.append(x_modelpars_bs,x) #x_modelpars[parlist == p])
+                        parlist_bs = np.append(parlist_bs,parlist_parts[0]+'_'+str(i))
+                    elif len(parlist_parts) == 3:
+                        x_modelpars_bs = np.append(x_modelpars_bs,x) # x_modelpars[parlist == p])
+                        parlist_bs = np.append(parlist_bs,parlist_parts[0]+'_'+str(i)+'_'+parlist_parts[2])
+
+            datadict = copy.deepcopy(datadict_bootstrap)
+            parlist = copy.deepcopy(parlist_bs)
+            x_modelpars = copy.deepcopy(x_modelpars_bs)
+
+
         fitter = fitting(self.options.n_components,self.options.n_colorpars,
                          n_phaseknots,n_waveknots,
                          datadict)
@@ -634,8 +677,9 @@ class TrainSALT(TrainSALTBase):
             
             # do the fitting
             trainingresult,message = fitter.gaussnewton(
-                    saltfitter,x_modelpars,
-                    self.options.gaussnewton_maxiter,getdatauncertainties=not self.options.use_previous_errors)
+                saltfitter,x_modelpars,
+                self.options.gaussnewton_maxiter,
+                getdatauncertainties=(not self.options.use_previous_errors and not self.options.errors_from_bootstrap))
             for k in datadict.keys():
                 trainingresult.SNParams[k]['t0'] =  datadict[k].tpk_guess
         
@@ -651,7 +695,7 @@ class TrainSALT(TrainSALTBase):
             loglikes = saltfitter.loglikes
         else: chain,loglikes = None,None
 
-        return trainingresult,chain,loglikes
+        return trainingresult,chain,loglikes,saltfitter
 
     def wrtoutput(self,outdir,trainingresult,chain,
                   loglikes,datadict):
@@ -712,13 +756,13 @@ class TrainSALT(TrainSALTBase):
                         
         if self.options.use_previous_errors and self.options.resume_from_outputdir:
             for filename in ['salt3_lc_variance_0.dat','salt3_lc_variance_1.dat','salt3_lc_variance_host.dat',
-                             'salt3_lc_covariance_01.dat','salt3_lc_covariance_0host.dat','salt3_lc_covariance_1host.dat',
+                             'salt3_lc_covariance_01.dat','salt3_lc_covariance_0host.dat',
                              'salt3_lc_variance_0.dat','salt3_lc_variance_1.dat']:
                 os.system(f"cp {self.options.resume_from_outputdir}/{filename} {outdir}/{filename}")
         elif self.options.use_previous_errors and self.options.error_dir:
             for filename in ['salt3_lc_variance_0.dat','salt3_lc_variance_1.dat',
                              'salt3_lc_covariance_01.dat','salt3_lc_variance_0.dat',
-                             'salt3_lc_covariance_0host.dat','salt3_lc_covariance_1host.dat',
+                             'salt3_lc_covariance_0host.dat',
                              'salt3_lc_variance_1.dat']:
                 os.system(f"cp {self.options.error_dir}/{filename} {outdir}/{filename}")
                 
@@ -774,6 +818,7 @@ SIGMA_INT: 0.106  # used in simulation"""
 
                 for k in trainingresult.SNParams.keys():
                     foundfile = False
+                    SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD,salt2x0,salt2x1,salt2c,salt2t0 = -99,-99,-99,-99,-99,-99,-99,-99
                     for l in snfiles:
                         if '.fits' in l.lower(): continue
                         if str(k) not in l: continue
@@ -807,7 +852,7 @@ SIGMA_INT: 0.106  # used in simulation"""
         
         keys=['num_lightcurves','num_spectra','num_sne']
         yamloutputdict={key.upper():trainingresult.__dict__[key] for key in keys}
-        yamloutputdict['CPU_MINUTES']=(time()-self.initializationtime)/60
+        yamloutputdict['CPU_MINUTES']=(time.time()-self.initializationtime)/60
         yamloutputdict['ABORT_IF_ZERO']=1
         with open(f'{self.options.yamloutputfile}','w') as file: yaml.dump(yamloutputdict,file)
         
@@ -950,7 +995,7 @@ SIGMA_INT: 0.106  # used in simulation"""
                 if not os.path.exists(snlist):
                     raise RuntimeError(f'SN list file {snlist} does not exist')
 
-            tspec = time()
+            tspec = time.time()
             if self.options.dospec:
                 if self.options.binspec:
                     binspecres = self.options.binspecres
@@ -961,7 +1006,7 @@ SIGMA_INT: 0.106  # used in simulation"""
                 ValidateSpectra.compareSpectra(
                     snlist,self.options.outputdir,specfile=f'{self.options.outputdir}/speccomp_{j:.0f}.pdf',
                     maxspec=2000,base=self,verbose=self.verbose,datadict=datadict,binspecres=binspecres)
-            log.info(f'plotting spectra took {time()-tspec:.1f}')
+            log.info(f'plotting spectra took {time.time()-tspec:.1f}')
                 
             snfiles = np.genfromtxt(snlist,dtype='str')
             snfiles = np.atleast_1d(snfiles)
@@ -982,7 +1027,7 @@ SIGMA_INT: 0.106  # used in simulation"""
                                            binspecres=binspecres,snparlist=self.options.snparlist,
                                            maxsn=self.options.maxsn)
                 
-            tlc = time()
+            tlc = time.time()
             count = 0
             salt2_chi2tot,salt3_chi2tot = 0,0
             plotsnlist = []
@@ -1063,16 +1108,16 @@ SIGMA_INT: 0.106  # used in simulation"""
         if not i %12 ==0:
             pdf_pages.savefig()
         pdf_pages.close()
-        log.info(f'plotting light curves took {time()-tlc:.1f}')
+        log.info(f'plotting light curves took {time.time()-tlc:.1f}')
         
     def main(self,returnGN=False):
         try:
             stage='initialization'
             if not len(self.surveylist):
                 raise RuntimeError('surveys are not defined - see documentation')
-            tkstart = time()
+            tkstart = time.time()
             self.kcordict=readutils.rdkcor(self.surveylist,self.options)
-            log.info(f'took {time()-tkstart:.3f} to read in kcor files')
+            log.info(f'took {time.time()-tkstart:.3f} to read in kcor files')
             # TODO: ASCII filter files
                 
             if not os.path.exists(self.options.outputdir):
@@ -1082,16 +1127,16 @@ SIGMA_INT: 0.106  # used in simulation"""
             else:
                 binspecres = None
 
-            tdstart = time()
+            tdstart = time.time()
             datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,
                                            dospec=self.options.dospec,
                                            peakmjdlist=self.options.tmaxlist,
                                            binspecres=binspecres,snparlist=self.options.snparlist,maxsn=self.options.maxsn)
-            log.info(f'took {time()-tdstart:.3f} to read in data files')
-            tcstart = time()
+            log.info(f'took {time.time()-tdstart:.3f} to read in data files')
+            tcstart = time.time()
 
             datadict = self.mkcuts(datadict)[0]
-            log.info(f'took {time()-tcstart:.3f} to apply cuts')
+            log.info(f'took {time.time()-tcstart:.3f} to apply cuts')
             
             
             phasebins=np.linspace(*self.options.phaserange,int((self.options.phaserange[1]-self.options.phaserange[0])/self.options.phasesplineres)+1,True)
@@ -1103,14 +1148,16 @@ SIGMA_INT: 0.106  # used in simulation"""
                 stage='training'
 
                 if not returnGN:
-                    trainingresult,chain,loglikes = self.fitSALTModel(datadict,returnGN=returnGN)
+                    trainingresult,chain,loglikes,saltfitter = self.fitSALTModel(datadict,returnGN=returnGN)
                 else:
                     fitter,saltfitter,modelpars = self.fitSALTModel(datadict,returnGN=returnGN)
                     return fitter,saltfitter,modelpars
 
                 if self.options.errors_from_bootstrap:
-                    fitter,saltfitter,modelpars = self.bootstrapSALTModel(datadict,trainingresult,returnGN=returnGN)
-
+                    if self.options.bootstrap_batch_mode:
+                        fitter,saltfitter,modelpars = self.bootstrapSALTModel_batch(datadict,trainingresult,saltfitter,returnGN=returnGN)
+                    else:
+                        fitter,saltfitter,modelpars = self.bootstrapSALTModel(datadict,trainingresult,returnGN=returnGN)
                 
                 stage='output'
                 # write the output model - M0, M1, c
