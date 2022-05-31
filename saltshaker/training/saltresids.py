@@ -656,12 +656,11 @@ class SALTResids:
         specresids={}
         for k in specmodel:
             spectralmodel=specmodel[k]
-            if (spectralmodel['modelvariance']<0).any() or (spectralmodel['modelvariance']==0).any():
+            variance=spectralmodel['fluxvariance'] + spectralmodel['modelvariance']
+            if (spectralmodel['modelvariance']<0).any():
                 warnings.warn('Negative variance in spectra',RuntimeWarning)
                 negVals=spectralmodel['modelvariance']<0
-                # zero causes NaNs in sqrt so just set zeros to the minumim of model variance elsewhere
-                spectralmodel['modelvariance'][negVals]= np.min(spectralmodel['modelvariance'][spectralmodel['modelvariance'] > 0]) #0
-            variance=spectralmodel['fluxvariance'] + spectralmodel['modelvariance']
+                spectralmodel['modelvariance'][negVals]=0
                 
             uncertainty=np.sqrt(variance)*SpecErrScale
 
