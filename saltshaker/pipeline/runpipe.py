@@ -296,6 +296,15 @@ class RunPipe():
                                 self.pipe.glue(['trainsim','training'])
                             if ['training', 'biascorsim'] in self.pipe.gluepairs:
                                 self.pipe.glue(['training', 'biascorsim'])
+                            if ['initlcfit','training'] in self.pipe.gluepairs:
+                                self.pipe.glue(['initlcfit','training'])
+                        if any([p.startswith('initlcfit') for p in self.pipe.pipepros]):    
+                            for i in range(self.pipe.n_lcfit):
+                                df_lcfit = self._add_suffix(self.pipe.InitLCFit[i],['outdir'],self.num,section=['header'])
+                                done_file = "{}_{:03d}/ALL.DONE".format(os.path.dirname(self.pipe.InitLCFit[i].done_file.strip()),self.num)
+                                self._reconfig_w_suffix(self.pipe.InitLCFit[i],df_lcfit,self.num,done_file=done_file)
+                            if ['trainsim','initlcfit'] in self.pipe.gluepairs:
+                                self.pipe.glue(['trainsim','initlcfit'],on='phot')
                         if any([p.startswith('lcfit') for p in self.pipe.pipepros]):    
                             for i in range(self.pipe.n_lcfit):
                                 df_lcfit = self._add_suffix(self.pipe.LCFitting[i],['outdir'],self.num,section=['header'])

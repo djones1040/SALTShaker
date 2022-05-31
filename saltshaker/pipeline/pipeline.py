@@ -165,7 +165,7 @@ class SALT3pipe():
             else:
                 pipepro.setkeys = None
                 
-            if prostr.startswith('lcfit'):
+            if prostr.startswith('lcfit') or prostr.startswith('initlcfit'):
                 niter = n_lcfit
             elif prostr.startswith('biascorlcfit'):
                 niter = n_biascorlcfit
@@ -262,9 +262,9 @@ class SALT3pipe():
                         pipepro[i].run(batch=pipepro[i].batch,translate=pipepro[i].translate)
                         if pipepro[i].success:
                             pipepro[i].extract_gzfitres()
-                            if 'initlcfit' in prostr.lower(): #read in salt2pars from initial fit
-                                saltpars = pipepro[i].get_init_salt2pars()
-                                saltpars_dflist.append(salt2pars)
+                            if 'initlcfit' in prostr.lower(): #read in saltpars from initial fit
+                                saltpars = pipepro[i].get_init_saltpars()
+                                saltpars_dflist.append(saltpars)
                             if pipepro[i].validplots:
                                 print('making validation plots in %s/'%self.plotdir)
                                 pipepro[i].validplot_run()
@@ -279,9 +279,18 @@ class SALT3pipe():
             if 'initlcfit' in prostr.lower():
                 #write out initpar file
                 df = pd.concat(saltpars_dflist)
-                outdir = self.Training._get_output_info()['outputdir'].values[0]
+                outdir = self.Training._get_output_info().loc[self.Training._get_output_info().key=='outputdir','value'].values[0]
                 fname = os.path.join(outdir,'snparlist.txt')
-                df.to_csv(fname,index=False,sep=' ')
+                fname_tpk = os.path.join(outdir,'tmaxlist.txt')
+                if not os.path.exists(outdir):
+                    os.makedirs(outdir)
+                if os.path.exists(fname):
+                    print("removing old file {}".format(fname))
+                    os.system("rm {}".format(fname))
+                with open(fname, 'w') as f:
+                    f.write('# SNID zHelio x0 x1 c FITPROB\n')
+                    df[['SNID','zHelio','x0','x1','c','FITPROB']].to_csv(f,index=False,sep=' ',header=None)   
+                df[['SNID','PKMJD']].to_csv(fname_tpk,sep=' ',index=False,header=None)
                 
         if not isinstance(self.lastpipepro,list):
             self.success = self.lastpipepro.success
@@ -409,6 +418,13 @@ class SALT3pipe():
                     pro2_in = pro2._get_input_info().loc[on]
 #                     pro2_in['value'] = pro1_out
                     pro2_in['value'] = os.path.join(os.getcwd(),pro1_out)
+    
+                elif isinstance(pro1,LCFitting) and isinstance(pro2, Training):
+                    outdir = pro2._get_output_info().loc[pro2._get_output_info().key=='outputdir','value'].values[0]
+                    fname = os.path.join(outdir,'snparlist.txt')
+                    fname_tpk = os.path.join(outdir,'tmaxlist.txt')
+                    pro2_in = pd.DataFrame([{'label':'main','section':'iodata','key':'snparlist','value':fname},
+                               {'label':'main','section':'iodata','key':'tmaxlist','value':fname_tpk}])
                     
                 elif isinstance(pro2, GetMu):
                     if pro1.biascor:
@@ -525,6 +541,8 @@ class SALT3pipe():
             pipepro = self.TrainSim
         elif pipepro_str.lower().startswith("testsim"):
             pipepro = self.TestSim
+        elif pipepro_str.lower().startswith("initlcfit"):
+            pipepro = self.InitLCFit
         else:
             raise ValueError("Unknow pipeline procedure:",pipepro.strip())
         return pipepro
@@ -1273,8 +1291,10 @@ class LCFitting(PipeProcedure):
             else:
                 outprefix = abspath_for_getmu(str(output_df.loc['TEXTFILE_PREFIX','value']).strip())
                 return str(outprefix)+'.FITRES.TEXT'
+        elif pipepro.lower().startswith('training'):
+            return None
         else:
-            raise ValueError("lcfitting can only glue to getmu")
+            raise ValueError("lcfitting can only glue to getmu or training")
 
     def get_outdirs(self):
         return abspath_for_getmu(self._get_output_info().value.values[0])
@@ -1382,12 +1402,12 @@ class LCFitting(PipeProcedure):
         for gzfile in gzfiles:
             os.system('gunzip {}'.format(gzfile))
             
-    def get_init_salt2pars(self):
-        f = self.get_outdirs()
+    def get_init_saltpars(self):
+        outdir = self.get_outdirs()
+        f = glob.glob('%s/*/FITOPT000*.FITRES*'%outdir)[0]
         df = pd.read_csv(f,sep='\s+',comment='#')
         df = df.rename(columns={"zHEL": "zHelio","CID":"SNID"})
-        return df[['SNID','zHelio','x0','x1','c','FITPROB']]
-        
+        return df[['SNID','zHelio','x0','x1','c','FITPROB','PKMJD']]
             
 class GetMu(PipeProcedure):
             
