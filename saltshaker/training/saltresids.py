@@ -580,10 +580,10 @@ class SALTResids:
             choleskykey=f'photCholesky_{sn}_{flt}'
             if not choleskykey in storedResults:
                 #Calculate cholesky matrix for each set of photometric measurements in each filter
-                if (filtmodel['modelvariance']<0).any() or (filtmodel['modelvariance'] == 0).any():
+                if (filtmodel['modelvariance']<0).any():
                     warnings.warn('Negative variance in photometry',RuntimeWarning)
                     negVals=filtmodel['modelvariance']<0
-                    filtmodel['modelvariance'][negVals]=np.min(filtmodel['modelvariance'][filtmodel['modelvariance'] > 0])
+                    filtmodel['modelvariance'][negVals]=0
                 variance=filtmodel['fluxvariance']+filtmodel['modelvariance']
                 clscat,dclscatdx=filtmodel['colorvariance']
                 #Find cholesky matrix as sqrt of diagonal uncertainties, then perform rank one update to incorporate color scatter
