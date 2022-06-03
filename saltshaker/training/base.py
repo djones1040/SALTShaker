@@ -109,22 +109,23 @@ class TrainSALTBase:
 
                 # The basics
                 parser.add_argument('-v', '--verbose', action="count", dest="verbose",
-                                                        default=0,help='verbosity level')
+                                    default=0,help='verbosity level')
                 parser.add_argument('--debug', default=False, action="store_true",
-                                                        help='debug mode: more output and debug files')
+                                    help='debug mode: more output and debug files')
                 parser.add_argument('--clobber', default=False, action="store_true",
-                                                        help='clobber')
+                                    help='clobber')
                 parser.add_argument('configpositional', nargs='?',default=None, type=str,
-                                                        help='configuration file')
+                                    help='configuration file')
                 parser.add_argument('-c','--configfile', default=None, type=str,
-                                                        help='configuration file')
+                                    help='configuration file')
                 parser.add_argument('-s','--stage', default='all', type=str,
-                                                        help='stage - options are train and validate')
+                                    help='stage - options are train and validate')
                 parser.add_argument('--skip_validation', default=False, action="store_true",
-                                                        help='skip making validation plots')
+                                    help='skip making validation plots')
                 parser.add_argument('--fast', default=False, action="store_true",
-                                                        help='if set, run in fast mode for debugging')
-                
+                                    help='if set, run in fast mode for debugging')
+                parser.add_argument('--bootstrap_single', default=False, action="store_true",
+                                    help='if set, run a single bootstrap iteration and save to outputdir')
                 
                 def wrapaddingargument(*args,**kwargs):
                         #Wrap this method to catch exceptions, providing a true if no exception was raised, False otherwise.
@@ -229,6 +230,18 @@ class TrainSALTBase:
                                                         help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn (default=%(default)s)")
                 successful=successful&wrapaddingargument(config,'trainparams','fitprobmin',     type=float,
                                                         help="Minimum FITPROB for including SNe (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','errors_from_bootstrap',     type=boolean_string,
+                                                        help="if set, get model surface errors from bootstrapping (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','n_bootstrap',     type=int,
+                                                        help="number of bootstrap resamples (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','maxiter_bootstrap',     type=int,
+                                                        help="maximum number of gauss-newton iterations for bootstrap estimation (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','bootstrap_sbatch_template',     type=str,
+                                                        help="batch template for bootstrap estimation (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','bootstrap_batch_mode',     type=boolean_string,
+                                                        help="batch mode for bootstrap estimation if set (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','get_bootstrap_output_only',     type=boolean_string,
+                                                        help="collect the output from bootstrapping in batch mode without running new jobs (default=%(default)s)")
 
 
                 # survey definitions

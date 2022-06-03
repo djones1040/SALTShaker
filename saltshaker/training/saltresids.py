@@ -145,6 +145,7 @@ class SALTfitcacheSN(SALTtrainingSN):
         self.mwextcurveint = interp1d(
             self.obswave,self.mwextcurve ,kind=residsobj.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
         
+
         self.ix0=np.where(residsobj.parlist==f'x0_{self.snid}')[0][0]
         self.ix1=np.where(residsobj.parlist==f'x1_{self.snid}')[0][0]
         self.ixhost=np.where(residsobj.parlist==f'xhost_{self.snid}')[0]
@@ -583,7 +584,8 @@ class SALTResids:
                 if (filtmodel['modelvariance']<0).any() or (filtmodel['modelvariance'] == 0).any():
                     warnings.warn('Negative variance in photometry',RuntimeWarning)
                     negVals=filtmodel['modelvariance']<0
-                    filtmodel['modelvariance'][negVals]=np.min(filtmodel['modelvariance'][filtmodel['modelvariance'] > 0])
+                    if (filtmodel['modelvariance'] > 0).any() and negVals.any():
+                        filtmodel['modelvariance'][negVals]=np.min(filtmodel['modelvariance'][filtmodel['modelvariance'] > 0])
                 variance=filtmodel['fluxvariance']+filtmodel['modelvariance']
                 clscat,dclscatdx=filtmodel['colorvariance']
                 #Find cholesky matrix as sqrt of diagonal uncertainties, then perform rank one update to incorporate color scatter
@@ -660,7 +662,8 @@ class SALTResids:
                 warnings.warn('Negative variance in spectra',RuntimeWarning)
                 negVals=spectralmodel['modelvariance']<0
                 # zero causes NaNs in sqrt so just set zeros to the minumim of model variance elsewhere
-                spectralmodel['modelvariance'][negVals]= np.min(spectralmodel['modelvariance'][spectralmodel['modelvariance'] > 0]) #0
+                if (spectralmodel['modelvariance'] > 0).any():
+                    spectralmodel['modelvariance'][negVals]= np.min(spectralmodel['modelvariance'][spectralmodel['modelvariance'] > 0]) #0
             variance=spectralmodel['fluxvariance'] + spectralmodel['modelvariance']
                 
             uncertainty=np.sqrt(variance)*SpecErrScale
@@ -788,13 +791,22 @@ class SALTResids:
             ##############
             # convenient lines for checking model/phot residuals
             #if self.debug:
-            #if sn == '1999ek' and name == 'phot' and len(np.where(varyParams)[0]):
-            #   import pylab as plt; plt.ion()
-            #   plt.clf()
-            #   plt.plot(valdict['O']['dataflux'],'o')
-            #   plt.plot(valdict['O']['modelflux'],'o')
-            #   plt.savefig('tmp.png')
-            #   import pdb; pdb.set_trace()
+            #import pdb; pdb.set_trace()
+            #if sn == '356' and name == 'phot' and len(np.where(varyParams)[0]):
+                #import pylab as plt; plt.ion()
+            #    for flt in valdict.keys():
+            #        plt.clf()
+            #        plt.plot(valdict[flt]['dataflux'],'o')
+            #        plt.plot(valdict[flt]['modelflux'],'o')
+            #        plt.savefig('tmp.png')
+            #        import pdb; pdb.set_trace()
+            #if sn == '356' and name == 'spec' and len(np.where(varyParams)[0]):
+            #    for flt in valdict.keys():
+            #        plt.clf()
+            #        plt.plot(valdict[flt]['dataflux'],'o')
+            #        plt.plot(valdict[flt]['modelflux'],'o')
+            #        plt.savefig('tmp.png')
+            #        import pdb; pdb.set_trace()
             ##############
             #------------
             ##############
