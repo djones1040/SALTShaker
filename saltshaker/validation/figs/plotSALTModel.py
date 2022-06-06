@@ -14,7 +14,7 @@ from scipy.interpolate import bisplrep,bisplev,RegularGridInterpolator
 
 def mkModelPlot(
         salt3dir='modelfiles/salt3',
-        xlimits=[2000,9200],outfile=None,plotErr=True,n_colorpars=4,host_component=False):
+        xlimits=[2000,9200],outfile=None,plotErr=True,n_colorpars=5,host_component=False):
 
     plt.figure(figsize=(5,8))
     plt.subplots_adjust(left=None, bottom=None, right=None, top=None,
