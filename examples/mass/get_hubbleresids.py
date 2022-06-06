@@ -16,7 +16,7 @@ from scipy.optimize import minimize
 
 _nmltmpl = f"""
   &SNLCINP
-     PRIVATE_DATA_PATH = '{os.getcwd()}/SALT3TRAIN_J21'
+     PRIVATE_DATA_PATH = '{os.getcwd()}/SALT3TRAIN_PanPlus'
 
      VERSION_PHOTOMETRY = '<data_version>'
      KCOR_FILE         = '<kcor>'
@@ -89,12 +89,25 @@ class masshubbleresids():
         self.snlc_fit()
         
         # make some comparison plots
-        self.plot_hrs()
+        self.plot_hrs_threepanel()
         
         # measure the mass step, w/ and w/o SALT2mu
 
-    def edit_model(self,modeldir='output',modelname='SALT3.fixedpars_'):
-        #'SALT3.lowz_host'):
+    def edit_model_list(self):
+
+        for errs in [True,False]:
+            for modeldir,modelname,host in zip(
+                    ['SALT3.host_bootstrap','SALT3.host_fixedpars_bootstrap','SALT3.nohost_bootstrap'],
+                    ['SALT3Models/SALT3.Host','SALT3Models/SALT3.HostFixed','SALT3Models/SALT3.NoHost'],
+                    [True,True,False]):
+
+                if errs:
+                    modelnamestr = modelname
+                else:
+                    modelnamestr = modelname+'NoErrs'
+                self.edit_model(modeldir=modeldir,modelname=modelnamestr,errs=errs,host=host)
+                
+    def edit_model(self,modeldir='SALT3.host_fixedpars_bootstrap',modelname='SALT3.',errs=True,host=True):
 
         if not os.path.exists(f'{modelname}HighMass'):
             os.makedirs(f'{modelname}HighMass')
@@ -105,40 +118,46 @@ class masshubbleresids():
 
         # copy to HighMass dir
         os.system(f'cp {modeldir}/SALT3.INFO {modelname}HighMass/')
-        #os.system(f'cp {modeldir}/salt3_lc_covariance_01.dat {modelname}HighMass/')
         os.system(f'cp {modeldir}/salt3_color_correction.dat {modelname}HighMass/')
-        #os.system(f'cp {modeldir}/salt3_lc_variance_0.dat {modelname}HighMass/')
-        #os.system(f'cp {modeldir}/salt3_template_1.dat {modelname}HighMass/')
-        os.system(f'cp {modeldir}/salt3_color_dispersion.dat {modelname}HighMass/')
-        #os.system(f'cp {modeldir}/salt3_lc_variance_1.dat {modelname}HighMass/')
 
         # copy to LowMass Dir
         os.system(f'cp {modeldir}/SALT3.INFO {modelname}LowMass/')
-        #os.system(f'cp {modeldir}/salt3_lc_covariance_01.dat {modelname}LowMass/')
         os.system(f'cp {modeldir}/salt3_color_correction.dat {modelname}LowMass/')
-        #os.system(f'cp {modeldir}/salt3_lc_variance_0.dat {modelname}LowMass/')
-        #os.system(f'cp {modeldir}/salt3_template_1.dat {modelname}LowMass/')
-        os.system(f'cp {modeldir}/salt3_color_dispersion.dat {modelname}LowMass/')
-        #os.system(f'cp {modeldir}/salt3_lc_variance_1.dat {modelname}LowMass/')
 
+        # copy color dispersion or file full of zeros
+        if errs:
+            os.system(f'cp {modeldir}/salt3_color_dispersion.dat {modelname}HighMass/')
+            os.system(f'cp {modeldir}/salt3_color_dispersion.dat {modelname}LowMass/')
+        else:
+            wave,disp = np.loadtxt(f'{modeldir}/salt3_color_dispersion.dat',unpack=True)
+            for filename in [f"{modelname}HighMass/salt3_color_dispersion.dat",f"{modelname}LowMass/salt3_color_dispersion.dat"]:
+                with open(f"{modelname}LowMass/salt3_color_dispersion.dat","w") as fout:
+                    for w,d in zip(wave,disp):
+                        print(f"{w:.1f} 0.0",file=fout)
+            
         # now edit the M0 component for high vs. low-mass SNe
         m0phase,m0wave,m0flux = np.loadtxt(f"{modeldir}/salt3_template_0.dat",unpack=True)
         m1phase,m1wave,m1flux = np.loadtxt(f"{modeldir}/salt3_template_1.dat",unpack=True)
-        mhostphase,mhostwave,mhostflux = np.loadtxt(f"{modeldir}/salt3_template_host.dat",unpack=True)
         m0varphase,m0varwave,m0varflux = np.loadtxt(f"{modeldir}/salt3_lc_variance_0.dat",unpack=True)
         m1varphase,m1varwave,m1varflux = np.loadtxt(f"{modeldir}/salt3_lc_variance_1.dat",unpack=True)
         m01covarphase,m01covarwave,m01covarflux = np.loadtxt(f"{modeldir}/salt3_lc_covariance_01.dat",unpack=True)
-        mhostvarphase,mhostvarwave,mhostvarflux = np.loadtxt(f"{modeldir}/salt3_lc_variance_host.dat",unpack=True)
-        m0hostcovarphase,m0hostcovarwave,m0hostcovarflux = np.loadtxt(f"{modeldir}/salt3_lc_covariance_0host.dat",unpack=True)
+        if host:
+            mhostphase,mhostwave,mhostflux = np.loadtxt(f"{modeldir}/salt3_template_host.dat",unpack=True)
+            mhostvarphase,mhostvarwave,mhostvarflux = np.loadtxt(f"{modeldir}/salt3_lc_variance_host.dat",unpack=True)
+            m0hostcovarphase,m0hostcovarwave,m0hostcovarflux = np.loadtxt(f"{modeldir}/salt3_lc_covariance_0host.dat",unpack=True)
         
         # model flux = x0*(M0 + x1*M1 + xhost*Mhost)
         # xhost is +0.5 for high-mass
         # xhost is -0.5 for low-mass
-        m0highmassflux = m0flux + mhostflux*0.5
-        m0lowmassflux= m0flux - mhostflux*0.5
-        m0highmassvarflux = m0varflux + 0.5**2.*mhostvarflux + 2*0.5*m0hostcovarflux*np.sqrt(m0varflux)*np.sqrt(mhostvarflux)
-        m0lowmassvarflux = m0varflux + 0.5**2.*mhostvarflux - 2*0.5*m0hostcovarflux*np.sqrt(m0varflux)*np.sqrt(mhostvarflux)
-
+        if host:
+            m0highmassflux = m0flux + mhostflux*0.5
+            m0lowmassflux= m0flux - mhostflux*0.5
+            m0highmassvarflux = m0varflux + 0.5**2.*mhostvarflux + 2*0.5*m0hostcovarflux*np.sqrt(m0varflux)*np.sqrt(mhostvarflux)
+            m0lowmassvarflux = m0varflux + 0.5**2.*mhostvarflux - 2*0.5*m0hostcovarflux*np.sqrt(m0varflux)*np.sqrt(mhostvarflux)
+        else:
+            m0highmassflux = m0flux; m0lowmassflux = m0flux
+            m0highmassvarflux = m0varflux; m0lowmassvarflux = m0varflux
+            
         from saltshaker.training.init_hsiao import synphotB, synphotBflux
         Bfilt = '../../saltshaker/initfiles/Bessell90_B.dat'
         refWave,refFlux=np.loadtxt('../../saltshaker/initfiles/flatnu.dat',unpack=True)
@@ -162,7 +181,7 @@ class masshubbleresids():
         # now fix M0 mag
         flux_adj_highmass = 10**(-0.4*(-19.49+(synphotB(refWave,refFlux,0,0,Bfilt)-synphotB(m0wave[m0phase==0],m0highmassflux[m0phase==0],0,0,Bfilt))))
         flux_adj_lowmass = 10**(-0.4*(-19.49+(synphotB(refWave,refFlux,0,0,Bfilt)-synphotB(m0wave[m0phase==0],m0lowmassflux[m0phase==0],0,0,Bfilt))))
-
+#        import pdb; pdb.set_trace()
         # now correct so B-band mag is same
         m0highmassflux *= flux_adj_highmass
         m0highmassvarflux *= flux_adj_highmass**2.
@@ -176,6 +195,13 @@ class masshubbleresids():
         m1lowmassvarflux = m1lowmassvarflux*flux_adj_lowmass**2.
         m01lowmasscovarflux = m01lowmasscovarflux*flux_adj_lowmass**2.
 
+        if not errs:
+            m0highmassvarflux[:] = 0.0
+            m0lowmassvarflux[:] = 0.0
+            m1highmassvarflux[:] = 0.0
+            m1lowmassvarflux[:] = 0.0
+            m01highmasscovarflux[:] = 0.0
+            m01lowmasscovarflux[:] = 0.0
         
         with open(f'{modelname}HighMass/salt3_template_0.dat','w') as fout:
             for p,w,m in zip(m0phase,m0wave,m0highmassflux):
@@ -216,10 +242,13 @@ class masshubbleresids():
         # let's just fit everything with both SN models and then concat the FITRES files
         # only keeping high vs. low-mass for different ones
 
+        # tmp flag
+        clobber = True
+        
         # surveys, filters, kcors
-        all_versions = ['SALT3TRAIN_J21_Hamuy1996','SALT3TRAIN_J21_Riess1999','SALT3TRAIN_J21_Jha2006',
-                        'SALT3TRAIN_J21_Hicken2009','SALT3TRAIN_J21_CfA4p1','SALT3TRAIN_J21_CfA4p2',
-                        'SALT3TRAIN_J21_CSPDR3','SALT3TRAIN_J21_OTHER_LOWZ','SALT3TRAIN_J21_Foundation_DR1']
+        all_versions = ['SALT3TRAIN_PanPlus_Hamuy1996','SALT3TRAIN_PanPlus_Riess1999','SALT3TRAIN_PanPlus_Jha2006',
+                        'SALT3TRAIN_PanPlus_Hicken2009','SALT3TRAIN_PanPlus_CfA4p1','SALT3TRAIN_PanPlus_CfA4p2',
+                        'SALT3TRAIN_PanPlus_CSPDR3','SALT3TRAIN_PanPlus_OTHER_LOWZ','SALT3TRAIN_PanPlus_Foundation_DR1']
         all_kcors = ['kcor/SALT3TRAIN_Fragilistic/kcor_Hamuy1996.fits',
                      'kcor/SALT3TRAIN_Fragilistic/kcor_Riess1999.fits',
                      'kcor/SALT3TRAIN_Fragilistic/kcor_Jha2006.fits',
@@ -232,217 +261,176 @@ class masshubbleresids():
         all_filtlists = ['BVRI','UBVRI','UBVRI','ABIRUVabcdefhjkltuvwxLC','DEFG','PQWT','AtuvxLCw','ABIRUVhjkltuvLC','griz']
         
         # do the fitting
-        for version,kcor,filtlist,outfile in zip(all_versions,all_kcors,all_filtlists,all_versions):
+        for model in ['SALT3Models/SALT3.Host','SALT3Models/SALT3.FixedHost','SALT3Models/SALT3.NoHost',
+                      'SALT3Models/SALT3.HostNoErrs','SALT3Models/SALT3.FixedHostNoErrs','SALT3Models/SALT3.NoHostNoErrs']:
+            prefix = model.split('.')[-1]
+            if clobber:
+                os.system(f"rm fitres/*")
+            for massmodel in ['HighMass','LowMass']:
+                for version,kcor,filtlist,outfile in zip(all_versions,all_kcors,all_filtlists,all_versions):
 
-            for model in ['HighMass','LowMass','lowz_nohost','K21','JLA-B14']:
-                if not clobber and os.path.exists(f"fitres/{outfile}_{model}.FITRES.TEXT"):
-                    continue
+                    for model in :
+                        if not clobber and os.path.exists(f"fitres/{outfile}_{model}.FITRES.TEXT"):
+                            continue
 
+                        nmltext = _nmltmpl.replace('<data_version>',version).\
+                            replace('<kcor>',kcor).\
+                            replace('<filtlist>',filtlist).\
+                            replace('<outfile>','fitres/'+outfile+'_'+model)
 
-                nmltext = _nmltmpl.replace('<data_version>',version).\
-                    replace('<kcor>',kcor).\
-                    replace('<filtlist>',filtlist).\
-                    replace('<outfile>','fitres/'+outfile+'_'+model)
+                        if model != 'K21' and model != 'JLA-B14':
+                            nmltext = nmltext.replace('<model>',os.getcwd()+'/SALT3.'+model)
+                        elif model == 'K21':
+                            nmltext = nmltext.replace('<model>','SALT3.'+model)
+                        else:
+                            nmltext = nmltext.replace('<model>','SALT2.JLA-B14')
+                        with open('tmp.nml','w') as fout:
+                            print(nmltext,file=fout)
 
-                if model != 'K21' and model != 'JLA-B14':
-                    nmltext = nmltext.replace('<model>',os.getcwd()+'/SALT3.'+model)
-                elif model == 'K21':
-                    nmltext = nmltext.replace('<model>','SALT3.'+model)
-                else:
-                    nmltext = nmltext.replace('<model>','SALT2.JLA-B14')
-                with open('tmp.nml','w') as fout:
-                    print(nmltext,file=fout)
+                        os.system(f'snlc_fit.exe tmp.nml')
 
-                os.system(f'snlc_fit.exe tmp.nml')
-                #import pdb; pdb.set_trace()
-        # now catenate everything together but only high- vs. low-mass
-        spi = txtobj('SALT3_PARS_INIT_HOSTMASS.LIST')
+                # now catenate everything together but only high- vs. low-mass
+                spi = txtobj('SALT3_PARS_INIT_HOSTMASS.LIST')
 
-        fitres_files_highmass = glob.glob('fitres/*HighMass.FITRES.TEXT')
-        with open('fitres/HighMass_Combined.FITRES.TEXT','w') as fout:
-            for i,ff in enumerate(fitres_files_highmass):
-                if 'Combined' in ff and i == 0: raise RuntimeError('bleh!')
-                if 'Combined' in ff: continue
-                with open(ff) as fin:
-                    for line in fin:
-                        line = line.replace('\n','')
-                        if line.startswith('VARNAMES') and i == 0:
-                            print(line,file=fout)
-                        elif line.startswith('SN:'):
-                            snid = line.split()[1]
-                            if snid in spi.SNID:
-                                iMass = spi.SNID == snid
-                                if spi.xhost[iMass] > 0:
-                                    print(line,file=fout)
+            fitres_files_highmass = glob.glob('fitres/*HighMass.FITRES.TEXT')
+            with open('fitres_combined/{prefix}_HighMass_Combined.FITRES.TEXT','w') as fout:
+                for i,ff in enumerate(fitres_files_highmass):
+                    if 'Combined' in ff and i == 0: raise RuntimeError('bleh!')
+                    if 'Combined' in ff: continue
+                    with open(ff) as fin:
+                        for line in fin:
+                            line = line.replace('\n','')
+                            if line.startswith('VARNAMES') and i == 0:
+                                print(line,file=fout)
+                            elif line.startswith('SN:'):
+                                snid = line.split()[1]
+                                if snid in spi.SNID:
+                                    iMass = spi.SNID == snid
+                                    if spi.xhost[iMass] > 0:
+                                        print(line,file=fout)
 
-        fitres_files_lowmass = glob.glob('fitres/*LowMass.FITRES.TEXT')
-        with open('fitres/LowMass_Combined.FITRES.TEXT','w') as fout:
-            for i,ff in enumerate(fitres_files_lowmass):
-                if 'Combined' in ff and i == 0: raise RuntimeError('bleh!')
-                if 'Combined' in ff: continue
-                with open(ff) as fin:
-                    for line in fin:
-                        line = line.replace('\n','')
-                        if line.startswith('VARNAMES') and i == 0:
-                            print(line,file=fout)
-                        #    varnames = np.array(line.split())
-                        #elif line.startswith('VARNAMES'):
-                        #    varnames = np.array(line.split())
-                        elif line.startswith('SN:'):
-                            snid = line.split()[1]
-                            if snid in spi.SNID:
-                                iMass = spi.SNID == snid
-                                if spi.xhost[iMass] < 0:
-                                    #if 'HOSTGAL_LOGMASS' in varnames:
-                                    #    inothost = varnames[(varnames != 'HOSTGAL_LOGMASS') & (varnames != 'HOSTGAL_LOGMASS_ERR')]
-                                    #    print(' '.join(np.array(line.split())[inothost]),file=fout)
-                                    #else:
-                                    print(line,file=fout)
+            fitres_files_lowmass = glob.glob('fitres/*LowMass.FITRES.TEXT')
+            with open(f'fitres/{prefix}_LowMass_Combined.FITRES.TEXT','w') as fout:
+                for i,ff in enumerate(fitres_files_lowmass):
+                    if 'Combined' in ff and i == 0: raise RuntimeError('bleh!')
+                    if 'Combined' in ff: continue
+                    with open(ff) as fin:
+                        for line in fin:
+                            line = line.replace('\n','')
+                            if line.startswith('VARNAMES') and i == 0:
+                                print(line,file=fout)
+                            elif line.startswith('SN:'):
+                                snid = line.split()[1]
+                                if snid in spi.SNID:
+                                    iMass = spi.SNID == snid
+                                    if spi.xhost[iMass] < 0:
+                                        print(line,file=fout)
 
-        with open('fitres/AllMass_Combined.FITRES.TEXT','w') as fout:
-            for i,ff in enumerate(['fitres/LowMass_Combined.FITRES.TEXT','fitres/HighMass_Combined.FITRES.TEXT']):
-                with open(ff) as fin:
-                    for line in fin:
-                        line = line.replace('\n','')
-                        if line.startswith('VARNAMES') and i == 0:
-                            print(line,file=fout)
-                        elif line.startswith('SN:'):
-                            print(line,file=fout)
-
-
-        fitres_files_k21 = glob.glob('fitres/*K21.FITRES.TEXT')
-        with open('fitres/K21_Combined.FITRES.TEXT','w') as fout:
-            for i,ff in enumerate(fitres_files_k21):
-                if 'Combined' in ff and i == 0: raise RuntimeError('bleh!')
-                if 'Combined' in ff: continue
-                with open(ff) as fin:
-                    for line in fin:
-                        line = line.replace('\n','')
-                        if line.startswith('VARNAMES') and i == 0:
-                            print(line,file=fout)
-                        elif line.startswith('SN:'):
-                            snid = line.split()[1]
-                            if snid in spi.SNID:
+            with open(f'fitres/{prefix}_AllMass_Combined.FITRES.TEXT','w') as fout:
+                for i,ff in enumerate(['fitres/LowMass_Combined.FITRES.TEXT','fitres/HighMass_Combined.FITRES.TEXT']):
+                    with open(ff) as fin:
+                        for line in fin:
+                            line = line.replace('\n','')
+                            if line.startswith('VARNAMES') and i == 0:
+                                print(line,file=fout)
+                            elif line.startswith('SN:'):
                                 print(line,file=fout)
 
-        fitres_files_k21 = glob.glob('fitres/*K21.FITRES.TEXT')
-        with open('fitres/K21_LowMass_Combined.FITRES.TEXT','w') as fout:
-            for i,ff in enumerate(fitres_files_k21):
-                if 'Combined' in ff and i == 0: raise RuntimeError('bleh!')
-                if 'Combined' in ff: continue
-                with open(ff) as fin:
-                    for line in fin:
-                        line = line.replace('\n','')
-                        if line.startswith('VARNAMES') and i == 0:
-                            print(line,file=fout)
-                        elif line.startswith('SN:'):
-                            snid = line.split()[1]
-                            if snid in spi.SNID:
-                                iMass = spi.SNID == snid
-                                if spi.xhost[iMass] < 0:
-                                    print(line,file=fout)
-
-        fitres_files_k21 = glob.glob('fitres/*K21.FITRES.TEXT')
-        with open('fitres/K21_HighMass_Combined.FITRES.TEXT','w') as fout:
-            for i,ff in enumerate(fitres_files_k21):
-                if 'Combined' in ff and i == 0: raise RuntimeError('bleh!')
-                if 'Combined' in ff: continue
-                with open(ff) as fin:
-                    for line in fin:
-                        line = line.replace('\n','')
-                        if line.startswith('VARNAMES') and i == 0:
-                            print(line,file=fout)
-                        elif line.startswith('SN:'):
-                            snid = line.split()[1]
-                            if snid in spi.SNID:
-                                iMass = spi.SNID == snid
-                                if spi.xhost[iMass] > 0:
-                                    print(line,file=fout)
-
-        fitres_files_k21 = glob.glob('fitres/*JLA-B14.FITRES.TEXT')
-        with open('fitres/JLA-B14_LowMass_Combined.FITRES.TEXT','w') as fout:
-            for i,ff in enumerate(fitres_files_k21):
-                if 'Combined' in ff and i == 0: raise RuntimeError('bleh!')
-                if 'Combined' in ff: continue
-                with open(ff) as fin:
-                    for line in fin:
-                        line = line.replace('\n','')
-                        if line.startswith('VARNAMES') and i == 0:
-                            print(line,file=fout)
-                        elif line.startswith('SN:'):
-                            snid = line.split()[1]
-                            if snid in spi.SNID:
-                                iMass = spi.SNID == snid
-                                if spi.xhost[iMass] < 0:
-                                    print(line,file=fout)
-
-        fitres_files_k21 = glob.glob('fitres/*JLA-B14.FITRES.TEXT')
-        with open('fitres/JLA-B14_HighMass_Combined.FITRES.TEXT','w') as fout:
-            for i,ff in enumerate(fitres_files_k21):
-                if 'Combined' in ff and i == 0: raise RuntimeError('bleh!')
-                if 'Combined' in ff: continue
-                with open(ff) as fin:
-                    for line in fin:
-                        line = line.replace('\n','')
-                        if line.startswith('VARNAMES') and i == 0:
-                            print(line,file=fout)
-                        elif line.startswith('SN:'):
-                            snid = line.split()[1]
-                            if snid in spi.SNID:
-                                iMass = spi.SNID == snid
-                                if spi.xhost[iMass] > 0:
-                                    print(line,file=fout)
-
-        fitres_files_k21 = glob.glob('fitres/*lowz_nohost.FITRES.TEXT')
-        with open('fitres/lowz_nohost_HighMass_Combined.FITRES.TEXT','w') as fout:
-            for i,ff in enumerate(fitres_files_k21):
-                if 'Combined' in ff and i == 0: raise RuntimeError('bleh!')
-                if 'Combined' in ff: continue
-                with open(ff) as fin:
-                    for line in fin:
-                        line = line.replace('\n','')
-                        if line.startswith('VARNAMES') and i == 0:
-                            print(line,file=fout)
-                        elif line.startswith('SN:'):
-                            snid = line.split()[1]
-                            if snid in spi.SNID:
-                                iMass = spi.SNID == snid
-                                if spi.xhost[iMass] > 0:
-                                    print(line,file=fout)
-
-        fitres_files_k21 = glob.glob('fitres/*lowz_nohost.FITRES.TEXT')
-        with open('fitres/lowz_nohost_LowMass_Combined.FITRES.TEXT','w') as fout:
-            for i,ff in enumerate(fitres_files_k21):
-                if 'Combined' in ff and i == 0: raise RuntimeError('bleh!')
-                if 'Combined' in ff: continue
-                with open(ff) as fin:
-                    for line in fin:
-                        line = line.replace('\n','')
-                        if line.startswith('VARNAMES') and i == 0:
-                            print(line,file=fout)
-                        elif line.startswith('SN:'):
-                            snid = line.split()[1]
-                            if snid in spi.SNID:
-                                iMass = spi.SNID == snid
-                                if spi.xhost[iMass] < 0:
-                                    print(line,file=fout)
-
-
-
-        # now it's SALT2mu time
-        os.system('SALT2mu.exe SALT2mu.default file=fitres/HighMass_Combined.FITRES.TEXT prefix=fitres/HighMass_Combined_SALT2mu')
-        os.system('SALT2mu.exe SALT2mu.default file=fitres/LowMass_Combined.FITRES.TEXT prefix=fitres/LowMass_Combined_SALT2mu')
-        os.system('SALT2mu.exe SALT2mu.default file=fitres/AllMass_Combined.FITRES.TEXT prefix=fitres/AllMass_Combined_SALT2mu')
-        os.system('SALT2mu.exe SALT2mu.default file=fitres/K21_Combined.FITRES.TEXT prefix=fitres/K21_Combined_SALT2mu')
-        os.system('SALT2mu.exe SALT2mu.default file=fitres/K21_LowMass_Combined.FITRES.TEXT prefix=fitres/K21_LowMass_Combined_SALT2mu')
-        os.system('SALT2mu.exe SALT2mu.default file=fitres/K21_HighMass_Combined.FITRES.TEXT prefix=fitres/K21_HighMass_Combined_SALT2mu')
-        os.system('SALT2mu.exe SALT2mu.default file=fitres/JLA-B14_LowMass_Combined.FITRES.TEXT prefix=fitres/JLA-B14_LowMass_Combined_SALT2mu')
-        os.system('SALT2mu.exe SALT2mu.default file=fitres/JLA-B14_HighMass_Combined.FITRES.TEXT prefix=fitres/JLA-B14_HighMass_Combined_SALT2mu')
-        os.system('SALT2mu.exe SALT2mu.default file=fitres/lowz_nohost_LowMass_Combined.FITRES.TEXT prefix=fitres/lowz_nohost_LowMass_Combined_SALT2mu')
-        os.system('SALT2mu.exe SALT2mu.default file=fitres/lowz_nohost_HighMass_Combined.FITRES.TEXT prefix=fitres/lowz_nohost_HighMass_Combined_SALT2mu')
+            # now it's SALT2mu time
+            os.system(f'SALT2mu.exe SALT2mu.default file=fitres/{prefix}_HighMass_Combined.FITRES.TEXT prefix=fitres/{prefix}_HighMass_Combined_SALT2mu')
+            os.system(f'SALT2mu.exe SALT2mu.default file=fitres/{prefix}_LowMass_Combined.FITRES.TEXT prefix=fitres/{prefix}_LowMass_Combined_SALT2mu')
+            os.system(f'SALT2mu.exe SALT2mu.default file=fitres/{prefix}_AllMass_Combined.FITRES.TEXT prefix=fitres/{prefix}_AllMass_Combined_SALT2mu')
 
         return
 
+    def plot_hrs_threepanel(self):
+
+        # matplotlib boredom
+        plt.subplots_adjust(wspace=0)
+        fig = plt.figure()
+        gs = GridSpec(3, 5) #, figure=fig)
+        gs.update(wspace=0.0, hspace=0.0,bottom=0.2)
+
+        
+        for i,prefix in enumerate(['NoHost','HostFixed','Host']):
+            # read in the files
+            lowmassfile = f'fitres_combined/{prefix}_LowMass_Combined_SALT2mu.fitres'
+            highmassfile = f'fitres_combined/{prefix}_HighMass_Combined_SALT2mu.fitres'
+            allmassfile = f'fitres_combined/{prefix}_AllMass_Combined_SALT2mu.fitres'
+            allmassnoerrfile = f'fitres_combined/{prefix}NoErr_AllMass_Combined_SALT2mu.fitres'
+            
+            frlowmass = txtobj(lowmassfile,fitresheader=True)
+            frhighmass = txtobj(highmassfile,fitresheader=True)
+            frall = txtobj(allmassfile,fitresheader=True)
+            frnoerr = txtobj(allmassnoerrfile,fitresheader=True)
+            
+            frlowmass = getmu.mkcuts(frlowmass,fitprobmin=0)
+            frhighmass = getmu.mkcuts(frhighmass,fitprobmin=0)          
+            frall = getmu.mkcuts(frall,fitprobmin=0)
+
+            # nuisance parameters
+            for fr,frfile in zip([frlowmass,frhighmass,frall],[lowmassfile,highmassfile,allmassfile]):
+                with open(frfile) as fin:
+                    for line in fin:
+                        if line.startswith('#  alpha0'): salt2alpha = float(line.split()[3])
+                        if line.startswith('#  beta0'): salt2beta = float(line.split()[3])
+                fr = getmu.getmu(fr)
+                fr.salt2alpha = salt2alpha; fr.salt2beta = salt2beta
+
+            # make the subplot
+            ax = fig.add_subplot(gs[i, 0:4])
+            axhist = fig.add_subplot(gs[i, 4])
+            ax.tick_params(top="on",bottom="on",left="on",right="off",direction="inout",length=8, width=1.5)
+            axhist.tick_params(top="on",bottom="on",left="on",right="off",direction="inout",length=8, width=1.5)
+
+            # plot HRs and bins
+            zbins = np.logspace(np.log10(0.01),np.log10(1.0),20)
+            salt3mubins = binned_statistic(frlowmass.zCMB,frlowmass.MURES,bins=zbins,statistic='mean').statistic
+            salt3muerrbins = binned_statistic(frlowmass.zCMB,frlowmass.MURES,bins=zbins,statistic=errfnc).statistic
+            ax.axhline(0,lw=2,color='k')
+            ax.errorbar(frlowmass.zCMB,frlowmass.MURES,yerr=frlowmass.MUERR,fmt='o',color='b',alpha=0.1)
+            ax.errorbar((zbins[1:]+zbins[:-1])/2.,salt3mubins,yerr=salt3muerrbins,fmt='o-',color='b')
+            muresbins = np.linspace(-1,1,40)
+            ax1hist.hist(frlowmass.MURES,bins=muresbins,orientation='horizontal',color='b',alpha=0.5)
+
+            salt3mubins = binned_statistic(frhighmass.zCMB,frhighmass.MURES,bins=zbins,statistic='mean').statistic
+            salt3muerrbins = binned_statistic(frhighmass.zCMB,frhighmass.MURES,bins=zbins,statistic=errfnc).statistic
+            ax.axhline(0,lw=2,color='k')
+            ax.errorbar(frhighmass.zCMB,frhighmass.MURES,yerr=frhighmass.MUERR,fmt='o',color='r',alpha=0.1)
+            ax.errorbar((zbins[1:]+zbins[:-1])/2.,salt3mubins,yerr=salt3muerrbins,fmt='o-',color='r')
+            muresbins = np.linspace(-1,1,40)
+            ax1hist.hist(frhighmass.MURES,bins=muresbins,orientation='horizontal',color='r',alpha=0.5)
+
+            # summary stats
+            ax1.text(0.01,0.99,fr"""log($M_{{\ast}}/M_{{\odot}}$) < 10 RMS = {np.std(frlowmass.MURES):.3f}""",
+                     ha='left',va='top',transform=ax1.transAxes,color='b')
+            ax1.text(0.01,0.9,fr"""log($M_{{\ast}}/M_{{\odot}}$) > 10 RMS = {np.std(frhighmass.MURES):.3f}""",
+                     ha='left',va='top',transform=ax1.transAxes,color='r')
+
+            # mass step
+            md = minimize(lnlikefunc,(0.0,0.0),
+                          args=(np.append([0.0]*len(frlowmass.MURES),[1.0]*len(frhighmass.MURES)),
+                                np.append(frlowmass.MURES,frhighmass.MURES),np.append(frlowmass.MUERR,frhighmass.MUERR),None))
+            mass_step = -md.x[1]; mass_steperr = np.sqrt(md.hess_inv[1,1])
+            chi2 = np.median(frallmass.FITCHI2/frallmass.NDOF)
+            ax1.text(0.01,0.01,f"Mass Step = ${mass_step:.3f}\pm{mass_steperr:.3f}$ mag",transform=ax1.transAxes,ha='left',va='bottom')
+            ax1.text(0.01,0.1,fr"$\chi^2_{{\nu}}$ = {chi2:.3f}",transform=ax1.transAxes,ha='left',va='bottom')
+
+
+            # matplotlib things
+            ax.set_xscale('log')
+            ax.xaxis.set_major_formatter(plt.NullFormatter())
+            ax.xaxis.set_minor_formatter(plt.NullFormatter())
+            ax.xaxis.set_ticks([0.02,0.05,0.1])
+            ax.xaxis.set_ticklabels(['0.02','0.05','0.1'])
+            axhist.set_ylim([-0.5,0.5])
+            axhist.yaxis.tick_right()
+
+            ax.set_ylabel('$\mu - \mu_{\Lambda CDM}$')
+
+        ax.set_xlabel('$z_{CMB}$')
+        plt.savefig('masshubbleresids.png')
+            
     def plot_hrs(self):
 
         plt.rcParams['figure.figsize'] = (12,6)
@@ -649,10 +637,12 @@ def colorscat():
     ax.legend(loc='lower right',prop={'size':13})
     plt.savefig('colorscat.png')
 
-    import pdb; pdb.set_trace()
+    import pdb; pdb.set_trace()    
         
 if __name__ == "__main__":
     hr = masshubbleresids()
     #hr.main()
-    hr.edit_model()
+    #hr.edit_model()
+    #hr.edit_model_list()
+    hr.main()
     #colorscat()
