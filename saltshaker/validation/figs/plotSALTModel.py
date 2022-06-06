@@ -44,6 +44,9 @@ def mkModelPlot(
             np.loadtxt('%s/salt3_lc_variance_0.dat'%salt3dir,unpack=True)
         salt3m1errphase,salt3m1errwave,salt3m1fluxerr = \
             np.loadtxt('%s/salt3_lc_variance_1.dat'%salt3dir,unpack=True)
+        salt3mhosterrphase,salt3mhosterrwave,salt3mhostfluxerr = \
+            np.loadtxt('%s/salt3_lc_variance_host.dat'%salt3dir,unpack=True)
+
     except:
         salt3m0phase,salt3m0wave,salt3m0flux = \
             np.loadtxt('%s/salt2_template_0.dat'%salt3dir,unpack=True)
@@ -52,6 +55,8 @@ def mkModelPlot(
         if host_component:
             salt3mhostphase,salt3mhostwave,salt3mhostflux = \
                 np.loadtxt('%s/salt2_template_host.dat'%salt3dir,unpack=True)
+            salt3mhosterrphase,salt3mhosterrwave,salt3mhostfluxerr = \
+                salt3mhostphase[:],salt3mhostwave[:],np.zeros(np.shape(salt3mhostphase))
         salt3m0errphase,salt3m0errwave,salt3m0fluxerr = salt3m0phase[:],salt3m0wave[:],np.zeros(np.shape(salt3m0phase))
         salt3m1errphase,salt3m1errwave,salt3m1fluxerr = salt3m1phase[:],salt3m1wave[:],np.zeros(np.shape(salt3m1phase))
 
@@ -78,7 +83,7 @@ def mkModelPlot(
     salt3m1fluxerr = salt3m1fluxerr.reshape([len(np.unique(salt3m1phase)),len(np.unique(salt3m1wave))])
     if host_component:
         salt3mhostflux = salt3mhostflux.reshape([len(np.unique(salt3mhostphase)),len(np.unique(salt3mhostwave))])
-        #salt3mhostfluxerr = salt3mhostfluxerr.reshape([len(np.unique(salt3mhostphase)),len(np.unique(salt3mhostwave))])
+        salt3mhostfluxerr = salt3mhostfluxerr.reshape([len(np.unique(salt3mhostphase)),len(np.unique(salt3mhostwave))])
 
     
     salt2m0phase = np.unique(salt2m0phase)
@@ -93,6 +98,8 @@ def mkModelPlot(
     if host_component:
         salt3mhostphase = np.unique(salt3mhostphase)
         salt3mhostwave = np.unique(salt3mhostwave)
+        salt3mhosterrphase = np.unique(salt3mhosterrphase)
+        salt3mhosterrwave = np.unique(salt3mhosterrwave)
 
     salt2m0errphase = np.unique(salt2m0errphase)
     salt2m0errwave = np.unique(salt2m0errwave)
@@ -191,16 +198,16 @@ def mkModelPlot(
         for plotphase,i,plotphasestr in zip([-5,0,10],range(3),['-5','+0','+10']):
 
             int_salt3mhost = interp2d(salt3mhostwave,salt3mhostphase,salt3mhostflux)
-            #int_salt3m1err = interp2d(salt3m1errwave,salt3m1errphase,salt3m1fluxerr)
+            int_salt3mhosterr = interp2d(salt3mhosterrwave,salt3mhosterrphase,salt3mhostfluxerr)
             salt3mhostflux_0 = int_salt3mhost(salt3mhostwave,plotphase)
-            #salt3mhostfluxerr_0 = int_salt3mhosterr(salt3mhostwave,plotphase)
+            salt3mhostfluxerr_0 = int_salt3mhosterr(salt3mhostwave,plotphase)
 
             ax4.plot(salt3mhostwave,salt3mhostflux_0+spacing*i,color='r',label='SALT3')
-            #if plotErr:
-            #    ax2.fill_between(salt3mhostwave,
-            #                     salt3mhostflux_0-np.sqrt(salt3mhostfluxerr_0)+spacing*i,
-            #                     salt3mhostflux_0+np.sqrt(salt3mhostfluxerr_0)+spacing*i,
-            #                     color='r',alpha=0.5)
+            if plotErr:
+                ax4.fill_between(salt3mhostwave,
+                                 salt3mhostflux_0-np.sqrt(salt3mhostfluxerr_0)+spacing*i,
+                                 salt3mhostflux_0+np.sqrt(salt3mhostfluxerr_0)+spacing*i,
+                                 color='r',alpha=0.5)
             ax4.set_xlim(xlimits)
             ax4.set_ylim([-0.05,0.39])
 

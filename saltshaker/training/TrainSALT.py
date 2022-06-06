@@ -450,7 +450,7 @@ class TrainSALT(TrainSALTBase):
                     for line in fin:
                         line = line.replace('\n','')
                         print(line.replace('REPLACE_JOB',cmd).\
-                              replace('REPLACE_MEM','20000').\
+                              replace('REPLACE_MEM','30000').\
                               replace('REPLACE_NAME',f'saltshaker_bootstrap_{i}').\
                               replace('REPLACE_LOGFILE',f'saltshaker_bootstrap_log_{i}').\
                               replace('REPLACE_WALLTIME','04:00:00').\
@@ -488,8 +488,16 @@ class TrainSALT(TrainSALTBase):
             np.zeros([np.shape(trainingresult.M0)[0],np.shape(trainingresult.M0)[1],self.options.n_bootstrap]),\
             np.zeros([np.shape(trainingresult.M0)[0],np.shape(trainingresult.M0)[1],self.options.n_bootstrap])
 
+        iGood = np.array([],dtype=int)
         for i in range(self.options.n_bootstrap):
-            params,parvals = np.loadtxt(f"{self.options.outputdir}/bootstrap_{i}/salt3_parameters.dat",unpack=True,dtype=str,skiprows=1)
+            if not os.path.exists(f"{self.options.outputdir}/bootstrap_{i}/salt3_parameters.dat"):
+                
+                continue
+            iGood = np.append(iGood,i)
+            try:
+                params,parvals = np.loadtxt(f"{self.options.outputdir}/bootstrap_{i}/salt3_parameters.dat",unpack=True,dtype=str,skiprows=1)
+            except:
+                import pdb; pdb.set_trace()
             parvals = parvals.astype(float)
             
             # save each result
@@ -499,19 +507,19 @@ class TrainSALT(TrainSALTBase):
                 M0,M1,Mhost = saltfitter.SALTModel(parvals,evaluatePhase=saltfitter.phaseout,evaluateWave=saltfitter.waveout)
             M0_bs[:,:,i] = M0 #parvals[params == 'm0'].reshape(np.shape(trainingresult.M0))
             M1_bs[:,:,i] = M1 #parvals[params == 'm1'].reshape(np.shape(trainingresult.M0))
-            if len(parvals[params == 'mhost']):
+            if self.options.host_component and len(parvals[params == 'mhost']):
                 Mhost_bs[:,:,i] = Mhost #parvals[params == 'mhost'].reshape(np.shape(trainingresult.M0))
 
 
-        trainingresult.M0bootstraperr = np.std(M0_bs,axis=2)
-        trainingresult.M1bootstraperr = np.std(M1_bs,axis=2)
-        trainingresult.Mhostbootstraperr = np.std(Mhost_bs,axis=2)
+        trainingresult.M0bootstraperr = np.std(M0_bs[:,:,iGood],axis=2)
+        trainingresult.M1bootstraperr = np.std(M1_bs[:,:,iGood],axis=2)
+        trainingresult.Mhostbootstraperr = np.std(Mhost_bs[:,:,iGood],axis=2)
         trainingresult.cov_M0_M1_bootstrap = np.zeros(np.shape(trainingresult.M0))
         trainingresult.cov_M0_Mhost_bootstrap = np.zeros(np.shape(trainingresult.M0))
         for j in range(np.shape(M0_bs)[0]):
             for i in range(np.shape(M0_bs)[1]):
-                trainingresult.cov_M0_M1_bootstrap[j,i] = np.sum((M0_bs[j,i]-np.mean(M0_bs[j,i,:]))*(M1_bs[j,i]-np.mean(M1_bs[j,i,:])))/(self.options.n_bootstrap-1)
-                trainingresult.cov_M0_Mhost_bootstrap[j,i] = np.sum((M0_bs[j,i]-np.mean(M0_bs[j,i,:]))*(Mhost_bs[j,i]-np.mean(Mhost_bs[j,i,:])))/(self.options.n_bootstrap-1)
+                trainingresult.cov_M0_M1_bootstrap[j,i] = np.sum((M0_bs[j,i]-np.mean(M0_bs[j,i,iGood]))*(M1_bs[j,i]-np.mean(M1_bs[j,i,iGood])))/(self.options.n_bootstrap-1)
+                trainingresult.cov_M0_Mhost_bootstrap[j,i] = np.sum((M0_bs[j,i]-np.mean(M0_bs[j,i,iGood]))*(Mhost_bs[j,i]-np.mean(Mhost_bs[j,i,iGood])))/(self.options.n_bootstrap-1)
 
         if 'chain' in saltfitter.__dict__.keys():
             chain = saltfitter.chain
@@ -672,6 +680,10 @@ class TrainSALT(TrainSALTBase):
             saltfitkwargs['regularize'] = self.options.regularize
             saltfitkwargs['fitting_sequence'] = self.options.fitting_sequence
             saltfitter = saltfit.GaussNewton(x_modelpars,datadict,parlist,**saltfitkwargs)
+            if self.options.bootstrap_single:
+                # suppress regularization
+                saltfitter.neff[saltfitter.neff<saltfitter.neffMax]=10
+
             if returnGN:
                 return fitter,saltfitter,x_modelpars
             
