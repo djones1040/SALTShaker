@@ -688,7 +688,6 @@ class GaussNewton(saltresids.SALTResids):
 
         Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
         logging.info('Checking that rescaling components to satisfy definitions did not modify photometry')
-        print('Checking that rescaling components to satisfy definitions did not modify photometry')
         try:
             unscaledresults={}
             scaledresults={}

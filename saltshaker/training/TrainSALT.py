@@ -722,12 +722,8 @@ class TrainSALT(TrainSALTBase):
                 trainingresult.SNParams[k]['t0'] =  datadict[k].tpk_guess
         
         log.info('message: %s'%message)
-        saltfitter.usePriors=[]
-        saltfitter.regularize=False
         log.info('Final loglike'); log.info(saltfitter.maxlikefit(trainingresult.X_raw))
         log.info('Final photometric loglike'); log.info(saltfitter.maxlikefit(trainingresult.X_raw,dospec=False))
-        saltfitter.usePriors=True
-        saltfitter.regularize=True
         
         log.info(trainingresult.X.size)
 
