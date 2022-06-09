@@ -424,6 +424,31 @@ class TrainSALT(TrainSALTBase):
                     guess[parlist == f'specx0_{sn}_{k}' ]= md.x[0]*x0
                     guess[parlist == f'specrecal_{sn}_{k}'] = md.x[1:]
 
+
+        if self.options.fix_salt2components_initdir:
+            log.info(f"resuming from output directory {self.options.fix_salt2components_initdir}")
+            
+            names=None
+            for possibleDir in [self.options.fix_salt2components_initdir]:
+                for possibleFile in ['salt3_parameters_unscaled.dat','salt3_parameters.dat']:   
+                    if names is None:
+                        try:
+                            names,pars = np.loadtxt(path.join(possibleDir,possibleFile),unpack=True,skiprows=1,dtype="U30,f8")
+                            break
+                        except:
+                            continue
+            if self.options.resume_from_gnhistory:
+                with open(f"{self.options.resume_from_gnhistory}/gaussnewtonhistory.pickle",'rb') as fin:
+                    data = pickle.load(fin)
+                    pars = data[-1][0]
+            for key in np.unique(parlist):
+                try:
+                    guess[parlist == key] = pars[names == key]
+                except:
+                    log.info(f'Could not initializing parameter {key} from previous training')
+                    pass
+
+                    
         return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
 
     def bootstrapSALTModel_batch(self,datadict,trainingresult,saltfitter,returnGN=False):
@@ -597,7 +622,8 @@ class TrainSALT(TrainSALTBase):
 
             log.info('message: %s'%message)
             log.info('Final loglike'); saltfitter.maxlikefit(trainingresult_bs.X_raw)
-
+            log.info('Final photometric loglike'); saltfitter.maxlikefit(trainingresult_bs.X_raw,dospec=False)
+            
             log.info(trainingresult_bs.X.size)
 
             # save each result
@@ -696,8 +722,9 @@ class TrainSALT(TrainSALTBase):
                 trainingresult.SNParams[k]['t0'] =  datadict[k].tpk_guess
         
         log.info('message: %s'%message)
-        log.info('Final loglike'); saltfitter.maxlikefit(trainingresult.X_raw)
-
+        log.info('Final loglike'); log.info(saltfitter.maxlikefit(trainingresult.X_raw))
+        log.info('Final photometric loglike'); log.info(saltfitter.maxlikefit(trainingresult.X_raw,dospec=False))
+        
         log.info(trainingresult.X.size)
 
 
