@@ -708,7 +708,6 @@ class GaussNewton(saltresids.SALTResids):
                 for flt in photresidsunscaled:
                     assert(np.allclose(photresidsunscaled[flt]['resid'],photresidsrescaled[flt]['resid']))
         except AssertionError:
-            import pdb; pdb.set_trace()
             logging.critical('Rescaling components failed; photometric residuals have changed. Will finish writing output using unscaled quantities')
             Xredefined=X.copy()
 
