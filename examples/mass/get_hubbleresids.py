@@ -663,7 +663,7 @@ def colorscat():
 if __name__ == "__main__":
     hr = masshubbleresids()
     #hr.main()
-    #hr.edit_model()
+    hr.edit_model()
     #hr.edit_model_list()
-    hr.main()
+    #hr.main()
     #colorscat()
