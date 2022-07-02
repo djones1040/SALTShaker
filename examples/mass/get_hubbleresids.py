@@ -14,6 +14,7 @@ from scipy.stats import binned_statistic
 import cosmo
 from scipy.optimize import minimize
 from astropy.stats import sigma_clipped_stats
+import warnings
 
 _nmltmpl = f"""
   &SNLCINP
@@ -87,18 +88,19 @@ class masshubbleresids():
         
         # run the LC fitting
         # and SALT2mu to give hubble residuals
-        self.snlc_fit()
+        #self.snlc_fit()
         
         # make some comparison plots
+        self.model_table()
         self.plot_hrs_threepanel()
-        
+
         # measure the mass step, w/ and w/o SALT2mu
 
     def edit_model_list(self):
 
         for errs in [True,False]:
             for modeldir,modelname,host in zip(
-                    ['SALT3.host_reg_bootstrap','SALT3.host_fixedpars_bootstrap','SALT3.nohost_bootstrap'],
+                    ['SALT3.host_bootstrap','SALT3.host_fixedpars_bootstrap','SALT3.nohost_bootstrap'],
                     ['SALT3Models/SALT3.Host','SALT3Models/SALT3.HostFixed','SALT3Models/SALT3.NoHost'],
                     [True,True,False]):
 
@@ -261,11 +263,11 @@ class masshubbleresids():
                      'kcor/SALT3TRAIN_Fragilistic/kcor_CSPDR3.fits',
                      'kcor/SALT3TRAIN_Fragilistic/kcor_OTHER_LOWZ.fits',
                      'kcor/SALT3TRAIN_Fragilistic/kcor_Foundation_DR1.fits']
-        all_filtlists = ['BVRI','UBVRI','UBVRI','ABIRUVabcdefhjkltuvwxLC','DEFG','PQWT','AtuvxLCw','ABIRUVhjkltuvLC','griz']
+        all_filtlists = ['BVRI','BVRI','BVRI','ABIRVbcdehjkluvwxLC','DEFG','PQWT','AuvxLCw','ABIRVhjkltuvLC','griz']
         
         # do the fitting
         for model in ['SALT3Models/SALT3.Host','SALT3Models/SALT3.HostFixed','SALT3Models/SALT3.NoHost',
-                      'SALT3Models/SALT3.HostNoErrs','SALT3Models/SALT3.HostFixedNoErrs','SALT3Models/SALT3.NoHostNoErrs'][3:4]:
+                      'SALT3Models/SALT3.HostNoErrs','SALT3Models/SALT3.HostFixedNoErrs','SALT3Models/SALT3.NoHostNoErrs']:
             if dofit:
                 prefix = model.split('.')[-1]
                 if clobber:
@@ -287,7 +289,7 @@ class masshubbleresids():
                             print(nmltext,file=fout)
 
                         os.system(f'snlc_fit.exe tmp.nml')
-                        #import pdb; pdb.set_trace()
+                        import pdb; pdb.set_trace()
                 # now catenate everything together but only high- vs. low-mass
                 spi = txtobj('SALT3_PARS_INIT_HOSTMASS.LIST')
 
@@ -358,6 +360,8 @@ class masshubbleresids():
         frcid = txtobj(allmassfile,fitresheader=True)
         frcid = getmu.mkcuts(frcid,fitprobmin=0).CID
 
+        labeldict = {'NoHost':'No Host','HostFixed':'Host, M$_0$/M$_1$ Fixed in Training','Host':'Host'}
+
         for i,prefix in enumerate(['NoHost','HostFixed','Host']):
             # read in the files
             lowmassfile = f'fitres_combined/{prefix}_LowMass_Combined_SALT2mu.fitres'
@@ -376,12 +380,12 @@ class masshubbleresids():
             frnoerr = getmu.mkcuts(frnoerr,fitprobmin=0)
 
             # nuisance parameters
-            for fr,frfile in zip([frall,frlowmass,frhighmass],[allmassfile,lowmassfile,highmassfile]):
+            for fr,frfile in zip([frall,frlowmass,frhighmass,frnoerr],[allmassfile,lowmassfile,highmassfile,allmassnoerrfile]):
                 with open(frfile) as fin:
                     for line in fin:
                         if line.startswith('#  alpha0'): salt2alpha = float(line.split()[3])
                         if line.startswith('#  beta0'): salt2beta = float(line.split()[3])
-                fr = getmu.getmu(fr,salt2alpha=salt2alpha,salt2beta=salt2beta)
+                fr = getmu.getmu(fr,salt2alpha,salt2beta=salt2beta)
 
                 goodcid = np.array([],dtype=int)
                 for j,si in enumerate(fr.CID):
@@ -431,10 +435,11 @@ class masshubbleresids():
             mass_step = -md.x[1]; mass_steperr = np.sqrt(md.hess_inv[1,1])
             #import pdb; pdb.set_trace()
             chi2 = np.median(frnoerr.FITCHI2/frnoerr.NDOF)
+            #chi2 = sigma_clipped_stats(frnoerr.FITCHI2/frnoerr.NDOF)[1]
             ax.text(0.01,0.01,f"Mass Step = ${mass_step:.3f}\pm{mass_steperr:.3f}$ mag",transform=ax.transAxes,ha='left',va='bottom')
             ax.text(0.01,0.1,fr"$\chi^2_{{\nu}}$ = {chi2:.3f}",transform=ax.transAxes,ha='left',va='bottom')
-            ax.text(0.01,0.22,f"RMS = {sigma_clipped_stats(np.append(frlowmass.MURES,frhighmass.MURES))[2]:.3f} mag",transform=ax.transAxes,ha='left',va='bottom')
-
+            ax.text(0.01,0.22,f"RMS = {np.std(np.append(frlowmass.MURES,frhighmass.MURES)):.3f} mag",transform=ax.transAxes,ha='left',va='bottom')
+            import pdb; pdb.set_trace()
             # matplotlib things
             ax.set_xscale('log')
             ax.xaxis.set_major_formatter(plt.NullFormatter())
@@ -447,10 +452,97 @@ class masshubbleresids():
             axhist.yaxis.set_ticks([-0.4,-0.2,0.0,0.2,0.4])
             axhist.yaxis.tick_right()
 
-            ax.set_ylabel(f'{prefix}\n$\mu - \mu_{{\Lambda CDM}}$')
+            ax.set_ylabel(f'{labeldict[prefix]}\n$\mu - \mu_{{\Lambda CDM}}$')
 
-        ax.set_xlabel('$z_{CMB}$')
-        plt.savefig('masshubbleresids.png')
+        ax.set_xlabel('$z_{CMB}$',fontsize=15)
+        plt.savefig('masshubbleresids.png',dpi=200)
+
+    def model_table(self):
+
+        # let's get the initial CID list so we're comparing apples to apples
+        allmassfile = f'fitres_combined/Host_AllMass_Combined_SALT2mu.fitres'
+        frcid = txtobj(allmassfile,fitresheader=True)
+        frcid = getmu.mkcuts(frcid,fitprobmin=0).CID
+
+        for i,prefix in enumerate(['NoHost','HostFixed','Host']):
+            # read in the files
+            lowmassfile = f'fitres_combined/{prefix}_LowMass_Combined_SALT2mu.fitres'
+            highmassfile = f'fitres_combined/{prefix}_HighMass_Combined_SALT2mu.fitres'
+            allmassfile = f'fitres_combined/{prefix}_AllMass_Combined_SALT2mu.fitres'
+            lowmassnoerrfile = f'fitres_combined/{prefix}NoErrs_LowMass_Combined_SALT2mu.fitres'
+            highmassnoerrfile = f'fitres_combined/{prefix}NoErrs_HighMass_Combined_SALT2mu.fitres'
+            allmassnoerrfile = f'fitres_combined/{prefix}NoErrs_AllMass_Combined_SALT2mu.fitres'
+            
+            frlowmass = txtobj(lowmassfile,fitresheader=True)
+            frhighmass = txtobj(highmassfile,fitresheader=True)
+            frall = txtobj(allmassfile,fitresheader=True)
+            frlowmassnoerr = txtobj(lowmassnoerrfile,fitresheader=True)
+            frhighmassnoerr = txtobj(highmassnoerrfile,fitresheader=True)
+            frnoerr = txtobj(allmassnoerrfile,fitresheader=True)
+
+            frlowmass = getmu.mkcuts(frlowmass,fitprobmin=0,trestwarn=False)
+            frhighmass = getmu.mkcuts(frhighmass,fitprobmin=0,trestwarn=False)          
+            frall = getmu.mkcuts(frall,fitprobmin=0,trestwarn=False)
+            frlowmassnoerr = getmu.mkcuts(frlowmassnoerr,fitprobmin=0,trestwarn=False)
+            frhighmassnoerr = getmu.mkcuts(frhighmassnoerr,fitprobmin=0,trestwarn=False)
+            frnoerr = getmu.mkcuts(frnoerr,fitprobmin=0,trestwarn=False)
+
+            # nuisance parameters
+            for fr,frfile in zip([frall,frlowmass,frhighmass,frnoerr,frlowmassnoerr,frhighmassnoerr],
+                                 [allmassfile,lowmassfile,highmassfile,allmassnoerrfile,lowmassnoerrfile,highmassnoerrfile]):
+                with open(frfile) as fin:
+                    for line in fin:
+                        if line.startswith('#  alpha0'): 
+                            salt2alpha = float(line.split()[3])
+                            salt2alphaerr = float(line.split()[5])
+                        if line.startswith('#  beta0'): 
+                            salt2beta = float(line.split()[3])
+                            salt2betaerr = float(line.split()[5])
+                fr = getmu.getmu(fr,salt2alpha=salt2alpha,salt2beta=salt2beta)
+
+                goodcid = np.array([],dtype=int)
+                for j,si in enumerate(fr.CID):
+                    if si in frcid:
+                        goodcid = np.append(goodcid,j)
+                for k in fr.__dict__.keys():
+                    fr.__dict__[k] = fr.__dict__[k][goodcid]
+
+                if frfile == allmassfile: muresmedian = np.median(frall.mures)
+                fr.mures -= muresmedian
+                fr.salt2alpha = salt2alpha; fr.salt2beta = salt2beta
+                fr.salt2alphaerr = salt2alphaerr; fr.salt2betaerr = salt2betaerr
+
+            # summary stats
+            #ax.text(0.01,0.99,fr"""log($M_{{\ast}}/M_{{\odot}}$) < 10 RMS = {np.std(frlowmass.mures):.3f}""",
+            #        ha='left',va='top',transform=ax.transAxes,color='b')
+            #ax.text(0.01,0.9,fr"""log($M_{{\ast}}/M_{{\odot}}$) > 10 RMS = {np.std(frhighmass.mures):.3f}""",
+            #        ha='left',va='top',transform=ax.transAxes,color='r')
+
+            # mass step
+            md = minimize(lnlikefunc,(0.0,0.0),
+                          args=(np.append([0.0]*len(frlowmass.mures),[1.0]*len(frhighmass.mures)),
+                                np.append(frlowmass.mures,frhighmass.mures),np.append(frlowmass.MUERR,frhighmass.MUERR),None))
+            mass_step = -md.x[1]; mass_steperr = np.sqrt(md.hess_inv[1,1])
+
+            chi2 = np.median(frnoerr.FITCHI2/frnoerr.NDOF)
+            rms_all = sigma_clipped_stats(np.append(frlowmass.MURES,frhighmass.MURES))[2]
+            rms_lowmass = sigma_clipped_stats(frlowmass.MURES)[2]
+            rms_highmass = sigma_clipped_stats(frhighmass.MURES)[2]
+
+            rms_all = np.std(np.append(frlowmass.MURES,frhighmass.MURES))
+            rms_lowmass = np.std(frlowmass.MURES)
+            rms_highmass = np.std(frhighmass.MURES)
+
+            #chi2 = sigma_clipped_stats(frnoerr.FITCHI2/frnoerr.NDOF)[1]
+            #ax.text(0.01,0.01,f"Mass Step = ${mass_step:.3f}\pm{mass_steperr:.3f}$ mag",transform=ax.transAxes,ha='left',va='bottom')
+            #ax.text(0.01,0.1,fr"$\chi^2_{{\nu}}$ = {chi2:.3f}",transform=ax.transAxes,ha='left',va='bottom')
+            #ax.text(0.01,0.22,f"RMS = {sigma_clipped_stats(np.append(frlowmass.MURES,frhighmass.MURES))[2]:.3f} mag",transform=ax.transAxes,ha='left',va='bottom')
+
+            modelline_all = f"SALT3.{prefix}&{rms_all:.3f}&{np.median(frnoerr.FITCHI2/frnoerr.NDOF):.2f}&${salt2alpha:.3f}\\pm{salt2alphaerr:.3f}$&${salt2beta:.3f}\\pm{salt2betaerr:.3f}$&${mass_step:.3f}\\pm{mass_steperr:.3f}$\\\\"
+            modelline_lowmass = f"$-$ $\\rm log(M_{{\\ast}}/M_{{\\odot}}) < 10$&{rms_lowmass:.3f}&{np.median(frlowmassnoerr.FITCHI2/frlowmassnoerr.NDOF):.2f}&${frlowmass.salt2alpha:.3f}\\pm{frlowmass.salt2alphaerr:.3f}$&${frlowmass.salt2beta:.3f}\\pm{frlowmass.salt2betaerr:.3f}$&\\nodata\\\\"
+            modelline_highmass = f"$-$ $\\rm log(M_{{\\ast}}/M_{{\\odot}}) > 10$&{rms_highmass:.3f}&{np.median(frhighmassnoerr.FITCHI2/frhighmassnoerr.NDOF):.2f}&${frhighmass.salt2alpha:.3f}\\pm{frhighmass.salt2alphaerr:.3f}$&${frhighmass.salt2beta:.3f}\\pm{frhighmass.salt2betaerr:.3f}$&\\nodata\\\\"
+            print(modelline_all); print(modelline_lowmass); print(modelline_highmass)
+
             
     def plot_hrs(self):
 
@@ -624,10 +716,10 @@ def errfnc(x):
 
 def colorscat():
 
-    frlowmass = txtobj('fitres/LowMass_Combined_SALT2mu.fitres',fitresheader=True)
-    frhighmass = txtobj('fitres/HighMass_Combined_SALT2mu.fitres',fitresheader=True)
-    frk21lowmass = txtobj('fitres/lowz_nohost_LowMass_Combined_SALT2mu.fitres',fitresheader=True)
-    frk21highmass = txtobj('fitres/lowz_nohost_HighMass_Combined_SALT2mu.fitres',fitresheader=True)
+    frlowmass = txtobj('fitres_combined/Host_LowMass_Combined_SALT2mu.fitres',fitresheader=True)
+    frhighmass = txtobj('fitres_combined/Host_HighMass_Combined_SALT2mu.fitres',fitresheader=True)
+    frk21lowmass = txtobj('fitres_combined/NoHost_LowMass_Combined_SALT2mu.fitres',fitresheader=True)
+    frk21highmass = txtobj('fitres_combined/NoHost_HighMass_Combined_SALT2mu.fitres',fitresheader=True)
 
     frlowmass = getmu.mkcuts(frlowmass,fitprobmin=0)
     frhighmass = getmu.mkcuts(frhighmass,fitprobmin=0)
@@ -642,7 +734,7 @@ def colorscat():
         return result.standard_error
 
 
-    bins = np.linspace(-0.2,0.2,10)
+    bins = np.linspace(-0.2,0.2,5)
     cbins = binned_statistic(np.append(frlowmass.c,frhighmass.c),np.append(frlowmass.MURES,frhighmass.MURES),bins=bins,statistic='std').statistic
     cbinsk21 = binned_statistic(np.append(frk21lowmass.c,frk21highmass.c),
                                 np.append(frk21lowmass.MURES,frk21highmass.MURES),bins=bins,statistic='std').statistic
@@ -651,8 +743,8 @@ def colorscat():
                                    np.append(frk21lowmass.MURES,frk21highmass.MURES),bins=bins,statistic=bootstrap_errs).statistic
 
     ax = plt.axes()
-    ax.errorbar((bins[1:]+bins[:-1])/2.,cbinsk21,yerr=cerrbinsk21,fmt='o-',label='SALT3.lowz')
-    ax.errorbar((bins[1:]+bins[:-1])/2.,cbins,yerr=cerrbins,fmt='o-',label='SALT3.host')
+    ax.errorbar((bins[1:]+bins[:-1])/2.,cbinsk21,yerr=cerrbinsk21,fmt='o-',label='SALT3.NoHost')
+    ax.errorbar((bins[1:]+bins[:-1])/2.,cbins,yerr=cerrbins,fmt='o-',label='SALT3.Host')
     ax.set_ylabel('RMS')
     ax.set_xlabel('$c$')
     ax.legend(loc='lower right',prop={'size':13})
@@ -665,5 +757,7 @@ if __name__ == "__main__":
     #hr.main()
     hr.edit_model()
     #hr.edit_model_list()
-    #hr.main()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        hr.main()
     #colorscat()
