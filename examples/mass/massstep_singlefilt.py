@@ -159,14 +159,14 @@ class masshubbleresids():
         # run the LC fitting
         # and SALT2mu to give hubble residuals
 
-        #for filt in 'BVRI':
-        #    self.snlc_fit(filt=filt,outdir=f'fitres_singlefilt/{filt}')
+        for filt in 'BVRI':
+            self.snlc_fit(filt=filt,outdir=f'fitres_singlefilt/{filt}')
 
         # measure the mass step, w/ and w/o SALT2mu
         # maximum likelihood calc, alpha/beta from all data
         self.plot_mass_step_allsn()
 
-        self.plot_mass_step_paper()
+        #self.plot_mass_step_paper()
 
     def plot_mass_step_allsn(self):
         # let's make sure nothing crazy is happening with individual HRs
