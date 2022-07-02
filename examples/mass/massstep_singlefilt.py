@@ -7,7 +7,7 @@ import glob
 import numpy as np
 from saltshaker.util.txtobj import txtobj
 import matplotlib
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from saltshaker.util import getmu
@@ -16,6 +16,7 @@ import cosmo
 from scipy.optimize import minimize
 from astropy.stats import sigma_clipped_stats
 import warnings
+import copy
 
 _nmltmpl = f"""
   &SNLCINP
@@ -84,6 +85,68 @@ _nmltmpl = f"""
   &END
 """
 
+_nmltmpl_all = f"""
+  &SNLCINP
+     PRIVATE_DATA_PATH = '{os.getcwd()}/SALT3TRAIN_J21'
+
+     VERSION_PHOTOMETRY = '<data_version>'
+     KCOR_FILE         = '<kcor>'
+
+     NFIT_ITERATION = 3
+     INTERP_OPT     = 1
+
+     SNTABLE_LIST = 'FITRES LCPLOT(text:key)'
+     TEXTFILE_PREFIX  = '<outfile>'
+     
+     LDMP_SNFAIL = T
+     USE_MWCOR = F
+     USE_MINOS = F
+
+     H0_REF   = 70.0
+     OLAM_REF =  0.70
+     OMAT_REF =  0.30
+     W0_REF   = -1.00
+
+     SNCID_LIST    =  0
+     CUTWIN_CID    =  0, 20000000
+     !SNCCID_LIST   =  <cidlist>
+     SNCCID_IGNORE =  
+
+     cutwin_redshift   = 0.001, 2.0
+     cutwin_Nepoch    =  1
+
+     RV_MWCOLORLAW = 3.1
+     OPT_MWCOLORLAW = 99
+     OPT_MWEBV = 3
+     MWEBV_SCALE = 1.00
+     MWEBV_SHIFT = 0.0
+     FUDGE_MAG_ERROR = 
+
+
+     MAGOBS_SHIFT_PRIMARY = ' '
+     EPCUT_SNRMIN = ''
+     ABORT_ON_NOEPOCHS = F
+
+  &END
+  &FITINP
+
+     FITMODEL_NAME  = '<model>'
+    
+     PRIOR_MJDSIG        = 5.0
+     PRIOR_LUMIPAR_RANGE = -5.0, 5.0
+
+     OPT_XTMW_ERR = 1
+     OPT_COVAR_FLUX = 0
+     TREST_REJECT  = -15.0, 45.0
+     NGRID_PDF     = 0
+
+     FUDGEALL_ITER1_MAXFRAC = 0.02
+     FILTLIST_FIT = '<filtlist>'
+
+  &END
+"""
+
+
 
 class masshubbleresids():
     def __init__(self):
@@ -96,8 +159,8 @@ class masshubbleresids():
         # run the LC fitting
         # and SALT2mu to give hubble residuals
 
-        for filt in 'BVRI':
-            self.snlc_fit(filt=filt,outdir=f'fitres_singlefilt/{filt}')
+        #for filt in 'BVRI':
+        #    self.snlc_fit(filt=filt,outdir=f'fitres_singlefilt/{filt}')
 
         # measure the mass step, w/ and w/o SALT2mu
         # maximum likelihood calc, alpha/beta from all data
@@ -114,38 +177,79 @@ class masshubbleresids():
 
     def plot_mass_step_paper(self):
         # let's summarize things for the paper
-        ax1 = plt.subplot(141)
-        ax2 = plt.subplot(142)
-        ax3 = plt.subplot(143)
-        ax4 = plt.subplot(144)
 
+        plt.rcParams['figure.figsize'] = (12,3)
+        plt.subplots_adjust(bottom=0.2,wspace=0)
+        
+        ax1 = plt.subplot(131)
+        ax2 = plt.subplot(132)
+        ax3 = plt.subplot(133)
+        
         sedpar = txtobj('hostpars_salt3_lowztraining.txt')
 
-        with open('fitres_combined/NoHost_AllMass_Combined_SALT2mu.fitres','r') as fin:
-            for line in fin:
-                if line.startswith('#  alpha0'): salt2alpha = float(line.split()[3])
-                if line.startswith('#  beta0'): salt2beta = float(line.split()[3])
 
-        for filt,label,ax in zip(['B','V','R','I'],['$B$','$V/g$','$R/r$','$I/i$'],[ax1,ax2,ax3,ax4]):
-            fr = txtobj(f'fitres_singlefilt/{filt}/singlefilt_results.FITRES')
-            #fr = txtobj(f'fitres_combined/NoHost_AllMass_Combined_SALT2mu.fitres',fitresheader=True)
-            fr.HOST_LOGMASS = np.zeros(len(fr.CID))
-            for j,i in enumerate(fr.CID):
-                idx = sedpar.snid == i
-                fr.HOST_LOGMASS[j] = sedpar.logmass[idx][0]
+        for filt,label,ax in zip(['V','R','I'],['$V/g$','$R/r$','$I/i$'],[ax1,ax2,ax3]):
+            for ix,model in enumerate(['SALT3.NoHost','SALT3.HostFixed','SALT3.Host']):
+                with open(f"fitres_combined/{model.split('.')[-1]}_AllMass_Combined_SALT2mu.fitres",'r') as fin:
+                    for line in fin:
+                        if line.startswith('#  alpha0'): salt2alpha = float(line.split()[3])
+                        if line.startswith('#  beta0'): salt2beta = float(line.split()[3])
 
-            fr = getmu.getmu(fr,salt2alpha=0.12745,salt2beta=2.57041) #salt2alpha=salt2alpha,salt2beta=salt2beta)
-            fr = getmu.mkcuts(fr,salt2alpha=0.12745,salt2beta=2.57041,fitprobmin=0)#salt2alpha=salt2alpha,salt2beta=salt2beta)
 
-            # mass step
-            phm = np.zeros(len(fr.CID))
-            phm[fr.HOST_LOGMASS > 10] = 1.0
-            md = minimize(lnlikefunc,(0.0,0.0),
-                          args=(phm,fr.mures,fr.muerr,None))
-            mass_step = -md.x[1]; mass_steperr = np.sqrt(md.hess_inv[1,1])
-            import pdb; pdb.set_trace()
-            print(f'filt {filt}, mass_step: {mass_step:.3f} +/- {mass_steperr:.3f}')
+                frh = txtobj(f'fitres_singlefilt/{filt}/singlefilt_results_{model}_HighMass.FITRES')
+                frl = txtobj(f'fitres_singlefilt/{filt}/singlefilt_results_{model}_LowMass.FITRES')
 
+                # combine the low- and high-mass results
+                cidfull = np.unique(np.append(frh.CID,frl.CID)) # in case something fails a fitter weirdly
+                idxh,idxl = np.array([],dtype=int),np.array([],dtype=int)
+                for j,i in enumerate(cidfull):
+                    idx = sedpar.snid == i
+                    if sedpar.logmass[idx][0] > 10:
+                        idxh = np.append(idxh,np.where(frh.CID == i)[0])
+                    else:
+                        idxl = np.append(idxl,np.where(frl.CID == i)[0])
+                #fr = txtobj(f'fitres_combined/NoHost_AllMass_Combined_SALT2mu.fitres',fitresheader=True)
+                #import pdb; pdb.set_trace()
+                fr = copy.deepcopy(frh)
+                for k in frh.__dict__.keys():
+                    fr.__dict__[k] = np.append(frl.__dict__[k][idxl],frh.__dict__[k][idxh])
+
+                fr.HOST_LOGMASS = np.zeros(len(fr.CID))
+                for j,i in enumerate(fr.CID):
+                    idx = sedpar.snid == i
+                    fr.HOST_LOGMASS[j] = sedpar.logmass[idx][0]
+
+                fr = getmu.getmu(fr,salt2alpha=salt2alpha,salt2beta=salt2beta)
+                fr = getmu.mkcuts(fr,salt2alpha=salt2alpha,salt2beta=salt2beta,fitprobmin=0)
+                
+                # mass step
+                phm = np.zeros(len(fr.CID))
+                phm[fr.HOST_LOGMASS > 10] = 1.0
+                md = minimize(lnlikefunc,(0.0,0.0),
+                              args=(phm,fr.mures,fr.muerr,None))
+                mass_step = -md.x[1]; mass_steperr = np.sqrt(md.hess_inv[1,1])
+
+                ax.errorbar(ix,mass_step,yerr=mass_steperr,fmt='o',color='k')
+
+                print(f'filt {filt}, mass_step: {mass_step:.3f} +/- {mass_steperr:.3f}')
+                import pdb; pdb.set_trace()
+            ax.xaxis.set_ticks([0,1,2])
+            ax.xaxis.set_ticklabels(['K21','HostOnly','Host'],rotation=0)
+            ax.set_xlim([-1,3])
+            ax.set_ylim([0,0.1])
+
+            ax.axhline(0.049,color='k',ls='--')
+            ax.fill_between(np.linspace(-1,3,100),[0.049-0.014]*100,[0.049+0.014]*100,color='0.5',alpha=0.5)
+            
+        ax1.set_ylabel('Mass Step (mag)')
+        ax2.yaxis.set_ticklabels([])
+        ax3.yaxis.set_ticklabels([])
+        ax1.set_title('$V/g$')
+        ax2.set_title('$R/r$')
+        ax3.set_title('$I/i$')
+        plt.savefig('tmp.png')
+        import pdb; pdb.set_trace()
+                    
     def snlc_fit(self,filt=None,clobber=False,dofit=True,dosalt2mu=True,outdir='fitres'):
         # let's just fit everything with both SN models and then concat the FITRES files
         # only keeping high vs. low-mass for different ones
@@ -190,7 +294,15 @@ class masshubbleresids():
                           file=foutsingle)
 
                     for version,kcor,filtlist,outfile in zip(all_versions,all_kcors,all_filtlists,all_versions):
-                        fr = txtobj(f'fitres_NoHost/{version}_SALT3.NoHost{massmodel}',fitresheader=True)
+
+                        # first fit everything
+                        nmltext = _nmltmpl_all.replace('<data_version>',version).\
+                            replace('<kcor>',kcor).\
+                            replace('<filtlist>',filtdict_version[version][filt]).\
+                            replace('<outfile>','tmp_full')
+                        fr = txtobj('tmp_full.FITRES.TEXT',fitresheader=True)
+                        
+                        #fr = txtobj(f'fitres_NoHost/{version}_SALT3.NoHost{massmodel}',fitresheader=True)
                         for i,cid in enumerate(fr.CID):
                             if filtdict_version[version][filt] is None: continue
                             nmltext = _nmltmpl.replace('<data_version>',version).\
