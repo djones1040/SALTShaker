@@ -766,4 +766,7 @@ if __name__ == "__main__":
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         hr.main()
+    #with warnings.catch_warnings():
+    #    warnings.simplefilter("ignore")
+    #    hr.main()
     #colorscat()
