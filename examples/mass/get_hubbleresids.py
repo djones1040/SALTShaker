@@ -755,10 +755,10 @@ def colorscat():
         
 if __name__ == "__main__":
     hr = masshubbleresids()
-    hr.main()
+    #hr.main()
     #hr.edit_model()
-    #hr.edit_model_list()
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        hr.main()
+    hr.edit_model_list()
+    #with warnings.catch_warnings():
+    #    warnings.simplefilter("ignore")
+    #    hr.main()
     #colorscat()
