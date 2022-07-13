@@ -293,49 +293,50 @@ class masshubbleresids():
                 # now catenate everything together but only high- vs. low-mass
                 spi = txtobj('SALT3_PARS_INIT_HOSTMASS.LIST')
 
-                fitres_files_highmass = glob.glob('fitres/*HighMass')
-                with open(f'fitres_combined/{prefix}_HighMass_Combined.FITRES.TEXT','w') as fout:
-                    for i,ff in enumerate(fitres_files_highmass):
-                        if 'Combined' in ff and i == 0: raise RuntimeError('bleh!')
-                        if 'Combined' in ff: continue
-                        with open(ff) as fin:
-                            for line in fin:
-                                line = line.replace('\n','')
-                                if line.startswith('VARNAMES') and i == 0:
-                                    print(line,file=fout)
-                                elif line.startswith('SN:'):
-                                    snid = line.split()[1]
-                                    if snid in spi.SNID:
-                                        iMass = spi.SNID == snid
-                                        if spi.xhost[iMass] > 0:
-                                            print(line,file=fout)
+                for ext_single,ext_comb,linestart in zip(['','.LCPLOT.TEXT'],['.FITRES.TEXT','.LCPLOT.TEXT'],['SN','OBS']):
+                    fitres_files_highmass = glob.glob('fitres/*HighMass'+ext_single)
+                    with open(f'fitres_combined/{prefix}_HighMass_Combined'+ext_comb,'w') as fout:
+                        for i,ff in enumerate(fitres_files_highmass):
+                            if 'Combined' in ff and i == 0: raise RuntimeError('bleh!')
+                            if 'Combined' in ff: continue
+                            with open(ff) as fin:
+                                for line in fin:
+                                    line = line.replace('\n','')
+                                    if line.startswith('VARNAMES') and i == 0:
+                                        print(line,file=fout)
+                                    elif line.startswith(f'{linestart}:'):
+                                        snid = line.split()[1]
+                                        if snid in spi.SNID:
+                                            iMass = spi.SNID == snid
+                                            if spi.xhost[iMass] > 0:
+                                                print(line,file=fout)
 
-                fitres_files_lowmass = glob.glob('fitres/*LowMass')
-                with open(f'fitres_combined/{prefix}_LowMass_Combined.FITRES.TEXT','w') as fout:
-                    for i,ff in enumerate(fitres_files_lowmass):
-                        if 'Combined' in ff and i == 0: raise RuntimeError('bleh!')
-                        if 'Combined' in ff: continue
-                        with open(ff) as fin:
-                            for line in fin:
-                                line = line.replace('\n','')
-                                if line.startswith('VARNAMES') and i == 0:
-                                    print(line,file=fout)
-                                elif line.startswith('SN:'):
-                                    snid = line.split()[1]
-                                    if snid in spi.SNID:
-                                        iMass = spi.SNID == snid
-                                        if spi.xhost[iMass] < 0:
-                                            print(line,file=fout)
+                    fitres_files_lowmass = glob.glob('fitres/*LowMass'+ext_single)
+                    with open(f'fitres_combined/{prefix}_LowMass_Combined'+ext_comb,'w') as fout:
+                        for i,ff in enumerate(fitres_files_lowmass):
+                            if 'Combined' in ff and i == 0: raise RuntimeError('bleh!')
+                            if 'Combined' in ff: continue
+                            with open(ff) as fin:
+                                for line in fin:
+                                    line = line.replace('\n','')
+                                    if line.startswith('VARNAMES') and i == 0:
+                                        print(line,file=fout)
+                                    elif line.startswith(f'{linestart}:'):
+                                        snid = line.split()[1]
+                                        if snid in spi.SNID:
+                                            iMass = spi.SNID == snid
+                                            if spi.xhost[iMass] < 0:
+                                                print(line,file=fout)
 
-                with open(f'fitres_combined/{prefix}_AllMass_Combined.FITRES.TEXT','w') as fout:
-                    for i,ff in enumerate([f'fitres_combined/{prefix}_LowMass_Combined.FITRES.TEXT',f'fitres_combined/{prefix}_HighMass_Combined.FITRES.TEXT']):
-                        with open(ff) as fin:
-                            for line in fin:
-                                line = line.replace('\n','')
-                                if line.startswith('VARNAMES') and i == 0:
-                                    print(line,file=fout)
-                                elif line.startswith('SN:'):
-                                    print(line,file=fout)
+                    with open(f'fitres_combined/{prefix}_AllMass_Combined'+ext_comb,'w') as fout:
+                        for i,ff in enumerate([f'fitres_combined/{prefix}_LowMass_Combined'+ext_comb,f'fitres_combined/{prefix}_HighMass_Combined'+ext_comb]):
+                            with open(ff) as fin:
+                                for line in fin:
+                                    line = line.replace('\n','')
+                                    if line.startswith('VARNAMES') and i == 0:
+                                        print(line,file=fout)
+                                    elif line.startswith(f'{linestart}:'):
+                                        print(line,file=fout)
 
             if dosalt2mu:
                 # now it's SALT2mu time
