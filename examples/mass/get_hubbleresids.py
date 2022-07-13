@@ -52,7 +52,7 @@ _nmltmpl = f"""
      MWEBV_SCALE = 1.00
      MWEBV_SHIFT = 0.0
      FUDGE_MAG_ERROR = 
-
+     MXLC_PLOT = 10000
 
      MAGOBS_SHIFT_PRIMARY = ' '
      EPCUT_SNRMIN = ''
@@ -88,11 +88,11 @@ class masshubbleresids():
         
         # run the LC fitting
         # and SALT2mu to give hubble residuals
-        #self.snlc_fit()
+        self.snlc_fit()
         
         # make some comparison plots
-        self.model_table()
-        self.plot_hrs_threepanel()
+        #self.model_table()
+        #self.plot_hrs_threepanel()
 
         # measure the mass step, w/ and w/o SALT2mu
 
@@ -249,7 +249,7 @@ class masshubbleresids():
 
         # tmp flag
         clobber = True
-        
+        do_snlcfit = True
         # surveys, filters, kcors
         all_versions = ['SALT3TRAIN_J21_Hamuy1996','SALT3TRAIN_J21_Riess1999','SALT3TRAIN_J21_Jha2006',
                         'SALT3TRAIN_J21_Hicken2009','SALT3TRAIN_J21_CfA4p1','SALT3TRAIN_J21_CfA4p2',
@@ -266,37 +266,42 @@ class masshubbleresids():
         all_filtlists = ['BVRI','BVRI','BVRI','ABIRVbcdehjkluvwxLC','DEFG','PQWT','AuvxLCw','ABIRVhjkltuvLC','griz']
         
         # do the fitting
-        for model in ['SALT3Models/SALT3.Host','SALT3Models/SALT3.HostFixed','SALT3Models/SALT3.NoHost',
+        for model in ['K21','SALT3Models/SALT3.HostFixed','SALT3Models/SALT3.Host','SALT3Models/SALT3.NoHost',
                       'SALT3Models/SALT3.HostNoErrs','SALT3Models/SALT3.HostFixedNoErrs','SALT3Models/SALT3.NoHostNoErrs']:
             if dofit:
                 prefix = model.split('.')[-1]
-                if clobber:
-                    os.system(f"rm fitres/*")
-                for massmodel in ['HighMass','LowMass']:
-                    for version,kcor,filtlist,outfile in zip(all_versions,all_kcors,all_filtlists,all_versions):
+                if do_snlcfit:
+                    if clobber:
+                        os.system(f"rm fitres/*")
+                    for massmodel in ['HighMass','LowMass']:
+                        for version,kcor,filtlist,outfile in zip(all_versions,all_kcors,all_filtlists,all_versions):
 
-                        nmltext = _nmltmpl.replace('<data_version>',version).\
-                                  replace('<kcor>',kcor).\
-                                  replace('<filtlist>',filtlist).\
-                                  replace('<outfile>','fitres/'+outfile+'_'+model.split('/')[-1]+massmodel)
-                        if model != 'K21' and model != 'JLA-B14':
-                            nmltext = nmltext.replace('<model>',os.getcwd()+'/'+model+massmodel)
-                        elif model == 'K21':
-                            nmltext = nmltext.replace('<model>',model)
-                        else:
-                            nmltext = nmltext.replace('<model>','SALT2.JLA-B14')
-                        with open('tmp.nml','w') as fout:
-                            print(nmltext,file=fout)
+                            nmltext = _nmltmpl.replace('<data_version>',version).\
+                                      replace('<kcor>',kcor).\
+                                      replace('<filtlist>',filtlist).\
+                                      replace('<outfile>','fitres/'+outfile+'_'+model.split('/')[-1]+massmodel)
+                            if model != 'K21' and model != 'JLA-B14':
+                                nmltext = nmltext.replace('<model>',os.getcwd()+'/'+model+massmodel)
+                            elif model == 'K21':
+                                nmltext = nmltext.replace('<model>','SALT3.K21') #model)
+                            else:
+                                nmltext = nmltext.replace('<model>','SALT2.JLA-B14')
+                            with open('tmp.nml','w') as fout:
+                                print(nmltext,file=fout)
 
-                        os.system(f'snlc_fit.exe tmp.nml')
-                        import pdb; pdb.set_trace()
+                            os.system(f'snlc_fit.exe tmp.nml')
+
+                        #import pdb; pdb.set_trace()
                 # now catenate everything together but only high- vs. low-mass
                 spi = txtobj('SALT3_PARS_INIT_HOSTMASS.LIST')
 
                 for ext_single,ext_comb,linestart in zip(['','.LCPLOT.TEXT'],['.FITRES.TEXT','.LCPLOT.TEXT'],['SN','OBS']):
-                    fitres_files_highmass = glob.glob('fitres/*HighMass'+ext_single)
+                    fitres_files_highmass = glob.glob(f'fitres/*HighMass'+ext_single)
                     with open(f'fitres_combined/{prefix}_HighMass_Combined'+ext_comb,'w') as fout:
-                        for i,ff in enumerate(fitres_files_highmass):
+                        pass
+                    for i,ff in enumerate(fitres_files_highmass):
+                        with open(f'fitres_combined/{prefix}_HighMass_Combined'+ext_comb,'a') as fout:
+                            print(ff)
                             if 'Combined' in ff and i == 0: raise RuntimeError('bleh!')
                             if 'Combined' in ff: continue
                             with open(ff) as fin:
@@ -756,7 +761,7 @@ def colorscat():
 if __name__ == "__main__":
     hr = masshubbleresids()
     #hr.main()
-    hr.edit_model()
+    #hr.edit_model()
     #hr.edit_model_list()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
