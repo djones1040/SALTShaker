@@ -469,7 +469,7 @@ class GaussNewton(saltresids.SALTResids):
                 self.fitlist = [f for f in kwargs['fitting_sequence'].split(',')]
         else:
             self.__dict__=args[0].__dict__.copy()
-    def datauncertaintiesfromhessianapprox(self,X,suppressregularization=True,smoothingfactor=150):
+    def datauncertaintiesfromhessianapprox(self,X,suppressregularization=True,smoothingfactor=150): # 150):
         """Approximate Hessian by jacobian times own transpose to determine uncertainties in flux surfaces"""
         log.info("determining M0/M1 errors by approximated Hessian")
         import time
@@ -516,9 +516,9 @@ class GaussNewton(saltresids.SALTResids):
             spline2d=sparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))[:,varyparlist=='m0']
         
             #Smooth things a bit, since this is supposed to be for broadband photometry
-#           if smoothingfactor>0:
-#               smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
-#               spline2d=smoothingmatrix*spline2d
+            if smoothingfactor>0:
+                smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
+                spline2d=smoothingmatrix*spline2d
             #Uncorrelated effect of parameter uncertainties on M0 and M1
             m0pulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='m0'].astype('float32')*spline2d.T.astype('float32')
             m1pulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='m1'].astype('float32')*spline2d.T.astype('float32')
@@ -710,7 +710,7 @@ class GaussNewton(saltresids.SALTResids):
         except AssertionError:
             logging.critical('Rescaling components failed; photometric residuals have changed. Will finish writing output using unscaled quantities')
             Xredefined=X.copy()
-
+        ##getdatauncertainties=False
         if getdatauncertainties:
             M0dataerr, M1dataerr, Mhostdataerr, cov_M0_M1_data, cov_M0_Mhost_data =self.datauncertaintiesfromhessianapprox(Xredefined)
         else:

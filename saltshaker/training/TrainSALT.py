@@ -768,13 +768,18 @@ class TrainSALT(TrainSALTBase):
              open(f'{outdir}/salt3_lc_covariance_0host.dat','w') as foutm0mhostcov,\
              open(f'{outdir}/salt3_lc_variance_0.dat','w') as foutm0dataerr,\
              open(f'{outdir}/salt3_lc_variance_1.dat','w') as foutm1dataerr,\
-             open(f'{outdir}/salt3_lc_variance_host.dat','w') as foutmhostdataerr:
+             open(f'{outdir}/salt3_lc_variance_host.dat','w') as foutmhostdataerr,\
+             open(f'{outdir}/salt3_lc_model_variance_host.dat','w') as foutmhostmodelerr,\
+             open(f'{outdir}/salt3_lc_model_covariance_0host.dat','w') as foutm0mhostmodelcov:
         
             for i,p in enumerate(trainingresult.phase):
                 for j,w in enumerate(trainingresult.wave):
                     print(f'{p:.1f} {w:.2f} {trainingresult.M0[i,j]:8.15e}',file=foutm0)
                     print(f'{p:.1f} {w:.2f} {trainingresult.M1[i,j]:8.15e}',file=foutm1)
-                    if self.options.host_component: print(f'{p:.1f} {w:.2f} {trainingresult.Mhost[i,j]:8.15e}',file=foutmhost)
+                    if self.options.host_component:
+                        print(f'{p:.1f} {w:.2f} {trainingresult.Mhost[i,j]:8.15e}',file=foutmhost)
+                        print(f'{p:.1f} {w:.2f} {trainingresult.Mhostmodelerr[i,j]:8.15e}',file=foutmhostmodelerr)
+                        print(f'{p:.1f} {w:.2f} {trainingresult.cov_M0_Mhost_model[i,j]:8.15e}',file=foutm0mhostmodelcov)
                     if not self.options.use_previous_errors:
                         print(f'{p:.1f} {w:.2f} {trainingresult.M0modelerr[i,j]**2.:8.15e}',file=foutm0modelerr)
                         print(f'{p:.1f} {w:.2f} {trainingresult.M1modelerr[i,j]**2.:8.15e}',file=foutm1modelerr)
