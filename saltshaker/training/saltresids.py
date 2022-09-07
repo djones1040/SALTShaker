@@ -145,6 +145,7 @@ class SALTfitcacheSN(SALTtrainingSN):
         self.mwextcurveint = interp1d(
             self.obswave,self.mwextcurve ,kind=residsobj.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
         
+
         self.ix0=np.where(residsobj.parlist==f'x0_{self.snid}')[0][0]
         self.ix1=np.where(residsobj.parlist==f'x1_{self.snid}')[0][0]
         self.ixhost=np.where(residsobj.parlist==f'xhost_{self.snid}')[0]
@@ -580,10 +581,11 @@ class SALTResids:
             choleskykey=f'photCholesky_{sn}_{flt}'
             if not choleskykey in storedResults:
                 #Calculate cholesky matrix for each set of photometric measurements in each filter
-                if (filtmodel['modelvariance']<0).any():
+                if (filtmodel['modelvariance']<0).any() or (filtmodel['modelvariance'] == 0).any():
                     warnings.warn('Negative variance in photometry',RuntimeWarning)
                     negVals=filtmodel['modelvariance']<0
-                    filtmodel['modelvariance'][negVals]=0
+                    if (filtmodel['modelvariance'] > 0).any() and negVals.any():
+                        filtmodel['modelvariance'][negVals]=np.min(filtmodel['modelvariance'][filtmodel['modelvariance'] > 0])
                 variance=filtmodel['fluxvariance']+filtmodel['modelvariance']
                 clscat,dclscatdx=filtmodel['colorvariance']
                 #Find cholesky matrix as sqrt of diagonal uncertainties, then perform rank one update to incorporate color scatter
@@ -656,12 +658,14 @@ class SALTResids:
         specresids={}
         for k in specmodel:
             spectralmodel=specmodel[k]
-            variance=spectralmodel['fluxvariance'] + spectralmodel['modelvariance']
-            if (spectralmodel['modelvariance']<0).any():
+            if (spectralmodel['modelvariance']<0).any() or (spectralmodel['modelvariance']==0).any():
                 warnings.warn('Negative variance in spectra',RuntimeWarning)
                 negVals=spectralmodel['modelvariance']<0
-                spectralmodel['modelvariance'][negVals]=0
-
+                # zero causes NaNs in sqrt so just set zeros to the minumim of model variance elsewhere
+                if (spectralmodel['modelvariance'] > 0).any():
+                    spectralmodel['modelvariance'][negVals]= np.min(spectralmodel['modelvariance'][spectralmodel['modelvariance'] > 0]) #0
+            variance=spectralmodel['fluxvariance'] + spectralmodel['modelvariance']
+                
             uncertainty=np.sqrt(variance)*SpecErrScale
 
             spectralSuppression=np.sqrt(self.num_phot/self.num_spec)*self.spec_chi2_scaling
@@ -683,8 +687,11 @@ class SALTResids:
                     spectralresids['resid_jacobian'][:,varyParams] -= uncertainty_jac*(spectralresids['resid'] /uncertainty)[:,np.newaxis]
             else: 
                 spectralresids['resid_jacobian']=sparse.csr_matrix(spectralmodel['modelflux_jacobian'].shape)
-
+            #if len(specresids[k]['resid'][specresids[k]['resid'] != specresids[k]['resid']]): import pdb; pdb.set_trace()
         tstart = time.time()
+        #for k in specresids.keys():
+        #    if len(np.where(specresids[k]['resid'] != specresids[k]['resid'])[0]):
+        #        import pdb; pdb.set_trace()
         return photresids,specresids
     
     def bestfitsinglebandnormalizationsforSN(self,x,sn,storedResults):
@@ -759,7 +766,7 @@ class SALTResids:
             saltCorr=storedResults['saltCorr'] 
             modelUncertainty= prefactor**2 *(saltErr[0]**2  + 2*x1* saltCorr[0]*saltErr[0]*saltErr[1] + x1**2 *saltErr[1]**2)
             if self.host_component:
-                modelUncertainty += prefactor**2.*xhost**2*saltErr[2]**2. + 2*xhost*saltCorr[1]*saltErr[0]*saltErr[2]
+                modelUncertainty += prefactor**2.*(xhost**2*saltErr[2]**2. + 2*xhost*saltCorr[1]*saltErr[0]*saltErr[2])
             
             temporaryResults['modelUncertainty']=modelUncertainty
 
@@ -784,13 +791,22 @@ class SALTResids:
             ##############
             # convenient lines for checking model/phot residuals
             #if self.debug:
-            #if sn == '1999ek' and name == 'phot' and len(np.where(varyParams)[0]):
-            #   import pylab as plt; plt.ion()
-            #   plt.clf()
-            #   plt.plot(valdict['O']['dataflux'],'o')
-            #   plt.plot(valdict['O']['modelflux'],'o')
-            #   plt.savefig('tmp.png')
-            #   import pdb; pdb.set_trace()
+            #import pdb; pdb.set_trace()
+            #if sn == '356' and name == 'phot' and len(np.where(varyParams)[0]):
+                #import pylab as plt; plt.ion()
+            #    for flt in valdict.keys():
+            #        plt.clf()
+            #        plt.plot(valdict[flt]['dataflux'],'o')
+            #        plt.plot(valdict[flt]['modelflux'],'o')
+            #        plt.savefig('tmp.png')
+            #        import pdb; pdb.set_trace()
+            #if sn == '356' and name == 'spec' and len(np.where(varyParams)[0]):
+            #    for flt in valdict.keys():
+            #        plt.clf()
+            #        plt.plot(valdict[flt]['dataflux'],'o')
+            #        plt.plot(valdict[flt]['modelflux'],'o')
+            #        plt.savefig('tmp.png')
+            #        import pdb; pdb.set_trace()
             ##############
             #------------
             ##############

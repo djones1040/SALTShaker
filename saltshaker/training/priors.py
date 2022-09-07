@@ -235,7 +235,14 @@ class SALTPriors:
                 X[ix0]*=(1+ratio*X[f'x1_{sn}'==self.parlist])
             X[self.ix1]/=1+ratio*X[self.ix1]
             X[self.im1]-=ratio*X[self.im0]
-            
+        else:
+            # we need to modify x1 and M_host to remove correlations
+            # this causes problems for the errors, but can be used in conjunction with bootstrapping
+            alpha = ((X[self.ix1]*X[self.ixhost]).sum() / (X[self.ixhost]**2).sum())
+            X[self.ix1] = X[self.ix1] - alpha*X[self.ixhost]
+            X[self.imhost] = X[self.imhost] + alpha*X[self.im1]
+
+
         ####This code will not work if the model uncertainties are not 0th order (simple interpolation)
         if self.errbsorder==0:
             m0variance=X[self.imodelerr0]**2
@@ -252,7 +259,7 @@ class SALTPriors:
 
         else:
             log.critical('RESCALING ERROR TO SATISFY DEFINITIONS HAS NOT BEEN IMPLEMENTED')
-        
+
         #Define x1 to have mean 0
         #m0 at peak is not modified, since m1B at peak is defined as 0
         #Thus does not need to be recalculated for the last definition
@@ -276,7 +283,7 @@ class SALTPriors:
             m0m1covariance*=x1std
         else:
             log.critical('RESCALING ERROR TO SATISFY DEFINITIONS HAS NOT BEEN IMPLEMENTED')
-            
+
         #Define m0 to have a standard B-band magnitude at peak
         bStdFlux=(10**((self.m0guess-27.5)/-2.5) )
         fluxratio=bStdFlux/m0Bflux
@@ -293,7 +300,7 @@ class SALTPriors:
                 m0mhostcovariance*=fluxratio**2
         else:
             log.critical('RESCALING ERROR TO SATISFY DEFINITIONS HAS NOT BEEN IMPLEMENTED')
-        
+
 #       Define color to have 0 mean
 #       centralwavelength=self.waveBinCenters[np.arange(self.im0.size)%self.waveBinCenters.size])
 #       
@@ -349,7 +356,7 @@ class SALTPriors:
 
 
 
-        
+
     @prior
     def m1prior(self,width,x,components):
         """M1 should have zero flux at t=0 in the B band"""
