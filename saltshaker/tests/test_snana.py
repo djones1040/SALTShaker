@@ -1,5 +1,5 @@
 import unittest
-from ..util import snana
+from saltshaker.util import snana
 
 class SNANA_Test(unittest.TestCase):
 
