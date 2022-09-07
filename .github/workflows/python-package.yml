@@ -38,7 +38,7 @@ jobs:
 ##        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
 ###		python setup.py install
+###        export PYTHONPATH=.
     - name: Test with pytest
       run: |
-###        export PYTHONPATH=.
         pytest --ignore=saltshaker/tests_bkp
