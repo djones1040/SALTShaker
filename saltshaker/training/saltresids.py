@@ -297,41 +297,30 @@ class SALTResids:
         self.fixedUncertainties={}
         starttime=time.time()
         #Store derivatives of a spline with fixed knot locations with respect to each knot value
-        spline_derivs = np.zeros([len(self.phase),len(self.wave),self.im0.size])
-        for i in range(self.im0.size):
-            if self.bsorder == 0: continue
-            spline_derivs[:,:,i]=bisplev(
-                self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
-        nonzero=np.nonzero(spline_derivs)
-        
-        #Repeat for the error model parameters
-        self.errorspline_deriv= np.zeros([len(self.phase),len(self.wave),self.imodelerr.size//self.n_components])
-        for i in range(self.imodelerr.size//self.n_components):
-            if self.errbsorder==0:
-                continue
-            self.errorspline_deriv[:,:,i]=bisplev(
-                self.phase, self.wave ,(self.errphaseknotloc,self.errwaveknotloc,
-                                        np.arange(self.imodelerr.size//self.n_components)==i,
-                                        self.errbsorder,self.errbsorder))
-        self.errorspline_deriv_interp= RegularGridInterpolator(
-            (self.phase,self.wave),self.errorspline_deriv,self.interpMethod,False,0)
-        
+    
         #Store the lower and upper edges of the phase/wavelength basis functions
         self.phaseBins=self.phaseknotloc[:-(self.bsorder+1)],self.phaseknotloc[(self.bsorder+1):]
         self.waveBins=self.waveknotloc[:-(self.bsorder+1)],self.waveknotloc[(self.bsorder+1):]
-        
+    
         #Find the iqr of the phase/wavelength basis functions
         self.phaseRegularizationBins=np.linspace(self.phase[0],self.phase[-1],self.phaseBins[0].size*2+1,True)
         self.waveRegularizationBins=np.linspace(self.wave[0],self.wave[-1],self.waveBins[0].size*2+1,True)
 
-        
+    
         self.phaseRegularizationPoints=(self.phaseRegularizationBins[1:]+self.phaseRegularizationBins[:-1])/2
         self.waveRegularizationPoints=(self.waveRegularizationBins[1:]+self.waveRegularizationBins[:-1])/2
 
+
+        basisfunctions=[bisplev(
+                self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i*(self.waveBins[0].size),self.bsorder,self.bsorder)) for i in range(self.phaseBins[0].size) ]
         self.phaseBinCenters=np.array(
-            [(self.phase[:,np.newaxis]* spline_derivs[:,:,i*(self.waveBins[0].size)]).sum()/spline_derivs[:,:,i*(self.waveBins[0].size)].sum() for i in range(self.phaseBins[0].size) ])
+
+            [(self.phase[:,np.newaxis]* x).sum()/x.sum() for x in basisfunctions ])
+        basisfunctions=[bisplev(
+                self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder)) for i in range(self.waveBins[0].size) ]
+
         self.waveBinCenters=np.array(
-            [(self.wave[np.newaxis,:]* spline_derivs[:,:,i]).sum()/spline_derivs[:,:,i].sum() for i in range(self.waveBins[0].size)])
+            [(self.wave[np.newaxis,:]*  x ).sum()/x.sum() for x in basisfunctions])
 
         #Find the basis functions evaluated at the centers of the basis functions for use in the regularization derivatives
         self.regularizationDerivs=[np.zeros((self.phaseRegularizationPoints.size,self.waveRegularizationPoints.size,self.im0.size)) for i in range(4)]
