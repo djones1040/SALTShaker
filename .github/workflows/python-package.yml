@@ -39,5 +39,5 @@ jobs:
     - name: Test with pytest
       run: |
         export PYTHONPATH=.
-	pip install saltshaker
+        pip install saltshaker
         pytest --ignore=saltshaker/tests_bkp
