@@ -5,6 +5,7 @@ from saltshaker.util.readutils import SALTtrainingSN,SALTtraininglightcurve,SALT
 
 from sncosmo.models import StretchSource
 from sncosmo.salt2utils import SALT2ColorLaw
+from saltshaker.training import colorlaw
 from sncosmo.constants import HC_ERG_AA, MODEL_BANDFLUX_SPACING
 from sncosmo.utils import integration_grid
 
@@ -349,13 +350,18 @@ class SALTResids:
 
         self.guessScale=[1.0 for f in fluxes]
 
-        self.colorLawDeriv=np.empty((self.wave.size,self.n_colorpars))
-        for i in range(self.n_colorpars):
-            self.colorLawDeriv[:,i]=\
-                SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(self.wave)-\
-                SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(self.wave)
-        self.colorLawDerivInterp=interp1d(
-            self.wave,self.colorLawDeriv,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
+        # initialize the color law
+        # xxxxxxxxxxxxx
+        
+        self.colorlaw = colorlaw.__colorlaws__[self.colorlaw_function](self.n_colorpars,self.colorwaverange,self.wave,self.interpMethod)
+        # marked for delete
+        #self.colorLawDeriv=np.empty((self.wave.size,self.n_colorpars))
+        #for i in range(self.n_colorpars):
+        #    self.colorLawDeriv[:,i]=\
+        #        SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(self.wave)-\
+        #        SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(self.wave)
+        #self.colorLawDerivInterp=interp1d(
+        #    self.wave,self.colorLawDeriv,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
                 
         if self.regularize:
             self.updateEffectivePoints(guess)
@@ -792,8 +798,7 @@ class SALTResids:
             # convenient lines for checking model/phot residuals
             #if self.debug:
             #import pdb; pdb.set_trace()
-            #if sn == '356' and name == 'phot' and len(np.where(varyParams)[0]):
-                #import pylab as plt; plt.ion()
+            #if sn == '2006ax' and name == 'phot' and len(np.where(varyParams)[0]):
             #    for flt in valdict.keys():
             #        plt.clf()
             #        plt.plot(valdict[flt]['dataflux'],'o')
@@ -882,7 +887,7 @@ class SALTResids:
             if varyParams[self.iCL].any():
                 filtresultsdict['modelflux_jacobian'][:,self.iCL]= \
                     (np.sum((modulatedFlux)[:,:,np.newaxis]*\
-                    self.colorLawDeriv[:,varyParams[self.iCL]][np.newaxis,idx,:], axis=1))*-0.4*np.log(10)*c    
+                    self.colorlaw.colorLawDeriv[:,varyParams[self.iCL]][np.newaxis,idx,:], axis=1))*-0.4*np.log(10)*c    
                 
             if requiredPCDerivs.any():
                 passbandColorExp=lcdata.pbspl*colorexp[idx]*sndata.mwextcurve[idx]
@@ -1171,7 +1176,7 @@ class SALTResids:
             for i,varIndex in enumerate(np.where(self.parlist=='cl')[0]):
                 if varyParams[self.iCL][i]:
                     filtresultsdict['modelvariance_jacobian'][:,varIndex] =  \
-                        (2* (-0.4 *np.log(10)*c)*modelUncertainty*self.colorLawDerivInterp(lcdata.lambdaeff/(1+z))[varyParams[self.iCL]][i])[np.newaxis].transpose()
+                        (2* (-0.4 *np.log(10)*c)*modelUncertainty*self.color.colorLawDerivInterp(lcdata.lambdaeff/(1+z))[varyParams[self.iCL]][i])[np.newaxis].transpose()
 
             if varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any():
                 extinctionexp=(colorexpinterp* _SCALE_FACTOR/(1+z)*sndata.mwextcurveint(lcdata.lambdaeff))
@@ -1203,7 +1208,7 @@ class SALTResids:
     def fillStoredResults(self,x,storedResults):
         if self.n_colorpars:
             if not 'colorLaw' in storedResults:
-                storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])(self.wave)
+                storedResults['colorLaw'] = -0.4 * self.colorlaw.colorlaw(x[self.parlist == 'cl'])
                 storedResults['colorLawInterp']= interp1d(
                     self.wave,storedResults['colorLaw'],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
         else: storedResults['colorLaw'] = 1
