@@ -254,7 +254,19 @@ class SALT3pipe():
                             print('making validation plots in %s/'%self.plotdir)
                             pipepro.validplot_run()
                     else:
-                        raise RuntimeError("Something went wrong..")
+                        if 'sim' in prostr.lower() and 'byosed' in self.pipepros:
+                            # rerun sim to see if byosed seg fault resolves
+                            for i in range(0,3):
+                                print("Rerun byosed sim due to unknown seg fault, {} try".format(i))
+                                pipepro.run(batch=pipepro.batch,translate=pipepro.translate)
+                                if pipepro.success:
+                                    pipepro.extract_gzfitres()
+                                    if pipepro.validplots:
+                                        print('making validation plots in %s/'%self.plotdir)
+                                        pipepro.validplot_run()
+                                    break
+                                else:                           
+                                    raise RuntimeError("Something went wrong..")
                 else:
                     if 'initlcfit' in prostr.lower():
                         saltpars_dflist = []
@@ -307,20 +319,28 @@ class SALT3pipe():
             try:
                 outnamelist = []
                 for p in self.pipepros:
-                    prooutname = self._get_pipepro_from_string(p).outname if not isinstance(self._get_pipepro_from_string(p),list) else [pi.outname for pi in self._get_pipepro_from_string(p)]
+                    prooutname = self._get_pipepro_from_string(p).outname if not isinstance(self._get_pipepro_from_string(p),list) else [pi.outname for pi in self._get_pipepro_from_string(p)]                       
+                    if prooutname is None:
+                        continue
                     if isinstance(prooutname,list):
                         outnamelist += prooutname
+                    elif isinstance(prooutname,dict):
+                        outnamelist += [prooutname[key] for key in prooutname.keys()]
                     else:
                         outnamelist += [prooutname]
+
+                dirnames = []
                 for i,outname_unique in enumerate(np.unique(list(outnamelist))):
-#                     print(outname_unique)
-                    dirname = os.path.dirname(outname_unique)
+                    dirnames.append(os.path.dirname(outname_unique))
+                # print(dirnames)
+
+                for i,dirname in enumerate(np.unique(dirnames)):
                     if dirname != '':
                         tarcommand = 'tar -zcvf {}/tempfiles.{}_{}.tar.gz {}/*.temp.{}*'.format(dirname,self.timestamp,i,dirname,self.timestamp)
                     else:
                         tarcommand = 'tar -zcvf tempfiles.{}_{}.tar.gz *.temp.{}*'.format(self.timestamp,i,self.timestamp)
                     tarcommand += ' --remove-files'
-                    print(tarcommand)
+                    print(tarcommand)      
                     os.system(tarcommand)
             except Exception as e:
                 print("[WARNING] Unable to pack all temp files")
@@ -787,6 +807,11 @@ class BYOSED(PyPipeProcedure):
             return "BYOSED {}/".format(os.path.dirname(self.byosed_default))
         else:
             raise ValueError("byosed can only glue to sim")
+           
+    def gen_input(self,outname="pipeline_generalpy_input.input"):
+        self.outname = outname
+        self.finput,self.keys = _gen_general_python_input(basefilename=self.baseinput,setkeys=self.setkeys,
+                                                          outname=outname,delimiter=' ')
 
 class Simulation(PipeProcedure):
     
@@ -828,7 +853,7 @@ class Simulation(PipeProcedure):
         df = pd.DataFrame()
         key = 'GENMODEL'
         keystrs = [x.split('[')[0] for x in self.keys.keys()]
-        keyarr = [x for x in self.keys.keys() if x.startswith(key)]    
+        keyarr = [x for x in self.keys.keys() if x.startswith(key) and '_' not in x]  
         df0 = {}
         if len(keyarr ) > 0:
             for ki in keyarr:
@@ -1023,7 +1048,7 @@ class Simulation(PipeProcedure):
 #         print(self.keys)
         genmodel_dict = {}
         for key,value in self.keys.items():
-            if key.startswith('GENMODEL'):
+            if key.startswith('GENMODEL') and "_" not in key:
                 if '[' in key: label = key.split('[')[1].split(']')[0]
                 else: label = 0
                 genmodel_dict[label] = value
@@ -1675,7 +1700,7 @@ def _run_batch_pro(pro,args,done_file=None):
 
 
 def _gen_general_python_input(basefilename=None,setkeys=None,
-                              outname=None):
+                              outname=None,delimiter=','):
 
     config = configparser.ConfigParser()
     if not os.path.isfile(basefilename):
@@ -1698,8 +1723,10 @@ def _gen_general_python_input(basefilename=None,setkeys=None,
             if not isinstance(values,list): values = [values]
             config[sec][key] = ''
             for value in values:
+                if value is None:
+                    continue
                 print("Adding/modifying key {}={} in [{}]".format(key,value,sec))
-                config[sec][key] = config[sec][key] + '%s,'%value
+                config[sec][key] = config[sec][key] + '%s%s'%(value,delimiter)
             config[sec][key] = config[sec][key][:-1]
         with _open_shared_file(outname, 'w') as f:
             config.write(f)
@@ -1870,6 +1897,7 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
     else:
         setkeys = pd.DataFrame(setkeys).dropna(subset=['key'])
         if np.any(setkeys.key.duplicated()):
+            print(setkeys)
             raise ValueError("Check for duplicated entries for",setkeys.key[setkeys.key.duplicated()].unique())
 
         config = {}
