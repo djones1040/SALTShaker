@@ -47,7 +47,8 @@ _SCALE_FACTOR = 1e-12
 _B_LAMBDA_EFF = np.array([4302.57])  # B-band-ish wavelength
 _V_LAMBDA_EFF = np.array([5428.55])  # V-band-ish wavelength
 warnings.simplefilter('ignore',category=FutureWarning)
-    
+
+ 
 def rankOneCholesky(variance,beta,v):
     """Given variances, a scalar, and a vector, returns the cholesky matrix describing the covariance formed by the sum of the diagonal variance and the self outer product of the vector multiplied by the scalar"""
     b=1
@@ -65,37 +66,47 @@ def __anyinnonzeroareaforsplinebasis__(phase,wave,phaseknotloc,waveknotloc,bsord
     return ((phase>=phaseknotloc[phaseindex])&(phase<=phaseknotloc[phaseindex+bsorder+1])).any() and ((wave>=waveknotloc[waveindex])&(wave<=waveknotloc[waveindex+bsorder+1])).any() 
 
 class SparseMatrix:
-    def __init__(self,mat):
-        self.shape=mat.shape
-        self.rowidxs,self.colidxs=np.nonzero(mat)
-        self.values=mat[np.nonzero(mat)]
-        self.rowidxscompressed=[(idx,(idx==rowidxs).sum()) for idx in np.unique(self.rowidxs)]
-
+    def __init__(self,*args):
+        if len(args)==1:
+            mat=args[0]
+            self.shape=mat.shape
+            self.rowidxs,self.colidxs=np.nonzero(mat)
+            self.values=mat[np.nonzero(mat)]
+            self.rowidxscompressed=[(idx,np.where(idx==self.rowidxs)[0]) for idx in np.arange(self.shape[0])]
+        elif len(args)==4:
+            self.shape,self.rowidxs,self.colidxs,self.values=args
+            self.rowidxscompressed=[(idx,np.where(idx==self.rowidxs)[0]) for idx in np.arange(self.shape[0])]
+        elif len(args)==5:
+            self.shape,self.rowidxs,self.colidxs,self.values,self.rowidxscompressed=args
+        else:
+            raise ValueError()            
+        
 
     def multidot(self,prevector,postvector):
+        assert((postvector.shape,)==self.shape[1])
+        assert((prevector.shape,)==self.shape[0])
         return (self.values*prevector[self.colidxs]*postvector[self.rowidxs]).sum()
 
     def dot(self,vector,returnsparse=False):
+        assert(vector.shape==(self.shape[1],))
+        
         multvals=self.values*vector[self.colidxs]
-        startidx=0
-
-
         if returnsparse:
-            idxs=np.empty(len(self.rowidxscompressed),dtype=int)
-            vals=[]
-            for i,(rowidx,numvals) in enumerate(self.rowidxscompressed):
-                idxs[i]=rowidx
-                vals+=[ (multvals[startidx:startidx+numvals]).sum()]
-                startidx+=numvals
-            vals=agnp.array(vals)
-            y=SparseVector(self.shape[0],idxs,vals)
+            idxs=agnp.array([rowidx for rowidx,idxs in (self.rowidxscompressed) if len(idxs)>0])
+            vals=agnp.array([multvals[idxs].sum() for rowidx,idxs in (self.rowidxscompressed)if len(idxs)>0])
+            return SparseVector(self.shape[0],idxs,vals)
         else:
-            y=np.zeros(mat.shape[0])
-            for rowidx,numvals in self.rowidxscompressed:
-                y[rowidx]= (multvals[startidx:startidx+numvals]).sum()
-                startidx+=numvals
-        return y
-    
+            return agnp.array([multvals[idxs].sum() for rowidx,idxs in (self.rowidxscompressed)])
+         
+    def elementwisemultiply(self,vector,axis):
+        assert((axis==0) or (axis==1))
+        assert((self.shape[axis],)==vector.shape)
+        idxs= self.rowidxs if axis==0 else self.colidxs
+        return SparseMatrix(self.shape, self.rowidxs,self.colidxs,self.values*vector[idxs],self.rowidxscompressed)
+
+        
+        
+        
 class SparseVector:
     
     def __init__(self,*args):
@@ -110,15 +121,43 @@ class SparseVector:
             raise ValueError()
     
     def dot(self,othervec):
+        assert(self.shape==othervec.shape)
         return (othervec[self.idxs]*self.vals).sum()
     
-            
-            
-  
+
+
+def evaljacobianforsomeindices(function,x,varyingparameters):
+        if varyingparameters.all():
+            return ag.jacobian(function)(agnp.array(x))
+        elif (~varyingparameters).all():
+            return np.zeros(( function(x).size,x.size))
+        else:
+            #Map indices from the original vector to the contracted vector composed of only the varying parameters
+            varyingparamsintindices=np.where(varyingparameters)[0]
+            varyingparamsintindices={idx:i for i,idx in enumerate(varyingparamsintindices)}
+    
+            def varysomeparams(xcontracted):
+                #Take only the varying parameters from the contracted vector, rest from the original
+                xnew=agnp.array([(xcontracted[varyingparamsintindices[i]] if i in varyingparamsintindices else x[i]) for i in range(x.size) ])
+                return function(xnew)
+            #Read out the jacobian
+            jacresult=ag.jacobian(varysomeparams)(agnp.array(x[varyingparameters]))
+            jacobianmatrix=np.zeros(( jacresult.shape[0],x.size))
+            jacobianmatrix[:,varyingparameters]=jacresult
+    
+            return jacobianmatrix
+
+preintegratebasis=True
+
 class SALTfitcachelightcurve(SALTtraininglightcurve):
 
-    __slots__ = ['idx','pbspl','denom','lambdaeff','pcderivsparse']
+    __slots__ = ['idx','pbspl','denom','lambdaeff','bsplinecoeffshape','colorlawderiv'
+    ,'im0','im1','iCL','ix0','ix1','ic','z','splinebasisconvolutions',
+    'lambdaeffrest','varianceprefactor',
+    'errorgridshape',
+    'imodelcorr01','imodelerr0','imodelerr1']
     
+
     def __init__(self,sn,lc,residsobj,kcordict):
         for key,val in lc.__dict__.items():
             self.__dict__[key]=copy.deepcopy(val)
@@ -127,6 +166,7 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
         #Define quantities for synthetic photometry
         filtwave = kcordict[sn.survey][lc.filt]['filtwave']
         filttrans = kcordict[sn.survey][lc.filt]['filttrans']
+        
         self.idx   = (sn.obswave>= kcordict[sn.survey][lc.filt]['minlam']) & \
                      (sn.obswave<= kcordict[sn.survey][lc.filt]['maxlam'])  # overlap range
         pbspl = np.interp(sn.obswave[self.idx],filtwave,filttrans)
@@ -136,82 +176,207 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
         
         self.pbspl = pbspl[np.newaxis,:]
         self.denom = denom
-        self.lambdaeff = kcordict[sn.survey][lc.filt]['lambdaeff']
-        self.wavebincenters=residsobj.waveBinCenters
+        self.lambdaeff = kcordict[sn.survey][lc.filt]['lambdaeff']    
+        self.lambdaeffrest= self.lambdaeff/(1+z)    
         self.bsplinecoeffshape=(residsobj.phaseBins[0].size,residsobj.waveBins[0].size)        
-        self.colorLawDerivBinCenters=residsobj.colorLawDerivBinCenters
+        self.z=z
+
         self.im0=residsobj.im0
         self.im1=residsobj.im1
         self.iCL=residsobj.iCL
         self.ix0=sn.ix0
         self.ix1=sn.ix1
         self.ic=sn.ic
-        self.dwave=sn.dwave
-        self.fluxfactor=residsobj.fluxfactor[sn.survey][self.filt]
-        self.z=z
+
+        clippedphase=np.clip(self.phase,residsobj.phase.min(),residsobj.phase.max())
+
+        #Evaluating a bunch of quantities used in the flux model
+        #Evaluate derivatives of the color law, here assumed to be linear in coefficients        
+        if preintegratebasis:
+            colorlawwaveeval=residsobj.waveBinCenters
+        else:
+            colorlawwaveeval=residsobj.wave
         
-        clippedPhase=np.clip(self.phase,residsobj.phase.min(),residsobj.phase.max())
+        self.colorlawderiv=np.empty((colorlawwaveeval.size,self.iCL.size))
+        for i in range(self.iCL.size):
+            self.colorlawderiv[:,i]=\
+                SALT2ColorLaw(residsobj.colorwaverange, np.arange(self.iCL.size)==i)(colorlawwaveeval)-\
+                SALT2ColorLaw(residsobj.colorwaverange, np.zeros(self.iCL.size))(colorlawwaveeval)
+    
+        #Zero point of flux
+        dwave=sn.dwave
+        fluxfactor=residsobj.fluxfactor[sn.survey][self.filt]
+
+
+        #Evaluate the b-spline basis functions for this passband
+        #Evaluate parameters only for relevant portions of phase/wavelength space        
         inds=np.array(range(residsobj.im0.size))
         phaseind,waveind=inds//(residsobj.waveknotloc.size-residsobj.bsorder-1),inds%(residsobj.waveknotloc.size-residsobj.bsorder-1)
-        inphase=((clippedPhase[:,np.newaxis]>= residsobj.phaseknotloc[np.newaxis,phaseind])&(clippedPhase[:,np.newaxis]<=residsobj.phaseknotloc[np.newaxis,phaseind+residsobj.bsorder+1])).any(axis=0)
+        inphase=((clippedphase[:,np.newaxis]>= residsobj.phaseknotloc[np.newaxis,phaseind])&(clippedphase[:,np.newaxis]<=residsobj.phaseknotloc[np.newaxis,phaseind+residsobj.bsorder+1])).any(axis=0)
         inwave=~ ((residsobj.wave[self.idx].min() >= residsobj.waveknotloc[waveind]) | (residsobj.wave[self.idx].max() <= residsobj.waveknotloc[waveind+residsobj.bsorder+1]))
         isrelevant=inphase&inwave
+    
         #Array output indices match time along 0th axis, wavelength along 1st axis
-        derivInterp=np.zeros((clippedPhase.size,self.idx.sum(),residsobj.im0.size))
-        checkwave=np.array([residsobj.wave[self.idx].min(),residsobj.wave[self.idx].max()])
+        derivInterp=np.zeros((clippedphase.size,self.idx.sum(),residsobj.im0.size))        
         for i in np.where(isrelevant)[0]:
-            if __anyinnonzeroareaforsplinebasis__(clippedPhase,residsobj.wave[self.idx],residsobj.phaseknotloc,residsobj.waveknotloc,residsobj.bsorder,i):
-                 derivInterp[:,:,i] = bisplev(clippedPhase ,residsobj.wave[self.idx],(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(residsobj.im0.size)==i, residsobj.bsorder,residsobj.bsorder))
-        
-        self.splinebasisconvolutions=[]
-        reddenedpassband=self.pbspl[0]*sn.mwextcurve[self.idx]
+            if __anyinnonzeroareaforsplinebasis__(clippedphase,residsobj.wave[self.idx],residsobj.phaseknotloc,residsobj.waveknotloc,residsobj.bsorder,i):
+                derivInterp[:,:,i] = bisplev(clippedphase ,residsobj.wave[self.idx],(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(residsobj.im0.size)==i, residsobj.bsorder,residsobj.bsorder))
 
+        self.splinebasisconvolutions=[]
+        reddenedpassband=self.pbspl[0]*sn.mwextcurve[self.idx]*dwave*fluxfactor*_SCALE_FACTOR/(1+self.z)
         for pdx in range(len(lc)):
             if self.phase[pdx]>sn.obsphase.max():
                 decayFactor= 10**(-0.4*residsobj.extrapolateDecline*(self.phase[pdx]-sn.obsphase.max()))
             else:
                 decayFactor=1
-            self.splinebasisconvolutions+=[SparseVector(np.dot(derivInterp[pdx,:,:].T,reddenedpassband)*decayFactor)]
-            
-            
-    def flux(self,pars):
+            if preintegratebasis:
+                self.splinebasisconvolutions+=[SparseVector(np.dot(derivInterp[pdx,:,:].T,reddenedpassband)*decayFactor)]
+            else:
+                self.splinebasisconvolutions+=[SparseMatrix((derivInterp[pdx,:,:]*reddenedpassband[:,np.newaxis])*decayFactor)]
+        
+        self.fluxdependentparameters=(ag.jacobian(self.modelflux)(residsobj.initparams)!=0).sum(axis=0)>0
+        
+        #Quantities used in computation of model uncertainties
+        self.colorlawderivlambdaeff=np.array([
+        SALT2ColorLaw(residsobj.colorwaverange, np.arange(self.iCL.size)==i)(np.array([self.lambdaeffrest]))-\
+                SALT2ColorLaw(residsobj.colorwaverange, np.zeros(self.iCL.size))(np.array([self.lambdaeffrest])) for i in range(self.iCL.size)])[:,0]
+        self.varianceprefactor=fluxfactor*(self.pbspl.sum())*dwave* _SCALE_FACTOR*sn.mwextcurveint(self.lambdaeff) /(1+self.z)
+        
+        errorwaveind=np.searchsorted(residsobj.errwaveknotloc,self.lambdaeffrest)-1
+        errorphaseind=(np.searchsorted(residsobj.errphaseknotloc,clippedphase)-1)
+        self.errorgridshape=(residsobj.errphaseknotloc.size-1,residsobj.errwaveknotloc.size-1)
+        waveindtemp=np.array([errorwaveind for x in errorphaseind])
+        ierrorbin=np.ravel_multi_index((errorphaseind,waveindtemp),self.errorgridshape)
+        self.imodelcorr01=residsobj.imodelcorr01[ierrorbin]    
+        self.imodelerr0=residsobj.imodelerr0[ierrorbin]    
+        self.imodelerr1=residsobj.imodelerr1[ierrorbin]    
+
+             
+    def modelflux(self,pars):
+        #Define parameters
         x0,x1,c=pars[[self.ix0,self.ix1,self.ic]]
-        colorlaw=agnp.dot(self.colorLawDerivBinCenters,pars[self.iCL])
+        #Evaluate the coefficients of the spline bases
+        fluxcoeffs=(pars[self.im0]+pars[self.im1]*x1)*x0
+        #Evaluate color law at the wavelength basis centers
+        colorlaw=agnp.dot(self.colorlawderiv,pars[self.iCL])
+        #Exponentiate and multiply by color
         colorexp= 10. ** (  -0.4*colorlaw* c)
-        intmult = self.dwave*self.fluxfactor*_SCALE_FACTOR/(1+self.z)*x0
-        fluxpars=(pars[self.im0]+pars[self.im1]*x1)*intmult
-        fluxparsreddened= (colorexp[np.newaxis,:]*fluxpars.reshape( self.bsplinecoeffshape)).flatten()
-        return agnp.array([design.dot(fluxparsreddened) for design in self.splinebasisconvolutions])     
-
+        if preintegratebasis:
+            #Redden flux coefficients
+            fluxcoeffsreddened= (colorexp[np.newaxis,:]*fluxcoeffs.reshape( self.bsplinecoeffshape)).flatten()
+            #Multiply spline bases by flux coefficients
+            return agnp.array([design.dot(fluxcoeffsreddened) for design in self.splinebasisconvolutions])     
+        else:    
+            #Integrate basis functions over wavelength and sum over flux coefficients
+            return agnp.array([design.multidot(fluxcoeffs,colorexp) for design in self.splinebasisconvolutions])     
     
+    def modelfluxvariance(self,pars):
+        x0,x1,c=pars[[self.ix0,self.ix1,self.ic]]
+        #Evaluate color law at the wavelength basis centers
+        colorlaw=agnp.dot(self.colorlawderivlambdaeff,pars[self.iCL])
+        #Exponentiate and multiply by color
+        colorexp= 10. ** (  -0.4*colorlaw* c)
+        
+        #Evaluate model uncertainty
+        corr01,modelerr0,modelerr1= pars[[ self.imodelcorr01, self.imodelerr0,self.imodelerr1]]
+        
+        modelfluxvar=colorexp**2 * self.varianceprefactor**2 * x0**2* (modelerr0**2 +2*x1*corr01*modelerr1* modelerr0+  (x1*modelerr1)**2)
+        return agnp.clip(modelfluxvar,0,None)
+        
 class SALTfitcachespectrum(SALTtrainingspectrum):
-
-    __slots__ = ['spectrum','pcderivsparse','ispecx0','ispcrcl','phase','wavelength','flux','fluxerr','tobs']
+# 'phase','wavelength','flux','fluxerr','tobs','mjd'
+    __slots__ = [
+        'restwavelength',
+        'im0','im1','iCL','ix1','ic','ispecx0','ispcrcl',
+        'z','spectrumid','mwextcurve',
+        'pcderivsparse','recaltermderivs',
+        'bsplinecoeffshape','varianceprefactor',
+    'errorgridshape',
+    'imodelcorr01','imodelerr0','imodelerr1']
     
-    def __init__(self,sn,spectrum,k,residsobj,kcordict):
+    def __init__(self,sn,spectrum,k,residsobj):
+        z = sn.zHelio
+        self.z=z
 
         self.flux = spectrum.flux
         self.phase = spectrum.phase
         self.wavelength = spectrum.wavelength
-        self.flux = spectrum.flux
+        self.restwavelength= spectrum.wavelength/ (1+self.z)
         self.fluxerr = spectrum.fluxerr
         self.tobs = spectrum.tobs
+        self.im0=residsobj.im0
+        self.im1=residsobj.im1
+        self.iCL=residsobj.iCL
+        self.ix1=sn.ix1
+        self.ic=sn.ic
+        self.ispecx0=np.where(residsobj.parlist=='specx0_{}_{}'.format(sn.snid,k))[0][0]
+        self.ispcrcl=np.where(residsobj.parlist=='specrecal_{}_{}'.format(sn.snid,k))[0]
+        self.bsplinecoeffshape=(residsobj.phaseBins[0].size,residsobj.waveBins[0].size)        
+
+        self.mwextcurve=sn.mwextcurveint(spectrum.wavelength)
+
         
-        z = sn.zHelio
         derivInterp=np.zeros((spectrum.wavelength.size,residsobj.im0.size))
         for i in range(residsobj.im0.size):
             if __anyinnonzeroareaforsplinebasis__(spectrum.phase,spectrum.wavelength/(1+z),residsobj.phaseknotloc,residsobj.waveknotloc,residsobj.bsorder,i):
                 derivInterp[:,i] = bisplev(spectrum.phase,spectrum.wavelength/(1+z),(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(residsobj.im0.size)==i, residsobj.bsorder,residsobj.bsorder))
-
-        self.pcderivsparse=sparse.csr_matrix(derivInterp)
+        derivInterp=derivInterp*(_SCALE_FACTOR/(1+self.z)*self.mwextcurve)[:,np.newaxis]
+        self.pcderivsparse=SparseMatrix(derivInterp)
         self.spectrumid=k
-        self.ispecx0=np.where(residsobj.parlist=='specx0_{}_{}'.format(sn.snid,k))[0]
-        self.ispcrcl=np.where(residsobj.parlist=='specrecal_{}_{}'.format(sn.snid,k))[0]
+        
+
+        pow=self.ispcrcl.size-agnp.arange(self.ispcrcl.size)
+        recalCoord=(self.wavelength-agnp.mean(self.wavelength))/residsobj.specrange_wavescale_specrecal
+        #recalCoord=(residsobj.waveBinCenters-agnp.mean(self.wavelength))/residsobj.specrange_wavescale_specrecal
+        self.recaltermderivs=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
+        
+
+        self.varianceprefactor= _SCALE_FACTOR*sn.mwextcurveint(self.wavelength) /(1+self.z)
+        
+        errorwaveind=np.searchsorted(residsobj.errwaveknotloc,self.restwavelength)-1
+        errorphaseind=(np.searchsorted(residsobj.errphaseknotloc,self.phase)-1)
+        self.errorgridshape=(residsobj.errphaseknotloc.size-1,residsobj.errwaveknotloc.size-1)
+        phaseindtemp=np.tile(errorphaseind,errorwaveind.size )
+        ierrorbin=np.ravel_multi_index((phaseindtemp,errorwaveind),self.errorgridshape)
+        self.imodelcorr01=residsobj.imodelcorr01[ierrorbin]    
+        self.imodelerr0=residsobj.imodelerr0[ierrorbin]    
+        self.imodelerr1=residsobj.imodelerr1[ierrorbin]    
+
+
+    def modelflux(self,pars):
+        x0,x1=pars[[self.ispecx0,self.ix1]]
+        #Define recalibration factor
+        coeffs=pars[self.ispcrcl]
+        recalterm=agnp.dot(self.recaltermderivs,coeffs)
+        pastbounds=agnp.abs(recalterm)>100
+        recalterm=agnp.clip(recalterm,-100,100)
+        recalexp=agnp.exp(recalterm)
+        
+        fluxcoeffs=(pars[self.im0]+pars[self.im1]*x1)*x0
+        return recalexp*self.pcderivsparse.dot(fluxcoeffs,returnsparse=False)
+        #fluxcoeffsreddened= (recalexp[np.newaxis,:]*fluxcoeffs.reshape( self.bsplinecoeffshape)).flatten()
+        #return self.pcderivsparse.dot(fluxcoeffsreddened,returnsparse=False)
+
+    def modelfluxvariance(self,pars):
+        x0,x1=pars[[self.ispecx0,self.ix1]]
+        #Define recalibration factor
+        coeffs=pars[self.ispcrcl]
+        recalterm=agnp.dot(self.recaltermderivs,coeffs)
+        pastbounds=agnp.abs(recalterm)>100
+        recalterm=agnp.clip(recalterm,-100,100)
+        recalexp=agnp.exp(recalterm)
+        
+        #Evaluate model uncertainty
+        corr01,modelerr0,modelerr1= pars[[ self.imodelcorr01, self.imodelerr0,self.imodelerr1]]
+        
+        modelfluxvar=recalexp**2 * self.varianceprefactor**2 * x0**2* (modelerr0**2 +2*x1*corr01*modelerr1* modelerr0+  (x1*modelerr1)**2)
+        return agnp.clip(modelfluxvar,0,None)
+
 
 class SALTfitcacheSN(SALTtrainingSN):
     """Class to store SN data in addition to cached results useful in speeding up the fitter
     """
-    __slots__ = ['photdata','specdata','ix0','ix1','ic','mwextcurve','mwextcurve','mwextcurveint','dwave','obswave','obsphase']
+    __slots__ = ['photdata','specdata','ix0','ix1','ic','mwextcurve','mwextcurveint','dwave','obswave','obsphase']
     
     def __init__(self,sndata,residsobj,kcordict):
         for key,val in sndata.__dict__.items():
@@ -234,7 +399,7 @@ class SALTfitcacheSN(SALTtrainingSN):
         self.ic=np.where(residsobj.parlist==f'c_{self.snid}')[0][0]
         
         self.photdata={flt: SALTfitcachelightcurve(self,sndata.photdata[flt],residsobj,kcordict ) for flt in sndata.photdata}
-        self.specdata={k: SALTfitcachespectrum(self,sndata.specdata[k],k,residsobj,kcordict ) for k in sndata.specdata }
+        self.specdata={k: SALTfitcachespectrum(self,sndata.specdata[k],k,residsobj ) for k in sndata.specdata }
 
     
 class SALTResids:
@@ -250,7 +415,7 @@ class SALTResids:
         self.datadict = datadict
         
         self.bsorder=3
-        self.guess = guess
+        self.initparams = guess
         self.nsn = len(self.datadict.keys())
         
         for key, value in kwargs.items(): 
@@ -418,20 +583,7 @@ class SALTResids:
         fluxes=self.SALTModel(guess,evaluatePhase=self.phaseRegularizationPoints,evaluateWave=self.waveRegularizationPoints)
 
         self.guessScale=[1.0 for f in fluxes]
-        self.colorLawDerivBinCenters=np.empty((self.waveBinCenters.size,self.n_colorpars))
-        for i in range(self.n_colorpars):
-            self.colorLawDerivBinCenters[:,i]=\
-                SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(self.waveBinCenters)-\
-                SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(self.waveBinCenters)
 
-        self.colorLawDeriv=np.empty((self.wave.size,self.n_colorpars))
-        for i in range(self.n_colorpars):
-            self.colorLawDeriv[:,i]=\
-                SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(self.wave)-\
-                SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(self.wave)
-        self.colorLawDerivInterp=interp1d(
-            self.wave,self.colorLawDeriv,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
-                
         if self.regularize:
             self.updateEffectivePoints(guess)
 
@@ -511,7 +663,6 @@ class SALTResids:
     def lsqwrap(self,guess,storedResults,varyParams=None,doPriors=True,doSpecResids=True,usesns=None):
         if varyParams is None:
             varyParams=np.zeros(self.npar,dtype=bool)
-        self.fillStoredResults(guess,storedResults)
         if varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any() or varyParams[self.iclscat].any():
             raise ValueError('lsqwrap not allowed to handle varying model uncertainties')
 
@@ -582,8 +733,6 @@ class SALTResids:
         if varyParams is None:
             varyParams=np.zeros(self.npar,dtype=bool)
         computeDerivatives=np.any(varyParams)
-        #Set up SALT model
-        self.fillStoredResults(x,storedResults) 
         
         chi2 = 0
         #Construct arguments for maxlikeforSN method
@@ -645,7 +794,6 @@ class SALTResids:
 
         if varyParams is None:
             varyParams=np.zeros(self.npar,dtype=bool)
-        self.fillStoredResults(x,storedResults) 
         photmodel,specmodel=self.modelvalsforSN(x,sn,storedResults,varyParams)
 
         photresids={}
@@ -785,65 +933,11 @@ class SALTResids:
     def modelvalsforSN(self,x,sn,storedResults,varyParams):     
         
         temporaryResults={}
-        self.fillStoredResults(x,storedResults)
 
         fluxphotkey='phot'+'fluxes_{}'.format(sn)
         varphotkey= 'phot'+'variances_{}'.format(sn)
         fluxspeckey='spec'+'fluxes_{}'.format(sn)
         varspeckey= 'spec'+'variances_{}'.format(sn)
-        z = self.datadict[sn].zHelio
-        sndata=self.datadict[sn]
-        x1Deriv= varyParams[sndata.ix1] 
-        obsphase = sndata.obsphase #self.phase*(1+z)
-        x1,xhost,c = x[sndata.ix1],x[sndata.ixhost],\
-                            x[sndata.ic]
-        colorexp= 10. ** (storedResults['colorLaw'] * c)
-        temporaryResults['colorexp'] =colorexp
-
-        calculateFluxes= not ('photfluxes_{}'.format(sn) in storedResults  and  'specfluxes_{}'.format(sn) in storedResults)
-        calculateVariances= not ('photvariances_{}'.format(sn) in storedResults and  'specvariances_{}'.format(sn) in storedResults)
-        if calculateFluxes and not fluxphotkey in storedResults and not fluxspeckey in storedResults:
-            
-            #Apply MW extinction
-            
-                    
-            prefactor=_SCALE_FACTOR/(1+z)*(sndata.mwextcurve[np.newaxis,:])
-            if self.host_component:
-                M0,M1,Mhost = storedResults['components']
-                mod = prefactor*(M0 + x1*M1 + xhost*Mhost)
-            else:
-                M0,M1 = storedResults['components']
-                mod = prefactor*(M0 + x1*M1)
-
-            temporaryResults['fluxInterp'] = mod
-            if x1Deriv:
-                int1dM1 = interp1d(obsphase,prefactor*M1,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
-                temporaryResults['M1Interp']=int1dM1
-
-            # no fitting for xhost yet
-            #if xhostDeriv:
-            #   int1dMHost = interp1d(obsphase,prefactor*MHost,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
-            #   temporaryResults['MHostInterp']=int1dMHost
-                            
-        if calculateVariances and not varphotkey in storedResults and not varspeckey in storedResults:
-            prefactor=(sndata.mwextcurve *  _SCALE_FACTOR/(1+z))
-            if x1Deriv or varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any():
-                interr1d = [interp1d(
-                    obsphase,err * prefactor ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True) \
-                            for err in storedResults['saltErr']]
-                intcorr1d= [interp1d(
-                    obsphase,corr ,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True) \
-                            for corr in storedResults['saltCorr'] ]
-                temporaryResults['uncertaintyComponentsInterp']=interr1d
-                temporaryResults['uncertaintyCorrelationsInterp']=intcorr1d
-
-            saltErr=storedResults['saltErr']
-            saltCorr=storedResults['saltCorr'] 
-            modelUncertainty= prefactor**2 *(saltErr[0]**2  + 2*x1* saltCorr[0]*saltErr[0]*saltErr[1] + x1**2 *saltErr[1]**2)
-            if self.host_component:
-                modelUncertainty += prefactor**2.*(xhost**2*saltErr[2]**2. + 2*xhost*saltCorr[1]*saltErr[0]*saltErr[2])
-            
-            temporaryResults['modelUncertainty']=modelUncertainty
 
         returndicts=[]
         for valfun,uncertaintyfun,name in \
@@ -852,11 +946,11 @@ class SALTResids:
 
             fluxkey=name+'fluxes_{}'.format(sn)
             if not fluxkey in storedResults:
-                storedResults[fluxkey]=valfun(x,sn, storedResults,temporaryResults,varyParams)
+                storedResults[fluxkey]=valfun(x,sn,varyParams)
             valdict=storedResults[fluxkey]
             varkey=name+'variances_{}'.format(sn)   
             if not varkey in storedResults:
-                storedResults[varkey]=uncertaintyfun(x,sn,storedResults,temporaryResults,varyParams)
+                storedResults[varkey]=uncertaintyfun(x,sn,varyParams)
 
             uncertaintydict=storedResults[varkey]
             returndicts+=[{key:{**valdict[key],**uncertaintydict[key]} for key in valdict}]
@@ -888,272 +982,106 @@ class SALTResids:
         
         return returndicts      
     
-    def photValsForSN(self,x,sn,storedResults,temporaryResults,varyParams):
+    def photValsForSN(self,x,sn,varyParams):
         sndata= self.datadict[sn]        
         photresultsdict={}
+        
         for flt in sndata.filt:
             lcdata = sndata.photdata[flt]
+            varyparamsforfilter=varyParams#&lcdata.fluxdependentparameters
             filtresultsdict={}
             photresultsdict[flt]=filtresultsdict
             filtresultsdict['dataflux'] = lcdata.fluxcal
-            filtresultsdict['modelflux'] = lcdata.flux(x)
-            
-            filtresultsdict['modelflux_jacobian']=sparse.csr_matrix(ag.jacobian(lcdata.flux)(agnp.array(x))[:,varyParams] )
-            
+            filtresultsdict['modelflux'] = lcdata.modelflux(x)
+            if np.any(varyparamsforfilter):
+                
+    #             jacobianmatrix=evaljacobianforsomeindices(lcdata.modelflux,x,varyparamsforfilter)
+                jacobianmatrix=ag.jacobian(lcdata.modelflux)(x)
+                filtresultsdict['modelflux_jacobian']=sparse.csr_matrix(jacobianmatrix )
+            else:
+                filtresultsdict['modelflux_jacobian']=sparse.csr_matrix(lcdata.fluxcal.size,x.size )
             if np.isnan(filtresultsdict['modelflux']).any() or np.isinf(filtresultsdict['modelflux']).any():
                 import pdb; pdb.set_trace()
                 raise RuntimeError(f'phot model fluxes are nonsensical for SN {sn}')
         return photresultsdict
 
 
-    def specValsForSN(self,x,sn,storedResults,temporaryResults,varyParams):
+    def specValsForSN(self,x,sn,varyParams):
 
         sndata=self.datadict[sn]
-        z =        sndata.zHelio
-        survey =   sndata.survey
-
-        obswave =  sndata.obswave #self.wave*(1+z)
-        obsphase = sndata.obsphase #self.phase*(1+z)
-        wavedelt = obswave[1]-obswave[0]
-        phasedelt = obsphase[1]-obsphase[0]
-        x1,xhost,c = x[sndata.ix1],x[sndata.ixhost],\
-                            x[sndata.ic]
-
-        x1Deriv= varyParams[sndata.ix1]
-        cDeriv=  varyParams[sndata.ic]
-        if self.host_component:
-            requiredPCDerivs=varyParams[self.im0]|varyParams[self.im1]|varyParams[self.imhost]
-        else:
-            requiredPCDerivs=varyParams[self.im0]|varyParams[self.im1]
         
         resultsdict={}
 
         for k,spectrum in sndata.specdata.items():
             specresultsdict={}
             resultsdict[k]=specresultsdict
-
+            varyparamsforspec=varyParams#&spectrum.fluxdependentparameters
+            
             specresultsdict['dataflux'] = spectrum.flux
-            if (requiredPCDerivs).any():
-                specresultsdict['modelflux_jacobian'] = np.zeros((specresultsdict['dataflux'].size,self.parlist.size))
+            specresultsdict['modelflux']  = spectrum.modelflux(x)
+            if np.any(varyparamsforspec):
+#                 jacobianmatrix=evaljacobianforsomeindices(spectrum.modelflux,x,varyparamsforspec)
+                jacobianmatrix=ag.jacobian(spectrum.modelflux)(x)
+                specresultsdict['modelflux_jacobian']=sparse.csr_matrix(jacobianmatrix )
+                specresultsdict['modelflux_jacobian'][:,~varyParams]=0
             else:
-                specresultsdict['modelflux_jacobian'] = sparse.csr_matrix((specresultsdict['dataflux'].size,self.parlist.size))
-        
-
-
-            x0=x[spectrum.ispecx0]
-            x0Deriv=varyParams[spectrum.ispecx0]
-            
-            phase=spectrum.tobs
-
-            #Define recalibration factor
-            coeffs=x[spectrum.ispcrcl]
-            pow=coeffs.size-np.arange(coeffs.size)
-            recalCoord=(spectrum.wavelength-np.mean(spectrum.wavelength))/self.specrange_wavescale_specrecal
-            drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
-            recalterm=(drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1)
-            pastbounds=np.abs(recalterm)>100
-            recalterm=np.clip(recalterm,-100,100)
-            drecaltermdrecal[pastbounds,:]=0
-            recalexp=np.exp(recalterm)
-            
-            if len(np.where((recalexp != recalexp) | (recalexp == np.inf))[0]):
-                raise RuntimeError(f'error....spec recalibration problem for SN {sn}!')
-
-            dmodelfluxdx0 = recalexp*recalexp*temporaryResults['fluxInterp'][int(np.round((phase-obsphase[0])/phasedelt)),
-                            (np.round((spectrum.wavelength-obswave[0])/wavedelt)).astype(int)]
-            
-            #temporaryResults['fluxInterp'][int(np.round((phase-obsphase[0])/phasedelt)),
-            #                                                   (np.round((spectrum.wavelength-obswave[0])/wavedelt)).astype(int)]
-            
-            modulatedFlux = dmodelfluxdx0*x0
-            specresultsdict['modelflux']  = modulatedFlux
-            if len(np.where((specresultsdict['modelflux'] != specresultsdict['modelflux']) |
-                            (specresultsdict['modelflux'] == np.inf))[0]):
-                raise RuntimeError(f'spec model flux nonsensical for SN {sn}')
-            
-            if x0Deriv:
-                specresultsdict['modelflux_jacobian'][:,spectrum.ispecx0] = dmodelfluxdx0[:,np.newaxis]
-            
-            if x1Deriv:
-                M1interp = temporaryResults['M1Interp'](phase)
-                M1int = interp1d(obswave,M1interp,kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
-                M1interp = M1int(spectrum.wavelength)*recalexp
-                if (requiredPCDerivs).any():
-                    specresultsdict['modelflux_jacobian'][:,(sndata.ix1)] = x0*M1interp[np.newaxis]
-                else:
-                    specresultsdict['modelflux_jacobian'][:,(sndata.ix1)] = x0*M1interp[np.newaxis].transpose()
+                specresultsdict['modelflux_jacobian']=sparse.csr_matrix(spectrum.flux.size,x.size  )
                 
-                
-            if self.specrecal:
-                varySpecRecal=varyParams[self.parlist == 'specrecal_{}_{}'.format(sndata.snid,k)]
-                if varySpecRecal.sum():
-                    specresultsdict['modelflux_jacobian'][:,(self.parlist == 'specrecal_{}_{}'.format(sndata.snid,k))]  = modulatedFlux[:,np.newaxis] * drecaltermdrecal[:,varySpecRecal]
-            # M0, M1
-            if (requiredPCDerivs).any():
-                intmult = _SCALE_FACTOR/(1+z)*recalexp*sndata.mwextcurveint(spectrum.wavelength)
-                derivInterp=spectrum.pcderivsparse.multiply(intmult[:,np.newaxis]).tocsc()
-                #import pdb; pdb.set_trace()
-                if varyParams[self.im0].any():
-                    specresultsdict['modelflux_jacobian'][:,(varyParams) & (self.parlist == 'm0')]  = \
-                        (derivInterp[:,varyParams[self.im0[requiredPCDerivs]]]*(x0[0])).toarray()
-                if varyParams[self.im1].any():
-                    specresultsdict['modelflux_jacobian'][:,(varyParams) & (self.parlist == 'm1')] = \
-                        ( derivInterp[:,varyParams[self.im1[requiredPCDerivs]]]*(x1*x0[0])).toarray()
-                if self.host_component:
-                    specresultsdict['modelflux_jacobian'][:,(varyParams) & (self.parlist == 'mhost')] = \
-                        ( derivInterp[:,varyParams[self.imhost[requiredPCDerivs]]]*(xhost*x0[0])).toarray()
-
-            if (requiredPCDerivs).any():
-                resultsdict[k]['modelflux_jacobian']=sparse.csr_matrix(resultsdict[k]['modelflux_jacobian'])
-        
         return resultsdict
 
-    def specVarianceForSN(self,x,sn,storedResults,temporaryResults,varyParams):
+    def specVarianceForSN(self,x,sn,varyParams):
         sndata=self.datadict[sn]
-        z =        sndata.zHelio
-        survey =   sndata.survey
-        dwave =    sndata.dwave
-        obswave =  sndata.obswave #self.wave*(1+z)
-        obsphase = sndata.obsphase #self.phase*(1+z)
-        wavedelt = obswave[1]-obswave[0]
-        phasedelt = obsphase[1]-obsphase[0]
-        x1,c = x[sndata.ix1],\
-                         x[sndata.ic]
-
-        x1Deriv= varyParams[sndata.ix1]
-        cDeriv=  varyParams[sndata.ic]
-        
-        
         resultsdict={}
         for k,spectrum in sndata.specdata.items():
             x0=x[spectrum.ispecx0]
-            x0Deriv=varyParams[spectrum.ispecx0][0]
                         
             specresultsdict={}
             resultsdict[k]=specresultsdict
             specresultsdict['fluxvariance'] =  spectrum.fluxerr**2
             #specresultsdict['modelvariance_jacobian']=np.zeros([len(spectrum),self.parlist.size]) #sparse.csr_matrix([len(spectrum),self.parlist.size])
 
-            phase=spectrum.tobs
+            varyparamsforspec=varyParams#&spectrum.fluxdependentparameters
             
-            #Define recalibration factor
-            if self.specrecal:
-                coeffs=x[spectrum.ispcrcl]
-                pow=coeffs.size-np.arange(coeffs.size)
-                recalCoord=(spectrum.wavelength-np.mean(spectrum.wavelength))/self.specrange_wavescale_specrecal
-                drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
-                recalexp=np.exp((drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1))
+            specresultsdict['modelvariance']  = spectrum.modelfluxvariance(x)
+            if np.any(varyparamsforspec):
+#                 jacobianmatrix=evaljacobianforsomeindices(spectrum.modelflux,x,varyparamsforspec)
+                jacobianmatrix=ag.jacobian(spectrum.modelfluxvariance)(x)
+                specresultsdict['modelvariance_jacobian']=sparse.csr_matrix(jacobianmatrix )
+                specresultsdict['modelvariance_jacobian'][:,~varyParams]=0
             else:
-                recalexp=1
-                
-            if  x1Deriv or varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any():
-                modelErrInt = [ interp1d(
-                    obswave, interr(phase),kind=self.interpMethod,bounds_error=False,
-                    fill_value=0,assume_sorted=True)  for interr in temporaryResults['uncertaintyComponentsInterp']]
-                modelCorrInt= [ interp1d(
-                    obswave, intcorr(phase),kind=self.interpMethod,bounds_error=False,
-                    fill_value=0,assume_sorted=True) for intcorr in temporaryResults['uncertaintyCorrelationsInterp']]
-                modelerrnox = [  interr( spectrum.wavelength) *recalexp for interr in (modelErrInt)]
-                corr=  [intcorr(spectrum.wavelength) for intcorr in modelCorrInt]
-                
-            uncertaintyNoX0 = recalexp**2. * temporaryResults['modelUncertainty'][
-                int(np.round((phase-obsphase[0])/phasedelt)),
-                (np.round((spectrum.wavelength-obswave[0])/wavedelt)).astype(int)]
-
-            modelUncertainty=uncertaintyNoX0*x0**2
-
-            specresultsdict['modelvariance'] = modelUncertainty
-
+                specresultsdict['modelvariance_jacobian']=sparse.csr_matrix(spectrum.flux.size,x.size  )
         return resultsdict
 
-    def photVarianceForSN(self,x,sn,storedResults,temporaryResults,varyParams):
+    def photVarianceForSN(self,x,sn,varyParams):
         """Currently calculated only at the effective wavelength of the filter, not integrated over."""
         sndata= self.datadict[sn]
-        z     =    sndata.zHelio
-        survey   = sndata.survey
-        
-        dwave =    sndata.dwave
-        obswave =  sndata.obswave #self.wave*(1+z)
-        obsphase = sndata.obsphase #self.phase*(1+z)
-        wavedelt = obswave[1]-obswave[0]
-        phasedelt = obsphase[1]-obsphase[0]
-        x0,x1,c = x[self.parlist == f'x0_{sn}'],x[sndata.ix1],\
-                         x[sndata.ic]
-        
-        x0Deriv= varyParams[sndata.ix0]
-        x1Deriv= varyParams[sndata.ix1]
-        cDeriv=  varyParams[sndata.ic]
         
         photresultsdict={}
 
         for flt,lcdata in sndata.photdata.items():
             filtresultsdict={}
             photresultsdict[flt]=filtresultsdict
-
-            #Select data from the appropriate filter filter
-            phase=lcdata.tobs
-            clippedPhase=np.clip(phase,obsphase.min(),obsphase.max())
-            nphase = len(phase)
-            
+                        
             #Calculate color scatter
             if self.iclscat.size:
-                colorscat,dcolorscatdx=self.colorscatter(x,lcdata.lambdaeff/(1+z),varyParams)
+                colorscat,dcolorscatdx=self.colorscatter(x,lcdata.lambdaeffrest,varyParams)
                 if colorscat == np.inf:
                     log.error('infinite color scatter!')
                     import pdb; pdb.set_trace()
             else:
                 colorscat=0
                 dcolorscatdx=np.array([])
-
-            filtresultsdict['colorvariance']= colorscat,dcolorscatdx
-
-            colorlawinterp=storedResults['colorLawInterp'](lcdata.lambdaeff/(1+z))
-            colorexpinterp=10**(c*colorlawinterp)
-            
-            fluxfactor=(colorexpinterp*self.fluxfactor[survey][flt]*(lcdata.pbspl.sum())*dwave)**2
-            
-            if  x1Deriv or varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any():
-                modelErrInt = [ interp1d(
-                    obswave, interr(clippedPhase) ,kind=self.interpMethod,bounds_error=False,
-                    fill_value=0,assume_sorted=True)  for interr in temporaryResults['uncertaintyComponentsInterp']]
-                modelCorrInt= [ interp1d(
-                    obswave, intcorr(clippedPhase),kind=self.interpMethod,bounds_error=False,
-                    fill_value=0,assume_sorted=True) for intcorr in temporaryResults['uncertaintyCorrelationsInterp']]
-                
-                modelerrnox = [  interr( lcdata.lambdaeff)  for interr in (modelErrInt)]
-                corr=  [intcorr(lcdata.lambdaeff) for intcorr in modelCorrInt]
-            
-            modelErrInt =  temporaryResults['modelUncertainty'][np.round((clippedPhase-obsphase[0])/phasedelt).astype(int),
-                                                                int(np.round((lcdata.lambdaeff-obswave[0])/wavedelt))]
-            uncertaintyNoX0=  fluxfactor *  modelErrInt
-            modelUncertainty=uncertaintyNoX0*x0**2
-            negativevariance=modelUncertainty<0
-            modelUncertainty[negativevariance]=0
             filtresultsdict['fluxvariance'] = lcdata.fluxcalerr**2
-            filtresultsdict['modelvariance']=  modelUncertainty
-            filtresultsdict['modelvariance_jacobian']=sparse.csr_matrix((filtresultsdict['fluxvariance'].size,self.parlist.size))
+
+            varyparamsforfilter=varyParams#&lcdata.fluxdependentparameters
+            filtresultsdict['modelvariance'] = lcdata.modelfluxvariance(x)
+            if np.any(varyparamsforfilter):
+                jacobianmatrix=ag.jacobian(lcdata.modelfluxvariance)(x)
+                filtresultsdict['modelvariance_jacobian']=sparse.csr_matrix(jacobianmatrix )
+            else:
+                filtresultsdict['modelvariance_jacobian']=sparse.csr_matrix(lcdata.fluxcal.size,x.size )
                     
         return photresultsdict
-
-    
-    def fillStoredResults(self,x,storedResults):
-        if self.n_colorpars:
-            if not 'colorLaw' in storedResults:
-                storedResults['colorLawBasisCenters'] = -0.4 * SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])(self.waveBinCenters)
-                storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])(self.wave)
-                storedResults['colorLawInterp']= interp1d(
-                    self.wave,storedResults['colorLaw'],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
-        else: storedResults['colorLaw'] = 1
-                
-        if not 'components' in storedResults:
-            storedResults['components'] =self.SALTModel(x)
-        if not 'componentderivs' in storedResults:
-            if self.bsorder != 0: storedResults['componentderivs'] = self.SALTModelDeriv(x,1,0,self.phase,self.wave)
-        
-        if 'saltErr' not in storedResults:
-            storedResults['saltErr']=self.ErrModel(x)
-        if 'saltCorr' not in storedResults:
-            storedResults['saltCorr']=self.CorrelationModel(x)
 
     
     def loglikeforSN(self,x,sn,storedResults,varyParams=None,debug=False,SpecErrScale=1.0,fixFluxes=False,dospec=True):

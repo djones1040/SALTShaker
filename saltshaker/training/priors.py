@@ -47,14 +47,14 @@ class SALTPriors:
         self.priors={ key: partial(__priors__[key],self) for key in __priors__}
         phase=self.phaseRegularizationPoints
         wave=self.waveRegularizationPoints
-        components=self.SALTModel(self.guess,evaluatePhase=phase,evaluateWave=wave)
+        components=self.SALTModel(self.initparams,evaluatePhase=phase,evaluateWave=wave)
 
         for prior in self.usePriors:
-            result=self.priors[prior](1,self.guess,components)
+            result=self.priors[prior](1,self.initparams,components)
         self.numBoundResids=0
         for boundedparam in self.boundedParams:
             #width,bound,x,par
-            result=self.boundedprior(0.1,(0,1),self.guess,boundedparam)
+            result=self.boundedprior(0.1,(0,1),self.initparams,boundedparam)
             self.numBoundResids += result[0].size
     
     
