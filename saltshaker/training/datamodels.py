@@ -18,7 +18,7 @@ import logging
 log=logging.getLogger(__name__)
 
 warnings.simplefilter('ignore',category=FutureWarning)
-preintegratebasis=True
+
 from sncosmo.constants import HC_ERG_AA, MODEL_BANDFLUX_SPACING
 
 _SCALE_FACTOR = 1e-12
@@ -60,17 +60,22 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
         self.bsplinecoeffshape=(residsobj.phaseBins[0].size,residsobj.waveBins[0].size)        
         self.z=z
 
-        self.im0=residsobj.im0
-        self.im1=residsobj.im1
+        self.ix1=sn.ix1
+        self.icoordinates=[sn.ix1]
+        self.icomponents=[residsobj.im0,residsobj.im1]
+        if residsobj.host_component:
+            self.icoordinates+=[sn.ixhost]
+            self.icomponents+=[residsobj.imhost]
+        
         self.iCL=residsobj.iCL
         self.ix0=sn.ix0
-        self.ix1=sn.ix1
         self.ic=sn.ic
 
         clippedphase=np.clip(self.phase,residsobj.phase.min(),residsobj.phase.max())
-
+#########################################################################################
         #Evaluating a bunch of quantities used in the flux model
-        #Evaluate derivatives of the color law, here assumed to be linear in coefficients        
+        #Evaluate derivatives of the color law, here assumed to be linear in coefficients  
+        #Either evaluate on fine-grained wavelength grid, or at center of spline basis functions      
         if preintegratebasis:
             colorlawwaveeval=residsobj.waveBinCenters
         else:
@@ -82,7 +87,7 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
                 SALT2ColorLaw(residsobj.colorwaverange, np.arange(self.iCL.size)==i)(colorlawwaveeval)-\
                 SALT2ColorLaw(residsobj.colorwaverange, np.zeros(self.iCL.size))(colorlawwaveeval)
     
-        #Zero point of flux
+        #Calculate zero point of flux
         dwave=sn.dwave
         fluxfactor=residsobj.fluxfactor[sn.survey][self.filt]
 
@@ -102,8 +107,11 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
                 derivInterp[:,:,i] = bisplev(clippedphase ,residsobj.wave[self.idx],(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(residsobj.im0.size)==i, residsobj.bsorder,residsobj.bsorder))
 
         self.splinebasisconvolutions=[]
-        reddenedpassband=self.pbspl[0]*sn.mwextcurve[self.idx]*dwave*fluxfactor*_SCALE_FACTOR/(1+self.z)
+        #Redden passband transmission by MW extinction, multiply by scalar factors
+        reddenedpassband=sn.mwextcurve[self.idx]*self.pbspl[0]*dwave*fluxfactor*_SCALE_FACTOR/(1+self.z)
+    
         for pdx in range(len(lc)):
+            #For photometry past the edge of the phase grid, extrapolate a linear decline in magnitudes
             if self.phase[pdx]>sn.obsphase.max():
                 decayFactor= 10**(-0.4*residsobj.extrapolateDecline*(self.phase[pdx]-sn.obsphase.max()))
             else:
@@ -113,14 +121,19 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
             else:
                 self.splinebasisconvolutions+=[SparseMatrix((derivInterp[pdx,:,:]*reddenedpassband[:,np.newaxis])*decayFactor)]
         
-        self.fluxdependentparameters=(ag.jacobian(self.modelflux)(residsobj.initparams)!=0).sum(axis=0)>0
+#         self.fluxdependentparameters=(ag.jacobian(self.modelflux)(residsobj.initparams)!=0).sum(axis=0)>0
+
+#########################################################################################
         
         #Quantities used in computation of model uncertainties
+        #Color law derivatives at filter effective wavelength
         self.colorlawderivlambdaeff=np.array([
         SALT2ColorLaw(residsobj.colorwaverange, np.arange(self.iCL.size)==i)(np.array([self.lambdaeffrest]))-\
                 SALT2ColorLaw(residsobj.colorwaverange, np.zeros(self.iCL.size))(np.array([self.lambdaeffrest])) for i in range(self.iCL.size)])[:,0]
+        #Prefactor for variance
         self.varianceprefactor=fluxfactor*(self.pbspl.sum())*dwave* _SCALE_FACTOR*sn.mwextcurveint(self.lambdaeff) /(1+self.z)
         
+        #Identify the relevant error model parameters
         errorwaveind=np.searchsorted(residsobj.errwaveknotloc,self.lambdaeffrest)-1
         errorphaseind=(np.searchsorted(residsobj.errphaseknotloc,clippedphase)-1)
         self.errorgridshape=(residsobj.errphaseknotloc.size-1,residsobj.errwaveknotloc.size-1)
@@ -133,9 +146,13 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
              
     def modelflux(self,pars):
         #Define parameters
-        x0,x1,c=pars[[self.ix0,self.ix1,self.ic]]
+        x0,c=pars[[self.ix0,self.ic]]
         #Evaluate the coefficients of the spline bases
-        fluxcoeffs=(pars[self.im0]+pars[self.im1]*x1)*x0
+        
+        coordinates=agnp.array([1]+list(pars[self.icoordinates]))
+        components=pars[self.icomponents]
+        fluxcoeffs=agnp.dot(coordinates,components)*x0
+        
         #Evaluate color law at the wavelength basis centers
         colorlaw=agnp.dot(self.colorlawderiv,pars[self.iCL])
         #Exponentiate and multiply by color
@@ -184,17 +201,21 @@ class SALTfitcachespectrum(SALTtrainingspectrum):
         self.restwavelength= spectrum.wavelength/ (1+self.z)
         self.fluxerr = spectrum.fluxerr
         self.tobs = spectrum.tobs
-        self.im0=residsobj.im0
-        self.im1=residsobj.im1
-        self.iCL=residsobj.iCL
+        
         self.ix1=sn.ix1
+        self.iCL=residsobj.iCL
         self.ic=sn.ic
         self.ispecx0=np.where(residsobj.parlist=='specx0_{}_{}'.format(sn.snid,k))[0][0]
         self.ispcrcl=np.where(residsobj.parlist=='specrecal_{}_{}'.format(sn.snid,k))[0]
         self.bsplinecoeffshape=(residsobj.phaseBins[0].size,residsobj.waveBins[0].size)        
 
-        self.mwextcurve=sn.mwextcurveint(spectrum.wavelength)
+        self.icoordinates=[sn.ix1]
+        self.icomponents=[residsobj.im0,residsobj.im1]
+        if residsobj.host_component:
+            self.icoordinates+=[sn.ixhost]
+            self.icomponents+=[residsobj.imhost]
 
+        self.mwextcurve=sn.mwextcurveint(spectrum.wavelength)
         
         derivInterp=np.zeros((spectrum.wavelength.size,residsobj.im0.size))
         for i in range(residsobj.im0.size):
@@ -224,7 +245,7 @@ class SALTfitcachespectrum(SALTtrainingspectrum):
 
 
     def modelflux(self,pars):
-        x0,x1=pars[[self.ispecx0,self.ix1]]
+        x0=pars[self.ispecx0]
         #Define recalibration factor
         coeffs=pars[self.ispcrcl]
         recalterm=agnp.dot(self.recaltermderivs,coeffs)
@@ -232,7 +253,11 @@ class SALTfitcachespectrum(SALTtrainingspectrum):
         recalterm=agnp.clip(recalterm,-100,100)
         recalexp=agnp.exp(recalterm)
         
-        fluxcoeffs=(pars[self.im0]+pars[self.im1]*x1)*x0
+        coordinates=agnp.array([1]+list(pars[self.icoordinates]))
+        components=pars[self.icomponents]
+        
+        fluxcoeffs=agnp.dot(coordinates,components)*x0
+
         return recalexp*self.pcderivsparse.dot(fluxcoeffs,returnsparse=False)
         #fluxcoeffsreddened= (recalexp[np.newaxis,:]*fluxcoeffs.reshape( self.bsplinecoeffshape)).flatten()
         #return self.pcderivsparse.dot(fluxcoeffsreddened,returnsparse=False)
