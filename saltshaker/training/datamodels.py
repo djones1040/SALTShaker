@@ -139,10 +139,11 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
         self.errorgridshape=(residsobj.errphaseknotloc.size-1,residsobj.errwaveknotloc.size-1)
         waveindtemp=np.array([errorwaveind for x in errorphaseind])
         ierrorbin=np.ravel_multi_index((errorphaseind,waveindtemp),self.errorgridshape)
-        self.imodelcorr01=residsobj.imodelcorr01[ierrorbin]    
-        self.imodelerr0=residsobj.imodelerr0[ierrorbin]    
-        self.imodelerr1=residsobj.imodelerr1[ierrorbin]    
-
+        self.imodelcorrs=[(0,1,residsobj.imodelcorr01[ierrorbin])]    
+        self.imodelerrs=[residsobj.imodelerr0[ierrorbin] ,residsobj.imodelerr1[ierrorbin]    ]
+        if residsobj.host_component:
+            self.imodelcorrs+=[(0,2,residsobj.imodelcorr0host[ierrorbin])]
+            self.imodelerrs+=[residsobj.imodelerrhost[ierrorbin]]
              
     def modelflux(self,pars):
         #Define parameters
@@ -167,16 +168,21 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
             return agnp.array([design.multidot(fluxcoeffs,colorexp) for design in self.splinebasisconvolutions])     
     
     def modelfluxvariance(self,pars):
-        x0,x1,c=pars[[self.ix0,self.ix1,self.ic]]
+        x0,c=pars[[self.ix0,self.ic]]
         #Evaluate color law at the wavelength basis centers
         colorlaw=agnp.dot(self.colorlawderivlambdaeff,pars[self.iCL])
         #Exponentiate and multiply by color
         colorexp= 10. ** (  -0.4*colorlaw* c)
-        
-        #Evaluate model uncertainty
-        corr01,modelerr0,modelerr1= pars[[ self.imodelcorr01, self.imodelerr0,self.imodelerr1]]
-        
-        modelfluxvar=colorexp**2 * self.varianceprefactor**2 * x0**2* (modelerr0**2 +2*x1*corr01*modelerr1* modelerr0+  (x1*modelerr1)**2)
+  
+          #Evaluate model uncertainty
+
+        coordinates=agnp.array([1]+list(pars[self.icoordinates]))
+        errs= pars[self.imodelerrs]
+        errorsurfaces=agnp.dot(coordinates,errs)**2
+        for i,j,corridx in self.imodelcorrs:
+            errorsurfaces= errorsurfaces+2*coordinates[i]*coordinates[j]* errs[i]*errs[j]
+              
+        modelfluxvar=colorexp**2 * self.varianceprefactor**2 * x0**2* errorsurfaces
         return agnp.clip(modelfluxvar,0,None)
  
  
@@ -239,10 +245,11 @@ class SALTfitcachespectrum(SALTtrainingspectrum):
         self.errorgridshape=(residsobj.errphaseknotloc.size-1,residsobj.errwaveknotloc.size-1)
         phaseindtemp=np.tile(errorphaseind,errorwaveind.size )
         ierrorbin=np.ravel_multi_index((phaseindtemp,errorwaveind),self.errorgridshape)
-        self.imodelcorr01=residsobj.imodelcorr01[ierrorbin]    
-        self.imodelerr0=residsobj.imodelerr0[ierrorbin]    
-        self.imodelerr1=residsobj.imodelerr1[ierrorbin]    
-
+        self.imodelcorrs=[(0,1,residsobj.imodelcorr01[ierrorbin])]    
+        self.imodelerrs=[residsobj.imodelerr0[ierrorbin] ,residsobj.imodelerr1[ierrorbin]    ]
+        if residsobj.host_component:
+            self.imodelcorrs+=[(0,2,residsobj.imodelcorr0host[ierrorbin])]
+            self.imodelerrs+=[residsobj.imodelerrhost[ierrorbin]]
 
     def modelflux(self,pars):
         x0=pars[self.ispecx0]
@@ -270,11 +277,13 @@ class SALTfitcachespectrum(SALTtrainingspectrum):
         pastbounds=agnp.abs(recalterm)>100
         recalterm=agnp.clip(recalterm,-100,100)
         recalexp=agnp.exp(recalterm)
-        
+        coordinates=agnp.array([1]+list(pars[self.icoordinates]))
         #Evaluate model uncertainty
-        corr01,modelerr0,modelerr1= pars[[ self.imodelcorr01, self.imodelerr0,self.imodelerr1]]
-        
-        modelfluxvar=recalexp**2 * self.varianceprefactor**2 * x0**2* (modelerr0**2 +2*x1*corr01*modelerr1* modelerr0+  (x1*modelerr1)**2)
+        errs= pars[self.imodelerrs]
+        errorsurfaces=agnp.dot(coordinates,errs)**2
+        for i,j,corridx in self.imodelcorrs:
+            errorsurfaces= errorsurfaces+2*coordinates[i]*coordinates[j]* errs[i]*errs[j]
+        modelfluxvar=recalexp**2 * self.varianceprefactor**2 * x0**2* errorsurfaces
         return agnp.clip(modelfluxvar,0,None)
 
 
