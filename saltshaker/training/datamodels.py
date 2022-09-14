@@ -59,7 +59,9 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
         self.lambdaeffrest= self.lambdaeff/(1+z)    
         self.bsplinecoeffshape=(residsobj.phaseBins[0].size,residsobj.waveBins[0].size)        
         self.z=z
-
+        
+        self.preintegratebasis=residsobj.preintegrate_photometric_passband
+        
         self.ix1=sn.ix1
         self.icoordinates=[sn.ix1]
         self.icomponents=[residsobj.im0,residsobj.im1]
@@ -76,7 +78,7 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
         #Evaluating a bunch of quantities used in the flux model
         #Evaluate derivatives of the color law, here assumed to be linear in coefficients  
         #Either evaluate on fine-grained wavelength grid, or at center of spline basis functions      
-        if preintegratebasis:
+        if self.preintegratebasis:
             colorlawwaveeval=residsobj.waveBinCenters
         else:
             colorlawwaveeval=residsobj.wave
@@ -116,7 +118,7 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
                 decayFactor= 10**(-0.4*residsobj.extrapolateDecline*(self.phase[pdx]-sn.obsphase.max()))
             else:
                 decayFactor=1
-            if preintegratebasis:
+            if self.preintegratebasis:
                 self.splinebasisconvolutions+=[SparseVector(np.dot(derivInterp[pdx,:,:].T,reddenedpassband)*decayFactor)]
             else:
                 self.splinebasisconvolutions+=[SparseMatrix((derivInterp[pdx,:,:]*reddenedpassband[:,np.newaxis])*decayFactor)]
@@ -158,7 +160,7 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
         colorlaw=agnp.dot(self.colorlawderiv,pars[self.iCL])
         #Exponentiate and multiply by color
         colorexp= 10. ** (  -0.4*colorlaw* c)
-        if preintegratebasis:
+        if self.preintegratebasis:
             #Redden flux coefficients
             fluxcoeffsreddened= (colorexp[np.newaxis,:]*fluxcoeffs.reshape( self.bsplinecoeffshape)).flatten()
             #Multiply spline bases by flux coefficients

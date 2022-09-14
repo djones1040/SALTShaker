@@ -247,6 +247,8 @@ class TrainSALTBase:
                                                         help="collect the output from bootstrapping in batch mode without running new jobs (default=%(default)s)")
                 successful=successful&wrapaddingargument(config,'trainparams','no_transformed_err_check',     type=boolean_string,
                                                         help="for host mass SALTShaker version, turn on this flag to ignore a current issue where x1/xhost de-correlation doesn\'t preserve errors appropriately; bootstrap errors will be needed (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','preintegrate_photometric_passband', type=int,
+                                                        help='If true, integrate over the photometric passband prior to fitting the model. This approximation evaluates the color law only at the center of each spline basis function, and removes the need to integrate at every step of the fit. (default=%(default)s)')
 
 
                 # survey definitions
@@ -378,7 +380,7 @@ class TrainSALTBase:
         def get_saltkw(self,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc):
 
 
-                saltfitkwargs = {'m1regularization':self.options.m1regularization,'mhostregularization':self.options.mhostregularization,
+                saltfitkwargs = {'preintegrate_photometric_passband',self.options.preintegrate_photometric_passband,'m1regularization':self.options.m1regularization,'mhostregularization':self.options.mhostregularization,
                                  'bsorder':self.options.interporder,'errbsorder':self.options.errinterporder,
                                  'waveSmoothingNeff':self.options.wavesmoothingneff,'phaseSmoothingNeff':self.options.phasesmoothingneff,
                                  'neffFloor':self.options.nefffloor, 'neffMax':self.options.neffmax,
