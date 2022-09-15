@@ -677,7 +677,7 @@ class SALTResids:
                 jacobianmatrix=ag.jacobian(lcdata.modelflux)(x)
                 filtresultsdict['modelflux_jacobian']=sparse.csr_matrix(jacobianmatrix )
             else:
-                filtresultsdict['modelflux_jacobian']=sparse.csr_matrix(lcdata.fluxcal.size,x.size )
+                filtresultsdict['modelflux_jacobian']=sparse.csr_matrix((lcdata.fluxcal.size,x.size) )
             if np.isnan(filtresultsdict['modelflux']).any() or np.isinf(filtresultsdict['modelflux']).any():
                 import pdb; pdb.set_trace()
                 raise RuntimeError(f'phot model fluxes are nonsensical for SN {sn}')
@@ -703,7 +703,7 @@ class SALTResids:
                 specresultsdict['modelflux_jacobian']=sparse.csr_matrix(jacobianmatrix )
                 specresultsdict['modelflux_jacobian'][:,~varyParams]=0
             else:
-                specresultsdict['modelflux_jacobian']=sparse.csr_matrix(spectrum.flux.size,x.size  )
+                specresultsdict['modelflux_jacobian']=sparse.csr_matrix((spectrum.flux.size,x.size)  )
                 
         return resultsdict
 
@@ -727,7 +727,7 @@ class SALTResids:
                 specresultsdict['modelvariance_jacobian']=sparse.csr_matrix(jacobianmatrix )
                 specresultsdict['modelvariance_jacobian'][:,~varyParams]=0
             else:
-                specresultsdict['modelvariance_jacobian']=sparse.csr_matrix(spectrum.flux.size,x.size  )
+                specresultsdict['modelvariance_jacobian']=sparse.csr_matrix((spectrum.flux.size,x.size)  )
         return resultsdict
 
     def photVarianceForSN(self,x,sn,varyParams):
@@ -750,14 +750,15 @@ class SALTResids:
                 colorscat=0
                 dcolorscatdx=np.array([])
             filtresultsdict['fluxvariance'] = lcdata.fluxcalerr**2
-
+            filtresultsdict['colorvariance']=colorscat,dcolorscatdx
+            
             varyparamsforfilter=varyParams#&lcdata.fluxdependentparameters
             filtresultsdict['modelvariance'] = lcdata.modelfluxvariance(x)
             if np.any(varyparamsforfilter):
                 jacobianmatrix=ag.jacobian(lcdata.modelfluxvariance)(x)
                 filtresultsdict['modelvariance_jacobian']=sparse.csr_matrix(jacobianmatrix )
             else:
-                filtresultsdict['modelvariance_jacobian']=sparse.csr_matrix(lcdata.fluxcal.size,x.size )
+                filtresultsdict['modelvariance_jacobian']=sparse.csr_matrix((lcdata.fluxcal.size,x.size) )
                     
         return photresultsdict
 
@@ -1235,7 +1236,7 @@ class SALTResids:
             plt.savefig(output,dpi=288)
         plt.clf()
     
-    def regularizationScale(self,components,fluxes,regmethod='none'):
+    def regularizationScale(self,fluxes,regmethod='none'):
         if self.regularizationScaleMethod=='fixed':
             return self.guessScale,[np.zeros(self.im0.size) for component in fluxes]
         elif self.regularizationScaleMethod == 'rms':
@@ -1267,7 +1268,7 @@ class SALTResids:
         dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
         dfluxdphase=self.SALTModelDeriv(x,1,0,phase,wave)
         d2fluxdphasedwave=self.SALTModelDeriv(x,1,1,phase,wave)
-        scale,scaleDeriv=self.regularizationScale(storedResults['components'],fluxes,regmethod='dyadic')
+        scale,scaleDeriv=self.regularizationScale(fluxes,regmethod='dyadic')
         resids=[]
         jac=[]
 
@@ -1334,7 +1335,7 @@ class SALTResids:
         wave=self.waveRegularizationPoints
         fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
         dfluxdphase=self.SALTModelDeriv(x,1,0,phase,wave)
-        scale,scaleDeriv=self.regularizationScale(storedResults['components'],fluxes,regmethod='gradient')
+        scale,scaleDeriv=self.regularizationScale(fluxes,regmethod='gradient')
         resids=[]
         jac=[]
         for i in range(len(fluxes)):
@@ -1368,7 +1369,7 @@ class SALTResids:
         wave=self.waveRegularizationPoints
         fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
         dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
-        scale,scaleDeriv=self.regularizationScale(storedResults['components'],fluxes,regmethod='gradient')
+        scale,scaleDeriv=self.regularizationScale(fluxes,regmethod='gradient')
         waveGradResids=[]
         jac=[]
         for i in range(len(fluxes)):

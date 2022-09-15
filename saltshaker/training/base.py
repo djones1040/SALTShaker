@@ -380,7 +380,7 @@ class TrainSALTBase:
         def get_saltkw(self,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc):
 
 
-                saltfitkwargs = {'preintegrate_photometric_passband',self.options.preintegrate_photometric_passband,'m1regularization':self.options.m1regularization,'mhostregularization':self.options.mhostregularization,
+                saltfitkwargs = {'preintegrate_photometric_passband':self.options.preintegrate_photometric_passband,'m1regularization':self.options.m1regularization,'mhostregularization':self.options.mhostregularization,
                                  'bsorder':self.options.interporder,'errbsorder':self.options.errinterporder,
                                  'waveSmoothingNeff':self.options.wavesmoothingneff,'phaseSmoothingNeff':self.options.phasesmoothingneff,
                                  'neffFloor':self.options.nefffloor, 'neffMax':self.options.neffmax,

@@ -68,7 +68,7 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
         if residsobj.host_component:
             self.icoordinates+=[sn.ixhost]
             self.icomponents+=[residsobj.imhost]
-        
+        self.icomponents=np.array(self.icomponents)
         self.iCL=residsobj.iCL
         self.ix0=sn.ix0
         self.ic=sn.ic
@@ -146,7 +146,8 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
         if residsobj.host_component:
             self.imodelcorrs+=[(0,2,residsobj.imodelcorr0host[ierrorbin])]
             self.imodelerrs+=[residsobj.imodelerrhost[ierrorbin]]
-             
+        self.imodelerrs=np.array(self.imodelerrs)
+        
     def modelflux(self,pars):
         #Define parameters
         x0,c=pars[[self.ix0,self.ic]]
@@ -222,7 +223,7 @@ class SALTfitcachespectrum(SALTtrainingspectrum):
         if residsobj.host_component:
             self.icoordinates+=[sn.ixhost]
             self.icomponents+=[residsobj.imhost]
-
+        self.icomponents=np.array(self.icomponents)
         self.mwextcurve=sn.mwextcurveint(spectrum.wavelength)
         
         derivInterp=np.zeros((spectrum.wavelength.size,residsobj.im0.size))
@@ -252,7 +253,8 @@ class SALTfitcachespectrum(SALTtrainingspectrum):
         if residsobj.host_component:
             self.imodelcorrs+=[(0,2,residsobj.imodelcorr0host[ierrorbin])]
             self.imodelerrs+=[residsobj.imodelerrhost[ierrorbin]]
-
+        self.imodelerrs=np.array(self.imodelerrs)
+        
     def modelflux(self,pars):
         x0=pars[self.ispecx0]
         #Define recalibration factor

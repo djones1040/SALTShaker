@@ -5,7 +5,8 @@ import time
 from astropy.io import fits
 import numpy as np
 import glob
-from collections import Sequence
+try: from collections import Sequence
+except: from collections.abc import Sequence
 from matplotlib import pyplot as p
 from matplotlib import patches
 from astropy.time import Time
