@@ -1,5 +1,5 @@
 import numpy as np
-from autograd import numpy as agnp
+from jax import numpy as jnp
 
 class SparseMatrix:
     def __init__(self,*args):
@@ -28,11 +28,11 @@ class SparseMatrix:
         
         multvals=self.values*vector[self.colidxs]
         if returnsparse:
-            idxs=agnp.array([rowidx for rowidx,idxs in (self.rowidxscompressed) if len(idxs)>0])
-            vals=agnp.array([multvals[idxs].sum() for rowidx,idxs in (self.rowidxscompressed)if len(idxs)>0])
+            idxs=jnp.array([rowidx for rowidx,idxs in (self.rowidxscompressed) if len(idxs)>0])
+            vals=jnp.array([multvals[idxs].sum() for rowidx,idxs in (self.rowidxscompressed)if len(idxs)>0])
             return SparseVector(self.shape[0],idxs,vals)
         else:
-            return agnp.array([multvals[idxs].sum() for rowidx,idxs in (self.rowidxscompressed)])
+            return jnp.array([multvals[idxs].sum() for rowidx,idxs in (self.rowidxscompressed)])
          
     def elementwisemultiply(self,vector,axis):
         assert((axis==0) or (axis==1))

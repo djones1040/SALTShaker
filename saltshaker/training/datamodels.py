@@ -8,8 +8,9 @@ from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,R
 
 import numpy as np
 
-import autograd as ag
-from autograd import numpy as agnp
+from jax import numpy as jnp
+import jax
+from functools import partial
 
 import extinction
 import copy
@@ -27,7 +28,7 @@ def __anyinnonzeroareaforsplinebasis__(phase,wave,phaseknotloc,waveknotloc,bsord
     phaseindex,waveindex=i//(waveknotloc.size-bsorder-1), i% (waveknotloc.size-bsorder-1)
     return ((phase>=phaseknotloc[phaseindex])&(phase<=phaseknotloc[phaseindex+bsorder+1])).any() and ((wave>=waveknotloc[waveindex])&(wave<=waveknotloc[waveindex+bsorder+1])).any() 
 
-
+recalmax=20
 class SALTfitcachelightcurve(SALTtraininglightcurve):
 
     __slots__ = ['idx','pbspl','denom','lambdaeff','bsplinecoeffshape','colorlawderiv'
@@ -68,6 +69,7 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
         if residsobj.host_component:
             self.icoordinates+=[sn.ixhost]
             self.icomponents+=[residsobj.imhost]
+        self.icoordinates=np.array(self.icoordinates)
         self.icomponents=np.array(self.icomponents)
         self.iCL=residsobj.iCL
         self.ix0=sn.ix0
@@ -147,46 +149,48 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
             self.imodelcorrs+=[(0,2,residsobj.imodelcorr0host[ierrorbin])]
             self.imodelerrs+=[residsobj.imodelerrhost[ierrorbin]]
         self.imodelerrs=np.array(self.imodelerrs)
-        
+    
+    @partial(jax.jit, static_argnums=(0,))
     def modelflux(self,pars):
         #Define parameters
-        x0,c=pars[[self.ix0,self.ic]]
+        x0,c=pars[np.array([self.ix0,self.ic])]
         #Evaluate the coefficients of the spline bases
         
-        coordinates=agnp.array([1]+list(pars[self.icoordinates]))
+        coordinates=jnp.array([1]+list(pars[self.icoordinates]))
         components=pars[self.icomponents]
-        fluxcoeffs=agnp.dot(coordinates,components)*x0
+        fluxcoeffs=jnp.dot(coordinates,components)*x0
         
         #Evaluate color law at the wavelength basis centers
-        colorlaw=agnp.dot(self.colorlawderiv,pars[self.iCL])
+        colorlaw=jnp.dot(self.colorlawderiv,pars[self.iCL])
         #Exponentiate and multiply by color
         colorexp= 10. ** (  -0.4*colorlaw* c)
         if self.preintegratebasis:
             #Redden flux coefficients
             fluxcoeffsreddened= (colorexp[np.newaxis,:]*fluxcoeffs.reshape( self.bsplinecoeffshape)).flatten()
             #Multiply spline bases by flux coefficients
-            return agnp.array([design.dot(fluxcoeffsreddened) for design in self.splinebasisconvolutions])     
+            return jnp.array([design.dot(fluxcoeffsreddened) for design in self.splinebasisconvolutions])     
         else:    
             #Integrate basis functions over wavelength and sum over flux coefficients
-            return agnp.array([design.multidot(fluxcoeffs,colorexp) for design in self.splinebasisconvolutions])     
-    
+            return jnp.array([design.multidot(fluxcoeffs,colorexp) for design in self.splinebasisconvolutions])   
+              
+    @partial(jax.jit, static_argnums=(0,))
     def modelfluxvariance(self,pars):
-        x0,c=pars[[self.ix0,self.ic]]
+        x0,c=pars[np.array([self.ix0,self.ic])]
         #Evaluate color law at the wavelength basis centers
-        colorlaw=agnp.dot(self.colorlawderivlambdaeff,pars[self.iCL])
+        colorlaw=jnp.dot(self.colorlawderivlambdaeff,pars[self.iCL])
         #Exponentiate and multiply by color
         colorexp= 10. ** (  -0.4*colorlaw* c)
   
           #Evaluate model uncertainty
 
-        coordinates=agnp.array([1]+list(pars[self.icoordinates]))
+        coordinates=jnp.array([1]+list(pars[self.icoordinates]))
         errs= pars[self.imodelerrs]
-        errorsurfaces=agnp.dot(coordinates,errs)**2
+        errorsurfaces=jnp.dot(coordinates,errs)**2
         for i,j,corridx in self.imodelcorrs:
             errorsurfaces= errorsurfaces+2*coordinates[i]*coordinates[j]* errs[i]*errs[j]
               
         modelfluxvar=colorexp**2 * self.varianceprefactor**2 * x0**2* errorsurfaces
-        return agnp.clip(modelfluxvar,0,None)
+        return jnp.clip(modelfluxvar,0,None)
  
  
 class SALTfitcachespectrum(SALTtrainingspectrum):
@@ -223,6 +227,7 @@ class SALTfitcachespectrum(SALTtrainingspectrum):
         if residsobj.host_component:
             self.icoordinates+=[sn.ixhost]
             self.icomponents+=[residsobj.imhost]
+        self.icoordinates=np.array(self.icoordinates)
         self.icomponents=np.array(self.icomponents)
         self.mwextcurve=sn.mwextcurveint(spectrum.wavelength)
         
@@ -235,9 +240,9 @@ class SALTfitcachespectrum(SALTtrainingspectrum):
         self.spectrumid=k
         
 
-        pow=self.ispcrcl.size-agnp.arange(self.ispcrcl.size)
-        recalCoord=(self.wavelength-agnp.mean(self.wavelength))/residsobj.specrange_wavescale_specrecal
-        #recalCoord=(residsobj.waveBinCenters-agnp.mean(self.wavelength))/residsobj.specrange_wavescale_specrecal
+        pow=self.ispcrcl.size-jnp.arange(self.ispcrcl.size)
+        recalCoord=(self.wavelength-jnp.mean(self.wavelength))/residsobj.specrange_wavescale_specrecal
+        #recalCoord=(residsobj.waveBinCenters-jnp.mean(self.wavelength))/residsobj.specrange_wavescale_specrecal
         self.recaltermderivs=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
         
 
@@ -255,40 +260,40 @@ class SALTfitcachespectrum(SALTtrainingspectrum):
             self.imodelerrs+=[residsobj.imodelerrhost[ierrorbin]]
         self.imodelerrs=np.array(self.imodelerrs)
         
+    @partial(jax.jit, static_argnums=(0,))   
     def modelflux(self,pars):
         x0=pars[self.ispecx0]
         #Define recalibration factor
         coeffs=pars[self.ispcrcl]
-        recalterm=agnp.dot(self.recaltermderivs,coeffs)
-        pastbounds=agnp.abs(recalterm)>100
-        recalterm=agnp.clip(recalterm,-100,100)
-        recalexp=agnp.exp(recalterm)
+        recalterm=jnp.dot(self.recaltermderivs,coeffs)
+        recalterm=jnp.clip(recalterm,-recalmax,recalmax)
+        recalexp=jnp.exp(recalterm)
         
-        coordinates=agnp.array([1]+list(pars[self.icoordinates]))
+        coordinates=jnp.array([1]+list(pars[self.icoordinates]))
         components=pars[self.icomponents]
         
-        fluxcoeffs=agnp.dot(coordinates,components)*x0
+        fluxcoeffs=jnp.dot(coordinates,components)*x0
 
         return recalexp*self.pcderivsparse.dot(fluxcoeffs,returnsparse=False)
         #fluxcoeffsreddened= (recalexp[np.newaxis,:]*fluxcoeffs.reshape( self.bsplinecoeffshape)).flatten()
         #return self.pcderivsparse.dot(fluxcoeffsreddened,returnsparse=False)
-
+        
+    @partial(jax.jit, static_argnums=(0,))
     def modelfluxvariance(self,pars):
-        x0,x1=pars[[self.ispecx0,self.ix1]]
+        x0=pars[self.ispecx0]
         #Define recalibration factor
         coeffs=pars[self.ispcrcl]
-        recalterm=agnp.dot(self.recaltermderivs,coeffs)
-        pastbounds=agnp.abs(recalterm)>100
-        recalterm=agnp.clip(recalterm,-100,100)
-        recalexp=agnp.exp(recalterm)
-        coordinates=agnp.array([1]+list(pars[self.icoordinates]))
+        recalterm=jnp.dot(self.recaltermderivs,coeffs)
+        recalterm=jnp.clip(recalterm,-recalmax,recalmax)
+        recalexp=jnp.exp(recalterm)
+        coordinates=jnp.array([1]+list(pars[self.icoordinates]))
         #Evaluate model uncertainty
         errs= pars[self.imodelerrs]
-        errorsurfaces=agnp.dot(coordinates,errs)**2
+        errorsurfaces=jnp.dot(coordinates,errs)**2
         for i,j,corridx in self.imodelcorrs:
             errorsurfaces= errorsurfaces+2*coordinates[i]*coordinates[j]* errs[i]*errs[j]
         modelfluxvar=recalexp**2 * self.varianceprefactor**2 * x0**2* errorsurfaces
-        return agnp.clip(modelfluxvar,0,None)
+        return jnp.clip(modelfluxvar,0,None)
 
 
 class SALTfitcacheSN(SALTtrainingSN):

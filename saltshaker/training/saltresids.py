@@ -32,8 +32,9 @@ import matplotlib as mpl
 mpl.use('agg')
 import pylab as plt
 
-import autograd as ag
-from autograd import numpy as agnp
+import jax
+from jax import numpy as jnp
+from jaxlib.xla_extension import DeviceArray
 
 import time
 import sys
@@ -62,7 +63,7 @@ def rankOneCholesky(variance,beta,v):
 
 def evaljacobianforsomeindices(function,x,varyingparameters):
     if varyingparameters.all():
-        return ag.jacobian(function)(agnp.array(x))
+        return jax.jacfwd(function)(jnp.array(x))
     elif (~varyingparameters).all():
         return np.zeros(( function(x).size,x.size))
     else:
@@ -72,10 +73,10 @@ def evaljacobianforsomeindices(function,x,varyingparameters):
 
         def varysomeparams(xcontracted):
             #Take only the varying parameters from the contracted vector, rest from the original
-            xnew=agnp.array([(xcontracted[varyingparamsintindices[i]] if i in varyingparamsintindices else x[i]) for i in range(x.size) ])
+            xnew=jnp.array([(xcontracted[varyingparamsintindices[i]] if i in varyingparamsintindices else x[i]) for i in range(x.size) ])
             return function(xnew)
         #Read out the jacobian
-        jacresult=ag.jacobian(varysomeparams)(agnp.array(x[varyingparameters]))
+        jacresult=jax.jacfwd(varysomeparams)(jnp.array(x[varyingparameters]))
         jacobianmatrix=np.zeros(( jacresult.shape[0],x.size))
         jacobianmatrix[:,varyingparameters]=jacresult
 
@@ -482,11 +483,6 @@ class SALTResids:
             choleskykey=f'photCholesky_{sn}_{flt}'
             if not choleskykey in storedResults:
                 #Calculate cholesky matrix for each set of photometric measurements in each filter
-                if (filtmodel['modelvariance']<0).any() or (filtmodel['modelvariance'] == 0).any():
-                    warnings.warn('Negative variance in photometry',RuntimeWarning)
-                    negVals=filtmodel['modelvariance']<0
-                    if (filtmodel['modelvariance'] > 0).any() and negVals.any():
-                        filtmodel['modelvariance'][negVals]=np.min(filtmodel['modelvariance'][filtmodel['modelvariance'] > 0])
                 variance=filtmodel['fluxvariance']+filtmodel['modelvariance']
                 clscat,dclscatdx=filtmodel['colorvariance']
                 #Find cholesky matrix as sqrt of diagonal uncertainties, then perform rank one update to incorporate color scatter
@@ -559,12 +555,6 @@ class SALTResids:
         specresids={}
         for k in specmodel:
             spectralmodel=specmodel[k]
-            if (spectralmodel['modelvariance']<0).any() or (spectralmodel['modelvariance']==0).any():
-                warnings.warn('Negative variance in spectra',RuntimeWarning)
-                negVals=spectralmodel['modelvariance']<0
-                # zero causes NaNs in sqrt so just set zeros to the minumim of model variance elsewhere
-                if (spectralmodel['modelvariance'] > 0).any():
-                    spectralmodel['modelvariance'][negVals]= np.min(spectralmodel['modelvariance'][spectralmodel['modelvariance'] > 0]) #0
             variance=spectralmodel['fluxvariance'] + spectralmodel['modelvariance']
                 
             uncertainty=np.sqrt(variance)*SpecErrScale
@@ -624,11 +614,20 @@ class SALTResids:
 
             fluxkey=name+'fluxes_{}'.format(sn)
             if not fluxkey in storedResults:
-                storedResults[fluxkey]=valfun(x,sn,varyParams)
+                result=valfun(x,sn,varyParams)
+                for key in result: 
+                    if isinstance(result[key],DeviceArray):
+                        result[key]=np.array(result[key])
+                storedResults[fluxkey]=result
+                
             valdict=storedResults[fluxkey]
             varkey=name+'variances_{}'.format(sn)   
             if not varkey in storedResults:
-                storedResults[varkey]=uncertaintyfun(x,sn,varyParams)
+                result=uncertaintyfun(x,sn,varyParams)
+                for key in result: 
+                    if isinstance(result[key],DeviceArray):
+                        result[key]=np.array(result[key])
+                storedResults[varkey]=result
 
             uncertaintydict=storedResults[varkey]
             returndicts+=[{key:{**valdict[key],**uncertaintydict[key]} for key in valdict}]
@@ -674,7 +673,7 @@ class SALTResids:
             if np.any(varyparamsforfilter):
                 
     #             jacobianmatrix=evaljacobianforsomeindices(lcdata.modelflux,x,varyparamsforfilter)
-                jacobianmatrix=ag.jacobian(lcdata.modelflux)(x)
+                jacobianmatrix=jax.jacfwd(lcdata.modelflux)(x)
                 filtresultsdict['modelflux_jacobian']=sparse.csr_matrix(jacobianmatrix )
             else:
                 filtresultsdict['modelflux_jacobian']=sparse.csr_matrix((lcdata.fluxcal.size,x.size) )
@@ -687,7 +686,6 @@ class SALTResids:
     def specValsForSN(self,x,sn,varyParams):
 
         sndata=self.datadict[sn]
-        
         resultsdict={}
 
         for k,spectrum in sndata.specdata.items():
@@ -699,7 +697,7 @@ class SALTResids:
             specresultsdict['modelflux']  = spectrum.modelflux(x)
             if np.any(varyparamsforspec):
 #                 jacobianmatrix=evaljacobianforsomeindices(spectrum.modelflux,x,varyparamsforspec)
-                jacobianmatrix=ag.jacobian(spectrum.modelflux)(x)
+                jacobianmatrix=jax.jacfwd(spectrum.modelflux)(x)
                 specresultsdict['modelflux_jacobian']=sparse.csr_matrix(jacobianmatrix )
                 specresultsdict['modelflux_jacobian'][:,~varyParams]=0
             else:
@@ -723,7 +721,7 @@ class SALTResids:
             specresultsdict['modelvariance']  = spectrum.modelfluxvariance(x)
             if np.any(varyparamsforspec):
 #                 jacobianmatrix=evaljacobianforsomeindices(spectrum.modelflux,x,varyparamsforspec)
-                jacobianmatrix=ag.jacobian(spectrum.modelfluxvariance)(x)
+                jacobianmatrix=jax.jacfwd(spectrum.modelfluxvariance)(x)
                 specresultsdict['modelvariance_jacobian']=sparse.csr_matrix(jacobianmatrix )
                 specresultsdict['modelvariance_jacobian'][:,~varyParams]=0
             else:
@@ -755,7 +753,7 @@ class SALTResids:
             varyparamsforfilter=varyParams#&lcdata.fluxdependentparameters
             filtresultsdict['modelvariance'] = lcdata.modelfluxvariance(x)
             if np.any(varyparamsforfilter):
-                jacobianmatrix=ag.jacobian(lcdata.modelfluxvariance)(x)
+                jacobianmatrix=jax.jacfwd(lcdata.modelfluxvariance)(x)
                 filtresultsdict['modelvariance_jacobian']=sparse.csr_matrix(jacobianmatrix )
             else:
                 filtresultsdict['modelvariance_jacobian']=sparse.csr_matrix((lcdata.fluxcal.size,x.size) )
