@@ -152,10 +152,10 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
         self.imodelerrs=np.array(self.imodelerrs)
         
         
-        pow=clscatpars.size-1-np.arange(clscatpars.size)
+        pow=self.iclscat.size-1-np.arange(self.iclscat.size)
         colorscateval=((self.lambdaeffrest-5500)/1000)
         
-        self.clscatderivs=((colorscateval)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
+        self.clscatderivs=((colorscateval)  ** (pow)) / factorial(pow)
 
     
 #     @partial(jax.jit, static_argnums=(0,))
@@ -201,7 +201,7 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
         return jnp.clip(modelfluxvar,0,None)
  
     def colorscatter(self,pars):
-        clscatpars = x[self.iclscat]
+        clscatpars = pars[self.iclscat]
         return  jnp.exp(self.clscatderivs @ clscatpars)
         
 class SALTfitcachespectrum(SALTtrainingspectrum):

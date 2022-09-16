@@ -238,7 +238,7 @@ class mcmc(saltresids.SALTResids):
 
         return
     
-    def mcmcfit(self,x,nsteps,nburn,pool=None,debug=False,thin=1,stepsizes=None,SpecErrScale=0.01):
+    def mcmcfit(self,x,nsteps,nburn,pool=None,debug=False,thin=1,stepsizes=None):
         npar = len(x)
         self.npar = npar
         self.chain,self.loglikes = [],[]
@@ -246,7 +246,7 @@ class mcmc(saltresids.SALTResids):
         if self.chain==[]:
             self.chain+=[x]
         if self.loglikes==[]:
-            self.loglikes += [self.maxlikefit(x,pool=pool,debug=debug,SpecErrScale=SpecErrScale)]
+            self.loglikes += [self.maxlikefit(x,pool=pool,debug=debug)]
         self.M0stddev = np.std(x[self.parlist == 'm0'])
         self.M1stddev = np.std(x[self.parlist == 'm1'])
         self.errstddev = self.stepsize_magscale_err
@@ -290,7 +290,7 @@ class mcmc(saltresids.SALTResids):
             self.__components_time_stamp__ = time.time()
             
             # loglike
-            this_loglike = self.maxlikefit(X,pool=pool,debug=debug,SpecErrScale=SpecErrScale)
+            this_loglike = self.maxlikefit(X,pool=pool,debug=debug)
             accept_bool = self.accept(self.loglikes[-1],this_loglike)
             if accept_bool:
                 if not nstep % thin:

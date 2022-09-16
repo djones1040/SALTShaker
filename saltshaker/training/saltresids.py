@@ -35,6 +35,10 @@ import pylab as plt
 import jax
 from jax import numpy as jnp
 from jaxlib.xla_extension import DeviceArray
+from jax.scipy import linalg as jaxlinalg
+from jax import lax
+
+from collections import namedtuple
 
 import time
 import sys
@@ -60,6 +64,19 @@ def rankOneCholesky(variance,beta,v):
         Lprime[j+1:,j]=Lprime[j,j]*beta*v[j+1:]*v[j]/gamma
         b+=beta*v[j]**2/variance[j]
     return Lprime
+
+def jaxrankOneCholesky(variance,beta,v):
+    Lprime=jnp.zeros((variance.size,variance.size))
+    b=1
+    for j in range(v.size):
+        Lprime=Lprime.at[j,j].set(jnp.sqrt(variance[j]+beta/b*v[j]**2))
+        gamma=(b*variance[j]+beta*v[j]**2)
+        Lprime=Lprime.at[j+1:,j].set(Lprime[j,j]*beta*v[j+1:]*v[j]/gamma)
+        b=b+beta*v[j]**2/variance[j]
+    return Lprime
+
+def toidentifier(input):
+    return "x"+str(abs(hash(input)))
 
 def evaljacobianforsomeindices(function,x,varyingparameters):
     if varyingparameters.all():
@@ -262,6 +279,28 @@ class SALTResids:
         fluxes=self.SALTModel(guess,evaluatePhase=self.phaseRegularizationPoints,evaluateWave=self.waveRegularizationPoints)
 
         self.guessScale=[1.0 for f in fluxes]
+        
+        
+        cachekeys=[]
+        for sn in self.datadict:
+            sndata=self.datadict[sn]
+            for flt in sndata.photdata:
+                cachekeys+=[f'phot_fluxes_{sn}_{flt}', f'phot_variances_{sn}_{flt}']
+            for k in sndata.specdata:
+                cachekeys+=  [f'spec_fluxes_{sn}_{k}',f'spec_variances_{sn}_{k}']
+        saltcachedresultsunhash=namedtuple('saltcachedresults',[toidentifier(x) for x in cachekeys])
+
+        class saltcachedresults(saltcachedresultsunhash):
+    
+            def __hash__(self):
+                hashval=0
+                for field in self._fields:
+                    entry=getattr(self,field)
+                    if isinstance(entry,tuple): hashval=hashval+sum([hash(float((x**2 ).sum())) for x in entry])
+                    else: hashval=hashval+hash(float((entry**2 ).sum()))
+                    
+                return hash(hashval)
+        self.saltcachedresults=saltcachedresults
 
         if self.regularize:
             self.updateEffectivePoints(guess)
@@ -337,7 +376,7 @@ class SALTResids:
             for i,parname in enumerate(np.unique(self.parlist[self.iclscat])):
                 self.iclscat_0 = np.append(self.iclscat_0,np.where(self.parlist == parname)[0][-1])
                 self.iclscat_poly = np.append(self.iclscat_poly,np.where(self.parlist == parname)[0][:-1])
-        
+ 
     
     def lsqwrap(self,guess,storedResults,varyParams=None,doPriors=True,doSpecResids=True,usesns=None):
         if varyParams is None:
@@ -348,7 +387,7 @@ class SALTResids:
         residuals = []
         jacobian = [] # Jacobian matrix from r
         for sn in self.datadict.keys() if usesns is None else usesns:
-            photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,storedResults,varyParams,fixUncertainty=True)
+            photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,storedResults,varyParams,fixuncertainties=True)
             for residsdict in ([photresidsdict,specresidsdict] if doSpecResids else [photresidsdict]):
                 residuals+=[residsdict[k]['resid'] for k in residsdict]
                 jacobian+=[residsdict[k]['resid_jacobian'] for k in residsdict]
@@ -386,7 +425,7 @@ class SALTResids:
 
     def maxlikefit(
             self,x,storedResults=None,varyParams=None,pool=None,debug=False,
-            SpecErrScale=1.0,fixFluxes=False,dospec=True,usesns=None):
+            fixfluxes=False,dospec=True,usesns=None):
         """
         Calculates the likelihood of given SALT model to photometric and spectroscopic data given during initialization
         
@@ -416,7 +455,7 @@ class SALTResids:
         chi2 = 0
         #Construct arguments for maxlikeforSN method
         #If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
-        args=[(x,sn,storedResults,varyParams,debug,SpecErrScale,fixFluxes,dospec) \
+        args=[(x,sn,storedResults,varyParams,debug,fixfluxes,dospec) \
               for sn in (self.datadict.keys() if usesns is None else usesns)]
 
         mapFun=pool.map if pool else starmap
@@ -465,327 +504,120 @@ class SALTResids:
             return logp,grad
         else:
             return logp
-                    
-    def ResidsForSN(self,x,sn,storedResults,varyParams=None,fixUncertainty=False,SpecErrScale=1.,fixFluxes=False):
+
+
+    def calculatecachedvals(self,x):
+        results={}
+        for sn in self.datadict:
+            sndata=self.datadict[sn]
+            for flt in sndata.photdata:
+                fluxkey=toidentifier(f'phot_fluxes_{sn}_{flt}')
+                varkey = toidentifier(f'phot_variances_{sn}_{flt}')
+                lcdata=sndata.photdata[flt]
+                results[fluxkey]=lcdata.modelflux(x)
+                results[varkey]=lcdata.modelfluxvariance(x),lcdata.colorscatter(x)
+            for k in sndata.specdata:
+                spectrum=sndata.specdata[k]
+                fluxkey=toidentifier(f'spec_fluxes_{sn}_{k}')
+                varkey= toidentifier(f'spec_variances_{sn}_{k}')
+                results[fluxkey]=spectrum.modelflux(x)
+                results[varkey]=spectrum.modelfluxvariance(x)
+        return self.saltcachedresults(**results)
+
+    def ResidsForSN(self,x,sn,cachedresults=None,fixuncertainties=False,fixfluxes=False):
         """ This method should be the only one required for any fitter to process the supernova data. 
         Find the residuals of a set of parameters to the photometric and spectroscopic data of a given supernova. 
         Photometric residuals are first decorrelated to diagonalize color scatter"""
 
-        if varyParams is None:
-            varyParams=np.zeros(self.npar,dtype=bool)
-        photmodel,specmodel=self.modelvalsforSN(x,sn,storedResults,varyParams)
-
+        sndata=self.datadict[sn]
         photresids={}
-        for flt in photmodel:
-            filtmodel=photmodel[flt]
-            filtresids={}
-            photresids[flt]=filtresids
-            choleskykey=f'photCholesky_{sn}_{flt}'
-            if not choleskykey in storedResults:
-                #Calculate cholesky matrix for each set of photometric measurements in each filter
-                variance=filtmodel['fluxvariance']+filtmodel['modelvariance']
-                clscat,dclscatdx=filtmodel['colorvariance']
-                #Find cholesky matrix as sqrt of diagonal uncertainties, then perform rank one update to incorporate color scatter
-                L = rankOneCholesky(variance,clscat**2,filtmodel['modelflux'])
-                invL=sparse.csr_matrix(linalg.solve_triangular(L,np.diag(np.ones(L.shape[0])),lower=True))
-                
-                storedResults[choleskykey]=L,invL,clscat,dclscatdx
+
+        for flt in sndata.photdata:
+            fluxkey=toidentifier(f'phot_fluxes_{sn}_{flt}')
+            varkey = toidentifier(f'phot_variances_{sn}_{flt}')
+            lcdata=sndata.photdata[flt]
+            if fixfluxes:
+                modelflux=getattr(cachedresults,fluxkey)
             else:
-                L,invL,clscat,dclscatdx=storedResults[choleskykey]
-                
-            if not fixUncertainty: 
-                filtresids['lognorm']=0
-                filtresids['lognorm_grad']=np.zeros(self.parlist.size)
-        
-            #More stable to solve by backsubstitution than to invert and multiply
-            fluxdiff=filtmodel['modelflux']-filtmodel['dataflux']
-            filtresids['resid']=linalg.solve_triangular(L, fluxdiff,lower=True)
+                modelflux=lcdata.modelflux(x)
 
-            if not fixUncertainty:
-                filtresids['lognorm']-= (np.log(np.diag(L)).sum())
-            
-            if varyParams.any():
-                if not fixFluxes: 
-                    filtresids['resid_jacobian']=invL.dot(filtmodel['modelflux_jacobian'])
-                    #filtresids['resid_jacobian']=linalg.solve_triangular(L,filtmodel['modelflux_jacobian'],lower=True)
-                else: 
-                    filtresids['resid_jacobian']=sparse.csr_matrix(filtmodel['modelflux_jacobian'].shape)
-                if not fixUncertainty:
-                    raise NotImplementedError('Derivative of variance is still a work in progress')
-                    #Cut out zeroed jacobian entries to save time
-                    nonzero=(~((filtmodel['modelvariance_jacobian']==0) & \
-                               (filtmodel['modelflux_jacobian']==0 if not fixFluxes else True)).all(axis=0)) | \
-                               (self.parlist=='clscat')
-                    reducedJac=filtmodel['modelvariance_jacobian'][:,nonzero]
+            if fixuncertainties:
+                 modelvariance,clscat=getattr(cachedresults,varkey)
+            else:
+                modelvariance=lcdata.modelfluxvariance(x)
+                clscat=lcdata.colorscatter(x)
 
-                    #Calculate L^-1 (necessary for the diagonal derivative)
-                    invL=linalg.solve_triangular(L,np.diag(np.ones(fluxdiff.size)),lower=True)
+            variance=lcdata.fluxcalerr**2 + modelvariance            
             
-                    # Calculate the fractional derivative of L w.r.t model parameters
-                    # L^-1 dL/dx = {L^-1 x d Sigma / dx x L^-T, with the upper triangular part zeroed and the diagonal halved}
+            #if clscat>0, then need to use a cholesky matrix to find pulls
+            def choleskyresidsandnorm( variance,clscat,modelflux):
+                cholesky=jaxrankOneCholesky(variance,clscat**2,modelflux)
+                return {'residuals':jaxlinalg.solve_triangular(cholesky, modelflux-lcdata.fluxcal,lower=True), 
+                'lognorm': -jnp.log(jnp.diag(cholesky)).sum()}
             
-                    #First calculating diagonal part
-                    fractionalLDeriv=np.dot(invL,np.swapaxes(reducedJac[:,np.newaxis,:]* invL.T[:,:,np.newaxis],0,1))
-        
-                    fluxPrime= linalg.solve_triangular(L,filtmodel['modelflux'])
-                    fractionalLDeriv[:,:,self.iclscat]+= 2*clscat*dclscat[np.newaxis,np.newaxis,:]* \
-                                                         np.outer(fluxPrime,fluxPrime)[:,:,np.newaxis]
-                    if not fixFluxes:
-                        jacPrime = linalg.solve_triangular(L,filtmodel['modelflux_jacobian'][:,nonzero])
-                        #Derivative w.r.t  color scatter 
-                        #Derivative w.r.t model flux
-                        dfluxSquared = jacPrime[:,np.newaxis,:]*fluxPrime[np.newaxis,:,np.newaxis]
-                        #Symmetrize
-                        dfluxSquared = np.swapaxes(dfluxSquared,0,1)+dfluxSquared
-                        fractionalLDeriv +=clscat**2 * dfluxSquared
-                
-                    fractionalLDeriv[np.triu(np.ones((fluxdiff.size,fluxdiff.size),dtype=bool),1),:]=0
-                    fractionalLDeriv[np.diag(np.ones((fluxdiff.size),dtype=bool)),:]/=2
-            
-                    #Multiply by size of transformed residuals and apply to resiudal jacobian
-                
-                    filtresids['resid_jacobian'][:,nonzero]-=np.dot(np.swapaxes(fractionalLDeriv,1,2),filtresids['resid'])
-                
-                    #Trace of fractional derivative gives the gradient of the lognorm term, since determinant is product of diagonal
-                    filtresids['lognorm_grad'][nonzero]-= np.trace(fractionalLDeriv)
-            else: 
-                filtresids['resid_jacobian']=sparse.csr_matrix(filtmodel['modelflux_jacobian'].shape)
+            def diagonalresidsandnorm(variance,clscat,modelflux):
+                sigma=jnp.sqrt(variance)
+                return {'residuals':(modelflux-lcdata.fluxcal)/sigma,'lognorm': -jnp.log(sigma).sum()}
+
+            photresids[flt]=lax.cond(clscat==0, diagonalresidsandnorm, choleskyresidsandnorm, 
+            variance,clscat,modelflux )
 
         #Handle spectra
         specresids={}
-        for k in specmodel:
-            spectralmodel=specmodel[k]
-            variance=spectralmodel['fluxvariance'] + spectralmodel['modelvariance']
-                
-            uncertainty=np.sqrt(variance)*SpecErrScale
+        for k in sndata.specdata:
+            fluxkey=toidentifier(f'spec_fluxes_{sn}_{k}')
+            varkey=toidentifier( f'spec_variances_{sn}_{k}')
+            spectrum=sndata.specdata[k]
+
+            if fixfluxes:
+                modelflux=getattr(cachedresults,fluxkey)
+            else:
+                modelflux=spectrum.modelflux(x)
+            
+            if fixuncertainties:
+                 modelvariance=getattr(cachedresults,varkey)
+            else:
+                modelvariance=spectrum.modelfluxvariance(x)
+            
+            variance=spectrum.fluxerr**2 + modelvariance
+              
+            uncertainty=jnp.sqrt(variance)
 
             spectralSuppression=np.sqrt(self.num_phot/self.num_spec)*self.spec_chi2_scaling
 
-            spectralresids={'resid': spectralSuppression * (spectralmodel['modelflux']-spectralmodel['dataflux'])/uncertainty}
-            specresids[k]=spectralresids
-            if not fixUncertainty:
-                spectralresids['lognorm']=-np.log((np.sqrt(2*np.pi)*uncertainty)).sum()
-            if varyParams.any():
-            #Create a diagonal matrix with the inverse uncertainty on the diagonal
-                if not fixFluxes: spectralresids['resid_jacobian']= \
-                   sparse.diags([spectralSuppression/uncertainty],offsets=[0])*spectralmodel['modelflux_jacobian']
-                else: spectralresids['resid_jacobian']=sparse.csr_matrix((spectralmodel['modelflux'].size,self.parlist.size))
-            
-                if not fixUncertainty:
-                    #Calculate jacobian of total spectral uncertainty including reported uncertainties
-                    uncertainty_jac=  spectralmodel['modelvariance_jacobian'][:,varyParams] / (2*uncertainty[:,np.newaxis])
-                    spectralresids['lognorm_grad']= - (uncertainty_jac/uncertainty[:,np.newaxis]).sum(axis=0)
-                    spectralresids['resid_jacobian'][:,varyParams] -= uncertainty_jac*(spectralresids['resid'] /uncertainty)[:,np.newaxis]
-            else: 
-                spectralresids['resid_jacobian']=sparse.csr_matrix(spectralmodel['modelflux_jacobian'].shape)
-            #if len(specresids[k]['resid'][specresids[k]['resid'] != specresids[k]['resid']]): import pdb; pdb.set_trace()
-        tstart = time.time()
-        #for k in specresids.keys():
-        #    if len(np.where(specresids[k]['resid'] != specresids[k]['resid'])[0]):
-        #        import pdb; pdb.set_trace()
+            specresids[k]={'residuals': spectralSuppression * (modelflux-spectrum.flux)/uncertainty,
+                        'lognorm': -jnp.log(uncertainty).sum()}
+
         return photresids,specresids
     
-    def bestfitsinglebandnormalizationsforSN(self,x,sn,storedResults):
-        photmodel,specmodel=self.modelvalsforSN(x,sn,storedResults,np.zeros(self.parlist.size,dtype=bool))
-        results={}
-        for flt in photmodel:
-            fluxes=photmodel[flt]
-            designmatrix=photmodel[flt]['modelflux']
-            vals=photmodel[flt]['dataflux']
-            variance=photmodel[flt]['fluxvariance']+photmodel[flt]['modelvariance']
+    def bestfitsinglebandnormalizationsforSN(self,x,sn):
+        sndata=self.datadict[sn]
+        for flt in sndata.photdata:
+            lcdata=sndata.photdata[flt]
+            designmatrix=lcdata.modelflux(x)
+            vals=lcdata.fluxcal
+            variance=lcdata.fluxcalerr**2 +lcdata.modelfluxvariance(x)
+            
             normvariance=1/(designmatrix**2/variance).sum()
             normalization=(designmatrix*vals/variance).sum()*normvariance
             results[flt]=normalization,normvariance
         return results
         
-    def modelvalsforSN(self,x,sn,storedResults,varyParams):     
-        
-        temporaryResults={}
-
-        fluxphotkey='phot'+'fluxes_{}'.format(sn)
-        varphotkey= 'phot'+'variances_{}'.format(sn)
-        fluxspeckey='spec'+'fluxes_{}'.format(sn)
-        varspeckey= 'spec'+'variances_{}'.format(sn)
-
-        returndicts=[]
-        for valfun,uncertaintyfun,name in \
-            [(self.photValsForSN,self.photVarianceForSN,'phot'),
-             (self.specValsForSN,self.specVarianceForSN, 'spec')]:
-
-            fluxkey=name+'fluxes_{}'.format(sn)
-            if not fluxkey in storedResults:
-                result=valfun(x,sn,varyParams)
-                for key in result: 
-                    if isinstance(result[key],DeviceArray):
-                        result[key]=np.array(result[key])
-                storedResults[fluxkey]=result
-                
-            valdict=storedResults[fluxkey]
-            varkey=name+'variances_{}'.format(sn)   
-            if not varkey in storedResults:
-                result=uncertaintyfun(x,sn,varyParams)
-                for key in result: 
-                    if isinstance(result[key],DeviceArray):
-                        result[key]=np.array(result[key])
-                storedResults[varkey]=result
-
-            uncertaintydict=storedResults[varkey]
-            returndicts+=[{key:{**valdict[key],**uncertaintydict[key]} for key in valdict}]
-
-            ##############
-            #------------
-            ##############
-            # convenient lines for checking model/phot residuals
-            #if self.debug:
-            #import pdb; pdb.set_trace()
-            #if sn == '356' and name == 'phot' and len(np.where(varyParams)[0]):
-                #import pylab as plt; plt.ion()
-            #    for flt in valdict.keys():
-            #        plt.clf()
-            #        plt.plot(valdict[flt]['dataflux'],'o')
-            #        plt.plot(valdict[flt]['modelflux'],'o')
-            #        plt.savefig('tmp.png')
-            #        import pdb; pdb.set_trace()
-            #if sn == '356' and name == 'spec' and len(np.where(varyParams)[0]):
-            #    for flt in valdict.keys():
-            #        plt.clf()
-            #        plt.plot(valdict[flt]['dataflux'],'o')
-            #        plt.plot(valdict[flt]['modelflux'],'o')
-            #        plt.savefig('tmp.png')
-            #        import pdb; pdb.set_trace()
-            ##############
-            #------------
-            ##############
-        
-        return returndicts      
     
-    def photValsForSN(self,x,sn,varyParams):
-        sndata= self.datadict[sn]        
-        photresultsdict={}
-        
-        for flt in sndata.filt:
-            lcdata = sndata.photdata[flt]
-            varyparamsforfilter=varyParams#&lcdata.fluxdependentparameters
-            filtresultsdict={}
-            photresultsdict[flt]=filtresultsdict
-            filtresultsdict['dataflux'] = lcdata.fluxcal
-            filtresultsdict['modelflux'] = lcdata.modelflux(x)
-            if np.any(varyparamsforfilter):
-                
-    #             jacobianmatrix=evaljacobianforsomeindices(lcdata.modelflux,x,varyparamsforfilter)
-                jacobianmatrix=jax.jacfwd(lcdata.modelflux)(x)
-                filtresultsdict['modelflux_jacobian']=sparse.csr_matrix(jacobianmatrix )
-            else:
-                filtresultsdict['modelflux_jacobian']=sparse.csr_matrix((lcdata.fluxcal.size,x.size) )
-            if np.isnan(filtresultsdict['modelflux']).any() or np.isinf(filtresultsdict['modelflux']).any():
-                import pdb; pdb.set_trace()
-                raise RuntimeError(f'phot model fluxes are nonsensical for SN {sn}')
-        return photresultsdict
-
-
-    def specValsForSN(self,x,sn,varyParams):
-
-        sndata=self.datadict[sn]
-        resultsdict={}
-
-        for k,spectrum in sndata.specdata.items():
-            specresultsdict={}
-            resultsdict[k]=specresultsdict
-            varyparamsforspec=varyParams#&spectrum.fluxdependentparameters
-            
-            specresultsdict['dataflux'] = spectrum.flux
-            specresultsdict['modelflux']  = spectrum.modelflux(x)
-            if np.any(varyparamsforspec):
-#                 jacobianmatrix=evaljacobianforsomeindices(spectrum.modelflux,x,varyparamsforspec)
-                jacobianmatrix=jax.jacfwd(spectrum.modelflux)(x)
-                specresultsdict['modelflux_jacobian']=sparse.csr_matrix(jacobianmatrix )
-                specresultsdict['modelflux_jacobian'][:,~varyParams]=0
-            else:
-                specresultsdict['modelflux_jacobian']=sparse.csr_matrix((spectrum.flux.size,x.size)  )
-                
-        return resultsdict
-
-    def specVarianceForSN(self,x,sn,varyParams):
-        sndata=self.datadict[sn]
-        resultsdict={}
-        for k,spectrum in sndata.specdata.items():
-            x0=x[spectrum.ispecx0]
-                        
-            specresultsdict={}
-            resultsdict[k]=specresultsdict
-            specresultsdict['fluxvariance'] =  spectrum.fluxerr**2
-            #specresultsdict['modelvariance_jacobian']=np.zeros([len(spectrum),self.parlist.size]) #sparse.csr_matrix([len(spectrum),self.parlist.size])
-
-            varyparamsforspec=varyParams#&spectrum.fluxdependentparameters
-            
-            specresultsdict['modelvariance']  = spectrum.modelfluxvariance(x)
-            if np.any(varyparamsforspec):
-#                 jacobianmatrix=evaljacobianforsomeindices(spectrum.modelflux,x,varyparamsforspec)
-                jacobianmatrix=jax.jacfwd(spectrum.modelfluxvariance)(x)
-                specresultsdict['modelvariance_jacobian']=sparse.csr_matrix(jacobianmatrix )
-                specresultsdict['modelvariance_jacobian'][:,~varyParams]=0
-            else:
-                specresultsdict['modelvariance_jacobian']=sparse.csr_matrix((spectrum.flux.size,x.size)  )
-        return resultsdict
-
-    def photVarianceForSN(self,x,sn,varyParams):
-        """Currently calculated only at the effective wavelength of the filter, not integrated over."""
-        sndata= self.datadict[sn]
-        
-        photresultsdict={}
-
-        for flt,lcdata in sndata.photdata.items():
-            filtresultsdict={}
-            photresultsdict[flt]=filtresultsdict
-                        
-            #Calculate color scatter
-            if self.iclscat.size:
-                colorscat,dcolorscatdx=self.colorscatter(x,lcdata.lambdaeffrest,varyParams)
-                if colorscat == np.inf:
-                    log.error('infinite color scatter!')
-                    import pdb; pdb.set_trace()
-            else:
-                colorscat=0
-                dcolorscatdx=np.array([])
-            filtresultsdict['fluxvariance'] = lcdata.fluxcalerr**2
-            filtresultsdict['colorvariance']=colorscat,dcolorscatdx
-            
-            varyparamsforfilter=varyParams#&lcdata.fluxdependentparameters
-            filtresultsdict['modelvariance'] = lcdata.modelfluxvariance(x)
-            if np.any(varyparamsforfilter):
-                jacobianmatrix=jax.jacfwd(lcdata.modelfluxvariance)(x)
-                filtresultsdict['modelvariance_jacobian']=sparse.csr_matrix(jacobianmatrix )
-            else:
-                filtresultsdict['modelvariance_jacobian']=sparse.csr_matrix((lcdata.fluxcal.size,x.size) )
-                    
-        return photresultsdict
-
-    
-    def loglikeforSN(self,x,sn,storedResults,varyParams=None,debug=False,SpecErrScale=1.0,fixFluxes=False,dospec=True):
+    def loglikeforSN(self,x,sn,cachedresults,fixuncertainties=False,fixfluxes=False,dospec=True):
         
         """
         Calculates the likelihood of given SALT model to photometric and spectroscopic observations of a single SN 
 
         Parameters
         ----------
-        args : tuple or None
-            Placeholder that contains all the other variables for multiprocessing quirks
 
         sn : str
             Name of supernova to compare to model
             
         x : array
             SALT model parameters
-            
-        components: array_like, optional
-            SALT model components, if not provided will be derived from SALT model parameters passed in \'x\'
-        
-        colorLaw: function, optional
-            SALT color law which takes wavelength as an argument
-
-        debug : boolean, optional
-            Debug flag
-        
+                    
         Returns
         -------
         chi2: float
@@ -793,26 +625,15 @@ class SALTResids:
         """
 
         photResidsDict,specResidsDict = self.ResidsForSN(
-            x,sn,storedResults,varyParams,fixUncertainty=False,fixFluxes=True,SpecErrScale=SpecErrScale)
+            x,sn,storedResults,fixuncertainties=fixuncertainties,fixfluxes=fixfluxes)
 
         loglike=0
-        grad_loglike=0
-        calculategrad=(not varyParams is None) and np.any(varyParams)
         for residsdict in ([photResidsDict,specResidsDict] if dospec else [photResidsDict]):
             for key in residsdict:
                 resids=residsdict[key]
-                loglike+= resids['lognorm']- (resids['resid']**2).sum() / 2.  
-                if calculategrad:
-                    grad_loglike+=resids['lognorm_grade']-resids['resid_jacobian'].T.dot(resids['resid'])
-
-        if calculategrad:
-            return loglike,grad_loglike
-        else:
-            return loglike
+                loglike+= resids['lognorm']- (resids['residuals']**2).sum() / 2.  
+        return loglike
                 
-    def specchi2(self):
-
-        return chi2
     
     def SALTModel(self,x,evaluatePhase=None,evaluateWave=None):
         """Returns flux surfaces of SALT model"""
