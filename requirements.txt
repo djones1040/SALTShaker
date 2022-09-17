@@ -15,3 +15,5 @@ iminuit==2.8.4
 tqdm
 pyyaml
 pyParz
+jax
+jaxlib
