@@ -39,4 +39,4 @@ jobs:
     - name: Test with pytest
       run: |
         export PYTHONPATH=.
-        pytest --ignore=saltshaker/tests_bkp
+        pytest
