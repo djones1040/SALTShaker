@@ -768,13 +768,18 @@ class TrainSALT(TrainSALTBase):
              open(f'{outdir}/salt3_lc_covariance_0host.dat','w') as foutm0mhostcov,\
              open(f'{outdir}/salt3_lc_variance_0.dat','w') as foutm0dataerr,\
              open(f'{outdir}/salt3_lc_variance_1.dat','w') as foutm1dataerr,\
-             open(f'{outdir}/salt3_lc_variance_host.dat','w') as foutmhostdataerr:
+             open(f'{outdir}/salt3_lc_variance_host.dat','w') as foutmhostdataerr,\
+             open(f'{outdir}/salt3_lc_model_variance_host.dat','w') as foutmhostmodelerr,\
+             open(f'{outdir}/salt3_lc_model_covariance_0host.dat','w') as foutm0mhostmodelcov:
         
             for i,p in enumerate(trainingresult.phase):
                 for j,w in enumerate(trainingresult.wave):
                     print(f'{p:.1f} {w:.2f} {trainingresult.M0[i,j]:8.15e}',file=foutm0)
                     print(f'{p:.1f} {w:.2f} {trainingresult.M1[i,j]:8.15e}',file=foutm1)
-                    if self.options.host_component: print(f'{p:.1f} {w:.2f} {trainingresult.Mhost[i,j]:8.15e}',file=foutmhost)
+                    if self.options.host_component:
+                        print(f'{p:.1f} {w:.2f} {trainingresult.Mhost[i,j]:8.15e}',file=foutmhost)
+                        print(f'{p:.1f} {w:.2f} {trainingresult.Mhostmodelerr[i,j]:8.15e}',file=foutmhostmodelerr)
+                        print(f'{p:.1f} {w:.2f} {trainingresult.cov_M0_Mhost_model[i,j]:8.15e}',file=foutm0mhostmodelcov)
                     if not self.options.use_previous_errors:
                         print(f'{p:.1f} {w:.2f} {trainingresult.M0modelerr[i,j]**2.:8.15e}',file=foutm0modelerr)
                         print(f'{p:.1f} {w:.2f} {trainingresult.M1modelerr[i,j]**2.:8.15e}',file=foutm1modelerr)
@@ -1225,3 +1230,80 @@ SIGMA_INT: 0.106  # used in simulation"""
         #import pdb; pdb.set_trace()
 
         return fitter,saltfitter,modelpars
+
+class RunTraining:
+
+    def __init__(self):
+
+        self.usagestring = """SALT3 Training
+
+usage: python TrainSALT.py -c <configfile> <options>
+
+config file options can be overwridden at the command line"""
+
+        
+    def get_config_options(self,salt,configfile,configpositional):
+        
+        if configfile:
+            pass
+        elif configpositional:
+            configfile= configpositional
+        else:
+            parser.print_help()
+            raise RuntimeError('Configuration file must be specified at command line')
+
+        config = configparser.ConfigParser(inline_comment_prefixes='#')
+        if not os.path.exists(configfile):
+            raise RuntimeError('Configfile doesn\'t exist!')
+        config.read(configfile)
+
+        user_parser = salt.add_user_options(usage=self.usagestring,config=config)
+        user_options = user_parser.parse_known_args()[0]
+
+        loggerconfig.dictconfigfromYAML(user_options.loggingconfig,user_options.outputdir)
+
+        if not os.path.exists(user_options.trainingconfig):
+            print('warning : training config file %s doesn\'t exist.  Trying package directory'%user_options.trainingconfig)
+            user_options.trainingconfig = '%s/%s'%(config_rootdir,user_options.trainingconfig)
+        if not os.path.exists(user_options.trainingconfig):
+            raise RuntimeError('can\'t find training config file!  Checked %s'%user_options.trainingconfig)
+
+        trainingconfig = configparser.ConfigParser(inline_comment_prefixes='#')
+        trainingconfig.read(user_options.trainingconfig)
+        training_parser = salt.add_training_options(
+            parser=user_parser,usage=self.usagestring,config=trainingconfig)
+        training_parser.addhelp()
+        training_options = training_parser.parse_args()
+
+        salt.options = training_options
+        salt.verbose = training_options.verbose
+        salt.clobber = training_options.clobber
+
+        if training_options.fast:
+            if salt.options.gaussnewton_maxiter >= 1:
+                salt.options.gaussnewton_maxiter = 1
+            salt.options.fit_model_err = False
+            salt.options.fit_cdisp_only = False
+            salt.options.validate_modelonly = True
+            salt.options.maxsn = 10
+
+        if salt.options.stage not in ['all','validate','train']:
+            raise RuntimeError('stage must be one of all, validate, train')
+
+        return
+        
+    def main(self):
+
+        salt = TrainSALT()
+
+        parser = argparse.ArgumentParser(usage=self.usagestring, conflict_handler="resolve",add_help=False)
+        parser.add_argument('configpositional',nargs='?',default=None,type=str,help='configuration file')
+        parser.add_argument('-c','--configfile', default=None, type=str,
+                            help='configuration file')
+
+        options, args = parser.parse_known_args()
+
+        self.get_config_options(salt,options.configfile,options.configpositional)
+        
+        salt.main()
+
