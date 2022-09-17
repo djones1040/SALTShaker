@@ -7,6 +7,7 @@ from saltshaker.util.specSynPhot import getColorsForSN
 from argparse import SUPPRESS
 from saltshaker.training.priors import __priors__
 import logging
+
 log=logging.getLogger(__name__)
 
 
