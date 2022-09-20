@@ -90,21 +90,25 @@ class SALTPriors:
                 else: log.info(f'Discarding prior {priorname}, as it has size zero')
                 
         self.priorexecutionlist=list(checkpriorsvalid())
-
-        def checkboundsvalid():
-            for parname,(lower,upper,width) in zip(self.boundedParams,self.bounds):
-                result=self.boundedprior(width,(lower,upper),self.initparams,parname)
-                if result.size>0: yield (parname,lower,upper,width)
-                else: log.info(f'Discarding bounds on parameter {parname}, as it is not included in the indices available')
-
-        self.boundspriorexecutionlist=list(checkboundsvalid())
-                        
-        self.numBoundResids=sum([self.boundedprior(width,(lower,upper),self.initparams,parname).size for parname,lower,upper,width in self.boundspriorexecutionlist])
                 
         self.lowresphase=self.phaseRegularizationPoints
         self.lowreswave=self.waveRegularizationPoints
         
-        
+        lower=np.tile(-np.inf,self.npar)
+        upper=np.tile(np.inf,self.npar)
+        widths=np.tile(np.inf,self.npar)
+
+        for parname,(lbound,ubound,width) in zip(self.boundedParams,self.bounds):
+            iPar = self.__dict__['i%s'%parname]
+            lower[iPar]=lbound
+            upper[iPar]=ubound
+            if not np.isinf(widths[iPar]).all():
+                log.warning(f'Multiple bounds are being applied to parameter {parname}')
+            widths[iPar]=width
+            
+        self.isbounded=np.where(~np.isinf(widths))[0]
+        self.parameterbounds= lower[self.isbounded],upper[self.isbounded],widths[self.isbounded]
+     
         m0Bderivjac= np.zeros(self.im0.size)
         passbandColorExp = self.kcordict['default']['Bpbspl']
         intmult = (self.wave[1]-self.wave[0])*self.fluxfactor['default']['B']
@@ -257,35 +261,15 @@ class SALTPriors:
     def m1endalllam(self,width,x):
         """Prior such that at early times there is no flux"""
         return self.__initialphasepcderiv__ @ x[self.im1]/width
+                    
         
-        
-    def boundedprior(self,width,bound,x,par):
-        """Flexible prior that sets Gaussian bounds on parameters"""
-        #import pdb;pdb.set_trace()
-
-        lbound,ubound = bound
-        
-        iPar = self.__dict__['i%s'%par]
-            
-        return (jnp.clip(x[iPar]-lbound,None,0)+jnp.clip(x[iPar]-ubound,0,None))/width
         
 
-    def getBounds(self,bounds,boundparams):
-        lower=np.ones(self.npar)*-np.inf
-        upper=np.ones(self.npar)*np.inf
-        for bound,par in zip(bounds,boundparams):
-            lbound,ubound,width = bound
-            iPar = self.__dict__['i%s'%par]
-            lower[iPar]=lbound
-            upper[iPar]=ubound
-        return lower,upper
     
     def priorResids(self,x):
         """Given a parameter vector returns a residuals vector representing the priors"""
 
         residuals=[]
-        debugstring='Prior values are '
-        chi2string='Prior chi2 are '
         for prior,width in self.priorexecutionlist:
             try:
                 priorFunction=self.priors[prior]
@@ -293,29 +277,15 @@ class SALTPriors:
                 raise ValueError('Invalid prior supplied: {}'.format(prior)) 
             residuals+=[jnp.atleast_1d(priorFunction(width,x))]
             
-            if residuals[-1].size==1:
-                debugstring+='{}: {:.2e},'.format(prior,float(residuals[-1]))
-            chi2string+='{}: {:.2e},'.format(prior,(residuals[-1]**2).sum())
-                #debugstring+=f'{prior}: '+' '.join(['{:.2e}'.format(val) for val in results[-1][1]])+','
-        
-        log.debug(debugstring)
-        log.debug(chi2string)
         return jnp.concatenate(  residuals)
 
 
     def BoundedPriorResids(self,x):
         """Given a parameter vector, returns a residuals vector, nonzero where parameters are outside bounds specified at configuration """
-
-        debugstring='Values outside bounds: '
-        residuals=[]
+        lbound,ubound,widths=self.parameterbounds
+        xprime=x[self.isbounded]
+        return (jnp.clip(xprime-lbound,None,0)+jnp.clip(xprime-ubound,0,None))/widths
         
-        for parname,lower,upper,width in self.boundspriorexecutionlist:
-            result=self.boundedprior(width,(lower,upper),x,parname)
-            residuals+=[result]
-            debugstring+='{} {}, '.format(parname,np.nonzero(result)[0].size)
-        log.debug(debugstring[:-1])
-        return jnp.concatenate(residuals) 
-
         
     def satisfyDefinitions(self,X,components):
         """Ensures that the definitions of M1,M0,x0,x1 are satisfied"""
