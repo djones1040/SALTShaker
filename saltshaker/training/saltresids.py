@@ -49,6 +49,8 @@ import warnings
 import logging
 log=logging.getLogger(__name__)
 
+from scipy import sparse as scisparse
+
 _B_LAMBDA_EFF = np.array([4302.57])  # B-band-ish wavelength
 _V_LAMBDA_EFF = np.array([5428.55])  # V-band-ish wavelength
 warnings.simplefilter('ignore',category=FutureWarning)
@@ -280,37 +282,14 @@ class SALTResids:
         wave=self.waveRegularizationPoints
         fluxes=self.SALTModel(guess,evaluatePhase=self.phaseRegularizationPoints,evaluateWave=self.waveRegularizationPoints)
 
-        self.guessScale=[1.0 for f in fluxes]
+        self.guessScale=np.array([1.0 for f in fluxes])
         
         
-        cachekeys=[]
-        for sn in self.datadict:
-            sndata=self.datadict[sn]
-            for flt in sndata.photdata:
-                cachekeys+=[f'phot_fluxes_{sn}_{flt}', f'phot_variances_{sn}_{flt}']
-            for k in sndata.specdata:
-                cachekeys+=  [f'spec_fluxes_{sn}_{k}',f'spec_variances_{sn}_{k}']
-        saltcachedresultsunhash=namedtuple('saltcachedresults',[toidentifier(x) for x in cachekeys])
-
-        class saltcachedresults(saltcachedresultsunhash):
-    
-            def __hash__(self):
-                #Hack, figure out a better way to do this (probably the memoize python module?)
-                hashval=0
-                for field in self._fields:
-                    entry=getattr(self,field)
-                    if isinstance(entry,tuple): hashval=hashval+sum([hash(float((x**2 ).sum())) for x in entry])
-                    else: hashval=hashval+hash(float((entry**2 ).sum()))
-                    
-                return hash(hashval)
-        self.saltcachedresults=saltcachedresults
-
+        self.relativeregularizationweights=jnp.array([1,self.m1regularization]+( [self.mhostregularization] if self.host_component else []))
+        
         if self.regularize:
             self.updateEffectivePoints(guess)
 
-        
-    
-        
         self.datadictnocache=datadict
         log.info('Calculating cached quantities for speed in fitting loop')
         start=time.time()
@@ -319,6 +298,7 @@ class SALTResids:
             iterable=tqdm(iterable)
         self.datadict={snid: SALTfitcacheSN(sn,self,self.kcordict) for snid,sn in iterable}
         self.priors = SALTPriors(self)
+                
         log.info('Time required to calculate cached quantities {:.1f}s'.format(time.time()-start))
             
     def set_param_indices(self):
@@ -375,62 +355,58 @@ class SALTResids:
         self.iModelParam[self.imodelerr]=False
         self.iModelParam[self.imodelcorr]=False
         self.iModelParam[self.iclscat]=False
-
+        self.icomponents =[self.im0,self.im1]
+        if self.host_component:
+            self.icomponents+=[self.imhost]
+        self.icomponents = np.array(self.icomponents)
+        
         self.iclscat_0,self.iclscat_poly = np.array([],dtype='int'),np.array([],dtype='int')
         if len(self.ispcrcl):
             for i,parname in enumerate(np.unique(self.parlist[self.iclscat])):
                 self.iclscat_0 = np.append(self.iclscat_0,np.where(self.parlist == parname)[0][-1])
-                self.iclscat_poly = np.append(self.iclscat_poly,np.where(self.parlist == parname)[0][:-1])
- 
-    
-    def lsqwrap(self,guess,storedResults,varyParams=None,doPriors=True,doSpecResids=True,usesns=None):
-        if varyParams is None:
-            varyParams=np.zeros(self.npar,dtype=bool)
-        if varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any() or varyParams[self.iclscat].any():
-            raise ValueError('lsqwrap not allowed to handle varying model uncertainties')
+                self.iclscat_poly = np.append(self.iclscat_poly,np.where(self.parlist == parname)[0][:-1])        
+
+    def lsqwrap(self,guess,cachedresults,getjacobian,dopriors=True,dospecresids=True,usesns=None):
 
         residuals = []
-        jacobian = [] # Jacobian matrix from r
-        for sn in self.datadict.keys() if usesns is None else usesns:
-            photresidsdict,specresidsdict=self.ResidsForSN(guess,sn,storedResults,varyParams,fixuncertainties=True)
-            for residsdict in ([photresidsdict,specresidsdict] if doSpecResids else [photresidsdict]):
-                residuals+=[residsdict[k]['resid'] for k in residsdict]
-                jacobian+=[residsdict[k]['resid_jacobian'] for k in residsdict]
-
-        if doPriors:
-            priorResids,priorVals,priorJac=self.priors.priorResids(guess)
-            residuals+=[priorResids]
-            jacobian+=[priorJac]
-            BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
-                self.priors.BoundedPriorResids(guess)
-            residuals+=[BoundedPriorResids]
-            jacobian+=[sparse.csr_matrix(BoundedPriorJac)]
-
+        jacobian= []
+        for sn in (self.datadict.keys() if usesns is None else usesns):
+            for data in self.datadict[sn].photdata.values():
+                varkey = (f'phot_variances_{data.id}')
+                cachedvars=cachedresults[varkey]
+                residuals+=[data.modelresidual(guess,cachedresults=cachedvars,fixuncertainties=True,jit=True)['residuals']]
+                if getjacobian: 
+                    jacobian+=[scisparse.csr_matrix(data.modelresidual(guess,cachedresults=cachedvars,fixuncertainties=True,jit=True,jac=True,forward=False)['residuals'])]
+        
+        if dospecresids:
+            spectralSuppression=np.sqrt(self.num_phot/self.num_spec)*self.spec_chi2_scaling
+            for sn in (self.datadict.keys() if usesns is None else usesns):
+                for data in self.datadict[sn].specdata.values():
+                    varkey=( f'spec_variances_{data.id}')
+                    cachedvars=cachedresults[varkey]
+                    residuals+=[spectralSuppression*data.modelresidual(guess,cachedresults=cachedvars,fixuncertainties=True,jit=True)['residuals']]
+                    if getjacobian: 
+                        jacobian+=[spectralSuppression*scisparse.csr_matrix(data.modelresidual(guess,cachedresults=cachedvars,fixuncertainties=True,jit=True,jac=True,forward=False)['residuals'])]
+        if dopriors:
+            residuals+=[self.priors.priorresids(guess,jit=True)]
+            if getjacobian: 
+                jacobian+=[self.priors.priorresids(guess,jit=True,jac=True,forward=self.priors.numresids > self.npar)]
         if self.regularize:
-            for regularization, weight,regKey in [(self.phaseGradientRegularization, self.regulargradientphase,'regresult_phase'),
-                                           (self.waveGradientRegularization,self.regulargradientwave,'regresult_wave' ),
-                                           (self.dyadicRegularization,self.regulardyad,'regresult_dyad')]:
-                if weight ==0:
-                    continue
-                if regKey in storedResults and not (varyParams[self.im0].any() or varyParams[self.im1].any()):
-                    residuals += storedResults[regKey]
-                    jacobian +=  [sparse.csr_matrix((r.size,self.parlist.size)) for r in storedResults[regKey]]
-                else:
-                    for regResids,regJac,relativeweight in zip(
-                            *regularization(guess,storedResults,varyParams),[1,self.m1regularization,self.mhostregularization]):
-                        residuals += [regResids*np.sqrt(weight*relativeweight)]
-                        if np.isnan(residuals[-1]).any(): import pdb;pdb.set_trace()
-                        jacobian+=[sparse.csr_matrix(regJac)*np.sqrt(weight*relativeweight)]
-                    storedResults[regKey]=residuals[-self.n_components:]
+            residuals+=[func(guess) for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]]  
+            if getjacobian: 
+                jacobian+=[((self.dyadicRegularization_jacobian)(guess))]
+                jacobian+=[((self.phaseGradientRegularization_jacobian)(guess))]
+                jacobian+=[((self.waveGradientRegularization_jacobian)(guess))]
 
-        if varyParams.any():
-            return np.concatenate(residuals),sparse.vstack(jacobian)
+        if getjacobian:
+            return  jnp.concatenate(residuals).to_py(),scisparse.vstack(jacobian).tocsr()
+          
         else:
-            return  np.concatenate(residuals)
+            return  jnp.concatenate(residuals).to_py()
+
 
     def maxlikefit(
-            self,x,storedResults=None,varyParams=None,pool=None,debug=False,
-            fixfluxes=False,dospec=True,usesns=None):
+            self,x,sn,cachedresults,fixuncertainties=False,fixfluxes=False,dospec=True,usesns=None):
         """
         Calculates the likelihood of given SALT model to photometric and spectroscopic data given during initialization
         
@@ -451,64 +427,20 @@ class SALTResids:
         chi2: float
             Goodness of fit of model to training data   
         """
-        
-        if storedResults is None: storedResults={}
-        if varyParams is None:
-            varyParams=np.zeros(self.npar,dtype=bool)
-        computeDerivatives=np.any(varyParams)
-        
+                
         chi2 = 0
         #Construct arguments for maxlikeforSN method
         #If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
         args=[(x,sn,storedResults,varyParams,debug,fixfluxes,dospec) \
               for sn in (self.datadict.keys() if usesns is None else usesns)]
 
-        mapFun=pool.map if pool else starmap
+        loglike=sum([self.loglikeforSN(x,sn,cachedresults,fixuncertainties=fixuncertainties,fixfluxes=fixfluxes,dospec=dospec)
+        for sn in (self.datadict.keys() if usesns is None else usesns)])
 
-
-        result=list(mapFun(self.loglikeforSN,args))
-
-
-        loglike=sum(result)
-        logp = loglike
-
-        if computeDerivatives:
-            loglike=sum([r[0] for r in result])
-            grad=sum([r[1] for r in result])
-        else:
-            loglike=sum(result)
-        logp = loglike
         if len(self.usePriors):
-            priorResids,priorVals,priorJac=self.priors.priorResids(x)   
-            logp -=(priorResids**2).sum()/2
-            if computeDerivatives:
-                grad-= (priorResids [:,np.newaxis] * priorJac).sum(axis=0)
-            BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
-            self.priors.BoundedPriorResids(x)
-            logp -=(BoundedPriorResids**2).sum()/2
-            if computeDerivatives:
-                grad-= (BoundedPriorResids [:,np.newaxis] * BoundedPriorJac).sum(axis=0)
-
-
-        if self.regularize:
-            for regularization, weight in [
-                    (self.phaseGradientRegularization, self.regulargradientphase),
-                    (self.waveGradientRegularization,self.regulargradientwave ),
-                    (self.dyadicRegularization,self.regulardyad)]:
-                if weight ==0:
-                    continue
-                regResids,regJac=regularization(x,storedResults,varyParams)
-                logp-= sum([(res**2).sum()*weight*componentweight/2 \
-                            for res,componentweight in zip(regResids,[1,self.m1regularization,self.mhostregularization])])
-                if computeDerivatives:
-                    for res,jac,componentweight in zip(regResids,regJac,[1,self.m1regularization,self.mhostregularization]):
-                        grad -= (res[:,np.newaxis]*jac *weight*componentweight).sum(axis=0)
-        self.nstep += 1
-
-        if computeDerivatives:
-            return logp,grad
-        else:
-            return logp
+            loglike+= - ((self.priors.priorResids(x) **2 ).sum() +(self.priors.BoundedPriorResids(x)**2).sum() )/2 
+        #
+        return loglike
 
 
     def calculatecachedvals(self,x):
@@ -516,85 +448,20 @@ class SALTResids:
         for sn in self.datadict:
             sndata=self.datadict[sn]
             for flt in sndata.photdata:
-                fluxkey=toidentifier(f'phot_fluxes_{sn}_{flt}')
-                varkey = toidentifier(f'phot_variances_{sn}_{flt}')
+                fluxkey=(f'phot_fluxes_{sn}_{flt}')
+                varkey = (f'phot_variances_{sn}_{flt}')
                 lcdata=sndata.photdata[flt]
                 results[fluxkey]=lcdata.modelflux(x)
                 results[varkey]=lcdata.modelfluxvariance(x),lcdata.colorscatter(x)
             for k in sndata.specdata:
                 spectrum=sndata.specdata[k]
-                fluxkey=toidentifier(f'spec_fluxes_{sn}_{k}')
-                varkey= toidentifier(f'spec_variances_{sn}_{k}')
+                fluxkey=(f'spec_fluxes_{sn}_{k}')
+                varkey= (f'spec_variances_{sn}_{k}')
                 results[fluxkey]=spectrum.modelflux(x)
                 results[varkey]=spectrum.modelfluxvariance(x)
-        return self.saltcachedresults(**results)
+        return (results)
 
-    def ResidsForSN(self,x,sn,cachedresults=None,fixuncertainties=False,fixfluxes=False):
-        """ This method should be the only one required for any fitter to process the supernova data. 
-        Find the residuals of a set of parameters to the photometric and spectroscopic data of a given supernova. 
-        Photometric residuals are first decorrelated to diagonalize color scatter"""
-
-        sndata=self.datadict[sn]
-        photresids={}
-
-        for flt in sndata.photdata:
-            fluxkey=toidentifier(f'phot_fluxes_{sn}_{flt}')
-            varkey = toidentifier(f'phot_variances_{sn}_{flt}')
-            lcdata=sndata.photdata[flt]
-            if fixfluxes:
-                modelflux=getattr(cachedresults,fluxkey)
-            else:
-                modelflux=lcdata.modelflux(x)
-
-            if fixuncertainties:
-                 modelvariance,clscat=getattr(cachedresults,varkey)
-            else:
-                modelvariance=lcdata.modelfluxvariance(x)
-                clscat=lcdata.colorscatter(x)
-
-            variance=lcdata.fluxcalerr**2 + modelvariance            
-            
-            #if clscat>0, then need to use a cholesky matrix to find pulls
-            def choleskyresidsandnorm( variance,clscat,modelflux):
-                cholesky=jaxrankOneCholesky(variance,clscat**2,modelflux)
-                return {'residuals':jaxlinalg.solve_triangular(cholesky, modelflux-lcdata.fluxcal,lower=True), 
-                'lognorm': -jnp.log(jnp.diag(cholesky)).sum()}
-            
-            def diagonalresidsandnorm(variance,clscat,modelflux):
-                sigma=jnp.sqrt(variance)
-                return {'residuals':(modelflux-lcdata.fluxcal)/sigma,'lognorm': -jnp.log(sigma).sum()}
-
-            photresids[flt]=lax.cond(clscat==0, diagonalresidsandnorm, choleskyresidsandnorm, 
-            variance,clscat,modelflux )
-
-        #Handle spectra
-        specresids={}
-        for k in sndata.specdata:
-            fluxkey=toidentifier(f'spec_fluxes_{sn}_{k}')
-            varkey=toidentifier( f'spec_variances_{sn}_{k}')
-            spectrum=sndata.specdata[k]
-
-            if fixfluxes:
-                modelflux=getattr(cachedresults,fluxkey)
-            else:
-                modelflux=spectrum.modelflux(x)
-            
-            if fixuncertainties:
-                 modelvariance=getattr(cachedresults,varkey)
-            else:
-                modelvariance=spectrum.modelfluxvariance(x)
-            
-            variance=spectrum.fluxerr**2 + modelvariance
-              
-            uncertainty=jnp.sqrt(variance)
-
-            spectralSuppression=np.sqrt(self.num_phot/self.num_spec)*self.spec_chi2_scaling
-
-            specresids[k]={'residuals': spectralSuppression * (modelflux-spectrum.flux)/uncertainty,
-                        'lognorm': -jnp.log(uncertainty).sum()}
-
-        return photresids,specresids
-    
+      
     def bestfitsinglebandnormalizationsforSN(self,x,sn):
         sndata=self.datadict[sn]
         for flt in sndata.photdata:
@@ -1031,7 +898,7 @@ class SALTResids:
 
         if not np.any(np.isinf(self.neff)): log.warning('Regularization is being applied to the entire phase/wavelength space: consider lowering neffmax (currently {:.2e})'.format(self.neffMax))
         
-        self.neff=np.clip(self.neff,self.neffFloor,None)
+        self.neff=np.clip(self.neff,self.neffFloor,None).flatten()
 
         
     def plotEffectivePoints(self,phases=None,output=None):
@@ -1059,55 +926,101 @@ class SALTResids:
         else:
             plt.savefig(output,dpi=288)
         plt.clf()
+        
     
-    def regularizationScale(self,x,regmethod='none'):
-        if self.regularizationScaleMethod=='fixed':
-            return self.guessScale   
-        else:
-            raise ValueError('Regularization scale method invalid: ',self.regularizationScaleMethod)
-
+    
+#     def regularizationScale(self,x,regmethod='none'):
+#         if self.regularizationScaleMethod=='fixed':
+#             return self.guessScale   
+#         else:
+#             raise ValueError('Regularization scale method invalid: ',self.regularizationScaleMethod)
+    @partial(jax.jit, static_argnums=[0])
     def dyadicRegularization(self,x):
+        coeffs=x[self.icomponents]
 
-        scales=self.regularizationScale(x)
-        componentidxs=[self.im0,self.im1]
-        if self.host_component:
-            componentidxs+=[self.imhost]
-        
-        for scale,idxs in zip(scales,componentidxs):
-            coeffs=x[idxs]
-            fluxes= self.componentderiv @ coeffs
-            dfluxdwave=self.dcompdphasederiv @ coeffs
-            dfluxdphase=self.dcompdwavederiv @ coeffs
-            d2fluxdphasedwave=self.ddcompdwavedphase @ coeffs
+        fluxes= self.componentderiv @ coeffs.T
+        dfluxdwave=self.dcompdwavederiv @ coeffs.T
+        dfluxdphase=self.dcompdphasederiv @ coeffs.T
+        d2fluxdphasedwave=self.ddcompdwavedphase @ coeffs.T
 
-            #Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
-            normalization=np.sqrt(1/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))**2.
-            #0 if model is locally separable in phase and wavelength i.e. flux=g(phase)* h(wavelength) for arbitrary functions g and h
-            numerator=(dfluxdphase *dfluxdwave -d2fluxdphasedwave *fluxes )
-            yield normalization* (numerator / (scale**2 * self.neff.flatten()))      
-
+        #Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
+        normalization=jnp.sqrt( self.regulardyad*self.relativeregularizationweights/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1))**2.)
+        #0 if model is locally separable in phase and wavelength i.e. flux=g(phase)* h(wavelength) for arbitrary functions g and h
+        numerator=(dfluxdphase *dfluxdwave -d2fluxdphasedwave *fluxes )
+        return (normalization[np.newaxis,:]* (numerator / (  self.neff[:,np.newaxis] ))).flatten()  
     
+    def dyadicRegularization_jacobian(self,x):
+        result=self.dyadreghelper(x)
+        excesspars=self.npar-self.icomponents.size
+        retval=scisparse.bmat([[(scisparse.csr_matrix(result[:,i,:]) if i==j else None) for j in range(result.shape[1])]+[scisparse.csr_matrix((result.shape[0], excesspars))]  for i in range(result.shape[1])],format='csr')
+        return retval
+        
+    @partial(jax.jit, static_argnums=[0])
+    def dyadreghelper(self,x):
+        coeffs=x[self.icomponents]
+
+        fluxes= self.componentderiv @ coeffs.T
+        dfluxdwave=self.dcompdwavederiv @ coeffs.T
+        dfluxdphase=self.dcompdphasederiv @ coeffs.T
+        d2fluxdphasedwave=self.ddcompdwavedphase @ coeffs.T
+
+        #Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
+        normalization=jnp.sqrt( self.regulardyad*self.relativeregularizationweights/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1))**2.)
+
+        bcooderivs=(sparse.bcoo_concatenate([self.dcompdphasederiv[:,np.newaxis,:]]*self.icomponents.shape[0],dimension=1)*  dfluxdwave[:,:,np.newaxis]
+
+        +sparse.bcoo_concatenate([self.dcompdwavederiv[:,np.newaxis,:]]*self.icomponents.shape[0],dimension=1)*  dfluxdphase[:,:,np.newaxis]
+
+        -sparse.bcoo_concatenate([self.componentderiv[:,np.newaxis,:]]*self.icomponents.shape[0],dimension=1)*  d2fluxdphasedwave[:,:,np.newaxis]
+        -sparse.bcoo_concatenate([self.ddcompdwavedphase[:,np.newaxis,:]]*self.icomponents.shape[0],dimension=1)*  fluxes[:,:,np.newaxis]
+        )*(normalization[np.newaxis,:] / (  self.neff[:,np.newaxis] )) [:,:,np.newaxis]
+        return bcooderivs.todense()
+
+  
+    @partial(jax.jit, static_argnums=[0])        
     def phaseGradientRegularization(self, x):
-        scales=self.regularizationScale(x)
-        componentidxs=[self.im0,self.im1]
-        if self.host_component:
-            componentidxs+=[self.imhost]
-        
-        for scale,idxs in zip(scales,componentidxs):
-            coeffs=x[idxs]
-            dfluxdphase=self.dcompdphasederiv @ coeffs
-            normalization=np.sqrt(1/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
-            yield normalization* ( dfluxdphase/scale / self.neff.flatten())
+        coeffs=x[self.icomponents]
 
-    
+        dfluxdphase=self.dcompdphasederiv @ coeffs.T
+        normalization=jnp.sqrt(self.regulargradientphase *self.relativeregularizationweights /( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
+        return (normalization[np.newaxis,:]* ( dfluxdphase / self.neff[:,np.newaxis]  )).flatten()
+
+    def phaseGradientRegularization_jacobian(self, x):
+        try: 
+            return self.__phaseGradientRegularization_jacobian
+        except:
+            normalization=jnp.sqrt(self.regulargradientphase *self.relativeregularizationweights /( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
+            bcooderivs=(sparse.bcoo_concatenate([self.dcompdphasederiv[:,np.newaxis,:]]*self.icomponents.shape[0],dimension=1)
+            )*(normalization[np.newaxis,:] / (  self.neff[:,np.newaxis] )) [:,:,np.newaxis]
+            bcooderivs=bcooderivs.todense()
+
+            jac=scisparse.lil_matrix((bcooderivs.shape[0]*bcooderivs.shape[1],self.npar))
+            for i in range(self.icomponents.shape[0]):
+                jac[i::self.icomponents.shape[0],self.icomponents[i]]= (bcooderivs[:,i,:])
+            self.__phaseGradientRegularization_jacobian=jac.tocsr()
+            return self.__phaseGradientRegularization_jacobian
+
+    @partial(jax.jit, static_argnums=[0])    
     def waveGradientRegularization(self, x):
-        scales=self.regularizationScale(x)
-        componentidxs=[self.im0,self.im1]
-        if self.host_component:
-            componentidxs+=[self.imhost]
+        coeffs=x[self.icomponents]
+
+        dfluxdwave=self.dcompdwavederiv @ coeffs.T
+        normalization=jnp.sqrt(self.regulargradientwave *self.relativeregularizationweights/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
+
+        return  (normalization[np.newaxis,:]* ( dfluxdwave / self.neff[:,np.newaxis] )).flatten()
+
+    def waveGradientRegularization_jacobian(self, x):
+        try: 
+            return self.__waveGradientRegularization_jacobian
+        except:
         
-        for scale,idxs in zip(scales,componentidxs):
-            coeffs=x[idxs]
-            dfluxdwave=self.dcompdwavederiv @ coeffs
-            normalization=np.sqrt(1/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
-            yield normalization* ( dfluxdwave/scale / self.neff.flatten())
+            normalization=jnp.sqrt(self.regulargradientwave *self.relativeregularizationweights /( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
+            bcooderivs=(sparse.bcoo_concatenate([self.dcompdwavederiv[:,np.newaxis,:]]*self.icomponents.shape[0],dimension=1)
+            )*(normalization[np.newaxis,:] / (  self.neff[:,np.newaxis] )) [:,:,np.newaxis]
+            bcooderivs=bcooderivs.todense()
+
+            jac=scisparse.lil_matrix((bcooderivs.shape[0]*bcooderivs.shape[1],self.npar))
+            for i in range(self.icomponents.shape[0]):
+                jac[i::self.icomponents.shape[0],self.icomponents[i]]= (bcooderivs[:,i,:])
+            self.__waveGradientRegularization_jacobian=jac.tocsr()
+            return self.__waveGradientRegularization_jacobian

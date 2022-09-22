@@ -4,8 +4,12 @@ import jax
 from jax import lax
 from jax.experimental import sparse 
 
-from inspect import signature
+
 from functools import partial
+from saltshaker.util.jaxoptions import jaxoptions
+
+from inspect import signature
+
 from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
 from sncosmo.salt2utils import SALT2ColorLaw
 from scipy.special import factorial
@@ -72,24 +76,8 @@ class SALTPriors:
             self.__dict__[k] = SALTResidsObj.__dict__[k]
         self.SALTModel = SALTResidsObj.SALTModel
         self.SALTModelDeriv = SALTResidsObj.SALTModelDeriv
-        self.regularizationScale=SALTResidsObj.regularizationScale
         
         self.priors={ key: partial(__priors__[key],self) for key in __priors__}
-
-        def checkpriorsvalid():
-            for priorname,priorwidth in zip(self.usePriors,self.priorWidths):
-                try:
-                    result=self.priors[priorname](priorwidth,self.initparams)
-                except ValueError as e:
-                    if "vmap was requested" in e.args[0]:
-                        continue
-                        log.info(f'Discarding prior {priorname}, as it has size zero')
-                    else:
-                        raise e
-                if result.size>0: yield priorname,priorwidth
-                else: log.info(f'Discarding prior {priorname}, as it has size zero')
-                
-        self.priorexecutionlist=list(checkpriorsvalid())
                 
         self.lowresphase=self.phaseRegularizationPoints
         self.lowreswave=self.waveRegularizationPoints
@@ -157,6 +145,44 @@ class SALTPriors:
         self.__componentderivs__=SALTResidsObj.componentderiv
 
         self.bstdflux=(10**((self.m0guess-27.5)/-2.5) )
+        
+        def checkpriorsvalid():
+            for priorname,priorwidth in zip(self.usePriors,self.priorWidths):
+                try:
+                    result=self.priors[priorname](priorwidth,self.initparams)
+                except ValueError as e:
+                    if "vmap was requested" in e.args[0]:
+                        continue
+                        log.info(f'Discarding prior {priorname}, as it has size zero')
+                    else:
+                        raise e
+                if result.size>0: yield priorname,priorwidth
+                else: log.info(f'Discarding prior {priorname}, as it has size zero')
+                
+        self.priorexecutionlist=list(checkpriorsvalid())
+                
+        self.numresids=self.priorresids(SALTResidsObj.initparams,jit=True).size
+        
+    @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],jac_argnums=1)        
+    def priorresids(self,x):
+        """Given a parameter vector returns a residuals vector representing the priors"""
+
+        residuals=[]
+        for prior,width in self.priorexecutionlist:
+            try:
+                priorFunction=self.priors[prior]
+            except:
+                raise ValueError('Invalid prior supplied: {}'.format(prior)) 
+            residuals+=[jnp.atleast_1d(priorFunction(width,x))]
+        residuals+=[self.boundedpriorresids(x)]
+        return jnp.concatenate(  residuals)
+
+
+    def boundedpriorresids(self,x):
+        """Given a parameter vector, returns a residuals vector, nonzero where parameters are outside bounds specified at configuration """
+        lbound,ubound,widths=self.parameterbounds
+        xprime=x[self.isbounded]
+        return (jnp.clip(xprime-lbound,None,0)+jnp.clip(xprime-ubound,0,None))/widths
 
         
     @prior
@@ -266,25 +292,6 @@ class SALTPriors:
         
 
     
-    def priorResids(self,x):
-        """Given a parameter vector returns a residuals vector representing the priors"""
-
-        residuals=[]
-        for prior,width in self.priorexecutionlist:
-            try:
-                priorFunction=self.priors[prior]
-            except:
-                raise ValueError('Invalid prior supplied: {}'.format(prior)) 
-            residuals+=[jnp.atleast_1d(priorFunction(width,x))]
-            
-        return jnp.concatenate(  residuals)
-
-
-    def BoundedPriorResids(self,x):
-        """Given a parameter vector, returns a residuals vector, nonzero where parameters are outside bounds specified at configuration """
-        lbound,ubound,widths=self.parameterbounds
-        xprime=x[self.isbounded]
-        return (jnp.clip(xprime-lbound,None,0)+jnp.clip(xprime-ubound,0,None))/widths
         
         
     def satisfyDefinitions(self,X,components):
