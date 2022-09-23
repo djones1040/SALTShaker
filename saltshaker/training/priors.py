@@ -54,11 +54,12 @@ def jpsi(z):
 jpsi=jax.vmap(jpsi)
 
 def robustcorrelation(x,y):
+    assert(x.size==y.size)
     xdev=x-jnp.median(x)
-    xscale=1.48*jnp.median(np.abs(xdev))
+    xscale=1.48*jnp.median(jnp.abs(xdev))
     
     ydev=y-jnp.median(y)
-    yscale=1.48*jnp.median(np.abs(ydev))
+    yscale=1.48*jnp.median(jnp.abs(ydev))
     #Attempt to construct a robust correlator against the optimizer choosing certain points to blow up by using a median estimator, then transforming points. This (hopefully) gives relatively smooth derivatives
     #The psi function is identity for objects within 2 MAD, and transitions to 0 for extreme objects
     #This derivative then isn't wholly accurate since median estimator derivatives aren't accounted for. Maybe it's fine???????
@@ -145,21 +146,8 @@ class SALTPriors:
         self.__componentderivs__=SALTResidsObj.componentderiv
 
         self.bstdflux=(10**((self.m0guess-27.5)/-2.5) )
-        
-        def checkpriorsvalid():
-            for priorname,priorwidth in zip(self.usePriors,self.priorWidths):
-                try:
-                    result=self.priors[priorname](priorwidth,self.initparams)
-                except ValueError as e:
-                    if "vmap was requested" in e.args[0]:
-                        continue
-                        log.info(f'Discarding prior {priorname}, as it has size zero')
-                    else:
-                        raise e
-                if result.size>0: yield priorname,priorwidth
-                else: log.info(f'Discarding prior {priorname}, as it has size zero')
-                
-        self.priorexecutionlist=list(checkpriorsvalid())
+                        
+        self.priorexecutionlist=list(zip(self.usePriors,self.priorWidths))
                 
         self.numresids=self.priorresids(SALTResidsObj.initparams,jit=True).size
         
@@ -177,6 +165,19 @@ class SALTPriors:
         residuals+=[self.boundedpriorresids(x)]
         return jnp.concatenate(  residuals)
 
+    @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],jac_argnums=1)        
+    def priorloglike(self,x):
+        """Given a parameter vector returns a residuals vector representing the priors"""
+
+        loglike=0.
+        for prior,width in self.priorexecutionlist:
+            try:
+                priorFunction=self.priors[prior]
+            except:
+                raise ValueError('Invalid prior supplied: {}'.format(prior)) 
+            loglike+=-(priorFunction(width,x)**2).sum()/2
+        loglike+=-(self.boundedpriorresids(x)**2).sum()/2
+        return loglike
 
     def boundedpriorresids(self,x):
         """Given a parameter vector, returns a residuals vector, nonzero where parameters are outside bounds specified at configuration """
@@ -189,7 +190,8 @@ class SALTPriors:
     def colorstretchcorr(self,width,x):
         """x1 should have no inner product with c"""
         x1=x[self.ix1]
-        xhost=x[self.ic]
+        c=x[self.ic]
+        if x1.size!=c.size: return np.array([])
         return robustcorrelation(x1,c)/width
 
     @prior
@@ -198,7 +200,7 @@ class SALTPriors:
 
         x1=x[self.ix1]
         xhost=x[self.ixhost]
-
+        if x1.size!=xhost.size: return np.array([])      
         return robustcorrelation(x1,xhost)/width
 
     @prior
@@ -207,7 +209,7 @@ class SALTPriors:
 
         xhost=x[self.ixhost]
         c=x[self.ic]
-
+        if c.size!=xhost.size: return np.array([])
         return robustcorrelation(xhost,c)/width
 
     @prior

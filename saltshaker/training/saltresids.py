@@ -1,3 +1,12 @@
+def in_ipynb():
+    try:
+        cfg = get_ipython().config 
+        return True
+
+    except NameError:
+        return False
+
+
 from saltshaker.util.synphot import synphot
 from saltshaker.training import init_hsiao
 from saltshaker.training.datamodels import SALTfitcachelightcurve,  SALTfitcachespectrum,SALTfitcacheSN
@@ -7,6 +16,7 @@ from saltshaker.training.priors import SALTPriors
 from sncosmo.models import StretchSource
 from sncosmo.constants import HC_ERG_AA, MODEL_BANDFLUX_SPACING
 from sncosmo.utils import integration_grid
+from sncosmo.salt2utils import SALT2ColorLaw
 
 import scipy.stats as ss
 from scipy.optimize import minimize, least_squares
@@ -26,7 +36,10 @@ from multiprocessing import Pool, get_context
 from inspect import signature
 from functools import partial
 from itertools import starmap
-from tqdm import tqdm
+if in_ipynb():
+    from tqdm.notebook import tqdm
+else:
+    from tqdm import tqdm
 
 import matplotlib as mpl
 mpl.use('agg')
@@ -105,7 +118,7 @@ def evaljacobianforsomeindices(function,x,varyingparameters):
     
 class SALTResids:
     def __init__(self,guess,datadict,parlist,**kwargs):
-
+        inittime=time.time()
         self.options=kwargs
         assert type(parlist) == np.ndarray
         self.nstep = 0
@@ -133,6 +146,7 @@ class SALTResids:
                 self.boundedParams += [opt[len('bound_'):]]
                 self.bounds += [tuple([float(x) for x in self.__dict__[opt]])]
                 
+        
 
         # pre-set some indices
         self.set_param_indices()
@@ -232,6 +246,7 @@ class SALTResids:
         denom = np.trapz(pbspl,self.wave)
         pbspl /= denom*HC_ERG_AA
         self.kcordict['default']['Vpbspl'] = pbspl
+        
                 
         #Count number of photometric and spectroscopic points
         self.num_spec=sum([datadict[sn].num_specobs for sn in datadict])
@@ -267,6 +282,19 @@ class SALTResids:
         self.waveBinCenters=np.array(
             [(self.wave[np.newaxis,:]*  x ).sum()/x.sum() for x in basisfunctions])
 
+        if self.preintegrate_photometric_passband:
+            colorlawwaveeval=self.waveBinCenters
+        else:
+            colorlawwaveeval=self.wave 
+        
+        self.colorlawderiv=np.empty((colorlawwaveeval.size,self.iCL.size))
+        for i in range(self.iCL.size):
+            self.colorlawderiv[:,i]=\
+                SALT2ColorLaw(self.colorwaverange, np.arange(self.iCL.size)==i)(colorlawwaveeval)-\
+                SALT2ColorLaw(self.colorwaverange, np.zeros(self.iCL.size))(colorlawwaveeval)
+
+        self.colorlawzero=SALT2ColorLaw(self.colorwaverange, np.zeros(self.iCL.size))(colorlawwaveeval)
+        
         #Find the basis functions evaluated at the centers of the basis functions for use in the regularization derivatives
         regularizationDerivs=[np.zeros((self.phaseRegularizationPoints.size*self.waveRegularizationPoints.size,self.im0.size)) for i in range(4)]
         for i in range(len(self.im0)):
@@ -284,7 +312,6 @@ class SALTResids:
 
         self.guessScale=np.array([1.0 for f in fluxes])
         
-        
         self.relativeregularizationweights=jnp.array([1,self.m1regularization]+( [self.mhostregularization] if self.host_component else []))
         
         if self.regularize:
@@ -294,9 +321,10 @@ class SALTResids:
         log.info('Calculating cached quantities for speed in fitting loop')
         start=time.time()
         iterable=self.datadict.items()
-        if sys.stdout.isatty():
+        if sys.stdout.isatty() or in_ipynb():
             iterable=tqdm(iterable)
         self.datadict={snid: SALTfitcacheSN(sn,self,self.kcordict) for snid,sn in iterable}
+
         self.priors = SALTPriors(self)
                 
         log.info('Time required to calculate cached quantities {:.1f}s'.format(time.time()-start))
@@ -391,12 +419,12 @@ class SALTResids:
             residuals+=[self.priors.priorresids(guess,jit=True)]
             if getjacobian: 
                 jacobian+=[self.priors.priorresids(guess,jit=True,jac=True,forward=self.priors.numresids > self.npar)]
-        if self.regularize:
-            residuals+=[func(guess) for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]]  
-            if getjacobian: 
-                jacobian+=[((self.dyadicRegularization_jacobian)(guess))]
-                jacobian+=[((self.phaseGradientRegularization_jacobian)(guess))]
-                jacobian+=[((self.waveGradientRegularization_jacobian)(guess))]
+            if self.regularize:
+                residuals+=[func(guess) for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]]  
+                if getjacobian: 
+                    jacobian+=[((self.dyadicRegularization_jacobian)(guess))]
+                    jacobian+=[((self.phaseGradientRegularization_jacobian)(guess))]
+                    jacobian+=[((self.waveGradientRegularization_jacobian)(guess))]
 
         if getjacobian:
             return  jnp.concatenate(residuals).to_py(),scisparse.vstack(jacobian).tocsr()
@@ -406,7 +434,7 @@ class SALTResids:
 
 
     def maxlikefit(
-            self,x,sn,cachedresults,fixuncertainties=False,fixfluxes=False,dospec=True,usesns=None):
+            self,guess,cachedresults=None,fixuncertainties=False,fixfluxes=False,dopriors=True,dospec=True,usesns=None,getgrad=False):
         """
         Calculates the likelihood of given SALT model to photometric and spectroscopic data given during initialization
         
@@ -414,13 +442,7 @@ class SALTResids:
         ----------
         x : array
             SALT model parameters
-            
-        pool :  multiprocessing.pool.Pool, optional
-            Optional worker pool to be used for calculating chi2 values for each SN. If not provided, all work is done in root process
-        
-        debug : boolean, optional
-            Debug flag
-        
+                    
         Returns
         -------
         
@@ -428,19 +450,54 @@ class SALTResids:
             Goodness of fit of model to training data   
         """
                 
-        chi2 = 0
-        #Construct arguments for maxlikeforSN method
-        #If worker pool available, use it to calculate chi2 for each SN; otherwise, do it in this process
-        args=[(x,sn,storedResults,varyParams,debug,fixfluxes,dospec) \
-              for sn in (self.datadict.keys() if usesns is None else usesns)]
+        loglike=0.
+        grad= jnp.zeros(self.npar)
+        for sn in (self.datadict.keys() if usesns is None else usesns):
+            for data in self.datadict[sn].photdata.values():
+                if fixfluxes:
+                    fluxkey= (f'phot_fluxes_{data.id}')
+                    cached=cachedresults[fluxkey]
+                elif fixuncertainties:
+                    varkey = (f'phot_variances_{data.id}')
+                    cached=cachedresults[varkey]
+                else:
+                    cached=None
+                loglike+=data.modelloglikelihood(guess,cachedresults=cached, fixuncertainties = fixuncertainties, fixfluxes=fixfluxes,jit=True) 
+                if getgrad: 
+                    grad+= data.modelloglikelihood(guess,cachedresults=cached,fixuncertainties = fixuncertainties, fixfluxes=fixfluxes,jit=True,jac=True,forward=False)
+        
+        if dospec:
+            spectralSuppression=np.sqrt(self.num_phot/self.num_spec)*self.spec_chi2_scaling
+            for sn in (self.datadict.keys() if usesns is None else usesns):
+                for data in self.datadict[sn].specdata.values():
+                    if fixfluxes:
+                        fluxkey= (f'spec_fluxes_{data.id}')
+                        cached=cachedresults[fluxkey]
+                    elif fixuncertainties:
+                        varkey = (f'spec_variances_{data.id}')
+                        cached=cachedresults[varkey]
+                    else:
+                        cached=None
+                    loglike+=spectralSuppression*data.modelloglikelihood(guess,cachedresults=cached, fixuncertainties = fixuncertainties, fixfluxes=fixfluxes,jit=True) 
+                    if getgrad: 
+                        grad+=spectralSuppression* data.modelloglikelihood(guess,cachedresults=cached,fixuncertainties = fixuncertainties, fixfluxes=fixfluxes,jit=True,jac=True,forward=False)
+        if dopriors:
+            loglike+=self.priors.priorloglike(guess,jit=True)
+            if getgrad: 
+                grad+=self.priors.priorloglike(guess,jit=True,jac=True)
+                
+            if self.regularize:
+                loglike+=sum([-(func(guess)**2).sum()/2. for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]] )
+                if getgrad: 
+                    grad+= - self.dyadicRegularization(guess) @ self.dyadicRegularization_jacobian(guess) 
+                    grad+= - self.phaseGradientRegularization(guess) @ self.phaseGradientRegularization_jacobian(guess) 
+                    grad+= - self.waveGradientRegularization(guess) @ self.waveGradientRegularization_jacobian(guess) 
 
-        loglike=sum([self.loglikeforSN(x,sn,cachedresults,fixuncertainties=fixuncertainties,fixfluxes=fixfluxes,dospec=dospec)
-        for sn in (self.datadict.keys() if usesns is None else usesns)])
+        if getgrad:
+            return loglike,grad
 
-        if len(self.usePriors):
-            loglike+= - ((self.priors.priorResids(x) **2 ).sum() +(self.priors.BoundedPriorResids(x)**2).sum() )/2 
-        #
-        return loglike
+        else:
+            return loglike
 
 
     def calculatecachedvals(self,x):
@@ -451,14 +508,14 @@ class SALTResids:
                 fluxkey=(f'phot_fluxes_{sn}_{flt}')
                 varkey = (f'phot_variances_{sn}_{flt}')
                 lcdata=sndata.photdata[flt]
-                results[fluxkey]=lcdata.modelflux(x)
-                results[varkey]=lcdata.modelfluxvariance(x),lcdata.colorscatter(x)
+                results[fluxkey]=lcdata.modelflux(x,jit=True)
+                results[varkey]=lcdata.modelfluxvariance(x,jit=True),lcdata.colorscatter(x)
             for k in sndata.specdata:
                 spectrum=sndata.specdata[k]
                 fluxkey=(f'spec_fluxes_{sn}_{k}')
                 varkey= (f'spec_variances_{sn}_{k}')
-                results[fluxkey]=spectrum.modelflux(x)
-                results[varkey]=spectrum.modelfluxvariance(x)
+                results[fluxkey]=spectrum.modelflux(x,jit=True)
+                results[varkey]=spectrum.modelfluxvariance(x,jit=True)
         return (results)
 
       
@@ -475,38 +532,7 @@ class SALTResids:
             results[flt]=normalization,normvariance
         return results
         
-    
-    def loglikeforSN(self,x,sn,cachedresults,fixuncertainties=False,fixfluxes=False,dospec=True):
         
-        """
-        Calculates the likelihood of given SALT model to photometric and spectroscopic observations of a single SN 
-
-        Parameters
-        ----------
-
-        sn : str
-            Name of supernova to compare to model
-            
-        x : array
-            SALT model parameters
-                    
-        Returns
-        -------
-        chi2: float
-            Model chi2 relative to training data    
-        """
-
-        photResidsDict,specResidsDict = self.ResidsForSN(
-            x,sn,storedResults,fixuncertainties=fixuncertainties,fixfluxes=fixfluxes)
-
-        loglike=0
-        for residsdict in ([photResidsDict,specResidsDict] if dospec else [photResidsDict]):
-            for key in residsdict:
-                resids=residsdict[key]
-                loglike+= resids['lognorm']- (resids['residuals']**2).sum() / 2.  
-        return loglike
-                
-    
     def SALTModel(self,x,evaluatePhase=None,evaluateWave=None):
         """Returns flux surfaces of SALT model"""
         m0pars = x[self.m0min:self.m0max+1]
