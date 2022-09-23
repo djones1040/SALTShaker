@@ -216,13 +216,13 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
         return  jnp.exp(self.clscatderivs @ clscatpars)
 
     @partial(jaxoptions, static_argnums=[0,3,4],static_argnames= ['self','fixuncertainties','fixfluxes'],jac_argnums=1)        
-    def modelloglikelihood(self,x,cachedresults,fixuncertainties=False,fixfluxes=False):
+    def modelloglikelihood(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False):
         resids=self.modelresidual(x,cachedresults,fixuncertainties,fixfluxes)
         return resids['lognorm']- (resids['residuals']**2).sum() / 2.  
         
         
     @partial(jaxoptions, static_argnums=[0,3,4],static_argnames= ['self','fixuncertainties','fixfluxes'],jac_argnums=1)        
-    def modelresidual(self,x,cachedresults,fixuncertainties=False,fixfluxes=False):
+    def modelresidual(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False):
    
         if fixfluxes:
             modelflux=cachedresults
@@ -382,7 +382,7 @@ class SALTfitcachespectrum(SALTtrainingspectrum):
                         'lognorm': -jnp.log(uncertainty).sum()}
                         
     @partial(jaxoptions, static_argnums=[0,3,4],static_argnames= ['self','fixuncertainties','fixfluxes'],jac_argnums=1)        
-    def modelloglikelihood(self,x,cachedresults,fixuncertainties=False,fixfluxes=False):
+    def modelloglikelihood(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False):
         resids=self.modelresidual(x,cachedresults,fixuncertainties,fixfluxes)
         return resids['lognorm']- (resids['residuals']**2).sum() / 2.  
  

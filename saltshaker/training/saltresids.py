@@ -394,15 +394,19 @@ class SALTResids:
                 self.iclscat_0 = np.append(self.iclscat_0,np.where(self.parlist == parname)[0][-1])
                 self.iclscat_poly = np.append(self.iclscat_poly,np.where(self.parlist == parname)[0][:-1])        
 
-    def lsqwrap(self,guess,cachedresults,getjacobian,dopriors=True,dospecresids=True,usesns=None):
-
+    def lsqwrap(self,guess,cachedresults=None,getjacobian=False,dopriors=True,dospecresids=True,usesns=None,identifyresidualsources=False):
+        if cachedresults is None: 
+            cachedresults=self.calculatecachedvals(guess,getvars=True)
         residuals = []
+        sources=[]
         jacobian= []
         for sn in (self.datadict.keys() if usesns is None else usesns):
             for data in self.datadict[sn].photdata.values():
                 varkey = (f'phot_variances_{data.id}')
                 cachedvars=cachedresults[varkey]
                 residuals+=[data.modelresidual(guess,cachedresults=cachedvars,fixuncertainties=True,jit=True)['residuals']]
+                if identifyresidualsources: 
+                    sources+=[f'phot_{data.id}']*len(residuals[-1])
                 if getjacobian: 
                     jacobian+=[scisparse.csr_matrix(data.modelresidual(guess,cachedresults=cachedvars,fixuncertainties=True,jit=True,jac=True,forward=False)['residuals'])]
         
@@ -413,24 +417,45 @@ class SALTResids:
                     varkey=( f'spec_variances_{data.id}')
                     cachedvars=cachedresults[varkey]
                     residuals+=[spectralSuppression*data.modelresidual(guess,cachedresults=cachedvars,fixuncertainties=True,jit=True)['residuals']]
+                    if identifyresidualsources: 
+                        sources+=[f'spec_{data.id}']*len(residuals[-1])
                     if getjacobian: 
                         jacobian+=[spectralSuppression*scisparse.csr_matrix(data.modelresidual(guess,cachedresults=cachedvars,fixuncertainties=True,jit=True,jac=True,forward=False)['residuals'])]
         if dopriors:
             residuals+=[self.priors.priorresids(guess,jit=True)]
             if getjacobian: 
                 jacobian+=[self.priors.priorresids(guess,jit=True,jac=True,forward=self.priors.numresids > self.npar)]
+            if identifyresidualsources: 
+                sources+=[f'priors']*len(residuals[-1])
             if self.regularize:
                 residuals+=[func(guess) for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]]  
+                if identifyresidualsources: 
+                    sources+=[f'reg_dyad']*len(residuals[-3])
+                    sources+=[f'reg_phase']*len(residuals[-2])
+                    sources+=[f'reg_wave']*len(residuals[-1])
                 if getjacobian: 
                     jacobian+=[((self.dyadicRegularization_jacobian)(guess))]
                     jacobian+=[((self.phaseGradientRegularization_jacobian)(guess))]
                     jacobian+=[((self.waveGradientRegularization_jacobian)(guess))]
-
+        
+        if identifyresidualsources:
+            return jnp.concatenate(residuals).to_py(), sources
         if getjacobian:
             return  jnp.concatenate(residuals).to_py(),scisparse.vstack(jacobian).tocsr()
           
         else:
             return  jnp.concatenate(residuals).to_py()
+            
+    def getChi2Contributions(self,X,**kwargs):
+        residuals,sources= self.lsqwrap(X,identifyresidualsources=True,**kwargs)
+        sources=np.array([x.split('_')[0] for x in  sources])
+        assert(np.isin(sources,['reg','phot','spec','priors']).all())
+        def loop():
+            for name,abbrev in [('Photometric', 'phot'),('Spectroscopic','spec'),('Prior','priors'),('Regularization','reg')]:
+                x=residuals[sources==abbrev]
+                yield (name,(x**2).sum(),x.size)
+
+        return list(loop())
 
 
     def maxlikefit(
@@ -500,7 +525,7 @@ class SALTResids:
             return loglike
 
 
-    def calculatecachedvals(self,x):
+    def calculatecachedvals(self,x,getfluxes=False,getvars=False):
         results={}
         for sn in self.datadict:
             sndata=self.datadict[sn]
@@ -508,14 +533,14 @@ class SALTResids:
                 fluxkey=(f'phot_fluxes_{sn}_{flt}')
                 varkey = (f'phot_variances_{sn}_{flt}')
                 lcdata=sndata.photdata[flt]
-                results[fluxkey]=lcdata.modelflux(x,jit=True)
-                results[varkey]=lcdata.modelfluxvariance(x,jit=True),lcdata.colorscatter(x)
+                if getfluxes: results[fluxkey]=lcdata.modelflux(x,jit=True)
+                if getvars: results[varkey]=lcdata.modelfluxvariance(x,jit=True),lcdata.colorscatter(x)
             for k in sndata.specdata:
                 spectrum=sndata.specdata[k]
                 fluxkey=(f'spec_fluxes_{sn}_{k}')
                 varkey= (f'spec_variances_{sn}_{k}')
-                results[fluxkey]=spectrum.modelflux(x,jit=True)
-                results[varkey]=spectrum.modelfluxvariance(x,jit=True)
+                if getfluxes: results[fluxkey]=spectrum.modelflux(x,jit=True)
+                if getvars: results[varkey]=spectrum.modelfluxvariance(x,jit=True)
         return (results)
 
       
