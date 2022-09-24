@@ -4,14 +4,17 @@ from sncosmo.salt2utils import SALT2ColorLaw
 
 from scipy.special import factorial
 from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
-
+from scipy import sparse as scisparse
 import numpy as np
 
 from jax import numpy as jnp
 import jax
 from jax.experimental import sparse
+from jax import lax
+from jax.scipy import linalg as jaxlinalg
 
 from functools import partial
+from saltshaker.util.jaxoptions import jaxoptions
 
 import extinction
 import copy
@@ -22,6 +25,7 @@ log=logging.getLogger(__name__)
 warnings.simplefilter('ignore',category=FutureWarning)
 
 from sncosmo.constants import HC_ERG_AA, MODEL_BANDFLUX_SPACING
+recalmax=20
 
 _SCALE_FACTOR = 1e-12
 
@@ -29,7 +33,20 @@ def __anyinnonzeroareaforsplinebasis__(phase,wave,phaseknotloc,waveknotloc,bsord
     phaseindex,waveindex=i//(waveknotloc.size-bsorder-1), i% (waveknotloc.size-bsorder-1)
     return ((phase>=phaseknotloc[phaseindex])&(phase<=phaseknotloc[phaseindex+bsorder+1])).any() and ((wave>=waveknotloc[waveindex])&(wave<=waveknotloc[waveindex+bsorder+1])).any() 
 
-recalmax=20
+def jaxrankOneCholesky(variance,beta,v):
+    Lprime=jnp.zeros((variance.size,variance.size))
+    b=1
+    for j in range(v.size):
+        Lprime=Lprime.at[j,j].set(jnp.sqrt(variance[j]+beta/b*v[j]**2))
+        gamma=(b*variance[j]+beta*v[j]**2)
+        Lprime=Lprime.at[j+1:,j].set(Lprime[j,j]*beta*v[j+1:]*v[j]/gamma)
+        b=b+beta*v[j]**2/variance[j]
+    return Lprime
+
+def toidentifier(input):
+    return "x"+str(abs(hash(input)))
+
+
 class SALTfitcachelightcurve(SALTtraininglightcurve):
 
     __slots__ = ['idx','pbspl','denom','lambdaeff','bsplinecoeffshape','colorlawderiv'
@@ -54,8 +71,9 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
         pbspl *= sn.obswave[self.idx]
         denom = np.trapz(pbspl,sn.obswave[self.idx])
         pbspl /= denom*HC_ERG_AA
+        self.id= f'{sn.snid}_{lc.filt}'
         
-        self.pbspl = pbspl[np.newaxis,:]
+        self.pbspl = pbspl
         self.denom = denom
         self.lambdaeff = kcordict[sn.survey][lc.filt]['lambdaeff']    
         self.lambdaeffrest= self.lambdaeff/(1+z)    
@@ -65,13 +83,9 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
         self.preintegratebasis=residsobj.preintegrate_photometric_passband
         
         self.ix1=sn.ix1
-        self.icoordinates=[sn.ix1]
-        self.icomponents=[residsobj.im0,residsobj.im1]
-        if residsobj.host_component:
-            self.icoordinates+=[sn.ixhost]
-            self.icomponents+=[residsobj.imhost]
-        self.icoordinates=np.array(self.icoordinates)
-        self.icomponents=np.array(self.icomponents)
+        self.icoordinates=sn.icoordinates
+        self.icomponents=residsobj.icomponents
+        
         self.iCL=residsobj.iCL
         self.ix0=sn.ix0
         self.ic=sn.ic
@@ -82,39 +96,33 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
         #Evaluating a bunch of quantities used in the flux model
         #Evaluate derivatives of the color law, here assumed to be linear in coefficients  
         #Either evaluate on fine-grained wavelength grid, or at center of spline basis functions      
-        if self.preintegratebasis:
-            colorlawwaveeval=residsobj.waveBinCenters
-        else:
-            colorlawwaveeval=residsobj.wave[self.idx]
-        
-        self.colorlawderiv=np.empty((colorlawwaveeval.size,self.iCL.size))
-        for i in range(self.iCL.size):
-            self.colorlawderiv[:,i]=\
-                SALT2ColorLaw(residsobj.colorwaverange, np.arange(self.iCL.size)==i)(colorlawwaveeval)-\
-                SALT2ColorLaw(residsobj.colorwaverange, np.zeros(self.iCL.size))(colorlawwaveeval)
-    
+        self.colorlawderiv=residsobj.colorlawderiv
+        self.colorlawzero=residsobj.colorlawzero
+        if not self.preintegratebasis:
+            self.colorlawderiv=self.colorlawderiv[self.idx]
+            self.colorlawzero=self.colorlawzero[self.idx]
         #Calculate zero point of flux
         dwave=sn.dwave
         fluxfactor=residsobj.fluxfactor[sn.survey][self.filt]
 
-
+        wave=residsobj.wave[self.idx]
         #Evaluate the b-spline basis functions for this passband
         #Evaluate parameters only for relevant portions of phase/wavelength space        
         inds=np.array(range(residsobj.im0.size))
         phaseind,waveind=inds//(residsobj.waveknotloc.size-residsobj.bsorder-1),inds%(residsobj.waveknotloc.size-residsobj.bsorder-1)
         inphase=((clippedphase[:,np.newaxis]>= residsobj.phaseknotloc[np.newaxis,phaseind])&(clippedphase[:,np.newaxis]<=residsobj.phaseknotloc[np.newaxis,phaseind+residsobj.bsorder+1])).any(axis=0)
-        inwave=~ ((residsobj.wave[self.idx].min() >= residsobj.waveknotloc[waveind]) | (residsobj.wave[self.idx].max() <= residsobj.waveknotloc[waveind+residsobj.bsorder+1]))
+        inwave=((wave.max()>=residsobj.waveknotloc[waveind])&(wave.min()<=residsobj.waveknotloc[waveind+residsobj.bsorder+1]))
+
         isrelevant=inphase&inwave
-    
         #Array output indices match time along 0th axis, wavelength along 1st axis
         derivInterp=np.zeros((clippedphase.size,self.idx.sum(),residsobj.im0.size))        
         for i in np.where(isrelevant)[0]:
-            if __anyinnonzeroareaforsplinebasis__(clippedphase,residsobj.wave[self.idx],residsobj.phaseknotloc,residsobj.waveknotloc,residsobj.bsorder,i):
-                derivInterp[:,:,i] = bisplev(clippedphase ,residsobj.wave[self.idx],(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(residsobj.im0.size)==i, residsobj.bsorder,residsobj.bsorder))
+                derivInterp[:,:,i] = bisplev(clippedphase ,wave,(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(residsobj.im0.size)==i, residsobj.bsorder,residsobj.bsorder))
 
         self.splinebasisconvolutions=[]
         #Redden passband transmission by MW extinction, multiply by scalar factors
-        reddenedpassband=sn.mwextcurve[self.idx]*self.pbspl[0]*dwave*fluxfactor*_SCALE_FACTOR/(1+self.z)
+        reddenedpassband=sn.mwextcurve[self.idx]*self.pbspl*dwave*fluxfactor*_SCALE_FACTOR/(1+self.z)
+        self.prefactor=reddenedpassband
     
         for pdx in range(len(lc)):
             #For photometry past the edge of the phase grid, extrapolate a linear decline in magnitudes
@@ -135,6 +143,7 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
         self.colorlawderivlambdaeff=np.array([
         SALT2ColorLaw(residsobj.colorwaverange, np.arange(self.iCL.size)==i)(np.array([self.lambdaeffrest]))-\
                 SALT2ColorLaw(residsobj.colorwaverange, np.zeros(self.iCL.size))(np.array([self.lambdaeffrest])) for i in range(self.iCL.size)])[:,0]
+        self.colorlawzerolambdaeff = SALT2ColorLaw(residsobj.colorwaverange, np.zeros(self.iCL.size))(np.array([self.lambdaeffrest]))[0]
         #Prefactor for variance
         self.varianceprefactor=fluxfactor*(self.pbspl.sum())*dwave* _SCALE_FACTOR*sn.mwextcurveint(self.lambdaeff) /(1+self.z)
         
@@ -151,25 +160,24 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
             self.imodelerrs+=[residsobj.imodelerrhost[ierrorbin]]
         self.imodelerrs=np.array(self.imodelerrs)
         
-        
         pow=self.iclscat.size-1-np.arange(self.iclscat.size)
         colorscateval=((self.lambdaeffrest-5500)/1000)
         
         self.clscatderivs=((colorscateval)  ** (pow)) / factorial(pow)
 
     
-#     @partial(jax.jit, static_argnums=(0,))
+    @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],jac_argnums=1)                      
     def modelflux(self,pars):
         #Define parameters
         x0,c=pars[np.array([self.ix0,self.ic])]
         #Evaluate the coefficients of the spline bases
         
-        coordinates=jnp.array([1]+list(pars[self.icoordinates]))
+        coordinates=jnp.concatenate((jnp.ones(1), pars[self.icoordinates]))
         components=pars[self.icomponents]
         fluxcoeffs=jnp.dot(coordinates,components)*x0
         
         #Evaluate color law at the wavelength basis centers
-        colorlaw=jnp.dot(self.colorlawderiv,pars[self.iCL])
+        colorlaw=jnp.dot(self.colorlawderiv,pars[self.iCL])+self.colorlawzero
         #Exponentiate and multiply by color
         colorexp= 10. ** (  -0.4*colorlaw* c)
         if self.preintegratebasis:
@@ -182,18 +190,18 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
         else:    
             #Integrate basis functions over wavelength and sum over flux coefficients
             return ( self.splinebasisconvolutions @ fluxcoeffs) @ colorexp 
-              
-#     @partial(jax.jit, static_argnums=(0,))
+            
+    @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],jac_argnums=1)                      
     def modelfluxvariance(self,pars):
         x0,c=pars[np.array([self.ix0,self.ic])]
         #Evaluate color law at the wavelength basis centers
-        colorlaw=jnp.dot(self.colorlawderivlambdaeff,pars[self.iCL])
+        colorlaw=jnp.dot(self.colorlawderivlambdaeff,pars[self.iCL])+self.colorlawzerolambdaeff
         #Exponentiate and multiply by color
         colorexp= 10. ** (  -0.4*colorlaw* c)
   
           #Evaluate model uncertainty
 
-        coordinates=jnp.array([1]+list(pars[self.icoordinates]))
+        coordinates=jnp.concatenate((jnp.ones(1), pars[self.icoordinates]))
         errs= pars[self.imodelerrs]
         errorsurfaces=jnp.dot(coordinates,errs)**2
         for i,j,corridx in self.imodelcorrs:
@@ -201,11 +209,53 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
               
         modelfluxvar=colorexp**2 * self.varianceprefactor**2 * x0**2* errorsurfaces
         return jnp.clip(modelfluxvar,0,None)
- 
+
+    @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],jac_argnums=1)                       
     def colorscatter(self,pars):
         clscatpars = pars[self.iclscat]
         return  jnp.exp(self.clscatderivs @ clscatpars)
+
+    @partial(jaxoptions, static_argnums=[0,3,4],static_argnames= ['self','fixuncertainties','fixfluxes'],jac_argnums=1)        
+    def modelloglikelihood(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False):
+        resids=self.modelresidual(x,cachedresults,fixuncertainties,fixfluxes)
+        return resids['lognorm']- (resids['residuals']**2).sum() / 2.  
         
+        
+    @partial(jaxoptions, static_argnums=[0,3,4],static_argnames= ['self','fixuncertainties','fixfluxes'],jac_argnums=1)        
+    def modelresidual(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False):
+   
+        if fixfluxes:
+            modelflux=cachedresults
+        else:
+            modelflux=self.modelflux(x)
+
+        if fixuncertainties:
+             modelvariance,clscat=cachedresults
+        else:
+            modelvariance=self.modelfluxvariance(x)
+            clscat=self.colorscatter(x)
+
+        variance=self.fluxcalerr**2 + modelvariance            
+        sigma=jnp.sqrt(variance)
+        
+        #if clscat>0, then need to use a cholesky matrix to find pulls
+        def choleskyresidsandnorm( variance,clscat,modelflux):
+#             cholesky=jaxrankOneCholesky(variance,clscat**2,modelflux)
+            cholesky=jaxlinalg.cholesky(jnp.diag(variance)+ clscat**2*jnp.outer(modelflux,modelflux),lower=True)
+            return {'residuals':jaxlinalg.solve_triangular(cholesky, modelflux-self.fluxcal,lower=True), 
+            'lognorm': -jnp.log(jnp.diag(cholesky)).sum()}
+        
+        def diagonalresidsandnorm(variance,clscat,modelflux):
+            sigma=jnp.sqrt(variance)
+            return {'residuals':(modelflux-self.fluxcal)/sigma,'lognorm': -jnp.log(sigma).sum()}
+        return lax.cond(clscat==0, diagonalresidsandnorm, choleskyresidsandnorm, 
+             variance,clscat,modelflux )
+#         return lax.cond(clscat==0, diagonalresidsandnorm, choleskyresidsandnorm, 
+#              variance,clscat,modelflux )
+  
+  
+
+    
 class SALTfitcachespectrum(SALTtrainingspectrum):
 # 'phase','wavelength','flux','fluxerr','tobs','mjd'
     __slots__ = [
@@ -227,27 +277,32 @@ class SALTfitcachespectrum(SALTtrainingspectrum):
         self.restwavelength= spectrum.wavelength/ (1+self.z)
         self.fluxerr = spectrum.fluxerr
         self.tobs = spectrum.tobs
+        self.id='{}_{}'.format(sn.snid,k)
         
         self.ix1=sn.ix1
         self.iCL=residsobj.iCL
         self.ic=sn.ic
-        self.ispecx0=np.where(residsobj.parlist=='specx0_{}_{}'.format(sn.snid,k))[0][0]
-        self.ispcrcl=np.where(residsobj.parlist=='specrecal_{}_{}'.format(sn.snid,k))[0]
+        self.ispecx0=np.where(residsobj.parlist==f'specx0_{self.id}')[0][0]
+        self.ispcrcl=np.where(residsobj.parlist==f'specrecal_{self.id}')[0]
         self.bsplinecoeffshape=(residsobj.phaseBins[0].size,residsobj.waveBins[0].size)        
 
-        self.icoordinates=[sn.ix1]
-        self.icomponents=[residsobj.im0,residsobj.im1]
-        if residsobj.host_component:
-            self.icoordinates+=[sn.ixhost]
-            self.icomponents+=[residsobj.imhost]
-        self.icoordinates=np.array(self.icoordinates)
-        self.icomponents=np.array(self.icomponents)
+        self.icomponents=residsobj.icomponents
+        self.icoordinates=sn.icoordinates
         self.mwextcurve=sn.mwextcurveint(spectrum.wavelength)
-        
+
+        wave=self.restwavelength
+        #Evaluate the b-spline basis functions for this passband
+        #Evaluate parameters only for relevant portions of phase/wavelength space        
+        inds=np.array(range(residsobj.im0.size))
+        phaseind,waveind=inds//(residsobj.waveknotloc.size-residsobj.bsorder-1),inds%(residsobj.waveknotloc.size-residsobj.bsorder-1)
+        inphase=((self.phase>= residsobj.phaseknotloc[phaseind])&(self.phase<=residsobj.phaseknotloc[phaseind+residsobj.bsorder+1]))
+        inwave=((wave.max()>=residsobj.waveknotloc[waveind])&(wave.min()<=residsobj.waveknotloc[waveind+residsobj.bsorder+1]))
+
+        isrelevant=inphase&inwave
+
         derivInterp=np.zeros((spectrum.wavelength.size,residsobj.im0.size))
-        for i in range(residsobj.im0.size):
-            if __anyinnonzeroareaforsplinebasis__(spectrum.phase,spectrum.wavelength/(1+z),residsobj.phaseknotloc,residsobj.waveknotloc,residsobj.bsorder,i):
-                derivInterp[:,i] = bisplev(spectrum.phase,spectrum.wavelength/(1+z),(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(residsobj.im0.size)==i, residsobj.bsorder,residsobj.bsorder))
+        for i in np.where(isrelevant)[0]:
+                derivInterp[:,i] = bisplev(spectrum.phase,self.restwavelength,(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(residsobj.im0.size)==i, residsobj.bsorder,residsobj.bsorder))
         derivInterp=derivInterp*(_SCALE_FACTOR/(1+self.z)*self.mwextcurve)[:,np.newaxis]
         self.pcderivsparse=sparse.BCOO.fromdense(derivInterp)
         self.spectrumid=k
@@ -272,8 +327,9 @@ class SALTfitcachespectrum(SALTtrainingspectrum):
             self.imodelcorrs+=[(0,2,residsobj.imodelcorr0host[ierrorbin])]
             self.imodelerrs+=[residsobj.imodelerrhost[ierrorbin]]
         self.imodelerrs=np.array(self.imodelerrs)
+
         
-#     @partial(jax.jit, static_argnums=(0,))   
+    @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],jac_argnums=1)                      
     def modelflux(self,pars):
         x0=pars[self.ispecx0]
         #Define recalibration factor
@@ -281,16 +337,15 @@ class SALTfitcachespectrum(SALTtrainingspectrum):
         recalterm=jnp.dot(self.recaltermderivs,coeffs)
         recalterm=jnp.clip(recalterm,-recalmax,recalmax)
         recalexp=jnp.exp(recalterm)
-        
-        coordinates=jnp.array([1]+list(pars[self.icoordinates]))
+
+        coordinates=jnp.concatenate((jnp.ones(1), pars[self.icoordinates]))
         components=pars[self.icomponents]
-        
+
         fluxcoeffs=jnp.dot(coordinates,components)*x0
 
         return recalexp*(self.pcderivsparse @ (fluxcoeffs))
 
-        
-#     @partial(jax.jit, static_argnums=(0,))
+    @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],jac_argnums=1)                              
     def modelfluxvariance(self,pars):
         x0=pars[self.ispecx0]
         #Define recalibration factor
@@ -298,7 +353,7 @@ class SALTfitcachespectrum(SALTtrainingspectrum):
         recalterm=jnp.dot(self.recaltermderivs,coeffs)
         recalterm=jnp.clip(recalterm,-recalmax,recalmax)
         recalexp=jnp.exp(recalterm)
-        coordinates=jnp.array([1]+list(pars[self.icoordinates]))
+        coordinates=jnp.concatenate((jnp.ones(1), pars[self.icoordinates]))
         #Evaluate model uncertainty
         errs= pars[self.imodelerrs]
         errorsurfaces=jnp.dot(coordinates,errs)**2
@@ -307,8 +362,31 @@ class SALTfitcachespectrum(SALTtrainingspectrum):
         modelfluxvar=recalexp**2 * self.varianceprefactor**2 * x0**2* errorsurfaces
         return jnp.clip(modelfluxvar,0,None)
 
+    @partial(jaxoptions, static_argnums=[0,3,4],static_argnames= ['self','fixuncertainties','fixfluxes'],jac_argnums=1)        
+    def modelresidual(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False):
+            if fixfluxes:
+                modelflux=cachedresults
+            else:
+                modelflux=self.modelflux(x)
+        
+            if fixuncertainties:
+                 modelvariance=cachedresults
+            else:
+                modelvariance=self.modelfluxvariance(x)
+        
+            variance=self.fluxerr**2 + modelvariance
+          
+            uncertainty=jnp.sqrt(variance)
 
-
+            return {'residuals':  (modelflux-self.flux)/uncertainty,
+                        'lognorm': -jnp.log(uncertainty).sum()}
+                        
+    @partial(jaxoptions, static_argnums=[0,3,4],static_argnames= ['self','fixuncertainties','fixfluxes'],jac_argnums=1)        
+    def modelloglikelihood(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False):
+        resids=self.modelresidual(x,cachedresults,fixuncertainties,fixfluxes)
+        return resids['lognorm']- (resids['residuals']**2).sum() / 2.  
+ 
+        
 class SALTfitcacheSN(SALTtrainingSN):
     """Class to store SN data in addition to cached results useful in speeding up the fitter
     """
@@ -333,8 +411,9 @@ class SALTfitcacheSN(SALTtrainingSN):
         self.ixhost=np.where(residsobj.parlist==f'xhost_{self.snid}')[0]
         if len(self.ixhost): self.ixhost = self.ixhost[0]
         self.ic=np.where(residsobj.parlist==f'c_{self.snid}')[0][0]
-        
+
+        self.icoordinates=np.array([self.ix1]+([self.ixhost]if residsobj.host_component else []))
+       
         self.photdata={flt: SALTfitcachelightcurve(self,sndata.photdata[flt],residsobj,kcordict ) for flt in sndata.photdata}
         self.specdata={k: SALTfitcachespectrum(self,sndata.specdata[k],k,residsobj ) for k in sndata.specdata }
-
         
