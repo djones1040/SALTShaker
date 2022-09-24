@@ -17,11 +17,11 @@ handlers:
   file:
     class : logging.FileHandler
     formatter: standard
-    filename: testing.log
+    filename: OUTPUTDIR/testing.log
     level: DEBUG
     mode: w
 loggers:
-  salt3:
+  saltshaker:
     handlers: [console,file]
     level: DEBUG
     propagate: False
