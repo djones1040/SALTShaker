@@ -15,7 +15,7 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.special import factorial
 from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
 from scipy.integrate import trapz
-from scipy import linalg,sparse
+from scipy import linalg
 
 import numpy as np
 from numpy.random import standard_normal
@@ -36,6 +36,7 @@ import jax
 from jax import numpy as jnp
 from jaxlib.xla_extension import DeviceArray
 from jax.scipy import linalg as jaxlinalg
+from jax.experimental import sparse
 from jax import lax
 
 from collections import namedtuple
@@ -265,15 +266,16 @@ class SALTResids:
             [(self.wave[np.newaxis,:]*  x ).sum()/x.sum() for x in basisfunctions])
 
         #Find the basis functions evaluated at the centers of the basis functions for use in the regularization derivatives
-        self.regularizationDerivs=[np.zeros((self.phaseRegularizationPoints.size,self.waveRegularizationPoints.size,self.im0.size)) for i in range(4)]
+        regularizationDerivs=[np.zeros((self.phaseRegularizationPoints.size*self.waveRegularizationPoints.size,self.im0.size)) for i in range(4)]
         for i in range(len(self.im0)):
             for j,derivs in enumerate([(0,0),(1,0),(0,1),(1,1)]):
                 if self.bsorder == 0: continue
-                self.regularizationDerivs[j][:,:,i]=bisplev(
+                regularizationDerivs[j][:,i]=bisplev(
                     self.phaseRegularizationPoints,self.waveRegularizationPoints,
                     (self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder),
-                    dx=derivs[0],dy=derivs[1])
-
+                    dx=derivs[0],dy=derivs[1]).flatten()
+        regularizationDerivs=map(sparse.BCOO.fromdense,regularizationDerivs)
+        self.componentderiv,self.dcompdphasederiv,self.dcompdwavederiv,self.ddcompdwavedphase =regularizationDerivs
         phase=self.phaseRegularizationPoints
         wave=self.waveRegularizationPoints
         fluxes=self.SALTModel(guess,evaluatePhase=self.phaseRegularizationPoints,evaluateWave=self.waveRegularizationPoints)
@@ -293,6 +295,7 @@ class SALTResids:
         class saltcachedresults(saltcachedresultsunhash):
     
             def __hash__(self):
+                #Hack, figure out a better way to do this (probably the memoize python module?)
                 hashval=0
                 for field in self._fields:
                     entry=getattr(self,field)
@@ -305,7 +308,8 @@ class SALTResids:
         if self.regularize:
             self.updateEffectivePoints(guess)
 
-        self.priors = SALTPriors(self)
+        
+    
         
         self.datadictnocache=datadict
         log.info('Calculating cached quantities for speed in fitting loop')
@@ -314,6 +318,7 @@ class SALTResids:
         if sys.stdout.isatty():
             iterable=tqdm(iterable)
         self.datadict={snid: SALTfitcacheSN(sn,self,self.kcordict) for snid,sn in iterable}
+        self.priors = SALTPriors(self)
         log.info('Time required to calculate cached quantities {:.1f}s'.format(time.time()-start))
             
     def set_param_indices(self):
@@ -393,11 +398,11 @@ class SALTResids:
                 jacobian+=[residsdict[k]['resid_jacobian'] for k in residsdict]
 
         if doPriors:
-            priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,guess)
+            priorResids,priorVals,priorJac=self.priors.priorResids(guess)
             residuals+=[priorResids]
             jacobian+=[priorJac]
             BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
-                self.priors.BoundedPriorResids(self.bounds,self.boundedParams,guess)
+                self.priors.BoundedPriorResids(guess)
             residuals+=[BoundedPriorResids]
             jacobian+=[sparse.csr_matrix(BoundedPriorJac)]
 
@@ -474,12 +479,12 @@ class SALTResids:
             loglike=sum(result)
         logp = loglike
         if len(self.usePriors):
-            priorResids,priorVals,priorJac=self.priors.priorResids(self.usePriors,self.priorWidths,x)   
+            priorResids,priorVals,priorJac=self.priors.priorResids(x)   
             logp -=(priorResids**2).sum()/2
             if computeDerivatives:
                 grad-= (priorResids [:,np.newaxis] * priorJac).sum(axis=0)
             BoundedPriorResids,BoundedPriorVals,BoundedPriorJac = \
-            self.priors.BoundedPriorResids(self.bounds,self.boundedParams,x)
+            self.priors.BoundedPriorResids(x)
             logp -=(BoundedPriorResids**2).sum()/2
             if computeDerivatives:
                 grad-= (BoundedPriorResids [:,np.newaxis] * BoundedPriorJac).sum(axis=0)
@@ -1056,277 +1061,54 @@ class SALTResids:
             plt.savefig(output,dpi=288)
         plt.clf()
     
-    def regularizationScale(self,fluxes,regmethod='none'):
+    def regularizationScale(self,x,regmethod='none'):
         if self.regularizationScaleMethod=='fixed':
-            return self.guessScale,[np.zeros(self.im0.size) for component in fluxes]
-        elif self.regularizationScaleMethod == 'rms':
-            scale= [np.sqrt(np.mean(flux**2)) for flux in fluxes]
-            return scale, [np.mean(flux[:,:,np.newaxis]*self.regularizationDerivs[0],axis=(0,1))/s for s,flux in zip(scale,fluxes)]
-        elif self.regularizationScaleMethod=='meanabs':
-            scale= [np.mean(np.abs(flux)) for flux in fluxes]
-            return scale, [np.mean(np.sign(flux[:,:,np.newaxis])*self.regularizationDerivs[0],axis=(0,1)) for s,flux in zip(scale,fluxes)]
-        elif self.regularizationScaleMethod=='mad':
-            scale= [np.mean(np.abs(np.median(flux))) for flux in zip(fluxes)]
-            return scale, [np.zeros(self.im0.size) for component in fluxes]
-        elif self.regularizationScaleMethod=='maxneff':
-            iqr=[ (np.percentile(self.neffRaw,80)<self.neffRaw)  for flux in fluxes]
-            scale= [np.mean(np.abs(flux[select])) for select,flux in zip(iqr,fluxes)]
-            return scale, [np.mean(np.sign(flux[select,np.newaxis])*self.regularizationDerivs[0][select,:],axis=(0)) for s,select,flux in zip(scale,iqr,fluxes)]
-        elif self.regularizationScaleMethod=='snpca':
-            iqr=[ (np.percentile(self.neffRaw,80)<self.neffRaw)  for flux in fluxes]
-            if regmethod == 'gradient': scale = [2746.769325]*len(fluxes)
-            elif regmethod == 'dyadic': scale = [361838.9736]*len(fluxes)
-            return scale, [np.mean(self.regularizationDerivs[0][select,:],axis=(0)) for select,flux in zip(iqr,fluxes)]     
+            return self.guessScale   
         else:
             raise ValueError('Regularization scale method invalid: ',self.regularizationScaleMethod)
 
-    def dyadicRegularization(self,x, storedResults,varyParams):
-        phase=self.phaseRegularizationPoints
-        wave=self.waveRegularizationPoints
+    def dyadicRegularization(self,x):
+
+        scales=self.regularizationScale(x)
+        componentidxs=[self.im0,self.im1]
+        if self.host_component:
+            componentidxs+=[self.imhost]
         
-        fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
-        dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
-        dfluxdphase=self.SALTModelDeriv(x,1,0,phase,wave)
-        d2fluxdphasedwave=self.SALTModelDeriv(x,1,1,phase,wave)
-        scale,scaleDeriv=self.regularizationScale(fluxes,regmethod='dyadic')
-        resids=[]
-        jac=[]
-
-        for i in range(len(fluxes)):
-            if len(fluxes) == 2: indices=[self.im0,self.im1][i]
-            elif len(fluxes) == 3: indices=[self.im0,self.im1,self.imhost][i]
-            else: raise RuntimeError(f'not sure how to deal with {len(fluxes)} total components')
-
-            boolIndex=np.zeros(self.npar,dtype=bool)
-            boolIndex[indices]=True
+        for scale,idxs in zip(scales,componentidxs):
+            coeffs=x[idxs]
+            fluxes= self.componentderiv @ coeffs
+            dfluxdwave=self.dcompdphasederiv @ coeffs
+            dfluxdphase=self.dcompdwavederiv @ coeffs
+            d2fluxdphasedwave=self.ddcompdwavedphase @ coeffs
 
             #Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
             normalization=np.sqrt(1/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))**2.
             #0 if model is locally separable in phase and wavelength i.e. flux=g(phase)* h(wavelength) for arbitrary functions g and h
-            numerator=(dfluxdphase[i] *dfluxdwave[i] -d2fluxdphasedwave[i] *fluxes[i] )
-            
-            dnumerator=( self.regularizationDerivs[1][:,:,varyParams[indices]]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2][:,:,varyParams[indices]]* dfluxdphase[i][:,:,np.newaxis] 
-                - self.regularizationDerivs[3][:,:,varyParams[indices]]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0][:,:,varyParams[indices]]* d2fluxdphasedwave[i][:,:,np.newaxis] )          
-            resids += [normalization* (numerator / (scale[i]**2 * self.neff)).flatten()]
-            if boolIndex[varyParams].any(): jacobian=jacobian=np.zeros((resids[-1].size,self.parlist.size))
-            else: jacobian = jacobian = sparse.csr_matrix((resids[-1].size,self.parlist.size))
-            
-            if boolIndex[varyParams].any():
-                jacobian[:,boolIndex & varyParams]=((dnumerator*(scale[i]**2 )- scaleDeriv[i][np.newaxis,np.newaxis,varyParams[indices]]*2*scale[i]*numerator[:,:,np.newaxis])/self.neff[:,:,np.newaxis]*normalization / scale[i]**4  ).reshape(-1, varyParams[indices].sum())
-            jac += [sparse.csr_matrix(jacobian)]
-            
-        return resids,jac
+            numerator=(dfluxdphase *dfluxdwave -d2fluxdphasedwave *fluxes )
+            yield normalization* (numerator / (scale**2 * self.neff.flatten()))      
 
-    def dyadicRegularizationTest(self,x, storedResults,varyParams):
-        phase=self.phaseRegularizationPoints
-        wave=self.waveRegularizationPoints
+    
+    def phaseGradientRegularization(self, x):
+        scales=self.regularizationScale(x)
+        componentidxs=[self.im0,self.im1]
+        if self.host_component:
+            componentidxs+=[self.imhost]
         
-        fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
-        dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
-        dfluxdphase=self.SALTModelDeriv(x,1,0,phase,wave)
-        d2fluxdphasedwave=self.SALTModelDeriv(x,1,1,phase,wave)
-
-        resids=[]
-        jac=[]
-        for i in range(len(fluxes)):
-            if len(fluxes) == 2: indices=[self.im0,self.im1][i]
-            elif len(fluxes) == 3: indices=[self.im0,self.im1,self.imhost][i]
-            else: raise RuntimeError(f'not sure how to deal with {len(fluxes)} total components')
-
-            boolIndex=np.zeros(self.npar,dtype=bool)
-            boolIndex[indices]=True
-
-            #Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
-            normalization=361838973.6
-            #0 if model is locally separable in phase and wavelength i.e. flux=g(phase)* h(wavelength) for arbitrary functions g and h
-            numerator=(dfluxdphase[i] *dfluxdwave[i] -d2fluxdphasedwave[i] *fluxes[i] )
-            dnumerator=( self.regularizationDerivs[1][:,:,varyParams[indices]]*dfluxdwave[i][:,:,np.newaxis] + self.regularizationDerivs[2][:,:,varyParams[indices]]* dfluxdphase[i][:,:,np.newaxis] 
-                - self.regularizationDerivs[3][:,:,varyParams[indices]]* fluxes[i][:,:,np.newaxis] - self.regularizationDerivs[0][:,:,varyParams[indices]]* d2fluxdphasedwave[i][:,:,np.newaxis] )          
-            resids += [normalization* (numerator).flatten()]
-            jacobian=sparse.csr_matrix((resids[-1].size,self.parlist.size))
-            if boolIndex[varyParams].any():
-                jacobian[:,boolIndex[varyParams]]=(dnumerator).reshape(-1, varyParams[indices].sum())
-            jac += [jacobian]
-        return resids,jac
+        for scale,idxs in zip(scales,componentidxs):
+            coeffs=x[idxs]
+            dfluxdphase=self.dcompdphasederiv @ coeffs
+            normalization=np.sqrt(1/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
+            yield normalization* ( dfluxdphase/scale / self.neff.flatten())
 
     
-    def phaseGradientRegularization(self, x, storedResults,varyParams):
-        phase=self.phaseRegularizationPoints
-        wave=self.waveRegularizationPoints
-        fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
-        dfluxdphase=self.SALTModelDeriv(x,1,0,phase,wave)
-        scale,scaleDeriv=self.regularizationScale(fluxes,regmethod='gradient')
-        resids=[]
-        jac=[]
-        for i in range(len(fluxes)):
-            if len(fluxes) == 2: indices=[self.im0,self.im1][i]
-            elif len(fluxes) == 3: indices=[self.im0,self.im1,self.imhost][i]
-            else: raise RuntimeError(f'not sure how to deal with {len(fluxes)} total components')
-            
-            boolIndex=np.zeros(self.npar,dtype=bool)
-            boolIndex[indices]=True
-            #Normalize gradient by flux scale
-            normedGrad=dfluxdphase[i]/scale[i]
-            #Derivative of normalized gradient with respect to model parameters
-            normedGradDerivs=(self.regularizationDerivs[1][:,:,varyParams[indices]] * scale[i] - scaleDeriv[i][np.newaxis,np.newaxis,varyParams[indices]]*dfluxdphase[i][:,:,np.newaxis])/ scale[i]**2
-            #Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
-            normalization=np.sqrt(1/((self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
-            #Minimize model derivative w.r.t wavelength in unconstrained regions
-            resids+= [normalization* ( normedGrad / self.neff).flatten()]
-            #jacobian=np.zeros((resids[-1].size,self.parlist.size)) #sparse.csr_matrix((resids[-1].size,self.parlist.size))
-            if boolIndex[varyParams].any(): jacobian=jacobian=np.zeros((resids[-1].size,self.parlist.size))
-            else: jacobian = jacobian = sparse.csr_matrix((resids[-1].size,self.parlist.size))
-
-            if boolIndex[varyParams].any():
-                jacobian[:,boolIndex & varyParams]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
-            jac+= [sparse.csr_matrix(jacobian)]
-                
-        return resids,jac
-    
-    def waveGradientRegularization(self, x, storedResults,varyParams):
-        #Declarations
-        phase=self.phaseRegularizationPoints
-        wave=self.waveRegularizationPoints
-        fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
-        dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
-        scale,scaleDeriv=self.regularizationScale(fluxes,regmethod='gradient')
-        waveGradResids=[]
-        jac=[]
-        for i in range(len(fluxes)):
-            if len(fluxes) == 2: indices=[self.im0,self.im1][i]
-            elif len(fluxes) == 3: indices=[self.im0,self.im1,self.imhost][i]
-            else: raise RuntimeError(f'not sure how to deal with {len(fluxes)} total components')
-            boolIndex=np.zeros(self.npar,dtype=bool)
-            boolIndex[indices]=True
-
-            #Normalize gradient by flux scale
-            normedGrad=dfluxdwave[i]/scale[i]
-            #Derivative of normalized gradient with respect to model parameters
-            normedGradDerivs=(self.regularizationDerivs[2][:,:,varyParams[indices]] * scale[i] - scaleDeriv[i][np.newaxis,np.newaxis,varyParams[indices]]*dfluxdwave[i][:,:,np.newaxis])/ scale[i]**2
-            #Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
-            normalization=np.sqrt(1/((self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
-            #Minimize model derivative w.r.t wavelength in unconstrained regions
-            waveGradResids+= [normalization* ( normedGrad / self.neff).flatten()]
-
-            if boolIndex[varyParams].any(): jacobian=jacobian=np.zeros((waveGradResids[-1].size,self.parlist.size))
-            else: jacobian = jacobian = sparse.csr_matrix((waveGradResids[-1].size,self.parlist.size))
-
-            if boolIndex[varyParams].any():
-                jacobian[:,boolIndex & varyParams]=normalization*((normedGradDerivs) / self.neff[:,:,np.newaxis]).reshape(-1, varyParams[indices].sum())
-
-            jac+= [jacobian]
-
-        return waveGradResids,jac
-
-    #def waveGradientRegularization_snpca(self, x, storedResults,varyParams):
-    #   nx = len(self.phaseRegularizationPoints)
-    #   ny = len(self.waveRegularizationPoints)
-    #   
-    #   def total_weight():
-#
-#           reference_flux = 7.1739e+13
-#           bmaxintegral = 2.008780068e+14
-#           
-#           scale = 1./(nx*(ny-1)) # remove dependence on number of bins
-#           scale *= (bmaxintegral/reference_flux)**2. # remove dependence on both total flux and values of the function basis
-#           # now chi2 is in unit of (% variation per A)^2
-#
-#           # calibrated using SNLS3 template 0:
-#           scale *= 4.85547e5 # so approx. 0.15% variation allowed per A (wrt to flux at max)
-#
-#           scale *= weight; # tunable weight
-#           return scale
-#
-#
-#       def chi2():
-#
-#           waveGradResids=[]
-#           
-#           result = 0
-#           #v = SV.Data()
-#           y = self.waveRegularizationPoints #SV.MeanLambdas().Data()
-#           #m = 0; if(mask) m = mask->Data();
-#
-#           phase=self.phaseRegularizationPoints
-#           wave=self.waveRegularizationPoints
-#           fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave).flatten()
- # 
-#           for j in range(ny):
-#               for i in range(nx):
- #     
-#                   i0 = i+nx*j
-#                   i1 = i+nx*(j+1)
- #    
-#                   waveGradResids += [( ( fluxes[i1] - fluxes[i0] ) / ( y[j+1] - y[j] ) )**2.]
-#           
-#           return total_weight()*np.array(waveGradResids)
-#
-#       def chi2_derivatives(jacobian): #const FunctionBasis &V, Mat &A, Vect& B, const Vect* mask) const {
- # 
-#           # A and B can be already filled with some other regularization term, so allocate only if necessary  
- #   
-#           residual = 0
-#           dy_inv = 0
-#           dy_inv2 = 0
-#
-#           phase=self.phaseRegularizationPoints
-#           wave=self.waveRegularizationPoints
-#           fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave).flatten()
-#           y = self.waveRegularizationPoints #SV.MeanLambdas().Data()
-#           #m = 0; if(mask) m = mask->Data()
-#           scale = total_weight()
- # 
-#           for j in range(ny):
-#               for i in range(nx):
-#                   i0 = i+nx*j
-#                   i1 = i+nx*(j+1)
-#                   
-#                   dy_inv =  1. / ( y[j+1] - y[j] )
-#                   residual = ( fluxes[i1] - fluxes[i0] ) * dy_inv
- #     
-#                   B[i0] += scale * residual * dy_inv # -0.5*dchi2/di = -residual*dres/di
-#                   B[i1] -= scale * residual * dy_inv
-#                   dy_inv2 = np.sqrt(dy_inv);
- #     
-#                   jacobian[i0,i0] += scale * dy_inv2 # 0.5*d2chi2/didj = dres/di*dres/dj
-#                   jacobian[i1,i1] += scale * dy_inv2
-#                   jacobian[i0,i1] -= scale * dy_inv2
-#                   jacobian[i1,i0] -= scale * dy_inv2
-#
-#
-#       waveGradResids = chi2()
-#       jacobian=np.zeros((waveGradResids[-1].size,varyParams.sum()))
-#       jacobian = chi2_derivatives(jacobian)
+    def waveGradientRegularization(self, x):
+        scales=self.regularizationScale(x)
+        componentidxs=[self.im0,self.im1]
+        if self.host_component:
+            componentidxs+=[self.imhost]
         
-    def waveGradientRegularizationTest(self, x, storedResults,varyParams):
-        #Declarations
-        phase=self.phaseRegularizationPoints
-        wave=self.waveRegularizationPoints
-        fluxes=self.SALTModel(x,evaluatePhase=phase,evaluateWave=wave)
-        dfluxdwave=self.SALTModelDeriv(x,0,1,phase,wave)
-
-        waveGradResids=[]
-        jac=[]
-        for i in range(len(fluxes)):
-            if len(fluxes) == 2: indices=[self.im0,self.im1][i]
-            elif len(fluxes) == 3: indices=[self.im0,self.im1,self.imhost][i]
-            else: raise RuntimeError(f'not sure how to deal with {len(fluxes)} total components')
-
-            boolIndex=np.zeros(self.npar,dtype=bool)
-            boolIndex[indices]=True
-
-            #Normalize gradient by flux scale
-            normedGrad=dfluxdwave[i]
-            #Derivative of normalized gradient with respect to model parameters
-            normedGradDerivs=(self.regularizationDerivs[2][:,:,varyParams[indices]])
-            #Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
-            normalization=27467.69325
-            #Minimize model derivative w.r.t wavelength in unconstrained regions
-            waveGradResids+= [normalization* ( normedGrad / self.neff).flatten()]
-            jacobian=sparse.csr_matrix((waveGradResids[-1].size,self.parlist.size))
-            if boolIndex[varyParams].any():
-                jacobian[:,boolIndex[varyParams]]=normalization*((normedGradDerivs)).reshape(-1, varyParams[indices].sum())
-            jac+= [jacobian]
-
-        return waveGradResids,jac
-    
+        for scale,idxs in zip(scales,componentidxs):
+            coeffs=x[idxs]
+            dfluxdwave=self.dcompdwavederiv @ coeffs
+            normalization=np.sqrt(1/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
+            yield normalization* ( dfluxdwave/scale / self.neff.flatten())

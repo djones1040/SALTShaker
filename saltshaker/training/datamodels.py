@@ -123,11 +123,11 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
             else:
                 decayFactor=1
             if self.preintegratebasis:
-                self.splinebasisconvolutions+=[decayFactor*sparse.BCOO.fromdense(np.dot(derivInterp[pdx,:,:].T,reddenedpassband))]
+                self.splinebasisconvolutions+=[decayFactor*(np.dot(derivInterp[pdx,:,:].T,reddenedpassband))]
             else:
                 
-                self.splinebasisconvolutions+=[decayFactor*sparse.BCOO.fromdense(derivInterp[pdx,:,:]*reddenedpassband[:,np.newaxis])]
-        
+                self.splinebasisconvolutions+=[decayFactor*(derivInterp[pdx,:,:]*reddenedpassband[:,np.newaxis])]
+        self.splinebasisconvolutions=sparse.BCOO.fromdense( np.stack(self.splinebasisconvolutions))
 #########################################################################################
         
         #Quantities used in computation of model uncertainties
@@ -176,10 +176,12 @@ class SALTfitcachelightcurve(SALTtraininglightcurve):
             #Redden flux coefficients
             fluxcoeffsreddened= (colorexp[np.newaxis,:]*fluxcoeffs.reshape( self.bsplinecoeffshape)).flatten()
             #Multiply spline bases by flux coefficients
-            return jnp.array([design @ (fluxcoeffsreddened) for design in self.splinebasisconvolutions])     
+            
+            
+            return self.splinebasisconvolutions @ fluxcoeffsreddened
         else:    
             #Integrate basis functions over wavelength and sum over flux coefficients
-            return jnp.array([colorexp @ (design @ fluxcoeffs) for design in self.splinebasisconvolutions])   
+            return ( self.splinebasisconvolutions @ fluxcoeffs) @ colorexp 
               
 #     @partial(jax.jit, static_argnums=(0,))
     def modelfluxvariance(self,pars):
