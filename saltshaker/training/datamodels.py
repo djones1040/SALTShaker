@@ -426,7 +426,8 @@ class modeledtrainingspectrum(modeledtrainingdata):
         errs= pars[self.imodelerrs]
         errorsurfaces=jnp.dot(coordinates,errs)**2
         for i,j,corridx in self.imodelcorrs:
-            errorsurfaces= errorsurfaces+2*coordinates[i]*coordinates[j]* errs[i]*errs[j]
+            correlation=  pars[corridx]
+            errorsurfaces= errorsurfaces+2*correlation*coordinates[i]*coordinates[j]* errs[i]*errs[j]
         modelfluxvar=recalexp**2 * self.varianceprefactor**2 * x0**2* errorsurfaces
         return jnp.clip(modelfluxvar,0,None)
 
