@@ -24,6 +24,7 @@ import warnings
 import logging
 import abc
 
+from typing import NamedTuple
 
 log=logging.getLogger(__name__)
 
@@ -51,6 +52,32 @@ def jaxrankOneCholesky(variance,beta,v):
 def toidentifier(input):
     return "x"+str(abs(hash(input)))
 
+
+@register_pytree_node_class
+class SALTparameters:
+            
+    __slots__=['x0','coordinates','components','c','CL'
+    'modelcorrs','modelerrs','spcrcl']
+    
+    def __init__(self,data,parsarray):
+        for var in self.__slots__:
+            indexvar=f'i{var}'
+            if  indexvar in data.__indexattributes__:
+                setattr(self,var, parsarray[getattr(data,indexvar)])
+            else:
+                setattr(self,var, np.array([]))
+        
+    def tree_flatten(self):
+        children =tuple(getattr(self,x) for x in vars(self))
+        aux_data =tuple()
+        return (children, aux_data)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        self=cls.__new__(cls)
+        for attr,val in zip(self.__slots__,children):
+            setattr(self,attr,val)
+        return self
 
 class modeledtrainingdata(metaclass=abc.ABCMeta):
     
@@ -106,6 +133,7 @@ class modeledtrainingdata(metaclass=abc.ABCMeta):
 
 @register_pytree_node_class
 class modeledtraininglightcurve(modeledtrainingdata):
+    __indexattributes__=['iCL','ix0','ic','icoordinates', 'icomponents','imodelcorrs', 'imodelerrs','iclscat',]
 
     __dynamicattributes__= [
         'phase','fluxcal','fluxcalerr',
@@ -122,10 +150,10 @@ class modeledtraininglightcurve(modeledtrainingdata):
     ]
     __staticattributes__=[
         'preintegratebasis',
-        'iCL','ix0','ic','icoordinates', 'icomponents','imodelcorrs', 'imodelerrs','iclscat',
+        'imodelcorrs_coordinds',
         'bsplinecoeffshape','errorgridshape'
 
-    ]
+    ]+__indexattributes__
     __slots__ = __staticattributes__+__dynamicattributes__
     
 
@@ -160,6 +188,15 @@ class modeledtraininglightcurve(modeledtrainingdata):
         self.ix0=sn.ix0
         self.ic=sn.ic
         self.iclscat=residsobj.iclscat
+        self.imodelcorrs=[residsobj.imodelcorr01]    
+        self.imodelcorrs_coordinds=[(0,1)]
+        self.imodelerrs=[residsobj.imodelerr0 ,residsobj.imodelerr1    ]
+        if residsobj.host_component:
+            self.imodelcorrs+=[(residsobj.imodelcorr0host)]
+            self.imodelcorrs_coordinds +=[(0,2)]
+            self.imodelerrs+=[residsobj.imodelerrhost]
+        self.imodelcorrs=np.array(self.imodelcorrs)
+        self.imodelerrs=np.array(self.imodelerrs)
         
         clippedphase=np.clip(self.phase,residsobj.phase.min(),residsobj.phase.max())
 #########################################################################################
@@ -227,12 +264,6 @@ class modeledtraininglightcurve(modeledtrainingdata):
         errordesignmat[np.arange(0,len(lc)),ierrorbin ]= 1
         self.errordesignmat= sparse.BCOO.from_scipy_sparse(errordesignmat)
         
-        self.imodelcorrs=[(0,1,residsobj.imodelcorr01)]    
-        self.imodelerrs=[residsobj.imodelerr0 ,residsobj.imodelerr1    ]
-        if residsobj.host_component:
-            self.imodelcorrs+=[(0,2,residsobj.imodelcorr0host)]
-            self.imodelerrs+=[residsobj.imodelerrhost]
-        self.imodelerrs=np.array(self.imodelerrs)
         
         pow=self.iclscat.size-1-np.arange(self.iclscat.size)
         colorscateval=((self.lambdaeffrest-5500)/1000)
@@ -268,18 +299,21 @@ class modeledtraininglightcurve(modeledtrainingdata):
     @partial(jaxoptions, jac_argnums=1)                      
     def modelfluxvariance(self,pars):
         x0,c=pars[np.array([self.ix0,self.ic])]
+        CL=pars[self.iCL]
+        coordinates=pars[self.icoordinates]
+        errs=  pars[self.imodelerrs]
+        correlations=pars[self.imodelcorrs]
+
         #Evaluate color law at the wavelength basis centers
-        colorlaw=jnp.dot(self.colorlawderivlambdaeff,pars[self.iCL])+self.colorlawzerolambdaeff
+        colorlaw=jnp.dot(self.colorlawderivlambdaeff,CL)+self.colorlawzerolambdaeff
         #Exponentiate and multiply by color
         colorexp= 10. ** (  -0.4*colorlaw* c)
   
           #Evaluate model uncertainty
-
-        coordinates=jnp.concatenate((jnp.ones(1), pars[self.icoordinates]))
-        errs=  pars[self.imodelerrs]
+        
+        coordinates=jnp.concatenate((jnp.ones(1), coordinates ))
         errorsurfaces=jnp.dot(coordinates,errs)**2
-        for i,j,corridx in self.imodelcorrs:
-            correlation=  pars[corridx]
+        for (i,j),correlation in zip(self.imodelcorrs_coordinds,correlations):
             errorsurfaces= errorsurfaces+2 *correlation*coordinates[i]*coordinates[j]* errs[i]*errs[j]
         
         errorsurfaces=self.errordesignmat @ errorsurfaces
@@ -330,18 +364,20 @@ class modeledtraininglightcurve(modeledtrainingdata):
  
 @register_pytree_node_class
 class modeledtrainingspectrum(modeledtrainingdata):
-
+    __indexattributes__=[
+    'ix0','ispcrcl','icomponents', 'icoordinates',
+    'imodelcorrs', 'imodelerrs',]
     __dynamicattributes__ = [
         'flux', 'wavelength','phase', 'fluxerr', 'restwavelength',
         'pcderivsparse','recaltermderivs',
-        'varianceprefactor',
+        'varianceprefactor','errordesignmat'
      ]
     __staticattributes__=[
-        'iCL','ic','ispecx0','ispcrcl','icomponents', 'icoordinates',
-        'imodelcorrs', 'imodelerrs',
+        
+        
         'errorgridshape','bsplinecoeffshape'
 
-    ]
+    ]+__indexattributes__
     __slots__ = __dynamicattributes__+__staticattributes__
     
     def __init__(self,sn,spectrum,k,residsobj):
@@ -350,9 +386,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
                 setattr(self,attr,getattr(spectrum,attr))
         z = sn.zHelio
 #         import pdb;pdb.set_trace()
-        self.iCL=residsobj.iCL
-        self.ic=sn.ic
-        self.ispecx0=np.where(residsobj.parlist==f'specx0_{sn.snid}_{k}')[0][0]
+        self.ix0=np.where(residsobj.parlist==f'specx0_{sn.snid}_{k}')[0][0]
         self.ispcrcl=np.where(residsobj.parlist==f'specrecal_{sn.snid}_{k}')[0]
         self.bsplinecoeffshape=(residsobj.phaseBins[0].size,residsobj.waveBins[0].size)        
 
@@ -388,18 +422,23 @@ class modeledtrainingspectrum(modeledtrainingdata):
         errorphaseind=(np.searchsorted(residsobj.errphaseknotloc,self.phase)-1)
         self.errorgridshape=(residsobj.errphaseknotloc.size-1,residsobj.errwaveknotloc.size-1)
         phaseindtemp=np.tile(errorphaseind,errorwaveind.size )
-        ierrorbin=np.ravel_multi_index((phaseindtemp,errorwaveind),self.errorgridshape)
-        self.imodelcorrs=[(0,1,residsobj.imodelcorr01[ierrorbin])]    
-        self.imodelerrs=[residsobj.imodelerr0[ierrorbin] ,residsobj.imodelerr1[ierrorbin]    ]
+        try: ierrorbin=np.ravel_multi_index((phaseindtemp,errorwaveind),self.errorgridshape)
+        except: import pdb;pdb.set_trace()
+        errordesignmat=scisparse.lil_matrix((len(spectrum),residsobj.imodelerr0.size ))
+        errordesignmat[np.arange(0,len(spectrum)),ierrorbin ]= 1
+        self.errordesignmat= sparse.BCOO.from_scipy_sparse(errordesignmat)
+
+        self.imodelcorrs=[(0,1,residsobj.imodelcorr01)]    
+        self.imodelerrs=[residsobj.imodelerr0 ,residsobj.imodelerr1    ]
         if residsobj.host_component:
-            self.imodelcorrs+=[(0,2,residsobj.imodelcorr0host[ierrorbin])]
-            self.imodelerrs+=[residsobj.imodelerrhost[ierrorbin]]
+            self.imodelcorrs+=[(0,2,residsobj.imodelcorr0host)]
+            self.imodelerrs+=[residsobj.imodelerrhost]
         self.imodelerrs=np.array(self.imodelerrs)
 
         
     @partial(jaxoptions, jac_argnums=1)                      
     def modelflux(self,pars):
-        x0=pars[self.ispecx0]
+        x0=pars[self.ix0]
         #Define recalibration factor
         coeffs=pars[self.ispcrcl]
         recalterm=jnp.dot(self.recaltermderivs,coeffs)
@@ -415,7 +454,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
 
     @partial(jaxoptions, jac_argnums=1)                              
     def modelfluxvariance(self,pars):
-        x0=pars[self.ispecx0]
+        x0=pars[self.ix0]
         #Define recalibration factor
         coeffs=pars[self.ispcrcl]
         recalterm=jnp.dot(self.recaltermderivs,coeffs)
@@ -428,6 +467,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
         for i,j,corridx in self.imodelcorrs:
             correlation=  pars[corridx]
             errorsurfaces= errorsurfaces+2*correlation*coordinates[i]*coordinates[j]* errs[i]*errs[j]
+        errorsurfaces=self.errordesignmat @ errorsurfaces
         modelfluxvar=recalexp**2 * self.varianceprefactor**2 * x0**2* errorsurfaces
         return jnp.clip(modelfluxvar,0,None)
 

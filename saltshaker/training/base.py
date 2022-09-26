@@ -494,7 +494,7 @@ class TrainSALTBase:
                 photdata = sn.photdata
                 specdata = sn.specdata
                 z = sn.zHelio
-
+                
                 for k in list(specdata.keys()):
                     #Remove spectra outside phase range
                     spectrum=specdata[k]
