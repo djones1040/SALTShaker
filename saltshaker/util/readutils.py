@@ -38,7 +38,7 @@ class SALTtrainingdata(metaclass=abc.ABCMeta):
     def clip(self,clipcriterion):
         copy=deepcopy(self)
         for key in self.__listdatakeys__:
-            setattr(self,key,getattr(self,key)[clipcriterion])
+            setattr(copy,key,getattr(self,key)[clipcriterion])
         return copy
         
 class SALTtraininglightcurve(SALTtrainingdata):
@@ -68,7 +68,7 @@ class SALTtraininglightcurve(SALTtrainingdata):
                 
 class SALTtrainingspectrum(SALTtrainingdata):
 
-        __slots__=['flux', 'phase', 'wavelength', 'fluxerr', 'tobs','restwavelength']
+        __slots__=['flux', 'phase', 'wavelength', 'fluxerr', 'tobs','restwavelength','mjd']
 
         def __init__(self,snanaspec,z,tpk_guess,binspecres=None ):
                         m=snanaspec['SPECTRUM_MJD']
