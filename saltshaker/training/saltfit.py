@@ -779,7 +779,7 @@ class GaussNewton(saltresids.SALTResids):
                 kwargs['limit_'+params[i]] = (-5,5)
 
         kwargs.update({params[i]: initVals[i] for i in range(includePars.sum())})
-        m=Minuit(fn,use_array_call=True,forced_parameters=params,grad=grad,errordef=1,**kwargs)
+        m=Minuit(fn,forced_parameters=params,grad=grad,errordef=1,**kwargs) #use_array_call=True,
         result,paramResults=m.migrad()
 
         X=X.copy()
