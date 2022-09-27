@@ -145,7 +145,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
     
         'colorlawderiv','colorlawzero', 
     
-    
+        'errordesignmat','pcderivsparse',
         
         
         'varianceprefactor',
@@ -157,7 +157,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         'imodelcorrs_coordinds',
         'bsplinecoeffshape','errorgridshape',
         
-        'splinebasisconvolutions','errordesignmat',
+        
 
     ]+__indexattributes__
     __slots__ = __staticattributes__+__dynamicattributes__
@@ -232,7 +232,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         for i in np.where(isrelevant)[0]:
                 derivInterp[:,:,i] = bisplev(clippedphase ,wave,(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(residsobj.im0.size)==i, residsobj.bsorder,residsobj.bsorder))
 
-        self.splinebasisconvolutions=[]
+        splinebasisconvolutions=[]
         #Redden passband transmission by MW extinction, multiply by scalar factors
         reddenedpassband=sn.mwextcurve[waveidxs]*pbspl*dwave*fluxfactor*_SCALE_FACTOR/(1+z)
     
@@ -243,11 +243,11 @@ class modeledtraininglightcurve(modeledtrainingdata):
             else:
                 decayFactor=1
             if self.preintegratebasis:
-                self.splinebasisconvolutions+=[decayFactor*(np.dot(derivInterp[pdx,:,:].T,reddenedpassband))]
+                splinebasisconvolutions+=[decayFactor*(np.dot(derivInterp[pdx,:,:].T,reddenedpassband))]
             else:
                 
-                self.splinebasisconvolutions+=[decayFactor*(derivInterp[pdx,:,:]*reddenedpassband[:,np.newaxis])]
-        self.splinebasisconvolutions=sparse.BCOO.fromdense( np.stack(self.splinebasisconvolutions))
+                splinebasisconvolutions+=[decayFactor*(derivInterp[pdx,:,:]*reddenedpassband[:,np.newaxis])]
+        self.pcderivsparse=copy.deepcopy(sparse.BCOO.fromdense( np.stack(splinebasisconvolutions)))
 #########################################################################################
         
         #Quantities used in computation of model uncertainties
@@ -299,10 +299,10 @@ class modeledtraininglightcurve(modeledtrainingdata):
             #Multiply spline bases by flux coefficients
             
             
-            return self.splinebasisconvolutions @ fluxcoeffsreddened
+            return self.pcderivsparse @ fluxcoeffsreddened
         else:    
             #Integrate basis functions over wavelength and sum over flux coefficients
-            return ( self.splinebasisconvolutions @ fluxcoeffs) @ colorexp 
+            return ( self.pcderivsparse @ fluxcoeffs) @ colorexp 
             
     @partial(jaxoptions, jac_argnums=1)                      
     def modelfluxvariance(self,pars):
@@ -378,11 +378,11 @@ class modeledtrainingspectrum(modeledtrainingdata):
     __dynamicattributes__ = [
         'flux', 'wavelength','phase', 'fluxerr', 'restwavelength',
         'recaltermderivs',
-        'varianceprefactor'
+        'varianceprefactor',
+        'pcderivsparse','errordesignmat',
      ]
     __staticattributes__=[
         
-        'pcderivsparse','errordesignmat',
         
         'errorgridshape','bsplinecoeffshape'
 
