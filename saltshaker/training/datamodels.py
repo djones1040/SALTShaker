@@ -145,7 +145,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
     
         'colorlawderiv','colorlawzero', 
     
-        'errordesignmat','pcderivsparse',
+        'errordesignmat',
         
         
         'varianceprefactor',
@@ -153,7 +153,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         'colorlawderivlambdaeff', 'colorlawzerolambdaeff',
     ]
     __staticattributes__=[
-        'preintegratebasis',
+        'preintegratebasis','pcderivsparse',
         'imodelcorrs_coordinds',
         'bsplinecoeffshape','errorgridshape',
         
@@ -247,7 +247,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
             else:
                 
                 splinebasisconvolutions+=[decayFactor*(derivInterp[pdx,:,:]*reddenedpassband[:,np.newaxis])]
-        self.pcderivsparse=copy.deepcopy(sparse.BCOO.fromdense( np.stack(splinebasisconvolutions)))
+        self.pcderivsparse=(sparse.BCOO.fromdense( np.stack(splinebasisconvolutions)))
 #########################################################################################
         
         #Quantities used in computation of model uncertainties
