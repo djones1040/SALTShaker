@@ -16,7 +16,7 @@ from jax.tree_util import register_pytree_node_class
 
 
 from functools import partial
-from saltshaker.util.jaxoptions import jaxoptions
+from saltshaker.util.jaxoptions import jaxoptions,sparsejaxoptions
 
 import extinction
 import copy
@@ -142,16 +142,18 @@ class modeledtraininglightcurve(modeledtrainingdata):
         'colorlawderiv','colorlawzero', 
     
     
-        'splinebasisconvolutions',
+        
         
         'varianceprefactor',
-        'clscatderivs','errordesignmat',
+        'clscatderivs',
         'colorlawderivlambdaeff', 'colorlawzerolambdaeff',
     ]
     __staticattributes__=[
         'preintegratebasis',
         'imodelcorrs_coordinds',
-        'bsplinecoeffshape','errorgridshape'
+        'bsplinecoeffshape','errorgridshape',
+        
+        'splinebasisconvolutions','errordesignmat',
 
     ]+__indexattributes__
     __slots__ = __staticattributes__+__dynamicattributes__
@@ -274,7 +276,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
     @partial(jaxoptions, jac_argnums=1)                      
     def modelflux(self,pars):
         #Define parameters
-        x0,c=pars[np.array([self.ix0,self.ic])]
+        x0,c=pars[self.ix0],pars[self.ic]
         #Evaluate the coefficients of the spline bases
         
         coordinates=jnp.concatenate((jnp.ones(1), pars[self.icoordinates]))
@@ -298,7 +300,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
             
     @partial(jaxoptions, jac_argnums=1)                      
     def modelfluxvariance(self,pars):
-        x0,c=pars[np.array([self.ix0,self.ic])]
+        x0,c=pars[self.ix0],pars[self.ic]
         CL=pars[self.iCL]
         coordinates=pars[self.icoordinates]
         errs=  pars[self.imodelerrs]
@@ -369,11 +371,12 @@ class modeledtrainingspectrum(modeledtrainingdata):
     'imodelcorrs', 'imodelerrs',]
     __dynamicattributes__ = [
         'flux', 'wavelength','phase', 'fluxerr', 'restwavelength',
-        'pcderivsparse','recaltermderivs',
-        'varianceprefactor','errordesignmat'
+        'recaltermderivs',
+        'varianceprefactor'
      ]
     __staticattributes__=[
         
+        'pcderivsparse','errordesignmat',
         
         'errorgridshape','bsplinecoeffshape'
 
