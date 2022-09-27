@@ -9,7 +9,7 @@ def in_ipynb():
 
 from saltshaker.util.synphot import synphot
 from saltshaker.training import init_hsiao
-from saltshaker.training.datamodels import SALTfitcachelightcurve,  SALTfitcachespectrum,SALTfitcacheSN
+from saltshaker.training.datamodels import SALTfitcacheSN
 
 from saltshaker.training.priors import SALTPriors
 
@@ -401,24 +401,24 @@ class SALTResids:
         sources=[]
         jacobian= []
         for sn in (self.datadict.keys() if usesns is None else usesns):
-            for data in self.datadict[sn].photdata.values():
-                varkey = (f'phot_variances_{data.id}')
+            for lc,data in self.datadict[sn].photdata.items():
+                varkey = (f'phot_variances_{sn}_{lc}')
                 cachedvars=cachedresults[varkey]
                 residuals+=[data.modelresidual(guess,cachedresults=cachedvars,fixuncertainties=True,jit=True)['residuals']]
                 if identifyresidualsources: 
-                    sources+=[f'phot_{data.id}']*len(residuals[-1])
+                    sources+=[f'phot_{sn}_{lc}']*len(residuals[-1])
                 if getjacobian: 
                     jacobian+=[scisparse.csr_matrix(data.modelresidual(guess,cachedresults=cachedvars,fixuncertainties=True,jit=True,jac=True,forward=False)['residuals'])]
         
         if dospecresids:
             spectralSuppression=np.sqrt(self.num_phot/self.num_spec)*self.spec_chi2_scaling
             for sn in (self.datadict.keys() if usesns is None else usesns):
-                for data in self.datadict[sn].specdata.values():
-                    varkey=( f'spec_variances_{data.id}')
+                for k,data in self.datadict[sn].specdata.items():
+                    varkey=( f'spec_variances_{sn}_{k}')
                     cachedvars=cachedresults[varkey]
                     residuals+=[spectralSuppression*data.modelresidual(guess,cachedresults=cachedvars,fixuncertainties=True,jit=True)['residuals']]
                     if identifyresidualsources: 
-                        sources+=[f'spec_{data.id}']*len(residuals[-1])
+                        sources+=[f'spec_{sn}_{k}']*len(residuals[-1])
                     if getjacobian: 
                         jacobian+=[spectralSuppression*scisparse.csr_matrix(data.modelresidual(guess,cachedresults=cachedvars,fixuncertainties=True,jit=True,jac=True,forward=False)['residuals'])]
         if dopriors:
@@ -478,12 +478,12 @@ class SALTResids:
         loglike=0.
         grad= jnp.zeros(self.npar)
         for sn in (self.datadict.keys() if usesns is None else usesns):
-            for data in self.datadict[sn].photdata.values():
+            for lc,data in self.datadict[sn].photdata.items():
                 if fixfluxes:
-                    fluxkey= (f'phot_fluxes_{data.id}')
+                    fluxkey= (f'phot_fluxes_{sn}_{lc}')
                     cached=cachedresults[fluxkey]
                 elif fixuncertainties:
-                    varkey = (f'phot_variances_{data.id}')
+                    varkey = (f'phot_variances_{sn}_{lc}')
                     cached=cachedresults[varkey]
                 else:
                     cached=None
@@ -496,10 +496,10 @@ class SALTResids:
             for sn in (self.datadict.keys() if usesns is None else usesns):
                 for data in self.datadict[sn].specdata.values():
                     if fixfluxes:
-                        fluxkey= (f'spec_fluxes_{data.id}')
+                        fluxkey= (f'spec_fluxes_{sn}_{k}')
                         cached=cachedresults[fluxkey]
                     elif fixuncertainties:
-                        varkey = (f'spec_variances_{data.id}')
+                        varkey = (f'spec_variances_{sn}_{k}')
                         cached=cachedresults[varkey]
                     else:
                         cached=None

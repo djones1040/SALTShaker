@@ -484,6 +484,7 @@ class GaussNewton(saltresids.SALTResids):
         
         logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
         if suppressregularization:
+        #HACK: This code likely no longer functions as expected, since the regularization functions have been compiled
             self.neff[self.neff<self.neffMax]=10
         
         residuals,jac=self.lsqwrap(X,getjacobian=True)
