@@ -131,6 +131,10 @@ class modeledtrainingdata(metaclass=abc.ABCMeta):
             setattr(self,attr,val)
         return self
 
+    @abc.abstractmethod
+    def __len__(self):
+        pass
+    
 @register_pytree_node_class
 class modeledtraininglightcurve(modeledtrainingdata):
     __indexattributes__=['iCL','ix0','ic','icoordinates', 'icomponents','imodelcorrs', 'imodelerrs','iclscat',]
@@ -272,7 +276,9 @@ class modeledtraininglightcurve(modeledtrainingdata):
         
         self.clscatderivs=((colorscateval)  ** (pow)) / factorial(pow)
 
-    
+    def __len__(self):
+        return self.fluxcal.size
+        
     @partial(jaxoptions, jac_argnums=1)                      
     def modelflux(self,pars):
         #Define parameters
@@ -438,7 +444,9 @@ class modeledtrainingspectrum(modeledtrainingdata):
             self.imodelerrs+=[residsobj.imodelerrhost]
         self.imodelerrs=np.array(self.imodelerrs)
 
-        
+    def __len__(self):
+        return self.flux.size
+                
     @partial(jaxoptions, jac_argnums=1)                      
     def modelflux(self,pars):
         x0=pars[self.ix0]
