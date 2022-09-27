@@ -703,7 +703,7 @@ class GaussNewton(saltresids.SALTResids):
                     lcdata=self.datadict[sn].photdata[flt]
                     photresidsunscaled=lcdata.modelresidual(Xtmp)
                     photresidsrescaled=lcdata.modelresidual(Xredefinedtmp)
-                    assert(np.allclose(photresidsunscaled['residuals'],photresidsrescaled['residuals']))
+                    assert(np.allclose(photresidsunscaled['residuals'],photresidsrescaled['residuals'],rtol=0.001))
         except AssertionError:
             logging.critical('Rescaling components failed; photometric residuals have changed. Will finish writing output using unscaled quantities')
             Xredefined=X.copy()

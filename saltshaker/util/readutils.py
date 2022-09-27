@@ -116,7 +116,6 @@ class SALTtrainingspectrum(SALTtrainingdata):
                                         variance = np.average((flux[indices]/fluxmax-average)**2, weights=weights[indices])      # Fast and numerically precise
                                         return np.sqrt(variance)
 
-
                                 wavebins = np.linspace(np.min(wavelength),np.max(wavelength),int((np.max(wavelength)-np.min(wavelength))/(binspecres*(1+z))))
                                 binned_flux = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_avg).statistic
                                 binned_fluxerr = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_err).statistic
