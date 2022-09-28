@@ -704,7 +704,7 @@ class GaussNewton(saltresids.SALTResids):
                     lcdata=self.datadict[sn].photdata[flt]
                     photresidsunscaled=lcdata.modelresidual(Xtmp)
                     photresidsrescaled=lcdata.modelresidual(Xredefinedtmp)
-                    assert(np.allclose(photresidsunscaled['residuals'],photresidsrescaled['residuals'],rtol=0.001))
+                    assert(np.allclose(photresidsunscaled['residuals'],photresidsrescaled['residuals'],rtol=0.001,atol=1e-4))
         except AssertionError:
             logging.critical('Rescaling components failed; photometric residuals have changed. Will finish writing output using unscaled quantities')
             Xredefined=X.copy()
@@ -779,7 +779,8 @@ class GaussNewton(saltresids.SALTResids):
                 kwargs['limit_'+params[i]] = (-5,5)
 
         kwargs.update({params[i]: initVals[i] for i in range(includePars.sum())})
-        m=Minuit(fn,forced_parameters=params,grad=grad,errordef=1,**kwargs) #use_array_call=True,
+        m=Minuit(fn,name=params,grad=grad,**kwargs) #use_array_call=True,
+        m.errordef=1
         result,paramResults=m.migrad()
 
         X=X.copy()
@@ -883,30 +884,33 @@ class GaussNewton(saltresids.SALTResids):
         initVals=X[includePars].copy()
 
         minuitkwargs=({params[i]: initVals[i] for i in range(includePars.sum())})
-        minuitkwargs.update({'error_'+params[i]: 1e-2 for i in range(includePars.sum())})
-        clscatindices=np.where(self.parlist[includePars] == 'clscat')[0]
-        if clscatindices.size>0:
-            minuitkwargs.update({'limit_'+params[i]: (-1e-4,1e-4) for i in [clscatindices[0]]})
-            minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in clscatindices[1:-1]})
-            minuitkwargs.update({'limit_'+params[i]: (-10,2) for i in [clscatindices[-1]]})
-        minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelerr_0')[0]})
-        minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelerr_1')[0]})
-        minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelcorr_01')[0]})
-        if self.host_component:
-            minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelerr_host')[0]})
-            minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelcorr_0host')[0]})
-        
-        minuitkwargs.update({'limit_'+params[i]: (-100,100) for i in np.where(self.parlist[includePars] == 'cl')[0]})
-
-        
         if rescaleerrs:
             extrapar= 'x'+str(includePars.sum())
             params+=[extrapar]
             minuitkwargs[extrapar]=1
-            minuitkwargs['error_'+extrapar]=1e-2
-            minuitkwargs['limit_'+extrapar]=(0,2)
         
-        m=Minuit(fn,use_array_call=True,forced_parameters=params,errordef=.5,**minuitkwargs)
+        m=Minuit(fn,name=params,**minuitkwargs)
+        m.errordef=0.5
+
+        m.errors = {params[i]: 1e-2 for i in range(includePars.sum())}
+        m.limits = {}
+        clscatindices=np.where(self.parlist[includePars] == 'clscat')[0]
+        if clscatindices.size>0:
+            m.limits.update({params[i]: (-1e-4,1e-4) for i in [clscatindices[0]]})
+            m.limits.update({params[i]: (-1,1) for i in clscatindices[1:-1]})
+            m.limits.update({params[i]: (-10,2) for i in [clscatindices[-1]]})
+        m.limits.update({params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelerr_0')[0]})
+        m.limits.update({params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelerr_1')[0]})
+        m.limits.update({params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelcorr_01')[0]})
+        if self.host_component:
+            m.limits.update({params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelerr_host')[0]})
+            m.limits.update({params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelcorr_0host')[0]})
+        m.limits.update({params[i]: (-100,100) for i in np.where(self.parlist[includePars] == 'cl')[0]})
+
+        
+        if rescaleerrs:
+            m.errors = {extrapar:1e-2}
+            m.limits = {extrapar:(0,2)}
         try:
             result,paramResults=m.migrad(ncall=maxiter)
         except KeyboardInterrupt:
@@ -1034,12 +1038,14 @@ class GaussNewton(saltresids.SALTResids):
             return 1e10 if np.isnan(result) else result
             
         params=['x0','x1']
-        minuitkwargs=({'x0':0,'x1':1})
-        minuitkwargs.update({'error_x0': 1e-2,'error_x1': 1e-2})
-        minuitkwargs.update({'limit_x0': (-3,3),'limit_x1': (-3,3)})
+        minuitkwargs={'x0':0,'x1':1}
+        #minuitkwargs.update({'error_x0': 1e-2,'error_x1': 1e-2})
+        #minuitkwargs.update({'limit_x0': (-3,3),'limit_x1': (-3,3)})
 
-        
-        m=Minuit(fn,use_array_call=True,forced_parameters=params,errordef=.5,**minuitkwargs)
+        m=Minuit(fn,name=params,**minuitkwargs)
+        m.errordef = 0.5
+        m.errors = {'error_x0':1e-2,'error_x1':1e-2}
+        m.limits = {'limit_x0':(-3,3),'limit_x1':(-3,3)}
         result,paramResults=m.migrad()
 
         if m.covariance:
