@@ -494,7 +494,7 @@ class SALTResids:
         if dospec:
             spectralSuppression=np.sqrt(self.num_phot/self.num_spec)*self.spec_chi2_scaling
             for sn in (self.datadict.keys() if usesns is None else usesns):
-                for data in self.datadict[sn].specdata.values():
+                for k,data in self.datadict[sn].specdata.items():
                     if fixfluxes:
                         fluxkey= (f'spec_fluxes_{sn}_{k}')
                         cached=cachedresults[fluxkey]
@@ -543,7 +543,6 @@ class SALTResids:
                 if getvars: results[varkey]=spectrum.modelfluxvariance(x,jit=True)
         return (results)
 
-      
     def bestfitsinglebandnormalizationsforSN(self,x,sn):
         sndata=self.datadict[sn]
         for flt in sndata.photdata:
@@ -556,7 +555,6 @@ class SALTResids:
             normalization=(designmatrix*vals/variance).sum()*normvariance
             results[flt]=normalization,normvariance
         return results
-        
         
     def SALTModel(self,x,evaluatePhase=None,evaluateWave=None):
         """Returns flux surfaces of SALT model"""

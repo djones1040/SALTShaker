@@ -517,9 +517,9 @@ class GaussNewton(saltresids.SALTResids):
             spline2d=sparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))[:,varyparlist=='m0']
         
             #Smooth things a bit, since this is supposed to be for broadband photometry
-#           if smoothingfactor>0:
-#               smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
-#               spline2d=smoothingmatrix*spline2d
+            if smoothingfactor>0:
+                smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
+                spline2d=smoothingmatrix*spline2d
             #Uncorrelated effect of parameter uncertainties on M0 and M1
             m0pulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='m0'].astype('float32')*spline2d.T.astype('float32')
             m1pulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='m1'].astype('float32')*spline2d.T.astype('float32')
@@ -704,11 +704,11 @@ class GaussNewton(saltresids.SALTResids):
                     lcdata=self.datadict[sn].photdata[flt]
                     photresidsunscaled=lcdata.modelresidual(Xtmp)
                     photresidsrescaled=lcdata.modelresidual(Xredefinedtmp)
-                    assert(np.allclose(photresidsunscaled['residuals'],photresidsrescaled['residuals']))
+                    assert(np.allclose(photresidsunscaled['residuals'],photresidsrescaled['residuals'],rtol=0.001,atol=1e-4))
         except AssertionError:
             logging.critical('Rescaling components failed; photometric residuals have changed. Will finish writing output using unscaled quantities')
             Xredefined=X.copy()
-
+        getdatauncertainties=False
         if getdatauncertainties:
             M0dataerr, M1dataerr, Mhostdataerr, cov_M0_M1_data, cov_M0_Mhost_data =self.datauncertaintiesfromhessianapprox(Xredefined)
         else:
@@ -779,7 +779,8 @@ class GaussNewton(saltresids.SALTResids):
                 kwargs['limit_'+params[i]] = (-5,5)
 
         kwargs.update({params[i]: initVals[i] for i in range(includePars.sum())})
-        m=Minuit(fn,use_array_call=True,forced_parameters=params,grad=grad,errordef=1,**kwargs)
+        m=Minuit(fn,name=params,grad=grad,**kwargs) #use_array_call=True,
+        m.errordef=1
         result,paramResults=m.migrad()
 
         X=X.copy()
@@ -817,7 +818,7 @@ class GaussNewton(saltresids.SALTResids):
         log.debug(str(minuitresult))
         return X
 
-    def iterativelyfiterrmodel(self,X):
+    def iterativelyfiterrmodel(self,X,**kwargs):
         log.info('Optimizing model error')
         X=X.copy()
         imodelerr=np.zeros(self.parlist.size,dtype=bool)
@@ -827,17 +828,8 @@ class GaussNewton(saltresids.SALTResids):
 
         X0=X.copy()
         mapFun= starmap
+        cachedfluxes= self.calculatecachedvals(X,getfluxes=True)
         
-        log.debug('turning off model priors')
-        store_priors = self.usePriors.copy()
-        self.usePriors = ()
-        
-        storedResults={}
-        log.info('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X,storedResults)))
-        fluxes={key:storedResults[key] for key in storedResults if 'fluxes' in key }
-        storedResults=fluxes.copy()
-        args=[(X0,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
-        result0=np.array(list(mapFun(self.loglikeforSN,args)))
         partriplets= list(zip(np.where(self.parlist=='modelerr_0')[0],np.where(self.parlist=='modelerr_1')[0],np.where(self.parlist=='modelcorr_01')[0]))
         if self.host_component:
             partriplets= list(zip(np.where(self.parlist=='modelerr_0')[0],np.where(self.parlist=='modelerr_1')[0],np.where(self.parlist=='modelcorr_01')[0],
@@ -846,83 +838,94 @@ class GaussNewton(saltresids.SALTResids):
         for i,parindices in tqdm(enumerate(partriplets)):
             includePars=np.zeros(self.parlist.size,dtype=bool)
             includePars[list(parindices)]=True
-            storedResults=fluxes.copy()
-            args=[(X0+includePars*.5,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
-            result=np.array(list(mapFun(self.loglikeforSN,args)))
-            usesns=np.array(list(self.datadict.keys()))[result!=result0]
-            logging.debug(f'{usesns.size} SNe constraining {i}th error bin')
-            X,minuitfitresult=self.minuitoptimize(X,includePars,fluxes,fixFluxes=True,dospec=False,usesns=usesns)
-        log.debug('turning on model priors')
-        self.usePriors = store_priors
+
+            X,minuitfitresult=self.minuitoptimize(X,includePars,cachedfluxes,fixfluxes=True,dopriors=False,dospec=False,usesns=usesns)
+
         log.info('Finished model error optimization')
         return X
 
     def minuitoptimize(self,X,includePars,storedResults=None,rescaleerrs=False,maxiter=100,**kwargs):
         X=X.copy()
         if storedResults is None: storedResults={}
-        if  not rescaleerrs:
+        if includePars.dtype==bool:
+            includePars= np.where(includePars)[0]
+            
+        if not rescaleerrs:
             def fn(Y):
                 Xnew=X.copy()
                 Xnew[includePars]=Y
-                result=-self.maxlikefit(Xnew,storedResults.copy(),**kwargs)
+                result=-self.maxlikefit(Xnew,storedResults,**kwargs)
                 return 1e10 if np.isnan(result) else result
+            def grad(Y):
+                Xnew=X.copy()
+                Xnew[includePars]=Y
+                grad=-self.maxlikefit(Xnew,storedResults,getgrad=True,**kwargs)[1]
+                grad=grad[includePars]
+                return np.ones(Y.size) if np.isnan(grad ).any() else grad
+
         else:
             def fn(Y):
-                try:
-                    Xnew=X.copy()
-                    Xnew[includePars]=Y[:-1]
-                    Xnew[self.imodelerr]*=Y[-1]
-                    result=-self.maxlikefit(Xnew,storedResults.copy(),**kwargs)
-                    return 1e10 if np.isnan(result) else result
-                except KeyboardInterrupt as e:
-                    raise e
-                except:
-                    logging.warning('Error caught in minuit loop')
-                    return 1e10
-        params=['x'+str(i) for i in range(includePars.sum())]
-        initVals=X[includePars].copy()
+                Xnew=X.copy()
+                Xnew[includePars]=Y[:-1]
+                Xnew[self.imodelerr]*=Y[-1]
+                result=-self.maxlikefit(Xnew,storedResults,**kwargs)
+                return (1e10 if np.isnan(result) else result)
 
-        minuitkwargs=({params[i]: initVals[i] for i in range(includePars.sum())})
-        minuitkwargs.update({'error_'+params[i]: 1e-2 for i in range(includePars.sum())})
+            def grad(Y):
+                Xnew=X.copy()
+                Xnew[includePars]=Y[:-1]
+                Xnew[self.imodelerr]*=Y[-1]
+                grad=-self.maxlikefit(Xnew,storedResults,getgrad=True,**kwargs)[1]
+                grad=np.concatenate(grad[includePars], [np.dot(grad[self.imodelerr], X[self.imodelerr])])
+                return np.ones(Y.size) if np.isnan(grad ).any() else grad
+        initvals=X[includePars].copy()
+
+        if rescaleerrs:
+            initvals=np.concatenate((initvals, [1])
+)
+        m=Minuit(fn,initvals,grad=grad)
+        m.errordef=0.5
+        m.errors = np.tile(1e-2, initvals.size)
+
+        lowerlims=np.tile(-np.inf,includePars.size)
+        upperlims=np.tile( np.inf,includePars.size)
         clscatindices=np.where(self.parlist[includePars] == 'clscat')[0]
         if clscatindices.size>0:
-            minuitkwargs.update({'limit_'+params[i]: (-1e-4,1e-4) for i in [clscatindices[0]]})
-            minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in clscatindices[1:-1]})
-            minuitkwargs.update({'limit_'+params[i]: (-10,2) for i in [clscatindices[-1]]})
-        minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelerr_0')[0]})
-        minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelerr_1')[0]})
-        minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelcorr_01')[0]})
-        if self.host_component:
-            minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelerr_host')[0]})
-            minuitkwargs.update({'limit_'+params[i]: (-1,1) for i in np.where(self.parlist[includePars] == 'modelcorr_0host')[0]})
-        
-        minuitkwargs.update({'limit_'+params[i]: (-100,100) for i in np.where(self.parlist[includePars] == 'cl')[0]})
+            lowerlims[clscatindices[0]]=-1e-4
+            lowerlims[clscatindices[1:-1]]=-1 
+            lowerlims[clscatindices[-1]]=-10
+            
+            upperlims[clscatindices[0]]=1e-4
+            upperlims[clscatindices[1:-1]]=1 
+            upperlims[clscatindices[-1]]=2
 
-        
+        onebounded=np.array( [x.startswith('modelerr') or x.startswith('modelcorr') for x in  self.parlist[includePars] ])
+        lowerlims[onebounded]=-1
+        upperlims[onebounded]=1
+        lowerlims[self.parlist[includePars] == 'cl'] = -100
+        upperlims[self.parlist[includePars] == 'cl'] = 100
+    
+
         if rescaleerrs:
-            extrapar= 'x'+str(includePars.sum())
-            params+=[extrapar]
-            minuitkwargs[extrapar]=1
-            minuitkwargs['error_'+extrapar]=1e-2
-            minuitkwargs['limit_'+extrapar]=(0,2)
-        
-        m=Minuit(fn,use_array_call=True,forced_parameters=params,errordef=.5,**minuitkwargs)
+            lowerlims=np.concatenate((lowerlims,[0]))
+            upperlims=np.concatenate((upperlims,[2]))
+        m.limits=list(zip(lowerlims,upperlims))
         try:
-            result,paramResults=m.migrad(ncall=maxiter)
+            result=m.migrad(ncall=maxiter)
         except KeyboardInterrupt:
             logging.info('Keyboard interrupt, exiting minuit loop')
             return X,None
         X=X.copy()
-        
-        paramresults=np.array([x.value for x  in paramResults])
+
+        paramresults=np.array(m.values)
         if rescaleerrs:
             X[includePars]=paramresults[:-1]
             X[self.imodelerr]*=paramresults[-1]
         else:
             X[includePars]=paramresults
-        
+
         return X,result
-    
+
     #def iterativelyfitdataerrmodel(self,X):
     #
     #   X0=X.copy()
@@ -1034,12 +1037,14 @@ class GaussNewton(saltresids.SALTResids):
             return 1e10 if np.isnan(result) else result
             
         params=['x0','x1']
-        minuitkwargs=({'x0':0,'x1':1})
-        minuitkwargs.update({'error_x0': 1e-2,'error_x1': 1e-2})
-        minuitkwargs.update({'limit_x0': (-3,3),'limit_x1': (-3,3)})
+        minuitkwargs={'x0':0,'x1':1}
+        #minuitkwargs.update({'error_x0': 1e-2,'error_x1': 1e-2})
+        #minuitkwargs.update({'limit_x0': (-3,3),'limit_x1': (-3,3)})
 
-        
-        m=Minuit(fn,use_array_call=True,forced_parameters=params,errordef=.5,**minuitkwargs)
+        m=Minuit(fn,name=params,**minuitkwargs)
+        m.errordef = 0.5
+        m.errors = {'error_x0':1e-2,'error_x1':1e-2}
+        m.limits = {'limit_x0':(-3,3),'limit_x1':(-3,3)}
         result,paramResults=m.migrad()
 
         if m.covariance:

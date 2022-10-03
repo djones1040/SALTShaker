@@ -7,6 +7,7 @@ from saltshaker.util.specSynPhot import getColorsForSN
 from argparse import SUPPRESS
 from saltshaker.training.priors import __priors__
 import logging
+
 log=logging.getLogger(__name__)
 
 
@@ -364,6 +365,8 @@ class TrainSALTBase:
                                                         help='number of angstroms over which to compute scaling of error model (default=%(default)s)')
                 successful=successful&wrapaddingargument(config,'modelparams','use_snpca_knots',         type=boolean_string,
                                                         help='if set, define model on SNPCA knots (default=%(default)s)')               
+                successful=successful&wrapaddingargument(config,'modelparams','colorlaw_function',         type=str,
+                                                        help='color law function, see colorlaw.py (default=%(default)s)')               
 
                 # priors
                 for prior in __priors__:
@@ -414,7 +417,8 @@ class TrainSALTBase:
                                  'use_previous_errors':self.options.use_previous_errors,
                                  'fix_salt2modelpars':self.options.fix_salt2modelpars,
                                  'fix_salt2components':self.options.fix_salt2components,
-                                 'no_transformed_err_check':self.options.no_transformed_err_check}
+                                 'no_transformed_err_check':self.options.no_transformed_err_check,
+                                 'colorlaw_function':self.options.colorlaw_function}
 
                 for k in self.options.__dict__.keys():
                     if k.startswith('prior') or k.startswith('bound'):
