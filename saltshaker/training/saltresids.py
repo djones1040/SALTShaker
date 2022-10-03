@@ -494,7 +494,7 @@ class SALTResids:
         if dospec:
             spectralSuppression=np.sqrt(self.num_phot/self.num_spec)*self.spec_chi2_scaling
             for sn in (self.datadict.keys() if usesns is None else usesns):
-                for data in self.datadict[sn].specdata.values():
+                for k,data in self.datadict[sn].specdata.items():
                     if fixfluxes:
                         fluxkey= (f'spec_fluxes_{sn}_{k}')
                         cached=cachedresults[fluxkey]
