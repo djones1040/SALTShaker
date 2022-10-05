@@ -1249,7 +1249,6 @@ config file options can be overwridden at the command line"""
         elif configpositional:
             configfile= configpositional
         else:
-            parser.print_help()
             raise RuntimeError('Configuration file must be specified at command line')
 
         config = configparser.ConfigParser(inline_comment_prefixes='#')
