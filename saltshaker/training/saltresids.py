@@ -8,8 +8,9 @@ def in_ipynb():
 
 
 from saltshaker.util.synphot import synphot
+from saltshaker.util import batching
 from saltshaker.training import init_hsiao
-from saltshaker.training.datamodels import SALTfitcacheSN
+from saltshaker.training.datamodels import SALTfitcacheSN,modeledtraininglightcurve,modeledtrainingspectrum
 
 from saltshaker.training.priors import SALTPriors
 
@@ -317,13 +318,37 @@ class SALTResids:
         if self.regularize:
             self.updateEffectivePoints(guess)
 
+        
+        def getphotdatacounts(datadict):
+            for snid,sn in datadict.items():
+                for flt,lc in sn.photdata.items():
+                    yield len(lc)
+
+        photdatasizes=list(getphotdatacounts(datadict))
+        photpadding=batching.optimizepaddingsizes(4,photdatasizes)
+        
         log.info('Calculating cached quantities for speed in fitting loop')
         start=time.time()
         iterable=self.datadict.items()
         if sys.stdout.isatty() or in_ipynb():
             iterable=tqdm(iterable)
-        self.datadict={snid: sn if isinstance(sn,SALTfitcacheSN) else SALTfitcacheSN(sn,self,self.kcordict)  for snid,sn in iterable}
- 
+        self.datadict={snid: sn if isinstance(sn,SALTfitcacheSN) else SALTfitcacheSN(sn,self,self.kcordict,photpadding)  for snid,sn in iterable}
+        
+        photdata = sum([[x.photdata[lc] for lc in x.photdata ]for x in self.datadict.values() ],[])
+        self.batchedphotdata= batching.batchdatabysize(photdata)
+        
+        self.batchedphotresiduals=batching.batchedmodelfunctions(lambda *args,**kwargs: modeledtraininglightcurve.modelresidual(*args,**kwargs)['residuals'],
+                                  self.batchedphotdata, modeledtraininglightcurve,
+                                  flatten=True)
+        
+        self.batchedphotvariances=jax.jit(batching.batchedmodelfunctions(  modeledtraininglightcurve.modelfluxvariance,
+                                  self.batchedphotdata, modeledtraininglightcurve,
+                                  ))
+                                  
+        self.batchedphotfluxes=jax.jit(batching.batchedmodelfunctions(  modeledtraininglightcurve.modelflux,
+                                  self.batchedphotdata, modeledtraininglightcurve,
+                                  ))
+
         self.priors = SALTPriors(self)
                 
         log.info('Time required to calculate cached quantities {:.1f}s'.format(time.time()-start))
