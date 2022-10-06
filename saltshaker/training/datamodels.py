@@ -54,21 +54,22 @@ def toidentifier(input):
 
 
 @register_pytree_node_class
-class SALTparameters:
-            
-    __slots__=['x0','coordinates','components','c','CL'
-    'modelcorrs','modelerrs','spcrcl']
+class SALTparameters:          
+    __slots__=['x0','coordinates','components','c','CL',
+    'modelcorrs','modelerrs','spcrcl','clscat']
     
     def __init__(self,data,parsarray):
         for var in self.__slots__:
             indexvar=f'i{var}'
-            if  indexvar in data.__indexattributes__:
+            if isinstance(data,dict) and indexvar in data:
+                setattr(self,var, parsarray[data[indexvar]])
+            elif '__indexattributes__' in dir(data) and indexvar in data.__indexattributes__:
                 setattr(self,var, parsarray[getattr(data,indexvar)])
             else:
                 setattr(self,var, np.array([]))
         
     def tree_flatten(self):
-        children =tuple(getattr(self,x) for x in vars(self))
+        children =tuple(getattr(self,x) for x in self.__slots__)
         aux_data =tuple()
         return (children, aux_data)
 
@@ -78,6 +79,7 @@ class SALTparameters:
         for attr,val in zip(self.__slots__,children):
             setattr(self,attr,val)
         return self
+
 
 class modeledtrainingdata(metaclass=abc.ABCMeta):
     
@@ -111,11 +113,9 @@ class modeledtrainingdata(metaclass=abc.ABCMeta):
         pass
     
     @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],jac_argnums=1)        
-    def modelloglikelihood(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False):
-        """Calculate the predicted model log-likelihood given the data and model"""
+    def modelloglikelihood(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False,jit=False,jac=False,forward=False):
         resids=self.modelresidual(x,cachedresults,fixuncertainties,fixfluxes)
         return resids['lognorm']- (resids['residuals']**2).sum() / 2.  
-
 
     def tree_flatten(self):
         children =tuple(getattr(self,x) for x in self.__dynamicattributes__)
@@ -131,45 +131,52 @@ class modeledtrainingdata(metaclass=abc.ABCMeta):
             setattr(self,attr,val)
         return self
 
+    def unpack(self):
+        return tuple(getattr(self,x) for x in self.__slots__)
+ 
+    @classmethod
+    def repack(cls, data):
+        self=cls.__new__(cls)
+        for attr,val in zip(self.__slots__,data):
+            setattr(self,attr,val)
+        return self
+       
     @abc.abstractmethod
     def __len__(self):
         pass
     
 @register_pytree_node_class
 class modeledtraininglightcurve(modeledtrainingdata):
-    __indexattributes__=['iCL','ix0','ic','icoordinates', 'icomponents','imodelcorrs', 'imodelerrs','iclscat',]
+    __indexattributes__=['iCL','ix0','ic','icoordinates', 'icomponents','imodelcorrs', 'imodelerrs','iclscat','ipad']
 
     __dynamicattributes__= [
         'phase','fluxcal','fluxcalerr',
         'lambdaeff','lambdaeffrest',
-    
         'colorlawderiv','colorlawzero', 
-    
         'errordesignmat',
-        
-        
         'varianceprefactor',
         'clscatderivs',
         'colorlawderivlambdaeff', 'colorlawzerolambdaeff',
-    ]
+        'padding',
+    ]+__indexattributes__
     __staticattributes__=[
         'preintegratebasis','pcderivsparse',
         'imodelcorrs_coordinds',
         'bsplinecoeffshape','errorgridshape',
-        
-        
-
-    ]+__indexattributes__
-    __slots__ = __staticattributes__+__dynamicattributes__
+    ]
+    __slots__ = __dynamicattributes__+__staticattributes__
     
 
-    def __init__(self,sn,lc,residsobj,kcordict):
+    def __init__(self,sn,lc,residsobj,kcordict,padding=0):
         for attr in lc.__slots__:
             if attr in self.__slots__:
                 setattr(self,attr,getattr(lc,attr))
 
         z = sn.zHelio
-        
+        padding=max(0,padding)
+        self.padding=padding
+        self.ipad= np.arange(len(lc)+padding )>= len(lc)
+
         #Define quantities for synthetic photometry
         filtwave = kcordict[sn.survey][lc.filt]['filtwave']
         filttrans = kcordict[sn.survey][lc.filt]['filttrans']
@@ -247,7 +254,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
             else:
                 
                 splinebasisconvolutions+=[decayFactor*(derivInterp[pdx,:,:]*reddenedpassband[:,np.newaxis])]
-        self.pcderivsparse=(sparse.BCOO.fromdense( np.stack(splinebasisconvolutions)))
+        self.pcderivsparse=(sparse.BCOO.fromdense( np.stack(splinebasisconvolutions+ [np.zeros(splinebasisconvolutions[-1].shape) ] *padding)))
 #########################################################################################
         
         #Quantities used in computation of model uncertainties
@@ -266,7 +273,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         waveindtemp=np.array([errorwaveind for x in errorphaseind])
         ierrorbin=np.ravel_multi_index((errorphaseind,waveindtemp),self.errorgridshape)
         
-        errordesignmat=scisparse.lil_matrix((len(lc),residsobj.imodelerr0.size ))
+        errordesignmat=scisparse.lil_matrix((len(lc)+padding,residsobj.imodelerr0.size ))
         errordesignmat[np.arange(0,len(lc)),ierrorbin ]= 1
         self.errordesignmat= sparse.BCOO.from_scipy_sparse(errordesignmat)
         
@@ -275,63 +282,63 @@ class modeledtraininglightcurve(modeledtrainingdata):
         colorscateval=((self.lambdaeffrest-5500)/1000)
         
         self.clscatderivs=((colorscateval)  ** (pow)) / factorial(pow)
+        for attr in lc.__slots__:
+            if attr in lc.__listdatakeys__ and attr in self.__slots__:
+                setattr(self,attr,np.concatenate((getattr(self,attr),np.zeros(padding))))
+        self.fluxcalerr[self.ipad]=1
 
     def __len__(self):
         return self.fluxcal.size
-        
-    @partial(jaxoptions, jac_argnums=1)                      
+
+    @partial(jaxoptions, jac_argnums=1)                              
     def modelflux(self,pars):
-        #Define parameters
-        x0,c=pars[self.ix0],pars[self.ic]
+        if not isinstance(pars,SALTparameters):
+            pars=SALTparameters(self,pars)
         #Evaluate the coefficients of the spline bases
         
-        coordinates=jnp.concatenate((jnp.ones(1), pars[self.icoordinates]))
-        components=pars[self.icomponents]
-        fluxcoeffs=jnp.dot(coordinates,components)*x0
+        coordinates=jnp.concatenate((jnp.ones(1), pars.coordinates))
+
+        fluxcoeffs=jnp.dot(coordinates,pars.components)*pars.x0
         
         #Evaluate color law at the wavelength basis centers
-        colorlaw=jnp.dot(self.colorlawderiv,pars[self.iCL])+self.colorlawzero
+        colorlaw=jnp.dot(self.colorlawderiv,pars.CL)+self.colorlawzero
         #Exponentiate and multiply by color
-        colorexp= 10. ** (  -0.4*colorlaw* c)
+        colorexp= 10. ** (  -0.4*colorlaw* pars.c)
         if self.preintegratebasis:
             #Redden flux coefficients
             fluxcoeffsreddened= (colorexp[np.newaxis,:]*fluxcoeffs.reshape( self.bsplinecoeffshape)).flatten()
             #Multiply spline bases by flux coefficients
-            
-            
             return self.pcderivsparse @ fluxcoeffsreddened
         else:    
             #Integrate basis functions over wavelength and sum over flux coefficients
             return ( self.pcderivsparse @ fluxcoeffs) @ colorexp 
-            
-    @partial(jaxoptions, jac_argnums=1)                      
+
+    @partial(jaxoptions, jac_argnums=1)                                  
     def modelfluxvariance(self,pars):
-        x0,c=pars[self.ix0],pars[self.ic]
-        CL=pars[self.iCL]
-        coordinates=pars[self.icoordinates]
-        errs=  pars[self.imodelerrs]
-        correlations=pars[self.imodelcorrs]
+        if not isinstance(pars,SALTparameters):
+            pars=SALTparameters(self,pars)
 
         #Evaluate color law at the wavelength basis centers
-        colorlaw=jnp.dot(self.colorlawderivlambdaeff,CL)+self.colorlawzerolambdaeff
+        colorlaw=jnp.dot(self.colorlawderivlambdaeff,pars.CL)+self.colorlawzerolambdaeff
         #Exponentiate and multiply by color
-        colorexp= 10. ** (  -0.4*colorlaw* c)
-  
-          #Evaluate model uncertainty
-        
-        coordinates=jnp.concatenate((jnp.ones(1), coordinates ))
-        errorsurfaces=jnp.dot(coordinates,errs)**2
-        for (i,j),correlation in zip(self.imodelcorrs_coordinds,correlations):
-            errorsurfaces= errorsurfaces+2 *correlation*coordinates[i]*coordinates[j]* errs[i]*errs[j]
-        
-        errorsurfaces=self.errordesignmat @ errorsurfaces
-        modelfluxvar=colorexp**2 * self.varianceprefactor**2 * x0**2* errorsurfaces
-        return jnp.clip(modelfluxvar,0,None)
+        colorexp= 10. ** (  -0.4*colorlaw* pars.c)
 
-    @partial(jaxoptions, jac_argnums=1)                       
+          #Evaluate model uncertainty
+
+        coordinates=jnp.concatenate((jnp.ones(1), pars.coordinates ))
+        errorsurfaces=jnp.dot(coordinates,pars.modelerrs)**2
+        for (i,j),correlation in zip(self.imodelcorrs_coordinds,pars.modelcorrs):
+            errorsurfaces= errorsurfaces+2 *correlation*coordinates[i]*coordinates[j]* pars.modelerrs[i]*pars.modelerrs[j]
+
+        errorsurfaces=self.errordesignmat @ errorsurfaces
+        modelfluxvar=colorexp**2 * self.varianceprefactor**2 * pars.x0**2* errorsurfaces
+        return jnp.clip(modelfluxvar ,0,None)
+        
+    @partial(jaxoptions, jac_argnums=1)                      
     def colorscatter(self,pars):
-        clscatpars = pars[self.iclscat]
-        return  jnp.exp(self.clscatderivs @ clscatpars)
+        if not isinstance(pars,SALTparameters):
+            pars=SALTparameters(self,pars)
+        return  jnp.exp(self.clscatderivs @ pars.clscat)
 
         
         
@@ -344,17 +351,19 @@ class modeledtraininglightcurve(modeledtrainingdata):
             modelflux=self.modelflux(x)
 
         if fixuncertainties:
-             modelvariance,clscat=cachedresults
+            if isinstance(cachedresults,tuple):
+                modelvariance,clscat=cachedresults
+            else:
+                modelvariance,clscat=cachedresults,0
         else:
             modelvariance=self.modelfluxvariance(x)
             clscat=self.colorscatter(x)
 
-        variance=self.fluxcalerr**2 + modelvariance            
+        variance=self.fluxcalerr**2 + modelvariance  
         sigma=jnp.sqrt(variance)
         
         #if clscat>0, then need to use a cholesky matrix to find pulls
         def choleskyresidsandnorm( variance,clscat,modelflux):
-#             cholesky=jaxrankOneCholesky(variance,clscat**2,modelflux)
             cholesky=jaxlinalg.cholesky(jnp.diag(variance)+ clscat**2*jnp.outer(modelflux,modelflux),lower=True)
             return {'residuals':jaxlinalg.solve_triangular(cholesky, modelflux-self.fluxcal,lower=True), 
             'lognorm': -jnp.log(jnp.diag(cholesky)).sum()}
@@ -364,8 +373,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
             return {'residuals':(modelflux-self.fluxcal)/sigma,'lognorm': -jnp.log(sigma).sum()}
         return lax.cond(clscat==0, diagonalresidsandnorm, choleskyresidsandnorm, 
              variance,clscat,modelflux )
-#         return lax.cond(clscat==0, diagonalresidsandnorm, choleskyresidsandnorm, 
-#              variance,clscat,modelflux )
+
   
   
 
@@ -374,7 +382,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
 class modeledtrainingspectrum(modeledtrainingdata):
     __indexattributes__=[
     'ix0','ispcrcl','icomponents', 'icoordinates',
-    'imodelcorrs', 'imodelerrs',]
+    'imodelcorrs', 'imodelerrs','ipad']
     __dynamicattributes__ = [
         'flux', 'wavelength','phase', 'fluxerr', 'restwavelength',
         'recaltermderivs',
@@ -383,22 +391,24 @@ class modeledtrainingspectrum(modeledtrainingdata):
      ]
     __staticattributes__=[
         
-        
+        'padding',
         'errorgridshape','bsplinecoeffshape'
 
     ]+__indexattributes__
     __slots__ = __dynamicattributes__+__staticattributes__
     
-    def __init__(self,sn,spectrum,k,residsobj):
+    def __init__(self,sn,spectrum,k,residsobj,padding=0):
         for attr in spectrum.__slots__:
             if attr in self.__slots__:
-                setattr(self,attr,getattr(spectrum,attr))
+                    setattr(self,attr,getattr(spectrum,attr))
         z = sn.zHelio
 #         import pdb;pdb.set_trace()
+        padding=max(0,padding)
         self.ix0=np.where(residsobj.parlist==f'specx0_{sn.snid}_{k}')[0][0]
         self.ispcrcl=np.where(residsobj.parlist==f'specrecal_{sn.snid}_{k}')[0]
         self.bsplinecoeffshape=(residsobj.phaseBins[0].size,residsobj.waveBins[0].size)        
-
+        self.padding=padding
+        self.ipad= np.arange(len(spectrum)+padding )> len(spectrum)
         self.icomponents=residsobj.icomponents
         self.icoordinates=sn.icoordinates
         mwextcurve=sn.mwextcurveint(spectrum.wavelength)
@@ -417,15 +427,16 @@ class modeledtrainingspectrum(modeledtrainingdata):
         for i in np.where(isrelevant)[0]:
                 derivInterp[:,i] = bisplev(spectrum.phase,self.restwavelength,(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(residsobj.im0.size)==i, residsobj.bsorder,residsobj.bsorder))
         derivInterp=derivInterp*(_SCALE_FACTOR/(1+z)*mwextcurve)[:,np.newaxis]
-        self.pcderivsparse=sparse.BCOO.fromdense(derivInterp)        
+        self.pcderivsparse=sparse.BCOO.fromdense(np.concatenate((derivInterp,np.zeros((padding,residsobj.im0.size)))))        
 
         pow=self.ispcrcl.size-np.arange(self.ispcrcl.size)
         recalCoord=(self.wavelength-np.mean(self.wavelength))/residsobj.specrange_wavescale_specrecal
         #recalCoord=(residsobj.waveBinCenters-jnp.mean(self.wavelength))/residsobj.specrange_wavescale_specrecal
         self.recaltermderivs=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
-        
+        self.recaltermderivs=np.concatenate((self.recaltermderivs,np.zeros((padding,pow.size))))
 
         self.varianceprefactor= _SCALE_FACTOR*sn.mwextcurveint(self.wavelength) /(1+z)
+        self.varianceprefactor= np.concatenate((self.varianceprefactor, np.zeros(padding)))
         
         errorwaveind=np.searchsorted(residsobj.errwaveknotloc,self.restwavelength)-1
         errorphaseind=(np.searchsorted(residsobj.errphaseknotloc,self.phase)-1)
@@ -433,7 +444,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
         phaseindtemp=np.tile(errorphaseind,errorwaveind.size )
         try: ierrorbin=np.ravel_multi_index((phaseindtemp,errorwaveind),self.errorgridshape)
         except: import pdb;pdb.set_trace()
-        errordesignmat=scisparse.lil_matrix((len(spectrum),residsobj.imodelerr0.size ))
+        errordesignmat=scisparse.lil_matrix((len(spectrum)+padding,residsobj.imodelerr0.size ))
         errordesignmat[np.arange(0,len(spectrum)),ierrorbin ]= 1
         self.errordesignmat= sparse.BCOO.from_scipy_sparse(errordesignmat)
 
@@ -444,6 +455,13 @@ class modeledtrainingspectrum(modeledtrainingdata):
             self.imodelerrs+=[residsobj.imodelerrhost]
         self.imodelerrs=np.array(self.imodelerrs)
 
+        for attr in spectrum.__slots__:
+            if attr in spectrum.__listdatakeys__ and attr in self.__slots__:
+                setattr(self,attr,np.concatenate((getattr(self,attr),np.zeros(padding))))
+        self.fluxerr[self.ipad]=1
+
+        
+        
     def __len__(self):
         return self.flux.size
                 
@@ -480,7 +498,8 @@ class modeledtrainingspectrum(modeledtrainingdata):
             errorsurfaces= errorsurfaces+2*correlation*coordinates[i]*coordinates[j]* errs[i]*errs[j]
         errorsurfaces=self.errordesignmat @ errorsurfaces
         modelfluxvar=recalexp**2 * self.varianceprefactor**2 * x0**2* errorsurfaces
-        return jnp.clip(modelfluxvar,0,None)
+        return jnp.clip(modelfluxvar ,0,None)
+
 
     @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],jac_argnums=1)        
     def modelresidual(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False):
@@ -509,13 +528,18 @@ class SALTfitcacheSN(SALTtrainingSN):
     
     __slots__= ['ix0','ix1','ic', 'ixhost','icoordinates','mwextcurve','mwextcurveint','dwave','obswave','obsphase']
     
-    def __init__(self,sndata,residsobj,kcordict):
+    def __init__(self,sndata,residsobj,kcordict,lcpaddingsizes=None,specpaddingsizes=None):
         for attr in sndata.__slots__:
             if attr=='photdata' or  attr=='specdata':
                 pass
             else:
                 setattr(self,attr, getattr(sndata,attr))
-                
+        if isinstance(lcpaddingsizes,int):
+            lcpaddingsizes=[lcpaddingsizes]
+        if isinstance(specpaddingsizes,int):
+            specpaddingsizes=[specpaddingsizes]
+        ###HACK
+        specminsize=0
         self.obswave = residsobj.wave*(1+self.zHelio)
         self.obsphase = residsobj.phase*(1+self.zHelio)
         self.dwave = residsobj.wave[1]*(1+self.zHelio) - residsobj.wave[0]*(1+self.zHelio)
@@ -531,7 +555,14 @@ class SALTfitcacheSN(SALTtrainingSN):
         self.ic=np.where(residsobj.parlist==f'c_{self.snid}')[0][0]
 
         self.icoordinates=np.array([self.ix1]+([self.ixhost]if residsobj.host_component else []))
-       
-        self.photdata={flt: modeledtraininglightcurve(self,sndata.photdata[flt],residsobj,kcordict ) for flt in sndata.photdata}
-        self.specdata={k: modeledtrainingspectrum(self,sndata.specdata[k],k,residsobj ) for k in sndata.specdata }
+        def choosesmallestpadsize(padsizes,datasize):
+            if padsizes is None: return 0
+            else: 
+                padneeded= np.array(padsizes)-datasize
+                padneeded= padneeded[padneeded>=0]
+                try: return np.min(padneeded)
+                except ValueError: raise ValueError(f'Data of length {datasize} is longer than requested zero-padded length of {max(padsizes)}')
+                                
+        self.photdata={flt: modeledtraininglightcurve(self,sndata.photdata[flt],residsobj,kcordict , choosesmallestpadsize( lcpaddingsizes, len(sndata.photdata[flt]) ) ) for flt in sndata.photdata}
+        self.specdata={k: modeledtrainingspectrum(self,sndata.specdata[k],k,residsobj,max(0,specminsize-len(sndata.specdata[k]) ) ) for k in sndata.specdata }
         

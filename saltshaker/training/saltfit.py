@@ -844,7 +844,7 @@ class GaussNewton(saltresids.SALTResids):
         log.info('Finished model error optimization')
         return X
 
-    def minuitoptimize(self,X,includePars,storedResults=None,rescaleerrs=False,maxiter=100,**kwargs):
+    def minuitoptimize(self,X,includePars,storedResults=None,rescaleerrs=False,tol=0.1,**kwargs):
         X=X.copy()
         if storedResults is None: storedResults={}
         if includePars.dtype==bool:
@@ -886,7 +886,8 @@ class GaussNewton(saltresids.SALTResids):
         m=Minuit(fn,initvals,grad=grad)
         m.errordef=0.5
         m.errors = np.tile(1e-2, initvals.size)
-
+        m.tol=tol
+        
         lowerlims=np.tile(-np.inf,includePars.size)
         upperlims=np.tile( np.inf,includePars.size)
         clscatindices=np.where(self.parlist[includePars] == 'clscat')[0]
@@ -911,7 +912,7 @@ class GaussNewton(saltresids.SALTResids):
             upperlims=np.concatenate((upperlims,[2]))
         m.limits=list(zip(lowerlims,upperlims))
         try:
-            result=m.migrad(ncall=maxiter)
+            result=m.migrad()
         except KeyboardInterrupt:
             logging.info('Keyboard interrupt, exiting minuit loop')
             return X,None

@@ -317,14 +317,13 @@ class SALTResids:
         if self.regularize:
             self.updateEffectivePoints(guess)
 
-        self.datadictnocache=datadict
         log.info('Calculating cached quantities for speed in fitting loop')
         start=time.time()
         iterable=self.datadict.items()
         if sys.stdout.isatty() or in_ipynb():
             iterable=tqdm(iterable)
-        self.datadict={snid: SALTfitcacheSN(sn,self,self.kcordict) for snid,sn in iterable}
-
+        self.datadict={snid: sn if isinstance(sn,SALTfitcacheSN) else SALTfitcacheSN(sn,self,self.kcordict)  for snid,sn in iterable}
+ 
         self.priors = SALTPriors(self)
                 
         log.info('Time required to calculate cached quantities {:.1f}s'.format(time.time()-start))
