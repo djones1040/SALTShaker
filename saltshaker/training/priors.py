@@ -151,7 +151,7 @@ class SALTPriors:
                 
         self.numresids=self.priorresids(SALTResidsObj.initparams,jit=True).size
         
-    @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],jac_argnums=1)        
+    @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],diff_argnum=1)        
     def priorresids(self,x):
         """Given a parameter vector returns a residuals vector representing the priors"""
 
@@ -165,7 +165,7 @@ class SALTPriors:
         residuals+=[self.boundedpriorresids(x)]
         return jnp.concatenate(  residuals)
 
-    @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],jac_argnums=1)        
+    @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],diff_argnum=1)        
     def priorloglike(self,x):
         """Given a parameter vector returns a residuals vector representing the priors"""
 

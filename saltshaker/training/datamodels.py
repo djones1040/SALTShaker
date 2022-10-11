@@ -112,7 +112,7 @@ class modeledtrainingdata(metaclass=abc.ABCMeta):
         """Calculate the predicted flux given the data and model"""
         pass
     
-    @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],jac_argnums=1)        
+    @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],diff_argnum=1)        
     def modelloglikelihood(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False,jit=False,jac=False,forward=False):
         resids=self.modelresidual(x,cachedresults,fixuncertainties,fixfluxes)
         return resids['lognorm']- (resids['residuals']**2).sum() / 2.  
@@ -290,7 +290,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
     def __len__(self):
         return self.fluxcal.size
 
-    @partial(jaxoptions, jac_argnums=1)                              
+    @partial(jaxoptions, diff_argnum=1)                              
     def modelflux(self,pars):
         if not isinstance(pars,SALTparameters):
             pars=SALTparameters(self,pars)
@@ -313,7 +313,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
             #Integrate basis functions over wavelength and sum over flux coefficients
             return ( self.pcderivsparse @ fluxcoeffs) @ colorexp 
 
-    @partial(jaxoptions, jac_argnums=1)                                  
+    @partial(jaxoptions, diff_argnum=1)                                  
     def modelfluxvariance(self,pars):
         if not isinstance(pars,SALTparameters):
             pars=SALTparameters(self,pars)
@@ -334,7 +334,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         modelfluxvar=colorexp**2 * self.varianceprefactor**2 * pars.x0**2* errorsurfaces
         return jnp.clip(modelfluxvar ,0,None)
         
-    @partial(jaxoptions, jac_argnums=1)                      
+    @partial(jaxoptions, diff_argnum=1)                      
     def colorscatter(self,pars):
         if not isinstance(pars,SALTparameters):
             pars=SALTparameters(self,pars)
@@ -342,7 +342,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
 
         
         
-    @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],jac_argnums=1)        
+    @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],diff_argnum=1)        
     def modelresidual(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False):
    
         if fixfluxes:
@@ -465,7 +465,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
     def __len__(self):
         return self.flux.size
                 
-    @partial(jaxoptions, jac_argnums=1)                      
+    @partial(jaxoptions, diff_argnum=1)                      
     def modelflux(self,pars):
         x0=pars[self.ix0]
         #Define recalibration factor
@@ -481,7 +481,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
 
         return recalexp*(self.pcderivsparse @ (fluxcoeffs))
 
-    @partial(jaxoptions, jac_argnums=1)                              
+    @partial(jaxoptions, diff_argnum=1)                              
     def modelfluxvariance(self,pars):
         x0=pars[self.ix0]
         #Define recalibration factor
@@ -501,7 +501,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
         return jnp.clip(modelfluxvar ,0,None)
 
 
-    @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],jac_argnums=1)        
+    @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],diff_argnum=1)        
     def modelresidual(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False):
         if fixfluxes:
             modelflux=cachedresults

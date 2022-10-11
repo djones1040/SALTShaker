@@ -9,6 +9,7 @@ def in_ipynb():
 
 from saltshaker.util.synphot import synphot
 from saltshaker.util import batching
+from saltshaker.util.jaxoptions import jaxoptions
 from saltshaker.training import init_hsiao
 from saltshaker.training.datamodels import SALTfitcacheSN,modeledtraininglightcurve,modeledtrainingspectrum
 
@@ -326,7 +327,7 @@ class SALTResids:
 
         photdatasizes=list(getphotdatacounts(datadict))
         photpadding=batching.optimizepaddingsizes(4,photdatasizes)
-        
+
         log.info('Calculating cached quantities for speed in fitting loop')
         start=time.time()
         iterable=self.datadict.items()
@@ -418,21 +419,16 @@ class SALTResids:
                 self.iclscat_0 = np.append(self.iclscat_0,np.where(self.parlist == parname)[0][-1])
                 self.iclscat_poly = np.append(self.iclscat_poly,np.where(self.parlist == parname)[0][:-1])        
 
-    def lsqwrap(self,guess,cachedresults=None,getjacobian=False,dopriors=True,dospecresids=True,usesns=None,identifyresidualsources=False):
-        if cachedresults is None: 
-            cachedresults=self.calculatecachedvals(guess,getvars=True)
+
+    @partial(jaxoptions, static_argnums=[0,3,4,5,6 ],static_argnames= ['dopriors','dospecresids','usesns','identifyresidualsources'],diff_argnum=1,jitdefault=True) 
+    def lsqwrap(self,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None,identifyresidualsources=False):
         residuals = []
         sources=[]
-        jacobian= []
-        for sn in (self.datadict.keys() if usesns is None else usesns):
-            for lc,data in self.datadict[sn].photdata.items():
-                varkey = (f'phot_variances_{sn}_{lc}')
-                cachedvars=cachedresults[varkey]
-                residuals+=[data.modelresidual(guess,cachedresults=cachedvars,fixuncertainties=True,jit=True)['residuals']]
-                if identifyresidualsources: 
-                    sources+=[f'phot_{sn}_{lc}']*len(residuals[-1])
-                if getjacobian: 
-                    jacobian+=[scisparse.csr_matrix(data.modelresidual(guess,cachedresults=cachedvars,fixuncertainties=True,jit=True,jac=True,forward=False)['residuals'])]
+        if not (usesns is  None): raise NotImplementedError('Have not implemented a restricted set of sne')
+        residuals+=[ self.batchedphotresiduals(guess,uncertainties,fixuncertainties=True,jit=False) ]
+        if identifyresidualsources: 
+            sources+=[f'phot_{sn}_{lc}']*len(residuals[-1])
+
         
         if dospecresids:
             spectralSuppression=np.sqrt(self.num_phot/self.num_spec)*self.spec_chi2_scaling
@@ -443,12 +439,8 @@ class SALTResids:
                     residuals+=[spectralSuppression*data.modelresidual(guess,cachedresults=cachedvars,fixuncertainties=True,jit=True)['residuals']]
                     if identifyresidualsources: 
                         sources+=[f'spec_{sn}_{k}']*len(residuals[-1])
-                    if getjacobian: 
-                        jacobian+=[spectralSuppression*scisparse.csr_matrix(data.modelresidual(guess,cachedresults=cachedvars,fixuncertainties=True,jit=True,jac=True,forward=False)['residuals'])]
         if dopriors:
-            residuals+=[self.priors.priorresids(guess,jit=True)]
-            if getjacobian: 
-                jacobian+=[self.priors.priorresids(guess,jit=True,jac=True,forward=self.priors.numresids > self.npar)]
+            residuals+=[self.priors.priorresids(guess)]
             if identifyresidualsources: 
                 sources+=[f'priors']*len(residuals[-1])
             if self.regularize:
@@ -457,18 +449,11 @@ class SALTResids:
                     sources+=[f'reg_dyad']*len(residuals[-3])
                     sources+=[f'reg_phase']*len(residuals[-2])
                     sources+=[f'reg_wave']*len(residuals[-1])
-                if getjacobian: 
-                    jacobian+=[((self.dyadicRegularization_jacobian)(guess))]
-                    jacobian+=[((self.phaseGradientRegularization_jacobian)(guess))]
-                    jacobian+=[((self.waveGradientRegularization_jacobian)(guess))]
         
         if identifyresidualsources:
-            return jnp.concatenate(residuals).to_py(), sources
-        if getjacobian:
-            return  jnp.concatenate(residuals).to_py(),scisparse.vstack(jacobian).tocsr()
-          
+            return jnp.concatenate(residuals), sources          
         else:
-            return  jnp.concatenate(residuals).to_py()
+            return  jnp.concatenate(residuals)
             
     def getChi2Contributions(self,X,**kwargs):
         residuals,sources= self.lsqwrap(X,identifyresidualsources=True,**kwargs)

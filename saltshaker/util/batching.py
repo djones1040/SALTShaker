@@ -9,7 +9,7 @@ from scipy import optimize, stats
 def optimizepaddingsizes(numbatches,datasizes):
     def parstobins(pars):
         pars=np.abs(pars)
-        pars=np.concatenate([[0],pars,[1]])
+        pars=np.concatenate([[0],pars,[1.0001]])
         return np.cumsum(pars/pars.sum())
 
     def loss(pars):#    binlocs=[14,60]
@@ -24,7 +24,9 @@ def optimizepaddingsizes(numbatches,datasizes):
 
         'initial_simplex':vertices})
     pars=result.x
-    return np.floor(( parstobins(pars)[1:])*max(datasizes)).astype(int)
+    bins=np.floor(( parstobins(pars)[1:])*max(datasizes)).astype(int)
+    bins[-1]=max(datasizes)
+    return bins
 
 
 
