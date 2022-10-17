@@ -284,6 +284,7 @@ class TrainSALT(TrainSALTBase):
                 else:
                     spcrclcopy = spcrcldata[spcrcldata['SNID'] == sn]
                     order = int(spcrclcopy['ncalib'][spcrclcopy['N'] == k+1])
+                order=min(max(order,self.options.n_min_specrecal ), self.options.n_max_specrecal)
                 recalParams=[f'specx0_{sn}_{k}']+[f'specrecal_{sn}_{k}']*(order-1)
                 parlist=np.append(parlist,recalParams)
         # initial guesses

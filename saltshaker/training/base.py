@@ -305,6 +305,8 @@ class TrainSALTBase:
                                                         help='scaling of spectral chi^2 so it doesn\'t dominate the total chi^2 (default=%(default)s)')
                 successful=successful&wrapaddingargument(config,'trainingparams','n_min_specrecal',     type=int,
                                                         help='Minimum order of spectral recalibration polynomials (default=%(default)s)')
+                successful=successful&wrapaddingargument(config,'trainingparams','n_max_specrecal',     type=int,
+                                                        help='Maximum order of spectral recalibration polynomials (default=%(default)s)')
                 successful=successful&wrapaddingargument(config,'trainingparams','specrange_wavescale_specrecal',  type=float,
                                                         help='Wavelength scale (in angstroms) for determining additional orders of spectral recalibration from wavelength range of spectrum (default=%(default)s)')
                 successful=successful&wrapaddingargument(config,'trainingparams','n_specrecal_per_lightcurve',  type=float,
