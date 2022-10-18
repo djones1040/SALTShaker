@@ -6,6 +6,9 @@ import numpy as np
 
 from scipy import optimize, stats
 
+import warnings
+
+
 def optimizepaddingsizes(numbatches,datasizes):
     def parstobins(pars):
         pars=np.abs(pars)
@@ -43,13 +46,17 @@ def batchdatabysize(data):
             batcheddata[key] =[x]
             
     def repackforvmap(data):
+        __ismapped__=data[0].__ismapped__
         unpacked=[x.unpack() for x in data]
-        for j in range(len(unpacked[0])):
+        
+        for j,varname in enumerate( data[0].__slots__):
+
             vals=np.array([(unpacked[i][j]) for i in range(len(unpacked))])
             if isinstance(vals[0],sparse.BCOO) : 
                 yield sparse.bcoo_concatenate([x.reshape((1,*x.shape)).update_layout(n_batch=1) for x in vals] ,dimension=0)
             else: 
-                if np.all(vals[0]==vals):
+                if not (varname in __ismapped__ ):
+                    assert(np.all(vals[0]==vals), "Unmapped quantity different between different objects")
                     yield vals[0]
                 else:
                     yield  np.stack(vals,axis=0) 
@@ -58,18 +65,18 @@ def batchdatabysize(data):
 
 
 
-def walkargumenttree(x,targetsize):
+def walkargumenttree(x,targetsize,ncalls=0):
     if isinstance(x,dict):
-        return {key:walkargumenttree(val,targetsize) for key,val in x.items()} 
+        return {key:walkargumenttree(val,targetsize,ncalls+1) for key,val in x.items()} 
     elif hasattr(x,'shape') :
         if len(x.shape)>0 and x.shape[0]==targetsize:
             return 0
         else: return None
     elif hasattr(x,'__len__'):
-        if len(x)==targetsize:
+        if len(x)==targetsize and ncalls>0:
             return 0
         else :
-            return type(x)(walkargumenttree(y,targetsize) for y in x )
+            return type(x)(walkargumenttree(y,targetsize,ncalls+1) for y in x )
     else : return None
 
 def batchedmodelfunctions(function,batcheddata, dtype,flatten=False):
@@ -92,7 +99,8 @@ def batchedmodelfunctions(function,batcheddata, dtype,flatten=False):
             batchedargs=[[]]*len(batcheddata)
         else:
             batchedargs= list(zip(*[x if hasattr(x,'__len__') else [x]*len(batcheddata) for x in batchedargs]))
-        if len(batchedkwargs)=={}:
+        
+        if (batchedkwargs)=={}:
             batchedkwargs=[{}]*len(batcheddata)
         else:
             batchedkwargs= [{y:x[i] if hasattr(x,'__len__') else x for y,x in batchedkwargs.items()}
@@ -107,17 +115,21 @@ def batchedmodelfunctions(function,batcheddata, dtype,flatten=False):
 #             import pdb;pdb.set_trace()
             newpars=datamodels.SALTparameters(indexdict, pars)
             parsvmapped=newpars.tree_flatten()[0]
-            newargs=batch,list(parsvmapped),kwargs,*args
-            
+            newargs=kwargs,*args
+
             #Determine which axes of the arguments correspond to the lightcurve data
             targetsize=indexdict['ix0'].size
-            
-            inaxes=walkargumenttree(newargs,targetsize)
-            mapped=jax.vmap(  funpacked,in_axes= 
-                inaxes
-                        )(
-                *newargs
-            )
+            #The batched data has prenoted which arguments are to be mapped over; otherwise need to attempt to determine it programatically
+            try:
+                inaxes= [(0 if (x in dtype.__ismapped__) else None) for x in dtype.__slots__],newpars.mappingaxes,*walkargumenttree(newargs,targetsize)
+                mapped=jax.vmap(  funpacked,in_axes= 
+                    inaxes
+                            )(
+                    batch,list(parsvmapped),*newargs
+                )
+            except Exception as e:
+                print(e)
+                import pdb;pdb.set_trace()
             if flatten: mapped=mapped.flatten()
             result+=[mapped ]
         if flatten:

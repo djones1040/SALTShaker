@@ -474,30 +474,20 @@ class GaussNewton(saltresids.SALTResids):
         import time
         tstart = time.time()
 
-        varyingParams=self.fitOptions['components'][1]|self.fitOptions['colorlaw'][1]
-        if self.fix_salt2components:
-            # generally I think we want to get real errors from our training sample
-            # even if these components are fixed in the training
-            varyingParams[self.im0]=True
-            varyingParams[self.im1]=True
         
         logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
-        if suppressregularization:
-        #HACK: This code likely no longer functions as expected, since the regularization functions have been compiled
-            self.neff[self.neff<self.neffMax]=10
         
-        residuals,jac=self.lsqwrap(X,getjacobian=True)
-
-        self.updateEffectivePoints(X)
-        #Simple preconditioning of the jacobian before attempting to invert
-        precondition=sparse.diags(1/np.sqrt(np.asarray((jac.power(2)).sum(axis=0))),[0])
-        precondjac=(jac*precondition)
+        datauncertainties=self.calculatecachedvals(X,target='variances')
         
         #Define the matrix sigma^-1=J^T J
-        square=ensurepositivedefinite((precondjac.T*precondjac).toarray())
         
+        jvp=jaxoptions.jaxoptions(jax.grad(lambda x: (sf.lsqwrap(x,datauncertainties,jit=False)**2).sum())
+           )(pars,diff='jvp',jit=True)
+
+        hessian=jnp.stack([jvp(((np.arange( pars.size)==i)*1.)) for i in range(pars.size)])
+                
         #Inverting cholesky matrix for speed
-        L=linalg.cholesky(square,lower=True)
+        L=linalg.cholesky(hessian,lower=True)
         invL=(linalg.solve_triangular(L,np.diag(np.ones(L.shape[0])),lower=True))
         #Turning spline_derivs into a sparse matrix for speed
         chunkindex,chunksize=0,10
@@ -508,7 +498,7 @@ class GaussNewton(saltresids.SALTResids):
         cov_M0_Mhost_data = np.empty((self.phaseout.size,self.waveout.size))
         
         for chunkindex in np.arange(self.waveout.size)[::chunksize]:
-            varyparlist= self.parlist[varyingParams]
+            varyparlist= self.parlist
             spline_derivs = np.empty([self.phaseout.size, min(self.waveout.size-chunkindex, chunksize),self.im0.size])
             for i in range(self.im0.size):
                 if self.bsorder == 0: continue
@@ -520,10 +510,10 @@ class GaussNewton(saltresids.SALTResids):
                 smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
                 spline2d=smoothingmatrix*spline2d
             #Uncorrelated effect of parameter uncertainties on M0 and M1
-            m0pulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='m0'].astype('float32')*spline2d.T.astype('float32')
-            m1pulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='m1'].astype('float32')*spline2d.T.astype('float32')
+            m0pulls=invL.astype('float32')[:,varyparlist=='m0'].astype('float32')*spline2d.T.astype('float32')
+            m1pulls=invL.astype('float32')[:,varyparlist=='m1'].astype('float32')*spline2d.T.astype('float32')
             if self.host_component:
-                mhostpulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='mhost'].astype('float32')*spline2d.T.astype('float32')
+                mhostpulls=invL.astype('float32')[:,varyparlist=='mhost'].astype('float32')*spline2d.T.astype('float32')
                 
             mask=np.zeros((self.phaseout.size,self.waveout.size),dtype=bool)
             mask[:,chunkindex:chunkindex+chunksize]=True        
@@ -608,7 +598,7 @@ class GaussNewton(saltresids.SALTResids):
         if not nocolorscatter: log.debug('Turning off color scatter for convergence_loop')
         X[self.iclscat[-1]]=-np.inf
 
-        cacheduncertainties= self.calculatecachedvals(X,getvars=True)
+        cacheduncertainties= self.calculatecachedvals(X,target='variances')
         Xlast = copy.deepcopy(guess[:])
         if np.all(X[self.ix1]==0) or np.all(X[self.ic]==0):
             #If snparams are totally uninitialized
@@ -635,11 +625,11 @@ class GaussNewton(saltresids.SALTResids):
                    self.fit_cdisp_only and photochi2perdof<self.model_err_max_chisq and not superloop == 0:
                     X=self.iterativelyfiterrmodel(X)
                     chi2results=self.getChi2Contributions(X)
-                    cacheduncertainties= self.calculatecachedvals(X,getvars=True)
+                    cacheduncertainties= self.calculatecachedvals(X,target='variances')
                 else:
                     log.info('Reevaluted model error')
                     chi2results=self.getChi2Contributions(X)
-                    cacheduncertainties= self.calculatecachedvals(X,getvars=True)
+                    cacheduncertainties= self.calculatecachedvals(X,target='variances')
                 
                 for name,chi2component,dof in chi2results:
                     log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/sum([x[1] for x in chi2results])*100))
@@ -802,7 +792,7 @@ class GaussNewton(saltresids.SALTResids):
         includePars[self.iclscat]=True
         includePars[self.iCL]=fitcolorlaw
         
-        log.info('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X,{})))
+        log.info('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X)))
         storedResults={}
         storedResults['components'] =self.SALTModel(X)
         if self.bsorder != 0: storedResults['componentderivs'] = self.SALTModelDeriv(X,1,0,self.phase,self.wave)        
@@ -827,7 +817,7 @@ class GaussNewton(saltresids.SALTResids):
 
         X0=X.copy()
         mapFun= starmap
-        cachedfluxes= self.calculatecachedvals(X,getfluxes=True)
+        cachedfluxes= self.calculatecachedvals(X,target='fluxes')
         
         partriplets= list(zip(np.where(self.parlist=='modelerr_0')[0],np.where(self.parlist=='modelerr_1')[0],np.where(self.parlist=='modelcorr_01')[0]))
         if self.host_component:
@@ -843,9 +833,8 @@ class GaussNewton(saltresids.SALTResids):
         log.info('Finished model error optimization')
         return X
 
-    def minuitoptimize(self,X,includePars,storedResults=None,rescaleerrs=False,tol=0.1,**kwargs):
+    def minuitoptimize(self,X,includePars,storedResults=None,rescaleerrs=False,tol=0.1,*args,**kwargs):
         X=X.copy()
-        if storedResults is None: storedResults={}
         if includePars.dtype==bool:
             includePars= np.where(includePars)[0]
             
@@ -853,12 +842,12 @@ class GaussNewton(saltresids.SALTResids):
             def fn(Y):
                 Xnew=X.copy()
                 Xnew[includePars]=Y
-                result=-self.maxlikefit(Xnew,storedResults,**kwargs)
+                result=-self.maxlikefit(Xnew,*args,**kwargs)
                 return 1e10 if np.isnan(result) else result
             def grad(Y):
                 Xnew=X.copy()
                 Xnew[includePars]=Y
-                grad=-self.maxlikefit(Xnew,storedResults,getgrad=True,**kwargs)[1]
+                grad=-self.maxlikefit(Xnew,*args,**kwargs,diff='grad')
                 grad=grad[includePars]
                 return np.ones(Y.size) if np.isnan(grad ).any() else grad
 
@@ -867,14 +856,14 @@ class GaussNewton(saltresids.SALTResids):
                 Xnew=X.copy()
                 Xnew[includePars]=Y[:-1]
                 Xnew[self.imodelerr]*=Y[-1]
-                result=-self.maxlikefit(Xnew,storedResults,**kwargs)
+                result=-self.maxlikefit(Xnew,*args,**kwargs)
                 return (1e10 if np.isnan(result) else result)
 
             def grad(Y):
                 Xnew=X.copy()
                 Xnew[includePars]=Y[:-1]
                 Xnew[self.imodelerr]*=Y[-1]
-                grad=-self.maxlikefit(Xnew,storedResults,getgrad=True,**kwargs)[1]
+                grad=-self.maxlikefit(Xnew,*args,**kwargs,diff='grad')
                 grad=np.concatenate(grad[includePars], [np.dot(grad[self.imodelerr], X[self.imodelerr])])
                 return np.ones(Y.size) if np.isnan(grad ).any() else grad
         initvals=X[includePars].copy()
@@ -985,10 +974,7 @@ class GaussNewton(saltresids.SALTResids):
         X0=X.copy()
         mapFun= starmap
 
-        storedResults={}
-        log.info('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X,storedResults)))
-        fluxes={key:storedResults[key] for key in storedResults if 'fluxes' in key }
-        storedResults=fluxes.copy()
+        log.info('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X)))
         args=[(X0,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
         result0=np.array(list(mapFun(self.loglikeforSN,args)))
         pars = np.where(self.parlist=='modelerr_0')[0]
