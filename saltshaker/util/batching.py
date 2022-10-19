@@ -10,19 +10,26 @@ import warnings
 
 
 def optimizepaddingsizes(numbatches,datasizes):
+    """Given a set of the sizes of batches of data, and a number of batches to divide them into, each of which is zero-padded, determine the zero-paddings that will minimize the additional space required to store the results
+    """
+    #Transform a set of n-1 unconstrained parameters into n+1 bin edges, starting at 0 and monotonically increasing to 1
     def parstobins(pars):
+        #Probably a better transform to use here!
         pars=np.abs(pars)
-        pars=np.concatenate([[0],pars,[1.0001]])
+        pars=np.concatenate([[0],pars,[1.]])
         return np.cumsum(pars/pars.sum())
-
+    
+    #Define the loss function to be used here: defined here as just the space required to store the result
     def loss(pars):#    binlocs=[14,60]
         bins=parstobins(pars)* max(datasizes) 
         spacerequired=stats.binned_statistic(datasizes, datasizes,statistic='count', bins=bins).statistic* np.floor(bins[1:])
         return spacerequired.sum()
     ndim=numbatches-1
 
+    #Integer programming doesn't seem to have a particularly easy implementation in python
+    #I use Nelder-Mead method since it doesn't use gradients, and it gets reasonable results
+    #Starting vertices are chosen based on a fixed rng seed to eliminate reproducibility error
     vertices=np.random.default_rng(seed=13241245642435).random(size=(ndim+1,ndim))
-    
     result=optimize.minimize(loss,[0]*ndim,  method='Nelder-Mead', options= {
 
         'initial_simplex':vertices})
@@ -34,38 +41,46 @@ def optimizepaddingsizes(numbatches,datasizes):
 
 
 def batchdatabysize(data):
-
+    """ Given a set of  data, divide them into batches each of a fixed size, for easy use with jax's batching methods. Quantities that are marked as 'mapped' by their objects will be turned into arrays, otherwise the values are tested for equality and given as unmapped objects  """
     batcheddata={ }
 
     for x in data:
+        #determine length of each piece of data
         key=len(x)
+        #assign data to an appropriate entry in dictionary based on length
         if key in batcheddata:
             
             batcheddata[key] += [x]
         else:
             batcheddata[key] =[x]
-            
+    
+    #Given a batch of data, unpacks it and stacks it along the first axis for use with jax's vmap method   
     def repackforvmap(data):
         __ismapped__=data[0].__ismapped__
+        #Given n data with m attributes, this yields an n x m list of lists
         unpacked=[x.unpack() for x in data]
         
+        #Want to convert that into an m-element list of n-element arrays or single values
         for j,varname in enumerate( data[0].__slots__):
 
             vals=np.array([(unpacked[i][j]) for i in range(len(unpacked))])
+            #If it's a sparse array, concatenate along new "batched" axis for use with vmap
             if isinstance(vals[0],sparse.BCOO) : 
                 yield sparse.bcoo_concatenate([x.reshape((1,*x.shape)).update_layout(n_batch=1) for x in vals] ,dimension=0)
             else: 
                 if not (varname in __ismapped__ ):
+                    #If an attribute is not to be mapped over, the single value is set, and it is verified that it is the same for all elements
                     assert(np.all(vals[0]==vals), "Unmapped quantity different between different objects")
                     yield vals[0]
                 else:
                     yield  np.stack(vals,axis=0) 
-    
+    #Returns a list of batches of data suitable for use with the batchedmodelfunctions function
     return [list(repackforvmap(x)) for x in batcheddata.values()]
 
 
 
 def walkargumenttree(x,targetsize,ncalls=0):
+    """ Walks argument trees checking for whether the first axis of each leaf matches the size of the mapped axes; if so return 0, otherwise None"""
     if isinstance(x,dict):
         return {key:walkargumenttree(val,targetsize,ncalls+1) for key,val in x.items()} 
     elif hasattr(x,'shape') :
@@ -80,6 +95,7 @@ def walkargumenttree(x,targetsize,ncalls=0):
     else : return None
 
 def batchedmodelfunctions(function,batcheddata, dtype,flatten=False):
+    """Constructor function to map a function that takes a modeledtrainingdata object as first arg and a SALTparameters object as second arg over batched, zero-padded data"""
     if issubclass(dtype,datamodels.modeledtrainingdata) :
         pass
     elif dtype in ['light-curves','spectra']:
