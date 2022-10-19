@@ -458,39 +458,41 @@ class SALTResids:
                 self.iclscat_poly = np.append(self.iclscat_poly,np.where(self.parlist == parname)[0][:-1])        
 
 
-    @partial(jaxoptions, static_argnums=[0,3,4,5,6 ],static_argnames= ['dopriors','dospecresids','usesns','identifyresidualsources'],diff_argnum=1,jitdefault=True) 
-    def lsqwrap(self,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None,identifyresidualsources=False):
+    @partial(jaxoptions, static_argnums=[0,3,4,5],static_argnames= ['dopriors','dospecresids','usesns'],diff_argnum=1,jitdefault=True) 
+    def lsqwrap(self,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None):
         residuals = []
-        sources=[]
         if not (usesns is  None): raise NotImplementedError('Have not implemented a restricted set of sne')
         lcuncertainties,specuncertainties=uncertainties
         residuals+=[ self.batchedphotresiduals(guess,lcuncertainties,fixuncertainties=True,jit=False) ]
-        if identifyresidualsources: 
-            sources+=[f'phot_{sn}_{lc}']*len(residuals[-1])
 
         if dospecresids:
             residuals+=[ self.batchedspecresiduals(guess,specuncertainties,fixuncertainties=True,jit=False) ]
-            if identifyresidualsources: 
-                sources+=[f'spec_{sn}_{k}']*len(residuals[-1])
 
         if dopriors:
             residuals+=[self.priors.priorresids(guess)]
-            if identifyresidualsources: 
-                sources+=[f'priors']*len(residuals[-1])
             if self.regularize:
                 residuals+=[func(guess) for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]]  
-                if identifyresidualsources: 
-                    sources+=[f'reg_dyad']*len(residuals[-3])
-                    sources+=[f'reg_phase']*len(residuals[-2])
-                    sources+=[f'reg_wave']*len(residuals[-1])
 
-        if identifyresidualsources:
-            return jnp.concatenate(residuals), sources          
-        else:
-            return  jnp.concatenate(residuals)
-            
+        
+        return  jnp.concatenate(residuals)
+    
+    def lsqwrap_sources(self,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None)   :
+        numresids= lambda func: jax.eval_shape(func,guess).shape[0] 
+        sources=[]
+        sources+=['phot']* numresids(lambda x: self.batchedphotresiduals(x,uncertainties[0],fixuncertainties=True,jit=False) )
+        if dospecresids: sources+=[f'spec']* numresids(lambda x: self.batchedspecresiduals(x,uncertainties[1],fixuncertainties=True,jit=False) )
+       
+        if dopriors: 
+            sources+=[f'priors']*numresids(self.priors.priorresids)
+            for label,func in [('reg_dyad',self.dyadicRegularization), ('reg_phase',self.phaseGradientRegularization), ('reg_wave',self.waveGradientRegularization)] :
+                sources+=[label]*numresids(func)
+        return sources
+
+        
     def getChi2Contributions(self,X,**kwargs):
-        residuals,sources= self.lsqwrap(X,identifyresidualsources=True,**kwargs)
+        uncertainties= self.calculatecachedvals(X,target='variances')
+        residuals= self.lsqwrap(X,uncertainties,**kwargs)
+        sources=self.lsqwrap_sources(X,uncertainties,**kwargs)
         sources=np.array([x.split('_')[0] for x in  sources])
         assert(np.isin(sources,['reg','phot','spec','priors']).all())
         def loop():
@@ -500,7 +502,7 @@ class SALTResids:
 
         return list(loop())
 
-
+    @partial(jaxoptions, static_argnums=[0,3,4,5,6 ,7],static_argnames= ['fixfluxes','fixuncertainties','dopriors','dospec','usesns'],diff_argnum=1,jitdefault=True) 
     def maxlikefit(
             self,guess,cachedresults=None,fixuncertainties=False,fixfluxes=False,dopriors=True,dospec=True,usesns=None):
         """
@@ -517,7 +519,9 @@ class SALTResids:
         chi2: float
             Goodness of fit of model to training data   
         """
-                
+
+        if not (usesns is  None): raise NotImplementedError('Have not implemented a restricted set of sne')
+
         loglike=sum(self.batchedphotlikelihood (guess,cachedresults,fixuncertainties,fixfluxes))
 
         

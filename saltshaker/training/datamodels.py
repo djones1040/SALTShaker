@@ -171,7 +171,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
     __staticattributes__=[
         'preintegratebasis',
         'imodelcorrs_coordinds',
-        'bsplinecoeffshape','errorgridshape',
+        'bsplinecoeffshape','errorgridshape','uniqueid'
     ]
     
     __slots__ = __dynamicattributes__+__staticattributes__
@@ -181,7 +181,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         'lambdaeff','lambdaeffrest','errordesignmat','pcderivsparse',
         'varianceprefactor',
         'clscatderivs','colorlawderivlambdaeff', 'colorlawzerolambdaeff',
-        'padding',
+        'padding','uniqueid'
     }
 
     def __init__(self,sn,lc,residsobj,kcordict,padding=0):
@@ -193,7 +193,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         padding=max(0,padding)
         self.padding=padding
         self.ipad= np.arange(len(lc)+padding )>= len(lc)
-
+        self.uniqueid= f'{sn.snid}_{lc.filt}'
         #Define quantities for synthetic photometry
         filtwave = kcordict[sn.survey][lc.filt]['filtwave']
         filttrans = kcordict[sn.survey][lc.filt]['filttrans']
@@ -408,15 +408,15 @@ class modeledtrainingspectrum(modeledtrainingdata):
      ]
     __staticattributes__=[
         'padding','imodelcorrs_coordinds',
-        'errorgridshape','bsplinecoeffshape'
-
+        'errorgridshape','bsplinecoeffshape',
+        'uniqueid'
     ]+__indexattributes__
     __slots__ = __dynamicattributes__+__staticattributes__
 
     __ismapped__={
     'ix0','ispcrcl','icoordinates','ipad','phase','flux','fluxerr',
         'restwavelength','recaltermderivs','errordesignmat','pcderivsparse',
-        'varianceprefactor','varianceprefactor',
+        'varianceprefactor','varianceprefactor','uniqueid'
     }
     
     def __init__(self,sn,spectrum,k,residsobj,padding=0):
@@ -430,7 +430,8 @@ class modeledtrainingspectrum(modeledtrainingdata):
         self.ispcrcl=np.where(residsobj.parlist==f'specrecal_{sn.snid}_{k}')[0]
         self.bsplinecoeffshape=(residsobj.phaseBins[0].size,residsobj.waveBins[0].size)        
         self.padding=padding
-        self.ipad= np.arange(len(spectrum)+padding )> len(spectrum)
+        self.ipad= np.arange(len(spectrum)+padding )>= len(spectrum)
+        self.uniqueid= f'{sn.snid}_{k}'
         
         self.spectralsuppression=np.sqrt(residsobj.num_phot/residsobj.num_spec)*residsobj.spec_chi2_scaling
         
