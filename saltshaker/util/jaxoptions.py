@@ -57,7 +57,7 @@ def jaxoptions(fun,static_argnums=None,static_argnames=None,diff_argnum=0, jitde
     gradoptions=[ 
 None,'jacfwd','jacrev','jvp','vjp',
         'sparsejacfwd','sparsejacrev',
-        
+        'grad',
         
     ]
     
@@ -67,6 +67,8 @@ None,'jacfwd','jacrev','jvp','vjp',
         for difftype in gradoptions:
             compileargs=[static_argnums,static_argnames,]
             match difftype:
+                case 'grad':
+                    gradfunc= jax.grad(fun,argnums=diff_argnum)
                 case 'jacfwd':
                     gradfunc= jax.jacfwd(fun,argnums=[diff_argnum] )
                 case 'jacrev':

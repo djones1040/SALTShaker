@@ -463,10 +463,10 @@ class SALTResids:
         residuals = []
         if not (usesns is  None): raise NotImplementedError('Have not implemented a restricted set of sne')
         lcuncertainties,specuncertainties=uncertainties
-        residuals+=[ self.batchedphotresiduals(guess,lcuncertainties,fixuncertainties=True,jit=False) ]
+        residuals+=[ self.batchedphotresiduals(guess,lcuncertainties,fixuncertainties=True) ]
 
         if dospecresids:
-            residuals+=[ self.batchedspecresiduals(guess,specuncertainties,fixuncertainties=True,jit=False) ]
+            residuals+=[ self.batchedspecresiduals(guess,specuncertainties,fixuncertainties=True) ]
 
         if dopriors:
             residuals+=[self.priors.priorresids(guess)]
@@ -479,8 +479,8 @@ class SALTResids:
     def lsqwrap_sources(self,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None)   :
         numresids= lambda func: jax.eval_shape(func,guess).shape[0] 
         sources=[]
-        sources+=['phot']* numresids(lambda x: self.batchedphotresiduals(x,uncertainties[0],fixuncertainties=True,jit=False) )
-        if dospecresids: sources+=[f'spec']* numresids(lambda x: self.batchedspecresiduals(x,uncertainties[1],fixuncertainties=True,jit=False) )
+        sources+=['phot']* numresids(lambda x: self.batchedphotresiduals(x,uncertainties[0],fixuncertainties=True) )
+        if dospecresids: sources+=[f'spec']* numresids(lambda x: self.batchedspecresiduals(x,uncertainties[1],fixuncertainties=True) )
        
         if dopriors: 
             sources+=[f'priors']*numresids(self.priors.priorresids)
@@ -519,16 +519,16 @@ class SALTResids:
         chi2: float
             Goodness of fit of model to training data   
         """
-
+        if cachedresults is None: cachedresults=None,None
         if not (usesns is  None): raise NotImplementedError('Have not implemented a restricted set of sne')
 
-        loglike=sum(self.batchedphotlikelihood (guess,cachedresults,fixuncertainties,fixfluxes))
+        loglike=sum(self.batchedphotlikelihood (guess,cachedresults[0],fixuncertainties,fixfluxes))
 
         
         if dospec:
             
             loglike+= sum(
-             self.batchedspeclikelihood(guess,cachedresults,fixuncertainties,fixfluxes)
+             self.batchedspeclikelihood(guess,cachedresults[1],fixuncertainties,fixfluxes)
              )
         if dopriors:
             loglike+=self.priors.priorloglike(guess)

@@ -791,23 +791,17 @@ class GaussNewton(saltresids.SALTResids):
         includePars=np.zeros(self.parlist.size,dtype=bool)
         includePars[self.iclscat]=True
         includePars[self.iCL]=fitcolorlaw
-        
+        fixfluxes=not fitcolorlaw
+        if fixfluxes: cachedfluxes = self.calculatecachedvals(X,target='fluxes')
+        else: cachedfluxes=None
         log.info('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X)))
-        storedResults={}
-        storedResults['components'] =self.SALTModel(X)
-        if self.bsorder != 0: storedResults['componentderivs'] = self.SALTModelDeriv(X,1,0,self.phase,self.wave)        
-        if not rescaleerrs :
-            if 'saltErr' not in storedResults:
-                storedResults['saltErr']=self.ErrModel(X)
-            if 'saltCorr' not in storedResults:
-                storedResults['saltCorr']=self.CorrelationModel(X)
-        log.debug(str(storedResults.keys()))
-        X,minuitresult=self.minuitoptimize(X,includePars,{},rescaleerrs=rescaleerrs,fixFluxes=not fitcolorlaw,dospec=False,maxiter=maxiter)
+        
+        X,minuitresult=self.minuitoptimize(X,includePars,cachedresults=cachedfluxes ,rescaleerrs=rescaleerrs,fixfluxes=fixfluxes, dopriors=False,dospec=False)
         log.info('Finished optimizing color scatter')
         log.debug(str(minuitresult))
         return X
 
-    def iterativelyfiterrmodel(self,X,**kwargs):
+    def iterativelyfiterrmodel(self,X):
         log.info('Optimizing model error')
         X=X.copy()
         imodelerr=np.zeros(self.parlist.size,dtype=bool)
@@ -824,22 +818,23 @@ class GaussNewton(saltresids.SALTResids):
             partriplets= list(zip(np.where(self.parlist=='modelerr_0')[0],np.where(self.parlist=='modelerr_1')[0],np.where(self.parlist=='modelcorr_01')[0],
                                   np.where(self.parlist=='modelerr_host')[0],np.where(self.parlist=='modelcorr_0host')[0]))
         
-        for i,parindices in tqdm(enumerate(partriplets)):
+        for i,parindices in tqdm(list(enumerate(partriplets))):
             includePars=np.zeros(self.parlist.size,dtype=bool)
             includePars[list(parindices)]=True
 
-            X,minuitfitresult=self.minuitoptimize(X,includePars,cachedfluxes,fixfluxes=True,dopriors=False,dospec=False,usesns=usesns)
+            X,minuitfitresult=self.minuitoptimize(X,includePars,cachedresults=cachedfluxes,fixfluxes=True,dopriors=False,dospec=False)
 
         log.info('Finished model error optimization')
         return X
 
-    def minuitoptimize(self,X,includePars,storedResults=None,rescaleerrs=False,tol=0.1,*args,**kwargs):
+    def minuitoptimize(self,X,includePars,rescaleerrs=False,tol=0.1,*args,**kwargs):
         X=X.copy()
         if includePars.dtype==bool:
             includePars= np.where(includePars)[0]
             
         if not rescaleerrs:
             def fn(Y):
+                
                 Xnew=X.copy()
                 Xnew[includePars]=Y
                 result=-self.maxlikefit(Xnew,*args,**kwargs)
@@ -864,7 +859,7 @@ class GaussNewton(saltresids.SALTResids):
                 Xnew[includePars]=Y[:-1]
                 Xnew[self.imodelerr]*=Y[-1]
                 grad=-self.maxlikefit(Xnew,*args,**kwargs,diff='grad')
-                grad=np.concatenate(grad[includePars], [np.dot(grad[self.imodelerr], X[self.imodelerr])])
+                grad=np.concatenate((grad[includePars], [np.dot(grad[self.imodelerr], X[self.imodelerr])]))
                 return np.ones(Y.size) if np.isnan(grad ).any() else grad
         initvals=X[includePars].copy()
 
@@ -1292,5 +1287,5 @@ class GaussNewton(saltresids.SALTResids):
         log.info('Chi2 diff, % diff')
         log.info(' '.join(['{:.2f}'.format(x) for x in [oldChi-chi2,(100*(oldChi-chi2)/oldChi)] ]))
         log.info('')
-        return X,chi2,oldChi
+        return np.array(X.to_py()),chi2,oldChi
 

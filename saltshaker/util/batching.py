@@ -136,16 +136,16 @@ def batchedmodelfunctions(function,batcheddata, dtype,flatten=False):
             #Determine which axes of the arguments correspond to the lightcurve data
             targetsize=indexdict['ix0'].size
             #The batched data has prenoted which arguments are to be mapped over; otherwise need to attempt to determine it programatically
-            try:
-                inaxes= [(0 if (x in dtype.__ismapped__) else None) for x in dtype.__slots__],newpars.mappingaxes,*walkargumenttree(newargs,targetsize)
-                mapped=jax.vmap(  funpacked,in_axes= 
-                    inaxes
-                            )(
-                    batch,list(parsvmapped),*newargs
-                )
-            except Exception as e:
-                print(e)
-                import pdb;pdb.set_trace()
+#             try:
+            inaxes= [(0 if (x in dtype.__ismapped__) else None) for x in dtype.__slots__],newpars.mappingaxes,*walkargumenttree(newargs,targetsize)
+            mapped=jax.vmap(  funpacked,in_axes= 
+                inaxes
+                        )(
+                batch,list(parsvmapped),*newargs
+            )
+#             except Exception as e:
+#                 print(e)
+#                 import pdb;pdb.set_trace()
             if flatten: mapped=mapped.flatten()
             result+=[mapped ]
         if flatten:
