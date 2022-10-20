@@ -27,14 +27,15 @@ from saltshaker.training import saltresids
 from multiprocessing import Pool, get_context
 from iminuit import Minuit
 from datetime import datetime
-from tqdm import tqdm
+from tqdm import tqdm,trange
 from itertools import starmap
 from os import path
-
+from functools import partial
 
 import jax
 from jax import numpy as jnp
 
+import sys
 import iminuit,warnings
 import logging
 log=logging.getLogger(__name__)
@@ -617,7 +618,6 @@ class GaussNewton(saltresids.SALTResids):
             if name.lower()=='photometric':
                 photochi2perdof=chi2component/dof
 
-        storedResults={}
         for superloop in range(loop_niter):
             tstartloop = time.time()
             try:
@@ -864,8 +864,8 @@ class GaussNewton(saltresids.SALTResids):
         initvals=X[includePars].copy()
 
         if rescaleerrs:
-            initvals=np.concatenate((initvals, [1])
-)
+            initvals=np.concatenate((initvals, [1]))
+
         m=Minuit(fn,initvals,grad=grad)
         m.errordef=0.5
         m.errors = np.tile(1e-2, initvals.size)
@@ -915,11 +915,11 @@ class GaussNewton(saltresids.SALTResids):
     #   X0=X.copy()
     #   mapFun= starmap
     #
-    #   storedResults={}
-    #   print('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X,storedResults)))
-    #   fluxes={key:storedResults[key] for key in storedResults if 'fluxes' in key }
-    #   storedResults=fluxes.copy()
-    #   args=[(X0,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
+    #   uncertainties={}
+    #   print('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X,uncertainties)))
+    #   fluxes={key:uncertainties[key] for key in uncertainties if 'fluxes' in key }
+    #   uncertainties=fluxes.copy()
+    #   args=[(X0,sn,uncertainties,None,False,1,True,False) for sn in self.datadict.keys()]
     #   result0=np.array(list(mapFun(self.loglikeforSN,args)))
     #   pardoublets= list(zip(np.where(self.parlist=='m0')[0],np.where(self.parlist=='m1')[0]))
     #
@@ -931,22 +931,22 @@ class GaussNewton(saltresids.SALTResids):
     #           includePars=np.zeros(self.parlist.size,dtype=bool)
     #           includePars[list(parindices)]=True
     #           
-    #           storedResults=fluxes.copy()
-    #           args=[(X0+includePars*.5,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
+    #           uncertainties=fluxes.copy()
+    #           args=[(X0+includePars*.5,sn,uncertainties,None,False,1,True,False) for sn in self.datadict.keys()]
     #           result=np.array(list(mapFun(self.loglikeforSN,args)))
     #
     #           m0var[i],m1var[i],m01cov[i] = self.minuitoptimize_components(X,includePars,fluxes,fixFluxes=False,dospec=True)
     #
     #   return m0var,m1var,m01cov
              
-    #def minuitoptimize_components(self,X,includePars,storedResults=None,**kwargs):
+    #def minuitoptimize_components(self,X,includePars,uncertainties=None,**kwargs):
     #
     #   X=X.copy()
-    #   if storedResults is None: storedResults={}
+    #   if uncertainties is None: uncertainties={}
     #   def fn(Y):
     #       Xnew=X.copy()
     #       Xnew[includePars]=Y
-    #       result=-self.maxlikefit(Xnew,{},**kwargs) #storedResults.copy(),**kwargs)
+    #       result=-self.maxlikefit(Xnew,{},**kwargs) #uncertainties.copy(),**kwargs)
     #       return 1e10 if np.isnan(result) else result
     #
     #   params=['x'+str(i) for i in range(includePars.sum())]
@@ -970,7 +970,7 @@ class GaussNewton(saltresids.SALTResids):
         mapFun= starmap
 
         log.info('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X)))
-        args=[(X0,sn,storedResults,None,False,1,True,False) for sn in self.datadict.keys()]
+        args=[(X0,sn,uncertainties,None,False,1,True,False) for sn in self.datadict.keys()]
         result0=np.array(list(mapFun(self.loglikeforSN,args)))
         pars = np.where(self.parlist=='modelerr_0')[0]
         
@@ -1003,15 +1003,15 @@ class GaussNewton(saltresids.SALTResids):
 
         return m0var,m1var,m01cov
 
-    def minuitoptimize_components(self,X,includeM0Pars,includeM1Pars,storedResults=None,varyParams=None,**kwargs):
+    def minuitoptimize_components(self,X,includeM0Pars,includeM1Pars,uncertainties=None,varyParams=None,**kwargs):
 
         X=X.copy()
-        if storedResults is None: storedResults={}
+        if uncertainties is None: uncertainties={}
         def fn(Y):
             Xnew=X.copy()
             Xnew[includeM0Pars] += Y[0]
             Xnew[includeM1Pars] += Y[1]
-            storedCopy = storedResults.copy()
+            storedCopy = uncertainties.copy()
             if 'components' in storedCopy.keys():
                 storedCopy.pop('components')
             result=-self.maxlikefit(Xnew,{})
@@ -1040,77 +1040,12 @@ class GaussNewton(saltresids.SALTResids):
         
     
     def robust_process_fit(self,X_init,uncertainties,chi2_init,niter,usesns=None):
-        X,chi2=X_init.copy(),chi2_init
-        storedResults=uncertainties.copy()
-        for fit in self.fitlist:
-            if 'all-grouped' in fit :continue
-            if 'modelerr' in fit: continue
-            log.info('fitting '+self.fitOptions[fit][0])
-        
-        
-            Xprop = X.copy()
-            if (fit=='all'):
-                if self.tryFittingAllParams:
-                    Xprop,chi2prop,chi2 = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit,usesns=usesns)
-                    if (chi2prop/chi2 < 0.95):
-                        log.info('Terminating iteration {}, continuing with all parameter fit'.format(niter+1))
-                        return Xprop,chi2prop,False
-                    elif (chi2prop<chi2):
-                        X,chi2=Xprop,chi2prop
-                        storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys)}
-                    else:
-                        retainReg=True
-                        retainPCDerivs=True
-                        storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
-                                (retainReg and key.startswith('regresult' )) or
-                               (retainPCDerivs and key.startswith('pcDeriv_'   )) }
-            elif fit.startswith('piecewisecomponent'):
-                for i in range(self.GN_iter[fit]):
-                    for i,p in enumerate(self.phaseBinCenters):
-                        log.info(f'fitting phase {p:.1f}')
-                        indices=np.arange((self.waveknotloc.size-4)*(self.phaseknotloc.size-4))
-                        iFit= (((i-1)*(self.waveknotloc.size-4)) <= indices) & (indices <((i+2)*(self.waveknotloc.size-4)))
-                        includeParsPhase=np.zeros(self.npar,dtype=bool)
 
-                        if fit== 'piecewisecomponents':
-                            includeParsPhase[self.im0[iFit]]=True
-                            includeParsPhase[self.im1[iFit]]=True
-                            includeParsPhase[self.imhost[iFit]]=True
-                        else:
-                            includeParsPhase[self.__dict__[f'im{fit[-1]}'][iFit]] = True
-                        Xprop,chi2prop,chi2 = self.process_fit(Xprop,includeParsPhase,storedResults,fit=fit,usesns=usesns)
-
-                        if np.isnan(Xprop).any() or np.isnan(chi2prop) or ~np.isfinite(chi2prop):
-                            log.error('NaN detected, breaking out of loop')
-                            break;
-                        if chi2prop<chi2 :
-                            X,chi2=Xprop[:],chi2prop
-                        retainPCDerivs=True
-                        storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
-                               (retainPCDerivs and key.startswith('pcDeriv_'   )) }
-                    else:
-                        continue
-            else:
-                for i in range(self.GN_iter[fit]):
-                    Xprop,chi2prop,chi2 = self.process_fit(Xprop,self.fitOptions[fit][1],storedResults,fit=fit,usesns=usesns)
-                    if np.isnan(Xprop).any()  or np.isnan(chi2prop) or ~np.isfinite(chi2prop):
-                        log.error('NaN detected, breaking out of loop')
-                        break;
-                    if chi2prop<chi2 :
-                        X,chi2=Xprop,chi2prop
-                    varyParams=self.fitOptions[fit][1]
-                    retainReg=( ~ np.any(varyParams[self.im0]) and ~ np.any(varyParams[self.im1]) )
-                    retainPCDerivs=( ~ np.any(varyParams[self.ic]) and ~ np.any(varyParams[self.iCL]) and ~ np.any(varyParams[self.ispcrcl]) ) 
-                    storedResults= {key:storedResults[key] for key in storedResults if (key in self.uncertaintyKeys) or
-                            (retainReg and key.startswith('regresult' )) or
-                           (retainPCDerivs and key.startswith('pcDeriv_'   )) }
-
-                    if chi2 != chi2 or chi2 == np.inf:
-                        break
-                else:
-                    continue
-        #In this case GN optimizer can do no better
-        return X,chi2,(X is X_init)
+        Xprop,chi2prop,chi2 = self.process_fit(X_init,self.fitOptions['all'][1],uncertainties,fit='all',usesns=usesns)
+        if (chi2prop<chi2_init):
+            return Xprop,chi2prop, False
+        else:
+            return X_init, chi2_init, True
 
     def linesearch(self,X,searchdir,*args,**kwargs):
         def opFunc(x):
@@ -1119,19 +1054,18 @@ class GaussNewton(saltresids.SALTResids):
         log.info('Linear optimization factor is {:.2f} x {} step'.format(result.x,stepType))
         log.info('Linear optimized chi2 is {:.2f}'.format(result.fun))
         return result.x*searchdir,result.fun
-        
+
     def preconditioningscales(self,*args,**kwargs):
         #Simple diagonal preconditioning matrix designed to make the jacobian better conditioned. Seems to do well enough! If output is showing significant condition number in J, consider improving this
         jshape= jax.eval_shape(lambda x: self.lsqwrap(x,*args[1:],**kwargs) ,args[0]).shape[0],args[0].size
 
-        localdiff=self.lsqwrap(*args, **kwargs,diff='jvp',jit=True)
+        localdiff=self.lsqwrap(*args, **kwargs,diff='jvp')
         def jacnorm(i):
             jacrow=localdiff((jnp.arange(jshape[1])==i)*1.)
             return  1/jnp.sqrt(jacrow@jacrow)
-        precon=jnp.array([jacnorm(i) for i in (range(jshape[1]))])
-
-        precon= precon.at[jnp.isinf(precon)].set(precon[~jnp.isinf(precon)].max())
-        return precon
+        iterator = trange  if sys.stdout.isatty() else range 
+        precon=jnp.array([jacnorm(i) for i in (iterator(jshape[1]))])
+        return jnp.nan_to_num(precon)
         
     def constructoperator(self,precon,includepars,*args,**kwargs):
         if includepars.dtype==bool: includepars=np.where(includepars)[0]
@@ -1166,8 +1100,10 @@ class GaussNewton(saltresids.SALTResids):
 
         log.info('Number of parameters fit this round: {}'.format(varyingParams.sum()))
         log.info('Initial chi2: {:.2f} '.format(oldChi))
+        log.info('Calculating preconditioning')
 
         preconditioning= self.preconditioningscales(X,uncertainties,**kwargs)
+        log.info('Finished preconditioning')
 
         jacobian,preconinv= self.constructoperator(preconditioning, varyingParams, X,uncertainties, **kwargs)
 
@@ -1196,6 +1132,7 @@ class GaussNewton(saltresids.SALTResids):
             #If the new position is worse, need to increase the damping until the new position is better
             increasedDamping=False
             while oldChi<postGN:
+                log.debug('Reiterating and increasing damping')
                 increasedDamping=True
                 self.damping[fit]*=scale*11/9
                 result,postGN,gaussNewtonStep,damping=gaussNewtonFit(self.damping[fit])

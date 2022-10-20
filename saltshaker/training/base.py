@@ -228,8 +228,14 @@ class TrainSALTBase:
                                                         help='fit for color dispersion component of model error if set (default=%(default)s)')
                 successful=successful&wrapaddingargument(config,'trainparams','steps_between_errorfit', type=int,
                                                         help='fit for error model every x steps (default=%(default)s)')
-                successful=successful&wrapaddingargument(config,'trainparams','model_err_max_chisq', type=int,
+                successful=successful&wrapaddingargument(config,'trainparams','model_err_max_chisq', type=float,
                                                         help='max photometric chi2/dof below which model error estimation is done (default=%(default)s)')
+                                                        
+                successful=successful&wrapaddingargument(config,'trainparams','photometric_zeropadding_batches', type=int,
+                                                        help='Number of batches to divide the photometric data into when zero-padding. Increasing this value may improve memory performance at the cost of speed (default=%(default)s)')
+                successful=successful&wrapaddingargument(config,'trainparams','spectroscopic_zeropadding_batches', type=int,
+                                                        help='Number of batches to divide the spectroscopic data into when zero-padding. Increasing this value may improve memory performance at the cost of speed (default=%(default)s)')
+
                 successful=successful&wrapaddingargument(config,'trainparams','fitting_sequence',  type=str,
                                                         help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn (default=%(default)s)")
                 successful=successful&wrapaddingargument(config,'trainparams','fitprobmin',     type=float,
@@ -385,7 +391,11 @@ class TrainSALTBase:
         def get_saltkw(self,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc):
 
 
-                saltfitkwargs = {'preintegrate_photometric_passband':self.options.preintegrate_photometric_passband,'m1regularization':self.options.m1regularization,'mhostregularization':self.options.mhostregularization,
+                saltfitkwargs = {
+                
+                'spectroscopic_zeropadding_batches': self.options.spectroscopic_zeropadding_batches, 'photometric_zeropadding_batches':self.options.photometric_zeropadding_batches,
+                
+                'preintegrate_photometric_passband':self.options.preintegrate_photometric_passband,'m1regularization':self.options.m1regularization,'mhostregularization':self.options.mhostregularization,
                                  'bsorder':self.options.interporder,'errbsorder':self.options.errinterporder,
                                  'waveSmoothingNeff':self.options.wavesmoothingneff,'phaseSmoothingNeff':self.options.phasesmoothingneff,
                                  'neffFloor':self.options.nefffloor, 'neffMax':self.options.neffmax,

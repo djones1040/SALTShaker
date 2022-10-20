@@ -335,10 +335,17 @@ class SALTResids:
                     yield len(lc)
 
         photdatasizes=list(getphotdatacounts(datadict))
-        photpadding=batching.optimizepaddingsizes(4,photdatasizes)
-
+        photpadding,efficiency=batching.optimizepaddingsizes(self.photometric_zeropadding_batches,photdatasizes)
+        
+        log.info(f'Separating photometric data into {len(photpadding)} batches, at a space efficiency of {efficiency:.0%}')
+        efficiencywarningthreshold= .3
+        if efficiency<efficiencywarningthreshold:
+            log.warning(f'Efficiency less than {efficiencywarningthreshold:.0%}, consider increasing batching of data')
         specdatasizes=list(getspecdatacounts(datadict))
-        specpadding=batching.optimizepaddingsizes(4,specdatasizes)
+        specpadding,efficiency=batching.optimizepaddingsizes(self.spectroscopic_zeropadding_batches,specdatasizes)
+        log.info(f'Separating spectroscopic data into {len(specpadding)} batches, at a space efficiency of {efficiency:.0%}')
+        if efficiency<efficiencywarningthreshold:
+            log.warning(f'Efficiency less than {efficiencywarningthreshold:.0%}, consider increasing batching of data')
 
         log.info('Calculating cached quantities for speed in fitting loop')
         start=time.time()
@@ -346,7 +353,7 @@ class SALTResids:
         if sys.stdout.isatty() or in_ipynb():
             iterable=tqdm(iterable)
         self.datadict={snid: sn if isinstance(sn,SALTfitcacheSN) else SALTfitcacheSN(sn,self,self.kcordict,photpadding,specpadding)  for snid,sn in iterable}
-        
+        log.info('Batching data and constructing batched methods')
         self.allphotdata = sum([[x.photdata[lc] for lc in x.photdata ]for x in self.datadict.values() ],[])
         self.batchedphotdata= batching.batchdatabysize(self.allphotdata)
         
@@ -432,6 +439,7 @@ class SALTResids:
         self.ispcrcl_norm = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specx0')],dtype=int)
         if self.ispcrcl_norm.size==0: self.ispcrcl_norm=np.zeros(self.npar,dtype=bool)
         self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('spec')],dtype=int) # used to be specrecal
+        self.ispcrcl_coeffs = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specrecal')],dtype=int) # used to be specrecal
         if self.ispcrcl.size==0: self.ispcrcl=np.zeros(self.npar,dtype=bool)
         self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr')],dtype=int)
         self.imodelerr0 = np.array([i for i, si in enumerate(self.parlist) if si ==('modelerr_0')],dtype=int)

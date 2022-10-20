@@ -13,15 +13,18 @@ def optimizepaddingsizes(numbatches,datasizes):
     """Given a set of the sizes of batches of data, and a number of batches to divide them into, each of which is zero-padded, determine the zero-paddings that will minimize the additional space required to store the results
     """
     #Transform a set of n-1 unconstrained parameters into n+1 bin edges, starting at 0 and monotonically increasing to 1
-    def parstobins(pars):
+    def parstobins(pars,largest):
         #Probably a better transform to use here!
         pars=np.abs(pars)
         pars=np.concatenate([[0],pars,[1.]])
-        return np.cumsum(pars/pars.sum())
+        bins=np.cumsum(pars/pars.sum())
+        bins*=largest
+        bins[-1]+=.1
+        return bins
     
     #Define the loss function to be used here: defined here as just the space required to store the result
     def loss(pars):#    binlocs=[14,60]
-        bins=parstobins(pars)* max(datasizes) 
+        bins=parstobins(pars,max(datasizes))
         spacerequired=stats.binned_statistic(datasizes, datasizes,statistic='count', bins=bins).statistic* np.floor(bins[1:])
         return spacerequired.sum()
     ndim=numbatches-1
@@ -34,9 +37,13 @@ def optimizepaddingsizes(numbatches,datasizes):
 
         'initial_simplex':vertices})
     pars=result.x
-    bins=np.floor(( parstobins(pars)[1:])*max(datasizes)).astype(int)
-    bins[-1]=max(datasizes)
-    return bins
+    bins=parstobins(pars,max(datasizes))
+    padsizes= stats.binned_statistic(datasizes, datasizes,statistic= lambda x: x.max() if x.size>0 else 0, bins=bins).statistic
+    padsizes[np.isnan(padsizes)]=0
+    padsizes=padsizes.astype(int)
+    finalspacecost=(stats.binned_statistic(datasizes, datasizes,statistic='count', bins=bins).statistic* padsizes).sum()
+    padsizes=padsizes[np.nonzero(padsizes)]
+    return padsizes,sum(datasizes)/finalspacecost
 
 
 
