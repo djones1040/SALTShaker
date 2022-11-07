@@ -820,6 +820,7 @@ COLORLAW_VERSION: 1
 COLORCOR_PARAMS: {self.options.colorwaverange[0]:.0f} {self.options.colorwaverange[1]:.0f}  {len(trainingresult.clpars)}  {' '.join(['%8.10e'%cl for cl in trainingresult.clpars])}
 
 COLOR_OFFSET:  0.0
+COLOR_DISP_MAX: 1.0  # avoid crazy sim-mags at high-z
 
 MAG_OFFSET:  0.27  # to get B-band mag from cosmology fit (Nov 23, 2011)
 
