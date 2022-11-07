@@ -796,7 +796,8 @@ class GaussNewton(saltresids.SALTResids):
         else: cachedfluxes=None
         log.info('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X)))
         
-        X,minuitresult=self.minuitoptimize(X,includePars,cachedresults=cachedfluxes ,rescaleerrs=rescaleerrs,fixfluxes=fixfluxes, dopriors=False,dospec=False)
+        X,minuitresult=self.minuitoptimize(
+            X,includePars,cachedresults=cachedfluxes ,rescaleerrs=rescaleerrs,fixfluxes=fixfluxes, dopriors=False,dospec=False)
         log.info('Finished optimizing color scatter')
         log.debug(str(minuitresult))
         return X
