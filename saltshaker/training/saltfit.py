@@ -27,21 +27,41 @@ from saltshaker.training import saltresids
 from multiprocessing import Pool, get_context
 from iminuit import Minuit
 from datetime import datetime
-from tqdm import tqdm,trange
 from itertools import starmap
 from os import path
 from functools import partial
+from collections import namedtuple
 
 import jax
 from jax import numpy as jnp
+
 
 import sys
 import iminuit,warnings
 import logging
 log=logging.getLogger(__name__)
 
+
+def in_ipynb():
+    try:
+        cfg = get_ipython().config 
+        return True
+
+    except NameError:
+        return False
+
+if in_ipynb():
+    from tqdm.notebook import tqdm,trange
+else:
+    from tqdm import tqdm,trange
+
+usetqdm= sys.stdout.isatty() or in_ipynb()
+
 #Which integer code corresponds to which reason for LSMR terminating
 stopReasons=['x=0 solution','atol approx. solution','atol+btol approx. solution','ill conditioned','machine precision limit','machine precision limit','machine precision limit','max # of iteration']
+        
+gnfitresult=namedtuple('gnfitresult',['lsmrresult','postGN','gaussNewtonStep','resids','damping','reductionratio'])
+lsmrresult=namedtuple('lsmrresult',['precondstep','stopsignal','itn','normr','normar','norma','conda','normx'] )
 
 class SALTTrainingResult(object):
      def __init__(self, **kwargs):
@@ -364,7 +384,7 @@ class GaussNewton(saltresids.SALTResids):
             self.iModelParam[self.iclscat]=False
             self.iModelParam[self.ixhost]=False
             self.uncertaintyKeys=set(['photvariances_' +sn for sn in self.datadict]+['specvariances_' +sn for sn in self.datadict]+sum([[f'photCholesky_{sn}_{flt}' for flt in self.datadict[sn].filt] for sn in self.datadict],[]))
-        
+            self.cachedpreconevalfuns={}
             self.Xhistory=[]
             self.tryFittingAllParams=True
             fitlist = [('all parameters','all'),('all parameters grouped','all-grouped'),('supernova params','sn'),
@@ -1054,17 +1074,35 @@ class GaussNewton(saltresids.SALTResids):
         log.info('Linear optimization factor is {:.2f} x {} step'.format(result.x,stepType))
         log.info('Linear optimized chi2 is {:.2f}'.format(result.fun))
         return result.x*searchdir,result.fun
+    
+    #@partial(lambda x: jax.jit( jax.vmap(x, in_axes=[None,0,None,None,None,None,None,None] ),static_argnums=[ 4,5,6] , static_argnames= ['dopriors','dospecresids','usesns' ]  ))
+    def evalpreconditioningscales(self,parindex,*args,**kwargs):
+        jacrow=self.lsqwrap(*args,**kwargs,diff='jvp',jit=False)((jnp.arange(self.npar)==parindex)*1.)
+        return  1/jnp.sqrt(jacrow@jacrow)
+    
 
-    def preconditioningscales(self,*args,**kwargs):
+    def preconditioningscales(self,varyingParams,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None):
         #Simple diagonal preconditioning matrix designed to make the jacobian better conditioned. Seems to do well enough! If output is showing significant condition number in J, consider improving this
-        jshape= jax.eval_shape(lambda x: self.lsqwrap(x,*args[1:],**kwargs) ,args[0]).shape[0],args[0].size
-
-        localdiff=self.lsqwrap(*args, **kwargs,diff='jvp')
-        def jacnorm(i):
-            jacrow=localdiff((jnp.arange(jshape[1])==i)*1.)
-            return  1/jnp.sqrt(jacrow@jacrow)
-        iterator = trange  if sys.stdout.isatty() else range 
-        precon=jnp.array([jacnorm(i) for i in (iterator(jshape[1]))])
+        chunksize=10
+        
+        iterator = tqdm  if usetqdm else lambda x: x 
+        targets=np.where(varyingParams)[0]
+        numchunks=(targets.size//chunksize) + (targets.size%chunksize != 0 )
+        staticargs=(dopriors,dospecresids,usesns)
+        if staticargs in self.cachedpreconevalfuns: 
+            preconevalfun= self.cachedpreconevalfuns[staticargs]
+            
+        else:
+            preconevalfun = jax.jit(jax.vmap(lambda parindex,x,y: self.evalpreconditioningscales(parindex,x,y,*staticargs),
+            
+                    in_axes=(0,None,[[None]*len(self.batchedphotdata),[None]*len(self.batchedspecdata)])))
+                    
+            self.cachedpreconevalfuns[staticargs]=preconevalfun
+        
+        
+        
+        
+        precon=jnp.array([preconevalfun(targets[i*chunksize: (i+1)*chunksize] , guess,uncertainties) for i in iterator(range(numchunks)) ])
         return jnp.nan_to_num(precon)
         
     def constructoperator(self,precon,includepars,*args,**kwargs):
@@ -1074,17 +1112,80 @@ class GaussNewton(saltresids.SALTResids):
         jshape= jax.eval_shape(lambda x: self.lsqwrap(x,*args[1:],**kwargs) ,args[0]).shape[0],includepars.size
         @jax.jit
         def preconditioninverse(x):
-            return jnp.zeros(self.npar).at[includepars].set( precon[includepars] *x)
+            return jnp.zeros(self.npar).at[includepars].set( precon *x)
 
         linop=sprslinalg.LinearOperator(matvec = lambda x: (self.lsqwrap(*args,**kwargs,diff='jvp',jit=True)( preconditioninverse(x) )) ,
 
-                                 rmatvec= lambda x: (self.lsqwrap(*args,**kwargs,diff='vjp',jit=True)(x)*precon)[includepars] ,shape=(jshape))
+                                 rmatvec= lambda x: (self.lsqwrap(*args,**kwargs,diff='vjp',jit=True)(x))[includepars]*precon ,shape=(jshape))
 
         return linop,preconditioninverse
-       
-    def process_fit(self,X,iFit,uncertainties,fit='all',allowjacupdate=True,**kwargs):
+        
+    def gaussNewtonFit(self,initval,jacobian,preconinv,residuals,damping, lsqwrapargs):
 
-        X=X.copy()
+        tol=1e-8
+        #import pdb; pdb.set_trace()
+        initchi=(residuals**2).sum()
+        result=lsmrresult(*sprslinalg.lsmr(jacobian,residuals,damp=damping,maxiter=2*min(jacobian.shape),atol=tol,btol=tol))
+        gaussNewtonStep= preconinv(result.precondstep)
+        resids=self.lsqwrap(initval-gaussNewtonStep,*lsqwrapargs[0],**lsqwrapargs[1])
+        postGN=(resids**2).sum() #
+        #if fit == 'all': import pdb; pdb.set_trace()
+        log.debug(f'Attempting fit with damping {damping} gave chi2 {postGN}')
+        reductionratio= (initchi -postGN)/(initchi-(result.normr**2))
+        # np.unique(self.parlist[np.where(varyingParams != True)])
+        return gnfitresult(result,postGN,gaussNewtonStep,resids,damping,reductionratio)
+        
+    def iteratedampings(self,fit,initval,jacobian,preconinv,residuals,lsqwrapargs):
+        """Experiment with different amounts of damping in the fit"""
+        scale=1.5
+    
+        oldChi=(residuals**2).sum()
+        damping=self.damping[fit]
+        gnfitfun= lambda dampingval: self.gaussNewtonFit(initval, jacobian,preconinv,residuals,dampingval, lsqwrapargs )
+        result=gnfitfun(damping )
+        #Ratio of actual improvement in chi2 to how well the optimizer thinks it did
+    
+        #If the chi^2 is improving less than expected, check whether damping needs to be increased
+        #If the new position is worse, need to increase the damping until the new position is better
+        if (oldChi> result.postGN)  :
+            newresult=gnfitfun(damping/scale)
+            result=min([result,newresult],key=lambda x:x.postGN )
+        if (oldChi< result.postGN) or (result.reductionratio<0.33 ):
+
+            for i in range(20) :
+                
+                log.debug('Reiterating and increasing damping')
+                damping*=scale*11/9
+                newresult=gnfitfun(damping)
+                result=min([result,newresult],key=lambda x:x.postGN )
+                import pdb;pdb.set_trace()
+
+                if (oldChi>result.postGN): break
+            else:
+                log.info('After increasing damping 20 times, failed to find a result that improved chi2')
+        log.debug('After iteration on input damping {currdamping:.2e} found best damping was {result.damping:.2e}')
+        self.damping[fit]=damping
+        return result
+
+#     def geodesicgaussnewton(self):
+#         directionalSecondDeriv,tol= ridders(lambda dx: self.lsqwrap(X+dx*gaussNewtonStep,uncertainties,**kwargs) ,residuals,.5,5,1e-8)
+#         accelerationdir,stopsignal,itn,normr,normar,norma,conda,normx=sprslinalg.lsmr(precondjac,directionalSecondDeriv,damp=self.damping[fit],maxiter=2*min(jacobian.shape))
+#         secondStep=np.zeros(X.size)
+#         secondStep[varyingParams]=0.5*preconditioningmatrix*accelerationdir
+# 
+#         postgeodesic=(self.lsqwrap(X-gaussNewtonStep-secondStep,uncertainties,**kwargs)**2).sum() #doSpecResids
+#         log.info('After geodesic acceleration correction chi2 is {:.2f}'.format(postgeodesic))
+#         if postgeodesic<postGN :
+#             chi2=postgeodesic
+#             gaussNewtonStep=gaussNewtonStep+secondStep
+#         else:
+#             chi2=postGN
+#             gaussNewtonStep=gaussNewtonStep
+
+       
+    def process_fit(self,initvals,iFit,uncertainties,fit='all',allowjacupdate=True,**kwargs):
+
+        X=initvals.copy()
         varyingParams=iFit&self.iModelParam
         if 'usesns' in kwargs :
             if kwargs['usesns' ] is None:
@@ -1102,123 +1203,50 @@ class GaussNewton(saltresids.SALTResids):
         log.info('Initial chi2: {:.2f} '.format(oldChi))
         log.info('Calculating preconditioning')
 
-        preconditioning= self.preconditioningscales(X,uncertainties,**kwargs)
+        preconditioning= self.preconditioningscales(varyingParams,X,uncertainties,**kwargs)
         log.info('Finished preconditioning')
 
         jacobian,preconinv= self.constructoperator(preconditioning, varyingParams, X,uncertainties, **kwargs)
+        lsqwrapargs=([uncertainties],kwargs)
+        fittingfunction= (lambda *args: self.gaussNewtonFit(*args,0,lsqwrapargs)) if self.damping[fit]==0 else (lambda *args,**kwargs: self.iteratedampings(fit,*args,lsqwrapargs=lsqwrapargs,**kwargs))
 
-        scale=1.5
+        result= fittingfunction(X,jacobian,preconinv,residuals)
+        log.debug(f'First Gauss-Newton step: LSMR results with damping factor {result.damping:.2e}: {stopReasons[result.lsmrresult.stopsignal]}, norm r {result.lsmrresult.normr:.2f}, norm J^T r {result.lsmrresult.normar:.2f}, norm J {result.lsmrresult.norma:.2f}, cond J {result.lsmrresult.conda:.2f}, norm step {result.lsmrresult.normx:.2f}, reduction ratio {result.reductionratio:.2f} required {result.lsmrresult.itn} iterations' )
+        if result.lsmrresult.stopsignal==7: log.warning('Gauss-Newton solver reached max # of iterations')
 
-        tol=1e-8
-        #Convenience function to encapsulate the code to calculate LSMR results with varying damping
-        def gaussNewtonFit(damping):
-            #import pdb; pdb.set_trace()
-            result=sprslinalg.lsmr(jacobian,residuals,damp=damping,maxiter=2*min(jacobian.shape),atol=tol,btol=tol)
-            gaussNewtonStep= preconinv(result[0])
-            postGN=(self.lsqwrap(X-gaussNewtonStep,uncertainties,**kwargs)**2).sum() #
-            #if fit == 'all': import pdb; pdb.set_trace()
-            if fit=='all': log.debug(f'Attempting fit with damping {damping} gave chi2 {postGN}')
-            # np.unique(self.parlist[np.where(varyingParams != True)])
-            return result,postGN,gaussNewtonStep,damping
-
-
-        if self.damping[fit]!=0 :
-            results=[]
-            #Try increasing, decreasing, or keeping the same damping to see which does best
-            for dampingFactor in [1/scale,1] :
-                    results+=[(gaussNewtonFit(self.damping[fit]*dampingFactor))]
-            result,postGN,gaussNewtonStep,damping=min(results,key=lambda x:x[1])
-            precondstep,stopsignal,itn,normr,normar,norma,conda,normx=result
-            #If the new position is worse, need to increase the damping until the new position is better
-            increasedDamping=False
-            while oldChi<postGN:
-                log.debug('Reiterating and increasing damping')
-                increasedDamping=True
-                self.damping[fit]*=scale*11/9
-                result,postGN,gaussNewtonStep,damping=gaussNewtonFit(self.damping[fit])
-                precondstep,stopsignal,itn,normr,normar,norma,conda,normx=result
-            #Ratio of actual improvement in chi2 to how well the optimizer thinks it did
-            reductionratio= (oldChi-postGN)/(oldChi-(normr**2))
-            #If the chi^2 is improving less than expected, check whether damping needs to be increased
-            if reductionratio<0.33 and not increasedDamping: 
-                increaseddampingresult=gaussNewtonFit(self.damping[fit]*scale*11/9)
-                if increaseddampingresult[1]<postGN:
-                    result,postGN,gaussNewtonStep,damping=increaseddampingresult
-                    precondstep,stopsignal,itn,normr,normar,norma,conda,normx=result
-            self.damping[fit]=damping
-        else:
-            result,postGN,gaussNewtonStep,damping=gaussNewtonFit(0)
-            precondstep,stopsignal,itn,normr,normar,norma,conda,normx=result
-            reductionratio= (oldChi-postGN)/(oldChi-(normr**2))
-        log.debug('First Gauss-Newton step: LSMR results with damping factor {:.2e}: {}, norm r {:.2f}, norm J^T r {:.2f}, norm J {:.2f}, cond J {:.2f}, norm step {:.2f}, reduction ratio {:.2f} required {} iterations'.format(self.damping[fit],stopReasons[stopsignal],normr,normar,norma,conda,normx,reductionratio,itn ))
-        if stopsignal==7: log.warning('Gauss-Newton solver reached max # of iterations')
-
-        if np.any(np.isnan(gaussNewtonStep)):
+        if np.any(np.isnan(result.gaussNewtonStep)):
             log.error('NaN detected in stepsize; exitting to debugger')
             import pdb;pdb.set_trace()
+        X-=result.gaussNewtonStep
 
-        log.info('After Gauss-Newton chi2 is {:.2f}'.format(postGN))
+        log.info('After Gauss-Newton chi2 is {:.2f}'.format(result.postGN))
 
 
         if self.updatejacobian and allowjacupdate:  
             prevresult=result
-            currentresids=self.lsqwrap(X-gaussNewtonStep,uncertainties,**kwargs)
-            prevresids=residuals
-            prevstep=gaussNewtonStep.copy()
-            currentchi2=(currentresids**2).sum()
             for i in range(30):
-                self.Xhistory+=[(X-prevstep,currentchi2,prevresult)]
+                self.Xhistory+=[(X,prevresult.postGN,prevresult)]
+                
+                jacobian,_= self.constructoperator(preconditioning, varyingParams, X,uncertainties, **kwargs)
 
-                jacobian,_= self.constructoperator(preconditioning, varyingParams, X-prevstep,uncertainties, **kwargs)
+                result=fittingfunction(X,jacobian,preconinv,prevresult.resids)
+                
+                chi2improvement=prevresult.postGN-result.postGN
 
-                currentresult=sprslinalg.lsmr(jacobian,currentresids,damp=damping,maxiter=2*min(jacobian.shape),atol=tol,btol=tol)
-                precondstep,stopsignal,itn,normr,normar,norma,conda,normx=currentresult
-
-                currentstep=prevstep + preconinv(precondstep)
-
-                nextresids=self.lsqwrap(X-currentstep,uncertainties,**kwargs)
-                nextchi2=(nextresids**2).sum()
-                chi2improvement=currentchi2-nextchi2
-                reductionratio= chi2improvement/(currentchi2-(normr**2))
                 log.info(f'Reiterating with updated jacobian gives improvement {chi2improvement}')
-                log.debug('On reiteration: LSMR results are {}, norm r {:.2f}, norm J^T r {:.2f}, norm J {:.2f}, cond J {:.2f}, norm step {:.2f}, reduction ratio {:.2f} required {} iterations'.format(stopReasons[stopsignal],normr,normar,norma,conda,normx,reductionratio,itn ))
+                log.debug('On reiteration: LSMR results with damping factor {result.damping:.2e}: {stopReasons[result.lsmrresult.stopsignal]}, norm r {result.lsmrresult.normr:.2f}, norm J^T r {result.lsmrresult.normar:.2f}, norm J {result.lsmrresult.norma:.2f}, cond J {result.lsmrresult.conda:.2f}, norm step {result.lsmrresult.normx:.2f}, reduction ratio {result.reductionratio:.2f} required {itn} iterations' )
                 if chi2improvement<0:
                     log.info('Negative improvement, finishing process_fit')
                     break
                 else:
-                    prevstep=currentstep
-                    prevresids=currentresids
-                    currentresids=nextresids
-                    currentchi2=nextchi2
-                    prevresult=currentresult
-            self.Xhistory+=[(X-prevstep,currentchi2,prevresult)]
+                    X-=result.gaussNewtonStep
+                    prevresult=result
+            self.Xhistory+=[(X ,prevresult.postGN,prevresult.lsmrresult)]
 
-            postGN=(currentresids**2).sum()
-            gaussNewtonStep=prevstep
-        else:
-            if self.geodesiccorrection:
-                #Fancypants cubic correction to the Gauss-Newton step based on fun differential geometry! See https://arxiv.org/abs/1207.4999 for derivation
-                # Right now, doesn't seem worth it compared to directional fit; maybe worth trying both?
-
-                directionalSecondDeriv,tol= ridders(lambda dx: self.lsqwrap(X+dx*gaussNewtonStep,uncertainties,**kwargs) ,residuals,.5,5,1e-8)
-                accelerationdir,stopsignal,itn,normr,normar,norma,conda,normx=sprslinalg.lsmr(precondjac,directionalSecondDeriv,damp=self.damping[fit],maxiter=2*min(jacobian.shape))
-                secondStep=np.zeros(X.size)
-                secondStep[varyingParams]=0.5*preconditioningmatrix*accelerationdir
-
-                postgeodesic=(self.lsqwrap(X-gaussNewtonStep-secondStep,uncertainties,**kwargs)**2).sum() #doSpecResids
-                log.info('After geodesic acceleration correction chi2 is {:.2f}'.format(postgeodesic))
-                if postgeodesic<postGN :
-                    chi2=postgeodesic
-                    gaussNewtonStep=gaussNewtonStep+secondStep
-                else:
-                    chi2=postGN
-                    gaussNewtonStep=gaussNewtonStep
         if self.directionaloptimization:
-            linearStep,chi2=self.linesearch(X,gaussNewtonStep,uncertainties,**kwargs)   
+            linearStep,chi2=self.linesearch(X,X-initvals,uncertainties,**kwargs)   
             X-=linearStep       
-        else:
-            X-=gaussNewtonStep
-            chi2=postGN
+
 
         with open(path.join(self.outputdir,'gaussnewtonhistory.pickle'),'wb') as file: pickle.dump(self.Xhistory,file)
         log.info('Chi2 diff, % diff')
