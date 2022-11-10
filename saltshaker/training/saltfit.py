@@ -1083,11 +1083,16 @@ class GaussNewton(saltresids.SALTResids):
 
     def preconditioningscales(self,varyingParams,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None):
         #Simple diagonal preconditioning matrix designed to make the jacobian better conditioned. Seems to do well enough! If output is showing significant condition number in J, consider improving this
-        chunksize=10
+        chunksize=self.preconditioningchunksize
         
         iterator = tqdm  if usetqdm else lambda x: x 
         targets=np.where(varyingParams)[0]
-        numchunks=(targets.size//chunksize) + (targets.size%chunksize != 0 )
+        if targets.size%chunksize!=0: 
+        
+            paddedtargets=np.concatenate((targets,np.tile( self.npar,chunksize-targets.size%chunksize)))
+        else: 
+            paddedtargets=targets
+        numchunks=(paddedtargets.size//chunksize)
         staticargs=(dopriors,dospecresids,usesns)
         if staticargs in self.cachedpreconevalfuns: 
             preconevalfun= self.cachedpreconevalfuns[staticargs]
@@ -1102,8 +1107,8 @@ class GaussNewton(saltresids.SALTResids):
         
         
         
-        precon=jnp.array([preconevalfun(targets[i*chunksize: (i+1)*chunksize] , guess,uncertainties) for i in iterator(range(numchunks)) ])
-        return jnp.nan_to_num(precon)
+        precon=jnp.concatenate([preconevalfun(paddedtargets[i*chunksize: (i+1)*chunksize] , guess,uncertainties) for i in iterator(range(numchunks)) ])
+        return jnp.nan_to_num(precon[targets.size])
         
     def constructoperator(self,precon,includepars,*args,**kwargs):
         if includepars.dtype==bool: includepars=np.where(includepars)[0]

@@ -231,6 +231,8 @@ class TrainSALTBase:
                 successful=successful&wrapaddingargument(config,'trainparams','model_err_max_chisq', type=float,
                                                         help='max photometric chi2/dof below which model error estimation is done (default=%(default)s)')
                                                         
+                successful=successful&wrapaddingargument(config,'trainparams','preconditioningchunksize', type=int,
+                                                        help='Size of batches to evaluate preconditioning scales in Gauss-Newton proces. Increasing this value may increase memory performance at the cost of speed (default=%(default)s)')
                 successful=successful&wrapaddingargument(config,'trainparams','photometric_zeropadding_batches', type=int,
                                                         help='Number of batches to divide the photometric data into when zero-padding. Increasing this value may improve memory performance at the cost of speed (default=%(default)s)')
                 successful=successful&wrapaddingargument(config,'trainparams','spectroscopic_zeropadding_batches', type=int,
@@ -394,7 +396,7 @@ class TrainSALTBase:
                 saltfitkwargs = {
                 
                 'spectroscopic_zeropadding_batches': self.options.spectroscopic_zeropadding_batches, 'photometric_zeropadding_batches':self.options.photometric_zeropadding_batches,
-                
+                'preconditioningchunksize':self.options.preconditioningchunksize,
                 'preintegrate_photometric_passband':self.options.preintegrate_photometric_passband,'m1regularization':self.options.m1regularization,'mhostregularization':self.options.mhostregularization,
                                  'bsorder':self.options.interporder,'errbsorder':self.options.errinterporder,
                                  'waveSmoothingNeff':self.options.wavesmoothingneff,'phaseSmoothingNeff':self.options.phasesmoothingneff,
