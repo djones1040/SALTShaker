@@ -1243,7 +1243,7 @@ usage: python TrainSALT.py -c <configfile> <options>
 config file options can be overwridden at the command line"""
 
         
-    def get_config_options(self,salt,configfile,configpositional):
+    def get_config_options(self,salt,configfile,configpositional,args=None):
         
         if configfile:
             pass
@@ -1259,7 +1259,7 @@ config file options can be overwridden at the command line"""
         config.read(configfile)
 
         user_parser = salt.add_user_options(usage=self.usagestring,config=config)
-        user_options = user_parser.parse_known_args()[0]
+        user_options = user_parser.parse_known_args(args)[0]
 
         loggerconfig.dictconfigfromYAML(user_options.loggingconfig,user_options.outputdir)
 
@@ -1274,7 +1274,7 @@ config file options can be overwridden at the command line"""
         training_parser = salt.add_training_options(
             parser=user_parser,usage=self.usagestring,config=trainingconfig)
         training_parser.addhelp()
-        training_options = training_parser.parse_args()
+        training_options = training_parser.parse_args(args)
 
         salt.options = training_options
         salt.verbose = training_options.verbose
