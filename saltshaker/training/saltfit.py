@@ -1108,7 +1108,7 @@ class GaussNewton(saltresids.SALTResids):
         
         
         precon=jnp.concatenate([preconevalfun(paddedtargets[i*chunksize: (i+1)*chunksize] , guess,uncertainties) for i in iterator(range(numchunks)) ])
-        return jnp.nan_to_num(precon[targets.size])
+        return jnp.nan_to_num(precon[:targets.size])
         
     def constructoperator(self,precon,includepars,*args,**kwargs):
         if includepars.dtype==bool: includepars=np.where(includepars)[0]
@@ -1163,7 +1163,6 @@ class GaussNewton(saltresids.SALTResids):
                 damping*=scale*11/9
                 newresult=gnfitfun(damping)
                 result=min([result,newresult],key=lambda x:x.postGN )
-                import pdb;pdb.set_trace()
 
                 if (oldChi>result.postGN): break
             else:
