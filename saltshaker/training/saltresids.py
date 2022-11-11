@@ -1176,7 +1176,7 @@ class SALTResids:
             for i,varIndex in enumerate(np.where(self.parlist=='cl')[0]):
                 if varyParams[self.iCL][i]:
                     filtresultsdict['modelvariance_jacobian'][:,varIndex] =  \
-                        (2* (-0.4 *np.log(10)*c)*modelUncertainty*self.color.colorLawDerivInterp(lcdata.lambdaeff/(1+z))[varyParams[self.iCL]][i])[np.newaxis].transpose()
+                        (2* (-0.4 *np.log(10)*c)*modelUncertainty*self.colorlaw.colorLawDerivInterp(lcdata.lambdaeff/(1+z))[varyParams[self.iCL]][i])[np.newaxis].transpose()
 
             if varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any():
                 extinctionexp=(colorexpinterp* _SCALE_FACTOR/(1+z)*sndata.mwextcurveint(lcdata.lambdaeff))
