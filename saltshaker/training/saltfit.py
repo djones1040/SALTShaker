@@ -1142,7 +1142,7 @@ class GaussNewton(saltresids.SALTResids):
         
     def iteratedampings(self,fit,initval,jacobian,preconinv,residuals,lsqwrapargs):
         """Experiment with different amounts of damping in the fit"""
-        scale=1.5
+        scale=self.dampingscalerate
     
         oldChi=(residuals**2).sum()
         damping=self.damping[fit]
@@ -1167,7 +1167,7 @@ class GaussNewton(saltresids.SALTResids):
                 if (oldChi>result.postGN): break
             else:
                 log.info('After increasing damping 20 times, failed to find a result that improved chi2')
-        log.debug('After iteration on input damping {currdamping:.2e} found best damping was {result.damping:.2e}')
+        log.debug(f'After iteration on input damping {currdamping:.2e} found best damping was {result.damping:.2e}')
         self.damping[fit]=damping
         return result
 

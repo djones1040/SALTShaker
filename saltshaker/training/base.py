@@ -230,7 +230,9 @@ class TrainSALTBase:
                                                         help='fit for error model every x steps (default=%(default)s)')
                 successful=successful&wrapaddingargument(config,'trainparams','model_err_max_chisq', type=float,
                                                         help='max photometric chi2/dof below which model error estimation is done (default=%(default)s)')
-                                                        
+                successful=successful&wrapaddingargument(config,'trainparams','dampingscalerate', type=float,
+                                                        help=' Parameter that controls how quickly damping is adjusted in optimizer  (default=%(default)s)')
+
                 successful=successful&wrapaddingargument(config,'trainparams','preconditioningchunksize', type=int,
                                                         help='Size of batches to evaluate preconditioning scales in Gauss-Newton proces. Increasing this value may increase memory performance at the cost of speed (default=%(default)s)')
                 successful=successful&wrapaddingargument(config,'trainparams','photometric_zeropadding_batches', type=int,
@@ -394,7 +396,7 @@ class TrainSALTBase:
 
 
                 saltfitkwargs = {
-                
+                'dampingscalerate': self.options.dampingscalerate,
                 'spectroscopic_zeropadding_batches': self.options.spectroscopic_zeropadding_batches, 'photometric_zeropadding_batches':self.options.photometric_zeropadding_batches,
                 'preconditioningchunksize':self.options.preconditioningchunksize,
                 'preintegrate_photometric_passband':self.options.preintegrate_photometric_passband,'m1regularization':self.options.m1regularization,'mhostregularization':self.options.mhostregularization,
