@@ -369,8 +369,12 @@ class GaussNewton(saltresids.SALTResids):
             super().__init__(guess,datadict,parlist,**kwargs)
             self.lsqfit = False
 
+
+            self.rngkey=jax.random.PRNGKey(18327534917853348)
+
             self.GN_iter = {}
             self.damping={}
+            self.randomvjpevalfuns={}
             self.directionaloptimization=True
             self.geodesiccorrection=False
             self.updatejacobian=True
@@ -502,7 +506,7 @@ class GaussNewton(saltresids.SALTResids):
         
         #Define the matrix sigma^-1=J^T J
         
-        jvp=jaxoptions.jaxoptions(jax.grad(lambda x: (sf.lsqwrap(x,datauncertainties,jit=False)**2).sum())
+        jvp=jaxoptions.jaxoptions(jax.grad(lambda x: (self.lsqwrap(x,datauncertainties,jit=False)**2).sum())
            )(pars,diff='jvp',jit=True)
 
         hessian=jnp.stack([jvp(((np.arange( pars.size)==i)*1.)) for i in range(pars.size)])
@@ -1076,13 +1080,14 @@ class GaussNewton(saltresids.SALTResids):
         log.info('Linear optimized chi2 is {:.2f}'.format(result.fun))
         return result.x*searchdir,result.fun
     
-    #@partial(lambda x: jax.jit( jax.vmap(x, in_axes=[None,0,None,None,None,None,None,None] ),static_argnums=[ 4,5,6] , static_argnames= ['dopriors','dospecresids','usesns' ]  ))
-    def evalpreconditioningscales(self,parindex,*args,**kwargs):
+    def evaljacobipreconditioning(self,parindex,*args,**kwargs):
         jacrow=self.lsqwrap(*args,**kwargs,diff='jvp',jit=False)((jnp.arange(self.npar)==parindex)*1.)
         return  1/jnp.sqrt(jacrow@jacrow)
     
+    
+       
 
-    def preconditioningscales(self,varyingParams,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None):
+    def jacobipreconditioning(self,varyingParams,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None):
         #Simple diagonal preconditioning matrix designed to make the jacobian better conditioned. Seems to do well enough! If output is showing significant condition number in J, consider improving this
         chunksize=self.preconditioningchunksize
         
@@ -1099,17 +1104,95 @@ class GaussNewton(saltresids.SALTResids):
             preconevalfun= self.cachedpreconevalfuns[staticargs]
             
         else:
-            preconevalfun = jax.jit(jax.vmap(lambda parindex,x,y: self.evalpreconditioningscales(parindex,x,y,*staticargs),
+            preconevalfun = jax.jit(jax.vmap(lambda parindex,x,y: self.evaljacobipreconditioning(parindex,x,y,*staticargs),
             
                     in_axes=(0,None,[[None]*len(self.batchedphotdata),[None]*len(self.batchedspecdata)])))
                     
             self.cachedpreconevalfuns[staticargs]=preconevalfun
         
-        
-        
-        
         precon=jnp.concatenate([preconevalfun(paddedtargets[i*chunksize: (i+1)*chunksize] , guess,uncertainties) for i in iterator(range(numchunks)) ])
         return jnp.nan_to_num(precon[:targets.size])
+
+    def stochasticbinormpreconditioning(self,includepars,*args,**kwargs):
+        #https://web.stanford.edu/group/SOL/dissertations/bradley-thesis.pdf
+        #Determines pre- and post- diagonal preconditioning matrices iteratively using only matrix-vector products
+        #Requires many fewer iterations than the jacobi preconditioner
+        if includepars.dtype==bool: includepars=np.where(includepars)[0]
+
+        def substitute(x):
+            y=np.copy(args[0])
+            y[includepars]=x
+            return y
+
+        jshape= jax.eval_shape(lambda x: self.lsqwrap(x,*args[1:],**kwargs) ,args[0]).shape[0],includepars.size
+
+        jaclinop=sprslinalg.LinearOperator(matvec = lambda x: (self.lsqwrap(*args,**kwargs,diff='jvp',jit=True)( substitute(x) )) ,
+
+                                         rmatvec= lambda x: (self.lsqwrap(*args,**kwargs,diff='vjp',jit=True)(x))[includepars] ,shape=(jshape))
+
+        iterator = tqdm  if usetqdm else lambda x: x 
+        r=np.ones(jshape[0])
+        c=np.ones(jshape[1])
+
+        #Number of matrix-vector products to perform
+        nmv= jshape[1]//10
+        for k in iterator(range( nmv)):
+            omega=2**(-max(min(np.floor(np.log2(k+1))-1,4),1))
+#                  Found that letting r vary wasn't giving much improvement, at least not obviously; might need to play with damping more. Regardless, for now I've fixed it to 1, and only doing postconditioning
+#                 s=np.random.normal(size=jshape[1])/np.sqrt(c)
+#                 y= jaclinop @ s
+#                 r= (1-omega)*r/r.sum() + omega* y**2 / (y**2).sum()
+            s= np.random.normal(size=(jshape[0])) / np.sqrt(r)
+            y= jaclinop.T @ s
+            cnew=(1-omega)*c/c.sum() + omega*y**2 /(y**2).sum()
+            c=cnew
+        x=1/np.sqrt(r)
+        y=1/np.sqrt(c)
+
+        return  y/np.median(y)*0.008
+
+
+    def evalrandomvjp(self,key,*args,**kwargs):
+        numresids=jax.eval_shape(lambda x: self.lsqwrap(x,*args[1:],**kwargs) ,args[0]).shape[0]
+        return self.lsqwrap(*args,**kwargs,diff='vjp',jit=False)(jax.random.normal(key,shape=[numresids]))
+
+    def vectorizedstochasticbinormpreconditioning(self,includepars,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None):
+        if includepars.dtype==bool: includepars=np.where(includepars)[0]
+
+        staticargs=(dopriors,dospecresids,usesns)
+        jshape= jax.eval_shape(lambda x: self.lsqwrap(x,uncertainties,dopriors,dospecresids,usesns) ,guess).shape[0],includepars.size
+
+        if staticargs in self.randomvjpevalfuns: 
+            preconevalfun= self.randomvjpevalfuns[staticargs]
+            
+        else:
+            preconevalfun = jax.jit(jax.vmap(lambda key,x,y: self.evalrandomvjp(key,x,y,*staticargs),
+            
+                    in_axes=(0,None,[[None]*len(self.batchedphotdata),[None]*len(self.batchedspecdata)])))
+                    
+            self.randomvjpevalfuns[staticargs]=preconevalfun
+        iterator = tqdm  if usetqdm else lambda x: x 
+        r=np.ones(jshape[0])
+        c=np.ones(jshape[1])
+        
+
+        nmv= jshape[1]//10
+        numblocks=(nmv//self.preconditioningchunksize) + ((nmv %self.preconditioningchunksize )>0)
+        k=0
+        for i in iterator(range(numblocks)):
+            self.rngkey,veckey=jax.random.split(self.rngkey,2)
+
+            veckey=jax.random.split(veckey,self.preconditioningchunksize)
+            for y in preconevalfun(veckey,guess,uncertainties  ):
+                k+=1
+                omega=2**(-max(min(np.floor(np.log2(k))-1,4),1))
+                y=y[includepars]
+                c=(1-omega)*c/c.sum() + omega*y**2 /(y**2).sum()
+        y=1/np.sqrt(c)
+
+        return  y/np.median(y)*0.008
+        
+
         
     def constructoperator(self,precon,includepars,*args,**kwargs):
         if includepars.dtype==bool: includepars=np.where(includepars)[0]
@@ -1125,7 +1208,9 @@ class GaussNewton(saltresids.SALTResids):
                                  rmatvec= lambda x: (self.lsqwrap(*args,**kwargs,diff='vjp',jit=True)(x))[includepars]*precon ,shape=(jshape))
 
         return linop,preconditioninverse
-        
+
+
+
     def gaussNewtonFit(self,initval,jacobian,preconinv,residuals,damping, lsqwrapargs):
 
         tol=1e-8
@@ -1143,7 +1228,7 @@ class GaussNewton(saltresids.SALTResids):
         
     def iteratedampings(self,fit,initval,jacobian,preconinv,residuals,lsqwrapargs):
         """Experiment with different amounts of damping in the fit"""
-        scale=1.5
+        scale=self.dampingscalerate
     
         oldChi=(residuals**2).sum()
         damping=self.damping[fit]
@@ -1168,7 +1253,7 @@ class GaussNewton(saltresids.SALTResids):
                 if (oldChi>result.postGN): break
             else:
                 log.info('After increasing damping 20 times, failed to find a result that improved chi2')
-        log.debug('After iteration on input damping {currdamping:.2e} found best damping was {result.damping:.2e}')
+        log.debug(f'After iteration on input damping {currdamping:.2e} found best damping was {result.damping:.2e}')
         self.damping[fit]=damping
         return result
 
@@ -1208,7 +1293,7 @@ class GaussNewton(saltresids.SALTResids):
         log.info('Initial chi2: {:.2f} '.format(oldChi))
         log.info('Calculating preconditioning')
 
-        preconditioning= self.preconditioningscales(varyingParams,X,uncertainties,**kwargs)
+        preconditioning= self.vectorizedstochasticbinormpreconditioning(varyingParams,X,uncertainties,**kwargs)
         log.info('Finished preconditioning')
 
         jacobian,preconinv= self.constructoperator(preconditioning, varyingParams, X,uncertainties, **kwargs)
