@@ -1232,6 +1232,7 @@ class GaussNewton(saltresids.SALTResids):
     
         oldChi=(residuals**2).sum()
         damping=self.damping[fit]
+        currdamping=damping
         gnfitfun= lambda dampingval: self.gaussNewtonFit(initval, jacobian,preconinv,residuals,dampingval, lsqwrapargs )
         result=gnfitfun(damping )
         #Ratio of actual improvement in chi2 to how well the optimizer thinks it did
