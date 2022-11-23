@@ -232,6 +232,17 @@ class TrainSALTBase:
                                                         help='max photometric chi2/dof below which model error estimation is done (default=%(default)s)')
                 successful=successful&wrapaddingargument(config,'trainparams','dampingscalerate', type=float,
                                                         help=' Parameter that controls how quickly damping is adjusted in optimizer  (default=%(default)s)')
+                                                        
+                successful=successful&wrapaddingargument(config,'trainparams','lsmrmaxiter', type=int,
+                                                        help=' Allowed number of iterations for the linear solver of the Gauss-Newton procedure to run  (default=%(default)s)')
+                successful=successful&wrapaddingargument(config,'trainparams','preconditioningmaxiter', type=int,
+                                                        help=' Number of operations used to evaluate preconditioning for the problem  (default=%(default)s)')
+
+
+                successful=successful&wrapaddingargument(config,'trainparams','dampingscalerate', type=float,
+                                                        help=' Parameter that controls how quickly damping is adjusted in optimizer  (default=%(default)s)')
+                successful=successful&wrapaddingargument(config,'trainparams','dampingscalerate', type=float,
+                                                        help=' Parameter that controls how quickly damping is adjusted in optimizer  (default=%(default)s)')
 
                 successful=successful&wrapaddingargument(config,'trainparams','preconditioningchunksize', type=int,
                                                         help='Size of batches to evaluate preconditioning scales in Gauss-Newton proces. Increasing this value may increase memory performance at the cost of speed (default=%(default)s)')
@@ -394,8 +405,8 @@ class TrainSALTBase:
 
         def get_saltkw(self,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc):
 
-
                 saltfitkwargs = {
+                'lsmrmaxiter':self.options.lsmrmaxiter, 'preconditioningmaxiter':self.options.preconditioningmaxiter,
                 'dampingscalerate': self.options.dampingscalerate,
                 'spectroscopic_zeropadding_batches': self.options.spectroscopic_zeropadding_batches, 'photometric_zeropadding_batches':self.options.photometric_zeropadding_batches,
                 'preconditioningchunksize':self.options.preconditioningchunksize,
