@@ -1221,7 +1221,7 @@ class GaussNewton(saltresids.SALTResids):
         tol=1e-8
         #import pdb; pdb.set_trace()
         initchi=(residuals**2).sum()
-        if maxiter is None: maxiter= 2*min(jacobian.shape)#self.lsmrmaxiter
+        if maxiter is None: maxiter= self.lsmrmaxiter
         result=lsmrresult(*sprslinalg.lsmr(jacobian,residuals,damp=damping,maxiter=maxiter,atol=tol,btol=tol))
         gaussNewtonStep= preconinv(result.precondstep)
         resids=self.lsqwrap(initval-gaussNewtonStep,*lsqwrapargs[0],**lsqwrapargs[1])
