@@ -564,8 +564,8 @@ class GaussNewton(saltresids.SALTResids):
         return M0dataerr, M1dataerr, Mhostdataerr, cov_M0_M1_data, cov_M0_Mhost_data
 
     def datauncertaintiesfromjackknife(self,X,max_iter,n_bootstrapsamples):
-        """Determine uncertainties in flux surfaces by bootstrapping"""
-        log.info("determining M0/M1 errors by bootstrapping")
+        """Determine uncertainties in flux surfaces by jackknife"""
+        log.info("determining M0/M1 errors by jackknife")
         snlist=list(self.datadict.keys())
         removesnindices=np.random.choice(len(snlist),n_bootstrapsamples)
         samples=[self.convergence_loop(X,max_iter, snlist[:i]+snlist[i+1:], getdatauncertainties=False).X for i in  removesnindices]
@@ -641,15 +641,16 @@ class GaussNewton(saltresids.SALTResids):
         for name,chi2component,dof in chi2results:
             if name.lower()=='photometric':
                 photochi2perdof=chi2component/dof
-
+        tryfittinguncertainties=False
         for superloop in range(loop_niter):
             tstartloop = time.time()
             try:
-                if not superloop % self.steps_between_errorfit  and  self.fit_model_err and not \
+                if ((not superloop % self.steps_between_errorfit) or tryfittinguncertainties)  and  self.fit_model_err and not \
                    self.fit_cdisp_only and photochi2perdof<self.model_err_max_chisq and not superloop == 0:
                     X=self.iterativelyfiterrmodel(X)
                     chi2results=self.getChi2Contributions(X)
                     cacheduncertainties= self.calculatecachedvals(X,target='variances')
+                    tryfittinguncertainties=False
                 else:
                     log.info('Reevaluted model error')
                     chi2results=self.getChi2Contributions(X)
@@ -664,9 +665,11 @@ class GaussNewton(saltresids.SALTResids):
                 if chi2_init-chi2 < -1.e-6:
                     log.warning("MESSAGE WARNING chi2 has increased")
                 elif np.abs(chi2_init-chi2) < self.chi2_diff_cutoff:
-
-                    log.info(f'chi2 difference less than cutoff {self.chi2_diff_cutoff}, exiting loop')
-                    break
+                    if np.abs(photochi2perdof-1)>.2:
+                        tryfittinguncertainties=True
+                    else:
+                        log.info(f'chi2 difference less than cutoff {self.chi2_diff_cutoff}, exiting loop')
+                        break
 
                 log.info(f'finished iteration {superloop+1}, chi2 improved by {chi2_init-chi2:.1f}')
                 log.info(f'iteration {superloop+1} took {time.time()-tstartloop:.3f} seconds')
@@ -1129,7 +1132,7 @@ class GaussNewton(saltresids.SALTResids):
         jaclinop=sprslinalg.LinearOperator(matvec = lambda x: (self.lsqwrap(*args,**kwargs,diff='jvp',jit=True)( substitute(x) )) ,
 
                                          rmatvec= lambda x: (self.lsqwrap(*args,**kwargs,diff='vjp',jit=True)(x))[includepars] ,shape=(jshape))
-
+        
         iterator = tqdm  if usetqdm else lambda x: x 
         r=np.ones(jshape[0])
         c=np.ones(jshape[1])
@@ -1176,7 +1179,7 @@ class GaussNewton(saltresids.SALTResids):
         c=np.ones(jshape[1])
         
 
-        nmv= jshape[1]//10
+        nmv= self.preconditioningmaxiter
         numblocks=(nmv//self.preconditioningchunksize) + ((nmv %self.preconditioningchunksize )>0)
         k=0
         for i in iterator(range(numblocks)):
@@ -1188,8 +1191,11 @@ class GaussNewton(saltresids.SALTResids):
                 omega=2**(-max(min(np.floor(np.log2(k))-1,4),1))
                 y=y[includepars]
                 c=(1-omega)*c/c.sum() + omega*y**2 /(y**2).sum()
+                if np.isnan(c).any():
+                    log.critical('NaN appeared in preconditioning term, setting to zero and attempting to reiterate')
+                c=np.nan_to_num(c)
         y=1/np.sqrt(c)
-
+        
         return  y/np.median(y)*0.008
         
 
@@ -1211,17 +1217,18 @@ class GaussNewton(saltresids.SALTResids):
 
 
 
-    def gaussNewtonFit(self,initval,jacobian,preconinv,residuals,damping, lsqwrapargs):
+    def gaussNewtonFit(self,initval,jacobian,preconinv,residuals,damping,lsqwrapargs, maxiter=None):
 
         tol=1e-8
         #import pdb; pdb.set_trace()
         initchi=(residuals**2).sum()
-        result=lsmrresult(*sprslinalg.lsmr(jacobian,residuals,damp=damping,maxiter=2*min(jacobian.shape),atol=tol,btol=tol))
+        if maxiter is None: maxiter= 2*min(jacobian.shape)#self.lsmrmaxiter
+        result=lsmrresult(*sprslinalg.lsmr(jacobian,residuals,damp=damping,maxiter=maxiter,atol=tol,btol=tol))
         gaussNewtonStep= preconinv(result.precondstep)
         resids=self.lsqwrap(initval-gaussNewtonStep,*lsqwrapargs[0],**lsqwrapargs[1])
         postGN=(resids**2).sum() #
         #if fit == 'all': import pdb; pdb.set_trace()
-        log.debug(f'Attempting fit with damping {damping} gave chi2 {postGN}')
+        log.debug(f'Attempting fit with damping {damping} gave chi2 {postGN} with {result.itn} iterations')
         reductionratio= (initchi -postGN)/(initchi-(result.normr**2))
         # np.unique(self.parlist[np.where(varyingParams != True)])
         return gnfitresult(result,postGN,gaussNewtonStep,resids,damping,reductionratio)
@@ -1233,7 +1240,7 @@ class GaussNewton(saltresids.SALTResids):
         oldChi=(residuals**2).sum()
         damping=self.damping[fit]
         currdamping=damping
-        gnfitfun= lambda dampingval: self.gaussNewtonFit(initval, jacobian,preconinv,residuals,dampingval, lsqwrapargs )
+        gnfitfun= lambda dampingval,**kwargs: self.gaussNewtonFit(initval, jacobian,preconinv,residuals,dampingval, lsqwrapargs, **kwargs)
         result=gnfitfun(damping )
         #Ratio of actual improvement in chi2 to how well the optimizer thinks it did
     
@@ -1242,20 +1249,25 @@ class GaussNewton(saltresids.SALTResids):
         if (oldChi> result.postGN)  :
             newresult=gnfitfun(damping/scale)
             result=min([result,newresult],key=lambda x:x.postGN )
-        if (oldChi< result.postGN) or (result.reductionratio<0.33 ):
-
-            for i in range(20) :
+        if (oldChi< result.postGN) or (result.reductionratio<0.33 ) or np.isnan(result.postGN):
+            maxiter=10
+            for i in range(maxiter) :
                 
                 log.debug('Reiterating and increasing damping')
                 damping*=scale*11/9
-                newresult=gnfitfun(damping)
+                if np.isnan(result.postGN):
+                    damping*=3
+                    log.critical('NaN in core damping loop, attempting to increase damping')
+                    newresult=gnfitfun(damping)
+                else:
+                    newresult=gnfitfun(damping)
                 result=min([result,newresult],key=lambda x:x.postGN )
 
                 if (oldChi>result.postGN): break
             else:
-                log.info('After increasing damping 20 times, failed to find a result that improved chi2')
+                log.info(f'After increasing damping {maxiter} times, failed to find a result that improved chi2')
         log.debug(f'After iteration on input damping {currdamping:.2e} found best damping was {result.damping:.2e}')
-        self.damping[fit]=damping
+        self.damping[fit]=result.damping
         return result
 
 #     def geodesicgaussnewton(self):
@@ -1325,7 +1337,7 @@ class GaussNewton(saltresids.SALTResids):
                 chi2improvement=prevresult.postGN-result.postGN
 
                 log.info(f'Reiterating with updated jacobian gives improvement {chi2improvement}')
-                log.debug('On reiteration: LSMR results with damping factor {result.damping:.2e}: {stopReasons[result.lsmrresult.stopsignal]}, norm r {result.lsmrresult.normr:.2f}, norm J^T r {result.lsmrresult.normar:.2f}, norm J {result.lsmrresult.norma:.2f}, cond J {result.lsmrresult.conda:.2f}, norm step {result.lsmrresult.normx:.2f}, reduction ratio {result.reductionratio:.2f} required {itn} iterations' )
+                log.debug(f'On reiteration: LSMR results with damping factor {result.damping:.2e}: {stopReasons[result.lsmrresult.stopsignal]}, norm r {result.lsmrresult.normr:.2f}, norm J^T r {result.lsmrresult.normar:.2f}, norm J {result.lsmrresult.norma:.2f}, cond J {result.lsmrresult.conda:.2f}, norm step {result.lsmrresult.normx:.2f}, reduction ratio {result.reductionratio:.2f} required {result.lsmrresult.itn} iterations' )
                 if chi2improvement<0:
                     log.info('Negative improvement, finishing process_fit')
                     break
