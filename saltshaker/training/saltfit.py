@@ -1190,8 +1190,11 @@ class GaussNewton(saltresids.SALTResids):
                 omega=2**(-max(min(np.floor(np.log2(k))-1,4),1))
                 y=y[includepars]
                 c=(1-omega)*c/c.sum() + omega*y**2 /(y**2).sum()
+                if np.isnan(c).any():
+                    log.critical('NaN appeared in preconditioning term, setting to zero and attempting to reiterate')
+                c=np.nan_to_num(c)
         y=1/np.sqrt(c)
-
+        
         return  y/np.median(y)*0.008
         
 
@@ -1218,7 +1221,7 @@ class GaussNewton(saltresids.SALTResids):
         tol=1e-8
         #import pdb; pdb.set_trace()
         initchi=(residuals**2).sum()
-        if maxiter is None: maxiter= self.lsmrmaxiter
+        if maxiter is None: maxiter= 2*min(jacobian.shape)#self.lsmrmaxiter
         result=lsmrresult(*sprslinalg.lsmr(jacobian,residuals,damp=damping,maxiter=maxiter,atol=tol,btol=tol))
         gaussNewtonStep= preconinv(result.precondstep)
         resids=self.lsqwrap(initval-gaussNewtonStep,*lsqwrapargs[0],**lsqwrapargs[1])
@@ -1246,21 +1249,22 @@ class GaussNewton(saltresids.SALTResids):
             newresult=gnfitfun(damping/scale)
             result=min([result,newresult],key=lambda x:x.postGN )
         if (oldChi< result.postGN) or (result.reductionratio<0.33 ) or np.isnan(result.postGN):
-
-            for i in range(20) :
+            maxiter=10
+            for i in range(maxiter) :
                 
                 log.debug('Reiterating and increasing damping')
                 damping*=scale*11/9
                 if np.isnan(result.postGN):
                     damping*=3
-                    newresult=gnfitfun(damping,maxiter=2*self.npar)
+                    log.critical('NaN in core damping loop, attempting to increase damping')
+                    newresult=gnfitfun(damping)
                 else:
                     newresult=gnfitfun(damping)
                 result=min([result,newresult],key=lambda x:x.postGN )
 
                 if (oldChi>result.postGN): break
             else:
-                log.info('After increasing damping 20 times, failed to find a result that improved chi2')
+                log.info(f'After increasing damping {maxiter} times, failed to find a result that improved chi2')
         log.debug(f'After iteration on input damping {currdamping:.2e} found best damping was {result.damping:.2e}')
         self.damping[fit]=result.damping
         return result
