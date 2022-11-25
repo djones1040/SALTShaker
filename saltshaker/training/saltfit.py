@@ -909,10 +909,13 @@ class GaussNewton(saltresids.SALTResids):
             upperlims[clscatindices[0]]=1e-4
             upperlims[clscatindices[1:-1]]=1 
             upperlims[clscatindices[-1]]=2
-
-        onebounded=np.array( [x.startswith('modelerr') or x.startswith('modelcorr') for x in  self.parlist[includePars] ])
+        onebounded=np.array( [x.startswith('modelcorr') for x in  self.parlist[includePars] ])
         lowerlims[onebounded]=-1
         upperlims[onebounded]=1
+        positivebounded=np.array([x.startswith('modelerr') for x in self.parlist[includePars]])
+        lowerlims[positivebounded]=0
+        upperlims[positivebounded]=1
+        
         lowerlims[self.parlist[includePars] == 'cl'] = -100
         upperlims[self.parlist[includePars] == 'cl'] = 100
     
