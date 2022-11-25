@@ -910,10 +910,13 @@ class GaussNewton(saltresids.SALTResids):
             upperlims[clscatindices[0]]=1e-4
             upperlims[clscatindices[1:-1]]=1 
             upperlims[clscatindices[-1]]=2
-
-        onebounded=np.array( [x.startswith('modelerr') or x.startswith('modelcorr') for x in  self.parlist[includePars] ])
+        onebounded=np.array( [x.startswith('modelcorr') for x in  self.parlist[includePars] ])
         lowerlims[onebounded]=-1
         upperlims[onebounded]=1
+        positivebounded=np.array([x.startswith('modelerr') for x in self.parlist[includePars]])
+        lowerlims[positivebounded]=0
+        upperlims[positivebounded]=1
+        
         lowerlims[self.parlist[includePars] == 'cl'] = -100
         upperlims[self.parlist[includePars] == 'cl'] = 100
     
@@ -1220,9 +1223,10 @@ class GaussNewton(saltresids.SALTResids):
     def gaussNewtonFit(self,initval,jacobian,preconinv,residuals,damping,lsqwrapargs, maxiter=None):
 
         tol=1e-8
-        #import pdb; pdb.set_trace()
         initchi=(residuals**2).sum()
-        if maxiter is None: maxiter= self.lsmrmaxiter ###2*min(jacobian.shape)#self.lsmrmaxiter
+
+        if maxiter is None: maxiter= self.lsmrmaxiter
+
         result=lsmrresult(*sprslinalg.lsmr(jacobian,residuals,damp=damping,maxiter=maxiter,atol=tol,btol=tol))
         gaussNewtonStep= preconinv(result.precondstep)
         resids=self.lsqwrap(initval-gaussNewtonStep,*lsqwrapargs[0],**lsqwrapargs[1])
