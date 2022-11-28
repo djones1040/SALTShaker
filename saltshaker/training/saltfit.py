@@ -835,7 +835,8 @@ class GaussNewton(saltresids.SALTResids):
         imodelerr[self.imodelerr]=True
         problemerrvals=(X<0)&imodelerr
         X[problemerrvals]=1e-3
-
+        if np.isnan(X[self.iclscat[-1]]):
+            X[self.iclscat[-1]]=-np.inf
         X0=X.copy()
         mapFun= starmap
         cachedfluxes= self.calculatecachedvals(X,target='fluxes')
@@ -1340,8 +1341,8 @@ class GaussNewton(saltresids.SALTResids):
 
                 log.info(f'Reiterating with updated jacobian gives improvement {chi2improvement}')
                 log.debug(f'On reiteration: LSMR results with damping factor {result.damping:.2e}: {stopReasons[result.lsmrresult.stopsignal]}, norm r {result.lsmrresult.normr:.2f}, norm J^T r {result.lsmrresult.normar:.2f}, norm J {result.lsmrresult.norma:.2f}, cond J {result.lsmrresult.conda:.2f}, norm step {result.lsmrresult.normx:.2f}, reduction ratio {result.reductionratio:.2f} required {result.lsmrresult.itn} iterations' )
-                if chi2improvement<0:
-                    log.info('Negative improvement, finishing process_fit')
+                if chi2improvement<=0:
+                    log.info('No improvement, finishing process_fit')
                     break
                 else:
                     X-=result.gaussNewtonStep
