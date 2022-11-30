@@ -124,7 +124,7 @@ class modeledtrainingdata(metaclass=abc.ABCMeta):
 #    @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],diff_argnum=1)        
     def modelloglikelihood(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False,jit=False,jac=False,forward=False):
         resids=self.modelresidual(x,cachedresults,fixuncertainties,fixfluxes)
-        return resids['lognorm']- (resids['residuals']**2).sum() / 2.  
+        return resids['lognorm']- ((resids['residuals']**2).sum() / 2.)  
 
     def tree_flatten(self):
         children =tuple(getattr(self,x) for x in self.__dynamicattributes__)

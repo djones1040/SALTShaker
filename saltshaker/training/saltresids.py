@@ -506,7 +506,12 @@ class SALTResids:
         def loop():
             for name,abbrev in [('Photometric', 'phot'),('Spectroscopic','spec'),('Prior','priors'),('Regularization','reg')]:
                 x=residuals[sources==abbrev]
-                yield (name,(x**2).sum(),x.size)
+                #Number of data points shouldn't include the padding
+                if abbrev=='phot': ndof=self.num_phot
+                elif abbrev=='spec': ndof=self.num_spec
+                else:
+                    ndof=x.size
+                yield (name,(x**2).sum(),ndof)
 
         return list(loop())
 
