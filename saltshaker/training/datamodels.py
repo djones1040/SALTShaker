@@ -388,8 +388,9 @@ class modeledtraininglightcurve(modeledtrainingdata):
         def diagonalresidsandnorm(variance,clscat,modelflux):
             sigma=jnp.sqrt(variance)
             return {'residuals':(modelflux-self.fluxcal)/sigma,'lognorm': -jnp.log(sigma).sum()}
-        return lax.cond(clscat==0, diagonalresidsandnorm, choleskyresidsandnorm, 
-             variance,clscat,modelflux )
+        return choleskyresidsandnorm(variance,clscat,modelflux)
+#         return lax.cond(clscat==0, diagonalresidsandnorm, choleskyresidsandnorm, 
+#              variance,clscat,modelflux )
 
   
   

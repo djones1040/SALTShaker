@@ -1162,7 +1162,7 @@ class GaussNewton(saltresids.SALTResids):
         numresids=jax.eval_shape(lambda x: self.lsqwrap(x,*args[1:],**kwargs) ,args[0]).shape[0]
         return self.lsqwrap(*args,**kwargs,diff='vjp',jit=False)(jax.random.normal(key,shape=[numresids]))
 
-    def vectorizedstochasticbinormpreconditioning(self,includepars,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None):
+    def vectorizedstochasticbinormpreconditioning(self,includepars,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None,maxiter=None):
         if includepars.dtype==bool: includepars=np.where(includepars)[0]
 
         staticargs=(dopriors,dospecresids,usesns)
@@ -1182,7 +1182,10 @@ class GaussNewton(saltresids.SALTResids):
         c=np.ones(jshape[1])
         
 
-        nmv= self.preconditioningmaxiter
+        if maxiter is None: 
+            nmv= self.preconditioningmaxiter
+        else:
+            nmv= maxiter
         numblocks=(nmv//self.preconditioningchunksize) + ((nmv %self.preconditioningchunksize )>0)
         k=0
         for i in iterator(range(numblocks)):
@@ -1244,6 +1247,7 @@ class GaussNewton(saltresids.SALTResids):
         damping=self.damping[fit]
         currdamping=damping
         gnfitfun= lambda dampingval,**kwargs: self.gaussNewtonFit(initval, jacobian,preconinv,residuals,dampingval, lsqwrapargs, **kwargs)
+        log.debug('Beginning iteration over damping')
         result=gnfitfun(damping )
         #Ratio of actual improvement in chi2 to how well the optimizer thinks it did
     
@@ -1253,20 +1257,22 @@ class GaussNewton(saltresids.SALTResids):
             newresult=gnfitfun(damping/scale)
             result=min([result,newresult],key=lambda x:x.postGN )
         if (oldChi< result.postGN) or (result.reductionratio<0.33 ) or np.isnan(result.postGN):
-            maxiter=10
+            maxiter=5
             for i in range(maxiter) :
-                
-                log.debug('Reiterating and increasing damping')
-                damping*=scale*11/9
-                if np.isnan(result.postGN):
-                    damping*=3
-                    log.critical('NaN in core damping loop, attempting to increase damping')
-                    newresult=gnfitfun(damping)
+                if result.postGN > 1e4*oldChi or np.isnan(result.postGN):
+                    log.critical('Pathological result with chi2 {result.postGN:.3e}, attempting to iterate preconditioning')
                 else:
-                    newresult=gnfitfun(damping)
-                result=min([result,newresult],key=lambda x:x.postGN )
+             
+                    if result.postGN > 100*oldChi:
+                        damping*= 10
+                    log.debug('Reiterating and increasing damping')
+                    damping*=scale*11/9
+                    else:
+                        newresult=gnfitfun(damping)
+                    result=min([result,newresult],key=lambda x:x.postGN )
 
-                if (oldChi>result.postGN): break
+                    if (oldChi>result.postGN): break
+                    
             else:
                 log.info(f'After increasing damping {maxiter} times, failed to find a result that improved chi2')
         log.debug(f'After iteration on input damping {currdamping:.2e} found best damping was {result.damping:.2e}')
@@ -1330,7 +1336,7 @@ class GaussNewton(saltresids.SALTResids):
 
         if self.updatejacobian and allowjacupdate:  
             prevresult=result
-            for i in range(30):
+            for i in range(10):
                 self.Xhistory+=[(X,prevresult.postGN,prevresult)]
                 
                 jacobian,_= self.constructoperator(preconditioning, varyingParams, X,uncertainties, **kwargs)
@@ -1346,6 +1352,7 @@ class GaussNewton(saltresids.SALTResids):
                     break
                 else:
                     X-=result.gaussNewtonStep
+                    chi2=result.postGN
                     prevresult=result
             self.Xhistory+=[(X ,prevresult.postGN,prevresult.lsmrresult)]
 
