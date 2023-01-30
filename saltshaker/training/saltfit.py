@@ -493,7 +493,7 @@ class GaussNewton(saltresids.SALTResids):
                 self.fitlist = [f for f in kwargs['fitting_sequence'].split(',')]
         else:
             self.__dict__=args[0].__dict__.copy()
-    def datauncertaintiesfromhessianapprox(self,X,suppressregularization=True,smoothingfactor=150):
+    def datauncertaintiesfromhessianapprox(self,X,suppressregularization=True,smoothingfactor=150,exacthessian=False):
         """Approximate Hessian by jacobian times own transpose to determine uncertainties in flux surfaces"""
         log.info("determining M0/M1 errors by approximated Hessian")
         import time
@@ -506,11 +506,15 @@ class GaussNewton(saltresids.SALTResids):
         
         #Define the matrix sigma^-1=J^T J
         
-        jvp=jaxoptions.jaxoptions(jax.grad(lambda x: (self.lsqwrap(x,datauncertainties,jit=False)**2).sum())
-           )(pars,diff='jvp',jit=True)
+        if exacthessian:
+        
+            jvp=jaxoptions.jaxoptions(jax.grad(lambda x: (self.lsqwrap(x,datauncertainties,jit=False)**2).sum())
+                )(pars,diff='jvp',jit=True)
 
-        hessian=jnp.stack([jvp(((np.arange( pars.size)==i)*1.)) for i in range(pars.size)])
-                
+            hessian=jnp.stack([jvp(((np.arange( pars.size)==i)*1.)) for i in range(pars.size)])
+        else:
+            jac= self.lsqwrap(x,datauncertainties,diff='sparsejacfwd')
+            hessian= jac.T @ jac 
         #Inverting cholesky matrix for speed
         L=linalg.cholesky(hessian,lower=True)
         invL=(linalg.solve_triangular(L,np.diag(np.ones(L.shape[0])),lower=True))
