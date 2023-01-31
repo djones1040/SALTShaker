@@ -495,24 +495,22 @@ class GaussNewton(saltresids.SALTResids):
             self.__dict__=args[0].__dict__.copy()
     def datauncertaintiesfromhessianapprox(self,X,suppressregularization=True,smoothingfactor=150,exacthessian=False):
         """Approximate Hessian by jacobian times own transpose to determine uncertainties in flux surfaces"""
-        log.info("determining M0/M1 errors by approximated Hessian")
+        log.info("determining M0/M1 errors by Hessian")
         import time
         tstart = time.time()
-
-        
-        logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
         
         datauncertainties=self.calculatecachedvals(X,target='variances')
         
         #Define the matrix sigma^-1=J^T J
         
         if exacthessian:
-        
+            logging.info('Calculating exact Hessian matrix to estimate uncertainties')
             jvp=jaxoptions.jaxoptions(jax.grad(lambda x: (self.lsqwrap(x,datauncertainties,jit=False)**2).sum())
                 )(pars,diff='jvp',jit=True)
-
+        
             hessian=jnp.stack([jvp(((np.arange( pars.size)==i)*1.)) for i in range(pars.size)])
         else:
+            logging.info('Calculating approximate Hessian matrix')
             jac= self.lsqwrap(x,datauncertainties,diff='sparsejacfwd')
             hessian= jac.T @ jac 
         #Inverting cholesky matrix for speed
@@ -1271,8 +1269,6 @@ class GaussNewton(saltresids.SALTResids):
                         damping*= 10
                     log.debug('Reiterating and increasing damping')
                     damping*=scale*11/9
-                    else:
-                        newresult=gnfitfun(damping)
                     result=min([result,newresult],key=lambda x:x.postGN )
 
                     if (oldChi>result.postGN): break
