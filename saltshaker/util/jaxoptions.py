@@ -1,10 +1,23 @@
 import jax
 from jax.experimental import sparse
-
+import sys
 from jax import numpy as jnp
 from tqdm.notebook import trange
 
-debug=True
+def in_ipynb():
+    try:
+        cfg = get_ipython().config 
+        return True
+
+    except NameError:
+        return False
+
+if in_ipynb():
+    from tqdm.notebook import tqdm,trange
+else:
+    from tqdm import tqdm,trange
+
+usetqdm= sys.stdout.isatty() or in_ipynb()
 
     
 
@@ -21,7 +34,7 @@ def sparsejac(fun,difffunc,argnums, forward ):
         jshape=(numout[0],shapein[0])
         localdiff=difffunc
         
-        rangefunc= trange if debug else range
+        rangefunc= trange if usetqdm else range
         if forward:
             return sparse.bcoo_concatenate([sparse.BCOO.fromdense(
                     localdiff( jnp.zeros(jshape[1]).at[i].set(1) ,*args,**kwargs)
@@ -57,7 +70,7 @@ def jaxoptions(fun,static_argnums=None,static_argnames=None,diff_argnum=0, jitde
     gradoptions=[ 
 None,'jacfwd','jacrev','jvp','vjp',
         'sparsejacfwd','sparsejacrev',
-        'grad',
+        'grad','valueandgrad'
         
     ]
     
@@ -67,6 +80,8 @@ None,'jacfwd','jacrev','jvp','vjp',
         for difftype in gradoptions:
             compileargs=[static_argnums,static_argnames,]
             match difftype:
+                case 'valueandgrad':
+                    gradfunc= jax.valueandgrad(fun,argnums=diff_argnum)
                 case 'grad':
                     gradfunc= jax.grad(fun,argnums=diff_argnum)
                 case 'jacfwd':
