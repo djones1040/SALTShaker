@@ -790,7 +790,7 @@ class TrainSALT(TrainSALTBase):
              open(f'{outdir}/salt3_lc_covariance_0host.dat','w') as foutm0mhostcov,\
              open(f'{outdir}/salt3_lc_variance_host.dat','w') as foutmhostdataerr,\
              open(f'{outdir}/salt3_lc_model_variance_host.dat','w') as foutmhostmodelerr,\
-             open(f'{outdir}/salt3_lc_model_covariance_0host.dat','w') as foutm0mhostmodelcov
+             open(f'{outdir}/salt3_lc_model_covariance_0host.dat','w') as foutm0mhostmodelcov:
                 for i,p in enumerate(trainingresult.phase):
                         print(f'{p:.1f} {w:.2f} {trainingresult.Mhost[i,j]:8.15e}',file=foutmhost)
                         print(f'{p:.1f} {w:.2f} {trainingresult.Mhostmodelerr[i,j]:8.15e}',file=foutmhostmodelerr)
