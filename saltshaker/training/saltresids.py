@@ -2,6 +2,8 @@ from saltshaker.util.synphot import synphot
 from saltshaker.training import init_hsiao
 from saltshaker.training.priors import SALTPriors
 from saltshaker.util.readutils import SALTtrainingSN,SALTtraininglightcurve,SALTtrainingspectrum
+from saltshaker.config.configoptions import expandvariablesandhomecommaseparated, FullPaths, boolean_string, nonetype_or_int, DefaultRequiredParser
+
 
 from sncosmo.models import StretchSource
 from sncosmo.salt2utils import SALT2ColorLaw
@@ -57,7 +59,123 @@ def rankOneCholesky(variance,beta,v):
         Lprime[j+1:,j]=Lprime[j,j]*beta*v[j+1:]*v[j]/gamma
         b+=beta*v[j]**2/variance[j]
     return Lprime
-    
+
+
+def add_training_options(self, parser=None, usage=None, config=None):
+        if parser == None:
+                parser = ConfigWithCommandLineOverrideParser(usage=usage, conflict_handler="resolve")
+        def wrapaddingargument(*args,**kwargs):
+                #Wrap this method to catch exceptions, providing a true if no exception was raised, False otherwise.
+                try:
+                        parser.add_argument_with_config_default(*args,**kwargs)
+                        return True
+                except Exception as e:
+                        log.error('\n'.join(e.args))
+                        return False
+                
+        # input files
+        successful=True
+
+        # training params
+        successful=successful&wrapaddingargument(config,'trainingparams','specrecal',  type=int,
+                                                help='number of parameters defining the spectral recalibration (default=%(default)s)')
+
+
+        successful=successful&wrapaddingargument(config,'trainingparams','fix_t0',      type=boolean_string,
+                                                help='if set, don\'t allow time of max to float (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','regulargradientphase',         type=float,
+                                                help='Weighting of phase gradient chi^2 regularization during training of model parameters (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','regulargradientwave', type=float,
+                                                help='Weighting of wave gradient chi^2 regularization during training of model parameters (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','regulardyad', type=float,
+                                                help='Weighting of dyadic chi^2 regularization during training of model parameters (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','m1regularization',     type=float,
+                                                help='Scales regularization weighting of M1 component relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','mhostregularization',  type=float,
+                                                help='Scales regularization weighting of host component relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','spec_chi2_scaling',  type=float,
+                                                help='scaling of spectral chi^2 so it doesn\'t dominate the total chi^2 (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','n_min_specrecal',     type=int,
+                                                help='Minimum order of spectral recalibration polynomials (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','specrange_wavescale_specrecal',  type=float,
+                                                help='Wavelength scale (in angstroms) for determining additional orders of spectral recalibration from wavelength range of spectrum (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','n_specrecal_per_lightcurve',  type=float,
+                                                help='Number of additional spectral recalibration orders per lightcurve (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','regularizationScaleMethod',  type=str,
+                                                help='Choose how scale for regularization is calculated (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','binspec',     type=boolean_string,
+                                                help='bin the spectra if set (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','binspecres',  type=int,
+                                                help='binning resolution (default=%(default)s)')
+        
+        #neff parameters
+        successful=successful&wrapaddingargument(config,'trainingparams','wavesmoothingneff',  type=float,
+                                                help='Smooth effective # of spectral points along wave axis (in units of waveoutres) (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','phasesmoothingneff',  type=float,
+                                                help='Smooth effective # of spectral points along phase axis (in units of phaseoutres) (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','nefffloor',  type=float,
+                                                help='Minimum number of effective points (has to be > 0 to prevent divide by zero errors).(default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','neffmax',     type=float,
+                                                help='Threshold for spectral coverage at which regularization will be turned off (default=%(default)s)')
+
+        # training model parameters
+        successful=successful&wrapaddingargument(config,'modelparams','waverange', type=int, nargs=2,
+                                                help='wavelength range over which the model is defined (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','colorwaverange', type=int, nargs=2,
+                                                help='wavelength range over which the color law is fit to data (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','interpfunc',     type=str,
+                                                help='function to interpolate between control points in the fitting (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','errinterporder', type=int,
+                                                help='for model uncertainty splines/polynomial funcs, order of the function (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','interporder',     type=int,
+                                                help='for model splines/polynomial funcs, order of the function (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','wavesplineres',  type=float,
+                                                help='number of angstroms between each wavelength spline knot (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','phasesplineres', type=float,
+                                                help='number of angstroms between each phase spline knot (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','waveinterpres',  type=float,
+                                                help='wavelength resolution in angstroms, used for internal interpolation (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','phaseinterpres', type=float,
+                                                help='phase resolution in angstroms, used for internal interpolation (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','waveoutres',     type=float,
+                                                help='wavelength resolution in angstroms of the output file (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','phaseoutres',     type=float,
+                                                help='phase resolution in angstroms of the output file (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','phaserange', type=int, nargs=2,
+                                                help='phase range over which model is trained (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','n_components',  type=int,
+                                                help='number of principal components of the SALT model to fit for (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','host_component', type=str,
+                                                help="NOT IMPLEMENTED: if set, fit for a host component.  Must equal 'mass', for now (default=%(default)s)")
+        successful=successful&wrapaddingargument(config,'modelparams','n_colorpars',     type=int,
+                                                help='number of degrees of the phase-independent color law polynomial (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','n_colorscatpars',         type=int,
+                                                help='number of parameters in the broadband scatter model (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','error_snake_phase_binsize',      type=float,
+                                                help='number of days over which to compute scaling of error model (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','error_snake_wave_binsize',  type=float,
+                                                help='number of angstroms over which to compute scaling of error model (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','use_snpca_knots',         type=boolean_string,
+                                                help='if set, define model on SNPCA knots (default=%(default)s)')               
+        successful=successful&wrapaddingargument(config,'modelparams','colorlaw_function',         type=str,
+                                                help='color law function, see colorlaw.py (default=%(default)s)')               
+
+        # priors
+        for prior in __priors__:
+                successful=successful&wrapaddingargument(config,'priors',prior ,type=float,clargformat="--prior_{key}",
+                                                        help=f"prior on {prior}",default=SUPPRESS)
+
+        # bounds
+        for bound,val in config.items('bounds'):
+                successful=successful&wrapaddingargument(config,'bounds', bound, type=float,nargs=3,clargformat="--bound_{key}",
+                                                        help="bound on %s"%bound)
+        if not successful: sys.exit(1)
+        return parser
+
+
+
+
+
 def __anyinnonzeroareaforsplinebasis__(phase,wave,phaseknotloc,waveknotloc,bsorder,i):
     phaseindex,waveindex=i//(waveknotloc.size-bsorder-1), i% (waveknotloc.size-bsorder-1)
     return ((phase>=phaseknotloc[phaseindex])&(phase<=phaseknotloc[phaseindex+bsorder+1])).any() and ((wave>=waveknotloc[waveindex])&(wave<=waveknotloc[waveindex+bsorder+1])).any() 

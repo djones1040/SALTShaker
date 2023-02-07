@@ -249,13 +249,24 @@ class SALTtrainingSN:
         @property
         def filt(self):
             return list(self.photdata.keys())
-        
-def rdkcor(surveylist,options):
+            
+def parse_survey_options(surveyfile):
+    surveyparser=configparser.ConfigParser()
+    surveyparser.read(surveyfile)
+    if any([ section.startswith('survey_') for section in surveyparser.sections()]):
+        surveydict= {section.replace('survey_',''): surveyparser._sections[section] for section in surveyparser.sections() if section.startswith('survey_')}
+    else:
+        surveydict= {section : surveyparser._sections[section] for section in surveyparser.sections()  }
+    assert(all( [key in surveydict[survey] for key in ['ignore_filters', 'subsurveylist','kcorfile' ] for survey in surveydict]))
+    return surveydict
 
+
+def rdkcor(surveyfile, filters_use_lastchar_only = False , calibrationshiftfile=None, calib_survey_ignore=False):
+    surveydict= parse_survey_options(surveyfile)
     kcordict = {}
     for survey in surveylist:
-        kcorfile = options.__dict__['%s_kcorfile'%survey]
-        subsurveys = options.__dict__['%s_subsurveylist'%survey].split(',')
+        kcorfile = surveydict[survey]['kcorfile']
+        subsurveys = surveydict[survey]['subsurveylist'].split(',')
         kcorfile = os.path.expandvars(kcorfile)
         if not os.path.exists(kcorfile):
             log.info('kcor file %s does not exist.   Checking %s/kcor'%(kcorfile,data_rootdir))
@@ -291,7 +302,7 @@ def rdkcor(surveylist,options):
                 kcordict[kcorkey]['BD17'] =      np.array(primarysed['BD17'])
             for filt in zpoff['Filter Name']:
                 #log.warning('Using only the last character of kcor-provided filter names')
-                if not options.filters_use_lastchar_only:
+                if not filters_use_lastchar_only:
                     internalfiltname=filt[:] #[-1]
                 else:
                     internalfiltname=filt[-1]
@@ -309,10 +320,10 @@ def rdkcor(surveylist,options):
                     zpoff['Primary Mag'][zpoff['Filter Name'] == filt][0] - zpoff['ZPoff(SNpot)'][zpoff['Filter Name'] == filt][0]
                 kcordict[kcorkey][internalfiltname]['zpoff'] = \
                     zpoff['ZPoff(Primary)'][zpoff['Filter Name'] == filt][0] - zpoff['ZPoff(SNpot)'][zpoff['Filter Name'] == filt][0]
-    if (options.calibrationshiftfile):
+    if (calibrationshiftfile):
         log.info('Calibration shift file provided, applying offsets:')
         #Calibration dictionary:
-        with open(options.calibrationshiftfile) as file:
+        with open(calibrationshiftfile) as file:
             for line in file:
                 log.info(f'Applying shift: {line}')
                 try:
@@ -322,7 +333,7 @@ def rdkcor(surveylist,options):
                     shifttype,survey,filter,shift=line
                     shift=float(shift)
                     #filter=filter[-1]#filter=filter[filter.index('/')+1:]
-                    if not options.calib_survey_ignore:
+                    if not calib_survey_ignore:
                         if shifttype=='MAGSHIFT':
                             kcordict[survey][filter]['zpoff'] +=shift
                             kcordict[survey][filter]['primarymag']+=shift

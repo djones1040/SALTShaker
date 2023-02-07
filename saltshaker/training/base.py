@@ -1,6 +1,9 @@
 import os,sys
 import argparse
+
+import configargparse
 import configparser
+
 import numpy as np
 from saltshaker.config import config_rootdir
 from saltshaker.util.specSynPhot import getColorsForSN
@@ -21,63 +24,30 @@ class FullPaths(argparse.Action):
 class EnvAwareArgumentParser(argparse.ArgumentParser):
 
         def add_argument(self,*args,**kwargs):
-                if 'action' in kwargs:
-                        action=kwargs['action']
-                        
-                        if (action==FullPaths or action=='FullPaths') and 'default' in kwargs:
-                                kwargs['default']=expandvariablesandhomecommaseparated(kwargs['default'])
-                return super().add_argument(*args,**kwargs)
                 
-class ConfigWithCommandLineOverrideParser(EnvAwareArgumentParser):
-                
-        def addhelp(self):
-                default_prefix='-'
-                self.add_argument(
-                                default_prefix+'h', default_prefix*2+'help',
-                                action='help', default=SUPPRESS,
-                                help=('show this help message and exit'))
+class DefaultRequiredParser(configargparse.ArgParser):
+    """ Extension to configparse.ArgParser that defaults all non-positional arguments to be a required argument"""
+    def add_argument(self,*args,**kwargs):
+        if 'action' in kwargs  and (kwargs['action']==FullPaths or kwargs['action']=='FullPaths') and 'default' in kwargs:
+                kwargs['default']=expandvariablesandhomecommaseparated(kwargs['default'])
 
-        def add_argument_with_config_default(self,config,section,*keys,**kwargs):
-                """Given a ConfigParser and a section header, scans the section for matching keys and sets them as the default value for a command line argument added to self. If a default is provided, it is used if there is no matching key in the config, otherwise this method will raise a KeyError"""
-                if 'clargformat' in kwargs:
-                        if kwargs['clargformat'] =='prependsection':
-                                kwargs['clargformat']='--{section}_{key}'
-                else:
-                        kwargs['clargformat']='--{key}'
-                
-                clargformat=kwargs.pop('clargformat')
+        if 'required' not in kwargs and args[0].startswith(parser.prefix_chars):
+                kwargs['required']=not 'default' in kwargs
+        super().add_argument(*args,**kwargs)
+        
+    def parse_known_args(self,*args,**kwargs):
+    
+        args,unparsed=super().parse_known_args(**args,**kwargs)
 
-                clargs=[clargformat.format(section=section,key=key) for key in keys]
-                def checkforflagsinconfig():
-                        for key in keys:
-                                if key in config[section]:
-                                        return key,config[section][key]
-                        raise KeyError(f'key {key} not found in section {section} of config file')
+        unparsedargnames=[ arg[2:max([arg.find(char) for char in ['=',':']])] for arg in unparsed if arg.startswith('--')]
 
-                try:
-                        includedkey,kwargs['default']=checkforflagsinconfig()
-                except KeyError:
-                        if 'default' in kwargs:
-                                pass
-                        else:
-                                message=f"Key {keys[0]} not found in section {section}; valid keys include: {', '.join(keys)}"
-                                if 'help' in kwargs:
-                                        message+=f"\nHelp string: {kwargs['help'].format(**kwargs)}"
-                                raise KeyError(message)
-                if 'nargs' in kwargs and ((type(kwargs['nargs']) is int and kwargs['nargs']>1) or (type(kwargs['nargs'] is str and (kwargs['nargs'] in ['+','*'])))):
-                        if not 'type' in kwargs:
-                                kwargs['default']=kwargs['default'].split(',')
-                        else:
-                                kwargs['default']=list(map(kwargs['type'],kwargs['default'].split(',')))
-                        if type(kwargs['nargs']) is int:
-                                try:
-                                        assert(len(kwargs['default'])==kwargs['nargs'])
-                                except:
-                                        nargs=kwargs['nargs']
-                                        numfound=len(kwargs['default'])
-                                        raise ValueError(f"Incorrect number of arguments in {(config)}, section {section}, key {includedkey}, {nargs} arguments required while {numfound} were found")
-                return super().add_argument(*clargs,**kwargs)
-                
+        log.warning(f'Unknown arguments in config file: '+ ', '.join(unparsedargnames))
+
+        if args.configpathflagged is not None:
+            args.configpath=args.configpathflagged
+            
+        return args,unparsed
+        
 def boolean_string(s):
         if s not in {'False', 'True', 'false', 'true', '1', '0'}:
                 raise ValueError('Not a valid boolean string')
@@ -103,12 +73,18 @@ class TrainSALTBase:
         def __init__(self):
                 self.verbose = False
                 
-                
-        def add_user_options(self, parser=None, usage=None, config=None):
-                if parser == None:
-                        parser = ConfigWithCommandLineOverrideParser(usage=usage, conflict_handler="resolve",add_help=False)
 
-                # The basics
+        def add_user_options(self, parser=None):
+                if parser is None: parser= DefaultRequiredParser()
+
+                group=parser.add_argument_group('Config files')
+                primaryconfig=group.add_mutually_exclusive_group()
+                primaryconfig.add('configpath',nargs='?',is_config_file_arg=True)
+                primaryconfig.add('-c','--configpathflagged', is_config_file_arg=True,default=None)
+                group.add('--surveyconfig',type=str,action=FullPaths,default=None, help='file containing paths to kcor files by survey')
+                group.add('--loggingconfig','--loggingconfigfile',  type=str,action=FullPaths,default='', help='logging config file')
+                group.add('--trainingconfig','--trainingconfigfile','--modelconfigfile',  type=str,action=FullPaths, help='Configuration file describing the construction of the model')
+
                 parser.add_argument('-v', '--verbose', action="count", dest="verbose",
                                     default=0,help='verbosity level')
                 parser.add_argument('--debug', default=False, action="store_true",
@@ -127,145 +103,66 @@ class TrainSALTBase:
                                     help='if set, run in fast mode for debugging')
                 parser.add_argument('--bootstrap_single', default=False, action="store_true",
                                     help='if set, run a single bootstrap iteration and save to outputdir')
-                
-                def wrapaddingargument(*args,**kwargs):
-                        #Wrap this method to catch exceptions, providing a true if no exception was raised, False otherwise.
-                        try:
-                                parser.add_argument_with_config_default(*args,**kwargs)
-                                return True
-                        except Exception as e:
-                                log.error('\n'.join(e.args))
-                                return False
-                        
-                # input files
-                successful=True
-                successful=successful&wrapaddingargument(config,'iodata','calibrationshiftfile',type=str,action=FullPaths,default='',
-                                                        help='file containing a list of changes to zeropoint and central wavelength of filters by survey')
-                successful=successful&wrapaddingargument(config,'iodata','calib_survey_ignore',type=boolean_string,
-                                                        help='if True, ignore survey names when applying shifts to filters')
-                successful=successful&wrapaddingargument(config,'iodata','loggingconfig','loggingconfigfile',  type=str,action=FullPaths,default='',
-                                                        help='logging config file')
-                successful=successful&wrapaddingargument(config,'iodata','trainingconfig','trainingconfigfile','modelconfigfile',  type=str,action=FullPaths,
-                                                        help='Configuration file describing the construction of the model')
-                successful=successful&wrapaddingargument(config,'iodata','snlists','snlistfiles',  type=str,action=FullPaths,
-                                                        help="""list of SNANA-formatted SN data files, including both photometry and spectroscopy. Can be multiple comma-separated lists. (default=%(default)s)""")
-                successful=successful&wrapaddingargument(config,'iodata','snparlist', 'snparlistfile', type=str,action=FullPaths,
-                                                        help="""optional list of initial SN parameters.  Needs columns SNID, zHelio, x0, x1, c""")
-                successful=successful&wrapaddingargument(config,'iodata','specrecallist','specrecallistfile',  type=str,action=FullPaths,
-                                                        help="""optional list giving number of spectral recalibration params.  Needs columns SNID, N, phase, ncalib where N is the spectrum number for a given SN, starting at 1""")
-                successful=successful&wrapaddingargument(config,'iodata','tmaxlist','tmaxlistfile',     type=str,action=FullPaths,
-                                                        help="""optional space-delimited list with SN ID, tmax, tmaxerr (default=%(default)s)""")
-        
-                #output files
-                successful=successful&wrapaddingargument(config,'iodata','outputdir',  type=str,action=FullPaths,
-                                                        help="""data directory for spectroscopy, format should be ASCII 
-                                                        with columns wavelength, flux, fluxerr (optional) (default=%(default)s)""")
-                successful=successful&wrapaddingargument(config,'iodata','yamloutputfile', default='/dev/null',type=str,action=FullPaths,
-                                                        help='File to which to output a summary of the fitting process')
-                
-                #options to configure cuts
-                successful=successful&wrapaddingargument(config,'iodata','dospec',      type=boolean_string,
-                                                        help="""if set, look for spectra in the snlist files (default=%(default)s)""")
-                successful=successful&wrapaddingargument(config,'iodata','maxsn',  type=nonetype_or_int,
-                                                        help="""sets maximum number of SNe to fit for debugging (default=%(default)s)""")
-                successful=successful&wrapaddingargument(config,'iodata','keeponlyspec',         type=boolean_string,
-                                                        help="""if set, only train on SNe with spectra (default=%(default)s)""")
-                successful=successful&wrapaddingargument(config,'iodata','filter_mass_tolerance',  type=float,
-                                                        help='Mass of filter transmission allowed outside of model wavelength range (default=%(default)s)')
-
-                msg = "range of obs filter central wavelength (A)"
-                successful=successful&wrapaddingargument(config, 'iodata',
-                        'filtercen_obs_waverange',type=float,nargs=2,help=msg)
-
-                #Initialize from SALT2.4                
-                successful=successful&wrapaddingargument(config,'iodata','initsalt2model',      type=boolean_string,
-                                                        help="""If true, initialize model parameters from prior SALT2 model""")
-                successful=successful&wrapaddingargument(config,'iodata','initsalt2var',         type=boolean_string,
-                                                        help="""If true, initialize model uncertainty parameters from prior SALT2 model""")
-                #Initialize from user defined files                             
-                successful=successful&wrapaddingargument(config,'iodata','initm0modelfile',     type=str,action=FullPaths,
-                                                        help="""initial M0 model to begin training, ASCII with columns
-                                                        phase, wavelength, flux (default=%(default)s)""")
-                successful=successful&wrapaddingargument(config,'iodata','initm1modelfile',     type=str,action=FullPaths,
-                                                        help="""initial M1 model with x1=1 to begin training, ASCII with columns
-                                                        phase, wavelength, flux (default=%(default)s)""")
-                #Choose B filter definition
-                successful=successful&wrapaddingargument(config,'iodata','initbfilt',  type=str,action=FullPaths,
-                                                        help="""initial B-filter to get the normalization of the initial model (default=%(default)s)""")
-                                                        
-                successful=successful&wrapaddingargument(config,'iodata','resume_from_outputdir',  type=str,action=FullPaths,
-                                                        help='if set, initialize using output parameters from previous run. If directory, initialize using ouptut parameters from specified directory')
-                successful=successful&wrapaddingargument(config,'iodata','resume_from_gnhistory',  type=str,action=FullPaths,
-                                                        help='if set, initialize using output parameters from previous run saved in gaussnewtonhistory.pickle file.')
-                successful=successful&wrapaddingargument(config,'iodata','error_dir', default='',type=str,action=FullPaths,
-                                                        help='directory with previous error files, to use with --use_previous_errors option')
-
-                
-                successful=successful&wrapaddingargument(config,'iodata','fix_salt2modelpars',  type=boolean_string,
-                                                        help="""if set, fix M0/M1 for wavelength/phase range of original SALT2 model (default=%(default)s)""")
-                successful=successful&wrapaddingargument(config,'iodata','fix_salt2components',  type=boolean_string,
-                                                        help="""if set, fix M0/M1 for *all* wavelength/phases (default=%(default)s)""")
-                successful=successful&wrapaddingargument(config,'iodata','fix_salt2components_initdir',  type=str,
-                                                        help="""if set, initialize component params from this directory (default=%(default)s)""")
-
-                #validation option
-                successful=successful&wrapaddingargument(config,'iodata','validate_modelonly',  type=boolean_string,
-                                                        help="""if set, only make model plots in the validation stage""")
-                # if resume_from_outputdir, use the errors from the previous run
-                successful=successful&wrapaddingargument(config,'iodata','use_previous_errors', type=boolean_string,
-                                                        help="""if set, use the errors from the previous run instead of computing new ones (can be memory intensive)""")
-                successful=successful&wrapaddingargument(config,'iodata','filters_use_lastchar_only',  type=boolean_string,
-                                                        help="""if set, use only the final filter character from the kcor file.  This is because of pathological SNANA records (default=%(default)s)""")
 
 
-                successful=successful&wrapaddingargument(config,'trainparams','gaussnewton_maxiter',     type=int,
-                                                        help='maximum iterations for Gauss-Newton (default=%(default)s)')
-                successful=successful&wrapaddingargument(config,'trainparams','regularize',     type=boolean_string,
-                                                        help='turn on regularization if set (default=%(default)s)')
-                successful=successful&wrapaddingargument(config,'trainparams','fitsalt2',  type=boolean_string,
-                                                        help='fit SALT2 as a validation check (default=%(default)s)')
-                successful=successful&wrapaddingargument(config,'trainparams','n_repeat',  type=int,
-                                                        help='repeat gauss newton n times (default=%(default)s)')
-                successful=successful&wrapaddingargument(config,'trainparams','fit_model_err',  type=boolean_string,
-                                                        help='fit for model error if set (default=%(default)s)')
-                successful=successful&wrapaddingargument(config,'trainparams','fit_cdisp_only', type=boolean_string,
-                                                        help='fit for color dispersion component of model error if set (default=%(default)s)')
-                successful=successful&wrapaddingargument(config,'trainparams','steps_between_errorfit', type=int,
-                                                        help='fit for error model every x steps (default=%(default)s)')
-                successful=successful&wrapaddingargument(config,'trainparams','model_err_max_chisq', type=int,
-                                                        help='max photometric chi2/dof below which model error estimation is done (default=%(default)s)')
-                successful=successful&wrapaddingargument(config,'trainparams','fitting_sequence',  type=str,
-                                                        help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn (default=%(default)s)")
-                successful=successful&wrapaddingargument(config,'trainparams','fitprobmin',     type=float,
-                                                        help="Minimum FITPROB for including SNe (default=%(default)s)")
-                successful=successful&wrapaddingargument(config,'trainparams','errors_from_bootstrap',     type=boolean_string,
-                                                        help="if set, get model surface errors from bootstrapping (default=%(default)s)")
-                successful=successful&wrapaddingargument(config,'trainparams','n_bootstrap',     type=int,
-                                                        help="number of bootstrap resamples (default=%(default)s)")
-                successful=successful&wrapaddingargument(config,'trainparams','maxiter_bootstrap',     type=int,
-                                                        help="maximum number of gauss-newton iterations for bootstrap estimation (default=%(default)s)")
-                successful=successful&wrapaddingargument(config,'trainparams','bootstrap_sbatch_template',     type=str,
-                                                        help="batch template for bootstrap estimation (default=%(default)s)")
-                successful=successful&wrapaddingargument(config,'trainparams','bootstrap_batch_mode',     type=boolean_string,
-                                                        help="batch mode for bootstrap estimation if set (default=%(default)s)")
-                successful=successful&wrapaddingargument(config,'trainparams','get_bootstrap_output_only',     type=boolean_string,
-                                                        help="collect the output from bootstrapping in batch mode without running new jobs (default=%(default)s)")
-                successful=successful&wrapaddingargument(config,'trainparams','no_transformed_err_check',     type=boolean_string,
-                                                        help="for host mass SALTShaker version, turn on this flag to ignore a current issue where x1/xhost de-correlation doesn\'t preserve errors appropriately; bootstrap errors will be needed (default=%(default)s)")
+                group=parser.add_argument_group('Data and initialized state')
+                group.add('--snlists','--snlistfiles',  type=str,action=FullPaths, help="""list of SNANA-formatted SN data files, including both photometry and spectroscopy. Can be multiple comma-separated lists. (default=%(default)s)""")
+                group.add('--snparlist', '--snparlistfile', type=str,action=FullPaths, help="""optional list of initial SN parameters.  Needs columns SNID, zHelio, x0, x1, c""")
+                group.add('--specrecallist','--specrecallistfile',  type=str,action=FullPaths, help="""optional list giving number of spectral recalibration params.  Needs columns SNID, N, phase, ncalib where N is the spectrum number for a given SN, starting at 1""")
+                group.add('--tmaxlist','--tmaxlistfile',     type=str,action=FullPaths, help="""optional space-delimited list with SN ID, tmax, tmaxerr (default=%(default)s)""")
+                group.add('--initsalt2model',      type=boolean_string, help="""If true, initialize model parameters from prior SALT2 model""")
+                group.add('--initsalt2var',         type=boolean_string, help="""If true, initialize model uncertainty parameters from prior SALT2 model""")     
+                group.add('--initm0modelfile',     type=str,action=FullPaths, help="""initial M0 model to begin training, ASCII with columns phase, wavelength, flux (default=%(default)s)""")
+                group.add('--initm1modelfile',     type=str,action=FullPaths, help="""initial M1 model with x1=1 to begin training, ASCII with columns phase, wavelength, flux (default=%(default)s)""")
+                group.add('--initbfilt',  type=str,action=FullPaths, help="""initial B-filter to get the normalization of the initial model (default=%(default)s)""")
+                group.add('--resume_from_outputdir',  type=str,action=FullPaths, help='if set, initialize using output parameters from previous run. If directory, initialize using ouptut parameters from specified directory')
+                group.add('--resume_from_gnhistory',  type=str,action=FullPaths, help='if set, initialize using output parameters from previous run saved in gaussnewtonhistory.pickle file.')
 
 
-                # survey definitions
-                self.surveylist = [section.replace('survey_','') for section in config.sections() if section.startswith('survey_')]
-                for survey in self.surveylist:
-                        
-                        successful=successful&wrapaddingargument(config,f'survey_{survey}',"kcorfile" ,type=str,clargformat=f"--{survey}" +"_{key}",action=FullPaths,
-                                                                help="kcor file for survey %s"%survey)
-                        successful=successful&wrapaddingargument(config,f'survey_{survey}',"subsurveylist" ,type=str,clargformat=f"--{survey}" +"_{key}",
-                                                                help="comma-separated list of subsurveys for survey %s"%survey)
-                        successful=successful&wrapaddingargument(config,f'survey_{survey}',"ignore_filters" ,type=str,clargformat=f"--{survey}" +"_{key}",
-                                                                help="comma-separated list of filters to ignore for survey %s"%survey)
+                group=parser.add_argument_group('Calibration options')
+                group.add ('--calibrationshiftfile',type=str,action=FullPaths,default='',
+                help='file containing a list of changes to zeropoint and central wavelength of filters by survey')
+                group.add('--calib_survey_ignore',type=boolean_string, help='if True, ignore survey names when applying shifts to filters')
 
-                if not successful: sys.exit(1)
+                group=parser.add_argument_group('Requirements and cuts')
+                group.add('--maxsn',  type=nonetype_or_int, help="""sets maximum number of SNe to fit for debugging (default=%(default)s)""")
+                group.add('--filter_mass_tolerance',  type=float, help='Mass of filter transmission allowed outside of model wavelength range (default=%(default)s)')
+                group.add('--filtercen_obs_waverange',type=float,nargs=2,help="range of obs filter central wavelength (A)",
+                          default= [-np.inf,np.inf])
+                group.add('--keeponlyspec',         type=boolean_string, help="""if set, only train on SNe with spectra (default=%(default)s)""")
+                group.add('--dospec',      type=boolean_string, help="""if set, look for spectra in the snlist files (default=%(default)s)""")
+
+
+                group=parser.add_argument_group('Outputs')
+                group.add('--outputdir',  type=str,action=FullPaths,help="""data directory for spectroscopy, format should be ASCII  with columns wavelength, flux, fluxerr (optional) (default=%(default)s)""")
+                group.add('--yamloutputfile', default='/dev/null',type=str,action=FullPaths,help='File to which to output a summary of the fitting process')
+
+
+                parser.add('--error_dir', default='',type=str,action=FullPaths, help='directory with previous error files, to use with --use_previous_errors option')
+                parser.add('--fix_salt2modelpars',  type=boolean_string, help="""if set, fix M0/M1 for wavelength/phase range of original SALT2 model (default=%(default)s)""")
+                parser.add('--fix_salt2components',  type=boolean_string, help="""if set, fix M0/M1 for *all* wavelength/phases (default=%(default)s)""")
+                parser.add('--fix_salt2components_initdir',  type=str, help="""if set, initialize component params from this directory (default=%(default)s)""")
+                parser.add('--validate_modelonly',  type=boolean_string, help="""if set, only make model plots in the validation stage""")
+                parser.add('--use_previous_errors', type=boolean_string, help="""if set, use the errors from the previous run instead of computing new ones (can be memory intensive)""")
+                parser.add('--filters_use_lastchar_only',  type=boolean_string, help="""if set, use only the final filter character from the kcor file.  This is because of pathological SNANA records (default=%(default)s)""")
+                parser.add('--gaussnewton_maxiter',     type=int, help='maximum iterations for Gauss-Newton (default=%(default)s)')
+                parser.add('--regularize',     type=boolean_string, help='turn on regularization if set (default=%(default)s)')
+                parser.add('--fitsalt2',  type=boolean_string, help='fit SALT2 as a validation check (default=%(default)s)')
+                parser.add('--n_repeat',  type=int, help='repeat gauss newton n times (default=%(default)s)')
+                parser.add('--fit_model_err',  type=boolean_string, help='fit for model error if set (default=%(default)s)')
+                parser.add('--fit_cdisp_only', type=boolean_string, help='fit for color dispersion component of model error if set (default=%(default)s)')
+                parser.add('--steps_between_errorfit', type=int, help='fit for error model every x steps (default=%(default)s)')
+                parser.add('--model_err_max_chisq', type=int, help='max photometric chi2/dof below which model error estimation is done (default=%(default)s)')
+                parser.add('--fitting_sequence',  type=str, help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn (default=%(default)s)")
+                parser.add('--fitprobmin',     type=float, help="Minimum FITPROB for including SNe (default=%(default)s)")
+                parser.add('--errors_from_bootstrap',     type=boolean_string, help="if set, get model surface errors from bootstrapping (default=%(default)s)")
+                parser.add('--n_bootstrap',     type=int, help="number of bootstrap resamples (default=%(default)s)")
+                parser.add('--maxiter_bootstrap',     type=int, help="maximum number of gauss-newton iterations for bootstrap estimation (default=%(default)s)")
+                parser.add('--bootstrap_sbatch_template',     type=str, help="batch template for bootstrap estimation (default=%(default)s)")
+                parser.add('--bootstrap_batch_mode',     type=boolean_string, help="batch mode for bootstrap estimation if set (default=%(default)s)")
+                parser.add('--get_bootstrap_output_only',     type=boolean_string, help="collect the output from bootstrapping in batch mode without running new jobs (default=%(default)s)")
+                parser.add('--no_transformed_err_check',     type=boolean_string,  help="for host mass SALTShaker version, turn on this flag to ignore a current issue where x1/xhost de-correlation doesn\'t preserve errors appropriately; bootstrap errors will be needed (default=%(default)s)")
+
                 return parser
 
 
