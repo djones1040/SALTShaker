@@ -1,3 +1,11 @@
+from saltshaker.util.inpynb import in_ipynb
+
+from saltshaker.util.query import query_yes_no
+import matplotlib.pyplot as plt
+
+try: from IPython import display
+except: pass
+
 import numpy as np
 from jax import numpy as jnp
 from jax import lax
@@ -16,13 +24,15 @@ class rpropwithbacktracking:
         self.Xbounds= np.tile(-np.inf, saltobj.npar),np.tile(np.inf, saltobj.npar)
         self.Xbounds[0][saltobj.ispcrcl_coeffs]= -10
         self.Xbounds[1][saltobj.ispcrcl_coeffs]= 10
+        self.Xbounds[0][saltobj.imodelcorr]=-1
+        self.Xbounds[1][saltobj.imodelcorr]=1
         self.searchtolerance= searchtolerance
         self.searchsize = searchsize
         self.functionevals=0
         self.losshistory=[]
         self.Xhistory=[]
         
-    def process_fit(self,initvals,iFit,learningrates=None,niter=100,**kwargs):
+    def process_fit(self,initvals,iFit,learningrates=None,niter=100,debug=False,**kwargs):
         X=initvals.copy()
         log.info('Entering process_fit')
         if ( iFit.dtype == int):
@@ -40,7 +50,7 @@ class rpropwithbacktracking:
             for idx in [self.saltobj.iCL,self.saltobj.ispcrcl_coeffs,self.saltobj.iclscat,self.saltobj.imodelcorr]:
                 learningrates[idx]=1e-2
             
-        rates= learningrates.copy()
+        rates= learningrates.copy()*1e-2
 #         import pdb;pdb.set_trace()
         assert(not np.isnan(learningrates).any() )
         
@@ -58,8 +68,10 @@ class rpropwithbacktracking:
                 Xnew,newloss, newsign, newgrad,newrates  = self.rpropiter(X, Xprev,loss,sign,rates)
         
                 searchdir=np.select([~np.isinf(X),np.isinf(X)], [ Xnew-X, 0])
-                gamma=self.twowaybacktracking(X,newloss,newgrad,searchdir)
-                
+                if newgrad @ searchdir < 0:
+                    gamma=self.twowaybacktracking(X,newloss,newgrad,searchdir)
+                else:
+                    gamma=1
                 newrates*=gamma
                 Xnew= X+ gamma*searchdir
                 if newloss==loss:
@@ -71,7 +83,20 @@ class rpropwithbacktracking:
                 
                 self.losshistory+=[loss]
                 self.Xhistory+=[X]
-            except KeyboardInterrupt:
+                if in_ipynb:
+                    if i==0: continue
+                    plt.clf()
+                    diffs= np.diff(self.losshistory[-100:])
+                    plt.plot( np.arange(diffs.size) + len(diffs)-diffs.size,diffs,'r-')
+                    
+                    plt.plot( np.arange(diffs.size) + len(diffs)-diffs.size,-diffs,'b-')
+                    plt.xlabel('Iteration')
+                    plt.ylabel('Change in Loss')
+                    plt.yscale('log')
+                    #if i>0: plt.text(0.7,.8,f'Last diff: {-np.diff(self.losshistory[-2:])[0]:.2g}',transform=plt.gca().transAxes)
+                    display.display(plt.gcf())
+                    display.clear_output(wait=True)
+            except KeyboardInterrupt as e:
                 if query_yes_no("Terminate optimization loop and begin writing output?"):
                     break
                 else:
@@ -89,18 +114,22 @@ class rpropwithbacktracking:
         return X,loss,rates
         
 
-    def twowaybacktracking(self,X,loss,grad, searchdir,debug=False,*args,**kwargs):
+    def twowaybacktracking(self,X,loss,grad, searchdir,*args,**kwargs):
         t= - self.searchtolerance * grad @ searchdir
         prevgamma=1/self.searchsize
         gamma=1
-        if debug: log.debug('t: ',t)
+        sign=1
+        if t<0:
+            raise ValueError('Bad search direction provided')            
+            
         Xprop= X + gamma * searchdir 
         proploss=-self.saltobj.maxlikefit(Xprop,*args,**kwargs)
         self.functionevals+=1
+        log.debug(f'Entering two way backtracking with initial loss {loss:.2g}, termination criterion {t:.2g}, and initial diff {loss-proploss:.2g}')
+        
         if loss-proploss >= gamma*t:
             for i in range(5):
                 if loss-proploss >= gamma*t:
-                    if debug: log.debug(gamma, gamma*t, loss-proploss)
                     prevgamma=gamma
                     gamma=gamma/self.searchsize 
                     Xprop= X + gamma * searchdir 
@@ -110,16 +139,14 @@ class rpropwithbacktracking:
                     break
         else:
             while (loss-proploss < gamma*t or  np.isnan(loss-proploss)) and ( loss-proploss != 0):
-                if debug: log.debug(gamma,gamma*t, loss-proploss)
                 prevgamma=gamma
                 gamma=gamma*self.searchsize
                 Xprop= X + gamma * searchdir 
                 proploss=-self.saltobj.maxlikefit(Xprop,*args,**kwargs)
                 self.functionevals+=1
     
-        if debug: log.debug(gamma, loss-proploss)
-        if debug: log.debug('Final',prevgamma,prevgamma*t, loss- ( -self.saltobj.maxlikefit(X + prevgamma * searchdir ,*args,**kwargs)))
-        return prevgamma
+        log.debug(f'final gamma factor {gamma:.2g}')
+        return sign*prevgamma
     
         
         

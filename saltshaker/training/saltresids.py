@@ -1,11 +1,4 @@
-def in_ipynb():
-    try:
-        cfg = get_ipython().config 
-        return True
-
-    except NameError:
-        return False
-
+from saltshaker.util.inpynb import in_ipynb
 
 from saltshaker.util.synphot import synphot
 from saltshaker.util import batching
@@ -38,7 +31,7 @@ from multiprocessing import Pool, get_context
 from inspect import signature
 from functools import partial
 from itertools import starmap
-if in_ipynb():
+if in_ipynb:
     from tqdm.notebook import tqdm
 else:
     from tqdm import tqdm
