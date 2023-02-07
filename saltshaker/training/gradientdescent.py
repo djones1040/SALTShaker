@@ -32,7 +32,7 @@ class rpropwithbacktracking:
         self.losshistory=[]
         self.Xhistory=[]
         
-    def process_fit(self,initvals,iFit,learningrates=None,niter=100,debug=False,**kwargs):
+    def convergence_loop(self,initvals,iFit,learningrates=None,niter=100,debug=False,**kwargs):
         X=initvals.copy()
         log.info('Entering process_fit')
         if ( iFit.dtype == int):
@@ -115,10 +115,34 @@ class rpropwithbacktracking:
         
 
     def twowaybacktracking(self,X,loss,grad, searchdir,*args,**kwargs):
+    
+        """
+        Based on a proposed parameter update, determines whether Armijo's criterion is satisfied; if so attempts to increase learning rate. If false, decreases learning rate until satisfied
+    
+        Armijo's criterion checks whether the gradient accurately models the proposed update; when satisfied indicates efficient convergence
+        
+        Parameters
+        ----------
+        X : array-like
+            Initial values of model parameters
+        loss : 
+            Loss of model at initial values
+        grad :
+            Gradient at initial values
+        searchdir :
+            Proposed direction for an update to the parameters. Dot product with `grad` must be positive.
+        Returns
+        -------
+        gamma : float
+            Scalar multiplier for parameter and learning rate update 
+        
+        References
+        https://doi.org/10.1007/s00245-020-09718-8
+
+            """
         t= - self.searchtolerance * grad @ searchdir
         prevgamma=1/self.searchsize
         gamma=1
-        sign=1
         if t<0:
             raise ValueError('Bad search direction provided')            
             
@@ -137,6 +161,8 @@ class rpropwithbacktracking:
                     self.functionevals+=1
                 else:
                     break
+            log.debug(f'final gamma factor {prevgamma:.2g}')
+            return prevgamma
         else:
             while (loss-proploss < gamma*t or  np.isnan(loss-proploss)) and ( loss-proploss != 0):
                 prevgamma=gamma
@@ -144,13 +170,48 @@ class rpropwithbacktracking:
                 Xprop= X + gamma * searchdir 
                 proploss=-self.saltobj.maxlikefit(Xprop,*args,**kwargs)
                 self.functionevals+=1
-    
-        log.debug(f'final gamma factor {gamma:.2g}')
-        return sign*prevgamma
+            log.debug(f'final gamma factor {gamma:.2g}')
+            return gamma
+
     
         
         
     def rpropiter(self,X, Xprev, prevloss,prevsign, learningrates,*args,**kwargs):
+    
+        """
+        Implementation of the iRProp+ with weight backtracking algorithm. Based on the sign of the gradient chooses in which direction to update the parameters as well as increasing or decreasing learning rate on a parameter by parameter basis. Parameters with gradients in a single direction will be consistently increased, while those with changing gradients (indicating jumps over minima) will be decreased and/or updates reverted.
+        
+        Parameters
+        ----------
+        
+        X : array-like
+            Initial values of parameters
+        Xprev: array-like
+            Previous values of parameters
+        prevloss : float
+            Loss of model at `Xprev`
+        prevsign : array-like
+            Sign of gradient of loss at `Xprev` (-1,0,1)
+        learningrates : array-like
+            Semipositive learning rates for each parameter
+            
+        Returns
+        --------
+        
+        Xnew : array-like
+            Suggested parameter vector
+        loss: float
+            Loss of model at `X`
+        sign: array-like
+            Sign of gradient of loss at `X` (-1,0,1)
+        grad: array-like
+            Gradient of loss at `X` 
+        learningrates : array-like
+            Semipositive learning rates for each parameter
+        
+        References
+        https://doi.org/10.1016/S0925-2312(01)00700-7
+        """
         lossval,grad=  self.saltobj.maxlikefit(X,*args,**kwargs, diff='valueandgrad')
         self.functionevals+=3
         lossval=-lossval
