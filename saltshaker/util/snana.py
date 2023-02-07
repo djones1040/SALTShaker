@@ -464,7 +464,11 @@ class SuperNova( object ) :
                 colon = line.find(':')
                 key = line[:colon].strip()
                 val = line[colon+1:].strip()
-                self.__dict__[ key ] = str2num(val)
+                
+                if key.lower() in ['name'  , 'snid'  ,  'nickname'  ,'cid'  , 'iauname' ]:
+                    self.__dict__[ key ] = val
+                else:
+                    self.__dict__[ key ] = str2num(val)
 
         for col in colnames : 
             self.__dict__[col] = array( self.__dict__[col] )
