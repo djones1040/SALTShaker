@@ -760,27 +760,19 @@ class TrainSALT(TrainSALTBase):
         np.save('{}/salt3_loglikes.npy'.format(outdir),loglikes)
         # principal components and color law
         with open(f'{outdir}/salt3_template_0.dat','w') as foutm0, open('%s/salt3_template_1.dat'%outdir,'w') as foutm1,\
-             open(f'{outdir}/salt3_template_host.dat','w') as foutmhost,\
              open(f'{outdir}/salt3_lc_model_variance_0.dat','w') as foutm0modelerr,\
              open(f'{outdir}/salt3_lc_model_variance_1.dat','w') as foutm1modelerr,\
              open(f'{outdir}/salt3_lc_dispersion_scaling.dat','w') as fouterrmod,\
              open(f'{outdir}/salt3_lc_model_covariance_01.dat','w') as foutmodelcov,\
              open(f'{outdir}/salt3_lc_covariance_01.dat','w') as foutdatacov,\
-             open(f'{outdir}/salt3_lc_covariance_0host.dat','w') as foutm0mhostcov,\
              open(f'{outdir}/salt3_lc_variance_0.dat','w') as foutm0dataerr,\
-             open(f'{outdir}/salt3_lc_variance_1.dat','w') as foutm1dataerr,\
-             open(f'{outdir}/salt3_lc_variance_host.dat','w') as foutmhostdataerr,\
-             open(f'{outdir}/salt3_lc_model_variance_host.dat','w') as foutmhostmodelerr,\
-             open(f'{outdir}/salt3_lc_model_covariance_0host.dat','w') as foutm0mhostmodelcov:
+             open(f'{outdir}/salt3_lc_variance_1.dat','w') as foutm1dataerr:
         
             for i,p in enumerate(trainingresult.phase):
                 for j,w in enumerate(trainingresult.wave):
                     print(f'{p:.1f} {w:.2f} {trainingresult.M0[i,j]:8.15e}',file=foutm0)
                     print(f'{p:.1f} {w:.2f} {trainingresult.M1[i,j]:8.15e}',file=foutm1)
-                    if self.options.host_component:
-                        print(f'{p:.1f} {w:.2f} {trainingresult.Mhost[i,j]:8.15e}',file=foutmhost)
-                        print(f'{p:.1f} {w:.2f} {trainingresult.Mhostmodelerr[i,j]:8.15e}',file=foutmhostmodelerr)
-                        print(f'{p:.1f} {w:.2f} {trainingresult.cov_M0_Mhost_model[i,j]:8.15e}',file=foutm0mhostmodelcov)
+
                     if not self.options.use_previous_errors:
                         print(f'{p:.1f} {w:.2f} {trainingresult.M0modelerr[i,j]**2.:8.15e}',file=foutm0modelerr)
                         print(f'{p:.1f} {w:.2f} {trainingresult.M1modelerr[i,j]**2.:8.15e}',file=foutm1modelerr)
@@ -789,16 +781,30 @@ class TrainSALT(TrainSALTBase):
                         if self.options.errors_from_bootstrap:
                             print(f'{p:.1f} {w:.2f} {trainingresult.M0bootstraperr[i,j]**2.:8.15e}',file=foutm0dataerr)
                             print(f'{p:.1f} {w:.2f} {trainingresult.M1bootstraperr[i,j]**2.:8.15e}',file=foutm1dataerr)
-                            print(f'{p:.1f} {w:.2f} {trainingresult.Mhostbootstraperr[i,j]**2.:8.15e}',file=foutmhostdataerr)
                             print(f'{p:.1f} {w:.2f} {trainingresult.cov_M0_M1_bootstrap[i,j]:8.15e}',file=foutdatacov)
-                            print(f'{p:.1f} {w:.2f} {trainingresult.cov_M0_Mhost_bootstrap[i,j]:8.15e}',file=foutm0mhostcov)
                         else:
                             print(f'{p:.1f} {w:.2f} {trainingresult.M0dataerr[i,j]**2.+trainingresult.M0modelerr[i,j]**2.:8.15e}',file=foutm0dataerr)
                             print(f'{p:.1f} {w:.2f} {trainingresult.M1dataerr[i,j]**2.+trainingresult.M1modelerr[i,j]**2.:8.15e}',file=foutm1dataerr)
-                            print(f'{p:.1f} {w:.2f} {trainingresult.Mhostdataerr[i,j]**2.+trainingresult.Mhostmodelerr[i,j]**2.:8.15e}',file=foutmhostdataerr)
                             print(f'{p:.1f} {w:.2f} {trainingresult.cov_M0_M1_data[i,j]+trainingresult.cov_M0_M1_model[i,j]:8.15e}',file=foutdatacov)
+        if self.options.host_component:
+            with open(f'{outdir}/salt3_template_host.dat','w') as foutmhost,\
+             open(f'{outdir}/salt3_lc_covariance_0host.dat','w') as foutm0mhostcov,\
+             open(f'{outdir}/salt3_lc_variance_host.dat','w') as foutmhostdataerr,\
+             open(f'{outdir}/salt3_lc_model_variance_host.dat','w') as foutmhostmodelerr,\
+             open(f'{outdir}/salt3_lc_model_covariance_0host.dat','w') as foutm0mhostmodelcov:
+                for i,p in enumerate(trainingresult.phase):
+                        print(f'{p:.1f} {w:.2f} {trainingresult.Mhost[i,j]:8.15e}',file=foutmhost)
+                        print(f'{p:.1f} {w:.2f} {trainingresult.Mhostmodelerr[i,j]:8.15e}',file=foutmhostmodelerr)
+                        print(f'{p:.1f} {w:.2f} {trainingresult.cov_M0_Mhost_model[i,j]:8.15e}',file=foutm0mhostmodelcov)
+
+                        if self.options.errors_from_bootstrap:
+                            print(f'{p:.1f} {w:.2f} {trainingresult.Mhostbootstraperr[i,j]**2.:8.15e}',file=foutmhostdataerr)
+                            print(f'{p:.1f} {w:.2f} {trainingresult.cov_M0_Mhost_bootstrap[i,j]:8.15e}',file=foutm0mhostcov)
+                        else:
+                            print(f'{p:.1f} {w:.2f} {trainingresult.Mhostdataerr[i,j]**2.+trainingresult.Mhostmodelerr[i,j]**2.:8.15e}',file=foutmhostdataerr)
                             print(f'{p:.1f} {w:.2f} {trainingresult.cov_M0_Mhost_data[i,j]+trainingresult.cov_M0_Mhost_model[i,j]**2.:8.15e}',file=foutm0mhostcov)
-                        
+
+
         if self.options.use_previous_errors and self.options.resume_from_outputdir:
             for filename in ['salt3_lc_variance_0.dat','salt3_lc_variance_1.dat','salt3_lc_variance_host.dat',
                              'salt3_lc_covariance_01.dat','salt3_lc_covariance_0host.dat',
@@ -821,6 +827,7 @@ COLORLAW_VERSION: 1
 COLORCOR_PARAMS: {self.options.colorwaverange[0]:.0f} {self.options.colorwaverange[1]:.0f}  {len(trainingresult.clpars)}  {' '.join(['%8.10e'%cl for cl in trainingresult.clpars])}
 
 COLOR_OFFSET:  0.0
+COLOR_DISP_MAX: 1.0  # avoid crazy sim-mags at high-z
 
 MAG_OFFSET:  0.27  # to get B-band mag from cosmology fit (Nov 23, 2011)
 
@@ -1250,7 +1257,6 @@ config file options can be overwridden at the command line"""
         elif configpositional:
             configfile= configpositional
         else:
-            parser.print_help()
             raise RuntimeError('Configuration file must be specified at command line')
 
         config = configparser.ConfigParser(inline_comment_prefixes='#')

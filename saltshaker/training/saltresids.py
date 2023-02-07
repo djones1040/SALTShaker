@@ -561,6 +561,7 @@ class SALTResids:
             results[flt]=normalization,normvariance
         return results
         
+
     def SALTModel(self,x,evaluatePhase=None,evaluateWave=None):
         """Returns flux surfaces of SALT model"""
         m0pars = x[self.m0min:self.m0max+1]

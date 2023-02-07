@@ -1,0 +1,3 @@
+#!/usr/bin/env python
+from saltshaker.pipeline import runpipe
+runpipe.main()

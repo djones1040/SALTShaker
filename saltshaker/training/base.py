@@ -173,6 +173,10 @@ class TrainSALTBase:
                 successful=successful&wrapaddingargument(config,'iodata','filter_mass_tolerance',  type=float,
                                                         help='Mass of filter transmission allowed outside of model wavelength range (default=%(default)s)')
 
+                msg = "range of obs filter central wavelength (A)"
+                successful=successful&wrapaddingargument(config, 'iodata',
+                        'filtercen_obs_waverange',type=float,nargs=2,help=msg)
+
                 #Initialize from SALT2.4                
                 successful=successful&wrapaddingargument(config,'iodata','initsalt2model',      type=boolean_string,
                                                         help="""If true, initialize model parameters from prior SALT2 model""")
@@ -543,9 +547,10 @@ class TrainSALTBase:
                         specdata.pop(k)
 
                 for flt in sn.filt:
-                    #Remove light-curves outside wavelength range
-                    if flt in self.options.__dict__[f"{sn.survey.split('(')[0]}_ignore_filters"].split(','):
-                        photdata.pop(flt)
+                    #Remove light curve outside model [rest-frame] wavelength range
+                    if not self.filter_select(sn.survey,flt):  # RK Nov 7 2022
+                    #if flt in self.options.__dict__[f"{sn.survey.split('(')[0]}_ignore_filters"].split(','):
+                        photdata.pop(flt)  # remove filter
                     elif self.checkFilterMass(z,sn.survey,flt):
                         lightcurve=sn.photdata[flt]
                         #Remove photometric data outside phase range
@@ -573,3 +578,16 @@ class TrainSALTBase:
             log.info( ', '.join([f'{final} {desc}' for attr,desc,initial,final,cut in zip(attrs,descriptions,initialdemos,finaldemos,sncutdemos)])+' remaining after all cuts')
 
             return outdict,cutdict
+
+        def filter_select(self,survey,flt):
+                select = True
+                if flt in self.options.__dict__[f"{survey.split('(')[0]}_ignore_filters"].split(','):
+                        select = False
+
+                lambdaeff = self.kcordict[survey][flt]['lambdaeff']
+                if lambdaeff < self.options.filtercen_obs_waverange[0] or \
+                   lambdaeff > self.options.filtercen_obs_waverange[1] :
+                        select = False                
+
+                return select                
+                # end filter_select
