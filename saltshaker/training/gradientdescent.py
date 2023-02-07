@@ -161,8 +161,8 @@ class rpropwithbacktracking:
                     self.functionevals+=1
                 else:
                     break
-            log.debug(f'final gamma factor {prevgamma:.2g}')
-            return prevgamma
+            log.debug(f'final gamma factor {gamma:.2g}')
+            return gamma
         else:
             while (loss-proploss < gamma*t or  np.isnan(loss-proploss)) and ( loss-proploss != 0):
                 prevgamma=gamma
@@ -170,8 +170,8 @@ class rpropwithbacktracking:
                 Xprop= X + gamma * searchdir 
                 proploss=-self.saltobj.maxlikefit(Xprop,*args,**kwargs)
                 self.functionevals+=1
-            log.debug(f'final gamma factor {gamma:.2g}')
-            return gamma
+            log.debug(f'final gamma factor {prevgamma:.2g}')
+            return prevgamma
 
     
         
