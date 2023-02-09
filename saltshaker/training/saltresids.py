@@ -6,7 +6,7 @@ from saltshaker.util.jaxoptions import jaxoptions
 from saltshaker.training import init_hsiao
 from saltshaker.training.datamodels import SALTfitcacheSN,modeledtraininglightcurve,modeledtrainingspectrum
 
-from saltshaker.training.priors import SALTPriors
+from saltshaker.training.priors import SALTPriors,__priors__
 
 from sncosmo.models import StretchSource
 from sncosmo.constants import HC_ERG_AA, MODEL_BANDFLUX_SPACING
@@ -48,6 +48,7 @@ from jax.experimental import sparse
 from jax import lax
 
 from collections import namedtuple
+from argparse import SUPPRESS
 
 import time
 import sys
@@ -55,6 +56,8 @@ import extinction
 import copy
 import warnings
 import logging
+
+
 log=logging.getLogger(__name__)
 
 from scipy import sparse as scisparse
@@ -63,76 +66,39 @@ _B_LAMBDA_EFF = np.array([4302.57])  # B-band-ish wavelength
 _V_LAMBDA_EFF = np.array([5428.55])  # V-band-ish wavelength
 warnings.simplefilter('ignore',category=FutureWarning)
 
- 
-def rankOneCholesky(variance,beta,v):
-    """Given variances, a scalar, and a vector, returns the cholesky matrix describing the covariance formed by the sum of the diagonal variance and the self outer product of the vector multiplied by the scalar"""
-    b=1
-    Lprime=np.zeros((variance.size,variance.size))
-    if beta==0: return np.diag(np.sqrt(variance))
-    for j in range(v.size):
-        Lprime[j,j]=np.sqrt(variance[j]+beta/b*v[j]**2)
-        gamma=(b*variance[j]+beta*v[j]**2)
-        Lprime[j+1:,j]=Lprime[j,j]*beta*v[j+1:]*v[j]/gamma
-        b+=beta*v[j]**2/variance[j]
-    return Lprime
+saltconfiguration=namedtuple('saltconfiguration',
 
-def jaxrankOneCholesky(variance,beta,v):
-    Lprime=jnp.zeros((variance.size,variance.size))
-    b=1
-    for j in range(v.size):
-        Lprime=Lprime.at[j,j].set(jnp.sqrt(variance[j]+beta/b*v[j]**2))
-        gamma=(b*variance[j]+beta*v[j]**2)
-        Lprime=Lprime.at[j+1:,j].set(Lprime[j,j]*beta*v[j+1:]*v[j]/gamma)
-        b=b+beta*v[j]**2/variance[j]
-    return Lprime
-
-def toidentifier(input):
-    return "x"+str(abs(hash(input)))
-
-def evaljacobianforsomeindices(function,x,varyingparameters):
-    if varyingparameters.all():
-        return jax.jacfwd(function)(jnp.array(x))
-    elif (~varyingparameters).all():
-        return np.zeros(( function(x).size,x.size))
-    else:
-        #Map indices from the original vector to the contracted vector composed of only the varying parameters
-        varyingparamsintindices=np.where(varyingparameters)[0]
-        varyingparamsintindices={idx:i for i,idx in enumerate(varyingparamsintindices)}
-
-        def varysomeparams(xcontracted):
-            #Take only the varying parameters from the contracted vector, rest from the original
-            xnew=jnp.array([(xcontracted[varyingparamsintindices[i]] if i in varyingparamsintindices else x[i]) for i in range(x.size) ])
-            return function(xnew)
-        #Read out the jacobian
-        jacresult=jax.jacfwd(varysomeparams)(jnp.array(x[varyingparameters]))
-        jacobianmatrix=np.zeros(( jacresult.shape[0],x.size))
-        jacobianmatrix[:,varyingparameters]=jacresult
-
-        return jacobianmatrix
+    ['parlist','phaseknotloc','waveknotloc','errphaseknotloc','errwaveknotloc'] )
 
     
 class SALTResids:
-    def __init__(self,guess,datadict,parlist,**kwargs):
+
+    parameters = ['x0','x1','xhost','c','m0','m1','mhost','spcrcl','spcrcl_norm','spcrcl_poly',
+                           'modelerr','modelcorr','clscat','clscat_0','clscat_poly']
+    configoptionnames = {}
+    
+    def __init__(self,datadict,kcordict,saltconfiguration,options):
         inittime=time.time()
-        self.options=kwargs
         assert type(parlist) == np.ndarray
         self.nstep = 0
-        self.parlist = parlist
-        self.npar = len(parlist)
         self.datadict = datadict
+        self.kcordict= kcordict
         
-        self.bsorder=3
-        self.initparams = guess
         self.nsn = len(self.datadict.keys())
         
-        for key, value in kwargs.items(): 
+        for key,value in saltconfiguration._asdict().items():
+            self.__dict__[key] =value
+            
+        for key  in  self.configoptionnames: 
             self.__dict__[key] = value
-
+        
+        self.npar = len(self.parlist)
+        
         self.usePriors = []
         self.priorWidths = []
         self.boundedParams = []
         self.bounds = []
-
+        
         for opt in self.__dict__.keys():
             if opt.startswith('prior_'):
                 self.usePriors += [opt[len('prior_'):]]
@@ -140,8 +106,8 @@ class SALTResids:
             elif opt.startswith('bound_'):
                 self.boundedParams += [opt[len('bound_'):]]
                 self.bounds += [tuple([float(x) for x in self.__dict__[opt]])]
-                
-        specrecalparams = parlist[(np.array([x.startswith('specrecal') for x in parlist]))]
+            
+        specrecalparams =self.parlist[(np.array([x.startswith('specrecal') for x in self.parlist]))]
         numrecalparams=[(specrecalparams==x ).sum() for x in np.unique(specrecalparams)]
         try:
             assert(all([numrecalparams[0]==x for x in numrecalparams]))
@@ -164,9 +130,6 @@ class SALTResids:
                 
         self.neff=0
 
-        # initialize the model
-        self.components = self.SALTModel(guess)
-        self.salterr = self.ErrModel(guess)
 
         self.m0guess = -19.49 #10**(-0.4*(-19.49-27.5))
         self.extrapolateDecline=0.015
@@ -253,9 +216,7 @@ class SALTResids:
         self.num_lc=sum([datadict[sn].num_lc for sn in datadict])
         self.num_phot=sum([datadict[sn].num_photobs for sn in datadict])
 
-        self.fixedUncertainties={}
         starttime=time.time()
-        #Store derivatives of a spline with fixed knot locations with respect to each knot value
     
         #Store the lower and upper edges of the phase/wavelength basis functions
         self.phaseBins=self.phaseknotloc[:-(self.bsorder+1)],self.phaseknotloc[(self.bsorder+1):]
@@ -305,16 +266,14 @@ class SALTResids:
                     dx=derivs[0],dy=derivs[1]).flatten()
         regularizationDerivs=map(sparse.BCOO.fromdense,regularizationDerivs)
         self.componentderiv,self.dcompdphasederiv,self.dcompdwavederiv,self.ddcompdwavedphase =regularizationDerivs
-        phase=self.phaseRegularizationPoints
-        wave=self.waveRegularizationPoints
-        fluxes=self.SALTModel(guess,evaluatePhase=self.phaseRegularizationPoints,evaluateWave=self.waveRegularizationPoints)
+
 
         self.guessScale=np.array([1.0 for f in fluxes])
         
         self.relativeregularizationweights=jnp.array([1,self.m1regularization]+( [self.mhostregularization] if self.host_component else []))
         
         if self.regularize:
-            self.updateEffectivePoints(guess)
+            self.updateEffectivePoints()
 
         
         def getphotdatacounts(datadict):
@@ -391,11 +350,125 @@ class SALTResids:
         self.priors = SALTPriors(self)
                 
         log.info('Time required to calculate cached quantities {:.1f}s'.format(time.time()-start))
-            
+    
+    @classmethod
+    def add_model_options(cls,parser,config):
+        if parser == None:
+                parser = ConfigWithCommandLineOverrideParser(usage=usage, conflict_handler="resolve")
+        def wrapaddingargument(*args,**kwargs):
+            if 'clargformat' in kwargs:
+                name=kwargs['clargformat'].format(args[2])
+            else:
+                name=args[2]
+            cls.configoptionnames.add(name)
+            return generateerrortolerantaddmethod(parser)
+        # input files
+        successful=True
+
+        # training params
+        successful=successful&wrapaddingargument(config,'trainingparams','specrecal',  type=int,
+                                                help='number of parameters defining the spectral recalibration (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','n_processes', type=int,
+                                                help='number of processes to use in calculating chi2 (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','estimate_tpk',         type=boolean_string,
+                                                help='if set, estimate time of max with quick least squares fitting (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','fix_t0',      type=boolean_string,
+                                                help='if set, don\'t allow time of max to float (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','regulargradientphase',         type=float,
+                                                help='Weighting of phase gradient chi^2 regularization during training of model parameters (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','regulargradientwave', type=float,
+                                                help='Weighting of wave gradient chi^2 regularization during training of model parameters (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','regulardyad', type=float,
+                                                help='Weighting of dyadic chi^2 regularization during training of model parameters (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','m1regularization',     type=float,
+                                                help='Scales regularization weighting of M1 component relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','mhostregularization',  type=float,
+                                                help='Scales regularization weighting of host component relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','spec_chi2_scaling',  type=float,
+                                                help='scaling of spectral chi^2 so it doesn\'t dominate the total chi^2 (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','n_min_specrecal',     type=int,
+                                                help='Minimum order of spectral recalibration polynomials (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','n_max_specrecal',     type=int,
+                                                help='Maximum order of spectral recalibration polynomials (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','specrange_wavescale_specrecal',  type=float,
+                                                help='Wavelength scale (in angstroms) for determining additional orders of spectral recalibration from wavelength range of spectrum (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','n_specrecal_per_lightcurve',  type=float,
+                                                help='Number of additional spectral recalibration orders per lightcurve (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','regularizationScaleMethod',  type=str,
+                                                help='Choose how scale for regularization is calculated (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','binspec',     type=boolean_string,
+                                                help='bin the spectra if set (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','binspecres',  type=int,
+                                                help='binning resolution (default=%(default)s)')
+        
+        #neff parameters
+        successful=successful&wrapaddingargument(config,'trainingparams','wavesmoothingneff',  type=float,
+                                                help='Smooth effective # of spectral points along wave axis (in units of waveoutres) (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','phasesmoothingneff',  type=float,
+                                                help='Smooth effective # of spectral points along phase axis (in units of phaseoutres) (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','nefffloor',  type=float,
+                                                help='Minimum number of effective points (has to be > 0 to prevent divide by zero errors).(default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','neffmax',     type=float,
+                                                help='Threshold for spectral coverage at which regularization will be turned off (default=%(default)s)')
+
+        # training model parameters
+        successful=successful&wrapaddingargument(config,'modelparams','waverange', type=int, nargs=2,
+                                                help='wavelength range over which the model is defined (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','colorwaverange', type=int, nargs=2,
+                                                help='wavelength range over which the color law is fit to data (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','interpfunc',     type=str,
+                                                help='function to interpolate between control points in the fitting (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','errbsorder','errinterporder', type=int,
+                                                help='for model uncertainty splines/polynomial funcs, order of the function (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','bsorder','interporder',     type=int,
+                                                help='for model splines/polynomial funcs, order of the function (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','wavesplineres',  type=float,
+                                                help='number of angstroms between each wavelength spline knot (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','phasesplineres', type=float,
+                                                help='number of angstroms between each phase spline knot (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','waveinterpres',  type=float,
+                                                help='wavelength resolution in angstroms, used for internal interpolation (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','phaseinterpres', type=float,
+                                                help='phase resolution in angstroms, used for internal interpolation (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','waveoutres',     type=float,
+                                                help='wavelength resolution in angstroms of the output file (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','phaseoutres',     type=float,
+                                                help='phase resolution in angstroms of the output file (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','phaserange', type=int, nargs=2,
+                                                help='phase range over which model is trained (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','n_components',  type=int,
+                                                help='number of principal components of the SALT model to fit for (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','host_component', type=str,
+                                                help="NOT IMPLEMENTED: if set, fit for a host component.  Must equal 'mass', for now (default=%(default)s)")
+        successful=successful&wrapaddingargument(config,'modelparams','n_colorpars',     type=int,
+                                                help='number of degrees of the phase-independent color law polynomial (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','n_colorscatpars',         type=int,
+                                                help='number of parameters in the broadband scatter model (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','error_snake_phase_binsize',      type=float,
+                                                help='number of days over which to compute scaling of error model (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','error_snake_wave_binsize',  type=float,
+                                                help='number of angstroms over which to compute scaling of error model (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','use_snpca_knots',         type=boolean_string,
+                                                help='if set, define model on SNPCA knots (default=%(default)s)')               
+        successful=successful&wrapaddingargument(config,'modelparams','colorlaw_function',         type=str,
+                                                help='color law function, see colorlaw.py (default=%(default)s)')               
+
+        # priors
+        for prior in __priors__:
+                successful=successful&wrapaddingargument(config,'priors',prior ,type=float,clargformat="--prior_{key}",
+                                                        help=f"prior on {prior}",default=SUPPRESS)
+        
+        # bounds
+        for param in self.parameters:
+                successful=successful&wrapaddingargument(config,'bounds', bound, type=float,nargs=3,clargformat="--bound_{key}",
+                                                        help="bound on %s"%bound,default=SUPPRESS)
+        if not successful: sys.exit(1)
+        return parser
+
+    
     def set_param_indices(self):
 
-        self.parameters = ['x0','x1','xhost','c','m0','m1','mhost','spcrcl','spcrcl_norm','spcrcl_poly',
-                           'modelerr','modelcorr','clscat','clscat_0','clscat_poly']
+        
         if not self.host_component:
             self.corrcombinations=sum([[(i,j) for j in range(i+1,self.n_components)]for i in range(self.n_components)] ,[])
         else:
@@ -711,15 +784,15 @@ class SALTResids:
         return components
 
     
-    def getParsGN(self,x):
+    def getPars(self,x):
 
         m0pars = x[self.parlist == 'm0']
         m1pars = x[self.parlist == 'm1']
         mhostpars = x[self.parlist == 'mhost']
-        
+    
         clpars = x[self.parlist == 'cl']
         clerr = np.zeros(len(x[self.parlist == 'cl']))
-        
+    
 
         clscat=self.colorscatter(x,self.wave)
         resultsdict = {}
@@ -755,28 +828,8 @@ class SALTResids:
         return(x,self.phaseout,self.waveout,m0,m0err,m1,m1err,mhost,mhosterr,cov_m0_m1,cov_m0_mhost,modelerr,
                clpars,clerr,clscat,resultsdict)
 
-    def getErrsGN(self,m0var,m1var,m0m1cov):
-
-        errs=[]
-        for errpars in [m0var,m1var,m0m1cov]:
-            if self.bsorder != 0:
-                errs+=[  bisplev(self.phase,
-                                 self.wave,
-                                 (self.phaseknotloc,self.waveknotloc,errpars,self.bsorder,self.bsorder))]
-            else:
-                n_repeat_phase = int(self.phase.size/(self.phaseknotloc.size-1))+1
-                n_repeat_phase_extra = -1*(n_repeat_phase*(self.phaseknotloc.size-1) % self.phase.size)
-                if n_repeat_phase_extra == 0: n_repeat_phase_extra = None
-                n_repeat_wave = int(self.wave.size/(self.waveknotloc.size-1))+1
-                n_repeat_wave_extra = -1*(n_repeat_wave*(self.waveknotloc.size-1) % self.wave.size)
-                if n_repeat_wave_extra == 0: n_repeat_wave_extra = None
-                errs += [np.repeat(np.repeat(errpars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),n_repeat_phase,axis=0),n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]]
-
-
-        return(np.sqrt(errs[0]),np.sqrt(errs[1]),errs[2])
-
     
-    def getPars(self,loglikes,x,nburn=500,mkplots=False):
+    def getParsMCMC(self,loglikes,x,nburn=500,mkplots=False):
 
         axcount = 0; parcount = 0
         from matplotlib.backends.backend_pdf import PdfPages
@@ -909,7 +962,7 @@ class SALTResids:
                clpars,clerr,clscat,resultsdict)
 
             
-    def updateEffectivePoints(self,x):
+    def updateEffectivePoints(self):
         """
         Updates the "effective number of points" constraining a given bin in 
         phase/wavelength space.
@@ -945,15 +998,15 @@ class SALTResids:
                     bins=self.waveRegularizationBins,statistic='sum').statistic
                 
 
-        self.neffRaw=gaussian_filter1d(self.neffRaw,self.phaseSmoothingNeff,0)
-        self.neffRaw=gaussian_filter1d(self.neffRaw,self.waveSmoothingNeff,1)
+        self.neffRaw=gaussian_filter1d(self.neffRaw,self.phasesmoothingneff,0)
+        self.neffRaw=gaussian_filter1d(self.neffRaw,self.wavesmoothingneff,1)
 
         self.neff=self.neffRaw.copy()
-        self.neff[self.neff>self.neffMax]=np.inf
+        self.neff[self.neff>self.neffmax]=np.inf
 
-        if not np.any(np.isinf(self.neff)): log.warning('Regularization is being applied to the entire phase/wavelength space: consider lowering neffmax (currently {:.2e})'.format(self.neffMax))
+        if not np.any(np.isinf(self.neff)): log.warning('Regularization is being applied to the entire phase/wavelength space: consider lowering neffmax (currently {:.2e})'.format(self.neffmax))
         
-        self.neff=np.clip(self.neff,self.neffFloor,None).flatten()
+        self.neff=np.clip(self.neff,self.nefffloorf,None).flatten()
 
         
     def plotEffectivePoints(self,phases=None,output=None):

@@ -9,60 +9,64 @@ import sys
 import multiprocessing
 import pickle
 import copy
+import yaml
+import time
+import matplotlib as mpl
+mpl.use('agg')
+import pylab as plt
 
 import os
 from os import path
 import subprocess
 
+from scipy.interpolate import interp1d
+from scipy.special import factorial
 from scipy.linalg import lstsq
 from scipy.optimize import minimize, least_squares, differential_evolution
+
 from astropy.io import fits
 from astropy.cosmology import Planck15 as cosmo
-from sncosmo.constants import HC_ERG_AA
-import astropy.table as at
+import astropy.units as u
+from astropy.table import Table
 
 from saltshaker.util import snana,readutils
 from saltshaker.util.estimate_tpk_bazin import estimate_tpk_bazin
 from saltshaker.util.txtobj import txtobj
 from saltshaker.util.specSynPhot import getScaleForSN
 from saltshaker.util.specrecal import SpecRecal
+from saltshaker.util.synphot import synphot
+
+from saltshaker.initfiles import init_rootdir
+from saltshaker.initfiles import init_rootdir as salt2dir
 
 from saltshaker.training.init_hsiao import init_hsiao, init_kaepora, init_errs,init_errs_percent,init_custom,init_salt2
 from saltshaker.training.base import TrainSALTBase
-from saltshaker.training.saltfit import fitting
+from saltshaker.training import saltresids
 from saltshaker.training import saltfit as saltfit
+
 from saltshaker.validation import ValidateParams,datadensity
-
-from saltshaker.data import data_rootdir
-from saltshaker.initfiles import init_rootdir
-from saltshaker.config import config_rootdir,loggerconfig
-
-import astropy.units as u
-import sncosmo
-import yaml
-
-from astropy.table import Table
-from saltshaker.initfiles import init_rootdir as salt2dir
-_flatnu=f'{init_rootdir}/flatnu.dat'
-
-# validation utils
-import matplotlib as mpl
-mpl.use('agg')
-import pylab as plt
 from saltshaker.validation import ValidateLightcurves
 from saltshaker.validation import ValidateSpectra
 from saltshaker.validation import ValidateModel
 from saltshaker.validation import CheckSALTParams
 from saltshaker.validation.figs import plotSALTModel
-from saltshaker.util.synphot import synphot
-from saltshaker.initfiles import init_rootdir as salt2dir
 from saltshaker.validation import SynPhotPlot
-import time
-from sncosmo.salt2utils import SALT2ColorLaw
-from scipy.interpolate import interp1d
-from scipy.optimize import least_squares
-from scipy.special import factorial
+
+from saltshaker.data import data_rootdir
+
+from saltshaker.config import config_rootdir,loggerconfig
+
 import extinction
+import sncosmo
+from sncosmo.salt2utils import SALT2ColorLaw
+from sncosmo.constants import HC_ERG_AA
+
+
+_flatnu=f'{init_rootdir}/flatnu.dat'
+
+# validation utils
+
+
 
 import logging
 log=logging.getLogger(__name__)
@@ -140,16 +144,16 @@ class TrainSALT(TrainSALTBase):
 
             loggerconfig.dictconfigfromYAML(user_options.loggingconfig,user_options.outputdir)
 
-            if not os.path.exists(user_options.trainingconfig):
-                print('warning : training config file %s doesn\'t exist.  Trying package directory'%user_options.trainingconfig)
-                user_options.trainingconfig = '%s/%s'%(config_rootdir,user_options.trainingconfig)
-            if not os.path.exists(user_options.trainingconfig):
-                raise RuntimeError('can\'t find training config file!  Checked %s'%user_options.trainingconfig)
+            if not os.path.exists(user_options.modelconfig):
+                print('warning : training config file %s doesn\'t exist.  Trying package directory'%user_options.modelconfig)
+                user_options.modelconfig = '%s/%s'%(config_rootdir,user_options.modelconfig)
+            if not os.path.exists(user_options.modelconfig):
+                raise RuntimeError('can\'t find training config file!  Checked %s'%user_options.modelconfig)
 
-            trainingconfig = configparser.ConfigParser(inline_comment_prefixes='#')
-            trainingconfig.read(user_options.trainingconfig)
-            training_parser = self.add_training_options(parser=user_parser,
-                                                        usage='',config=trainingconfig)
+            modelconfig = configparser.ConfigParser(inline_comment_prefixes='#')
+            modelconfig.read(user_options.modelconfig)
+            training_parser = self.add_model_options(parser=user_parser,
+                                                        usage='',config=modelconfig)
             training_parser.addhelp()
             training_options = training_parser.parse_args()
 
@@ -270,7 +274,7 @@ class TrainSALT(TrainSALTBase):
                 parlist = np.append(parlist,[f'x0_{k}',f'x1_{k}',f'xhost_{k}',f'c_{k}'])
 
         if self.options.specrecallist:
-            spcrcldata = at.Table.read(self.options.specrecallist,format='ascii')
+            spcrcldata = Table.read(self.options.specrecallist,format='ascii')
             
         # spectral params
         for sn in datadict.keys():
@@ -287,6 +291,9 @@ class TrainSALT(TrainSALTBase):
                 order=min(max(order,self.options.n_min_specrecal ), self.options.n_max_specrecal)
                 recalParams=[f'specx0_{sn}_{k}']+[f'specrecal_{sn}_{k}']*(order-1)
                 parlist=np.append(parlist,recalParams)
+                
+        modelconfiguration=saltresids.saltconfiguration(parlist=parlist,phaseknotloc =phaseknotloc ,waveknotloc=waveknotloc,
+            errphaseknotloc=errphaseknotloc,errwaveknotloc=errwaveknotloc)
         # initial guesses
         n_params=parlist.size
         guess = np.zeros(parlist.size)
@@ -450,7 +457,7 @@ class TrainSALT(TrainSALTBase):
                     pass
 
                     
-        return parlist,guess,phaseknotloc,waveknotloc,errphaseknotloc,errwaveknotloc
+        return guess,modelconfiguration
 
     def bootstrapSALTModel_batch(self,datadict,trainingresult,saltfitter,returnGN=False):
         # runs bootstrapping in batch mode via calls to trainsalt
@@ -1269,11 +1276,25 @@ config file options can be overwridden at the command line"""
 
         loggerconfig.dictconfigfromYAML(user_options.loggingconfig,user_options.outputdir)
 
+        if not os.path.exists(user_options.modelconfig):
+            print('warning : model config file %s doesn\'t exist.  Trying package directory'%user_options.modelconfig)
+            user_options.modelconfig = '%s/%s'%(config_rootdir,user_options.modelconfig)
+        if not os.path.exists(user_options.modelconfig):
+            raise RuntimeError('can\'t find model config file!  Checked %s'%user_options.modelconfig)
+                    
         if not os.path.exists(user_options.trainingconfig):
-            print('warning : training config file %s doesn\'t exist.  Trying package directory'%user_options.trainingconfig)
+            print('warning : trainingconfig config file %s doesn\'t exist.  Trying package directory'%user_options.trainingconfig)
             user_options.trainingconfig = '%s/%s'%(config_rootdir,user_options.trainingconfig)
         if not os.path.exists(user_options.trainingconfig):
-            raise RuntimeError('can\'t find training config file!  Checked %s'%user_options.trainingconfig)
+            raise RuntimeError('can\'t find trainingconfig config file!  Checked %s'%user_options.trainingconfig)
+
+
+        modelconfig = configparser.ConfigParser(inline_comment_prefixes='#')
+        modelconfig.read(user_options.modelconfig)
+        model_parser = saltresids.SALTResids.add_model_options(
+            parser=user_parser,config=modelconfig)
+        model_parser.addhelp()
+        model_options = model_parser.parse_args(args)
 
         trainingconfig = configparser.ConfigParser(inline_comment_prefixes='#')
         trainingconfig.read(user_options.trainingconfig)

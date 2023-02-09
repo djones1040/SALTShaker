@@ -79,7 +79,10 @@ class SALTPriors:
         self.SALTModelDeriv = SALTResidsObj.SALTModelDeriv
         
         self.priors={ key: partial(__priors__[key],self) for key in __priors__}
-                
+        if len(self.usePriors) != len(self.priorWidths):
+            raise RuntimeError('length of priors does not equal length of prior widths!')
+
+  
         self.lowresphase=self.phaseRegularizationPoints
         self.lowreswave=self.waveRegularizationPoints
         

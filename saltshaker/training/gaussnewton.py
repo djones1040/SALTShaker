@@ -20,6 +20,8 @@ from sncosmo.models import StretchSource
 from sncosmo.constants import HC_ERG_AA, MODEL_BANDFLUX_SPACING
 from sncosmo.utils import integration_grid
 
+from saltshaker.config.configparsing import *
+
 from saltshaker.util.synphot import synphot
 from saltshaker.util.query import query_yes_no
 from saltshaker.training import saltresids
@@ -361,15 +363,18 @@ class mcmc(saltresids.SALTResids):
 
 
 
-class GaussNewton(saltresids.SALTResids):
-    def __init__(self,*args,**kwargs):
-        if len(args)>1:
-            guess,datadict,parlist=args
+class GaussNewton:
+
+    configoptionnames={}
+    
+    def __init__(self,guess,saltresids,outputdir,options):
             self.debug=False
-            super().__init__(guess,datadict,parlist,**kwargs)
             self.lsqfit = False
-
-
+            self.modelobj=saltresids
+            self.outputdir=outputdir
+            for key in configoptionnames:
+                self.__dict__[key]=options.__dict__[key]
+                
             self.rngkey=jax.random.PRNGKey(18327534917853348)
 
             self.GN_iter = {}
@@ -382,12 +387,11 @@ class GaussNewton(saltresids.SALTResids):
             self._writetmp = False
             self.chi2_diff_cutoff = .1
             self.fitOptions={}
-            self.iModelParam=np.ones(self.npar,dtype=bool)
-            self.iModelParam[self.imodelerr]=False
-            self.iModelParam[self.imodelcorr]=False
-            self.iModelParam[self.iclscat]=False
-            self.iModelParam[self.ixhost]=False
-            self.uncertaintyKeys=set(['photvariances_' +sn for sn in self.datadict]+['specvariances_' +sn for sn in self.datadict]+sum([[f'photCholesky_{sn}_{flt}' for flt in self.datadict[sn].filt] for sn in self.datadict],[]))
+            self.iModelParam=np.ones(self.modelobj.npar,dtype=bool)
+            self.iModelParam[self.modelobj.imodelerr]=False
+            self.iModelParam[self.modelobj.imodelcorr]=False
+            self.iModelParam[self.modelobj.iclscat]=False
+            self.iModelParam[self.modelobj.ixhost]=False
             self.cachedpreconevalfuns={}
             self.Xhistory=[]
             self.tryFittingAllParams=True
@@ -396,90 +400,90 @@ class GaussNewton(saltresids.SALTResids):
                        ('component 1 piecewise','piecewisecomponent1'),('principal component 1','component1'),('color','color'),('color law','colorlaw'),
                        ('spectral recalibration const.','spectralrecalibration_norm'),('all spectral recalibration','spectralrecalibration'),
                        ('error model','modelerr'),('params with largest residuals','highestresids'),('pca parameters only','pcaparams'), 
-                       ('noncomponent parameters','snparams+colorlaw+recal'),('components and recalibration','components+recal')]+ [(f'sn {sn}',sn) for sn in self.datadict.keys()]
+                       ('noncomponent parameters','snparams+colorlaw+recal'),('components and recalibration','components+recal')]+ [(f'sn {sn}',sn) for sn in self.modelobj.datadict.keys()]
 
             for message,fit in fitlist:
                 self.GN_iter[fit]=1
                 self.damping[fit]=0.1
                 if 'all' in fit or fit=='highestresids':
-                    includePars=np.ones(self.npar,dtype=bool)
-                    includePars[self.ixhost] = False # we never want to fit the host coordinate
+                    includePars=np.ones(self.modelobj.npar,dtype=bool)
+                    includePars[self.modelobj.ixhost] = False # we never want to fit the host coordinate
                 else:
-                    includePars=np.zeros(self.npar,dtype=bool)
-                    if fit in self.datadict:
+                    includePars=np.zeros(self.modelobj.npar,dtype=bool)
+                    if fit in self.modelobj.datadict:
                         sn=fit
-                        includePars=np.array([ sn in name.split('_') for name in self.parlist])
+                        includePars=np.array([ sn in name.split('_') for name in self.modelobj.parlist])
                     elif fit=='components+recal':
-                        includePars[self.im0]=True
-                        includePars[self.im1]=True
-                        includePars[self.imhost]=True
-                        includePars[self.ispcrcl]=True
+                        includePars[self.modelobj.im0]=True
+                        includePars[self.modelobj.im1]=True
+                        includePars[self.modelobj.imhost]=True
+                        includePars[self.modelobj.ispcrcl]=True
                     elif 'pcaparams' == fit:
                         self.GN_iter[fit]=2
-                        includePars[self.im0]=True
-                        includePars[self.im1]=True      
-                        includePars[self.ix0]=True
-                        includePars[self.ix1]=True
+                        includePars[self.modelobj.im0]=True
+                        includePars[self.modelobj.im1]=True      
+                        includePars[self.modelobj.ix0]=True
+                        includePars[self.modelobj.ix1]=True
                     elif 'components' in fit:
-                        includePars[self.im0]=True
-                        includePars[self.im1]=True
-                        includePars[self.imhost]=True
+                        includePars[self.modelobj.im0]=True
+                        includePars[self.modelobj.im1]=True
+                        includePars[self.modelobj.imhost]=True
                     elif 'component0' in fit :
                         self.damping[fit]=1e-3
-                        includePars[self.im0]=True
+                        includePars[self.modelobj.im0]=True
                     elif 'component1' in fit:
                         self.damping[fit]=1e-3
-                        includePars[self.im1]=True
+                        includePars[self.modelobj.im1]=True
                     elif 'componenthost' in fit:
                         self.damping[fit]=1e-3
-                        includePars[self.imhost]=True
+                        includePars[self.modelobj.imhost]=True
                     elif fit=='sn':
                         self.damping[fit]=1e-3
-                        includePars[self.ix0]=True
-                        includePars[self.ix1]=True
+                        includePars[self.modelobj.ix0]=True
+                        includePars[self.modelobj.ix1]=True
                     elif fit=='snparams+colorlaw+recal':
-                        includePars[self.ix0]=True
-                        includePars[self.ix1]=True
-                        includePars[self.ic]=True
-                        includePars[self.iCL]=True
-                        includePars[self.ispcrcl]=True                
+                        includePars[self.modelobj.ix0]=True
+                        includePars[self.modelobj.ix1]=True
+                        includePars[self.modelobj.ic]=True
+                        includePars[self.modelobj.iCL]=True
+                        includePars[self.modelobj.ispcrcl]=True                
                     elif fit=='x0':
                         self.damping[fit]=0
-                        includePars[self.ix0]=True
+                        includePars[self.modelobj.ix0]=True
                     elif fit=='x1':
                         self.damping[fit]=1e-3
-                        includePars[self.ix1]=True
+                        includePars[self.modelobj.ix1]=True
                     elif fit=='color':
                         self.damping[fit]=1e-3
-                        includePars[self.ic]=True
+                        includePars[self.modelobj.ic]=True
                     elif fit=='colorlaw':
-                        includePars[self.iCL]=True
+                        includePars[self.modelobj.iCL]=True
                     elif fit=='spectralrecalibration':
-                        if len(self.ispcrcl):
-                            includePars[self.ispcrcl]=True
+                        if len(self.modelobj.ispcrcl):
+                            includePars[self.modelobj.ispcrcl]=True
                         else:
-                            self.ispcrcl = []
+                            self.modelobj.ispcrcl = []
                     elif fit=='spectralrecalibration_norm':
-                        if len(self.ispcrcl_norm):
-                            includePars[self.ispcrcl_norm]=True
+                        if len(self.modelobj.ispcrcl_norm):
+                            includePars[self.modelobj.ispcrcl_norm]=True
                         else:
-                            self.ispcrcl = []
+                            self.modelobj.ispcrcl = []
                     elif fit=='modelerr':
-                        includePars[self.imodelerr]=True
-                        includePars[self.imodelcorr]=True
-                        includePars[self.parlist=='clscat']=True
+                        includePars[self.modelobj.imodelerr]=True
+                        includePars[self.modelobj.imodelcorr]=True
+                        includePars[self.modelobj.parlist=='clscat']=True
                     else:
                         raise NotImplementedError("""This option for a Gauss-Newton fit with a 
         restricted parameter set has not been implemented: {}""".format(fit))
                 if self.fix_salt2modelpars:
-                    includePars[self.im0]=False
-                    includePars[self.im1]=False
-                    includePars[self.im0new]=True
-                    includePars[self.im1new]=True
+                    includePars[self.modelobj.im0]=False
+                    includePars[self.modelobj.im1]=False
+                    includePars[self.modelobj.im0new]=True
+                    includePars[self.modelobj.im1new]=True
                 elif self.fix_salt2components:
-                    includePars[self.im0]=False
-                    includePars[self.im1]=False
-                    includePars[self.iCL]=False
+                    includePars[self.modelobj.im0]=False
+                    includePars[self.modelobj.im1]=False
+                    includePars[self.modelobj.iCL]=False
                     
                 self.fitOptions[fit]=(message,includePars)
 
@@ -491,143 +495,66 @@ class GaussNewton(saltresids.SALTResids):
                                 ('sn')]
             else:
                 self.fitlist = [f for f in kwargs['fitting_sequence'].split(',')]
-        else:
-            self.__dict__=args[0].__dict__.copy()
-    def datauncertaintiesfromhessianapprox(self,X,suppressregularization=True,smoothingfactor=150,exacthessian=False):
-        """Approximate Hessian by jacobian times own transpose to determine uncertainties in flux surfaces"""
-        log.info("determining M0/M1 errors by Hessian")
-        import time
-        tstart = time.time()
-        
-        datauncertainties=self.calculatecachedvals(X,target='variances')
-        
-        #Define the matrix sigma^-1=J^T J
-        
-        if exacthessian:
-            logging.info('Calculating exact Hessian matrix to estimate uncertainties')
-            jvp=jaxoptions.jaxoptions(jax.grad(lambda x: (self.lsqwrap(x,datauncertainties,jit=False)**2).sum())
-                )(pars,diff='jvp',jit=True)
-        
-            hessian=jnp.stack([jvp(((np.arange( pars.size)==i)*1.)) for i in range(pars.size)])
-        else:
-            logging.info('Calculating approximate Hessian matrix')
-            jac= self.lsqwrap(x,datauncertainties,diff='sparsejacfwd')
-            hessian= jac.T @ jac 
-        #Inverting cholesky matrix for speed
-        L=linalg.cholesky(hessian,lower=True)
-        invL=(linalg.solve_triangular(L,np.diag(np.ones(L.shape[0])),lower=True))
-        #Turning spline_derivs into a sparse matrix for speed
-        chunkindex,chunksize=0,10
-        M0dataerr      = np.empty((self.phaseout.size,self.waveout.size))
-        cov_M0_M1_data = np.empty((self.phaseout.size,self.waveout.size))
-        M1dataerr      = np.empty((self.phaseout.size,self.waveout.size))
-        Mhostdataerr      = np.empty((self.phaseout.size,self.waveout.size))
-        cov_M0_Mhost_data = np.empty((self.phaseout.size,self.waveout.size))
-        
-        for chunkindex in np.arange(self.waveout.size)[::chunksize]:
-            varyparlist= self.parlist
-            spline_derivs = np.empty([self.phaseout.size, min(self.waveout.size-chunkindex, chunksize),self.im0.size])
-            for i in range(self.im0.size):
-                if self.bsorder == 0: continue
-                spline_derivs[:,:,i]=bisplev(self.phaseout,self.waveout[chunkindex:chunkindex+chunksize],(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
-            spline2d=sparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))[:,varyparlist=='m0']
-        
-            #Smooth things a bit, since this is supposed to be for broadband photometry
-            if smoothingfactor>0:
-                smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
-                spline2d=smoothingmatrix*spline2d
-            #Uncorrelated effect of parameter uncertainties on M0 and M1
-            m0pulls=invL.astype('float32')[:,varyparlist=='m0'].astype('float32')*spline2d.T.astype('float32')
-            m1pulls=invL.astype('float32')[:,varyparlist=='m1'].astype('float32')*spline2d.T.astype('float32')
-            if self.host_component:
-                mhostpulls=invL.astype('float32')[:,varyparlist=='mhost'].astype('float32')*spline2d.T.astype('float32')
-                
-            mask=np.zeros((self.phaseout.size,self.waveout.size),dtype=bool)
-            mask[:,chunkindex:chunkindex+chunksize]=True        
-            M0dataerr[mask] =  np.sqrt((m0pulls**2     ).sum(axis=0))
-            cov_M0_M1_data[mask] =     (m0pulls*m1pulls).sum(axis=0)
-            M1dataerr[mask] =  np.sqrt((m1pulls**2     ).sum(axis=0))
-            if self.host_component:
-                Mhostdataerr[mask] =  np.sqrt((mhostpulls**2     ).sum(axis=0))
-                # should we do host covariances?
-                cov_M0_Mhost_data[mask] =     (m0pulls*mhostpulls).sum(axis=0)
-                
-        correlation=cov_M0_M1_data/(M0dataerr*M1dataerr)
-        correlation[np.isnan(correlation)]=0
-        if self.host_component: M0,M1,Mhost=self.SALTModel(X)
-        else: M0,M1=self.SALTModel(X)
-        M0dataerr=np.clip(M0dataerr,0,np.abs(M0).max()*2)
-        M1dataerr=np.clip(M1dataerr,0,np.abs(M1).max()*2)
-        if self.host_component:
-            Mhostdataerr=np.clip(Mhostdataerr,0,np.abs(Mhost).max()*2)
-        correlation=np.clip(correlation,-1,1)
-        cov_M0_M1_data=correlation*(M0dataerr*M1dataerr)
-
-        return M0dataerr, M1dataerr, Mhostdataerr, cov_M0_M1_data, cov_M0_Mhost_data
-
-    def datauncertaintiesfromjackknife(self,X,max_iter,n_bootstrapsamples):
-        """Determine uncertainties in flux surfaces by jackknife"""
-        log.info("determining M0/M1 errors by jackknife")
-        snlist=list(self.datadict.keys())
-        removesnindices=np.random.choice(len(snlist),n_bootstrapsamples)
-        samples=[self.convergence_loop(X,max_iter, snlist[:i]+snlist[i+1:], getdatauncertainties=False).X for i in  removesnindices]
-        deviation=(samples-X)
-        sigma=ensurepositivedefinite(np.dot(deviation.T,deviation)/(deviation.shape[0]-1))
-        L=linalg.cholesky(sigma,lower=True)
-        
-        chunkindex,chunksize=0,10
-        M0dataerr      = np.empty((self.phaseout.size,self.waveout.size))
-        cov_M0_M1_data = np.empty((self.phaseout.size,self.waveout.size))
-        M1dataerr      = np.empty((self.phaseout.size,self.waveout.size))
-
-        for chunkindex in np.arange(self.waveout.size)[::chunksize]:
-            spline_derivs = np.empty([self.phaseout.size, min(self.waveout.size-chunkindex, chunksize),self.im0.size])
-            for i in range(self.im0.size):
-                if self.bsorder == 0: continue
-                spline_derivs[:,:,i]=bisplev(self.phaseout,self.waveout[chunkindex:chunkindex+chunksize],(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
-            spline2d=sparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))
-        
-            #Smooth things a bit, since this is supposed to be for broadband photometry
-#           if smoothingfactor>0:
-#               smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
-#               spline2d=smoothingmatrix*spline2d
-            #Uncorrelated effect of parameter uncertainties on M0 and M1
-            varyparlist= self.parlist[varyingParams]
-            m0pulls=L[:,varyparlist=='m0'].astype('float32')*spline2d.T.astype('float32')
-            m1pulls=L[:,varyparlist=='m1'].astype('float32')*spline2d.T.astype('float32')
-            mask=np.zeros((self.phaseout.size,self.waveout.size),dtype=bool)
-            mask[:,chunkindex:chunkindex+chunksize]=True        
-            M0dataerr[mask] =  np.sqrt((m0pulls**2     ).sum(axis=0))
-            cov_M0_M1_data[mask] =     (m0pulls*m1pulls).sum(axis=0)
-            M1dataerr[mask] =  np.sqrt((m1pulls**2     ).sum(axis=0))
             
-        correlation=cov_M0_M1_data/(M0dataerr*M1dataerr)
-        correlation[np.isnan(correlation)]=0
-        M0,M1=self.SALTModel(X)
-        M0dataerr=np.clip(M0dataerr,0,np.abs(M0).max()*2)
-        M1dataerr=np.clip(M1dataerr,0,np.abs(M1).max()*2)
-        correlation=np.clip(correlation,-1,1)
-        cov_M0_M1_data=correlation*(M0dataerr*M1dataerr)
-        return M0dataerr, M1dataerr,cov_M0_M1_data
+    @classmethod
+    def add_training_options(cls,parser,config):
+        if parser == None:
+            parser = ConfigWithCommandLineOverrideParser(usage=usage, conflict_handler="resolve")
+        
+        def wrapaddingargument(*args,**kwargs):
+            cls.configoptionnames.add(args[2])
+            return generateerrortolerantaddmethod(parser)
+
+        successful=wrapaddingargument(config,'trainparams','n_repeat',  type=int,
+                                                help='repeat gauss newton n times (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainparams','fit_model_err',  type=boolean_string,
+                                                help='fit for model error if set (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainparams','fit_cdisp_only', type=boolean_string,
+                                                help='fit for color dispersion component of model error if set (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainparams','steps_between_errorfit', type=int,
+                                                help='fit for error model every x steps (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainparams','model_err_max_chisq', type=float,
+                                                help='max photometric chi2/dof below which model error estimation is done (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainparams','dampingscalerate', type=float,
+                                                help=' Parameter that controls how quickly damping is adjusted in optimizer  (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainparams','gaussnewton_maxiter',     type=int,
+                                                help='maximum iterations for Gauss-Newton (default=%(default)s)')
+                                
+        successful=successful&wrapaddingargument(config,'trainparams','lsmrmaxiter', type=int,
+                                                help=' Allowed number of iterations for the linear solver of the Gauss-Newton procedure to run  (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainparams','preconditioningmaxiter', type=int,
+                                                help=' Number of operations used to evaluate preconditioning for the problem  (default=%(default)s)')
+
+        successful=successful&wrapaddingargument(config,'trainparams','dampingscalerate', type=float,
+                                                help=' Parameter that controls how quickly damping is adjusted in optimizer  (default=%(default)s)')
+
+        successful=successful&wrapaddingargument(config,'trainparams','preconditioningchunksize', type=int,
+                                                help='Size of batches to evaluate preconditioning scales in Gauss-Newton proces. Increasing this value may increase memory performance at the cost of speed (default=%(default)s)')
+
+        successful=successful&wrapaddingargument(config,'trainparams','fitting_sequence',  type=str,
+                                                        help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn (default=%(default)s)")
+                                                        
+        if not successful: sys.exit(1)
+
+        return parser
+    
     
     def convergence_loop(self,guess,loop_niter=3,usesns=None,getdatauncertainties=True):
         lastResid = 1e20
         log.info('Initializing')
         start=datetime.now()
         
-        if len(self.usePriors) != len(self.priorWidths):
-            raise RuntimeError('length of priors does not equal length of prior widths!')
         stepsizes=None
     
         X = copy.deepcopy(guess[:])
-        clscatzeropoint=X[self.iclscat[-1]]
+        clscatzeropoint=X[self.modelobj.iclscat[-1]]
         nocolorscatter=clscatzeropoint==-np.inf
         if not nocolorscatter: log.debug('Turning off color scatter for convergence_loop')
-        X[self.iclscat[-1]]=-np.inf
+        X[self.modelobj.iclscat[-1]]=-np.inf
 
-        cacheduncertainties= self.calculatecachedvals(X,target='variances')
+        cacheduncertainties= self.modelobj.calculatecachedvals(X,target='variances')
         Xlast = copy.deepcopy(guess[:])
-        if np.all(X[self.ix1]==0) or np.all(X[self.ic]==0):
+        if np.all(X[self.modelobj.ix1]==0) or np.all(X[self.modelobj.ic]==0):
             #If snparams are totally uninitialized
             log.info('Estimating supernova parameters x0,x1,c and spectral normalization')
             for fit in ['x0','color','x0','color','x1']:
@@ -636,10 +563,10 @@ class GaussNewton(saltresids.SALTResids):
                     doSpecResids=  (fit=='x0'),allowjacupdate=False)
         else:
 
-            chi2_init=(self.lsqwrap(X,cacheduncertainties ,usesns=usesns)**2).sum()
+            chi2_init=(self.modelobj.lsqwrap(X,cacheduncertainties ,usesns=usesns)**2).sum()
         
         log.info(f'starting loop; {loop_niter} iterations')
-        chi2results=self.getChi2Contributions(X)
+        chi2results=self.modelobj.getChi2Contributions(X)
         for name,chi2component,dof in chi2results:
             if name.lower()=='photometric':
                 photochi2perdof=chi2component/dof
@@ -650,13 +577,13 @@ class GaussNewton(saltresids.SALTResids):
                 if ((not superloop % self.steps_between_errorfit) or tryfittinguncertainties)  and  self.fit_model_err and not \
                    self.fit_cdisp_only and photochi2perdof<self.model_err_max_chisq and not superloop == 0:
                     X=self.iterativelyfiterrmodel(X)
-                    chi2results=self.getChi2Contributions(X)
-                    cacheduncertainties= self.calculatecachedvals(X,target='variances')
+                    chi2results=self.modelobj.getChi2Contributions(X)
+                    cacheduncertainties= self.modelobj.calculatecachedvals(X,target='variances')
                     tryfittinguncertainties=False
                 else:
                     log.info('Reevaluted model error')
-                    chi2results=self.getChi2Contributions(X)
-                    cacheduncertainties= self.calculatecachedvals(X,target='variances')
+                    chi2results=self.modelobj.getChi2Contributions(X)
+                    cacheduncertainties= self.modelobj.calculatecachedvals(X,target='variances')
                 
                 for name,chi2component,dof in chi2results:
                     log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/sum([x[1] for x in chi2results])*100))
@@ -694,14 +621,14 @@ class GaussNewton(saltresids.SALTResids):
             except Exception as e:
                 logging.exception('Error encountered in convergence_loop, exiting')
                 raise e
-        X[self.iclscat[-1]]=clscatzeropoint
+        X[self.modelobj.iclscat[-1]]=clscatzeropoint
         try:
             if self.fit_model_err: X= self.fitcolorscatter(X)
         except Exception as e:
             logging.critical('Color scatter crashed during fitting, finishing writing output')
             logging.critical(e, exc_info=True)
 
-        Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
+        Xredefined=self.modelobj.priors.satisfyDefinitions(X,self.modelobj.SALTModel(X))
         logging.info('Checking that rescaling components to satisfy definitions did not modify photometry')
         try:
             unscaledresults={}
@@ -717,9 +644,9 @@ class GaussNewton(saltresids.SALTResids):
                 Xtmp[self.imodelerrhost] = 0
                 Xredefinedtmp[self.imodelerrhost] = 0
                 
-            for sn in self.datadict:
-                for flt in self.datadict[sn].photdata:
-                    lcdata=self.datadict[sn].photdata[flt]
+            for sn in self.modelobj.datadict:
+                for flt in self.modelobj.datadict[sn].photdata:
+                    lcdata=self.modelobj.datadict[sn].photdata[flt]
                     photresidsunscaled=lcdata.modelresidual(Xtmp)
                     photresidsrescaled=lcdata.modelresidual(Xredefinedtmp)
                     assert(np.allclose(photresidsunscaled['residuals'],photresidsrescaled['residuals'],rtol=0.001,atol=1e-4))
@@ -734,79 +661,48 @@ class GaussNewton(saltresids.SALTResids):
         # M0/M1 errors
         xfinal,phase,wave,M0,M0modelerr,M1,M1modelerr,Mhost,Mhostmodelerr,cov_M0_M1_model,cov_M0_Mhost_model,\
             modelerr,clpars,clerr,clscat,SNParams = \
-            self.getParsGN(Xredefined)
+            self.modelobj.getPars(Xredefined)
         if M0dataerr is None:
-            M0dataerr      = np.zeros((self.phaseout.size,self.waveout.size))
-            cov_M0_M1_data = np.zeros((self.phaseout.size,self.waveout.size))
-            M1dataerr      = np.zeros((self.phaseout.size,self.waveout.size))
+            M0dataerr      = np.zeros((self.modelobj.phaseout.size,self.modelobj.waveout.size))
+            cov_M0_M1_data = np.zeros((self.modelobj.phaseout.size,self.modelobj.waveout.size))
+            M1dataerr      = np.zeros((self.modelobj.phaseout.size,self.modelobj.waveout.size))
 
-            Mhostdataerr = np.zeros((self.phaseout.size,self.waveout.size))
-            cov_M0_Mhost_data = np.zeros((self.phaseout.size,self.waveout.size))
+            Mhostdataerr = np.zeros((self.modelobj.phaseout.size,self.modelobj.waveout.size))
+            cov_M0_Mhost_data = np.zeros((self.modelobj.phaseout.size,self.modelobj.waveout.size))
             
         log.info('Total time spent in convergence loop: {}'.format(datetime.now()-start))
         
 
         return SALTTrainingResult(
-            num_lightcurves=self.num_lc,num_spectra=self.num_spectra,num_sne=len(self.datadict),
-            parlist=self.parlist,X=xfinal,X_raw=X,phase=phase,wave=wave,M0=M0,M0modelerr=M0modelerr,M0dataerr=M0dataerr,
+            num_lightcurves=self.modelobj.num_lc,num_spectra=self.modelobj.num_spectra,num_sne=len(self.modelobj.datadict),
+            parlist=self.modelobj.parlist,X=xfinal,X_raw=X,phase=phase,wave=wave,M0=M0,M0modelerr=M0modelerr,M0dataerr=M0dataerr,
             M1=M1,Mhost=Mhost,M1modelerr=M1modelerr,M1dataerr=M1dataerr,Mhostdataerr=Mhostdataerr,Mhostmodelerr=Mhostmodelerr,
             cov_M0_M1_model=cov_M0_M1_model,cov_M0_M1_data=cov_M0_M1_data,cov_M0_Mhost_model=cov_M0_Mhost_model,cov_M0_Mhost_data=cov_M0_Mhost_data,
             modelerr=modelerr,clpars=clpars,clerr=clerr,clscat=clscat,SNParams=SNParams,stepsizes=stepsizes)
         
-    def fitOneSN(self,X,sn):
-        X=X.copy()
-        includePars=self.fitOptions[sn][1] 
-        #Estimate parameters first using GN method
-        for par in self.parlist[includePars]:
-            if 'specrecal' in par: continue
-            if 'specx0' in par:
-                result=self.ResidsForSN(X,sn,{},varyParams=self.parlist==par,fixUncertainty=True)[1]
-            else:
-                result=self.ResidsForSN(X,sn,{},varyParams=self.parlist==par,fixUncertainty=True)[0]
-            resid,grad=result['resid'],result['resid_jacobian'][:,0]
-            X[self.parlist==par]-=np.dot(grad,resid)/np.dot(grad,grad)
-
-        def fn(Y):
-            if len(Y[Y != Y]):
-                import pdb; pdb.set_trace()
-            Xnew=X.copy()
-            Xnew[includePars]=Y
-            return - self.loglikeforSN(Xnew,sn,{},varyParams=None)
-        def grad(Y):
-            if len(Y[Y != Y]):
-                import pdb; pdb.set_trace()
-            Xnew=X.copy()
-            Xnew[includePars]=Y
-            return - self.loglikeforSN(Xnew,sn,{},varyParams=includePars)[1]
-        log.info('Initialized log likelihood: {:.2f}'.format(self.loglikeforSN(X,sn,{},varyParams=None)))
-        params=['x'+str(i) for i in range(includePars.sum())]
         
 
-        initVals=X[includePars].copy()
-        kwargs={}
-        for i,parname in enumerate(self.parlist[includePars]):
-            if 'x1' in parname:
-                kwargs['limit_'+params[i]] = (-5,5)
-            elif 'x0' in parname:
-                kwargs['limit_'+params[i]] = (0,2)
-            elif 'c_' in parname:
-                kwargs['limit_'+params[i]] = (-0.5,1)
-            elif 'specrecal' in parname:
-                kwargs['limit_'+params[i]] = (-0.5,0.5)
-            else:
-                kwargs['limit_'+params[i]] = (-5,5)
+        def getErrsGN(self,m0var,m1var,m0m1cov):
 
-        kwargs.update({params[i]: initVals[i] for i in range(includePars.sum())})
-        m=Minuit(fn,name=params,grad=grad,**kwargs) #use_array_call=True,
-        m.errordef=1
-        result,paramResults=m.migrad()
+            errs=[]
+            for errpars in [m0var,m1var,m0m1cov]:
+                if self.bsorder != 0:
+                    errs+=[  bisplev(self.phase,
+                                     self.wave,
+                                     (self.phaseknotloc,self.waveknotloc,errpars,self.bsorder,self.bsorder))]
+                else:
+                    n_repeat_phase = int(self.phase.size/(self.phaseknotloc.size-1))+1
+                    n_repeat_phase_extra = -1*(n_repeat_phase*(self.phaseknotloc.size-1) % self.phase.size)
+                    if n_repeat_phase_extra == 0: n_repeat_phase_extra = None
+                    n_repeat_wave = int(self.wave.size/(self.waveknotloc.size-1))+1
+                    n_repeat_wave_extra = -1*(n_repeat_wave*(self.waveknotloc.size-1) % self.wave.size)
+                    if n_repeat_wave_extra == 0: n_repeat_wave_extra = None
+                    errs += [np.repeat(np.repeat(errpars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),n_repeat_phase,axis=0),n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]]
 
-        X=X.copy()
-        X[includePars]=np.array([x.value for x  in paramResults])
 
-        log.info('Final log likelihood: {:.2f}'.format( -result.fval))
-        
-        return X,-result.fval
+            return(np.sqrt(errs[0]),np.sqrt(errs[1]),errs[2])
+
+
     
     def fitcolorscatter(self,X,fitcolorlaw=False,rescaleerrs=True,maxiter=2000):
         message='Optimizing color scatter'
@@ -815,15 +711,15 @@ class GaussNewton(saltresids.SALTResids):
         if fitcolorlaw:
             message+=', with color law varying'
         log.info(message)
-        if X[self.iclscat[-1]]==-np.inf:
-            X[self.iclscat[-1]]=-8
-        includePars=np.zeros(self.parlist.size,dtype=bool)
-        includePars[self.iclscat]=True
-        includePars[self.iCL]=fitcolorlaw
+        if X[self.modelobj.iclscat[-1]]==-np.inf:
+            X[self.modelobj.iclscat[-1]]=-8
+        includePars=np.zeros(self.modelobj.parlist.size,dtype=bool)
+        includePars[self.modelobj.iclscat]=True
+        includePars[self.modelobj.iCL]=fitcolorlaw
         fixfluxes=not fitcolorlaw
-        if fixfluxes: cachedfluxes = self.calculatecachedvals(X,target='fluxes')
+        if fixfluxes: cachedfluxes = self.modelobj.calculatecachedvals(X,target='fluxes')
         else: cachedfluxes=None
-        log.info('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X)))
+        log.info('Initialized log likelihood: {:.2f}'.format(self.modelobj.maxlikefit(X)))
         
         X,minuitresult=self.minuitoptimize(X,includePars,cachedresults=cachedfluxes ,rescaleerrs=rescaleerrs,fixfluxes=fixfluxes, dopriors=False,dospec=False)
         log.info('Finished optimizing color scatter')
@@ -833,23 +729,23 @@ class GaussNewton(saltresids.SALTResids):
     def iterativelyfiterrmodel(self,X):
         log.info('Optimizing model error')
         X=X.copy()
-        imodelerr=np.zeros(self.parlist.size,dtype=bool)
-        imodelerr[self.imodelerr]=True
+        imodelerr=np.zeros(self.modelobj.parlist.size,dtype=bool)
+        imodelerr[self.modelobj.imodelerr]=True
         problemerrvals=(X<0)&imodelerr
         X[problemerrvals]=1e-3
-        if np.isnan(X[self.iclscat[-1]]):
-            X[self.iclscat[-1]]=-np.inf
+        if np.isnan(X[self.modelobj.iclscat[-1]]):
+            X[self.modelobj.iclscat[-1]]=-np.inf
         X0=X.copy()
         mapFun= starmap
-        cachedfluxes= self.calculatecachedvals(X,target='fluxes')
+        cachedfluxes= self.modelobj.calculatecachedvals(X,target='fluxes')
         
-        partriplets= list(zip(np.where(self.parlist=='modelerr_0')[0],np.where(self.parlist=='modelerr_1')[0],np.where(self.parlist=='modelcorr_01')[0]))
-        if self.host_component:
-            partriplets= list(zip(np.where(self.parlist=='modelerr_0')[0],np.where(self.parlist=='modelerr_1')[0],np.where(self.parlist=='modelcorr_01')[0],
-                                  np.where(self.parlist=='modelerr_host')[0],np.where(self.parlist=='modelcorr_0host')[0]))
+        partriplets= list(zip(np.where(self.modelobj.parlist=='modelerr_0')[0],np.where(self.modelobj.parlist=='modelerr_1')[0],np.where(self.modelobj.parlist=='modelcorr_01')[0]))
+        if self.modelobj.host_component:
+            partriplets= list(zip(np.where(self.modelobj.parlist=='modelerr_0')[0],np.where(self.modelobj.parlist=='modelerr_1')[0],np.where(self.modelobj.parlist=='modelcorr_01')[0],
+                                  np.where(self.modelobj.parlist=='modelerr_host')[0],np.where(self.modelobj.parlist=='modelcorr_0host')[0]))
         
         for i,parindices in tqdm(list(enumerate(partriplets))):
-            includePars=np.zeros(self.parlist.size,dtype=bool)
+            includePars=np.zeros(self.modelobj.parlist.size,dtype=bool)
             includePars[list(parindices)]=True
 
             X,minuitfitresult=self.minuitoptimize(X,includePars,cachedresults=cachedfluxes,fixfluxes=True,dopriors=False,dospec=False)
@@ -867,12 +763,12 @@ class GaussNewton(saltresids.SALTResids):
                 
                 Xnew=X.copy()
                 Xnew[includePars]=Y
-                result=-self.maxlikefit(Xnew,*args,**kwargs)
+                result=-self.modelobj.maxlikefit(Xnew,*args,**kwargs)
                 return 1e10 if np.isnan(result) else result
             def grad(Y):
                 Xnew=X.copy()
                 Xnew[includePars]=Y
-                grad=-self.maxlikefit(Xnew,*args,**kwargs,diff='grad')
+                grad=-self.modelobj.maxlikefit(Xnew,*args,**kwargs,diff='grad')
                 grad=grad[includePars]
                 return np.ones(Y.size) if np.isnan(grad ).any() else grad
 
@@ -880,16 +776,16 @@ class GaussNewton(saltresids.SALTResids):
             def fn(Y):
                 Xnew=X.copy()
                 Xnew[includePars]=Y[:-1]
-                Xnew[self.imodelerr]*=Y[-1]
-                result=-self.maxlikefit(Xnew,*args,**kwargs)
+                Xnew[self.modelobj.imodelerr]*=Y[-1]
+                result=-self.modelobj.maxlikefit(Xnew,*args,**kwargs)
                 return (1e10 if np.isnan(result) else result)
 
             def grad(Y):
                 Xnew=X.copy()
                 Xnew[includePars]=Y[:-1]
-                Xnew[self.imodelerr]*=Y[-1]
-                grad=-self.maxlikefit(Xnew,*args,**kwargs,diff='grad')
-                grad=np.concatenate((grad[includePars], [np.dot(grad[self.imodelerr], X[self.imodelerr])]))
+                Xnew[self.modelobj.imodelerr]*=Y[-1]
+                grad=-self.modelobj.maxlikefit(Xnew,*args,**kwargs,diff='grad')
+                grad=np.concatenate((grad[includePars], [np.dot(grad[self.modelobj.imodelerr], X[self.modelobj.imodelerr])]))
                 return np.ones(Y.size) if np.isnan(grad ).any() else grad
         initvals=X[includePars].copy()
 
@@ -903,7 +799,7 @@ class GaussNewton(saltresids.SALTResids):
         
         lowerlims=np.tile(-np.inf,includePars.size)
         upperlims=np.tile( np.inf,includePars.size)
-        clscatindices=np.where(self.parlist[includePars] == 'clscat')[0]
+        clscatindices=np.where(self.modelobj.parlist[includePars] == 'clscat')[0]
         if clscatindices.size>0:
             lowerlims[clscatindices[0]]=-1e-4
             lowerlims[clscatindices[1:-1]]=-1 
@@ -912,15 +808,15 @@ class GaussNewton(saltresids.SALTResids):
             upperlims[clscatindices[0]]=1e-4
             upperlims[clscatindices[1:-1]]=1 
             upperlims[clscatindices[-1]]=2
-        onebounded=np.array( [x.startswith('modelcorr') for x in  self.parlist[includePars] ])
+        onebounded=np.array( [x.startswith('modelcorr') for x in  self.modelobj.parlist[includePars] ])
         lowerlims[onebounded]=-1
         upperlims[onebounded]=1
-        positivebounded=np.array([x.startswith('modelerr') for x in self.parlist[includePars]])
+        positivebounded=np.array([x.startswith('modelerr') for x in self.modelobj.parlist[includePars]])
         lowerlims[positivebounded]=0
         upperlims[positivebounded]=1
         
-        lowerlims[self.parlist[includePars] == 'cl'] = -100
-        upperlims[self.parlist[includePars] == 'cl'] = 100
+        lowerlims[self.modelobj.parlist[includePars] == 'cl'] = -100
+        upperlims[self.modelobj.parlist[includePars] == 'cl'] = 100
     
 
         if rescaleerrs:
@@ -937,104 +833,12 @@ class GaussNewton(saltresids.SALTResids):
         paramresults=np.array(m.values)
         if rescaleerrs:
             X[includePars]=paramresults[:-1]
-            X[self.imodelerr]*=paramresults[-1]
+            X[self.modelobj.imodelerr]*=paramresults[-1]
         else:
             X[includePars]=paramresults
 
         return X,result
 
-    #def iterativelyfitdataerrmodel(self,X):
-    #
-    #   X0=X.copy()
-    #   mapFun= starmap
-    #
-    #   uncertainties={}
-    #   print('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X,uncertainties)))
-    #   fluxes={key:uncertainties[key] for key in uncertainties if 'fluxes' in key }
-    #   uncertainties=fluxes.copy()
-    #   args=[(X0,sn,uncertainties,None,False,1,True,False) for sn in self.datadict.keys()]
-    #   result0=np.array(list(mapFun(self.loglikeforSN,args)))
-    #   pardoublets= list(zip(np.where(self.parlist=='m0')[0],np.where(self.parlist=='m1')[0]))
-    #
-    #   m0var,m1var,m01cov = np.zeros(len(pardoublets)),np.zeros(len(pardoublets)),np.zeros(len(pardoublets))
-    #   for i,parindices in enumerate(tqdm(pardoublets)):
-    #       waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
-    #       phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
-    #       if phaserange[0] < 0 and phaserange[1] > 0 and waverange[0] < 5000 and waverange[1] > 5000:
-    #           includePars=np.zeros(self.parlist.size,dtype=bool)
-    #           includePars[list(parindices)]=True
-    #           
-    #           uncertainties=fluxes.copy()
-    #           args=[(X0+includePars*.5,sn,uncertainties,None,False,1,True,False) for sn in self.datadict.keys()]
-    #           result=np.array(list(mapFun(self.loglikeforSN,args)))
-    #
-    #           m0var[i],m1var[i],m01cov[i] = self.minuitoptimize_components(X,includePars,fluxes,fixFluxes=False,dospec=True)
-    #
-    #   return m0var,m1var,m01cov
-             
-    #def minuitoptimize_components(self,X,includePars,uncertainties=None,**kwargs):
-    #
-    #   X=X.copy()
-    #   if uncertainties is None: uncertainties={}
-    #   def fn(Y):
-    #       Xnew=X.copy()
-    #       Xnew[includePars]=Y
-    #       result=-self.maxlikefit(Xnew,{},**kwargs) #uncertainties.copy(),**kwargs)
-    #       return 1e10 if np.isnan(result) else result
-    #
-    #   params=['x'+str(i) for i in range(includePars.sum())]
-    #   initVals=X[includePars].copy()
-    #
-    #   minuitkwargs=({params[i]: initVals[i] for i in range(includePars.sum())})
-    #   minuitkwargs.update({'error_'+params[i]: 1e-2 for i in range(includePars.sum())})
-    #
-    #   m=Minuit(fn,use_array_call=True,forced_parameters=params,errordef=.5,**minuitkwargs)
-    #   result,paramResults=m.migrad()
-    #   paramerr=np.array([x.value for x  in paramResults])
-    #
-    #   if m.covariance:
-    #       return paramResults[0].error**2.,paramResults[1].error**2.,m.covariance[('x0', 'x1')]
-    #   else:
-    #       return paramResults[0].error**2.,paramResults[1].error**2.,0.0
-
-    def iterativelyfitdataerrmodel(self,X):
-
-        X0=X.copy()
-        mapFun= starmap
-
-        log.info('Initialized log likelihood: {:.2f}'.format(self.maxlikefit(X)))
-        args=[(X0,sn,uncertainties,None,False,1,True,False) for sn in self.datadict.keys()]
-        result0=np.array(list(mapFun(self.loglikeforSN,args)))
-        pars = np.where(self.parlist=='modelerr_0')[0]
-        
-        m0var,m1var,m01cov = np.zeros(self.im0.size),np.zeros(self.im0.size),np.zeros(self.im0.size)
-        for i,parindices in enumerate(tqdm(pars)):
-            waverange=self.errwaveknotloc[[i%(self.errwaveknotloc.size-self.errbsorder-1),i%(self.errwaveknotloc.size-self.errbsorder-1)+self.errbsorder+1]]
-            phaserange=self.errphaseknotloc[[i//(self.errwaveknotloc.size-self.errbsorder-1),i//(self.errwaveknotloc.size-self.errbsorder-1)+self.errbsorder+1]]
-
-            includeM0Pars=np.zeros(self.parlist.size,dtype=bool)
-            includeM1Pars=np.zeros(self.parlist.size,dtype=bool)
-            # could be slow (and ugly), but should work.....
-            m0idx = np.array([],dtype=int)
-            for j in range(self.im0.size):
-                m0waverange=self.waveknotloc[[j%(self.waveknotloc.size-self.bsorder-1),j%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
-                m0phaserange=self.phaseknotloc[[j//(self.waveknotloc.size-self.bsorder-1),j//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
-                if (waverange[0] <= m0waverange[0] and waverange[1] >= m0waverange[0] and \
-                   phaserange[0] <= m0phaserange[0] and phaserange[1] >= m0phaserange[0]) or \
-                (waverange[0] <= m0waverange[1] and waverange[1] >= m0waverange[1] and \
-                 phaserange[0] <= m0phaserange[1] and phaserange[1] >= m0phaserange[1]):
-                    includeM0Pars[self.im0[j]] = True
-                    includeM1Pars[self.im1[j]] = True
-                    m0idx = np.append(m0idx,j)
-            varyParams = includeM0Pars | includeM1Pars
-
-            m0var_single,m1var_single,m01cov_single = self.minuitoptimize_components(
-                X,includeM0Pars,includeM1Pars,fluxes,fixFluxes=False,dospec=True,varyParams=varyParams)
-            m0var[m0idx] = m0var_single*len(m0idx)
-            m1var[m0idx] = m1var_single*len(m0idx)
-            m01cov[m0idx] = m01cov_single*len(m0idx)
-
-        return m0var,m1var,m01cov
 
     def minuitoptimize_components(self,X,includeM0Pars,includeM1Pars,uncertainties=None,varyParams=None,**kwargs):
 
@@ -1047,7 +851,7 @@ class GaussNewton(saltresids.SALTResids):
             storedCopy = uncertainties.copy()
             if 'components' in storedCopy.keys():
                 storedCopy.pop('components')
-            result=-self.maxlikefit(Xnew,{})
+            result=-self.modelobj.maxlikefit(Xnew,{})
             return 1e10 if np.isnan(result) else result
             
         params=['x0','x1']
@@ -1082,14 +886,14 @@ class GaussNewton(saltresids.SALTResids):
 
     def linesearch(self,X,searchdir,*args,**kwargs):
         def opFunc(x):
-            return ((self.lsqwrap(X-(x*searchdir),*args,**kwargs))**2).sum()
+            return ((self.modelobj.lsqwrap(X-(x*searchdir),*args,**kwargs))**2).sum()
         result,step,stepType=minimize_scalar(opFunc),searchdir,'Gauss-Newton'
         log.info('Linear optimization factor is {:.2f} x {} step'.format(result.x,stepType))
         log.info('Linear optimized chi2 is {:.2f}'.format(result.fun))
         return result.x*searchdir,result.fun
     
     def evaljacobipreconditioning(self,parindex,*args,**kwargs):
-        jacrow=self.lsqwrap(*args,**kwargs,diff='jvp',jit=False)((jnp.arange(self.npar)==parindex)*1.)
+        jacrow=self.modelobj.lsqwrap(*args,**kwargs,diff='jvp',jit=False)((jnp.arange(self.modelobj.npar)==parindex)*1.)
         return  1/jnp.sqrt(jacrow@jacrow)
     
     
@@ -1103,7 +907,7 @@ class GaussNewton(saltresids.SALTResids):
         targets=np.where(varyingParams)[0]
         if targets.size%chunksize!=0: 
         
-            paddedtargets=np.concatenate((targets,np.tile( self.npar,chunksize-targets.size%chunksize)))
+            paddedtargets=np.concatenate((targets,np.tile( self.modelobj.npar,chunksize-targets.size%chunksize)))
         else: 
             paddedtargets=targets
         numchunks=(paddedtargets.size//chunksize)
@@ -1114,7 +918,7 @@ class GaussNewton(saltresids.SALTResids):
         else:
             preconevalfun = jax.jit(jax.vmap(lambda parindex,x,y: self.evaljacobipreconditioning(parindex,x,y,*staticargs),
             
-                    in_axes=(0,None,[[None]*len(self.batchedphotdata),[None]*len(self.batchedspecdata)])))
+                    in_axes=(0,None,[[None]*len(self.modelobj.batchedphotdata),[None]*len(self.modelobj.batchedspecdata)])))
                     
             self.cachedpreconevalfuns[staticargs]=preconevalfun
         
@@ -1132,11 +936,11 @@ class GaussNewton(saltresids.SALTResids):
             y[includepars]=x
             return y
 
-        jshape= jax.eval_shape(lambda x: self.lsqwrap(x,*args[1:],**kwargs) ,args[0]).shape[0],includepars.size
+        jshape= jax.eval_shape(lambda x: self.modelobj.lsqwrap(x,*args[1:],**kwargs) ,args[0]).shape[0],includepars.size
 
-        jaclinop=sprslinalg.LinearOperator(matvec = lambda x: (self.lsqwrap(*args,**kwargs,diff='jvp',jit=True)( substitute(x) )) ,
+        jaclinop=sprslinalg.LinearOperator(matvec = lambda x: (self.modelobj.lsqwrap(*args,**kwargs,diff='jvp',jit=True)( substitute(x) )) ,
 
-                                         rmatvec= lambda x: (self.lsqwrap(*args,**kwargs,diff='vjp',jit=True)(x))[includepars] ,shape=(jshape))
+                                         rmatvec= lambda x: (self.modelobj.lsqwrap(*args,**kwargs,diff='vjp',jit=True)(x))[includepars] ,shape=(jshape))
         
         iterator = tqdm  if usetqdm else lambda x: x 
         r=np.ones(jshape[0])
@@ -1161,14 +965,14 @@ class GaussNewton(saltresids.SALTResids):
 
 
     def evalrandomvjp(self,key,*args,**kwargs):
-        numresids=jax.eval_shape(lambda x: self.lsqwrap(x,*args[1:],**kwargs) ,args[0]).shape[0]
-        return self.lsqwrap(*args,**kwargs,diff='vjp',jit=False)(jax.random.normal(key,shape=[numresids]))
+        numresids=jax.eval_shape(lambda x: self.modelobj.lsqwrap(x,*args[1:],**kwargs) ,args[0]).shape[0]
+        return self.modelobj.lsqwrap(*args,**kwargs,diff='vjp',jit=False)(jax.random.normal(key,shape=[numresids]))
 
     def vectorizedstochasticbinormpreconditioning(self,includepars,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None,maxiter=None):
         if includepars.dtype==bool: includepars=np.where(includepars)[0]
 
         staticargs=(dopriors,dospecresids,usesns)
-        jshape= jax.eval_shape(lambda x: self.lsqwrap(x,uncertainties,dopriors,dospecresids,usesns) ,guess).shape[0],includepars.size
+        jshape= jax.eval_shape(lambda x: self.modelobj.lsqwrap(x,uncertainties,dopriors,dospecresids,usesns) ,guess).shape[0],includepars.size
 
         if staticargs in self.randomvjpevalfuns: 
             preconevalfun= self.randomvjpevalfuns[staticargs]
@@ -1176,7 +980,7 @@ class GaussNewton(saltresids.SALTResids):
         else:
             preconevalfun = jax.jit(jax.vmap(lambda key,x,y: self.evalrandomvjp(key,x,y,*staticargs),
             
-                    in_axes=(0,None,[[None]*len(self.batchedphotdata),[None]*len(self.batchedspecdata)])))
+                    in_axes=(0,None,[[None]*len(self.modelobj.batchedphotdata),[None]*len(self.modelobj.batchedspecdata)])))
                     
             self.randomvjpevalfuns[staticargs]=preconevalfun
         iterator = tqdm  if usetqdm else lambda x: x 
@@ -1212,14 +1016,14 @@ class GaussNewton(saltresids.SALTResids):
         if includepars.dtype==bool: includepars=np.where(includepars)[0]
 
 
-        jshape= jax.eval_shape(lambda x: self.lsqwrap(x,*args[1:],**kwargs) ,args[0]).shape[0],includepars.size
+        jshape= jax.eval_shape(lambda x: self.modelobj.lsqwrap(x,*args[1:],**kwargs) ,args[0]).shape[0],includepars.size
         @jax.jit
         def preconditioninverse(x):
-            return jnp.zeros(self.npar).at[includepars].set( precon *x)
+            return jnp.zeros(self.modelobj.npar).at[includepars].set( precon *x)
 
-        linop=sprslinalg.LinearOperator(matvec = lambda x: (self.lsqwrap(*args,**kwargs,diff='jvp',jit=True)( preconditioninverse(x) )) ,
+        linop=sprslinalg.LinearOperator(matvec = lambda x: (self.modelobj.lsqwrap(*args,**kwargs,diff='jvp',jit=True)( preconditioninverse(x) )) ,
 
-                                 rmatvec= lambda x: (self.lsqwrap(*args,**kwargs,diff='vjp',jit=True)(x))[includepars]*precon ,shape=(jshape))
+                                 rmatvec= lambda x: (self.modelobj.lsqwrap(*args,**kwargs,diff='vjp',jit=True)(x))[includepars]*precon ,shape=(jshape))
 
         return linop,preconditioninverse
 
@@ -1233,7 +1037,7 @@ class GaussNewton(saltresids.SALTResids):
         if maxiter is None: maxiter= self.lsmrmaxiter
         result=lsmrresult(*sprslinalg.lsmr(jacobian,residuals,damp=damping,maxiter=maxiter,atol=tol,btol=tol))
         gaussNewtonStep= preconinv(result.precondstep)
-        resids=self.lsqwrap(initval-gaussNewtonStep,*lsqwrapargs[0],**lsqwrapargs[1])
+        resids=self.modelobj.lsqwrap(initval-gaussNewtonStep,*lsqwrapargs[0],**lsqwrapargs[1])
         postGN=(resids**2).sum() #
         #if fit == 'all': import pdb; pdb.set_trace()
         log.debug(f'Attempting fit with damping {damping} gave chi2 {postGN} with {result.itn} iterations')
@@ -1303,11 +1107,11 @@ class GaussNewton(saltresids.SALTResids):
             if kwargs['usesns' ] is None:
                 kwargs.pop('usesns')
             else:
-                snnotinset=[sn for sn in self.datadict if sn not in kwargs['usesns']]
+                snnotinset=[sn for sn in self.modelobj.datadict if sn not in kwargs['usesns']]
                 sndependentparams=np.prod([self.fitOptions[sn][1] for sn in snnotinset],axis=0).astype(bool)
                 log.debug(f'Removing {sndependentparams.sum()} params because {len(snnotinset)} SNe are not included in this iteration')
                 varyingParams=varyingParams&~sndependentparams
-        residuals=self.lsqwrap(X,uncertainties,**kwargs)
+        residuals=self.modelobj.lsqwrap(X,uncertainties,**kwargs)
         oldChi=(residuals**2).sum()
 
 
