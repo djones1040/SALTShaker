@@ -151,8 +151,9 @@ class SALTPriors:
         self.bstdflux=(10**((self.m0guess-27.5)/-2.5) )
                         
         self.priorexecutionlist=list(zip(self.usePriors,self.priorWidths))
-                
-        self.numresids=self.priorresids(SALTResidsObj.initparams,jit=True).size
+        
+        self.numresids=jax.eval_shape(self.priorresids,np.random.normal(1e-1,size=self.npar)).shape[0]
+
         
     @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],diff_argnum=1)        
     def priorresids(self,x):

@@ -2,12 +2,28 @@ import argparse
 import configparser
 from os import path 
 
+import logging
+log=logging.getLogger(__name__)
+
+__all__= ['expandvariablesandhomecommaseparated','FullPaths','EnvAwareArgumentParser' ,
+       'ConfigWithCommandLineOverrideParser','boolean_string','nonetype_or_int','generateerrortolerantaddmethod']
+                
 def expandvariablesandhomecommaseparated(paths):
         return ','.join([path.expanduser(path.expandvars(x)) for x in paths.split(',')])
 
 class FullPaths(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
                 setattr(namespace, self.dest,expandvariablesandhomecommaseparated(values))
+                
+def boolean_string(s):
+        if s not in {'False', 'True', 'false', 'true', '1', '0'}:
+                raise ValueError('Not a valid boolean string')
+        return (s == 'True') | (s == '1') | (s == 'true')
+
+def nonetype_or_int(s):
+        if s == 'None': return None
+        else: return int(s)
+
 
 class EnvAwareArgumentParser(argparse.ArgumentParser):
 
@@ -25,7 +41,7 @@ class ConfigWithCommandLineOverrideParser(EnvAwareArgumentParser):
                 default_prefix='-'
                 self.add_argument(
                                 default_prefix+'h', default_prefix*2+'help',
-                                action='help', default=SUPPRESS,
+                                action='help', default=argparse.SUPPRESS,
                                 help=('show this help message and exit'))
 
         def add_argument_with_config_default(self,config,section,*keys,**kwargs):
@@ -56,33 +72,29 @@ class ConfigWithCommandLineOverrideParser(EnvAwareArgumentParser):
                                         message+=f"\nHelp string: {kwargs['help'].format(**kwargs)}"
                                 raise KeyError(message)
                 if 'nargs' in kwargs and ((type(kwargs['nargs']) is int and kwargs['nargs']>1) or (type(kwargs['nargs'] is str and (kwargs['nargs'] in ['+','*'])))):
-                        if not 'type' in kwargs:
-                                kwargs['default']=kwargs['default'].split(',')
-                        else:
-                                kwargs['default']=list(map(kwargs['type'],kwargs['default'].split(',')))
-                        if type(kwargs['nargs']) is int:
-                                try:
-                                        assert(len(kwargs['default'])==kwargs['nargs'])
-                                except:
-                                        nargs=kwargs['nargs']
-                                        numfound=len(kwargs['default'])
-                                        raise ValueError(f"Incorrect number of arguments in {(config)}, section {section}, key {includedkey}, {nargs} arguments required while {numfound} were found")
+                        if kwargs['default'] != argparse.SUPPRESS:
+                            if not 'type' in kwargs:
+                                    kwargs['default']=kwargs['default'].split(',')
+                            else:
+                                    kwargs['default']=list(map(kwargs['type'],kwargs['default'].split(',')))
+                            if type(kwargs['nargs']) is int:
+                                    try:
+                                            assert(len(kwargs['default'])==kwargs['nargs'])
+                                    except:
+                                            nargs=kwargs['nargs']
+                                            numfound=len(kwargs['default'])
+                                            raise ValueError(f"Incorrect number of arguments in {(config)}, section {section}, key {includedkey}, {nargs} arguments required while {numfound} were found")
                 return super().add_argument(*clargs,**kwargs)
                 
-def boolean_string(s):
-        if s not in {'False', 'True', 'false', 'true', '1', '0'}:
-                raise ValueError('Not a valid boolean string')
-        return (s == 'True') | (s == '1') | (s == 'true')
+    
+def generateerrortolerantaddmethod(parser):
+        def wraparg(*args,**kwargs):
+            #Wrap this method to catch exceptions, providing a true if no exception was raised, False otherwise.
+            try:
+                    parser.add_argument_with_config_default(*args,**kwargs)
+                    return True
+            except Exception as e:
+                    log.error('\n'.join(e.args))
+                    return False
+        return wraparg
 
-def nonetype_or_int(s):
-        if s == 'None': return None
-        else: return int(s)
-        
-def wrapaddingargument(*args,**kwargs):
-        #Wrap this method to catch exceptions, providing a true if no exception was raised, False otherwise.
-        try:
-                parser.add_argument_with_config_default(*args,**kwargs)
-                return True
-        except Exception as e:
-                log.error('\n'.join(e.args))
-                return False

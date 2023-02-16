@@ -19,7 +19,6 @@ else:
 
 usetqdm= sys.stdout.isatty() or in_ipynb()
 
-    
 
 def sparsejac(fun,difffunc,argnums, forward ):
     if len(argnums)>1: raise NotImplementedError('Sparse jacobians differentiated w.r.t. multiple arguments have not been implemented')
@@ -71,7 +70,6 @@ def jaxoptions(fun,static_argnums=None,static_argnames=None,diff_argnum=0, jitde
 None,'jacfwd','jacrev','jvp','vjp',
         'sparsejacfwd','sparsejacrev',
         'grad','valueandgrad'
-        
     ]
     
     permutations={}
@@ -81,7 +79,7 @@ None,'jacfwd','jacrev','jvp','vjp',
             compileargs=[static_argnums,static_argnames,]
             match difftype:
                 case 'valueandgrad':
-                    gradfunc= jax.valueandgrad(fun,argnums=diff_argnum)
+                    gradfunc= jax.value_and_grad(fun,argnums=diff_argnum)
                 case 'grad':
                     gradfunc= jax.grad(fun,argnums=diff_argnum)
                 case 'jacfwd':

@@ -150,7 +150,7 @@ class TrainSALTBase:
                 successful=successful&wrapaddingargument(config,'trainparams','regularize',     type=boolean_string,
                                                         help='turn on regularization if set (default=%(default)s)')
 
-                successful=successful&wrapaddingargument(config,'trainparams','optimizer',     type=float,
+                successful=successful&wrapaddingargument(config,'trainparams','optimizer',     type=str,
                                                         help="Choice of optimizer to use (default=%(default)s)")
 
                 successful=successful&wrapaddingargument(config,'trainparams','fitprobmin',     type=float,

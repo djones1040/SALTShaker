@@ -556,7 +556,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
         uncertainty=jnp.sqrt(variance)
 
         return {'residuals':  self.spectralsuppression* (modelflux-self.flux)/uncertainty,
-                    'lognorm': -jnp.log(uncertainty).sum()}
+                    'lognorm': (self.spectralsuppression**2 )*-jnp.log(uncertainty).sum()}
                         
  
         
