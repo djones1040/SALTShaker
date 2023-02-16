@@ -1,0 +1,29 @@
+SN_SED: Hsiao07.dat
+BD17_SED:      bd_17d4708_stisnic_007.dat
+LAMBDA_RANGE: 2100 12500  # for SN templates
+OUTFILE: kcor_CfA4p1.fits
+
+
+# Start filters for VERSION = PS1s_CSPDR2_V_DS17
+MAGSYSTEM:   BD17
+FILTSYSTEM:  COUNT
+FILTPATH:  $SNDATA_ROOT/filters/CSP/CSP_TAMU_20180316
+SURVEY:   LOWZ,CSP
+FILTER: CSP-u/t  u_tel_ccd_atm_ext_1.2.dat       10.514
+FILTER: CSP-g/A  g_tel_ccd_atm_ext_1.2.dat       9.64806
+FILTER: CSP-r/L  r_tel_ccd_atm_ext_1.2.dat       9.35860
+FILTER: CSP-i/C  i_tel_ccd_atm_ext_1.2.dat       9.24100
+FILTER: CSP-B/u  B_tel_ccd_atm_ext_1.2.dat           9.88100
+FILTER: CSP-n/x  V_LC9844_tel_ccd_atm_ext_1.2.dat    9.472
+FILTER: CSP-o/v  V_LC3009_tel_ccd_atm_ext_1.2.dat    9.472
+FILTER: CSP-m/w  V_LC3014_tel_ccd_atm_ext_1.2.dat    9.472
+
+MAGSYSTEM:   BD17
+FILTSYSTEM:  COUNT
+FILTPATH:  filters/SALT3TRAIN_K21_CfA4
+SURVEY:    LOWZ,CFA4p1
+# Start filters for VERSION = PS1s_CFA4_p1_DS17
+FILTER:  CFA41-B/D          cfa4_B_p1+modtran.dat  9.88605-0.0057 
+FILTER:  CFA41-V/E          cfa4_V_p1+modtran.dat  9.47432-0.0005000000000000004 
+FILTER:  CFA41-r/F          cfa4_r_p1+modtran.dat  9.35252+0.0029 
+FILTER:  CFA41-i/G          cfa4_i_p1+modtran.dat  9.25465+0.004799999999999999 

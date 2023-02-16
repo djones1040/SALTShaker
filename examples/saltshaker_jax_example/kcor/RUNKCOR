@@ -1,0 +1,14 @@
+kcor.exe  kcor_CfA4p1.input > kcor_CfA4p1.log
+kcor.exe  kcor_CfA4p2.input > kcor_CfA4p2.log
+kcor.exe  kcor_CSPDR2.input > kcor_CSPDR2.log
+kcor.exe  kcor_DESSN3YR.input > kcor_DESSN3YR.log
+kcor.exe  kcor_Foundation_DR1.input > kcor_Foundation_DR1.log
+kcor.exe  kcor_Hamuy1996.input      > kcor_Hamuy1996.log
+kcor.exe  kcor_Hicken2009.input     > kcor_Hicken2009.log
+kcor.exe  kcor_Jha2006.input        > kcor_Jha2006.log
+kcor.exe  kcor_OTHER_LOWZ.input     > kcor_OTHER_LOWZ.log
+kcor.exe  kcor_PS1MD.input          > kcor_PS1MD.log
+kcor.exe  kcor_Riess1999.input      > kcor_Riess1999.log
+kcor.exe  kcor_SDSS.input           > kcor_SDSS.log
+kcor.exe  kcor_SNLS3.input          > kcor_SNLS3.log
+
