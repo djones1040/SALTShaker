@@ -10,108 +10,189 @@ import numpy as np
 from jax import numpy as jnp
 from jax import lax
 
+from saltshaker.config.configparsing import *
+
+from .__optimizers__ import salttrainingresult,salttrainingoptimizer
+
+
 import logging
 log=logging.getLogger(__name__)
 
 
-class rpropwithbacktracking:
-    def __init__(self,saltobj,etaminus=.5,etaplus=1.2, searchtolerance=np.exp(-.5),searchsize=np.exp(-.5)):
-        self.saltobj=saltobj        
-        self.etaplus=etaplus
-        self.etaminus=etaminus
+class rpropwithbacktracking(salttrainingoptimizer):
+
+    configoptionnames=set()
+    
+    
+    def __init__(self,guess,saltresids,outputdir,options):
+    
+        self.saltobj=saltresids  
+        
+        self.gradientmaxiter=options.gradientmaxiter
+        self.learningratesinitscale=options.learningratesinitscale
+        self.etaplus=options.etaplus
+        self.etaminus=options.etaminus
+        self.searchtolerance= options.searchtolerance
+        self.searchsize = options.searchsize
+        
+        assert(0<self.searchsize<1)
+        assert(0<self.searchtolerance<1)
+        assert(0<self.etaminus<1)
+        assert(self.etaplus>1)
+        assert(self.learningratesinitscale>0)
+        
         self.minlearning=0
         self.maxlearning=np.inf
-        self.Xbounds= np.tile(-np.inf, saltobj.npar),np.tile(np.inf, saltobj.npar)
-        self.Xbounds[0][saltobj.ispcrcl_coeffs]= -10
-        self.Xbounds[1][saltobj.ispcrcl_coeffs]= 10
-        self.Xbounds[0][saltobj.imodelcorr]=-1
-        self.Xbounds[1][saltobj.imodelcorr]=1
-        self.searchtolerance= searchtolerance
-        self.searchsize = searchsize
+        
+        self.Xbounds= np.tile(-np.inf,self.saltobj.npar),np.tile(np.inf,self.saltobj.npar)
+        self.Xbounds[0][self.saltobj.ispcrcl_coeffs]= -10
+        self.Xbounds[1][self.saltobj.ispcrcl_coeffs]= 10
+        self.Xbounds[0][self.saltobj.imodelcorr]=-1
+        self.Xbounds[1][self.saltobj.imodelcorr]=1
+        
         self.functionevals=0
         self.losshistory=[]
         self.Xhistory=[]
         
-    def convergence_loop(self,initvals,iFit,learningrates=None,niter=100,debug=False,**kwargs):
+        
+    @classmethod
+    def add_training_options(cls,parser,config):
+        """ Specifies to the parser all required configuration options"""
+        if parser == None:
+            parser = ConfigWithCommandLineOverrideParser(usage=usage, conflict_handler="resolve")
+        temp=generateerrortolerantaddmethod(parser)
+        def wrapaddingargument(*args,**kwargs):
+            cls.configoptionnames.add(args[2])
+            return temp(*args,**kwargs)
+
+
+        successful=wrapaddingargument(config,'rpropconfig','gradientmaxiter',  type=int,
+                                                help='Max number of gradient iterations allowed')
+                                                
+                                                
+        successful=successful&wrapaddingargument(config,'rpropconfig','learningratesinitscale',  type=float,
+                                                help="""Initial scale for the learning rates""")
+        successful=successful&wrapaddingargument(config,'rpropconfig','searchsize',  type=float,
+                                                help="""Size of steps to take in backtracking line-search (must be between 0 and 1)""")
+        successful=successful&wrapaddingargument(config,'rpropconfig','searchtolerance',  type=float,
+                                                help="""Size of  Armijo's criterion, smaller indicates looser constraints (must be between 0 and 1)""")
+        successful=successful&wrapaddingargument(config,'rpropconfig','etaminus',  type=float,
+                                                help="""Amount by which to decrease learning rates when applicable (must be between 0 and 1)""")
+        successful=successful&wrapaddingargument(config,'rpropconfig','etaplus',  type=float,
+                                                help="""Amount by which to increase learning rates when applicable (must be greater than 1)""")
+
+                                                        
+        if not successful: sys.exit(1)
+
+        return parser
+
+
+
+
+    def optimize(self,initvals):
         X=initvals.copy()
-        log.info('Entering process_fit')
+
+        residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'))
+        oldChi=(residuals**2).sum()
+        
+        log.info('Initial chi2: {:.2f} '.format(oldChi))
+
+        rates=self.initializelearningrates(X)
+
+        try:
+            #First fit with color scatter fixed
+            fitparams=~np.isin(np.arange(self.saltobj.npar),self.saltobj.iclscat)
+            X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter)
+            
+            
+            #Fit error model including color scatter
+            fitparams=~self.saltobj.iModelParam
+            X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter)
+            
+            
+        except KeyboardInterrupt as e:
+            if query_yes_no("Terminate optimization loop and begin writing output?"):
+                X=self.Xhistory[np.argmin(self.losshistory)]
+            else:
+                if query_yes_no("Enter pdb?"):
+                    import pdb;pdb.set_trace()
+                else:
+                    raise e
+        except Exception as e:
+            log.exception('Error encountered in convergence_loop, exiting')
+            raise e
+        residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'))
+        newChi=(residuals**2).sum()
+        log.info('Final chi2: {:.2f} '.format(newChi))
+        
+        chi2results=self.saltobj.getChi2Contributions(X)
+        
+        for name,chi2component,dof in chi2results:
+            log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/sum([x[1] for x in chi2results])*100))
+
+        return X
+    
+    
+    def initializelearningrates(self,X):
+    
+        learningrates=np.tile(np.nan,self.saltobj.npar)
+        for idx in [self.saltobj.im0,self.saltobj.im1,self.saltobj.imhost, self.saltobj.ix1,self.saltobj.ic,self.saltobj.ixhost
+                ,self.saltobj.imodelerr]:
+            learningrates[idx]=np.std( X[idx])*.1
+        for idx in [self.saltobj.ix0]:
+            learningrates[idx]= .1* X[idx] 
+        for idx in [self.saltobj.iCL,self.saltobj.ispcrcl_coeffs,self.saltobj.iclscat,self.saltobj.imodelcorr]:
+            learningrates[idx]=1e-2
+        assert(~np.any(np.isnan(learningrates)))
+        return learningrates*self.learningratesinitscale
+
+        
+    def optimizeparams(self,initvals,iFit,initrates,niter=100,debug=False,**kwargs):
         if ( iFit.dtype == int):
             iFit=np.isin( np.arange(X.size),iFit )
         assert((iFit.dtype==bool))
-        
-        if learningrates is None:
-    
-            learningrates=np.tile(np.nan,X.size)
-            for idx in [self.saltobj.im0,self.saltobj.im1,self.saltobj.imhost, self.saltobj.ix1,self.saltobj.ic,self.saltobj.ixhost
-                    ,self.saltobj.imodelerr]:
-                learningrates[idx]=np.std( X[idx])*.1
-            for idx in [self.saltobj.ix0]:
-                learningrates[idx]= .1* X[idx] 
-            for idx in [self.saltobj.iCL,self.saltobj.ispcrcl_coeffs,self.saltobj.iclscat,self.saltobj.imodelcorr]:
-                learningrates[idx]=1e-2
             
-        rates= learningrates.copy()*1e-2
 #         import pdb;pdb.set_trace()
-        assert(not np.isnan(learningrates).any() )
-        
-        rates=rates*iFit
-        
-        residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'),**kwargs)
-        oldChi=(residuals**2).sum()
-        
         log.info('Number of parameters fit this round: {}'.format(iFit.sum()))
-        log.info('Initial chi2: {:.2f} '.format(oldChi))
-                
-        X, Xprev,loss,sign= X,X, np.inf,np.zeros(X.size)
-        for i in range(niter):
-            try:
-                Xnew,newloss, newsign, newgrad,newrates  = self.rpropiter(X, Xprev,loss,sign,rates)
         
-                searchdir=np.select([~np.isinf(X),np.isinf(X)], [ Xnew-X, 0])
-                if newgrad @ searchdir < 0:
-                    gamma=self.twowaybacktracking(X,newloss,newgrad,searchdir)
-                else:
-                    gamma=1
-                newrates*=gamma
-                Xnew= X+ gamma*searchdir
-                if newloss==loss:
-                    log.info('Convergence achieved')
-                    break
-                loss,sign,grad,rates=newloss,newsign, newgrad,newrates
-                Xprev=X
-                X=Xnew
+        rates=initrates*iFit
+        
                 
-                self.losshistory+=[loss]
-                self.Xhistory+=[X]
-                if in_ipynb:
-                    if i==0: continue
-                    plt.clf()
-                    diffs= np.diff(self.losshistory[-100:])
-                    plt.plot( np.arange(diffs.size) + len(diffs)-diffs.size,diffs,'r-')
-                    
-                    plt.plot( np.arange(diffs.size) + len(diffs)-diffs.size,-diffs,'b-')
-                    plt.xlabel('Iteration')
-                    plt.ylabel('Change in Loss')
-                    plt.yscale('log')
-                    #if i>0: plt.text(0.7,.8,f'Last diff: {-np.diff(self.losshistory[-2:])[0]:.2g}',transform=plt.gca().transAxes)
-                    display.display(plt.gcf())
-                    display.clear_output(wait=True)
-            except KeyboardInterrupt as e:
-                if query_yes_no("Terminate optimization loop and begin writing output?"):
-                    break
-                else:
-                    if query_yes_no("Enter pdb?"):
-                        import pdb;pdb.set_trace()
-                    else:
-                        raise e
-            except Exception as e:
-                log.exception('Error encountered in convergence_loop, exiting')
-                raise e
-        residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'),**kwargs)
-        newChi=(residuals**2).sum()
-        log.info('Final chi2: {:.2f} '.format(newChi))
-
-        return X,loss,rates
+        X, Xprev,loss,sign= initvals,initvals, np.inf,np.zeros(initvals.size)
+        for i in range(niter):
+            Xnew,newloss, newsign, newgrad,newrates  = self.rpropiter(X, Xprev,loss,sign,rates)
+    
+            searchdir=np.select([~np.isinf(X),np.isinf(X)], [ Xnew-X, 0])
+            if newgrad @ searchdir < 0:
+                gamma=self.twowaybacktracking(X,newloss,newgrad,searchdir)
+            else:
+                gamma=1
+            newrates*=gamma
+            Xnew= X+ gamma*searchdir
+            if newloss==loss:
+                log.info('Convergence achieved')
+                break
+            loss,sign,grad,rates=newloss,newsign, newgrad,newrates
+            Xprev=X
+            X=Xnew
+            
+            self.losshistory+=[loss]
+            self.Xhistory+=[X]
+            if in_ipynb:
+                if i==0: continue
+                plt.clf()
+                diffs= np.diff(self.losshistory[-100:])
+                plt.plot( np.arange(diffs.size) + len(diffs)-diffs.size,diffs,'r-')
+                
+                plt.plot( np.arange(diffs.size) + len(diffs)-diffs.size,-diffs,'b-')
+                plt.xlabel('Iteration')
+                plt.ylabel('Change in Loss')
+                plt.yscale('log')
+                #if i>0: plt.text(0.7,.8,f'Last diff: {-np.diff(self.losshistory[-2:])[0]:.2g}',transform=plt.gca().transAxes)
+                display.display(plt.gcf())
+                display.clear_output(wait=True)
+        
+        return X,loss,rates.at[rates==0].set(initrates[rates==0])
         
 
     def twowaybacktracking(self,X,loss,grad, searchdir,*args,**kwargs):

@@ -128,10 +128,6 @@ class TrainSALTBase:
                                                         help='directory with previous error files, to use with --use_previous_errors option')
 
                 
-                successful=successful&wrapaddingargument(config,'iodata','fix_salt2modelpars',  type=boolean_string,
-                                                        help="""if set, fix M0/M1 for wavelength/phase range of original SALT2 model (default=%(default)s)""")
-                successful=successful&wrapaddingargument(config,'iodata','fix_salt2components',  type=boolean_string,
-                                                        help="""if set, fix M0/M1 for *all* wavelength/phases (default=%(default)s)""")
                 successful=successful&wrapaddingargument(config,'iodata','fix_salt2components_initdir',  type=str,
                                                         help="""if set, initialize component params from this directory (default=%(default)s)""")
 
@@ -152,7 +148,8 @@ class TrainSALTBase:
 
                 successful=successful&wrapaddingargument(config,'trainparams','optimizer',     type=str,
                                                         help="Choice of optimizer to use (default=%(default)s)")
-
+                successful=successful&wrapaddingargument(config,'trainparams','n_repeat',  type=int,
+                                                help='repeat optimization n times (default=%(default)s)')
                 successful=successful&wrapaddingargument(config,'trainparams','fitprobmin',     type=float,
                                                         help="Minimum FITPROB for including SNe (default=%(default)s)")
                 successful=successful&wrapaddingargument(config,'trainparams','errors_from_bootstrap',     type=boolean_string,
