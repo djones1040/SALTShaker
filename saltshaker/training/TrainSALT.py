@@ -752,7 +752,7 @@ class TrainSALT(TrainSALTBase):
             #Otherwise, loop through the model covariance surfaces and write them, storing them by index in a dictionary
             modelerrdict={}
             for firstind,secondind, covsurface in trainingresult.modelcovsurfaces:
-                if firstind<secondind:
+                if firstind>secondind:
                     secondind,firstind=firstind,secondind
                 modelerrdict[firstind,secondind]=covsurface
                 with open(f'{outdir}/salt3_lc_model_covariance_{trainingresult.componentnames[firstind][1:]}{trainingresult.componentnames[secondind][1:]}.dat','w') as foutcov:
@@ -762,7 +762,7 @@ class TrainSALT(TrainSALTBase):
         
             #Loop through and write the data covariance surfaces, including model error
             for firstind,secondind, datasurface in datacovsurfaces:
-                if firstind<secondind:
+                if firstind>secondind:
                     secondind,firstind=firstind,secondind
                 modelsurface=modelerrdict[firstind,secondind] 
                 with open(f'{outdir}/salt3_lc_covariance_{trainingresult.componentnames[firstind][1:]}{trainingresult.componentnames[secondind][1:]}.dat','w') as foutcov:
