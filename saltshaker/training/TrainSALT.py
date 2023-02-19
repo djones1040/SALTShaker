@@ -69,8 +69,6 @@ _flatnu=f'{init_rootdir}/flatnu.dat'
 
 # validation utils
 
-
-
 import logging
 log=logging.getLogger(__name__)
 
@@ -728,9 +726,9 @@ class TrainSALT(TrainSALTBase):
     
         #Loop through the components and write their output files
         for fluxmodel,errmodel,errdata,name in zip( trainingresult.componentsurfaces, trainingresult.modelerrsurfaces,dataerrsurfaces, trainingresult.componentnames):
-            with open(f'{outdir}/salt3_template_{name}.dat','w') as foutmodel,\
-             open(f'{outdir}/salt3_lc_model_variance_{name}.dat','w') as foutmodelerr,\
-             open(f'{outdir}/salt3_lc_variance_{name}.dat','w') as foutdataerr:
+            with open(f'{outdir}/salt3_template_{name[1:]}.dat','w') as foutmodel,\
+             open(f'{outdir}/salt3_lc_model_variance_{name[1:]}.dat','w') as foutmodelerr,\
+             open(f'{outdir}/salt3_lc_variance_{name[1:]}.dat','w') as foutdataerr:
                 for i,p in enumerate(trainingresult.phase):
                     for j,w in enumerate(trainingresult.wave):
                         foutmodel.write(f'{p:.1f} {w:.2f} {fluxmodel[i,j]:8.15e}\n')
@@ -757,7 +755,7 @@ class TrainSALT(TrainSALTBase):
                 if firstind<secondind:
                     secondind,firstind=firstind,secondind
                 modelerrdict[firstind,secondind]=covsurface
-                with open(f'{outdir}/salt3_lc_model_covariance_{trainingresult.componentnames[firstind]}{trainingresult.componentnames[secondind]}.dat','w') as foutcov:
+                with open(f'{outdir}/salt3_lc_model_covariance_{trainingresult.componentnames[firstind][1:]}{trainingresult.componentnames[secondind][1:]}.dat','w') as foutcov:
                     for i,p in enumerate(trainingresult.phase):
                         for j,w in enumerate(trainingresult.wave):
                             foutcov.write(f'{p:.1f} {w:.2f} {covsurface[i,j]:8.15e}')
@@ -767,7 +765,7 @@ class TrainSALT(TrainSALTBase):
                 if firstind<secondind:
                     secondind,firstind=firstind,secondind
                 modelsurface=modelerrdict[firstind,secondind] 
-                with open(f'{outdir}/salt3_lc_covariance_{trainingresult.componentnames[firstind]}{trainingresult.componentnames[secondind]}.dat','w') as foutcov:
+                with open(f'{outdir}/salt3_lc_covariance_{trainingresult.componentnames[firstind][1:]}{trainingresult.componentnames[secondind][1:]}.dat','w') as foutcov:
                     for i,p in enumerate(trainingresult.phase):
                         for j,w in enumerate(trainingresult.wave):
                             foutcov.write(f'{p:.1f} {w:.2f} {modelsurface[i,j]+datasurface[i,j]:8.15e}')
