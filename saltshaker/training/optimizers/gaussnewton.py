@@ -263,8 +263,7 @@ class gaussnewton(salttrainingoptimizer):
             cls.configoptionnames.add(args[2])
             return temp(*args,**kwargs)
 
-        successful=wrapaddingargument(config,'trainparams','n_repeat',  type=int,
-                                                help='repeat gauss newton n times (default=%(default)s)')
+        successful=True
         successful=successful&wrapaddingargument(config,'iodata','fix_salt2modelpars',  type=boolean_string,
                                                 help="""if set, fix M0/M1 for wavelength/phase range of original SALT2 model (default=%(default)s)""")
         successful=successful&wrapaddingargument(config,'iodata','fix_salt2components',  type=boolean_string,
@@ -698,24 +697,33 @@ class gaussnewton(salttrainingoptimizer):
         
 
         
-    def constructoperator(self,precon,includepars,*args,**kwargs):
+    def constructoperator(self,precon,includepars,*args,includeresids=None,**kwargs):
         if includepars.dtype==bool: includepars=np.where(includepars)[0]
 
 
-        jshape= jax.eval_shape(lambda x: self.modelobj.lsqwrap(x,*args[1:],**kwargs) ,args[0]).shape[0],includepars.size
+        jshape= jax.eval_shape(lambda x: self.modelobj.lsqwrap(x,*args[1:],**kwargs) ,args[0]).shape[0] if includeresids is None else includeresids.size,includepars.size
         @jax.jit
         def preconditioninverse(x):
             return jnp.zeros(self.modelobj.npar).at[includepars].set( precon *x)
-
-        linop=sprslinalg.LinearOperator(matvec = lambda x: (self.modelobj.lsqwrap(*args,**kwargs,diff='jvp',jit=True)( preconditioninverse(x) )) ,
+        if includeresids is None:
+            
+            linop=sprslinalg.LinearOperator(matvec = lambda x: (self.modelobj.lsqwrap(*args,**kwargs,diff='jvp',jit=True)( preconditioninverse(x) )) ,
 
                                  rmatvec= lambda x: (self.modelobj.lsqwrap(*args,**kwargs,diff='vjp',jit=True)(x))[includepars]*precon ,shape=(jshape))
+        else:
+            blankarray=jnp.zeros(jshape[0])
+            
+            linop=sprslinalg.LinearOperator(matvec = lambda x: (self.modelobj.lsqwrap(*args,**kwargs,diff='jvp',jit=True)( preconditioninverse(x) )[includeresids ]) ,
+
+                                 rmatvec= lambda x: (self.modelobj.lsqwrap(*args,**kwargs,diff='vjp',jit=True)(blankarray.at[includeresids].set(x)))[includepars]*precon
+                                 
+                                 ,shape=(jshape))
 
         return linop,preconditioninverse
 
 
 
-    def gaussnewtonfit(self,initval,jacobian,preconinv,residuals,damping,lsqwrapargs, maxiter=None):
+    def gaussnewtonfit(self,initval,jacobian,preconinv,residuals,damping,lsqwrapargs, maxiter=None,includeresids=None):
 
         tol=1e-8
         #import pdb; pdb.set_trace()
@@ -723,7 +731,9 @@ class gaussnewton(salttrainingoptimizer):
         if maxiter is None: maxiter= self.lsmrmaxiter
         result=lsmrresult(*sprslinalg.lsmr(jacobian,residuals,damp=damping,maxiter=maxiter,atol=tol,btol=tol))
         gaussNewtonStep= preconinv(result.precondstep)
-        resids=self.modelobj.lsqwrap(initval-gaussNewtonStep,*lsqwrapargs[0],**lsqwrapargs[1])
+        resids=self.modelobj.lsqwrap(initval-gaussNewtonStep,*lsqwrapargs[0],**lsqwrapargs[1])[includeresids]
+        if includeresids is None: pass
+        else: resids=resids[includeresids]
         postGN=(resids**2).sum() #
         #if fit == 'all': import pdb; pdb.set_trace()
         log.debug(f'Attempting fit with damping {damping} gave chi2 {postGN} with {result.itn} iterations')
@@ -731,7 +741,7 @@ class gaussnewton(salttrainingoptimizer):
         # np.unique(self.parlist[np.where(varyingParams != True)])
         return gnfitresult(result,postGN,gaussNewtonStep,resids,damping,reductionratio)
         
-    def iteratedampings(self,fit,initval,jacobian,preconinv,residuals,lsqwrapargs):
+    def iteratedampings(self,fit,initval,jacobian,preconinv,residuals,lsqwrapargs,includeresids=None):
         """Experiment with different amounts of damping in the fit"""
         scale=self.dampingscalerate
     
@@ -770,37 +780,27 @@ class gaussnewton(salttrainingoptimizer):
         self.damping[fit]=result.damping
         return result
 
-#     def geodesicgaussnewton(self):
-#         directionalSecondDeriv,tol= ridders(lambda dx: self.lsqwrap(X+dx*gaussNewtonStep,uncertainties,**kwargs) ,residuals,.5,5,1e-8)
-#         accelerationdir,stopsignal,itn,normr,normar,norma,conda,normx=sprslinalg.lsmr(precondjac,directionalSecondDeriv,damp=self.damping[fit],maxiter=2*min(jacobian.shape))
-#         secondStep=np.zeros(X.size)
-#         secondStep[varyingParams]=0.5*preconditioningmatrix*accelerationdir
-# 
-#         postgeodesic=(self.lsqwrap(X-gaussNewtonStep-secondStep,uncertainties,**kwargs)**2).sum() #doSpecResids
-#         log.info('After geodesic acceleration correction chi2 is {:.2f}'.format(postgeodesic))
-#         if postgeodesic<postGN :
-#             chi2=postgeodesic
-#             gaussNewtonStep=gaussNewtonStep+secondStep
-#         else:
-#             chi2=postGN
-#             gaussNewtonStep=gaussNewtonStep
-
        
-    def process_fit(self,initvals,iFit,uncertainties,fit='all',allowjacupdate=True,**kwargs):
+    def process_fit(self,initvals,iFit,uncertainties,fit='all',allowjacupdate=True,excludesn=None,**kwargs):
 
         X=initvals.copy()
         varyingParams=iFit&self.iModelParam
-        if 'usesns' in kwargs :
-            if kwargs['usesns' ] is None:
-                kwargs.pop('usesns')
-            else:
-                snnotinset=[sn for sn in self.modelobj.datadict if sn not in kwargs['usesns']]
-                sndependentparams=np.prod([self.fitOptions[sn][1] for sn in snnotinset],axis=0).astype(bool)
-                log.debug(f'Removing {sndependentparams.sum()} params because {len(snnotinset)} SNe are not included in this iteration')
-                varyingParams=varyingParams&~sndependentparams
+        
         residuals=self.modelobj.lsqwrap(X,uncertainties,**kwargs)
+     
+        if excludesn:
+            snx0params=np.array([parname.endswith(f'x0_{excludesn}') for parname in self.modelobj.parlist])
+            indepentofexcluded=(self.lsqwrap(X,uncertainties,**kwargs,diff='jvp')( snx0params*1.)==0)
+            includeresids=indepentofexcluded
+        else:
+            includeresids=np.ones(residuals.size,dtype=bool)
+            
+        includeresids=np.where(includeresids)[0]
+        residuals=residuals[includeresids]
+        
         oldChi=(residuals**2).sum()
-
+        
+        
 
         log.info('Number of parameters fit this round: {}'.format(varyingParams.sum()))
         log.info('Initial chi2: {:.2f} '.format(oldChi))
@@ -809,11 +809,11 @@ class gaussnewton(salttrainingoptimizer):
         preconditioning= self.vectorizedstochasticbinormpreconditioning(varyingParams,X,uncertainties,**kwargs)
         log.info('Finished preconditioning')
 
-        jacobian,preconinv= self.constructoperator(preconditioning, varyingParams, X,uncertainties, **kwargs)
+        jacobian,preconinv= self.constructoperator(preconditioning, varyingParams, X,uncertainties,includeresids=includeresids **kwargs)
         lsqwrapargs=([uncertainties],kwargs)
-        fittingfunction= (lambda *args: self.gaussnewtonfit(*args,0,lsqwrapargs)) if self.damping[fit]==0 else (lambda *args,**kwargs: self.iteratedampings(fit,*args,lsqwrapargs=lsqwrapargs,**kwargs))
+        fittingfunction= (lambda *args,**kwargs: self.gaussnewtonfit(*args,0,lsqwrapargs,**kwargs)) if self.damping[fit]==0 else (lambda *args,**kwargs: self.iteratedampings(fit,*args,lsqwrapargs=lsqwrapargs,**kwargs))
 
-        result= fittingfunction(X,jacobian,preconinv,residuals)
+        result= fittingfunction(X,jacobian,preconinv,residuals,includeresids=includeresids)
         log.debug(f'First Gauss-Newton step: LSMR results with damping factor {result.damping:.2e}: {stopReasons[result.lsmrresult.stopsignal]}, norm r {result.lsmrresult.normr:.2f}, norm J^T r {result.lsmrresult.normar:.2f}, norm J {result.lsmrresult.norma:.2f}, cond J {result.lsmrresult.conda:.2f}, norm step {result.lsmrresult.normx:.2f}, reduction ratio {result.reductionratio:.2f} required {result.lsmrresult.itn} iterations' )
         if result.lsmrresult.stopsignal==7: log.warning('Gauss-Newton solver reached max # of iterations')
 
@@ -830,9 +830,9 @@ class gaussnewton(salttrainingoptimizer):
             for i in range(10):
                 self.Xhistory+=[(X,prevresult.postGN,prevresult)]
                 
-                jacobian,_= self.constructoperator(preconditioning, varyingParams, X,uncertainties, **kwargs)
+                jacobian,_= self.constructoperator(preconditioning, varyingParams, X,uncertainties,includeresids=includeresids **kwargs)
 
-                result=fittingfunction(X,jacobian,preconinv,prevresult.resids)
+                result=fittingfunction(X,jacobian,preconinv,prevresult.resids,includeresids=includeresids)
                 
                 chi2improvement=prevresult.postGN-result.postGN
 

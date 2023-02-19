@@ -2,6 +2,9 @@ from saltshaker.util.inpynb import in_ipynb
 
 from saltshaker.util.query import query_yes_no
 import matplotlib.pyplot as plt
+import sys
+
+interactive= sys.stdout.isatty()
 
 try: from IPython import display
 except: pass
@@ -34,6 +37,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         self.etaminus=options.etaminus
         self.searchtolerance= options.searchtolerance
         self.searchsize = options.searchsize
+        self.convergencetolerance= options.convergencetolerance
         
         assert(0<self.searchsize<1)
         assert(0<self.searchtolerance<1)
@@ -80,6 +84,8 @@ class rpropwithbacktracking(salttrainingoptimizer):
                                                 help="""Amount by which to decrease learning rates when applicable (must be between 0 and 1)""")
         successful=successful&wrapaddingargument(config,'rpropconfig','etaplus',  type=float,
                                                 help="""Amount by which to increase learning rates when applicable (must be greater than 1)""")
+        successful=successful&wrapaddingargument(config,'rpropconfig','convergencetolerance',  type=float,
+                                                help=""" Convergence criterion, will abort when change in loss is consistently less than this (must be greater than 0)""")
 
                                                         
         if not successful: sys.exit(1)
@@ -136,18 +142,64 @@ class rpropwithbacktracking(salttrainingoptimizer):
     def initializelearningrates(self,X):
     
         learningrates=np.tile(np.nan,self.saltobj.npar)
+        #Parameters I expect to be more or less normal distribution, where the std gives a reasonable size to start learning
         for idx in [self.saltobj.im0,self.saltobj.im1,self.saltobj.imhost, self.saltobj.ix1,self.saltobj.ic,self.saltobj.ixhost
                 ,self.saltobj.imodelerr]:
+            
             learningrates[idx]=np.std( X[idx])*.1
+        #x0 should very fractionally from the initialization
         for idx in [self.saltobj.ix0]:
             learningrates[idx]= .1* X[idx] 
+        #The rest of the parameters are mostly dimensionless coeffs of O(1)
         for idx in [self.saltobj.iCL,self.saltobj.ispcrcl_coeffs,self.saltobj.iclscat,self.saltobj.imodelcorr]:
             learningrates[idx]=1e-2
+        #Check that all parameters get an initial guess
         assert(~np.any(np.isnan(learningrates)))
         return learningrates*self.learningratesinitscale
 
+    def lossfunction(self,params,*args,excludesn=None,**kwargs):
+        """ 
+        Passthrough function to maxlikefit, with an excludeSN keyword that calculates an excess 
+        excludesn
         
+        """
+        result= self.saltobj.maxlikefit(params,*args,**kwargs)
+        if excludesn: 
+            singleresult=self.saltobj.datadict[excludesn].modelloglikelihood(params,*args,**kwargs)
+            try: 
+                result=( x-y for x,y in zip(result,singleresult))
+            except:
+                result=result-singleresult
+        try:
+            return (-x for x in result)
+        except:
+            return -result
+            
+    
     def optimizeparams(self,initvals,iFit,initrates,niter=100,debug=False,**kwargs):
+        """
+        Iterate parameters by gradient descent algorithm until convergence or a maximum number of iterations is reached
+        
+        Parameters
+        ----------
+        initvals : array-like of size N
+            Initial values of model parameters
+        iFit : array of integers or booleans of size N
+            Index array indicating which parameters are to be fit
+        initrates : array-like of size N
+            Initial learning rates for each parameter
+        niter : integer
+            Maximum number of iterations allowed before automatic termination
+        Returns
+        -------
+        X : array-like of size N
+            Optimized parameter vector 
+        loss: float
+            Loss at local minimum
+        rates: array-like of size N
+            Final learning rates for each parameter as determined by the algorithm
+        """
+
         if ( iFit.dtype == int):
             iFit=np.isin( np.arange(X.size),iFit )
         assert((iFit.dtype==bool))
@@ -160,24 +212,29 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 
         X, Xprev,loss,sign= initvals,initvals, np.inf,np.zeros(initvals.size)
         for i in range(niter):
-            Xnew,newloss, newsign, newgrad,newrates  = self.rpropiter(X, Xprev,loss,sign,rates)
+            Xnew,newloss, newsign, newgrad,newrates  = self.rpropiter(X, Xprev,loss,sign,rates,**kwargs)
     
             searchdir=np.select([~np.isinf(X),np.isinf(X)], [ Xnew-X, 0])
             if newgrad @ searchdir < 0:
-                gamma=self.twowaybacktracking(X,newloss,newgrad,searchdir)
+                gamma=self.twowaybacktracking(X,newloss,newgrad,searchdir,**kwargs)
             else:
                 gamma=1
             newrates*=gamma
             Xnew= X+ gamma*searchdir
-            if newloss==loss:
-                log.info('Convergence achieved')
-                break
             loss,sign,grad,rates=newloss,newsign, newgrad,newrates
             Xprev=X
             X=Xnew
             
             self.losshistory+=[loss]
             self.Xhistory+=[X]
+            convergencecriterion=(np.std(self.losshistory[-5:]))
+            
+            if interactive:
+                sys.stdout.write(f'\r Iteration {i} , function evaluations {self.functionevals}, convergence criterion {convergencecriterion:.2g}\x1b[1K')
+            if newloss==loss or (convergencecriterion< self.convergencetolerance):
+                log.info('Convergence achieved')
+                break
+
             if in_ipynb:
                 if i==0: continue
                 plt.clf()
@@ -228,7 +285,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
             raise ValueError('Bad search direction provided')            
             
         Xprop= X + gamma * searchdir 
-        proploss=-self.saltobj.maxlikefit(Xprop,*args,**kwargs)
+        proploss=self.lossfunction(Xprop, *args,**kwargs)
         self.functionevals+=1
         log.debug(f'Entering two way backtracking with initial loss {loss:.2g}, termination criterion {t:.2g}, and initial diff {loss-proploss:.2g}')
         
@@ -238,7 +295,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
                     prevgamma=gamma
                     gamma=gamma/self.searchsize 
                     Xprop= X + gamma * searchdir 
-                    proploss=-self.saltobj.maxlikefit(Xprop,*args,**kwargs)
+                    proploss=self.lossfunction(Xprop,*args,**kwargs)
                     self.functionevals+=1
                 else:
                     break
@@ -249,7 +306,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 prevgamma=gamma
                 gamma=gamma*self.searchsize
                 Xprop= X + gamma * searchdir 
-                proploss=-self.saltobj.maxlikefit(Xprop,*args,**kwargs)
+                proploss=self.lossfunction(Xprop,*args,**kwargs)
                 self.functionevals+=1
             log.debug(f'final gamma factor {prevgamma:.2g}')
             return prevgamma
@@ -293,10 +350,9 @@ class rpropwithbacktracking(salttrainingoptimizer):
         References
         https://doi.org/10.1016/S0925-2312(01)00700-7
         """
-        lossval,grad=  self.saltobj.maxlikefit(X,*args,**kwargs, diff='valueandgrad')
+        lossval,grad=  self.lossfunction(X,*args,**kwargs, diff='valueandgrad')
         self.functionevals+=3
-        lossval=-lossval
-        grad=-grad
+
         sign=jnp.sign(grad)
         indicatorvector= prevsign *sign
 

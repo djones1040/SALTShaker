@@ -80,8 +80,6 @@ class SALTparameters:
         #Return None if the attribute is empty, otherwise check the ismapped attribute for if it's supposed to change from data to data
         return [(( 0 if x in self.__ismapped__ else None) if getattr(self,x).size>0 else None) for x in self.__slots__]
 
-    
-
     @classmethod
     def tree_unflatten(cls, aux_data, children):
         self=cls.__new__(cls)
@@ -122,9 +120,10 @@ class modeledtrainingdata(metaclass=abc.ABCMeta):
         pass
     
 #    @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],diff_argnum=1)        
-    def modelloglikelihood(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False,jit=False,jac=False,forward=False):
+    def modelloglikelihood(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False):
         resids=self.modelresidual(x,cachedresults,fixuncertainties,fixfluxes)
-        return resids['lognorm']- ((resids['residuals']**2).sum() / 2.)  
+        
+        return resids['lognorm']- ((resids['residuals']**2).sum() / 2.)
 
     def tree_flatten(self):
         children =tuple(getattr(self,x) for x in self.__dynamicattributes__)
@@ -303,7 +302,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
             if attr in lc.__listdatakeys__ and attr in self.__slots__:
                 setattr(self,attr,np.concatenate((getattr(self,attr),np.zeros(padding))))
         self.fluxcalerr[self.ipad]=1
-
+        
     def __len__(self):
         return self.fluxcal.size
 
@@ -358,7 +357,6 @@ class modeledtraininglightcurve(modeledtrainingdata):
         return  jnp.exp(self.clscatderivs @ pars.clscat)
 
         
-        
 #    @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],diff_argnum=1)        
     def modelresidual(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False):
    
@@ -379,15 +377,15 @@ class modeledtraininglightcurve(modeledtrainingdata):
         variance=self.fluxcalerr**2 + modelvariance  
         sigma=jnp.sqrt(variance)
         
+        numresids=(~self.ipad).sum() 
+        zeropoint= ( -jnp.log(self.fluxcalerr).sum() - numresids/2)
+        
         #if clscat>0, then need to use a cholesky matrix to find pulls
         def choleskyresidsandnorm( variance,clscat,modelflux):
             cholesky=jaxlinalg.cholesky(jnp.diag(variance)+ clscat**2*jnp.outer(modelflux,modelflux),lower=True)
             return {'residuals':jaxlinalg.solve_triangular(cholesky, modelflux-self.fluxcal,lower=True), 
-            'lognorm': -jnp.log(jnp.diag(cholesky)).sum()}
+            'lognorm': -jnp.log(jnp.diag(cholesky)).sum()-zeropoint}
         
-        def diagonalresidsandnorm(variance,clscat,modelflux):
-            sigma=jnp.sqrt(variance)
-            return {'residuals':(modelflux-self.fluxcal)/sigma,'lognorm': -jnp.log(sigma).sum()}
         return choleskyresidsandnorm(variance,clscat,modelflux)
 #         return lax.cond(clscat==0, diagonalresidsandnorm, choleskyresidsandnorm, 
 #              variance,clscat,modelflux )
@@ -554,9 +552,12 @@ class modeledtrainingspectrum(modeledtrainingdata):
         variance=self.fluxerr**2 + modelvariance
       
         uncertainty=jnp.sqrt(variance)
+        
+        numresids=(~self.ipad).sum() 
+        zeropoint= ( -jnp.log(self.fluxerr).sum() - numresids/2)
 
         return {'residuals':  self.spectralsuppression* (modelflux-self.flux)/uncertainty,
-                    'lognorm': (self.spectralsuppression**2 )*-jnp.log(uncertainty).sum()}
+                    'lognorm': (self.spectralsuppression**2 )*(-jnp.log(uncertainty).sum()-zeropoint)}
                         
  
         
@@ -604,4 +605,11 @@ class SALTfitcacheSN(SALTtrainingSN):
         self.specdata={k: modeledtrainingspectrum(self,sndata.specdata[k],k,residsobj,
         choosesmallestpadsize( specpaddingsizes, len(sndata.specdata[k]) )
          ) for k in sndata.specdata }
-        
+
+    @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],diff_argnum=1)              
+    def modelloglikelihood(self,*args,**kwargs):
+        return sum([lc.modelloglikelihood(*args,**kwargs) for lc in self.photdata])+sum([spec.modelloglikelihood(*args,**kwargs) for spec in self.specdata])
+
+
+
+

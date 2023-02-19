@@ -58,7 +58,7 @@ import extinction
 import copy
 import warnings
 import logging
-
+import random
 
 log=logging.getLogger(__name__)
 
@@ -310,9 +310,11 @@ class SALTResids:
 
         log.info('Calculating cached quantities for speed in fitting loop')
         start=time.time()
-        iterable=self.datadict.items()
+        iterable=list(self.datadict.items())
+        #Shuffle it so that tqdm's estimates are hopefully more accurate
+        random.shuffle(iterable)
         if sys.stdout.isatty() or in_ipynb:
-            iterable=tqdm(iterable)
+            iterable=tqdm(iterable,smoothing=.1)
         self.datadict={snid: sn if isinstance(sn,SALTfitcacheSN) else SALTfitcacheSN(sn,self,self.kcordict,photpadding,specpadding)  for snid,sn in iterable}
         log.info('Batching data and constructing batched methods')
         self.allphotdata = sum([[x.photdata[lc] for lc in x.photdata ]for x in self.datadict.values() ],[])
@@ -529,6 +531,7 @@ class SALTResids:
         self.iModelParam[self.imodelerr]=False
         self.iModelParam[self.imodelcorr]=False
         self.iModelParam[self.iclscat]=False
+        
         self.icomponents =[self.im0,self.im1]
         if self.host_component:
             self.icomponents+=[self.imhost]
