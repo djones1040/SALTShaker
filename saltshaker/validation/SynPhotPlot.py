@@ -32,7 +32,8 @@ def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
 
 
 
-	filtdict = {'SDSS':['sdss%s'%s for s in	 'ugri']+['desz'],'Bessell':['bessell%s'%s +('x' if s=='u' else '')for s in	 'ubvri']}
+	filtdict = {'SDSS':['sdss%s'%s for s in	 'ugri']+['desz'],'Bessell':['bessell%s'%s +('x' if s=='u' else '')for s in	 'ubvri'],
+                'ZTF': ['ztf%s'%s for s in 'gri']}
 	filters=filtdict[filterset]
 	
 	zpsys='AB'
@@ -285,7 +286,8 @@ def plotSynthPhotOverStretchRange(outfile,salt3dir,filterset='SDSS',
 
 
 
-	filtdict = {'SDSS':['sdss%s'%s for s in	 'ugri']+['desz'],'Bessell':['bessell%s'%s +('x' if s=='u' else '')for s in	'ubvri']}
+	filtdict = {'SDSS':['sdss%s'%s for s in	 'ugri']+['desz'],'Bessell':['bessell%s'%s +('x' if s=='u' else '')for s in	'ubvri'],
+                'ZTF': ['ztf%s'%s for s in 'gri']}
 	filters=filtdict[filterset]
 	
 	zpsys='AB'

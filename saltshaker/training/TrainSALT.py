@@ -758,7 +758,7 @@ class TrainSALT(TrainSALTBase):
                 with open(f'{outdir}/salt3_lc_model_covariance_{trainingresult.componentnames[firstind][1:]}{trainingresult.componentnames[secondind][1:]}.dat','w') as foutcov:
                     for i,p in enumerate(trainingresult.phase):
                         for j,w in enumerate(trainingresult.wave):
-                            foutcov.write(f'{p:.1f} {w:.2f} {covsurface[i,j]:8.15e}')
+                            foutcov.write(f'{p:.1f} {w:.2f} {covsurface[i,j]:8.15e}\n')
         
             #Loop through and write the data covariance surfaces, including model error
             for firstind,secondind, datasurface in datacovsurfaces:
@@ -768,7 +768,7 @@ class TrainSALT(TrainSALTBase):
                 with open(f'{outdir}/salt3_lc_covariance_{trainingresult.componentnames[firstind][1:]}{trainingresult.componentnames[secondind][1:]}.dat','w') as foutcov:
                     for i,p in enumerate(trainingresult.phase):
                         for j,w in enumerate(trainingresult.wave):
-                            foutcov.write(f'{p:.1f} {w:.2f} {modelsurface[i,j]+datasurface[i,j]:8.15e}')
+                            foutcov.write(f'{p:.1f} {w:.2f} {modelsurface[i,j]+datasurface[i,j]:8.15e}\n')
 
         #Write the color dispersion, clipping at one
         cldispersionmax=1.

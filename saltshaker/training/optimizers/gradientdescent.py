@@ -140,7 +140,18 @@ class rpropwithbacktracking(salttrainingoptimizer):
     
     
     def initializelearningrates(self,X):
-    
+        """
+        Determines starting learning rates for the gradient descent algorithm
+        
+        Parameters
+        ----------
+        X: array-like of size N
+            Initial parameter vector
+        ----------
+        Returns
+        rates: array-like of size N
+            Initial choice for learning rates
+        """
         learningrates=np.tile(np.nan,self.saltobj.npar)
         #Parameters I expect to be more or less normal distribution, where the std gives a reasonable size to start learning
         for idx in [self.saltobj.im0,self.saltobj.im1,self.saltobj.imhost, self.saltobj.ix1,self.saltobj.ic,self.saltobj.ixhost
@@ -159,9 +170,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
 
     def lossfunction(self,params,*args,excludesn=None,**kwargs):
         """ 
-        Passthrough function to maxlikefit, with an excludeSN keyword that calculates an excess 
-        excludesn
-        
+        Passthrough function to maxlikefit, with an excludeSN keyword that removes the log-likelihood of a single SN.
         """
         result= self.saltobj.maxlikefit(params,*args,**kwargs)
         if excludesn: 
@@ -227,13 +236,14 @@ class rpropwithbacktracking(salttrainingoptimizer):
             
             self.losshistory+=[loss]
             self.Xhistory+=[X]
-            convergencecriterion=(np.std(self.losshistory[-5:]))
-            
             if interactive:
                 sys.stdout.write(f'\r Iteration {i} , function evaluations {self.functionevals}, convergence criterion {convergencecriterion:.2g}\x1b[1K')
-            if newloss==loss or (convergencecriterion< self.convergencetolerance):
-                log.info('Convergence achieved')
-                break
+            if i> 20:
+                convergencecriterion=(np.std(self.losshistory[-5:]))
+                log.debug(f'Iteration {i}, loss {loss:.2g}, convergence {convergencecriterion:.2g}')
+                if newloss==loss or (convergencecriterion< self.convergencetolerance):
+                    log.info('Convergence achieved')
+                    break
 
             if in_ipynb:
                 if i==0: continue
