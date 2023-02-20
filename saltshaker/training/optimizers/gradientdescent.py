@@ -98,7 +98,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
     def optimize(self,initvals):
         X=initvals.copy()
 
-        residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'))
+        residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'),jit=False)
         oldChi=(residuals**2).sum()
         
         log.info('Initial chi2: {:.2f} '.format(oldChi))
@@ -127,11 +127,11 @@ class rpropwithbacktracking(salttrainingoptimizer):
         except Exception as e:
             log.exception('Error encountered in convergence_loop, exiting')
             raise e
-        residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'))
+        residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'),jit=False)
         newChi=(residuals**2).sum()
         log.info('Final chi2: {:.2f} '.format(newChi))
         
-        chi2results=self.saltobj.getChi2Contributions(X)
+        chi2results=self.saltobj.getChi2Contributions(X,jit=False)
         
         for name,chi2component,dof in chi2results:
             log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/sum([x[1] for x in chi2results])*100))

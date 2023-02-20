@@ -580,7 +580,8 @@ class SALTResids:
     def getChi2Contributions(self,X,**kwargs):
         uncertainties= self.calculatecachedvals(X,target='variances')
         residuals= self.lsqwrap(X,uncertainties,**kwargs)
-        sources=self.lsqwrap_sources(X,uncertainties,**kwargs)
+        sourceskwargs={key:val for key in kwargs if not (key=='jit')}
+        sources=self.lsqwrap_sources(X,uncertainties,**sourceskwargs)
         sources=np.array([x.split('_')[0] for x in  sources])
         assert(np.isin(sources,['reg','phot','spec','priors']).all())
         def loop():
