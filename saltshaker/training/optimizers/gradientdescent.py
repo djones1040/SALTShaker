@@ -17,7 +17,7 @@ from saltshaker.config.configparsing import *
 
 from .__optimizers__ import salttrainingresult,salttrainingoptimizer
 
-
+import time
 import logging
 log=logging.getLogger(__name__)
 
@@ -218,7 +218,8 @@ class rpropwithbacktracking(salttrainingoptimizer):
         
         rates=initrates*iFit
         
-                
+        starttime=time.time()
+        
         X, Xprev,loss,sign= initvals,initvals, np.inf,np.zeros(initvals.size)
         for i in range(niter):
             Xnew,newloss, newsign, newgrad,newrates  = self.rpropiter(X, Xprev,loss,sign,rates,**kwargs)
@@ -236,15 +237,18 @@ class rpropwithbacktracking(salttrainingoptimizer):
             
             self.losshistory+=[loss]
             self.Xhistory+=[X]
+
+            convergencecriterion=(np.std(self.losshistory[-5:]))
             if interactive:
                 sys.stdout.write(f'\r Iteration {i} , function evaluations {self.functionevals}, convergence criterion {convergencecriterion:.2g}\x1b[1K')
-            if i> 20:
-                convergencecriterion=(np.std(self.losshistory[-5:]))
                 log.debug(f'Iteration {i}, loss {loss:.2g}, convergence {convergencecriterion:.2g}')
-                if newloss==loss or (convergencecriterion< self.convergencetolerance):
+                
+            if i> 20:
+                if (convergencecriterion< self.convergencetolerance):
                     log.info('Convergence achieved')
                     break
-
+            if i==0:
+                log.debug(f'First iteration took {time.time()-starttime:1f} seconds')
             if in_ipynb:
                 if i==0: continue
                 plt.clf()

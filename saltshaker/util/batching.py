@@ -101,7 +101,7 @@ def walkargumenttree(x,targetsize,ncalls=0):
             return type(x)(walkargumenttree(y,targetsize,ncalls+1) for y in x )
     else : return None
 
-def batchedmodelfunctions(function,batcheddata, dtype,flatten=False):
+def batchedmodelfunctions(function,batcheddata, dtype,flatten=False,sum=False):
     """Constructor function to map a function that takes a modeledtrainingdata object as first arg and a SALTparameters object as second arg over batched, zero-padded data"""
     if issubclass(dtype,datamodels.modeledtrainingdata) :
         pass
@@ -117,7 +117,8 @@ def batchedmodelfunctions(function,batcheddata, dtype,flatten=False):
                  dtype.__indexattributes__ ]) for batch in batcheddata]
     
     def vectorized(pars,*batchedargs,**batchedkwargs):
-        result=[]
+        if sum: result=0
+        else: result=[]
         if len(batchedargs)==0:
             batchedargs=[[]]*len(batcheddata)
         else:
@@ -154,7 +155,10 @@ def batchedmodelfunctions(function,batcheddata, dtype,flatten=False):
 #                 print(e)
 #                 import pdb;pdb.set_trace()
             if flatten: mapped=mapped.flatten()
-            result+=[mapped ]
+            if sum: 
+                result+=mapped.sum()
+            else:
+                result+=[mapped ]
         if flatten:
             return jnp.concatenate(result)
         else: 

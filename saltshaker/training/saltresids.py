@@ -326,7 +326,7 @@ class SALTResids:
         
         self.batchedphotlikelihood=batching.batchedmodelfunctions(lambda *args,**kwargs: modeledtraininglightcurve.modelloglikelihood(*args,**kwargs),
                                   self.batchedphotdata, modeledtraininglightcurve,
-                                  flatten=True)
+                                  sum=True)
 
         self.batchedphotvariances=jax.jit(batching.batchedmodelfunctions(  modeledtraininglightcurve.modelfluxvariance,
                                   self.batchedphotdata, modeledtraininglightcurve,
@@ -347,7 +347,7 @@ class SALTResids:
 
         self.batchedspeclikelihood=batching.batchedmodelfunctions(lambda *args,**kwargs: modeledtrainingspectrum.modelloglikelihood(*args,**kwargs),
                           self.batchedspecdata, modeledtrainingspectrum,
-                          flatten=True)
+                          sum=True)
         
         self.batchedspecvariances=jax.jit(batching.batchedmodelfunctions(  modeledtrainingspectrum.modelfluxvariance,
                                   self.batchedspecdata, modeledtrainingspectrum,
@@ -546,6 +546,8 @@ class SALTResids:
 
     @partial(jaxoptions, static_argnums=[0,3,4,5],static_argnames= ['dopriors','dospecresids','usesns'],diff_argnum=1,jitdefault=True) 
     def lsqwrap(self,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None):
+        """
+        """
         residuals = []
         if not (usesns is  None): raise NotImplementedError('Have not implemented a restricted set of sne')
         lcuncertainties,specuncertainties=uncertainties
@@ -613,12 +615,12 @@ class SALTResids:
         if cachedresults is None: cachedresults=None,None
         if not (usesns is  None): raise NotImplementedError('Have not implemented a restricted set of sne')
 
-        loglike=sum(self.batchedphotlikelihood (guess,cachedresults[0],fixuncertainties,fixfluxes))
+        loglike=(self.batchedphotlikelihood (guess,cachedresults[0],fixuncertainties,fixfluxes))
 
         
         if dospec:
             
-            loglike+= sum(
+            loglike+= (
              self.batchedspeclikelihood(guess,cachedresults[1],fixuncertainties,fixfluxes)
              )
         if dopriors:
