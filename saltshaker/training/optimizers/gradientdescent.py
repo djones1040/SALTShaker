@@ -1,13 +1,18 @@
 from saltshaker.util.inpynb import in_ipynb
-
 from saltshaker.util.query import query_yes_no
-import matplotlib.pyplot as plt
+
 import sys
+import time
+import logging
 
+import matplotlib.pyplot as plt
 interactive= sys.stdout.isatty()
-
 try: from IPython import display
 except: pass
+
+
+
+
 
 import numpy as np
 from jax import numpy as jnp
@@ -17,8 +22,12 @@ from saltshaker.config.configparsing import *
 
 from .__optimizers__ import salttrainingresult,salttrainingoptimizer
 
-import time
-import logging
+
+from scipy.ndimage import gaussian_filter1d
+from scipy import signal
+
+
+
 log=logging.getLogger(__name__)
 
 
@@ -110,8 +119,9 @@ class rpropwithbacktracking(salttrainingoptimizer):
             fitparams=~np.isin(np.arange(self.saltobj.npar),self.saltobj.iclscat)
             X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter)
             
-            
+            log.info('Fitting color scatter')
             #Fit error model including color scatter
+            X=X.at[self.saltobj.iclscat[-1]].set(-4)
             fitparams=~self.saltobj.iModelParam
             X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter)
             
@@ -137,7 +147,11 @@ class rpropwithbacktracking(salttrainingoptimizer):
             log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/sum([x[1] for x in chi2results])*100))
 
         return X
-    
+
+
+    def estimateparametererrors(self,X,numjackknifes):
+        
+        self.optimizeparams( excludesn)
     
     def initializelearningrates(self,X):
         """
@@ -217,13 +231,18 @@ class rpropwithbacktracking(salttrainingoptimizer):
         log.info('Number of parameters fit this round: {}'.format(iFit.sum()))
         
         rates=initrates*iFit
-        
+        #Set convergence criteria
+        #Low pass filter to ensure that 
+#         convergencefilt=signal.butter(4,2e-2,output='sos')
+        numconvergence=20
+            
         starttime=time.time()
-        
+        initvals=jnp.array(initvals)
         X, Xprev,loss,sign= initvals,initvals, np.inf,np.zeros(initvals.size)
         for i in range(niter):
+            #Proposes a new value based on sign of gradient
             Xnew,newloss, newsign, newgrad,newrates  = self.rpropiter(X, Xprev,loss,sign,rates,**kwargs)
-    
+            #Take the direction being searched and do a line-search
             searchdir=np.select([~np.isinf(X),np.isinf(X)], [ Xnew-X, 0])
             if newgrad @ searchdir < 0:
                 gamma=self.twowaybacktracking(X,newloss,newgrad,searchdir,**kwargs)
@@ -237,32 +256,34 @@ class rpropwithbacktracking(salttrainingoptimizer):
             
             self.losshistory+=[loss]
             self.Xhistory+=[X]
-
-            convergencecriterion=(np.std(self.losshistory[-5:]))
-            if interactive:
-                sys.stdout.write(f'\r Iteration {i} , function evaluations {self.functionevals}, convergence criterion {convergencecriterion:.2g}\x1b[1K')
-                log.debug(f'Iteration {i}, loss {loss:.2g}, convergence {convergencecriterion:.2g}')
-                
-            if i> 20:
-                if (convergencecriterion< self.convergencetolerance):
-                    log.info('Convergence achieved')
-                    break
+            
             if i==0:
                 log.debug(f'First iteration took {time.time()-starttime:1f} seconds')
+            else:
+                convergencecriterion= self.losshistory[-numconvergence] - loss if len(self.losshistory)> numconvergence+10 else np.inf
+                #signal.sosfilt(convergencefilt, -np.diff((self.losshistory[-numconvergence:]) ))[-1]
+                if interactive:
+                    sys.stdout.write(f'\r Iteration {i} , function evaluations {self.functionevals}, convergence criterion {convergencecriterion:.2g}\x1b[1K')
+                log.debug(f'Iteration {i}, loss {loss:.2g}, convergence {convergencecriterion:.2g}')
+                
+                if i> numconvergence+10:
+                    if np.all(convergencecriterion< self.convergencetolerance):
+                        log.info('Convergence achieved')
+                        break
+
             if in_ipynb:
                 if i==0: continue
                 plt.clf()
                 diffs= np.diff(self.losshistory[-100:])
-                plt.plot( np.arange(diffs.size) + len(diffs)-diffs.size,diffs,'r-')
+                plt.plot( np.arange(diffs.size) + i-diffs.size,diffs,'r-')
                 
-                plt.plot( np.arange(diffs.size) + len(diffs)-diffs.size,-diffs,'b-')
+                plt.plot( np.arange(diffs.size) + i-diffs.size,-diffs,'b-')
                 plt.xlabel('Iteration')
                 plt.ylabel('Change in Loss')
                 plt.yscale('log')
                 #if i>0: plt.text(0.7,.8,f'Last diff: {-np.diff(self.losshistory[-2:])[0]:.2g}',transform=plt.gca().transAxes)
                 display.display(plt.gcf())
                 display.clear_output(wait=True)
-        
         return X,loss,rates.at[rates==0].set(initrates[rates==0])
         
 
@@ -316,12 +337,15 @@ class rpropwithbacktracking(salttrainingoptimizer):
             log.debug(f'final gamma factor {gamma:.2g}')
             return gamma
         else:
-            while (loss-proploss < gamma*t or  np.isnan(loss-proploss)) and ( loss-proploss != 0):
-                prevgamma=gamma
-                gamma=gamma*self.searchsize
-                Xprop= X + gamma * searchdir 
-                proploss=self.lossfunction(Xprop,*args,**kwargs)
-                self.functionevals+=1
+            for i in range(5):
+                if (loss-proploss < gamma*t or  np.isnan(loss-proploss)) and ( loss-proploss != 0):
+                    prevgamma=gamma
+                    gamma=gamma*self.searchsize
+                    Xprop= X + gamma * searchdir 
+                    proploss=self.lossfunction(Xprop,*args,**kwargs)
+                    self.functionevals+=1
+                else:
+                    break
             log.debug(f'final gamma factor {prevgamma:.2g}')
             return prevgamma
 

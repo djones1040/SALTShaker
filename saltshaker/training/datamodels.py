@@ -565,7 +565,7 @@ class SALTfitcacheSN(SALTtrainingSN):
     """Class to store SN data in addition to cached results useful in speeding up the fitter
     """
     
-    __slots__= ['ix0','ix1','ic', 'ixhost','icoordinates','mwextcurve','mwextcurveint','dwave','obswave','obsphase']
+    __slots__= ['ix0','ix1','ic', 'ixhost','icoordinates','mwextcurve','mwextcurveint','dwave','obswave','obsphase','photdata','specdata']
     
     def __init__(self,sndata,residsobj,kcordict,lcpaddingsizes=None,specpaddingsizes=None):
         for attr in sndata.__slots__:
@@ -608,7 +608,7 @@ class SALTfitcacheSN(SALTtrainingSN):
 
     @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],diff_argnum=1)              
     def modelloglikelihood(self,*args,**kwargs):
-        return sum([lc.modelloglikelihood(*args,**kwargs) for lc in self.photdata])+sum([spec.modelloglikelihood(*args,**kwargs) for spec in self.specdata])
+        return sum([lc.modelloglikelihood(*args,**kwargs) for lc in self.photdata.values()])+sum([spec.modelloglikelihood(*args,**kwargs) for spec in self.specdata.values()])
 
 
 
