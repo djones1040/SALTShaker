@@ -574,6 +574,7 @@ class RunPipe():
         else:
             self.combine_validplot_inputs(pros=[x for x in pipeinit.pipepros if x in validplot_pros],
                                           nums=success_list,outsuffix=outsuffix)
+            validplot_pros = [x for x in pipeinit.pipepros if x in validplot_pros]
             for p in validplot_pros:
                 if p.startswith('lcfit'):
                     p = 'lcfitting'
