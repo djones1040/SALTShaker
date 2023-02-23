@@ -455,7 +455,8 @@ class GaussNewton(saltresids.SALTResids):
                 elif self.fix_salt2components:
                     includePars[self.im0]=False
                     includePars[self.im1]=False
-                
+                    includePars[self.iCL]=False
+                    
                 self.fitOptions[fit]=(message,includePars)
 
             if kwargs['fitting_sequence'].lower() == 'default' or not kwargs['fitting_sequence']:
@@ -515,9 +516,9 @@ class GaussNewton(saltresids.SALTResids):
             spline2d=sparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))[:,varyparlist=='m0']
         
             #Smooth things a bit, since this is supposed to be for broadband photometry
-#           if smoothingfactor>0:
-#               smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
-#               spline2d=smoothingmatrix*spline2d
+            if smoothingfactor>0:
+                smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
+                spline2d=smoothingmatrix*spline2d
             #Uncorrelated effect of parameter uncertainties on M0 and M1
             m0pulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='m0'].astype('float32')*spline2d.T.astype('float32')
             m1pulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='m1'].astype('float32')*spline2d.T.astype('float32')
@@ -687,21 +688,29 @@ class GaussNewton(saltresids.SALTResids):
 
         Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
         logging.info('Checking that rescaling components to satisfy definitions did not modify photometry')
-        
         try:
             unscaledresults={}
             scaledresults={}
+
+            Xtmp,Xredefinedtmp = X.copy(),Xredefined.copy()
+            if self.options['no_transformed_err_check']:
+                log.warning('parameter no_transformed_err_check set to True.  Use this option with bootstrap errors *only*')
+                Xtmp[self.imodelerr0] = 0
+                Xredefinedtmp[self.imodelerr0] = 0
+                Xtmp[self.imodelerr1] = 0
+                Xredefinedtmp[self.imodelerr1] = 0
+                Xtmp[self.imodelerrhost] = 0
+                Xredefinedtmp[self.imodelerrhost] = 0
+                
             for sn in self.datadict:
-                photresidsunscaled=self.ResidsForSN(X,sn,unscaledresults)[0]
-                photresidsrescaled=self.ResidsForSN(Xredefined,sn,scaledresults)[0]
+                photresidsunscaled=self.ResidsForSN(Xtmp,sn,unscaledresults)[0]
+                photresidsrescaled=self.ResidsForSN(Xredefinedtmp,sn,scaledresults)[0]
                 for flt in photresidsunscaled:
                     assert(np.allclose(photresidsunscaled[flt]['resid'],photresidsrescaled[flt]['resid']))
         except AssertionError:
             logging.critical('Rescaling components failed; photometric residuals have changed. Will finish writing output using unscaled quantities')
             Xredefined=X.copy()
 
-        #log.info('hack - no data uncertainties while we sort out host component things')
-        #getdatauncertainties = False
         if getdatauncertainties:
             M0dataerr, M1dataerr, Mhostdataerr, cov_M0_M1_data, cov_M0_Mhost_data =self.datauncertaintiesfromhessianapprox(Xredefined)
         else:

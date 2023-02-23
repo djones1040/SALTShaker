@@ -7,6 +7,7 @@ from saltshaker.util.specSynPhot import getColorsForSN
 from argparse import SUPPRESS
 from saltshaker.training.priors import __priors__
 import logging
+
 log=logging.getLogger(__name__)
 
 
@@ -109,22 +110,23 @@ class TrainSALTBase:
 
                 # The basics
                 parser.add_argument('-v', '--verbose', action="count", dest="verbose",
-                                                        default=0,help='verbosity level')
+                                    default=0,help='verbosity level')
                 parser.add_argument('--debug', default=False, action="store_true",
-                                                        help='debug mode: more output and debug files')
+                                    help='debug mode: more output and debug files')
                 parser.add_argument('--clobber', default=False, action="store_true",
-                                                        help='clobber')
+                                    help='clobber')
                 parser.add_argument('configpositional', nargs='?',default=None, type=str,
-                                                        help='configuration file')
+                                    help='configuration file')
                 parser.add_argument('-c','--configfile', default=None, type=str,
-                                                        help='configuration file')
+                                    help='configuration file')
                 parser.add_argument('-s','--stage', default='all', type=str,
-                                                        help='stage - options are train and validate')
+                                    help='stage - options are train and validate')
                 parser.add_argument('--skip_validation', default=False, action="store_true",
-                                                        help='skip making validation plots')
+                                    help='skip making validation plots')
                 parser.add_argument('--fast', default=False, action="store_true",
-                                                        help='if set, run in fast mode for debugging')
-                
+                                    help='if set, run in fast mode for debugging')
+                parser.add_argument('--bootstrap_single', default=False, action="store_true",
+                                    help='if set, run a single bootstrap iteration and save to outputdir')
                 
                 def wrapaddingargument(*args,**kwargs):
                         #Wrap this method to catch exceptions, providing a true if no exception was raised, False otherwise.
@@ -171,6 +173,10 @@ class TrainSALTBase:
                 successful=successful&wrapaddingargument(config,'iodata','filter_mass_tolerance',  type=float,
                                                         help='Mass of filter transmission allowed outside of model wavelength range (default=%(default)s)')
 
+                msg = "range of obs filter central wavelength (A)"
+                successful=successful&wrapaddingargument(config, 'iodata',
+                        'filtercen_obs_waverange',type=float,nargs=2,help=msg)
+
                 #Initialize from SALT2.4                
                 successful=successful&wrapaddingargument(config,'iodata','initsalt2model',      type=boolean_string,
                                                         help="""If true, initialize model parameters from prior SALT2 model""")
@@ -199,6 +205,9 @@ class TrainSALTBase:
                                                         help="""if set, fix M0/M1 for wavelength/phase range of original SALT2 model (default=%(default)s)""")
                 successful=successful&wrapaddingargument(config,'iodata','fix_salt2components',  type=boolean_string,
                                                         help="""if set, fix M0/M1 for *all* wavelength/phases (default=%(default)s)""")
+                successful=successful&wrapaddingargument(config,'iodata','fix_salt2components_initdir',  type=str,
+                                                        help="""if set, initialize component params from this directory (default=%(default)s)""")
+
                 #validation option
                 successful=successful&wrapaddingargument(config,'iodata','validate_modelonly',  type=boolean_string,
                                                         help="""if set, only make model plots in the validation stage""")
@@ -229,6 +238,20 @@ class TrainSALTBase:
                                                         help="Order in which parameters are fit, 'default' or empty string does the standard approach, otherwise should be comma-separated list with any of the following: all, pcaparams, color, colorlaw, spectralrecalibration, sn (default=%(default)s)")
                 successful=successful&wrapaddingargument(config,'trainparams','fitprobmin',     type=float,
                                                         help="Minimum FITPROB for including SNe (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','errors_from_bootstrap',     type=boolean_string,
+                                                        help="if set, get model surface errors from bootstrapping (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','n_bootstrap',     type=int,
+                                                        help="number of bootstrap resamples (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','maxiter_bootstrap',     type=int,
+                                                        help="maximum number of gauss-newton iterations for bootstrap estimation (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','bootstrap_sbatch_template',     type=str,
+                                                        help="batch template for bootstrap estimation (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','bootstrap_batch_mode',     type=boolean_string,
+                                                        help="batch mode for bootstrap estimation if set (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','get_bootstrap_output_only',     type=boolean_string,
+                                                        help="collect the output from bootstrapping in batch mode without running new jobs (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','no_transformed_err_check',     type=boolean_string,
+                                                        help="for host mass SALTShaker version, turn on this flag to ignore a current issue where x1/xhost de-correlation doesn\'t preserve errors appropriately; bootstrap errors will be needed (default=%(default)s)")
 
 
                 # survey definitions
@@ -344,6 +367,8 @@ class TrainSALTBase:
                                                         help='number of angstroms over which to compute scaling of error model (default=%(default)s)')
                 successful=successful&wrapaddingargument(config,'modelparams','use_snpca_knots',         type=boolean_string,
                                                         help='if set, define model on SNPCA knots (default=%(default)s)')               
+                successful=successful&wrapaddingargument(config,'modelparams','colorlaw_function',         type=str,
+                                                        help='color law function, see colorlaw.py (default=%(default)s)')               
 
                 # priors
                 for prior in __priors__:
@@ -361,162 +386,179 @@ class TrainSALTBase:
 
 
                 saltfitkwargs = {'m1regularization':self.options.m1regularization,'mhostregularization':self.options.mhostregularization,
-                                                 'bsorder':self.options.interporder,'errbsorder':self.options.errinterporder,
-                                                 'waveSmoothingNeff':self.options.wavesmoothingneff,'phaseSmoothingNeff':self.options.phasesmoothingneff,
-                                                 'neffFloor':self.options.nefffloor, 'neffMax':self.options.neffmax,
-                                                 'specrecal':self.options.specrecal, 'regularizationScaleMethod':self.options.regularizationScaleMethod,
-                                                 'phaseinterpres':self.options.phaseinterpres,'waveinterpres':self.options.waveinterpres,
-                                                 'phaseknotloc':phaseknotloc,'waveknotloc':waveknotloc,
-                                                 'errphaseknotloc':errphaseknotloc,'errwaveknotloc':errwaveknotloc,
-                                                 'phaserange':self.options.phaserange,
-                                                 'waverange':self.options.waverange,'phaseres':self.options.phasesplineres,
-                                                 'waveres':self.options.wavesplineres,'phaseoutres':self.options.phaseoutres,
-                                                 'waveoutres':self.options.waveoutres,
-                                                 'colorwaverange':self.options.colorwaverange,
-                                                 'kcordict':self.kcordict,'initm0modelfile':self.options.initm0modelfile,
-                                                 'initbfilt':self.options.initbfilt,'regulargradientphase':self.options.regulargradientphase,
-                                                 'regulargradientwave':self.options.regulargradientwave,'regulardyad':self.options.regulardyad,
-                                                 'filter_mass_tolerance':self.options.filter_mass_tolerance,
-                                                 'specrange_wavescale_specrecal':self.options.specrange_wavescale_specrecal,
-                                                 'n_components':self.options.n_components,
-                                                 'host_component':self.options.host_component,
-                                                 'n_colorpars':self.options.n_colorpars,
-                                                 'n_colorscatpars':self.options.n_colorscatpars,
-                                                 'fix_t0':self.options.fix_t0,
-                                                 'regularize':self.options.regularize,
-                                                 'outputdir':self.options.outputdir,
-                                                 'fit_model_err':self.options.fit_model_err,
-                                                 'fit_cdisp_only':self.options.fit_cdisp_only,
-                                                 'model_err_max_chisq':self.options.model_err_max_chisq,
-                                                 'steps_between_errorfit':self.options.steps_between_errorfit,
-                                                 'spec_chi2_scaling':self.options.spec_chi2_scaling,
-                                                 'debug':self.options.debug,
-                                                 'use_previous_errors':self.options.use_previous_errors,
-                                                 'fix_salt2modelpars':self.options.fix_salt2modelpars,
-                                                 'fix_salt2components':self.options.fix_salt2components}
+                                 'bsorder':self.options.interporder,'errbsorder':self.options.errinterporder,
+                                 'waveSmoothingNeff':self.options.wavesmoothingneff,'phaseSmoothingNeff':self.options.phasesmoothingneff,
+                                 'neffFloor':self.options.nefffloor, 'neffMax':self.options.neffmax,
+                                 'specrecal':self.options.specrecal, 'regularizationScaleMethod':self.options.regularizationScaleMethod,
+                                 'phaseinterpres':self.options.phaseinterpres,'waveinterpres':self.options.waveinterpres,
+                                 'phaseknotloc':phaseknotloc,'waveknotloc':waveknotloc,
+                                 'errphaseknotloc':errphaseknotloc,'errwaveknotloc':errwaveknotloc,
+                                 'phaserange':self.options.phaserange,
+                                 'waverange':self.options.waverange,'phaseres':self.options.phasesplineres,
+                                 'waveres':self.options.wavesplineres,'phaseoutres':self.options.phaseoutres,
+                                 'waveoutres':self.options.waveoutres,
+                                 'colorwaverange':self.options.colorwaverange,
+                                 'kcordict':self.kcordict,'initm0modelfile':self.options.initm0modelfile,
+                                 'initbfilt':self.options.initbfilt,'regulargradientphase':self.options.regulargradientphase,
+                                 'regulargradientwave':self.options.regulargradientwave,'regulardyad':self.options.regulardyad,
+                                 'filter_mass_tolerance':self.options.filter_mass_tolerance,
+                                 'specrange_wavescale_specrecal':self.options.specrange_wavescale_specrecal,
+                                 'n_components':self.options.n_components,
+                                 'host_component':self.options.host_component,
+                                 'n_colorpars':self.options.n_colorpars,
+                                 'n_colorscatpars':self.options.n_colorscatpars,
+                                 'fix_t0':self.options.fix_t0,
+                                 'regularize':self.options.regularize,
+                                 'outputdir':self.options.outputdir,
+                                 'fit_model_err':self.options.fit_model_err,
+                                 'fit_cdisp_only':self.options.fit_cdisp_only,
+                                 'model_err_max_chisq':self.options.model_err_max_chisq,
+                                 'steps_between_errorfit':self.options.steps_between_errorfit,
+                                 'spec_chi2_scaling':self.options.spec_chi2_scaling,
+                                 'debug':self.options.debug,
+                                 'use_previous_errors':self.options.use_previous_errors,
+                                 'fix_salt2modelpars':self.options.fix_salt2modelpars,
+                                 'fix_salt2components':self.options.fix_salt2components,
+                                 'no_transformed_err_check':self.options.no_transformed_err_check,
+                                 'colorlaw_function':self.options.colorlaw_function}
 
                 for k in self.options.__dict__.keys():
-                        if k.startswith('prior') or k.startswith('bound'):
-                                saltfitkwargs[k] = self.options.__dict__[k]
+                    if k.startswith('prior') or k.startswith('bound'):
+                        saltfitkwargs[k] = self.options.__dict__[k]
                 return saltfitkwargs
         
         def snshouldbecut(self,sn,cuts):
         
-                passescuts= [cut.passescut(sn) for cut in cuts]
+            passescuts= [cut.passescut(sn) for cut in cuts]
                 
-                if not all(passescuts): # or iPreMaxCut < 2 or medSNR < 10:
-                        log.debug('SN %s fails cuts'%sn.snid)
-                        log.debug(', '.join([f'{cut.cutvalue(sn)} {cut.description} ({cut.requirement} needed)' for cut in cuts]))
+            if not all(passescuts): # or iPreMaxCut < 2 or medSNR < 10:
+                log.debug('SN %s fails cuts'%sn.snid)
+                log.debug(', '.join([f'{cut.cutvalue(sn)} {cut.description} ({cut.requirement} needed)' for cut in cuts]))
 
-                return not all(passescuts)
+            return not all(passescuts)
 
         def checkFilterMass(self,z,survey,flt):
 
-                try: 
-                        filtwave = self.kcordict[survey][flt]['filtwave']
-                except: 
-                        raise RuntimeError(f"filter {flt} not found in kcor file for survey {survey}.  Check your config file")
-                try:
-                        filttrans = self.kcordict[survey][flt]['filttrans']
-                except:
-                        raise RuntimeError('filter %s not found in kcor file for SN %s'%(flt,sn))
+            try: 
+                filtwave = self.kcordict[survey][flt]['filtwave']
+            except: 
+                raise RuntimeError(f"filter {flt} not found in kcor file for survey {survey}.  Check your config file")
+            try:
+                filttrans = self.kcordict[survey][flt]['filttrans']
+            except:
+                raise RuntimeError('filter %s not found in kcor file for SN %s'%(flt,sn))
                 
-                #Check how much mass of the filter is inside the wavelength range
-                filtRange=(filtwave/(1+z) > self.options.waverange[0]) & \
-                                   (filtwave/(1+z) < self.options.waverange[1])
-                return np.trapz((filttrans*filtwave/(1+z))[filtRange],
-                                                filtwave[filtRange]/(1+z))/np.trapz(
-                                                        filttrans*filtwave/(1+z),
-                                                        filtwave/(1+z)) > 1-self.options.filter_mass_tolerance
+            #Check how much mass of the filter is inside the wavelength range
+            filtRange=(filtwave/(1+z) > self.options.waverange[0]) & \
+                (filtwave/(1+z) < self.options.waverange[1])
+            return np.trapz((filttrans*filtwave/(1+z))[filtRange],
+                            filtwave[filtRange]/(1+z))/np.trapz(
+                                filttrans*filtwave/(1+z),
+                                filtwave/(1+z)) > 1-self.options.filter_mass_tolerance
         
         def getcuts(self):
-                def checkfitprob(sn):
-                        hasvalidfitprob=sn.salt2fitprob!=-99
-                        if      hasvalidfitprob:
-                                return sn.salt2fitprob
-                        else:
-                                log.warning(f'SN {sn.snid} does not have a valid salt2 fitprob, including in sample')
-                                return 1
+            def checkfitprob(sn):
+                hasvalidfitprob=sn.salt2fitprob!=-99
+                if hasvalidfitprob:
+                    return sn.salt2fitprob
+                else:
+                    log.warning(f'SN {sn.snid} does not have a valid salt2 fitprob, including in sample')
+                    return 1
                         
-                cuts= [SNCut('total epochs',4,lambda sn: sum([ ((sn.photdata[flt].phase > -10) & (sn.photdata[flt].phase < 35)).sum() for flt in sn.photdata])),
-                SNCut('epochs near peak',1,lambda sn: sum([ ((sn.photdata[flt].phase > -10) & (sn.photdata[flt].phase < 5)).sum() for flt in sn.photdata])),
-                SNCut('epochs post peak',1,lambda sn: sum([      ((sn.photdata[flt].phase > 5) & (sn.photdata[flt].phase < 20)).sum() for flt in sn.photdata])),
-                SNCut('filters near peak',2,lambda sn: sum([ (((sn.photdata[flt].phase > -8) & (sn.photdata[flt].phase < 10)).sum())>0 for flt in sn.photdata])),
-                SNCut('salt2 fitprob',self.options.fitprobmin,checkfitprob)]
-                if self.options.keeponlyspec:
-                        cuts+=[ SNCut('spectra', 1, lambda sn: sn.num_spec)]
-                return cuts
+            cuts= [SNCut('total epochs',4,lambda sn: sum([ ((sn.photdata[flt].phase > -10) & (sn.photdata[flt].phase < 35)).sum() for flt in sn.photdata])),
+                   SNCut('epochs near peak',1,lambda sn: sum([ ((sn.photdata[flt].phase > -10) & (sn.photdata[flt].phase < 5)).sum() for flt in sn.photdata])),
+                   SNCut('epochs post peak',1,lambda sn: sum([      ((sn.photdata[flt].phase > 5) & (sn.photdata[flt].phase < 20)).sum() for flt in sn.photdata])),
+                   SNCut('filters near peak',2,lambda sn: sum([ (((sn.photdata[flt].phase > -8) & (sn.photdata[flt].phase < 10)).sum())>0 for flt in sn.photdata])),
+                   SNCut('salt2 fitprob',self.options.fitprobmin,checkfitprob)]
+            if self.options.keeponlyspec:
+                cuts+=[ SNCut('spectra', 1, lambda sn: sn.num_spec)]
+            return cuts
+        
         def mkcuts(self,datadict):
-                # cuts
-                # 4 epochs at -10 < phase < 35
-                # 1 measurement near peak
-                # 1 measurement at 5 < t < 20
-                # 2 measurements at -8 < t < 10
-                # salt2fitprob >1e-4
-                # if set by command line flag, 1 spectra
-                
-                #Define cuts
-                cuts=self.getcuts()
-                
-                #Record initial demographics of the sample
-                sumattr=lambda x,sndict: len(sndict) if x =='num_sn' else sum([getattr(sndict[snid],x) for snid in sndict])
-                descriptionandattrs=[('photometric observations','num_photobs'),('spectroscopic observations','num_specobs'),('light-curves','num_lc'),('spectra','num_spec')]
-                descriptions,attrs=zip(*descriptionandattrs)
-                
-                initialdemos=[sumattr(attr,datadict) for attr in attrs]
-                outdict={}
-                cutdict={}
+            # cuts
+            # 4 epochs at -10 < phase < 35
+            # 1 measurement near peak
+            # 1 measurement at 5 < t < 20
+            # 2 measurements at -8 < t < 10
+            # salt2fitprob >1e-4
+            # if set by command line flag, 1 spectra
 
-                for snid in datadict:
-                        sn=datadict[snid]
-                        photdata = sn.photdata
-                        specdata = sn.specdata
-                        z = sn.zHelio
+            #Define cuts
+            cuts=self.getcuts()
 
-                        for k in list(specdata.keys()):
-                                #Remove spectra outside phase range
-                                spectrum=specdata[k]
-                                if spectrum.phase<self.options.phaserange[0] or \
-                                   spectrum.phase>self.options.phaserange[1]-3:
-                                        specdata.pop(k)
-                                        continue
+            #Record initial demographics of the sample
+            sumattr=lambda x,sndict: len(sndict) if x =='num_sn' else sum([getattr(sndict[snid],x) for snid in sndict])
+            descriptionandattrs=[('photometric observations','num_photobs'),('spectroscopic observations','num_specobs'),('light-curves','num_lc'),('spectra','num_spec')]
+            descriptions,attrs=zip(*descriptionandattrs)
 
-                                #remove spectral data outside wavelength range
-                                inwaverange=(spectrum.wavelength>(self.options.waverange[0]*(1+z)))&(spectrum.wavelength<(self.options.waverange[1]*(1+z)))
-                                clippedspectrum=spectrum.clip(inwaverange)
-                                if len(clippedspectrum):
-                                        specdata[k]=clippedspectrum
-                                else:
-                                        specdata.pop(k)
+            initialdemos=[sumattr(attr,datadict) for attr in attrs]
+            outdict={}
+            cutdict={}
 
-                        for flt in sn.filt:
-                                #Remove light-curves outside wavelength range
-                                if flt in self.options.__dict__[f"{sn.survey.split('(')[0]}_ignore_filters"].split(','):
-                                        photdata.pop(flt)
-                                elif self.checkFilterMass(z,sn.survey,flt):
-                                        lightcurve=sn.photdata[flt]
-                                        #Remove photometric data outside phase range
-                                        inphaserange=(lightcurve.phase>self.options.phaserange[0]) & (lightcurve.phase<self.options.phaserange[1])
-                                        clippedlightcurve=lightcurve.clip(inphaserange)
-                                        if len(clippedlightcurve):
-                                                photdata[flt]=clippedlightcurve
-                                        else:
-                                                photdata.pop(flt)
-                                else:
-                                        sn.photdata.pop(flt)
-                        #Check if SN passes all cuts
-                        if self.snshouldbecut(sn,cuts):
-                                cutdict[snid]=sn
+            for snid in datadict:
+                sn=datadict[snid]
+                photdata = sn.photdata
+                specdata = sn.specdata
+                z = sn.zHelio
+
+                for k in list(specdata.keys()):
+                    #Remove spectra outside phase range
+                    spectrum=specdata[k]
+                    if spectrum.phase<self.options.phaserange[0] or \
+                       spectrum.phase>self.options.phaserange[1]-3:
+                        specdata.pop(k)
+                        continue
+
+                    #remove spectral data outside wavelength range
+                    inwaverange=(spectrum.wavelength>(self.options.waverange[0]*(1+z)))&(spectrum.wavelength<(self.options.waverange[1]*(1+z)))
+                    clippedspectrum=spectrum.clip(inwaverange)
+                    if len(clippedspectrum):
+                        specdata[k]=clippedspectrum
+                    else:
+                        specdata.pop(k)
+
+                for flt in sn.filt:
+                    #Remove light curve outside model [rest-frame] wavelength range
+                    if not self.filter_select(sn.survey,flt):  # RK Nov 7 2022
+                    #if flt in self.options.__dict__[f"{sn.survey.split('(')[0]}_ignore_filters"].split(','):
+                        photdata.pop(flt)  # remove filter
+                    elif self.checkFilterMass(z,sn.survey,flt):
+                        lightcurve=sn.photdata[flt]
+                        #Remove photometric data outside phase range
+                        inphaserange=(lightcurve.phase>self.options.phaserange[0]) & (lightcurve.phase<self.options.phaserange[1])
+                        clippedlightcurve=lightcurve.clip(inphaserange)
+                        if len(clippedlightcurve):
+                            photdata[flt]=clippedlightcurve
                         else:
-                                outdict[snid]=sn
+                            photdata.pop(flt)
+                    else:
+                        sn.photdata.pop(flt)
+                #Check if SN passes all cuts
+                if self.snshouldbecut(sn,cuts):
+                    cutdict[snid]=sn
+                else:
+                    outdict[snid]=sn
 
-                finaldemos =[sumattr(attr,outdict) for attr in attrs]
-                sncutdemos =[sumattr(attr,cutdict) for attr in attrs]
-                for attr,desc,initial,final,cut in zip(attrs,descriptions,initialdemos,finaldemos,sncutdemos):
-                        log.info(f'{initial-(final+cut)} {desc} removed as a result of cuts for phase and wavelength range')
-                
-                log.info(f'{len(datadict)} SNe initially, {len(cutdict)} SNe cut from the sample')
-                log.info('Total number of supernovae: {}'.format(len(outdict)))
-                log.info( ', '.join([f'{final} {desc}' for attr,desc,initial,final,cut in zip(attrs,descriptions,initialdemos,finaldemos,sncutdemos)])+' remaining after all cuts')
+            finaldemos =[sumattr(attr,outdict) for attr in attrs]
+            sncutdemos =[sumattr(attr,cutdict) for attr in attrs]
+            for attr,desc,initial,final,cut in zip(attrs,descriptions,initialdemos,finaldemos,sncutdemos):
+                log.info(f'{initial-(final+cut)} {desc} removed as a result of cuts for phase and wavelength range')
 
-                return outdict,cutdict
+            log.info(f'{len(datadict)} SNe initially, {len(cutdict)} SNe cut from the sample')
+            log.info('Total number of supernovae: {}'.format(len(outdict)))
+            log.info( ', '.join([f'{final} {desc}' for attr,desc,initial,final,cut in zip(attrs,descriptions,initialdemos,finaldemos,sncutdemos)])+' remaining after all cuts')
+
+            return outdict,cutdict
+
+        def filter_select(self,survey,flt):
+                select = True
+                if flt in self.options.__dict__[f"{survey.split('(')[0]}_ignore_filters"].split(','):
+                        select = False
+
+                lambdaeff = self.kcordict[survey][flt]['lambdaeff']
+                if lambdaeff < self.options.filtercen_obs_waverange[0] or \
+                   lambdaeff > self.options.filtercen_obs_waverange[1] :
+                        select = False                
+
+                return select                
+                # end filter_select

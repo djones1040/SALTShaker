@@ -5,6 +5,7 @@ from saltshaker.util.readutils import SALTtrainingSN,SALTtraininglightcurve,SALT
 
 from sncosmo.models import StretchSource
 from sncosmo.salt2utils import SALT2ColorLaw
+from saltshaker.training import colorlaw
 from sncosmo.constants import HC_ERG_AA, MODEL_BANDFLUX_SPACING
 from sncosmo.utils import integration_grid
 
@@ -145,6 +146,7 @@ class SALTfitcacheSN(SALTtrainingSN):
         self.mwextcurveint = interp1d(
             self.obswave,self.mwextcurve ,kind=residsobj.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
         
+
         self.ix0=np.where(residsobj.parlist==f'x0_{self.snid}')[0][0]
         self.ix1=np.where(residsobj.parlist==f'x1_{self.snid}')[0][0]
         self.ixhost=np.where(residsobj.parlist==f'xhost_{self.snid}')[0]
@@ -348,13 +350,18 @@ class SALTResids:
 
         self.guessScale=[1.0 for f in fluxes]
 
-        self.colorLawDeriv=np.empty((self.wave.size,self.n_colorpars))
-        for i in range(self.n_colorpars):
-            self.colorLawDeriv[:,i]=\
-                SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(self.wave)-\
-                SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(self.wave)
-        self.colorLawDerivInterp=interp1d(
-            self.wave,self.colorLawDeriv,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
+        # initialize the color law
+        # xxxxxxxxxxxxx
+        
+        self.colorlaw = colorlaw.__colorlaws__[self.colorlaw_function](self.n_colorpars,self.colorwaverange,self.wave,self.interpMethod)
+        # marked for delete
+        #self.colorLawDeriv=np.empty((self.wave.size,self.n_colorpars))
+        #for i in range(self.n_colorpars):
+        #    self.colorLawDeriv[:,i]=\
+        #        SALT2ColorLaw(self.colorwaverange, np.arange(self.n_colorpars)==i)(self.wave)-\
+        #        SALT2ColorLaw(self.colorwaverange, np.zeros(self.n_colorpars))(self.wave)
+        #self.colorLawDerivInterp=interp1d(
+        #    self.wave,self.colorLawDeriv,axis=0,kind=self.interpMethod,bounds_error=True,assume_sorted=True)
                 
         if self.regularize:
             self.updateEffectivePoints(guess)
@@ -583,7 +590,9 @@ class SALTResids:
                 if (filtmodel['modelvariance']<0).any():
                     warnings.warn('Negative variance in photometry',RuntimeWarning)
                     negVals=filtmodel['modelvariance']<0
-                    filtmodel['modelvariance'][negVals]=0
+                    #filtmodel['modelvariance'][negVals]=0
+                    if (filtmodel['modelvariance'] > 0).any() and negVals.any():
+                        filtmodel['modelvariance'][negVals]=np.min(filtmodel['modelvariance'][filtmodel['modelvariance'] > 0])
                 variance=filtmodel['fluxvariance']+filtmodel['modelvariance']
                 clscat,dclscatdx=filtmodel['colorvariance']
                 #Find cholesky matrix as sqrt of diagonal uncertainties, then perform rank one update to incorporate color scatter
@@ -656,11 +665,14 @@ class SALTResids:
         specresids={}
         for k in specmodel:
             spectralmodel=specmodel[k]
-            variance=spectralmodel['fluxvariance'] + spectralmodel['modelvariance']
             if (spectralmodel['modelvariance']<0).any():
                 warnings.warn('Negative variance in spectra',RuntimeWarning)
                 negVals=spectralmodel['modelvariance']<0
-                spectralmodel['modelvariance'][negVals]=0
+                #spectralmodel['modelvariance'][negVals]=0
+                # zero causes NaNs in sqrt so just set zeros to the minumim of model variance elsewhere
+                if (spectralmodel['modelvariance'] > 0).any():
+                    spectralmodel['modelvariance'][negVals]= np.min(spectralmodel['modelvariance'][spectralmodel['modelvariance'] > 0]) #0
+            variance=spectralmodel['fluxvariance'] + spectralmodel['modelvariance']
                 
             uncertainty=np.sqrt(variance)*SpecErrScale
 
@@ -787,13 +799,21 @@ class SALTResids:
             ##############
             # convenient lines for checking model/phot residuals
             #if self.debug:
-            #if sn == '1999ek' and name == 'phot' and len(np.where(varyParams)[0]):
-            #   import pylab as plt; plt.ion()
-            #   plt.clf()
-            #   plt.plot(valdict['O']['dataflux'],'o')
-            #   plt.plot(valdict['O']['modelflux'],'o')
-            #   plt.savefig('tmp.png')
-            #   import pdb; pdb.set_trace()
+            #import pdb; pdb.set_trace()
+            #if sn == '2006ax' and name == 'phot' and len(np.where(varyParams)[0]):
+            #    for flt in valdict.keys():
+            #        plt.clf()
+            #        plt.plot(valdict[flt]['dataflux'],'o')
+            #        plt.plot(valdict[flt]['modelflux'],'o')
+            #        plt.savefig('tmp.png')
+            #        import pdb; pdb.set_trace()
+            #if sn == '356' and name == 'spec' and len(np.where(varyParams)[0]):
+            #    for flt in valdict.keys():
+            #        plt.clf()
+            #        plt.plot(valdict[flt]['dataflux'],'o')
+            #        plt.plot(valdict[flt]['modelflux'],'o')
+            #        plt.savefig('tmp.png')
+            #        import pdb; pdb.set_trace()
             ##############
             #------------
             ##############
@@ -869,7 +889,7 @@ class SALTResids:
             if varyParams[self.iCL].any():
                 filtresultsdict['modelflux_jacobian'][:,self.iCL]= \
                     (np.sum((modulatedFlux)[:,:,np.newaxis]*\
-                    self.colorLawDeriv[:,varyParams[self.iCL]][np.newaxis,idx,:], axis=1))*-0.4*np.log(10)*c    
+                    self.colorlaw.colorLawDeriv[:,varyParams[self.iCL]][np.newaxis,idx,:], axis=1))*-0.4*np.log(10)*c    
                 
             if requiredPCDerivs.any():
                 passbandColorExp=lcdata.pbspl*colorexp[idx]*sndata.mwextcurve[idx]
@@ -1158,7 +1178,7 @@ class SALTResids:
             for i,varIndex in enumerate(np.where(self.parlist=='cl')[0]):
                 if varyParams[self.iCL][i]:
                     filtresultsdict['modelvariance_jacobian'][:,varIndex] =  \
-                        (2* (-0.4 *np.log(10)*c)*modelUncertainty*self.colorLawDerivInterp(lcdata.lambdaeff/(1+z))[varyParams[self.iCL]][i])[np.newaxis].transpose()
+                        (2* (-0.4 *np.log(10)*c)*modelUncertainty*self.colorlaw.colorLawDerivInterp(lcdata.lambdaeff/(1+z))[varyParams[self.iCL]][i])[np.newaxis].transpose()
 
             if varyParams[self.imodelerr].any() or varyParams[self.imodelcorr].any():
                 extinctionexp=(colorexpinterp* _SCALE_FACTOR/(1+z)*sndata.mwextcurveint(lcdata.lambdaeff))
@@ -1190,7 +1210,7 @@ class SALTResids:
     def fillStoredResults(self,x,storedResults):
         if self.n_colorpars:
             if not 'colorLaw' in storedResults:
-                storedResults['colorLaw'] = -0.4 * SALT2ColorLaw(self.colorwaverange, x[self.parlist == 'cl'])(self.wave)
+                storedResults['colorLaw'] = -0.4 * self.colorlaw.colorlaw(x[self.parlist == 'cl'])
                 storedResults['colorLawInterp']= interp1d(
                     self.wave,storedResults['colorLaw'],kind=self.interpMethod,bounds_error=False,fill_value=0,assume_sorted=True)
         else: storedResults['colorLaw'] = 1
