@@ -234,7 +234,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         #Set convergence criteria
         #Low pass filter to ensure that 
 #         convergencefilt=signal.butter(4,2e-2,output='sos')
-        numconvergence=20
+        numconvergence=100
             
         starttime=time.time()
         initvals=jnp.array(initvals)
