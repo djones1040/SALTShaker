@@ -67,7 +67,6 @@ class rpropwithbacktracking(salttrainingoptimizer):
         self.losshistory=[]
         self.Xhistory=[]
         
-        
     @classmethod
     def add_training_options(cls,parser,config):
         """ Specifies to the parser all required configuration options"""
@@ -186,6 +185,8 @@ class rpropwithbacktracking(salttrainingoptimizer):
         """ 
         Passthrough function to maxlikefit, with an excludeSN keyword that removes the log-likelihood of a single SN.
         """
+        if 'diff' in kwargs and "grad" in kwargs['diff']: self.functionevals +=3
+        else: self.functionevals+=1
         result= self.saltobj.maxlikefit(params,*args,**kwargs)
         if excludesn: 
             singleresult=self.saltobj.datadict[excludesn].modelloglikelihood(params,*args,**kwargs)
@@ -234,7 +235,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         #Set convergence criteria
         #Low pass filter to ensure that 
 #         convergencefilt=signal.butter(4,2e-2,output='sos')
-        numconvergence=100
+        numconvergence=10
             
         starttime=time.time()
         initvals=jnp.array(initvals)
@@ -243,14 +244,24 @@ class rpropwithbacktracking(salttrainingoptimizer):
             #Proposes a new value based on sign of gradient
             Xnew,newloss, newsign, newgrad,newrates  = self.rpropiter(X, Xprev,loss,sign,rates,**kwargs)
             #Take the direction being searched and do a line-search
-            searchdir=np.select([~np.isinf(X),np.isinf(X)], [ Xnew-X, 0])
+            searchdir=jnp.select([~jnp.isinf(X),jnp.isinf(X)], [ Xnew-X, 0])
             if newgrad @ searchdir < 0:
                 gamma=self.twowaybacktracking(X,newloss,newgrad,searchdir,**kwargs)
+                newrates*=gamma
             else:
-                gamma=1
-            newrates*=gamma
+                #newsign=np.zeros(X.size)
+                #gamma=0
+                unimproved= self.lossfunction(Xnew,**kwargs) > newloss
+                if unimproved :
+                    backwards=newgrad*searchdir > 0
+                    gamma=self.twowaybacktracking(X,newloss,newgrad, searchdir.at[backwards].set(0 ),**kwargs)
+                    newrates[~backwards]*=gamma
+                else:
+                    gamma=1
             Xnew= X+ gamma*searchdir
+
             loss,sign,grad,rates=newloss,newsign, newgrad,newrates
+            
             Xprev=X
             X=Xnew
             
@@ -321,7 +332,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
             
         Xprop= X + gamma * searchdir 
         proploss=self.lossfunction(Xprop, *args,**kwargs)
-        self.functionevals+=1
+
         log.debug(f'Entering two way backtracking with initial loss {loss:.2g}, termination criterion {t:.2g}, and initial diff {loss-proploss:.2g}')
         
         if loss-proploss >= gamma*t:
@@ -331,23 +342,21 @@ class rpropwithbacktracking(salttrainingoptimizer):
                     gamma=gamma/self.searchsize 
                     Xprop= X + gamma * searchdir 
                     proploss=self.lossfunction(Xprop,*args,**kwargs)
-                    self.functionevals+=1
                 else:
                     break
             log.debug(f'final gamma factor {gamma:.2g}')
-            return gamma
+            return prevgamma
         else:
-            for i in range(5):
+            for i in range(10):
                 if (loss-proploss < gamma*t or  np.isnan(loss-proploss)) and ( loss-proploss != 0):
                     prevgamma=gamma
                     gamma=gamma*self.searchsize
                     Xprop= X + gamma * searchdir 
                     proploss=self.lossfunction(Xprop,*args,**kwargs)
-                    self.functionevals+=1
                 else:
                     break
             log.debug(f'final gamma factor {prevgamma:.2g}')
-            return prevgamma
+            return gamma
 
     
         
@@ -389,8 +398,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         https://doi.org/10.1016/S0925-2312(01)00700-7
         """
         lossval,grad=  self.lossfunction(X,*args,**kwargs, diff='valueandgrad')
-        self.functionevals+=3
-
+        
         sign=jnp.sign(grad)
         indicatorvector= prevsign *sign
 
@@ -404,5 +412,6 @@ class rpropwithbacktracking(salttrainingoptimizer):
         Xnew=jnp.select( [less,greatereq], [ lax.cond(lossval>prevloss, lambda x,y:x , lambda x,y: y, Xprev, X), 
             X-(sign *learningrates)
         ])
+        #Set sign to 0 after a previous change
         sign= (sign * greatereq)
         return jnp.clip(Xnew,*self.Xbounds), lossval, sign, grad, learningrates
