@@ -1,9 +1,10 @@
 import jax
 from jax.experimental import sparse
+from scipy import sparse as scisparse 
 import sys
 from jax import numpy as jnp
 from tqdm.notebook import trange
-
+from jax.nn import one_hot
 def in_ipynb():
     try:
         cfg = get_ipython().config 
@@ -33,12 +34,16 @@ def sparsejac(fun,difffunc,argnums, forward ):
         jshape=(numout[0],shapein[0])
         localdiff=difffunc
         
+        matrixproduct = jax.jit( jax.vmap(lambda vec: difffunc(vec,*args,**kwargs)) )
+        
+        diffchunksize=20 
+        
+        
         rangefunc= trange if usetqdm else range
         if forward:
-            return sparse.bcoo_concatenate([sparse.BCOO.fromdense(
-                    localdiff( jnp.zeros(jshape[1]).at[i].set(1) ,*args,**kwargs)
-                ).reshape(jshape[0],1)
-                                     for i in (rangefunc(jshape[1]))],dimension=1)
+            return scisparse.hstack([scisparse.csc_matrix(
+                    matrixproduct( one_hot(jnp.arange(i*diffchunksize, (i+1)*diffchunksize ), jshape[1] ))
+                ).T for i in (rangefunc(jshape[1] //diffchunksize +1 ))])[:, :jshape[1]]
         else:
             return sparse.bcoo_concatenate([sparse.BCOO.fromdense(
                     localdiff(jnp.zeros(jshape[0]).at[i].set(1) ,*args,**kwargs)

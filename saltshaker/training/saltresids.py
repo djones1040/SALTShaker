@@ -23,6 +23,7 @@ from scipy.special import factorial
 from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
 from scipy.integrate import trapz
 from scipy import linalg
+from scipy import sparse as scisparse
 
 import numpy as np
 from numpy.random import standard_normal
@@ -52,6 +53,8 @@ from jax import lax
 from collections import namedtuple
 from argparse import SUPPRESS
 
+
+
 import time
 import sys
 import extinction
@@ -67,6 +70,7 @@ from scipy import sparse as scisparse
 _B_LAMBDA_EFF = np.array([4302.57])  # B-band-ish wavelength
 _V_LAMBDA_EFF = np.array([5428.55])  # V-band-ish wavelength
 warnings.simplefilter('ignore',category=FutureWarning)
+interactive= sys.stdout.isatty()
 
 saltconfiguration=namedtuple('saltconfiguration',
 
@@ -78,7 +82,38 @@ salttrainingresult= namedtuple('salttrainingresult',
             
             'componentsurfaces' ,  'modelerrsurfaces', 'dataerrsurfaces' ,
             'modelcovsurfaces','datacovsurfaces','clpars','clscat','snparams'])        
+            
+def ensurepositivedefinite(matrix,maxiter=5):
 
+    for i in range(maxiter):
+        mineigenval=np.linalg.eigvalsh(matrix)[0]
+        if mineigenval>0:
+            return matrix
+        else:
+            if maxiter==0: 
+                raise ValueError('Unable to make matrix positive semidefinite')
+        matrix+=np.diag(-mineigenval*4* np.ones(matrix.shape[0]))
+    return matrix
+
+def getgaussianfilterdesignmatrix(shape,smoothing):
+    windowsize=10+shape%2
+    window=gaussian_filter1d(1.*(np.arange(windowsize)==windowsize//2),smoothing)
+    while ~(np.any(window==0)):
+        windowsize=2*windowsize+shape%2
+        window=gaussian_filter1d(1.*(np.arange(windowsize)==windowsize//2),smoothing)
+    window=window[window>0]
+
+    diagonals=[]
+    offsets=list(range(-(window.size//2),window.size//2+1))
+    for i,offset in enumerate(offsets):
+        diagonals+=[np.tile(window[i],shape-np.abs(offset))]
+    design=scisparse.diags(diagonals,offsets).tocsr()
+    for i in range(window.size//2+1):
+        design[i,:window.size//2+1]=gaussian_filter1d(1.*(np.arange(design.shape[0])== i ),5)[:window.size//2+1]
+        design[-i-1,-(window.size//2+1) : ]=gaussian_filter1d(1.*(np.arange(design.shape[0])== i ),5)[:window.size//2+1][::-1]    
+    return design
+
+    
 class SALTResids:
 
     parameters = ['x0','x1','xhost','c','m0','m1','mhost','spcrcl','spcrcl_norm','spcrcl_poly',
@@ -576,7 +611,10 @@ class SALTResids:
                 sources+=[label]*numresids(func)
         return sources
 
-        
+      
+
+      
+      
     def getChi2Contributions(self,X,**kwargs):
         uncertainties= self.calculatecachedvals(X,target='variances')
         residuals= self.lsqwrap(X,uncertainties,**kwargs)
@@ -648,10 +686,95 @@ class SALTResids:
             normalization=(designmatrix*vals/variance).sum()*normvariance
             results[flt]=normalization,normvariance
         return results
+
+
+    def estimateparametererrorsfromhessian(self,X):
+        """Approximate Hessian by jacobian times own transpose to determine uncertainties in flux surfaces"""
+        log.info("determining M0/M1 errors by approximated Hessian")
+        import time
+        tstart = time.time()
+
+        logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
+
+        jac=self.lsqwrap(X,self.calculatecachedvals(X,target='variances'),diff='sparsejacfwd')
+
+        varyingParams=np.isin(self.parlist, ['m0','m1','mhost','cl'])
+
+        hessian = ensurepositivedefinite((jac.T[varyingParams,:] @ jac[:,varyingParams]).toarray())
+        #Simple preconditioning of the jacobian before attempting to invert
+
+        scales=np.sqrt(np.diag(hessian) )
+        scales[scales==0]=1
+        preconditioningelementwise=np.outer( scales,scales)
+        sigma= linalg.cho_solve( linalg.cho_factor(hessian/preconditioningelementwise), np.identity(scales.size))/preconditioningelementwise
+        return sigma
+
+
+    def computeuncertaintiesfromparametererrors(self,X,sigma,smoothingfactor=150):
+        varyingParams=np.isin(self.parlist, ['m0','m1','mhost','cl'])
+        #Inverting cholesky matrix for speed
+        if sigma.shape[0]==self.npar:
+            sigma=sigma[varyingParams,:][:,varyingParams]
+        preconditioning = np.diag(np.sqrt(1/np.diag(sigma)))
+        L=np.diag( 1/ np.diag(preconditioning)) @ linalg.cholesky(preconditioning @ sigma @ preconditioning ,lower=True)
         
+        #Turning spline_derivs into a sparse matrix for speed
+        chunkindex,chunksize=0,10
+        M0dataerr      = np.empty((self.phaseout.size,self.waveout.size))
+        cov_M0_M1_data = np.empty((self.phaseout.size,self.waveout.size))
+        M1dataerr      = np.empty((self.phaseout.size,self.waveout.size))
+        Mhostdataerr      = np.empty((self.phaseout.size,self.waveout.size))
+        cov_M0_Mhost_data = np.empty((self.phaseout.size,self.waveout.size))
+        
+        for chunkindex in np.arange(self.waveout.size)[::chunksize]:
+            varyparlist= self.parlist[varyingParams]
+            spline_derivs = np.empty([self.phaseout.size, min(self.waveout.size-chunkindex, chunksize),self.im0.size])
+            for i in range(self.im0.size):
+                if self.bsorder == 0: continue
+                spline_derivs[:,:,i]=bisplev(self.phaseout,self.waveout[chunkindex:chunkindex+chunksize],(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
+            spline2d=scisparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))[:,varyparlist=='m0']
+        
+            #Smooth things a bit, since this is supposed to be for broadband photometry
+            if smoothingfactor>0:
+                smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
+                spline2d=smoothingmatrix*spline2d
+            #Uncorrelated effect of parameter uncertainties on M0 and M1
+            
+            m0pulls=L[:,varyparlist=='m0'].astype('float32') @ spline2d.T.astype('float32')
+            m1pulls=L[:,varyparlist=='m1'].astype('float32') @ spline2d.T.astype('float32')
+            if self.host_component:
+                mhostpulls=L[:,varyparlist=='mhost'].astype('float32') @ spline2d.T.astype('float32')
+                
+            mask=np.zeros((self.phaseout.size,self.waveout.size),dtype=bool)
+            mask[:,chunkindex:chunkindex+chunksize]=True        
+            M0dataerr[mask] =  np.sqrt((m0pulls**2     ).sum(axis=0))
+            cov_M0_M1_data[mask] =     (m0pulls*m1pulls).sum(axis=0)
+            M1dataerr[mask] =  np.sqrt((m1pulls**2     ).sum(axis=0))
+            if self.host_component:
+                Mhostdataerr[mask] =  np.sqrt((mhostpulls**2     ).sum(axis=0))
+                # should we do host covariances?
+                cov_M0_Mhost_data[mask] =     (m0pulls*mhostpulls).sum(axis=0)
+                
+        correlation=cov_M0_M1_data/(M0dataerr*M1dataerr)
+        correlation[np.isnan(correlation)]=0
+        if self.host_component: M0,M1,Mhost=self.SALTModel(X)
+        else: M0,M1=self.SALTModel(X)
+        M0dataerr=np.clip(M0dataerr,0,np.abs(M0).max()*2)
+        M1dataerr=np.clip(M1dataerr,0,np.abs(M1).max()*2)
+        if self.host_component:
+            Mhostdataerr=np.clip(Mhostdataerr,0,np.abs(Mhost).max()*2)
+        correlation=np.clip(correlation,-1,1)
+        cov_M0_M1_data=correlation*(M0dataerr*M1dataerr)
+        if self.host_component:
+
+            return [M0dataerr, M1dataerr, Mhostdataerr], [(0,1,cov_M0_M1_data), (0,2,cov_M0_Mhost_data)]
+        else:
+
+            return [M0dataerr, M1dataerr], [(0,1,cov_M0_M1_data) ]
+
     
-    def processoptimizedparametersforoutput(self,optimizedparams):
-        X=optimizedparams
+    def processoptimizedparametersforoutput(self,optimizedparams, parametercovariance=None):
+        X=np.array(optimizedparams)
         Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
         logging.info('Checking that rescaling components to satisfy definitions did not modify photometry')
         try:
@@ -679,14 +802,17 @@ class SALTResids:
             logging.critical('Rescaling components failed; photometric residuals have changed. Will finish writing output using unscaled quantities')
             Xfinal=X.copy()
         
-        componentnames=componentnames= ['M0','M1']+(['Mhost'] if self.host_component else [])
         errmodel=self.ErrModel(Xfinal,evaluatePhase=self.phaseout,evaluateWave=self.waveout)
         componentnames= ['M0','M1']+(['Mhost'] if self.host_component else [])
-    
+        
+        if parametercovariance is None:
+            dataerrs,datacovs=None,None
+        else : 
+            dataerrs,datacovs=self.computeuncertaintiesfromparametererrors( X,parametercovariance)
+        
         covmodel=[]
         corrmodel=self.CorrelationModel(Xfinal,evaluatePhase=self.phaseout,evaluateWave=self.waveout)
         for i,combination in enumerate(self.corrcombinations):
-            #Check which numerical components correspond to each covariance combination
             covmodel+= [(*combination,corrmodel[i] * errmodel[combination[0]] * errmodel[combination[1]])]
     
         return salttrainingresult( num_lightcurves=self.num_lc,num_spectra=self.num_spectra,num_sne=len(self.datadict), parlist=self.parlist,
@@ -695,8 +821,8 @@ class SALTResids:
             componentsurfaces= self.SALTModel(Xfinal,evaluatePhase=self.phaseout,evaluateWave=self.waveout),
             modelerrsurfaces=errmodel,
             modelcovsurfaces = covmodel,
-            dataerrsurfaces =None,
-            datacovsurfaces =None,
+            dataerrsurfaces =dataerrs,
+            datacovsurfaces =datacovs,
              clpars= Xfinal[self.iCL] , clscat=self.colorscatter(Xfinal,self.waveout),
             snparams= {sn: {'x0':X[self.parlist == f'x0_{sn}'][0],
                               'x1':X[self.parlist == f'x1_{sn}'][0],

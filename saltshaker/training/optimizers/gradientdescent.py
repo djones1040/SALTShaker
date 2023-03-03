@@ -115,9 +115,11 @@ class rpropwithbacktracking(salttrainingoptimizer):
 
         try:
             #First fit with color scatter fixed
+            if not np.isinf(X[self.saltobj.iclscat_0]):
+                X[self.saltobj.iclscat_0]=-np.inf
             fitparams=~np.isin(np.arange(self.saltobj.npar),self.saltobj.iclscat)
             X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter)
-            
+                        
             log.info('Fitting color scatter')
             #Fit error model including color scatter
             X=X.at[self.saltobj.iclscat[-1]].set(-4)
@@ -134,7 +136,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 else:
                     raise e
         except Exception as e:
-            log.exception('Error encountered in convergence_loop, exiting')
+            log.exception('Error encountered in optimization, exiting')
             raise e
         residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'),jit=False)
         newChi=(residuals**2).sum()
@@ -147,10 +149,6 @@ class rpropwithbacktracking(salttrainingoptimizer):
 
         return X
 
-
-    def estimateparametererrors(self,X,numjackknifes):
-        
-        self.optimizeparams( excludesn)
     
     def initializelearningrates(self,X):
         """

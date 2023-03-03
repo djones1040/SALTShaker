@@ -418,7 +418,7 @@ class TrainSALT(TrainSALTBase):
                     
         return guess,modelconfiguration
 
-    def bootstrapSALTModel_batch(self,datadict,trainingresult,saltfitter,returnGN=False):
+    def bootstrapSALTModel_batch(self,datadict,trainingresult,saltfitter):
         # runs bootstrapping in batch mode via calls to trainsalt
         USERNAME = os.environ['USER']
 
@@ -513,15 +513,10 @@ class TrainSALT(TrainSALTBase):
                 trainingresult.cov_M0_M1_bootstrap[j,i] = np.sum((M0_bs[j,i]-np.mean(M0_bs[j,i,iGood]))*(M1_bs[j,i]-np.mean(M1_bs[j,i,iGood])))/(self.options.n_bootstrap-1)
                 trainingresult.cov_M0_Mhost_bootstrap[j,i] = np.sum((M0_bs[j,i]-np.mean(M0_bs[j,i,iGood]))*(Mhost_bs[j,i]-np.mean(Mhost_bs[j,i,iGood])))/(self.options.n_bootstrap-1)
 
-        if 'chain' in saltfitter.__dict__.keys():
-            chain = saltfitter.chain
-            loglikes = saltfitter.loglikes
-        else: chain,loglikes = None,None
-
-        return trainingresult,chain,loglikes
+        return trainingresult
 
         
-    def bootstrapSALTModel(self,datadict,trainingresult,returnGN=False):
+    def bootstrapSALTModel(self,datadict,trainingresult):
 
         # check for option inconsistency
         if self.options.use_previous_errors and not self.options.resume_from_outputdir and not self.options.error_dir:
@@ -609,56 +604,51 @@ class TrainSALT(TrainSALTBase):
                 trainingresult.cov_M0_M1_bootstrap[j,i] = np.sum((M0_bs[j,i]-np.mean(M0_bs[j,i,:]))*(M1_bs[j,i]-np.mean(M1_bs[j,i,:])))/(self.options.n_bootstrap-1)
                 trainingresult.cov_M0_Mhost_bootstrap[j,i] = np.sum((M0_bs[j,i]-np.mean(M0_bs[j,i,:]))*(Mhost_bs[j,i]-np.mean(Mhost_bs[j,i,:])))/(self.options.n_bootstrap-1)
 
-        if 'chain' in saltfitter.__dict__.keys():
-            chain = saltfitter.chain
-            loglikes = saltfitter.loglikes
-        else: chain,loglikes = None,None
-
-        return trainingresult,chain,loglikes
+        return trainingresult
     
     
     def initializesaltmodelobject(self,datadict):
         x_modelpars,modelconfiguration = self.initialParameters(datadict)
         return x_modelpars,saltresids.SALTResids(datadict,self.kcordict,modelconfiguration,self.options)
 
-    def fitSALTModel(self,datadict,returnGN=True):
+    def fitSALTModel(self,datadict,x_modelpars,saltresids,returnGN=True):
         # check for option inconsistency
         if self.options.use_previous_errors and not self.options.resume_from_outputdir and not self.options.error_dir:
             raise RuntimeError('resume_from_outputdir or error_dir must be specified to use use_previous_errors option')
         
-        x_modelpars,saltresids=self.initializesaltmodelobject(datadict)
-#         if self.options.bootstrap_single:
-#             new_keys = np.random.choice(list(datadict.keys()),size=len(datadict.keys()))
-# 
-#             # make a new dictionary, ensure names are unique
-#             datadict_bootstrap = {}
-#             for nid,k in enumerate(new_keys):
-#                 datadict_bootstrap[str(nid)] = copy.deepcopy(datadict[k])
-#                 datadict_bootstrap[str(nid)].snid_orig = datadict[k].snid[:]
-#                 datadict_bootstrap[str(nid)].snid = str(nid)
-#                 
-#             # construct the new parlist
-#             x_modelpars_bs,parlist_bs,keys_done = np.array([]),np.array([]),np.array([])
-#             for i,xm in enumerate(x_modelpars):
-#                 if '_' not in parlist[i] or 'modelerr' in parlist[i] or 'modelcorr' in parlist[i]:
-#                     x_modelpars_bs = np.append(x_modelpars_bs,xm)
-#                     parlist_bs = np.append(parlist_bs,parlist[i])
-#             for i,k in enumerate(new_keys):
-#                 snidpars = [(x,p) for x,p in zip(x_modelpars,parlist) if '_' in p and p.split('_')[1] == k]
-#                 for xp in snidpars:
-#                     x,p = xp
-#                     parlist_parts = p.split('_')
-#                     snid = p.split('_')[1]
-#                     if len(parlist_parts) == 2:
-#                         x_modelpars_bs = np.append(x_modelpars_bs,x) #x_modelpars[parlist == p])
-#                         parlist_bs = np.append(parlist_bs,parlist_parts[0]+'_'+str(i))
-#                     elif len(parlist_parts) == 3:
-#                         x_modelpars_bs = np.append(x_modelpars_bs,x) # x_modelpars[parlist == p])
-#                         parlist_bs = np.append(parlist_bs,parlist_parts[0]+'_'+str(i)+'_'+parlist_parts[2])
-# 
-#             datadict = copy.deepcopy(datadict_bootstrap)
-#             parlist = copy.deepcopy(parlist_bs)
-#             x_modelpars = copy.deepcopy(x_modelpars_bs)
+        
+        if self.options.bootstrap_single:
+            new_keys = np.random.choice(list(datadict.keys()),size=len(datadict.keys()),replace=True)
+
+            # make a new dictionary, ensure names are unique
+            datadict_bootstrap = {}
+            for nid,k in enumerate(new_keys):
+                datadict_bootstrap[str(nid)] = copy.deepcopy(datadict[k])
+                datadict_bootstrap[str(nid)].snid_orig = datadict[k].snid[:]
+                datadict_bootstrap[str(nid)].snid = str(nid)
+                
+            # construct the new parlist
+            x_modelpars_bs,parlist_bs,keys_done = np.array([]),np.array([]),np.array([])
+            for i,xm in enumerate(x_modelpars):
+                if '_' not in parlist[i] or 'modelerr' in parlist[i] or 'modelcorr' in parlist[i]:
+                    x_modelpars_bs = np.append(x_modelpars_bs,xm)
+                    parlist_bs = np.append(parlist_bs,parlist[i])
+            for i,k in enumerate(new_keys):
+                snidpars = [(x,p) for x,p in zip(x_modelpars,parlist) if '_' in p and p.split('_')[1] == k]
+                for xp in snidpars:
+                    x,p = xp
+                    parlist_parts = p.split('_')
+                    snid = p.split('_')[1]
+                    if len(parlist_parts) == 2:
+                        x_modelpars_bs = np.append(x_modelpars_bs,x) #x_modelpars[parlist == p])
+                        parlist_bs = np.append(parlist_bs,parlist_parts[0]+'_'+str(i))
+                    elif len(parlist_parts) == 3:
+                        x_modelpars_bs = np.append(x_modelpars_bs,x) # x_modelpars[parlist == p])
+                        parlist_bs = np.append(parlist_bs,parlist_parts[0]+'_'+str(i)+'_'+parlist_parts[2])
+
+            datadict = copy.deepcopy(datadict_bootstrap)
+            parlist = copy.deepcopy(parlist_bs)
+            x_modelpars = copy.deepcopy(x_modelpars_bs)
 
         optimizer=optimizers.getoptimizer(self.options.optimizer)
         
@@ -673,7 +663,9 @@ class TrainSALT(TrainSALTBase):
             
             # do the fitting
             x_modelpars = saltfitter.optimize( x_modelpars)
-            trainingresult=saltresids.processoptimizedparametersforoutput(x_modelpars)
+            if self.options.errors_from_hessianapprox: sigma=saltresids.estimateparametererrorsfromhessian(x_modelpars)
+            else: sigma=None
+            trainingresult=saltresids.processoptimizedparametersforoutput(x_modelpars,sigma)
             for k in datadict.keys():
                 trainingresult.snparams[k]['t0'] =  datadict[k].tpk_guess
 
@@ -722,7 +714,7 @@ class TrainSALT(TrainSALTBase):
         if trainingresult.datacovsurfaces is None:
             datacovsurfaces=sum([ [(i,j, np.zeros((trainingresult.phase.size,trainingresult.wave.size) )) for j in range(i+1,len(trainingresult.componentnames))] for i in range(len(trainingresult.componentnames))],[])
         else:
-            datacovsurfaces=result.datacovsurfaces
+            datacovsurfaces=trainingresult.datacovsurfaces
     
         #Loop through the components and write their output files
         for fluxmodel,errmodel,errdata,name in zip( trainingresult.componentsurfaces, trainingresult.modelerrsurfaces,dataerrsurfaces, trainingresult.componentnames):
@@ -1152,18 +1144,18 @@ SIGMA_INT: 0.106  # used in simulation"""
             if self.options.stage == "all" or self.options.stage == "train":
                 # read the data
                 stage='training'
-
+                x_modelpars,saltresids=self.initializesaltmodelobject(datadict)
                 if not returnGN:
-                    trainingresult,chain,loglikes,saltfitter = self.fitSALTModel(datadict,returnGN=returnGN)
+                    trainingresult,chain,loglikes,saltfitter = self.fitSALTModel(datadict,x_modelpars,saltresids,returnGN=returnGN)
                 else:
-                    fitter,saltfitter,modelpars = self.fitSALTModel(datadict,returnGN=returnGN)
+                    fitter,saltfitter,modelpars = self.fitSALTModel(datadict,x_modelpars,saltresids,returnGN=returnGN)
                     return fitter,saltfitter,modelpars
 
                 if self.options.errors_from_bootstrap:
                     if self.options.bootstrap_batch_mode:
-                        fitter,saltfitter,modelpars = self.bootstrapSALTModel_batch(datadict,trainingresult,saltfitter,returnGN=returnGN)
+                        trainingresult = self.bootstrapSALTModel_batch(datadict,trainingresult,x_modelpars,saltresids)
                     else:
-                        fitter,saltfitter,modelpars = self.bootstrapSALTModel(datadict,trainingresult,returnGN=returnGN)
+                        trainingresult = self.bootstrapSALTModel(datadict,trainingresult,x_modelpars,saltresids)
                 
                 stage='output'
                 # write the output model - M0, M1, c
