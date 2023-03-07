@@ -238,6 +238,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         starttime=time.time()
         initvals=jnp.array(initvals)
         X, Xprev,loss,sign= initvals,initvals, np.inf,np.zeros(initvals.size)
+        rates=jnp.array(rates)
         for i in range(niter):
             #Proposes a new value based on sign of gradient
             Xnew,newloss, newsign, newgrad,newrates  = self.rpropiter(X, Xprev,loss,sign,rates,**kwargs)
@@ -253,7 +254,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 if unimproved :
                     backwards=newgrad*searchdir > 0
                     gamma=self.twowaybacktracking(X,newloss,newgrad, searchdir.at[backwards].set(0 ),**kwargs)
-                    newrates[~backwards]*=gamma
+                    newrates=newrates.at[~backwards].set(newrates[~backwards]*gamma)
                 else:
                     gamma=1
             Xnew= X+ gamma*searchdir
