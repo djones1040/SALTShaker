@@ -727,7 +727,7 @@ class TrainSALT(TrainSALTBase):
                         if not self.options.use_previous_errors:
                             foutmodelerr.write(f'{p:.1f} {w:.2f} {errmodel[i,j]**2.:8.15e}\n')
                             foutdataerr.write(f'{p:.1f} {w:.2f} {errmodel[i,j]**2.+errdata[i,j]**2.:8.15e}\n')
-    
+        
         #Copy previous variance files from relevant output
         if  self.options.use_previous_errors:
             if  self.options.resume_from_outputdir:
@@ -761,7 +761,13 @@ class TrainSALT(TrainSALTBase):
                     for i,p in enumerate(trainingresult.phase):
                         for j,w in enumerate(trainingresult.wave):
                             foutcov.write(f'{p:.1f} {w:.2f} {modelsurface[i,j]+datasurface[i,j]:8.15e}\n')
-
+        
+        #Write dispersion file, with everything set to 1
+        with open(f'{outdir}/salt3_lc_dispersion_scaling.dat','w') as lcdispfile:
+                for i,p in enumerate(trainingresult.phase):
+                    for j,w in enumerate(trainingresult.wave):
+                        lcdispfile.write(f'{p:.1f} {w:.2f} 1.00e+00\n')
+        
         #Write the color dispersion, clipping at one
         cldispersionmax=1.
         with open(f'{outdir}/salt3_color_dispersion.dat','w') as foutclscat:

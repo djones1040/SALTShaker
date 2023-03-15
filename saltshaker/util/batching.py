@@ -70,7 +70,7 @@ def batchdatabysize(data):
         #Want to convert that into an m-element list of n-element arrays or single values
         for j,varname in enumerate( data[0].__slots__):
 
-            vals=np.array([(unpacked[i][j]) for i in range(len(unpacked))])
+            vals=([(unpacked[i][j]) for i in range(len(unpacked))])
             #If it's a sparse array, concatenate along new "batched" axis for use with vmap
             if isinstance(vals[0],sparse.BCOO) : 
                 yield sparse.bcoo_concatenate([x.reshape((1,*x.shape)).update_layout(n_batch=1) for x in vals] ,dimension=0)

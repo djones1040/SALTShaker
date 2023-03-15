@@ -239,17 +239,17 @@ class rpropwithbacktracking(salttrainingoptimizer):
         initvals=jnp.array(initvals)
         X, Xprev,loss,sign= initvals,initvals, np.inf,np.zeros(initvals.size)
         rates=jnp.array(rates)
-        for i in range(niter):
+        
+        def iteration(X, Xprev,loss,sign,rates):
             #Proposes a new value based on sign of gradient
             Xnew,newloss, newsign, newgrad,newrates  = self.rpropiter(X, Xprev,loss,sign,rates,**kwargs)
-            #Take the direction being searched and do a line-search
+            #Take the direction proposed and do a line-search in that direction
             searchdir=jnp.select([~jnp.isinf(X),jnp.isinf(X)], [ Xnew-X, 0])
             if newgrad @ searchdir < 0:
                 gamma=self.twowaybacktracking(X,newloss,newgrad,searchdir,**kwargs)
                 newrates*=gamma
             else:
-                #newsign=np.zeros(X.size)
-                #gamma=0
+                #If the line is opposite the gradient, check that it actually improves the result
                 unimproved= self.lossfunction(Xnew,**kwargs) > newloss
                 if unimproved :
                     backwards=newgrad*searchdir > 0
@@ -258,11 +258,16 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 else:
                     gamma=1
             Xnew= X+ gamma*searchdir
-
-            loss,sign,grad,rates=newloss,newsign, newgrad,newrates
+            return Xnew, X, newloss,newsign, newgrad,newrates
             
-            Xprev=X
-            X=Xnew
+        for i in range(niter):
+            if i%20 == 19:
+                trials=[( reinitialized,*iteration(X, Xprev,loss,sign, rateguess)) for reinitialized,rateguess in [(False,rates), (True,self.initializelearningrates(X)*1e-2)]]
+                log.debug('Experimenting with reinitialization')                
+                reinitialized,X,Xprev,loss,sign,grad,rates = min(trials,key=lambda x: self.lossfunction(x[1],**kwargs) )
+                if reinitialized: log.debug('Reinitialized learning rates')
+            else:
+                X,Xprev,loss,sign,grad,rates = iteration(X, Xprev,loss,sign,rates)
             
             self.losshistory+=[loss]
             self.Xhistory+=[X]
@@ -273,11 +278,12 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 convergencecriterion= self.losshistory[-numconvergence] - loss if len(self.losshistory)> numconvergence+10 else np.inf
                 #signal.sosfilt(convergencefilt, -np.diff((self.losshistory[-numconvergence:]) ))[-1]
                 if interactive:
-                    sys.stdout.write(f'\r Iteration {i} , function evaluations {self.functionevals}, convergence criterion {convergencecriterion:.2g}\x1b[1K')
-                log.debug(f'Iteration {i}, loss {loss:.2g}, convergence {convergencecriterion:.2g}')
+                    sys.stdout.write(f'\rIteration {i} , function evaluations {self.functionevals}, convergence criterion {convergencecriterion:.2g}, last diff {self.losshistory[-2]-loss:.2g} \x1b[1K ')
+                log.debug(f'Iteration {i}, loss {loss:.1f}, convergence {convergencecriterion:.2g}, last diff {self.losshistory[-2]-loss:.2g}')
                 
                 if i> numconvergence+10:
                     if np.all(convergencecriterion< self.convergencetolerance):
+                        sys.stdout.write('\n')
                         log.info('Convergence achieved')
                         break
 
