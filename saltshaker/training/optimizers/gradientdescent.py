@@ -262,7 +262,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
             
         for i in range(niter):
             if i%20 == 19:
-                trials=[( reinitialized,*iteration(X, Xprev,loss,sign, rateguess)) for reinitialized,rateguess in [(False,rates), (True,self.initializelearningrates(X)*1e-2)]]
+                trials=[( reinitialized,*iteration(X, Xprev,loss,sign, rateguess)) for reinitialized,rateguess in [(False,rates), (True,iFit*self.initializelearningrates(X)*1e-2)]]
                 log.debug('Experimenting with reinitialization')                
                 reinitialized,X,Xprev,loss,sign,grad,rates = min(trials,key=lambda x: self.lossfunction(x[1],**kwargs) )
                 if reinitialized: log.debug('Reinitialized learning rates')
