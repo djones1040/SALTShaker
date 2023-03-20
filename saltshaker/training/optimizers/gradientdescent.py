@@ -117,12 +117,17 @@ class rpropwithbacktracking(salttrainingoptimizer):
             #First fit with color scatter fixed
             if not np.isinf(X[self.saltobj.iclscat_0]):
                 X[self.saltobj.iclscat_0]=-np.inf
+            
+            fitparams=self.saltobj.iModelParam
+            X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter)
+            
             fitparams=~np.isin(np.arange(self.saltobj.npar),self.saltobj.iclscat)
             X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter)
                         
-            log.info('Fitting color scatter')
             #Fit error model including color scatter
+            log.info('Fitting color scatter')
             X=X.at[self.saltobj.iclscat[-1]].set(-4)
+            
             fitparams=~self.saltobj.iModelParam
             X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter)
             
@@ -166,9 +171,10 @@ class rpropwithbacktracking(salttrainingoptimizer):
         learningrates=np.tile(np.nan,self.saltobj.npar)
         #Parameters I expect to be more or less normal distribution, where the std gives a reasonable size to start learning
         for idx in [self.saltobj.im0,self.saltobj.im1,self.saltobj.imhost, self.saltobj.ix1,self.saltobj.ic,self.saltobj.ixhost
-                ,self.saltobj.imodelerr]:
+                ]:
             
             learningrates[idx]=np.std( X[idx])*.1
+        learningrates[self.saltobj.imodelerr]=np.std( X[self.saltobj.imodelerr])*.1
         #x0 should very fractionally from the initialization
         for idx in [self.saltobj.ix0]:
             learningrates[idx]= .1* X[idx] 
@@ -262,7 +268,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
             
         for i in range(niter):
             if i%20 == 19:
-                trials=[( reinitialized,*iteration(X, Xprev,loss,sign, rateguess)) for reinitialized,rateguess in [(False,rates), (True,self.initializelearningrates(X)*1e-2)]]
+                trials=[( reinitialized,*iteration(X, Xprev,loss,sign, rateguess)) for reinitialized,rateguess in [(False,rates), (True,iFit*self.initializelearningrates(X)*1e-2)]]
                 log.debug('Experimenting with reinitialization')                
                 reinitialized,X,Xprev,loss,sign,grad,rates = min(trials,key=lambda x: self.lossfunction(x[1],**kwargs) )
                 if reinitialized: log.debug('Reinitialized learning rates')
@@ -278,7 +284,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 convergencecriterion= self.losshistory[-numconvergence] - loss if len(self.losshistory)> numconvergence+10 else np.inf
                 #signal.sosfilt(convergencefilt, -np.diff((self.losshistory[-numconvergence:]) ))[-1]
                 if interactive:
-                    sys.stdout.write(f'\rIteration {i} , function evaluations {self.functionevals}, convergence criterion {convergencecriterion:.2g}, last diff {self.losshistory[-2]-loss:.2g} \x1b[1K ')
+                    sys.stdout.write(f'\r \x1b[1K  Iteration {i} , function evaluations {self.functionevals}, convergence criterion {convergencecriterion:.2g}, last diff {self.losshistory[-2]-loss:.2g} ')
                 log.debug(f'Iteration {i}, loss {loss:.1f}, convergence {convergencecriterion:.2g}, last diff {self.losshistory[-2]-loss:.2g}')
                 
                 if i> numconvergence+10:

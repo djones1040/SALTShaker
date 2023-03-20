@@ -579,8 +579,8 @@ class SALTResids:
                 self.iclscat_poly = np.append(self.iclscat_poly,np.where(self.parlist == parname)[0][:-1])        
 
 
-    @partial(jaxoptions, static_argnums=[0,3,4,5],static_argnames= ['dopriors','dospecresids','usesns'],diff_argnum=1,jitdefault=True) 
-    def lsqwrap(self,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None):
+    @partial(jaxoptions, static_argnums=[0,3,4,5,6],static_argnames= ['dopriors','dospecresids','usesns','suppressregularization'],diff_argnum=1,jitdefault=True) 
+    def lsqwrap(self,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None,suppressregularization=False):
         """
         """
         residuals = []
@@ -594,7 +594,12 @@ class SALTResids:
         if dopriors:
             residuals+=[self.priors.priorresids(guess)]
             if self.regularize:
-                residuals+=[func(guess) for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]]  
+                if suppressregularization :
+                    neffreshaped = np.broadcast_to(self.neff[:,np.newaxis],(self.neff.size,self.icomponents.shape[0])).flatten()
+                    suppressionterm=np.nan_to_num(neffreshaped,nan=0,posinf=0,neginf=0)/10
+                else:
+                    suppressionterm=1
+                residuals+=[suppressionterm*func(guess) for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]]  
 
         
         return  jnp.concatenate(residuals)
@@ -696,7 +701,7 @@ class SALTResids:
 
         logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
 
-        jac=self.lsqwrap(X,self.calculatecachedvals(X,target='variances'),diff='sparsejacfwd')
+        jac=self.lsqwrap(X,self.calculatecachedvals(X,target='variances'),suppressregularization=True,diff='sparsejacfwd')
 
         varyingParams=np.isin(self.parlist, ['m0','m1','mhost','cl'])
 

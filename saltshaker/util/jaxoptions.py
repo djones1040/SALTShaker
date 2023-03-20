@@ -36,7 +36,7 @@ def sparsejac(fun,difffunc,argnums, forward ):
         
         matrixproduct = jax.jit( jax.vmap(lambda vec: difffunc(vec,*args,**kwargs)) )
         
-        diffchunksize=20 
+        diffchunksize=100 
         
         
         rangefunc= trange if usetqdm else range
