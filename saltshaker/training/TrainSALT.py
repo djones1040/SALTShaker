@@ -1213,7 +1213,7 @@ config file options can be overwridden at the command line"""
 
         config = configparser.ConfigParser(inline_comment_prefixes='#')
         if not os.path.exists(configfile):
-            raise RuntimeError('Configfile doesn\'t exist!')
+            raise RuntimeError(f'Configfile {configfile} doesn\'t exist!')
         config.read(configfile)
 
         user_parser = salt.add_user_options(usage=self.usagestring,config=config)
