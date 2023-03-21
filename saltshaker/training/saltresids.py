@@ -5,6 +5,7 @@ from saltshaker.util import batching
 from saltshaker.util.jaxoptions import jaxoptions
 from saltshaker.training import init_hsiao
 from saltshaker.training.datamodels import SALTfitcacheSN,modeledtraininglightcurve,modeledtrainingspectrum
+from saltshaker.training import colorlaw
 
 from saltshaker.training.priors import SALTPriors,__priors__
 
@@ -285,18 +286,7 @@ class SALTResids:
         self.waveBinCenters=np.array(
             [(self.wave[np.newaxis,:]*  x ).sum()/x.sum() for x in basisfunctions])
 
-        if self.preintegrate_photometric_passband:
-            colorlawwaveeval=self.waveBinCenters
-        else:
-            colorlawwaveeval=self.wave 
         
-        self.colorlawderiv=np.empty((colorlawwaveeval.size,self.iCL.size))
-        for i in range(self.iCL.size):
-            self.colorlawderiv[:,i]=\
-                SALT2ColorLaw(self.colorwaverange, np.arange(self.iCL.size)==i)(colorlawwaveeval)-\
-                SALT2ColorLaw(self.colorwaverange, np.zeros(self.iCL.size))(colorlawwaveeval)
-
-        self.colorlawzero=SALT2ColorLaw(self.colorwaverange, np.zeros(self.iCL.size))(colorlawwaveeval)
         
         #Find the basis functions evaluated at the centers of the basis functions for use in the regularization derivatives
         regularizationDerivs=[np.zeros((self.phaseRegularizationPoints.size*self.waveRegularizationPoints.size,self.im0.size)) for i in range(4)]
@@ -309,6 +299,15 @@ class SALTResids:
                     dx=derivs[0],dy=derivs[1]).flatten()
         regularizationDerivs=map(sparse.BCOO.fromdense,regularizationDerivs)
         self.componentderiv,self.dcompdphasederiv,self.dcompdwavederiv,self.ddcompdwavedphase =regularizationDerivs
+
+        #Color law initialization
+        if self.preintegrate_photometric_passband:
+            self.wavebasis=self.waveBinCenters
+        else:
+            self.wavebasis=self.wave 
+ 
+        self.colorlawfunction=colorlaw.getcolorlaw(self.colorlaw_function)( self.n_colorpars,
+        self.colorwaverange)
 
 
         self.guessScale=np.ones(self.n_components)
