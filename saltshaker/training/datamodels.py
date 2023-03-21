@@ -1,5 +1,6 @@
 from saltshaker.util.readutils import SALTtrainingSN,SALTtraininglightcurve,SALTtrainingspectrum
 
+
 from sncosmo.salt2utils import SALT2ColorLaw
 
 from scipy.special import factorial
@@ -160,17 +161,17 @@ class modeledtraininglightcurve(modeledtrainingdata):
     __dynamicattributes__= [
         'phase','fluxcal','fluxcalerr',
         'lambdaeff','lambdaeffrest',
-        'colorlawderiv','colorlawzero', 
         'errordesignmat','pcderivsparse',
         'varianceprefactor',
         'clscatderivs',
-        'colorlawderivlambdaeff', 'colorlawzerolambdaeff',
+        'wavebasis',
         'padding',
     ]+__indexattributes__
     __staticattributes__=[
         'preintegratebasis',
         'imodelcorrs_coordinds',
-        'bsplinecoeffshape','errorgridshape','uniqueid'
+        'bsplinecoeffshape','errorgridshape','uniqueid',
+        'colorlawfunction'
     ]
     
     __slots__ = __dynamicattributes__+__staticattributes__
@@ -179,7 +180,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
     'ix0','ic','icoordinates','ipad','phase','fluxcal','fluxcalerr',
         'lambdaeff','lambdaeffrest','errordesignmat','pcderivsparse',
         'varianceprefactor',
-        'clscatderivs','colorlawderivlambdaeff', 'colorlawzerolambdaeff',
+        'clscatderivs',
         'padding','uniqueid'
     }
 
@@ -187,7 +188,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         for attr in lc.__slots__:
             if attr in self.__slots__:
                 setattr(self,attr,getattr(lc,attr))
-
+        
         z = sn.zHelio
         padding=max(0,padding)
         self.padding=padding
@@ -227,16 +228,14 @@ class modeledtraininglightcurve(modeledtrainingdata):
         self.imodelcorrs=np.array(self.imodelcorrs)
         self.imodelerrs=np.array(self.imodelerrs)
         
+        self.wavebasis= residsobj.wavebasis
+        
+        self.colorlawfunction=residsobj.colorlawfunction
         clippedphase=np.clip(self.phase,residsobj.phase.min(),residsobj.phase.max())
 #########################################################################################
         #Evaluating a bunch of quantities used in the flux model
         #Evaluate derivatives of the color law, here assumed to be linear in coefficients  
         #Either evaluate on fine-grained wavelength grid, or at center of spline basis functions      
-        self.colorlawderiv=residsobj.colorlawderiv
-        self.colorlawzero=residsobj.colorlawzero
-        if not self.preintegratebasis:
-            self.colorlawderiv=self.colorlawderiv[waveidxs]
-            self.colorlawzero=self.colorlawzero[waveidxs]
         #Calculate zero point of flux
         dwave=sn.dwave
         fluxfactor=residsobj.fluxfactor[sn.survey][lc.filt]
@@ -275,10 +274,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         
         #Quantities used in computation of model uncertainties
         #Color law derivatives at filter effective wavelength
-        self.colorlawderivlambdaeff=np.array([
-        SALT2ColorLaw(residsobj.colorwaverange, np.arange(self.iCL.size)==i)(np.array([self.lambdaeffrest]))-\
-                SALT2ColorLaw(residsobj.colorwaverange, np.zeros(self.iCL.size))(np.array([self.lambdaeffrest])) for i in range(self.iCL.size)])[:,0]
-        self.colorlawzerolambdaeff = SALT2ColorLaw(residsobj.colorwaverange, np.zeros(self.iCL.size))(np.array([self.lambdaeffrest]))[0]
+
         #Prefactor for variance
         self.varianceprefactor=fluxfactor*(pbspl.sum())*dwave* _SCALE_FACTOR*sn.mwextcurveint(self.lambdaeff) /(1+z)
         
@@ -317,9 +313,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         fluxcoeffs=jnp.dot(coordinates,pars.components)*pars.x0
         
         #Evaluate color law at the wavelength basis centers
-        colorlaw=jnp.dot(self.colorlawderiv,pars.CL)+self.colorlawzero
-        #Exponentiate and multiply by color
-        colorexp= 10. ** (  -0.4*colorlaw* pars.c)
+        colorexp= 10. ** (  -0.4*self.colorlawfunction(pars.c, pars.CL,self.wavebasis))
         if self.preintegratebasis:
             #Redden flux coefficients
             fluxcoeffsreddened= (colorexp[np.newaxis,:]*fluxcoeffs.reshape( self.bsplinecoeffshape)).flatten()
@@ -334,10 +328,8 @@ class modeledtraininglightcurve(modeledtrainingdata):
         if not isinstance(pars,SALTparameters):
             pars=SALTparameters(self,pars)
 
-        #Evaluate color law at the wavelength basis centers
-        colorlaw=jnp.dot(self.colorlawderivlambdaeff,pars.CL)+self.colorlawzerolambdaeff
         #Exponentiate and multiply by color
-        colorexp= 10. ** (  -0.4*colorlaw* pars.c)
+        colorexp= 10. ** (  -0.4*self.colorlawfunction(pars.c, pars.CL,self.lambdaeffrest))
 
           #Evaluate model uncertainty
 
