@@ -583,6 +583,9 @@ class SALTResids:
     def lsqwrap(self,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None,suppressregularization=False):
         """
         """
+        #if suppressregularization:
+        #    self.neff[self.neff<self.neffmax]=10
+
         residuals = []
         if not (usesns is  None): raise NotImplementedError('Have not implemented a restricted set of sne')
         lcuncertainties,specuncertainties=uncertainties
@@ -597,6 +600,7 @@ class SALTResids:
                 if suppressregularization :
                     neffreshaped = np.broadcast_to(self.neff[:,np.newaxis],(self.neff.size,self.icomponents.shape[0])).flatten()
                     suppressionterm=np.nan_to_num(neffreshaped,nan=0,posinf=0,neginf=0)/10
+                    #suppressionterm=1
                 else:
                     suppressionterm=1
                 residuals+=[suppressionterm*func(guess) for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]]  
