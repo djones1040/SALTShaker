@@ -695,8 +695,6 @@ class SALTResids:
     def estimateparametererrorsfromhessian(self,X):
         """Approximate Hessian by jacobian times own transpose to determine uncertainties in flux surfaces"""
         log.info("determining M0/M1 errors by approximated Hessian")
-        import time
-        tstart = time.time()
 
         logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
 
