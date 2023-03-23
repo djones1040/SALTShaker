@@ -334,7 +334,8 @@ class modeledtraininglightcurve(modeledtrainingdata):
           #Evaluate model uncertainty
 
         coordinates=jnp.concatenate((jnp.ones(1), pars.coordinates ))
-        errorsurfaces=jnp.dot(coordinates,pars.modelerrs)**2
+        
+        errorsurfaces=((coordinates[:,np.newaxis]*pars.modelerrs)**2 ).sum(axis=0)
         for (i,j),correlation in zip(self.imodelcorrs_coordinds,pars.modelcorrs):
             errorsurfaces= errorsurfaces+2 *correlation*coordinates[i]*coordinates[j]* pars.modelerrs[i]*pars.modelerrs[j]
 
@@ -521,7 +522,8 @@ class modeledtrainingspectrum(modeledtrainingdata):
         recalexp=jnp.exp(recalterm)
 
         #Evaluate model uncertainty
-        errorsurfaces=jnp.dot(coordinates,errs)**2
+        #errorsurfaces=(coordinates,errs)**2
+        errorsurfaces=((coordinates[:,np.newaxis]*errs)**2 ).sum(axis=0)
         for (i,j),correlation in zip(self.imodelcorrs_coordinds,pars.modelcorrs):
             errorsurfaces= errorsurfaces+2*correlation*coordinates[i]*coordinates[j]* errs[i]*errs[j]
         errorsurfaces=self.errordesignmat @ errorsurfaces

@@ -28,7 +28,7 @@ class SALT2ColorLaw:
         self.l_lo = (wave_lo - SALT2CL_B) / SALT2CL_V_MINUS_B
         self.l_hi = (wave_hi - SALT2CL_B) / SALT2CL_V_MINUS_B
 
-        self.coeffs = jnp.concatenate((coeffs[::-1],jnp.array([1.0-jnp.sum(coeffs)]),jnp.array([0.])))
+        self.coeffs = jnp.concatenate((coeffs[::-1],jnp.array([1.0-jnp.sum(coeffs),0.])))
         self.ncoeffs = len(self.coeffs)
 
         # precompute value of
