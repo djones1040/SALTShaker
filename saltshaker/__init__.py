@@ -1,6 +1,8 @@
 from . import *
 import logging
 
+__version__='2.0.0dev0'
+
 logging.captureWarnings(True)
 for logName in ['py.warnings','salt3.default']:
 	logger=logging.getLogger(logName)

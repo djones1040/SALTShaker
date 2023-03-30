@@ -61,67 +61,6 @@ gnfitresult=namedtuple('gnfitresult',['lsmrresult','postGN','gaussNewtonStep','r
 lsmrresult=namedtuple('lsmrresult',['precondstep','stopsignal','itn','normr','normar','norma','conda','normx'] )
 
 
-def getgaussianfilterdesignmatrix(shape,smoothing):
-    windowsize=10+shape%2
-    window=gaussian_filter1d(1.*(np.arange(windowsize)==windowsize//2),smoothing)
-    while ~(np.any(window==0)):
-        windowsize=2*windowsize+shape%2
-        window=gaussian_filter1d(1.*(np.arange(windowsize)==windowsize//2),smoothing)
-    window=window[window>0]
-
-    diagonals=[]
-    offsets=list(range(-(window.size//2),window.size//2+1))
-    for i,offset in enumerate(offsets):
-        diagonals+=[np.tile(window[i],shape-np.abs(offset))]
-    design=sparse.diags(diagonals,offsets).tocsr()
-    for i in range(window.size//2+1):
-        design[i,:window.size//2+1]=gaussian_filter1d(1.*(np.arange(design.shape[0])== i ),5)[:window.size//2+1]
-        design[-i-1,-(window.size//2+1) : ]=gaussian_filter1d(1.*(np.arange(design.shape[0])== i ),5)[:window.size//2+1][::-1]    
-    return design
-
-
-def ridders(f,central,h,maxn,tol):
-    """Iterative method to evaluate the second derivative of a function f based on a stepsize h and a relative tolerance tol"""
-    lookup={}
-    def A(n,m):
-        if (n,m) in lookup: return lookup[n,m]
-        if n==1:
-            result=(f((h/2**(m-1)))-2*central+f((-h/2**(m-1))))/(h/2**(m-1))**2
-        elif n<1:
-            return 0
-        else:
-            result =(4**(n-1)*A(n-1,m+1)-A(n-1,m))/(4**(n-1)-1)
-        lookup[(n,m)]=result
-        return result
-    def AwithErr(n):
-        diff=A(n,1)-A(n-1,1)
-        return A(n,1),  norm(diff)/ min(norm(A(n,1)),norm(A(n-1,1)))
-    best=AwithErr(2)
-    result,err=best
-    prev=best[1]
-    diverging=0
-    errs=[prev]
-    for n in range(3,maxn+1):
-        if err<tol:
-            log.debug(f'Second directional derivative found to tolerance {tol} after {n} iterations')
-            best= result,err
-            break
-        elif err>prev:
-            diverging+=1
-            if diverging>2:
-                log.warning(f'Second directional derivative diverging after {n} iterations, tolerance is {best[1]}')
-                break
-        else:
-            diverging=0
-            if err<best[1]:
-                best=result,err
-                diverging=0
-        result,err=AwithErr(n)
-        errs+=[err]
-        prev=err
-    return best
-
-
 
 class gaussnewton(salttrainingoptimizer):
 
@@ -264,10 +203,6 @@ class gaussnewton(salttrainingoptimizer):
             return temp(*args,**kwargs)
 
         successful=True
-        successful=successful&wrapaddingargument(config,'iodata','fix_salt2modelpars',  type=boolean_string,
-                                                help="""if set, fix M0/M1 for wavelength/phase range of original SALT2 model (default=%(default)s)""")
-        successful=successful&wrapaddingargument(config,'iodata','fix_salt2components',  type=boolean_string,
-                                                help="""if set, fix M0/M1 for *all* wavelength/phases (default=%(default)s)""")
         successful=successful&wrapaddingargument(config,'trainparams','fit_model_err',  type=boolean_string,
                                                 help='fit for model error if set (default=%(default)s)')
         successful=successful&wrapaddingargument(config,'trainparams','fit_cdisp_only', type=boolean_string,
@@ -389,84 +324,7 @@ class gaussnewton(salttrainingoptimizer):
         return X 
 
 
-    def estimatesparametererrors(self,X):
-        """Approximate Hessian by jacobian times own transpose to determine uncertainties in flux surfaces"""
-        log.info("determining M0/M1 errors by approximated Hessian")
-        import time
-        tstart = time.time()
-
-        varyingParams=self.fitOptions['components'][1]|self.fitOptions['colorlaw'][1]
-        if self.fix_salt2components:
-            # generally I think we want to get real errors from our training sample
-            # even if these components are fixed in the training
-            varyingParams[self.im0]=True
-            varyingParams[self.im1]=True
         
-        logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
-        if suppressregularization:
-            self.neff[self.neff<self.neffMax]=10
-        
-        residuals,jac=self.lsqwrap(X,{},varyingParams,True,doSpecResids=True)
-
-        self.updateEffectivePoints(X)
-        #Simple preconditioning of the jacobian before attempting to invert
-        precondition=sparse.diags(1/np.sqrt(np.asarray((jac.power(2)).sum(axis=0))),[0])
-        precondjac=(jac*precondition)
-        
-        #Define the matrix sigma^-1=J^T J
-        square=ensurepositivedefinite((precondjac.T*precondjac).toarray())
-        
-        #Inverting cholesky matrix for speed
-        L=linalg.cholesky(square,lower=True)
-        invL=(linalg.solve_triangular(L,np.diag(np.ones(L.shape[0])),lower=True))
-        #Turning spline_derivs into a sparse matrix for speed
-        chunkindex,chunksize=0,10
-        M0dataerr      = np.empty((self.phaseout.size,self.waveout.size))
-        cov_M0_M1_data = np.empty((self.phaseout.size,self.waveout.size))
-        M1dataerr      = np.empty((self.phaseout.size,self.waveout.size))
-        Mhostdataerr      = np.empty((self.phaseout.size,self.waveout.size))
-        cov_M0_Mhost_data = np.empty((self.phaseout.size,self.waveout.size))
-        
-        for chunkindex in np.arange(self.waveout.size)[::chunksize]:
-            varyparlist= self.parlist[varyingParams]
-            spline_derivs = np.empty([self.phaseout.size, min(self.waveout.size-chunkindex, chunksize),self.im0.size])
-            for i in range(self.im0.size):
-                if self.bsorder == 0: continue
-                spline_derivs[:,:,i]=bisplev(self.phaseout,self.waveout[chunkindex:chunkindex+chunksize],(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
-            spline2d=sparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))[:,varyparlist=='m0']
-        
-            #Smooth things a bit, since this is supposed to be for broadband photometry
-            if smoothingfactor>0:
-                smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
-                spline2d=smoothingmatrix*spline2d
-            #Uncorrelated effect of parameter uncertainties on M0 and M1
-            m0pulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='m0'].astype('float32')*spline2d.T.astype('float32')
-            m1pulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='m1'].astype('float32')*spline2d.T.astype('float32')
-            if self.host_component:
-                mhostpulls=invL.astype('float32')*precondition.tocsr()[:,varyparlist=='mhost'].astype('float32')*spline2d.T.astype('float32')
-                
-            mask=np.zeros((self.phaseout.size,self.waveout.size),dtype=bool)
-            mask[:,chunkindex:chunkindex+chunksize]=True        
-            M0dataerr[mask] =  np.sqrt((m0pulls**2     ).sum(axis=0))
-            cov_M0_M1_data[mask] =     (m0pulls*m1pulls).sum(axis=0)
-            M1dataerr[mask] =  np.sqrt((m1pulls**2     ).sum(axis=0))
-            if self.host_component:
-                Mhostdataerr[mask] =  np.sqrt((mhostpulls**2     ).sum(axis=0))
-                # should we do host covariances?
-                cov_M0_Mhost_data[mask] =     (m0pulls*mhostpulls).sum(axis=0)
-                
-        correlation=cov_M0_M1_data/(M0dataerr*M1dataerr)
-        correlation[np.isnan(correlation)]=0
-        if self.host_component: M0,M1,Mhost=self.SALTModel(X)
-        else: M0,M1=self.SALTModel(X)
-        M0dataerr=np.clip(M0dataerr,0,np.abs(M0).max()*2)
-        M1dataerr=np.clip(M1dataerr,0,np.abs(M1).max()*2)
-        if self.host_component:
-            Mhostdataerr=np.clip(Mhostdataerr,0,np.abs(Mhost).max()*2)
-        correlation=np.clip(correlation,-1,1)
-        cov_M0_M1_data=correlation*(M0dataerr*M1dataerr)
-
-        return M0dataerr, M1dataerr, Mhostdataerr, cov_M0_M1_data, cov_M0_Mhost_data
         
     
     def fitcolorscatter(self,X,fitcolorlaw=False,rescaleerrs=True,maxiter=2000):
