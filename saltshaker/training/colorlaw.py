@@ -64,11 +64,12 @@ def k_Calzetti(wav,RV):
     '''
 
     # sanity check
-    Cal_wav_max = 22000
-    Cal_wav_min = 1200
-    if not (wav.min() >= Cal_wav_min) & (wav.max() <= Cal_wav_max):
-        msg_err = f'wav range = ({wav.min()}, {wav.max()}) outside the defined Calzetti CL range of {Cal_wav_min} < wav < {Cal_wav_max}'
-        assert False, msg_err
+    # DJ removed because jax is annoying
+    #Cal_wav_max = 22000
+    #Cal_wav_min = 1200
+    #if not (wav.min() >= Cal_wav_min) & (wav.max() <= Cal_wav_max):
+    #    msg_err = f'wav range = ({wav.min()}, {wav.max()}) outside the defined Calzetti CL range of {Cal_wav_min} < wav < {Cal_wav_max}'
+    #    assert False, msg_err
         
     # function is defined for wav in um
     wav_um  = wav/1e4 
@@ -142,7 +143,6 @@ class colorlaw_intrinsic_plus_dust:
         
     def __call__(self, color,colorlawparams,wave):
 
-        constant = -0.4 * np.log(10)
         c_g = self.c_coeffs[0] + self.c_coeffs[1]*color + self.c_coeffs[2]*color**2
         c_i = color - c_g
 

@@ -582,33 +582,40 @@ class SALTResids:
     def lsqwrap(self,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None,suppressregularization=False):
         """
         """
-        #if suppressregularization:
-        #    self.neff[self.neff<self.neffmax]=10
-
         residuals = []
         if not (usesns is  None): raise NotImplementedError('Have not implemented a restricted set of sne')
         lcuncertainties,specuncertainties=uncertainties
         residuals+=[ self.batchedphotresiduals(guess,lcuncertainties,fixuncertainties=True) ]
 
+        #suppressedneff = jnp.select([self.neff>=self.neffmax,self.neff<self.neffmax],[self.neff,jnp.tile(10,self.neff.shape)]))
+        
         if dospecresids:
             residuals+=[ self.batchedspecresiduals(guess,specuncertainties,fixuncertainties=True) ]
 
         if dopriors:
             residuals+=[self.priors.priorresids(guess)]
             if self.regularize:
-                if suppressregularization :
-                    neffreshaped = np.broadcast_to(self.neff[:,np.newaxis],(self.neff.size,self.icomponents.shape[0])).flatten()
-                    suppressionterm=np.nan_to_num(neffreshaped,nan=0,posinf=0,neginf=0)/10
-                    #suppressionterm=1
+                #if suppressregularization :
+                #    neffreshaped = np.broadcast_to(self.neff[:,np.newaxis],(self.neff.size,self.icomponents.shape[0])).flatten()
+                #    suppressionterm=np.nan_to_num(neffreshaped,nan=0,posinf=0,neginf=0)/10
+                #else:
+                #    suppressionterm=1
+                #residuals+=[suppressionterm*func(guess) for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]]  
+                if suppressregularization:
+                    residuals+=[
+                        func(guess,self.suppressedneff) \
+                                for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]]
                 else:
-                    suppressionterm=1
-                residuals+=[suppressionterm*func(guess) for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]]  
-
+                    residuals+=[func(guess,self.neff) \
+                                     for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]]
+                ###np.array([10]*len(self.neff))])) \
         
         return  jnp.concatenate(residuals)
     
     def lsqwrap_sources(self,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None)   :
-        numresids= lambda func: jax.eval_shape(func,guess).shape[0] 
+        numresids= lambda func: jax.eval_shape(func,guess).shape[0]
+        numresids_reg= lambda func: jax.eval_shape(func,guess,self.neff).shape[0]
+        
         sources=[]
         sources+=['phot']* numresids(lambda x: self.batchedphotresiduals(x,uncertainties[0],fixuncertainties=True) )
         if dospecresids: sources+=[f'spec']* numresids(lambda x: self.batchedspecresiduals(x,uncertainties[1],fixuncertainties=True) )
@@ -616,7 +623,7 @@ class SALTResids:
         if dopriors: 
             sources+=[f'priors']*numresids(self.priors.priorresids)
             for label,func in [('reg_dyad',self.dyadicRegularization), ('reg_phase',self.phaseGradientRegularization), ('reg_wave',self.waveGradientRegularization)] :
-                sources+=[label]*numresids(func)
+                sources+=[label]*numresids_reg(func)
         return sources
 
       
@@ -674,7 +681,7 @@ class SALTResids:
             loglike+=self.priors.priorloglike(guess)
                 
             if self.regularize:
-                loglike+=sum([-(func(guess)**2).sum()/2. for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]] )
+                loglike+=sum([-(func(guess,self.neff)**2).sum()/2. for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]] )
         return loglike
 
 
@@ -1022,11 +1029,11 @@ class SALTResids:
 
         self.neff=self.neffRaw.copy()
         self.neff[self.neff>self.neffmax]=np.inf
-
+        
         if not np.any(np.isinf(self.neff)): log.warning('Regularization is being applied to the entire phase/wavelength space: consider lowering neffmax (currently {:.2e})'.format(self.neffmax))
         
         self.neff=np.clip(self.neff,self.nefffloor,None).flatten()
-
+        self.suppressedneff = np.select([self.neff>=self.neffmax,self.neff<self.neffmax],[np.tile(10,self.neff.shape),np.tile(10,self.neff.shape)]) #[self.neff,np.tile(10,self.neff.shape)])
         
     def plotEffectivePoints(self,phases=None,output=None):
         import matplotlib.pyplot as plt
@@ -1055,7 +1062,7 @@ class SALTResids:
         plt.clf()
         
     
-    def dyadicRegularization(self,x):
+    def dyadicRegularization(self,x, neff):
         coeffs=x[self.icomponents]
 
         fluxes= self.componentderiv @ coeffs.T
@@ -1063,26 +1070,29 @@ class SALTResids:
         dfluxdphase=self.dcompdphasederiv @ coeffs.T
         d2fluxdphasedwave=self.ddcompdwavedphase @ coeffs.T
 
+        #jax.debug.print('hi')
+        #jax.debug.print(f"{self.neff[0]} {neff[0]} {jnp.shape(neff)}")
+        #jax.debug.breakpoint()
         #Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
         normalization=jnp.sqrt( self.regulardyad*self.relativeregularizationweights/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1))**2.)
         #0 if model is locally separable in phase and wavelength i.e. flux=g(phase)* h(wavelength) for arbitrary functions g and h
         numerator=(dfluxdphase *dfluxdwave -d2fluxdphasedwave *fluxes )
-        return (normalization[np.newaxis,:]* (numerator / (  self.neff[:,np.newaxis] ))).flatten()  
-    
+        return (normalization[np.newaxis,:]* (numerator / (  neff[:,np.newaxis] ))).flatten()  
+    #resids += [normalization* (numerator / (scale[i]**2 * self.neff)).flatten()]
   
-    def phaseGradientRegularization(self, x):
+    def phaseGradientRegularization(self, x, neff):
         coeffs=x[self.icomponents]
 
         dfluxdphase=self.dcompdphasederiv @ coeffs.T
         normalization=jnp.sqrt(self.regulargradientphase *self.relativeregularizationweights /( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
-        return (normalization[np.newaxis,:]* ( dfluxdphase / self.neff[:,np.newaxis]  )).flatten()
+        return (normalization[np.newaxis,:]* ( dfluxdphase / neff[:,np.newaxis]  )).flatten()
 
 
-    def waveGradientRegularization(self, x):
+    def waveGradientRegularization(self, x, neff):
         coeffs=x[self.icomponents]
 
         dfluxdwave=self.dcompdwavederiv @ coeffs.T
         normalization=jnp.sqrt(self.regulargradientwave *self.relativeregularizationweights/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
 
-        return  (normalization[np.newaxis,:]* ( dfluxdwave / self.neff[:,np.newaxis] )).flatten()
+        return  (normalization[np.newaxis,:]* ( dfluxdwave / neff[:,np.newaxis] )).flatten()
 
