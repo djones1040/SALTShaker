@@ -1,4 +1,4 @@
-import numpy as np
+##import numpy as np
 from scipy.interpolate import interp1d
 from jax import numpy as jnp
 
@@ -53,6 +53,73 @@ class SALT2ColorLaw:
              jnp.polyval(self.coeffs, l),
              self.p_hi + self.pprime_hi * (l - self.l_hi)])
 
+def k_Calzetti(wav,RV):
+    ''' Calzetti model (Calzetti et al. 2000)
+    https://ui.adsabs.harvard.edu/abs/2000ApJ...533..682C/abstract
+    inputs:
+        wav: wavelength to be evaluated (in Angstroms)
+        RV: slope
+    output:
+        kCal: A numpy array with ratio of attenuation A_lambda/E(B-V)
+    '''
+
+    # sanity check
+    Cal_wav_max = 22000
+    Cal_wav_min = 1200
+    if not (wav.min() >= Cal_wav_min) & (wav.max() <= Cal_wav_max):
+        msg_err = f'wav range = ({wav.min()}, {wav.max()}) outside the defined Calzetti CL range of {Cal_wav_min} < wav < {Cal_wav_max}'
+        assert False, msg_err
+        
+    # function is defined for wav in um
+    wav_um  = wav/1e4 
+    wav_transition_um = 6300/1e4
+    
+    # evaluate polynomial
+    kCal = jnp.select(
+        [wav_um >= wav_transition_um/1e4,wav_um < wav_transition_um/1e4],
+        [2.659 * (-1.857 + 1.040/wav_um) + RV,
+         2.659 * (-2.156 + 1.509/wav_um - 0.198/wav_um**2 + 0.011/wav_um**3) + RV])
+    
+    return kCal
+
+def k_Salim(wave,RV):
+    raise NotImplementedError
+    
+class GalacticDustLaw:
+    def __init__(self,
+                 RV=3.1,dust_model='Calzetti'):
+
+        self.RV = RV
+
+        # select galactic model
+        gCL_MODELS = {
+            'Calzetti':k_Calzetti,
+            'Salim':k_Salim
+        }
+        self.gCL_model = gCL_MODELS[dust_model]
+
+    def __call__(self,wave):
+        ''' Designed to be used for SALT3 color law model
+        inputs:
+            wave: array or scalar of wavelength to be evaluated (in Angstrom)
+            RV: R_V (attenuation slope)
+        output:
+            color law values
+        '''
+
+        # handle both scalar and array
+        wave_arr = jnp.atleast_1d(wave)
+
+        # evaluate Calzetti CL at wav, B, and V
+        k_lambda = self.gCL_model(wave_arr,self.RV)
+        k_B = self.gCL_model(jnp.asarray([SALT2CL_B]),self.RV)
+        k_V = self.gCL_model(jnp.asarray([SALT2CL_V]),self.RV)
+
+        # rescale so that CL(B)=0, CL(V)=-1
+        # convert back to scalar if wav is scalar
+        CL = jnp.squeeze((k_lambda - k_B) / (k_B - k_V))
+
+        return CL
 
 @colorlaw
 class colorlaw_default:
@@ -64,10 +131,28 @@ class colorlaw_default:
     def __call__(self, color,colorlawparams,wave):
         return color*(SALT2ColorLaw(self.colorwaverange, colorlawparams)(wave))
     
-        
+
 @colorlaw
 class colorlaw_intrinsic_plus_dust:
-    pass
+
+    def __init__(self,n_colorpars,colorwaverange):
+        self.n_colorpars=n_colorpars
+        self.colorwaverange=colorwaverange
+        self.c_coeffs=[0.0727, 0.57, 1.58]
+        
+    def __call__(self, color,colorlawparams,wave):
+
+        constant = -0.4 * np.log(10)
+        c_g = self.c_coeffs[0] + self.c_coeffs[1]*color + self.c_coeffs[2]*color**2
+        c_i = color - c_g
+
+        # compute colorlaw for each component
+        iCL = SALT2ColorLaw(self.colorwaverange, colorlawparams)(wave)
+        gCL = GalacticDustLaw()(wave)
+
+        # add two
+        return c_i * iCL +  c_g * gCL
+
 
 @colorlaw    
 class colorlaw_spare:
