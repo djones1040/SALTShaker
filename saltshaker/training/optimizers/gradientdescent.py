@@ -119,7 +119,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 X[self.saltobj.iclscat_0]=-np.inf
             
             fitparams=self.saltobj.iModelParam
-            X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter)
+            X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=100) #self.gradientmaxiter)
             
             fitparams=~np.isin(np.arange(self.saltobj.npar),self.saltobj.iclscat)
             X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter)
