@@ -589,7 +589,6 @@ class SALTResids:
         lcuncertainties,specuncertainties=uncertainties
         residuals+=[ self.batchedphotresiduals(guess,lcuncertainties,fixuncertainties=True) ]
 
-        #suppressedneff = jnp.select([self.neff>=self.neffmax,self.neff<self.neffmax],[self.neff,jnp.tile(10,self.neff.shape)]))
         
         if dospecresids:
             residuals+=[ self.batchedspecresiduals(guess,specuncertainties,fixuncertainties=True) ]
@@ -597,12 +596,6 @@ class SALTResids:
         if dopriors:
             residuals+=[self.priors.priorresids(guess)]
             if self.regularize:
-                #if suppressregularization :
-                #    neffreshaped = np.broadcast_to(self.neff[:,np.newaxis],(self.neff.size,self.icomponents.shape[0])).flatten()
-                #    suppressionterm=np.nan_to_num(neffreshaped,nan=0,posinf=0,neginf=0)/10
-                #else:
-                #    suppressionterm=1
-                #residuals+=[suppressionterm*func(guess) for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]]  
                 if suppressregularization:
                     residuals+=[
                         func(guess,self.suppressedneff) \
@@ -610,7 +603,6 @@ class SALTResids:
                 else:
                     residuals+=[func(guess,self.neff) \
                                      for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]]
-                ###np.array([10]*len(self.neff))])) \
         
         return  jnp.concatenate(residuals)
     
@@ -1072,15 +1064,11 @@ class SALTResids:
         dfluxdphase=self.dcompdphasederiv @ coeffs.T
         d2fluxdphasedwave=self.ddcompdwavedphase @ coeffs.T
 
-        #jax.debug.print('hi')
-        #jax.debug.print(f"{self.neff[0]} {neff[0]} {jnp.shape(neff)}")
-        #jax.debug.breakpoint()
         #Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
         normalization=jnp.sqrt( self.regulardyad*self.relativeregularizationweights/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1))**2.)
         #0 if model is locally separable in phase and wavelength i.e. flux=g(phase)* h(wavelength) for arbitrary functions g and h
         numerator=(dfluxdphase *dfluxdwave -d2fluxdphasedwave *fluxes )
         return (normalization[np.newaxis,:]* (numerator / (  neff[:,np.newaxis] ))).flatten()  
-    #resids += [normalization* (numerator / (scale[i]**2 * self.neff)).flatten()]
   
     def phaseGradientRegularization(self, x, neff):
         coeffs=x[self.icomponents]
