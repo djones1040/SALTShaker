@@ -15,15 +15,19 @@ from saltshaker.training.init_hsiao import synphotB
 from sncosmo.salt2utils import SALT2ColorLaw
 import os
 
+
+filtdict = {'SDSS':['sdss%s'%s for s in	 'ugri']+['desz'],'Bessell':['bessell%s'%s +('x' if s=='u' else '')for s in	 'ubvri'],
+                'ZTF': ['ztf%s'%s for s in 'gri'],
+                                'CSP':['csp%s'%s for s in ['ys','js']]}
+                
 plt.rcParams['font.size'] = 10
 _SCALE_FACTOR = 1e-12
 
-def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
+def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',comparison='salt3',
 		 m0file='salt3_template_0.dat',
 		 m1file='salt3_template_1.dat',
 		 clfile='salt3_color_correction.dat',
 		 cdfile='salt3_color_dispersion.dat',
-		 errscalefile='salt3_lc_dispersion_scaling.dat',
 		 lcrv00file='salt3_lc_variance_0.dat',
 		 lcrv11file='salt3_lc_variance_1.dat',
 		 lcrv01file='salt3_lc_covariance_01.dat'):
@@ -32,17 +36,15 @@ def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
 
 
 
-	filtdict = {'SDSS':['sdss%s'%s for s in	 'ugri']+['desz'],'Bessell':['bessell%s'%s +('x' if s=='u' else '')for s in	 'ubvri'],
-                'ZTF': ['ztf%s'%s for s in 'gri']}
+	
 	filters=filtdict[filterset]
 	
 	zpsys='AB'
 	
-	salt2model = sncosmo.Model(source='salt2')
-	salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,
+	salt2model = sncosmo.Model(source=comparison)
+	salt3 = sncosmo.SALT3Source(modeldir=salt3dir,m0file=m0file,
 								m1file=m1file,
 								clfile=clfile,cdfile=cdfile,
-								errscalefile=errscalefile,
 								lcrv00file=lcrv00file,
 								lcrv11file=lcrv11file,
 								lcrv01file=lcrv01file)
@@ -134,19 +136,18 @@ def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',
 	m0axes[0].set_ylabel('M0 Flux')
 	m1axes[0].set_ylabel('M1 Flux')
 	fig.text(0.5,0.04,'Time since peak (days)',ha='center')
-	fig.legend(salt2handle+salt3handle,['SALT2.JLA','SALT3.K21'],loc=(.825,.75))
+	fig.legend(salt2handle+salt3handle,['SALT3.K21' if comparison=='salt3' else comparison,'SALT3 (trained)'],loc=(.825,.75))
 	#axes[0].legend()
 
 	plt.savefig(outfile)
 	plt.close(fig)
 
 def overPlotSynthPhotByComponentCustom(
-		outfile,salt3dir,filterset='SDSS',
+		outfile,salt3dir,filterset='SDSS',comparison='salt2',
 		m0file='salt3_template_0.dat',
 		m1file='salt3_template_1.dat',
 		clfile='salt3_color_correction.dat',
 		cdfile='salt3_color_dispersion.dat',
-		errscalefile='salt3_lc_dispersion_scaling.dat',
 		lcrv00file='salt3_lc_variance_0.dat',
 		lcrv11file='salt3_lc_variance_1.dat',
 		lcrv01file='salt3_lc_covariance_01.dat',
@@ -182,16 +183,14 @@ def overPlotSynthPhotByComponentCustom(
 	int1ds2m1 = interp1d(salt2phase,salt2m1flux,axis=0,fill_value='extrapolate')
 	
 
-	filtdict = {'SDSS':['sdss%s'%s for s in	 'ugri']+['desz'],'Bessell':['bessell%s'%s +('x' if s=='u' else '')for s in	 'ubvri']}
 	filters=filtdict[filterset]
 	
 	zpsys='AB'
 	
-	salt2model = sncosmo.Model(source='salt2')
-	salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,
+	salt2model = sncosmo.Model(source=comparison)
+	salt3 = sncosmo.SALT3Source(modeldir=salt3dir,m0file=m0file,
 								m1file=m1file,
 								clfile=clfile,cdfile=cdfile,
-								errscalefile=errscalefile,
 								lcrv00file=lcrv00file,
 								lcrv11file=lcrv11file,
 								lcrv01file=lcrv01file)
@@ -272,12 +271,11 @@ def overPlotSynthPhotByComponentCustom(
 	plt.close(fig)
 	
 
-def plotSynthPhotOverStretchRange(outfile,salt3dir,filterset='SDSS',
+def plotSynthPhotOverStretchRange(outfile,salt3dir,filterset='SDSS',comparison='salt2',
 		 m0file='salt3_template_0.dat',
 		 m1file='salt3_template_1.dat',
 		 clfile='salt3_color_correction.dat',
 		 cdfile='salt3_color_dispersion.dat',
-		 errscalefile='salt3_lc_dispersion_scaling.dat',
 		 lcrv00file='salt3_lc_variance_0.dat',
 		 lcrv11file='salt3_lc_variance_1.dat',
 		 lcrv01file='salt3_lc_covariance_01.dat',includeSALT2=True):
@@ -286,17 +284,14 @@ def plotSynthPhotOverStretchRange(outfile,salt3dir,filterset='SDSS',
 
 
 
-	filtdict = {'SDSS':['sdss%s'%s for s in	 'ugri']+['desz'],'Bessell':['bessell%s'%s +('x' if s=='u' else '')for s in	'ubvri'],
-                'ZTF': ['ztf%s'%s for s in 'gri']}
 	filters=filtdict[filterset]
 	
 	zpsys='AB'
 	
-	salt2model = sncosmo.Model(source='salt2')
-	salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,
+	salt2model = sncosmo.Model(source=comparison)
+	salt3 = sncosmo.SALT3Source(modeldir=salt3dir,m0file=m0file,
 								m1file=m1file,
 								clfile=clfile,cdfile=cdfile,
-								errscalefile=errscalefile,
 								lcrv00file=lcrv00file,
 								lcrv11file=lcrv11file,
 								lcrv01file=lcrv01file)
@@ -363,12 +358,11 @@ def plotSynthPhotOverStretchRange(outfile,salt3dir,filterset='SDSS',
 	plt.close(fig)
 
 def plotSynthPhotOverStretchRangeNIR(
-        outfile,salt3dir,filterset='CSP',
+        outfile,salt3dir,filterset='CSP',comparison='salt2',
         m0file='salt3_template_0.dat',
         m1file='salt3_template_1.dat',
 		clfile='salt3_color_correction.dat',
 		cdfile='salt3_color_dispersion.dat',
-		errscalefile='salt3_lc_dispersion_scaling.dat',
 		lcrv00file='salt3_lc_variance_0.dat',
 		lcrv11file='salt3_lc_variance_1.dat',
 		lcrv01file='salt3_lc_covariance_01.dat',includeSALT2=False):
@@ -377,16 +371,13 @@ def plotSynthPhotOverStretchRangeNIR(
 
 
 
-	filtdict = {'SDSS':['sdss%s'%s for s in	 'ugri']+['desz'],'Bessell':['bessell%s'%s +('x' if s=='u' else '')for s in	'ubvri'],
-                'CSP':['csp%s'%s for s in ['ys','js']]}
 	filters=filtdict[filterset]
 	
 	zpsys='AB'
 	
-	salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,
+	salt3 = sncosmo.SALT3Source(modeldir=salt3dir,m0file=m0file,
 								m1file=m1file,
 								clfile=clfile,cdfile=cdfile,
-								errscalefile=errscalefile,
 								lcrv00file=lcrv00file,
 								lcrv11file=lcrv11file,
 								lcrv01file=lcrv01file)

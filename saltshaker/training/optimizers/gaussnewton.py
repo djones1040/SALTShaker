@@ -44,6 +44,7 @@ import iminuit,warnings
 import logging
 log=logging.getLogger(__name__)
 
+from functools import reduce
 
 from saltshaker.util.inpynb import in_ipynb
 
@@ -68,6 +69,11 @@ class gaussnewton(salttrainingoptimizer):
     
     def __init__(self,guess,saltresids,outputdir,options):
         super().__init__(guess,saltresids,outputdir,options)
+        for key in self.configoptionnames:
+            self.__dict__[key]=options.__dict__[key]
+        self.modelobj=saltresids
+        self.outputdir=outputdir
+
         self.debug=False
         self.lsqfit = False
             
@@ -377,10 +383,13 @@ class gaussnewton(salttrainingoptimizer):
         return X
 
     def minuitoptimize(self,X,includePars,rescaleerrs=False,tol=0.1,*args,**kwargs):
+        
         X=X.copy()
         if includePars.dtype==bool:
+            iFit=iFit & ~self.ifixedparams
             includePars= np.where(includePars)[0]
-            
+        else:
+            includePars=np.isin(iFit,np.where(~self.ifixedparams)[0])
         if not rescaleerrs:
             def fn(Y):
                 
@@ -722,7 +731,7 @@ class gaussnewton(salttrainingoptimizer):
     def process_fit(self,initvals,iFit,uncertainties,fit='all',allowjacupdate=True,excludesn=None,**kwargs):
 
         X=initvals.copy()
-        varyingParams=iFit&self.iModelParam
+        varyingParams=iFit&self.iModelParam & ~self.ifixedparams
         
         residuals=self.modelobj.lsqwrap(X,uncertainties,**kwargs)
      

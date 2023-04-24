@@ -10,6 +10,7 @@ interactive= sys.stdout.isatty()
 try: from IPython import display
 except: pass
 
+from functools import reduce
 
 
 
@@ -37,7 +38,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
     
     
     def __init__(self,guess,saltresids,outputdir,options):
-    
+        super().__init__(guess,saltresids,outputdir,options)
         self.saltobj=saltresids  
         
         self.gradientmaxiter=options.gradientmaxiter
@@ -48,6 +49,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         self.searchsize = options.searchsize
         self.convergencetolerance= options.convergencetolerance
         
+
         assert(0<self.searchsize<1)
         assert(0<self.searchtolerance<1)
         assert(0<self.etaminus<1)
@@ -119,7 +121,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 X[self.saltobj.iclscat_0]=-np.inf
             
             fitparams=self.saltobj.iModelParam
-            X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter)
+            X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=100)
             
             fitparams=~np.isin(np.arange(self.saltobj.npar),self.saltobj.iclscat)
             X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter)
@@ -231,7 +233,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         if ( iFit.dtype == int):
             iFit=np.isin( np.arange(X.size),iFit )
         assert((iFit.dtype==bool))
-            
+        iFit=iFit & ~self.ifixedparams
 #         import pdb;pdb.set_trace()
         log.info('Number of parameters fit this round: {}'.format(iFit.sum()))
         
