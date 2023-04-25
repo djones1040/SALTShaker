@@ -1,0 +1,18 @@
+SN_SED:    Hsiao07.dat 
+BD17_SED:  bd_17d4708_stisnic_007.dat
+VEGA_SED:  alpha_lyr_stis_003.dat   
+
+
+MAGSYSTEM: AB     (define mag system for filters below)
+FILTSYSTEM: COUNT
+SURVEY: DES
+FILTPATH: $SNDATA_ROOT/filters/DES/DES-SN3YR_DECam
+FILTER: DES-g   DECam_g.dat   0.0  (name, file, zero-point)
+FILTER: DES-r   DECam_r.dat   0.0
+FILTER: DES-i   DECam_i.dat   0.0
+FILTER: DES-z   DECam_z.dat   0.0
+FILTER: DES-Y   DECam_Y.dat   0.0
+
+LAMBDA_RANGE: 2100 12000
+
+OUTFILE: kcor_DESSN3YR.fits

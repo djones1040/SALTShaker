@@ -1,0 +1,15 @@
+SN_SED: Hsiao07.dat
+BD17_SED:    bd_17d4708_stisnic_007.dat
+LAMBDA_RANGE: 2100 12500  # for SN templates
+OUTFILE: kcor_CfA4p2.fits
+
+MAGSYSTEM:  BD17
+FILTSYSTEM: COUNT
+SURVEY:  LOWZ,CFA4p2
+FILTPATH:   $SNDATA_ROOT/filters/PS1/Pantheon/PS1_CFA4
+# Start filters for VERSION = PS1s_CFA4_p2_DS17
+#FILTER:  CFA41-U/C          cfa4_U_p2.dat  9.724  # not used
+FILTER:  CFA42-B/P          cfa4_B_p2.dat  9.86124+0.0027108700
+FILTER:  CFA42-V/Q          cfa4_V_p2.dat  9.47432-0.0012322002
+FILTER:  CFA42-r/W          cfa4_r_p2.dat  9.35730+0.0058652098
+FILTER:  CFA42-i/T          cfa4_i_p2.dat  9.25521-0.0042374653

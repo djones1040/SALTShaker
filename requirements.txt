@@ -11,7 +11,9 @@ emcee
 ipython
 pandas
 f90nml
-iminuit==2.8.4
+iminuit==2.16.0
 tqdm
 pyyaml
 pyParz
+jax
+jaxlib

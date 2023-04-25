@@ -414,7 +414,6 @@ class SuperNova( object ) :
         """
         # TODO : could make the data reading more general: instead of assuming the 6 known 
         #   columns, just iterate over the varlist.
-            
         from numpy import array,log10,unique,where
 
         self.datfile = os.path.abspath(datfile)

@@ -28,6 +28,8 @@ def checksize(a,b):
         
 class SALTtrainingdata(metaclass=abc.ABCMeta):
 
+    __slots__=[]
+    
     @property
     @abc.abstractmethod
     def __listdatakeys__(self):
@@ -36,10 +38,13 @@ class SALTtrainingdata(metaclass=abc.ABCMeta):
     def clip(self,clipcriterion):
         copy=deepcopy(self)
         for key in self.__listdatakeys__:
-            copy.__dict__[key]=self.__dict__[key][clipcriterion]
+            setattr(copy,key,getattr(self,key)[clipcriterion])
         return copy
         
 class SALTtraininglightcurve(SALTtrainingdata):
+        
+        __slots__=['mjd','tobs','phase','fluxcal','fluxcalerr','filt']
+        
         def __init__(self,z,tpk_guess,flt,sn ):
                 assert((sn.FLT==flt).sum()>0)
                 inlightcurve= (sn.FLT==flt)
@@ -62,6 +67,9 @@ class SALTtraininglightcurve(SALTtrainingdata):
 
                 
 class SALTtrainingspectrum(SALTtrainingdata):
+
+        __slots__=['flux', 'phase', 'wavelength', 'fluxerr', 'tobs','restwavelength','mjd']
+
         def __init__(self,snanaspec,z,tpk_guess,binspecres=None ):
                         m=snanaspec['SPECTRUM_MJD']
                         if snanaspec['FLAM'].size==0:
@@ -79,7 +87,7 @@ class SALTtrainingspectrum(SALTtrainingdata):
                         self.tobs=m -tpk_guess
                         self.mjd=m
                         self.phase=self.tobs/(1+z)
-
+                        
                         if 'DQ' in snanaspec:
                                 iGood=(snanaspec['DQ']==1)
                         elif 'SPECFLAG' in snanaspec:
@@ -116,7 +124,6 @@ class SALTtrainingspectrum(SALTtrainingdata):
                                         variance = np.average((flux[indices]/fluxmax-average)**2, weights=weights[indices])      # Fast and numerically precise
                                         return np.sqrt(variance)
 
-
                                 wavebins = np.linspace(np.min(wavelength),np.max(wavelength),int((np.max(wavelength)-np.min(wavelength))/(binspecres*(1+z))))
                                 binned_flux = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_avg).statistic
                                 binned_fluxerr = ss.binned_statistic(wavelength,range(len(flux)),bins=wavebins,statistic=weighted_err).statistic
@@ -134,15 +141,19 @@ class SALTtrainingspectrum(SALTtrainingdata):
 
                         # error floor
                         self.fluxerr = np.hypot(self.fluxerr, 5e-3*np.max(self.flux))
-                        checksize(self.wavelength,self.flux)
-                        checksize(self.wavelength,self.fluxerr)
+                        self.restwavelength= self.wavelength/ (1+z)
+
+                        for key in self.__listdatakeys__: 
+                            checksize(self.wavelength,getattr(self,key) )
         
-        __listdatakeys__={'wavelength','flux','fluxerr'}
+        __listdatakeys__={'wavelength','flux','fluxerr','restwavelength'}
 
         def __len__(self):
                 return len(self.wavelength)
                         
 class SALTtrainingSN:
+
+        __slots__=['survey', 'zHelio', 'MWEBV', 'snid', 'tpk_guess', 'salt2fitprob', 'photdata','specdata']
         def __init__(self,sn,
                      estimate_tpk=False,snpar=None,
                      pkmjddict={},binspecres=None):

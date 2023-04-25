@@ -40,12 +40,12 @@ def mkModelPlot(
         if host_component:
             salt3mhostphase,salt3mhostwave,salt3mhostflux = \
                 np.loadtxt('%s/salt3_template_host.dat'%salt3dir,unpack=True)
+            salt3mhosterrphase,salt3mhosterrwave,salt3mhostfluxerr = \
+                np.loadtxt('%s/salt3_lc_variance_host.dat'%salt3dir,unpack=True)
         salt3m0errphase,salt3m0errwave,salt3m0fluxerr = \
             np.loadtxt('%s/salt3_lc_variance_0.dat'%salt3dir,unpack=True)
         salt3m1errphase,salt3m1errwave,salt3m1fluxerr = \
             np.loadtxt('%s/salt3_lc_variance_1.dat'%salt3dir,unpack=True)
-        salt3mhosterrphase,salt3mhosterrwave,salt3mhostfluxerr = \
-            np.loadtxt('%s/salt3_lc_variance_host.dat'%salt3dir,unpack=True)
 
     except:
         salt3m0phase,salt3m0wave,salt3m0flux = \
