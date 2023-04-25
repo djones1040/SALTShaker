@@ -170,7 +170,7 @@ class TrainSALTBase:
                                                         help="for host mass SALTShaker version, turn on this flag to ignore a current issue where x1/xhost de-correlation doesn\'t preserve errors appropriately; bootstrap errors will be needed (default=%(default)s)")
                 successful=successful&wrapaddingargument(config,'trainparams','preintegrate_photometric_passband', type=boolean_string,
                                                         help='If true, integrate over the photometric passband prior to fitting the model. This approximation evaluates the color law only at the center of each spline basis function, and removes the need to integrate at every step of the fit. (default=%(default)s)')
-                successful=successful&wrapaddingargument(config,'trainparams','fixedparams','fixedparameters',     type=str,
+                successful=successful&wrapaddingargument(config,'trainparams','fixedparams','fixedparameters',     type=str, default='',
                                                         help="Comma-separated list of parameters to be kept fixed (default=%(default)s)")
 
                 successful=successful&wrapaddingargument(config,'trainparams','photometric_zeropadding_batches', type=int,
