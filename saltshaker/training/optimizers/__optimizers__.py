@@ -2,8 +2,10 @@ from abc import ABC,abstractmethod
 from collections import namedtuple
 import logging
 log=logging.getLogger(__name__)
+import numpy as np
 
-         
+from functools import reduce
+
 salttrainingresult= namedtuple('salttrainingresult',
             ['num_lightcurves' , 'num_spectra' ,'num_sne' ,
             'parlist' , 'params' , 'params_raw' ,'phase' ,'wave' , 'componentnames', 
@@ -28,10 +30,10 @@ class salttrainingoptimizer(ABC):
     
     @abstractmethod
     def __init__(self, guess,saltresids,outputdir,options):
-        self.modelobj=saltresids
-        self.outputdir=outputdir
-        for key in self.configoptionnames:
-            self.__dict__[key]=options.__dict__[key]
+        self.ifixedparams= reduce( np.union1d, [saltresids.__dict__['i'+x] for x in options.fixedparams.replace(' ','').split(',') if len(x)] ,[])
+        self.ifixedparams= np.isin(np.arange(guess.size), self.ifixedparams)
+
+        
     
     @classmethod
     @abstractmethod
@@ -44,6 +46,10 @@ class salttrainingoptimizer(ABC):
         """ Given an initial set of SALT model parameters, returns an optimized set of parameters"""
         pass
 
+#     @abstractmethod
+#     def estimateparametererrors(self,initialparams):
+#         """ Given an initial set of optimized SALT model parameters, estimate errors in the parameters"""
+#         pass
 
 
 def getoptimizer(name):

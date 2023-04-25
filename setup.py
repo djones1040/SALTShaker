@@ -1,6 +1,6 @@
 from setuptools.command.test import test as TestCommand
 from distutils.core import setup, Extension
-import numpy.distutils.misc_util
+# import numpy.distutils.misc_util
 import sys
 from setuptools import find_packages
 
@@ -16,14 +16,14 @@ class SALTShakerTest(TestCommand):
 
 AUTHOR = 'David Jones, Rick Kessler'
 AUTHOR_EMAIL = 'david.jones@ucsc.edu'
-VERSION = '0.1dev'
+VERSION = '2.0'
 LICENSE = 'BSD'
 URL = 'saltshaker.readthedocs.org'
 
 setup(
 	name='saltshaker',
 	version=VERSION,
-        packages=find_packages(include=['trainsalt','bin/*','saltshaker/scripts/*']),
+        packages=find_packages('.'),
 	#packages=['bin','saltshaker','saltshaker.tests','saltshaker.data','saltshaker.simulation',
         #          'saltshaker.training','saltshaker.util','saltshaker.initfiles',
         #          'saltshaker.validation','saltshaker.pipeline','saltshaker.config'],
@@ -31,19 +31,20 @@ setup(
         #entry_points={'console_scripts':['trainsalt = saltshaker.scripts.trainsalt']},
         scripts=['saltshaker/scripts/trainsalt','saltshaker/scripts/runpipe'],
 #	scripts=['bin/trainsalt','bin/runpipe','saltshaker/validation/SynPhotPlot.py','saltshaker/validation/ValidateLightcurves.py','saltshaker/validation/ValidateModel.py','saltshaker/validation/ValidateSpectra.py','saltshaker/validation/figs/plotSALTModel.py'],
-	package_data={'': ['initfiles/*.dat','initfiles/*.txt','data/kcor/*.fits','config/*conf','scripts/*']},
+	package_data={'': ['saltshaker/initfiles/*.dat','saltshaker/initfiles/*.txt','saltshaker/data/kcor/*.fits','saltshaker/config/*conf','saltshaker/scripts/*']},
 	include_package_data=True,
 	author=AUTHOR,
 	author_email=AUTHOR_EMAIL,
 	license=LICENSE,
 	long_description=open('README.md').read(),
-        include_dirs=numpy.distutils.misc_util.get_numpy_include_dirs(),
+#         include_dirs=numpy.distutils.misc_util.get_numpy_include_dirs(),
 	install_requires=['cython',
                           'numpy>=1.5.0',
-                          'scipy>=0.9.0',
+                          'scipy>=1.9.0',
                           'extinction>=0.2.2',
                           'astropy>=0.4.0',
-                          'pytest-astropy',
+                          'pytest-astropy'
+                          'jax>= 0.4.3',
                           'sncosmo',
                           'astroquery',
                           'matplotlib',

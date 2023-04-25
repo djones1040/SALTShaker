@@ -87,7 +87,9 @@ salttrainingresult= namedtuple('salttrainingresult',
 def ensurepositivedefinite(matrix,maxiter=5):
 
     for i in range(maxiter):
-        mineigenval=np.linalg.eigvalsh(matrix)[0]
+        try: mineigenval=np.linalg.eigvalsh(matrix)[0]
+        except np.linalg.LinAlgError:
+            mineigenval= -np.abs(np.diag(matrix).min() * 1e-4)
         if mineigenval>0:
             return matrix
         else:
