@@ -43,7 +43,7 @@ setup(
                           'scipy>=1.9.0',
                           'extinction>=0.2.2',
                           'astropy>=0.4.0',
-                          'pytest-astropy'
+                          'pytest-astropy',
                           'jax>= 0.4.3',
                           'sncosmo',
                           'astroquery',
