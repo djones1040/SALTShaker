@@ -153,6 +153,9 @@ class modeledtrainingdata(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def __len__(self):
         pass
+        
+    def determineneededparameters(self,modelobj):
+        return []
     
 @register_pytree_node_class
 class modeledtraininglightcurve(modeledtrainingdata):
@@ -311,9 +314,9 @@ class modeledtraininglightcurve(modeledtrainingdata):
         coordinates=jnp.concatenate((jnp.ones(1), pars.coordinates))
 
         fluxcoeffs=jnp.dot(coordinates,pars.components)*pars.x0
-        
         #Evaluate color law at the wavelength basis centers
-        colorexp= 10. ** (  -0.4*self.colorlawfunction(pars.c, pars.CL,self.wavebasis))
+        colorlaw= sum([fun(c,cl,self.wavebasis) for fun,c,cl in zip(self.colorlawfunction,pars.c, pars.CL)])
+        colorexp= 10. ** (  -0.4*colorlaw)
         if self.preintegratebasis:
             #Redden flux coefficients
             fluxcoeffsreddened= (colorexp[np.newaxis,:]*fluxcoeffs.reshape( self.bsplinecoeffshape)).flatten()
@@ -329,13 +332,15 @@ class modeledtraininglightcurve(modeledtrainingdata):
             pars=SALTparameters(self,pars)
 
         #Exponentiate and multiply by color
-        colorexp= 10. ** (  -0.4*self.colorlawfunction(pars.c, pars.CL,self.lambdaeffrest))
+        
+        colorlaw= sum([fun(c,cl,self.lambdaeffrest) for fun,c,cl in zip(self.colorlawfunction,pars.c, pars.CL)])
+        colorexp= 10. ** (  -0.4*colorlaw)
 
           #Evaluate model uncertainty
 
         coordinates=jnp.concatenate((jnp.ones(1), pars.coordinates ))
         
-        errorsurfaces=((coordinates[:,np.newaxis]*pars.modelerrs)**2 ).sum(axis=0)
+        errorsurfaces=((coordinates[:len(pars.modelerrs),np.newaxis]*pars.modelerrs)**2 ).sum(axis=0)
         for (i,j),correlation in zip(self.imodelcorrs_coordinds,pars.modelcorrs):
             errorsurfaces= errorsurfaces+2 *correlation*coordinates[i]*coordinates[j]* pars.modelerrs[i]*pars.modelerrs[j]
 
@@ -523,7 +528,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
 
         #Evaluate model uncertainty
         #errorsurfaces=(coordinates,errs)**2
-        errorsurfaces=((coordinates[:,np.newaxis]*errs)**2 ).sum(axis=0)
+        errorsurfaces=((coordinates[:len(errs),np.newaxis]*errs)**2 ).sum(axis=0)
         for (i,j),correlation in zip(self.imodelcorrs_coordinds,pars.modelcorrs):
             errorsurfaces= errorsurfaces+2*correlation*coordinates[i]*coordinates[j]* errs[i]*errs[j]
         errorsurfaces=self.errordesignmat @ errorsurfaces
@@ -552,7 +557,9 @@ class modeledtrainingspectrum(modeledtrainingdata):
 
         return {'residuals':  self.spectralsuppression* (modelflux-self.flux)/uncertainty,
                     'lognorm': (self.spectralsuppression**2 )*(-jnp.log(uncertainty).sum()-zeropoint)}
-                        
+   
+    def determineneededparameters(self,modelobj):
+        return []
  
         
 class SALTfitcacheSN(SALTtrainingSN):
@@ -584,9 +591,10 @@ class SALTfitcacheSN(SALTtrainingSN):
         self.ix1=np.where(residsobj.parlist==f'x1_{self.snid}')[0][0]
         self.ixhost=np.where(residsobj.parlist==f'xhost_{self.snid}')[0]
         if len(self.ixhost): self.ixhost = self.ixhost[0]
-        self.ic=np.where(residsobj.parlist==f'c_{self.snid}')[0][0]
+        self.ic=np.array([np.where(residsobj.parlist==f'c{i}_{self.snid}')[0][0] for i in range(residsobj.ncl)] )
 
-        self.icoordinates=np.array([self.ix1]+([self.ixhost]if residsobj.host_component else []))
+        self.icoordinates=np.array([np.where(residsobj.parlist==f'x{i}_{self.snid}')[0][0] for i in range(1,residsobj.n_components)]
+                +([self.ixhost] if residsobj.host_component else []))
         def choosesmallestpadsize(padsizes,datasize):
             if padsizes is None: return 0
             else: 
@@ -599,7 +607,14 @@ class SALTfitcacheSN(SALTtrainingSN):
         self.specdata={k: modeledtrainingspectrum(self,sndata.specdata[k],k,residsobj,
         choosesmallestpadsize( specpaddingsizes, len(sndata.specdata[k]) )
          ) for k in sndata.specdata }
-
+    
+    def determineneededparameters(self,modelobj):
+        paramsneeded=[f'x{i}_{self.snid}' for i in range(modelobj.n_components)]+[f'c_{self.snid}']  
+        for k in self.specdata.keys():
+            paramsneeded+= self.specdata[k].determineneededparameters(self,modelobj)
+        return paramsneeded
+    
+    
     @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],diff_argnum=1)              
     def modelloglikelihood(self,*args,**kwargs):
         return sum([lc.modelloglikelihood(*args,**kwargs) for lc in self.photdata.values()])+sum([spec.modelloglikelihood(*args,**kwargs) for spec in self.specdata.values()])

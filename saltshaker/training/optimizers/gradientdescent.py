@@ -120,9 +120,10 @@ class rpropwithbacktracking(salttrainingoptimizer):
             if not np.isinf(X[self.saltobj.iclscat_0]):
                 X[self.saltobj.iclscat_0]=-np.inf
             
+            log.info('Burning in flux model')
             fitparams=self.saltobj.iModelParam
             X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=100) #self.gradientmaxiter)
-            
+            log.info('Fitting all parameters')
             fitparams=~np.isin(np.arange(self.saltobj.npar),self.saltobj.iclscat)
             X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter)
                         
@@ -172,7 +173,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         """
         learningrates=np.tile(np.nan,self.saltobj.npar)
         #Parameters I expect to be more or less normal distribution, where the std gives a reasonable size to start learning
-        for idx in [self.saltobj.im0,self.saltobj.im1,self.saltobj.imhost, self.saltobj.ix1,self.saltobj.ic,self.saltobj.ixhost
+        for idx in list(self.saltobj.icomponents)+list(self.saltobj.icoordinates)+[ self.saltobj.ic
                 ]:
             
             learningrates[idx]=np.std( X[idx])*.1
@@ -184,7 +185,11 @@ class rpropwithbacktracking(salttrainingoptimizer):
         for idx in [self.saltobj.iCL,self.saltobj.ispcrcl_coeffs,self.saltobj.iclscat,self.saltobj.imodelcorr]:
             learningrates[idx]=1e-2
         #Check that all parameters get an initial guess
-        assert(~np.any(np.isnan(learningrates)))
+        try:
+            assert(~np.any(np.isnan(learningrates)))
+        except Exception as e:
+            log.critical(f'Uninitialized learning rates: {", ".join(np.unique(self.saltobj.parlist[np.isnan(learningrates)]))}')
+            raise e
         return learningrates*self.learningratesinitscale
 
     def lossfunction(self,params,*args,excludesn=None,**kwargs):

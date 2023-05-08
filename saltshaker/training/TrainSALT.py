@@ -203,34 +203,31 @@ class TrainSALT(TrainSALTBase):
         n_phaseknots,n_waveknots = len(phaseknotloc)-self.options.bsorder-1,len(waveknotloc)-self.options.bsorder-1
         n_errphaseknots,n_errwaveknots = len(errphaseknotloc)-self.options.errbsorder-1,len(errwaveknotloc)-self.options.errbsorder-1
         n_sn = len(datadict.keys())
-
+        parlist=[]
         # set up the list of parameters
-        parlist = np.array(['m0']*(n_phaseknots*n_waveknots))
-        if self.options.n_components >= 2:
-            parlist = np.append(parlist,['m1']*(n_phaseknots*n_waveknots))
+        for i in range(self.options.n_components):
+            parlist = np.append(parlist,['m'+str(i)]*(n_phaseknots*n_waveknots))
         if self.options.host_component:
             parlist = np.append(parlist,['mhost']*(n_phaseknots*n_waveknots))
         if self.options.n_colorpars:
-            parlist = np.append(parlist,['cl']*self.options.n_colorpars)
+            parlist = np.append(parlist,[[f'cl{i}']*num for i,num in enumerate(self.options.n_colorpars)])
         if self.options.error_snake_phase_binsize and self.options.error_snake_wave_binsize:
             for i in range(self.options.n_components): parlist = np.append(parlist,['modelerr_{}'.format(i)]*n_errphaseknots*n_errwaveknots)
             if self.options.host_component:
                 parlist = np.append(parlist,['modelerr_host']*len(mhostvarknots))
                 parlist = np.append(parlist,['modelcorr_0host']*len(mhostvarknots))
                 parlist = np.append(parlist,['modelcorr_1host']*len(mhostvarknots))
-            if self.options.n_components == 2:
+            if self.options.n_components >= 2:
                 parlist = np.append(parlist,['modelcorr_01']*n_errphaseknots*n_errwaveknots)
         
         if self.options.n_colorscatpars:
             parlist = np.append(parlist,['clscat']*(self.options.n_colorscatpars))
 
         # SN parameters
-        if not self.options.host_component:
-            for k in datadict.keys():
-                parlist = np.append(parlist,[f'x0_{k}',f'x1_{k}',f'c_{k}'])
-        else:
-            for k in datadict.keys():
-                parlist = np.append(parlist,[f'x0_{k}',f'x1_{k}',f'xhost_{k}',f'c_{k}'])
+        parlist = np.append(parlist,sum( [[f'x{i}_{k}' for i in range(self.options.n_components)]+[f'c{i}_{k}' for i in range(len(self.options.n_colorpars)) ] for k in datadict.keys()],[]))
+
+        if self.options.host_component:
+            parlist = np.append(parlist,[f'xhost_{k}' for k in datadict.keys()])
 
         if self.options.specrecallist:
             spcrcldata = Table.read(self.options.specrecallist,format='ascii')
@@ -289,7 +286,8 @@ class TrainSALT(TrainSALTBase):
                 guess[parlist == 'mhost'] = mhostknots
             if self.options.n_colorpars:
                 if self.options.initsalt2model:
-                    if self.options.n_colorpars == 4:
+                    if len(self.options.n_colorpars)>1: raise ValueError('Multiple color laws specified with initsalt2model option')
+                    if self.options.n_colorpars == [4]:
                         guess[parlist == 'cl'] = [-0.504294,0.787691,-0.461715,0.0815619]
                     else:
                         clwave = np.linspace(self.options.waverange[0],self.options.waverange[1],1000)
@@ -298,7 +296,7 @@ class TrainSALT(TrainSALTBase):
                             cl_init = SALT2ColorLaw(self.options.colorwaverange, p)(clwave)
                             return cl_init-salt2cl
 
-                        md = least_squares(bestfit,[0,0,0,0,0])
+                        md = least_squares(bestfit,self.options.n_colorpars[0])
                         if 'termination conditions are satisfied' not in md.message and \
                            'termination condition is satisfied' not in md.message:
                             
@@ -335,7 +333,7 @@ class TrainSALT(TrainSALTBase):
                         if self.options.host_component:
                             guess[parlist == f'xhost_{sn}'] = snpar['xhost'][iSN]
 
-                        guess[parlist == 'c_%s'%sn] = snpar['c'][iSN]
+                        guess[parlist == 'c0_%s'%sn] = snpar['c'][iSN]
                     else:
                         log.warning(f'SN {sn} not found in SN par list {self.options.snparlist}')
                         guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
@@ -346,7 +344,7 @@ class TrainSALT(TrainSALTBase):
                     log.info(f'initializing parameters using simulated values for SN {sn}')
                     guess[parlist == 'x0_%s'%sn] = datadict[sn].SIM_SALT2x0
                     guess[parlist == 'x1_%s'%sn] = datadict[sn].SIM_SALT2x1
-                    guess[parlist == 'c_%s'%sn] = datadict[sn].SIM_SALT2c
+                    guess[parlist == 'c0_%s'%sn] = datadict[sn].SIM_SALT2c
                 else:
                     guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
 

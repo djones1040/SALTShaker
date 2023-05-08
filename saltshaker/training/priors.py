@@ -194,7 +194,7 @@ class SALTPriors:
     def colorstretchcorr(self,width,x):
         """x1 should have no inner product with c"""
         x1=x[self.ix1]
-        c=x[self.ic]
+        c=x[self.ic][:,0]
         if x1.size!=c.size: return np.array([])
         return robustcorrelation(x1,c)/width
 
@@ -212,7 +212,7 @@ class SALTPriors:
         """xhost should have no inner product with c"""
 
         xhost=x[self.ixhost]
-        c=x[self.ic]
+        c=x[self.ic][:,0]
         if c.size!=xhost.size: return np.array([])
         return robustcorrelation(xhost,c)/width
 

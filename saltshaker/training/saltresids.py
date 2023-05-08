@@ -307,14 +307,20 @@ class SALTResids:
             self.wavebasis=self.waveBinCenters
         else:
             self.wavebasis=self.wave 
- 
-        self.colorlawfunction=colorlaw.getcolorlaw(self.colorlaw_function)( self.n_colorpars,
-        self.colorwaverange)
-
+        
+        try:
+            assert(len(self.n_colorpars)==len(self.colorlaw_function))
+            self.ncl=len(self.colorlaw_function)
+            
+        except:
+            raise ValueError(f'Inconsistent number of color law specifications given {self.colorlaw_function} {self.n_colorpars}' )
+        self.colorlawfunction=[colorlaw.getcolorlaw(function)( npars,
+        self.colorwaverange) for function,npars in zip(self.colorlaw_function,self.n_colorpars)]
+        
 
         self.guessScale=np.ones(self.n_components)
         
-        self.relativeregularizationweights=jnp.array([1,self.m1regularization]+( [self.mhostregularization] if self.host_component else []))
+        self.relativeregularizationweights=jnp.array([1]+[self.variantregularization]*(self.n_components-1)+( [self.mhostregularization] if self.host_component else []))
         
         if self.regularize:
             self.updateEffectivePoints()
@@ -428,8 +434,8 @@ class SALTResids:
                                                 help='Weighting of wave gradient chi^2 regularization during training of model parameters (default=%(default)s)')
         successful=successful&wrapaddingargument(config,'trainingparams','regulardyad', type=float,
                                                 help='Weighting of dyadic chi^2 regularization during training of model parameters (default=%(default)s)')
-        successful=successful&wrapaddingargument(config,'trainingparams','m1regularization',     type=float,
-                                                help='Scales regularization weighting of M1 component relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','variantregularization','m1regularization',     type=float,
+                                                help='Scales regularization weighting of varying components (all other than M0) relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
         successful=successful&wrapaddingargument(config,'trainingparams','mhostregularization',  type=float,
                                                 help='Scales regularization weighting of host component relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
         successful=successful&wrapaddingargument(config,'trainingparams','spec_chi2_scaling',  type=float,
@@ -488,8 +494,12 @@ class SALTResids:
                                                 help='number of principal components of the SALT model to fit for (default=%(default)s)')
         successful=successful&wrapaddingargument(config,'modelparams','host_component', type=str,
                                                 help="NOT IMPLEMENTED: if set, fit for a host component.  Must equal 'mass', for now (default=%(default)s)")
-        successful=successful&wrapaddingargument(config,'modelparams','n_colorpars',     type=int,
+        successful=successful&wrapaddingargument(config,'modelparams','n_colorpars',    nargs='+',      type=int,
                                                 help='number of degrees of the phase-independent color law polynomial (default=%(default)s)')
+                                                
+        successful=successful&wrapaddingargument(config,'modelparams','colorlaw_function',   nargs='+',      type=str,
+                                                help='color law function, see colorlaw.py (default=%(default)s)')               
+
         successful=successful&wrapaddingargument(config,'modelparams','n_colorscatpars',         type=int,
                                                 help='number of parameters in the broadband scatter model (default=%(default)s)')
         successful=successful&wrapaddingargument(config,'modelparams','error_snake_phase_binsize',      type=float,
@@ -498,8 +508,6 @@ class SALTResids:
                                                 help='number of angstroms over which to compute scaling of error model (default=%(default)s)')
         successful=successful&wrapaddingargument(config,'modelparams','use_snpca_knots',         type=boolean_string,
                                                 help='if set, define model on SNPCA knots (default=%(default)s)')               
-        successful=successful&wrapaddingargument(config,'modelparams','colorlaw_function',         type=str,
-                                                help='color law function, see colorlaw.py (default=%(default)s)')               
 
         # priors
         for prior in __priors__:
@@ -517,7 +525,7 @@ class SALTResids:
     def set_param_indices(self):
 
         if not self.host_component:
-            self.corrcombinations=sum([[(i,j) for j in range(i+1,self.n_components)]for i in range(self.n_components)] ,[])
+            self.corrcombinations=[(0,1)]#=sum([[(i,j) for j in range(i+1,self.n_components)]for i in range(self.n_components)] ,[])
         else:
             self.corrcombinations=[(0,1),(0,'host')]
         self.m0min = np.min(np.where(self.parlist == 'm0')[0])
@@ -544,11 +552,13 @@ class SALTResids:
         self.im0new = np.where(self.parlist == 'm0')[0][np.array(wavemin) > 8500]
         self.im1new = np.where(self.parlist == 'm1')[0][np.array(wavemin) > 8500]
         
-        self.iCL = np.where(self.parlist == 'cl')[0]
         self.ix0 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x0') or si.startswith('specx0')],dtype=int)
         self.ix1 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x1')],dtype=int)
         self.ixhost = np.array([i for i, si in enumerate(self.parlist) if si.startswith('xhost')],dtype=int)
-        self.ic  = np.array([i for i, si in enumerate(self.parlist) if si.startswith('c_')],dtype=int)
+        
+        self.ic  = np.array([np.where(np.char.startswith(self.parlist,f'c{i}_'  ))[0] for i in range(len(self.n_colorpars))]).T
+        self.iCL = np.array([np.where(self.parlist == f'cl{i}')[0] for i in range(len(self.n_colorpars))])
+
         self.ispcrcl_norm = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specx0')],dtype=int)
         if self.ispcrcl_norm.size==0: self.ispcrcl_norm=np.zeros(self.npar,dtype=bool)
         self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('spec')],dtype=int) # used to be specrecal
@@ -567,8 +577,10 @@ class SALTResids:
         self.iModelParam[self.imodelerr]=False
         self.iModelParam[self.imodelcorr]=False
         self.iModelParam[self.iclscat]=False
-        
-        self.icomponents =[self.im0,self.im1]
+        self.icoordinates = np.array([np.where(np.char.startswith(self.parlist,f'x{i}') )[0]
+                    for i in range(1,self.n_components)]+list(self.ixhost)
+        )
+        self.icomponents =[np.where(self.parlist == f'm{i}')[0] for i in range(self.n_components)]
         if self.host_component:
             self.icomponents+=[self.imhost]
         self.icomponents = np.array(self.icomponents)
