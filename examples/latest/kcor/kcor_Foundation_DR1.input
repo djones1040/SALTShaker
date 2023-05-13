@@ -1,0 +1,16 @@
+BD17_SED:    bd_17d4708_stisnic_007.dat
+SN_SED:    Hsiao07.dat   # spectral template for SN
+
+MAGSYSTEM:  AB
+FILTSYSTEM: COUNT
+SURVEY: FOUNDATION
+FILTPATH: filters/SALT3TRAIN_K21_PS1
+FILTER: PS1-g   g_filt_revised.txt -0.0-0.011-0.0072
+FILTER: PS1-r   r_filt_tonry.txt   -0.0-0.012+0.0068
+FILTER: PS1-i   i_filt_tonry.txt   -0.0-0.008+0.003
+FILTER: PS1-z   z_filt_tonry.txt   -0.0-0.008+0.0133
+FILTER: PS1-y   y_filt_tonry.txt   0.0
+
+LAMBDA_RANGE: 2100 11300  # for SN templates
+
+OUTFILE:  kcor_Foundation_DR1.fits
