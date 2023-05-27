@@ -189,7 +189,26 @@ class SALTPriors:
         xprime=x[self.isbounded]
         return (jnp.clip(xprime-lbound,None,0)+jnp.clip(xprime-ubound,0,None))/widths
 
+    
+    
+    @prior
+    def allcolorcoordinatemean(self,width,x):
+        idxs=np.concatenate([self.ic,self.icoordinates])
+        return jnp.mean(x[idxs],axis=1)/width
+    
+    @prior
+    def allcoordinatestd(self,width,x):
+        idxs=np.concatenate([self.ic,self.icoordinates])
+        return (jnp.std(x[idxs],axis=1)-1)/width
         
+    @prior
+    def allcolorcoordinatecorr(self,width,x):
+        idxs=np.concatenate([self.ic,self.icoordinates])
+        numparams=idxs.shape[0]
+        params=x[idxs]
+        return jnp.array(sum([ [  robustcorrelation(params[i],params[j]) for j in range(i)] for i in range(numparams)],[]))
+        
+    
     @prior
     def colorstretchcorr(self,width,x):
         """x1 should have no inner product with c"""

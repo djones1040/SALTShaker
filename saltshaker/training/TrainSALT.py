@@ -224,7 +224,8 @@ class TrainSALT(TrainSALTBase):
             parlist = np.append(parlist,['clscat']*(self.options.n_colorscatpars))
 
         # SN parameters
-        parlist = np.append(parlist,sum( [[f'x{i}_{k}' for i in range(self.options.n_components)]+[f'c{i}_{k}' for i in range(len(self.options.n_colorpars)) ] for k in datadict.keys()],[]))
+        parlist = np.append(parlist,sum( [[f'x{i}_{k}' for i in range(self.options.n_components)]
+            +[f'c{i}_{k}' for i in range(len(self.options.n_colorpars)) ] for k in datadict.keys()],[]))
 
         if self.options.host_component:
             parlist = np.append(parlist,[f'xhost_{k}' for k in datadict.keys()])
@@ -286,7 +287,7 @@ class TrainSALT(TrainSALTBase):
                 guess[parlist == 'mhost'] = mhostknots
             if self.options.n_colorpars:
                 if self.options.initsalt2model:
-                    if len(self.options.n_colorpars)>1: raise ValueError('Multiple color laws specified with initsalt2model option')
+                    #if len(self.options.n_colorpars)>1: raise ValueError('Multiple color laws specified with initsalt2model option')
                     if self.options.n_colorpars == [4]:
                         guess[parlist == 'cl'] = [-0.504294,0.787691,-0.461715,0.0815619]
                     else:
@@ -301,9 +302,9 @@ class TrainSALT(TrainSALTBase):
                            'termination condition is satisfied' not in md.message:
                             
                             raise RuntimeError('problem initializing color law!')
-                        guess[parlist == 'cl'] = md.x
+                        guess[parlist == 'cl0'] = md.x
                 else:
-                    guess[parlist == 'cl'] =[0.]*self.options.n_colorpars 
+                    guess[parlist == 'cl0'] =[0.]*self.options.n_colorpars 
             if self.options.n_colorscatpars:
 
                 guess[parlist == 'clscat'] = clscatcoeffs
@@ -320,6 +321,9 @@ class TrainSALT(TrainSALTBase):
                 snpar = Table.read(self.options.snparlist,format='ascii')
                 snpar['SNID'] = snpar['SNID'].astype(str)
 
+            from numpy.random import default_rng
+            rng = default_rng(134912348)
+
             for sn in datadict.keys():
                 if self.options.snparlist:
                     # hacky matching, but SN names are a mess as usual
@@ -328,11 +332,16 @@ class TrainSALT(TrainSALTBase):
                     if len(snpar['SNID'][iSN]) > 1:
                         raise RuntimeError(f"found duplicate in parameter list for SN {snpar['SNID'][iSN][0]}")
                     if len(snpar[iSN]):
-                        guess[parlist == 'x0_%s'%sn] = snpar['x0'][iSN]
-                        guess[parlist == 'x1_%s'%sn] = snpar['x1'][iSN]
                         if self.options.host_component:
                             guess[parlist == f'xhost_{sn}'] = snpar['xhost'][iSN]
-
+                        
+                        for i in range((self.options.n_components)):
+                            if ('x'+str(i)) in snpar.keys():
+                                guess[parlist==f'x{i}_{sn}'] = snpar[ 'x'+str(i)][iSN]
+                            else:
+                                guess[parlist==f'x{i}_{sn}'] = rng.standard_normal()
+                            
+                            
                         guess[parlist == 'c0_%s'%sn] = snpar['c'][iSN]
                     else:
                         log.warning(f'SN {sn} not found in SN par list {self.options.snparlist}')
@@ -754,7 +763,9 @@ class TrainSALT(TrainSALTBase):
             for firstind,secondind, datasurface in datacovsurfaces:
                 if firstind>secondind:
                     secondind,firstind=firstind,secondind
-                modelsurface=modelerrdict[firstind,secondind] 
+                try: modelsurface=modelerrdict[firstind,secondind] 
+                except KeyError:
+                    modelsurface=np.zeros(datasurface.shape)
                 with open(f'{outdir}/salt3_lc_covariance_{trainingresult.componentnames[firstind][1:]}{trainingresult.componentnames[secondind][1:]}.dat','w') as foutcov:
                     for i,p in enumerate(trainingresult.phase):
                         for j,w in enumerate(trainingresult.wave):
@@ -774,7 +785,7 @@ class TrainSALT(TrainSALTBase):
 
         foutinfotext = f"""RESTLAMBDA_RANGE: {self.options.colorwaverange[0]} {self.options.colorwaverange[1]}
 COLORLAW_VERSION: 1
-COLORCOR_PARAMS: {self.options.colorwaverange[0]:.0f} {self.options.colorwaverange[1]:.0f}  {len(trainingresult.clpars)}  {' '.join(['%8.10e'%cl for cl in trainingresult.clpars])}
+COLORCOR_PARAMS: {self.options.colorwaverange[0]:.0f} {self.options.colorwaverange[1]:.0f}  {len(trainingresult.clpars[0])}  {' '.join(['%8.10e'%cl for cl in trainingresult.clpars[0]])}
 
 COLOR_OFFSET:  0.0
 COLOR_DISP_MAX: {cldispersionmax:.1f}  # avoid crazy sim-mags at high-z
@@ -792,15 +803,25 @@ MAGERR_LAMREST: 0.1   100   200  # magerr minlam maxlam
 SIGMA_INT: 0.106  # used in simulation"""
         with open(f'{outdir}/SALT3.INFO','w') as foutinfo:
             print(foutinfotext,file=foutinfo)
-
-
-        with open(f'{outdir}/salt3_color_correction.dat','w') as foutcl:
-            print(f'{len(trainingresult.clpars):.0f}',file=foutcl)
-            for c in trainingresult.clpars:
-                print(f'{c:8.10e}',file=foutcl)
-            print(f"""Salt2ExtinctionLaw.version 1
-            Salt2ExtinctionLaw.min_lambda {self.options.colorwaverange[0]:.0f}
-            Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutcl)
+        if len(trainingresult.clpars)==1: 
+            colorlaw=trainingresult.clpars[0]
+            with open(f'{outdir}/salt3_color_correction.dat','w') as foutcl:
+                print(f'{len(colorlaw):.0f}',file=foutcl)
+                
+                for c in colorlaw:
+                    print(f'{c:8.10e}',file=foutcl)
+                print(f"""Salt2ExtinctionLaw.version 1
+                Salt2ExtinctionLaw.min_lambda {self.options.colorwaverange[0]:.0f}
+                Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutcl)
+        else:
+            for i,name,colorlaw in (zip(range(trainingresult.clpars.shape[0]),self.options.colorlaw_function,trainingresult.clpars)):
+                with open(f'{outdir}/salt3_color_correction_{i}.dat','w') as foutcl:
+                    print(f'{len(colorlaw):.0f}',file=foutcl)
+                    for c in colorlaw:
+                        print(f'{c:8.10e}',file=foutcl)
+                    print(f"""Salt2ExtinctionLaw.version {name}
+                    Salt2ExtinctionLaw.min_lambda {self.options.colorwaverange[0]:.0f}
+                    Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutcl)
 
 
         # best-fit and simulated SN params
@@ -850,7 +871,7 @@ SIGMA_INT: 0.106  # used in simulation"""
                     if 't0' not in trainingresult.snparams[k].keys():
                         trainingresult.snparams[k]['t0'] = 0.0
 
-                    print(f"{k} {trainingresult.snparams[k]['x0']:8.10e} {trainingresult.snparams[k]['x1']:.10f} {trainingresult.snparams[k]['c']:.10f} {trainingresult.snparams[k]['t0']:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",file=foutsn)
+                    print(f"{k} {trainingresult.snparams[k]['x0']:8.10e} {trainingresult.snparams[k]['x1']:.10f} {trainingresult.snparams[k]['c'] if 'c' in snparams[k] else trainingresult.snparams[k]['c0']:.10f} {trainingresult.snparams[k]['t0']:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",file=foutsn)
 
         keys=['num_lightcurves','num_spectra','num_sne']
         yamloutputdict={key.upper():getattr(trainingresult,key) for key in keys}

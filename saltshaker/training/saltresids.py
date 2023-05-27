@@ -556,7 +556,7 @@ class SALTResids:
         self.ix1 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x1')],dtype=int)
         self.ixhost = np.array([i for i, si in enumerate(self.parlist) if si.startswith('xhost')],dtype=int)
         
-        self.ic  = np.array([np.where(np.char.startswith(self.parlist,f'c{i}_'  ))[0] for i in range(len(self.n_colorpars))]).T
+        self.ic  = np.array([np.where(np.char.startswith(self.parlist,f'c{i}_'  ))[0] for i in range(len(self.n_colorpars))])
         self.iCL = np.array([np.where(self.parlist == f'cl{i}')[0] for i in range(len(self.n_colorpars))])
 
         self.ispcrcl_norm = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specx0')],dtype=int)
@@ -584,7 +584,6 @@ class SALTResids:
         if self.host_component:
             self.icomponents+=[self.imhost]
         self.icomponents = np.array(self.icomponents)
-        
         self.iclscat_0,self.iclscat_poly = np.array([],dtype='int'),np.array([],dtype='int')
         if len(self.ispcrcl):
             for i,parname in enumerate(np.unique(self.parlist[self.iclscat])):
@@ -822,7 +821,7 @@ class SALTResids:
             Xfinal=X.copy()
         
         errmodel=self.ErrModel(Xfinal,evaluatePhase=self.phaseout,evaluateWave=self.waveout)
-        componentnames= ['M0','M1']+(['Mhost'] if self.host_component else [])
+        componentnames=  ['M'+str(i) for i in range(self.n_components)]+(['Mhost'] if self.host_component else [])
         
         if parametercovariance is None:
             dataerrs,datacovs=None,None
@@ -843,64 +842,40 @@ class SALTResids:
             dataerrsurfaces =dataerrs,
             datacovsurfaces =datacovs,
              clpars= Xfinal[self.iCL] , clscat=self.colorscatter(Xfinal,self.waveout),
-            snparams= {sn: {'x0':X[self.parlist == f'x0_{sn}'][0],
-                              'x1':X[self.parlist == f'x1_{sn}'][0],
-                              'c':X[self.parlist == f'c_{sn}'][0] }                              
+            snparams= {sn: {
+                              (name if not ((name=='c0') and (len(self.n_colorpars)==1)) else 'c' 
+                              
+                              ):X[self.parlist == '_'.join([name,sn])][0] for name in (
+                                [f'x{i}' for i in range(self.n_components)]+
+                                ([f'c{i}' for i in range(len(self.n_colorpars))]
+                                )
+                              )}                              
                               for sn in self.datadict})
 
-    
     def SALTModel(self,x,evaluatePhase=None,evaluateWave=None):
         """Returns flux surfaces of SALT model"""
-        m0pars = x[self.m0min:self.m0max+1]
+        components=[]
+        for i in range( self.icomponents.shape[0]):
+            comppars=x[self.icomponents[i]]
 
-        if self.bsorder != 0:
-            m0 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
-                         self.wave if evaluateWave is None else evaluateWave,
-                         (self.phaseknotloc,self.waveknotloc,m0pars,self.bsorder,self.bsorder))
-        else:
-            phase = self.phase if evaluatePhase is None else evaluatePhase
-            wave = self.wave if evaluateWave is None else evaluateWave
-            n_repeat_phase = int(phase.size/(self.phaseknotloc.size-1))+1
-            n_repeat_phase_extra = -1*(n_repeat_phase*(self.phaseknotloc.size-1) % phase.size)
-            if n_repeat_phase_extra == 0: n_repeat_phase_extra = None
-            n_repeat_wave = int(wave.size/(self.waveknotloc.size-1))+1
-            n_repeat_wave_extra = -1*(n_repeat_wave*(self.waveknotloc.size-1) % wave.size)
-            if n_repeat_wave_extra == 0: n_repeat_wave_extra = None
-            m0 = np.repeat(np.repeat(m0pars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),n_repeat_phase,axis=0),
-                           n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]
-
-        
-
-        if self.n_components >= 2 and self.n_components <= 3:
-            m1pars = x[self.im1]
             if self.bsorder != 0:
-                m1 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
+                surface = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
                              self.wave if evaluateWave is None else evaluateWave,
-                             (self.phaseknotloc,self.waveknotloc,m1pars,self.bsorder,self.bsorder))
+                             (self.phaseknotloc,self.waveknotloc,comppars,self.bsorder,self.bsorder))
             else:
-                m1 = np.repeat(
-                    np.repeat(m1pars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),
-                              n_repeat_phase,axis=0),n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]
-
-            if self.n_components == 2 and not self.host_component:
-                components = (m0,m1)
-            elif self.host_component:
-                mhostpars = x[self.imhost]
-                if self.bsorder != 0:
-                    mhost = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
-                                 self.wave if evaluateWave is None else evaluateWave,
-                                 (self.phaseknotloc,self.waveknotloc,mhostpars,self.bsorder,self.bsorder))
-                else:
-                    mhost = np.repeat(
-                        np.repeat(mhostpars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),
-                                  n_repeat_phase,axis=0),n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]
-                components = (m0,m1,mhost)
-        elif self.n_components == 1:
-            components = (m0,)
-        else:
-            raise RuntimeError('A maximum of three principal components is allowed')
-
-        return components
+                phase = self.phase if evaluatePhase is None else evaluatePhase
+                wave = self.wave if evaluateWave is None else evaluateWave
+                n_repeat_phase = int(phase.size/(self.phaseknotloc.size-1))+1
+                n_repeat_phase_extra = -1*(n_repeat_phase*(self.phaseknotloc.size-1) % phase.size)
+                if n_repeat_phase_extra == 0: n_repeat_phase_extra = None
+                n_repeat_wave = int(wave.size/(self.waveknotloc.size-1))+1
+                n_repeat_wave_extra = -1*(n_repeat_wave*(self.waveknotloc.size-1) % wave.size)
+                if n_repeat_wave_extra == 0: n_repeat_wave_extra = None
+                surface = np.repeat(np.repeat(comppars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),n_repeat_phase,axis=0),
+                               n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]
+            components+=[surface]
+        
+        return np.array(components)
 
     def SALTModelDeriv(self,x,dx,dy,evaluatePhase=None,evaluateWave=None):
         """Returns derivatives of flux surfaces of SALT model"""
