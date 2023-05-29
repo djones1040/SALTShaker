@@ -340,8 +340,10 @@ class TrainSALT(TrainSALTBase):
                                 guess[parlist==f'x{i}_{sn}'] = snpar[ 'x'+str(i)][iSN]
                             else:
                                 guess[parlist==f'x{i}_{sn}'] = rng.standard_normal()
-                            
-                            
+                        if snpar['x0'][iSN]<= 0:
+                            log.warning(f'Bad input value for {sn}: x0= {snpar["x0"][iSN]}')
+                            guess[parlist==f'x{i}_{sn}'] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
+
                         guess[parlist == 'c0_%s'%sn] = snpar['c'][iSN]
                     else:
                         log.warning(f'SN {sn} not found in SN par list {self.options.snparlist}')
@@ -871,7 +873,7 @@ SIGMA_INT: 0.106  # used in simulation"""
                     if 't0' not in trainingresult.snparams[k].keys():
                         trainingresult.snparams[k]['t0'] = 0.0
 
-                    print(f"{k} {trainingresult.snparams[k]['x0']:8.10e} {trainingresult.snparams[k]['x1']:.10f} {trainingresult.snparams[k]['c'] if 'c' in snparams[k] else trainingresult.snparams[k]['c0']:.10f} {trainingresult.snparams[k]['t0']:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",file=foutsn)
+                    print(f"{k} {trainingresult.snparams[k]['x0']:8.10e} {trainingresult.snparams[k]['x1']:.10f} {trainingresult.snparams[k]['c'] if 'c' in trainingresult.snparams[k] else trainingresult.snparams[k]['c0']:.10f} {trainingresult.snparams[k]['t0']:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",file=foutsn)
 
         keys=['num_lightcurves','num_spectra','num_sne']
         yamloutputdict={key.upper():getattr(trainingresult,key) for key in keys}

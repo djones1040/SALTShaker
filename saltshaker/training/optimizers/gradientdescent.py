@@ -173,23 +173,31 @@ class rpropwithbacktracking(salttrainingoptimizer):
         """
         learningrates=np.tile(np.nan,self.saltobj.npar)
         #Parameters I expect to be more or less normal distribution, where the std gives a reasonable size to start learning
-        for idx in list(self.saltobj.icomponents)+list(self.saltobj.icoordinates)+[ self.saltobj.ic
-                ]:
+        for idx in list(self.saltobj.icomponents):
+            if np.std(X[idx])==0: learningrates[idx]=(np.std( X[self.saltobj.icomponents])*1e-2)
+            else: learningrates[idx]=(np.std( X[idx])*.1)
             
-            learningrates[idx]=np.std( X[idx])*.1
+            
+        for idx in list(self.saltobj.icoordinates)+[ self.saltobj.ic
+                ]:
+            learningrates[idx]=(np.std( X[idx])*.1)
+            
+                
+            
         learningrates[self.saltobj.imodelerr]=np.std( X[self.saltobj.imodelerr])*.1
         #x0 should very fractionally from the initialization
-        for idx in [self.saltobj.ix0]:
-            learningrates[idx]= .1* X[idx] 
+        x0=X[self.saltobj.ix0]
+        for idx in self.saltobj.ix0:
+            learningrates[idx]= .1* max(X[idx],x0[np.nonzero(x0)].min()) 
         #The rest of the parameters are mostly dimensionless coeffs of O(1)
         for idx in [self.saltobj.iCL,self.saltobj.ispcrcl_coeffs,self.saltobj.iclscat,self.saltobj.imodelcorr]:
             learningrates[idx]=1e-2
         #Check that all parameters get an initial guess
         try:
-            assert(~np.any(np.isnan(learningrates)))
+            assert(~np.any(np.isnan(learningrates)) and ~ np.any(learningrates<=0))
         except Exception as e:
-            log.critical(f'Uninitialized learning rates: {", ".join(np.unique(self.saltobj.parlist[np.isnan(learningrates)]))}')
-            raise e
+            log.critical(f'Uninitialized learning rates: {", ".join(np.unique(self.saltobj.parlist[np.isnan(learningrates) |(learningrates<=0) ]))}')
+            learningrates[np.isnan(learningrates) |(learningrates<=0) ]=1e-5
         return learningrates*self.learningratesinitscale
 
     def lossfunction(self,params,*args,excludesn=None,**kwargs):

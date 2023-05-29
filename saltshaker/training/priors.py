@@ -69,6 +69,8 @@ def robustcorrelation(x,y):
     
     return jnp.mean(xtrans*ytrans)
 
+def robustmean(x):
+    return jnp.mean(jpsi(x-jnp.median(x)))+jnp.median(x)
 
 class SALTPriors:
 
@@ -194,12 +196,13 @@ class SALTPriors:
     @prior
     def allcolorcoordinatemean(self,width,x):
         idxs=np.concatenate([self.ic,self.icoordinates])
-        return jnp.mean(x[idxs],axis=1)/width
+        return jax.vmap(robustmean)(x[idxs])/width
     
     @prior
     def allcoordinatestd(self,width,x):
         idxs=np.concatenate([self.ic,self.icoordinates])
-        return (jnp.std(x[idxs],axis=1)-1)/width
+        params=x[idxs]
+        return (jnp.var(params,axis=1)-1)/width
         
     @prior
     def allcolorcoordinatecorr(self,width,x):
