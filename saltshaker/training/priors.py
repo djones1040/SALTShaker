@@ -153,10 +153,27 @@ class SALTPriors:
         self.bstdflux=(10**((self.m0guess-27.5)/-2.5) )
                         
         self.priorexecutionlist=list(zip(self.usePriors,self.priorWidths))
-        
+
         self.numresids=jax.eval_shape(self.priorresids,np.random.normal(1e-1,size=self.npar)).shape[0]
 
+
+    @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],diff_argnum=1,jitdefault=True)        
+    def constraintobjective(self,x):
+        return (self.constraintresids(x)**2).sum()
         
+        
+    @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],diff_argnum=1)        
+    def constraintresids(self,x):
+        residuals=[]
+        for prior in self.constraints:
+            try:
+                priorFunction=self.priors[prior]
+            except:
+                raise ValueError('Invalid constraint supplied: {}'.format(prior)) 
+            residuals+=[jnp.atleast_1d(priorFunction(1,x))]
+        return jnp.concatenate(  residuals)
+    
+    
     @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],diff_argnum=1)        
     def priorresids(self,x):
         """Given a parameter vector returns a residuals vector representing the priors"""

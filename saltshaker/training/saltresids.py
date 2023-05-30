@@ -144,11 +144,18 @@ class SALTResids:
         self.priorWidths = []
         self.boundedParams = []
         self.bounds = []
+        self.constraints=[]
+        
         
         for opt in self.__dict__.keys():
             if opt.startswith('prior_'):
                 self.usePriors += [opt[len('prior_'):]]
                 self.priorWidths += [self.__dict__[opt]]
+                
+            elif opt.startswith('constraint_'):
+                if self.__dict__[opt]:
+                    self.constraints+=[opt[len('constraint_'):]]
+                    
             elif opt.startswith('bound_'):
                 self.boundedParams += [opt[len('bound_'):]]
                 self.bounds += [tuple([float(x) for x in self.__dict__[opt]])]
@@ -513,6 +520,9 @@ class SALTResids:
         for prior in __priors__:
                 successful=successful&wrapaddingargument(config,'priors',prior ,type=float,clargformat="--prior_{key}",
                                                         help=f"prior on {prior}",default=SUPPRESS)
+        for prior in __priors__:
+                successful=successful&wrapaddingargument(config,'constraints',prior ,type=bool,clargformat="--constraint_{key}",
+                                                        help=f"Constraint on {prior}",default=SUPPRESS)
 
         # bounds
         for param in cls.parameters:

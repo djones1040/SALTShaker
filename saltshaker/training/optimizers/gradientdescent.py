@@ -10,9 +10,10 @@ interactive= sys.stdout.isatty()
 try: from IPython import display
 except: pass
 
-from functools import reduce
+from functools import reduce,partial
 
 
+from scipy.optimize import minimize
 
 
 import numpy as np
@@ -49,7 +50,8 @@ class rpropwithbacktracking(salttrainingoptimizer):
         self.searchsize = options.searchsize
         self.convergencetolerance= options.convergencetolerance
         
-
+        self.constrainttolerance= 1e-2
+        
         assert(0<self.searchsize<1)
         assert(0<self.searchtolerance<1)
         assert(0<self.etaminus<1)
@@ -266,6 +268,14 @@ class rpropwithbacktracking(salttrainingoptimizer):
             Xnew,newloss, newsign, newgrad,newrates  = self.rpropiter(X, Xprev,loss,sign,rates,**kwargs)
             #Take the direction proposed and do a line-search in that direction
             searchdir=jnp.select([~jnp.isinf(X),jnp.isinf(X)], [ Xnew-X, 0])
+            
+            if len(self.saltobj.constraints)==0:
+                pass
+            else:
+                constraintval,constraintgrad=self.saltobj.priors.constraintobjective(X,diff='valueandgrad')
+                if (constraintgrad @ constraintgrad) ==0: pass
+                else: searchdir=searchdir - constraintgrad @ searchdir / (constraintgrad @ constraintgrad) *constraintgrad
+            
             if newgrad @ searchdir < 0:
                 gamma=self.twowaybacktracking(X,newloss,newgrad,searchdir,**kwargs)
                 newrates*=gamma
@@ -279,6 +289,18 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 else:
                     gamma=1
             Xnew= X+ gamma*searchdir
+            
+            if len(self.saltobj.constraints)==0:
+                pass
+            else:
+                constraintval=self.saltobj.priors.constraintobjective(X)
+                if constraintval> self.constrainttolerance:
+                
+                    result=minimize(self.saltobj.priors.constraintobjective, Xnew,jac=partial(self.saltobj.priors.constraintobjective,diff='grad'), tol=1e-2,method='cg')
+                    log.debug(str(result))
+                    Xnew=result.x
+                
+                
             return Xnew, X, newloss,newsign, newgrad,newrates
             
         for i in range(niter):
@@ -424,7 +446,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         https://doi.org/10.1016/S0925-2312(01)00700-7
         """
         lossval,grad=  self.lossfunction(X,*args,**kwargs, diff='valueandgrad')
-        
+            
         sign=jnp.sign(grad)
         indicatorvector= prevsign *sign
 
@@ -440,4 +462,6 @@ class rpropwithbacktracking(salttrainingoptimizer):
         ])
         #Set sign to 0 after a previous change
         sign= (sign * greatereq)
+        
+        
         return jnp.clip(Xnew,*self.Xbounds), lossval, sign, grad, learningrates
