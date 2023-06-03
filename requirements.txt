@@ -71,3 +71,4 @@ tzdata==2023.3
 wcwidth==0.2.6
 webencodings==0.5.1
 zipp==3.15.0
+iminuit==2.16.0

@@ -16,7 +16,7 @@ class SALTShakerTest(TestCommand):
 
 AUTHOR = 'David Jones, Rick Kessler'
 AUTHOR_EMAIL = 'david.jones@ucsc.edu'
-VERSION = '2.6'
+VERSION = '2.7'
 LICENSE = 'BSD'
 URL = 'saltshaker.readthedocs.org'
 
@@ -44,7 +44,7 @@ setup(
                       'emcee>=3.1.4',
                       'extinction>=0.4.6',
                       'f90nml>=0.1',
-                      'iminuit>=1.4.9',
+                      'iminuit>=2.16.0',
                       'jax>=0.4.11',
                       'jaxlib>=0.4.11',
                       'matplotlib>=3.7.1',
