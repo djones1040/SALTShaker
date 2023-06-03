@@ -46,7 +46,7 @@ import pylab as plt
 
 import jax
 from jax import numpy as jnp
-from jaxlib.xla_extension import DeviceArray
+#from jaxlib.xla_extension import DeviceArray
 from jax.scipy import linalg as jaxlinalg
 from jax.experimental import sparse
 from jax import lax
