@@ -19,7 +19,6 @@ f90nml==0.1
 fonttools==4.39.4
 html5lib==1.1
 hypothesis==6.75.9
-iminuit==1.4.9
 importlib-metadata==6.6.0
 iniconfig==2.0.0
 ipython==8.14.0
