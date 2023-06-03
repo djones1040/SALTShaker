@@ -16,7 +16,7 @@ class SALTShakerTest(TestCommand):
 
 AUTHOR = 'David Jones, Rick Kessler'
 AUTHOR_EMAIL = 'david.jones@ucsc.edu'
-VERSION = '2.0'
+VERSION = '2.6'
 LICENSE = 'BSD'
 URL = 'saltshaker.readthedocs.org'
 
@@ -38,22 +38,19 @@ setup(
 	license=LICENSE,
 	long_description=open('README.md').read(),
 #         include_dirs=numpy.distutils.misc_util.get_numpy_include_dirs(),
-	install_requires=['cython',
-                          'numpy>=1.5.0',
-                          'scipy>=1.9.0',
-                          'extinction>=0.2.2',
-                          'astropy>=0.4.0',
-                          'pytest-astropy',
-                          'jax>= 0.4.3',
-                          'sncosmo',
-                          'astroquery',
-                          'matplotlib',
-                          'emcee',
-                          'ipython',
-                          'pandas',
-                          'f90nml',
-                          'iminuit',
-                          'tqdm',
-                          'pyyaml',
-                          'pyParz'],
-	)
+	install_requires=['astropy>=5.3',
+                      'astroquery>=0.4.6',
+                      'Cython>=0.29.35',
+                      'emcee>=3.1.4',
+                      'extinction>=0.4.6',
+                      'f90nml>=0.1',
+                      'iminuit>=1.4.9',
+                      'jax>=0.4.11',
+                      'jaxlib>=0.4.11',
+                      'matplotlib>=3.7.1',
+                      'pandas>=2.0.2',
+                      'pyParz>=1.0.2',
+                      'pytest>=7.3.1',
+                      'sncosmo>=2.10.0',
+                      'tqdm>=4.65.0',
+                      'scipy>=1.10.1'])
