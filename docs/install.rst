@@ -14,7 +14,7 @@ Currently, the software can only be installed via GitHub::
 If you wish, create an isolated conda environment for
 the code::
 
-  conda create -n saltshaker python=3.7
+  conda create -n saltshaker python=3.10
   conda activate saltshaker
   conda install numpy
   conda install cython
@@ -22,4 +22,4 @@ the code::
 Finally, install the code with::
   
   cd SALTShaker
-  python setup.py install
+  pip install .

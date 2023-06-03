@@ -21,32 +21,39 @@ With SALTShaker we have developed an open-source
 model training framework and created the "SALT3" model.
 We more than doubled the amount of photometric and
 spectroscopic data used for model training and
-have extended the SALT framework to 11,000 Angstroms.  SALT3 will make use
-of *iz* data from PS1, the Vera Rubin Observatory,
+have extended the SALT framework to 11,000 Angstroms.  In the coming years, SALT3 will make use
+of data from the Vera Rubin Observatory,
 and the *Nancy Grace Roman Space Telescope* and can be re-trained easily in
 the coming years as more SN Ia data become available.
 
-Please report bugs, issues and requests via the SALTShaker GitHub page.
+Please report bugs, issues and requests via the `SALTShaker GitHub page <https://github.com/djones1040/SALTShaker/issues>`_.
 
 SALT3 Model and Training Data
 ==========================================
 
-The first version of the SALT3 model has been released in:
+The latest version of the SALT3 model has been released in:
     
-`Kenworthy et al., 2021, ApJ, submitted <https://arxiv.org/abs/2104.07795>`_
+`Taylor et al., 2023, MNRAS, 520, 5209T <https://ui.adsabs.harvard.edu/abs/2023MNRAS.520.5209T/abstract>`_
 
-The SALT3 model files are linked `here <_static/salt3-k21.tar.gz>`_.
+This model includes full re-calibration of the SALT3 training data (`Brout et al., 2021 <https://arxiv.org/abs/2112.03864>`_) to match SALT training sets used in the `Pantheon+ analysis <https://ui.adsabs.harvard.edu/abs/2022ApJ...938..113S/abstract>`_.  Other recent SALT3 publications include:
+
+`Pierel et al., 2021, ApJ, 911, 96P <https://ui.adsabs.harvard.edu/abs/2021ApJ...911...96P/abstract>`_: model-independent simulation framework for SALT3 validation
+`Kenworthy et al., 2021, ApJ, 923, 265K <https://ui.adsabs.harvard.edu/abs/2021ApJ...923..265K/abstract>`_: SALT3 model and SALTShaker framework.  The first SALT3 version.
+`Pierel et al., 2022, ApJ, 939, 11P <https://ui.adsabs.harvard.edu/abs/2022ApJ...939...11P/abstract>`_: A near-infrared extension to the SALT3 model
+`Dai et al., 2023, ApJ, in press <https://ui.adsabs.harvard.edu/abs/2022arXiv221206879D/abstract>`_: SALT3 model validation with extensive simulations and presentation
+`Jones et al., 2023, ApJ, in press <https://ui.adsabs.harvard.edu/abs/2022arXiv220905584J/abstract>`_: a host-galaxy mass-dependent SALT3 model
+
+The latest SALT3 model files are linked `here <_static/salt3-f22.tar.gz>`_.
 SALT3 light curve fits can be performed using `sncosmo <https://sncosmo.readthedocs.io/en/latest/>`_ 
 (currently the `latest version <https://github.com/sncosmo/sncosmo>`_ on GitHub is required)
 or `SNANA <https://snana.uchicago.edu/>`_ with the SALT3.K21
 model, with a brief sncosmo example given below.
 
-The SALT3 training data is also fully public and included `here <_static/SALT3TRAIN_K21_PUBLIC.tgz>`_.  This release includes all photometry and spectra
+The latest SALT3 training data is also fully public and included `here <_static/SALT3TRAIN_K21-Frag.tgz>`_.  This release includes all photometry and spectra
 along with everything required to run the code.  Once SALTShaker has been installed via the instructions in :ref:`install`, the SALT3 model can be
-(re)trained with the following command::
+(re)trained with the following command using the files in this directory::
 
-  trainsalt -c Train_SALT3_public.conf
-
+  trainsalt -c traingradient.conf
 
   
 Example SALT3 Fit
@@ -78,7 +85,7 @@ Then, in a python terminal::
 Pipeline
 ========
 
-We are developing a pipeline to fully test and validate the
+In `Dai et al., 2023 <https://ui.adsabs.harvard.edu/abs/2022arXiv221206879D/abstract>`_ we present a pipeline to fully test and validate the
 SALT3 model in the context of cosmological measurements.  Defails
 are given in :ref:`pipeline`.
 
