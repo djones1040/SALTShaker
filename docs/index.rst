@@ -55,9 +55,7 @@ model, with a brief sncosmo example given below.
 
 The latest SALT3 training data is also fully public and included `here <_static/SALT3TRAIN_K21-Frag.tgz>`_.  This release includes all photometry and spectra
 along with everything required to run the code.  Once SALTShaker has been installed via the instructions in :ref:`install`, the SALT3 model can be
-(re)trained with the following command using the files in this directory::
-
-  trainsalt -c traingradient.conf
+(re)trained following the instructions in :ref:`gettingstarted`.
 
   
 Example SALT3 Fit
@@ -101,6 +99,7 @@ are given in :ref:`pipeline`.
    :titlesonly:
 
    install
+   gettingstarted
    data
    training
    simulation

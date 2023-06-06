@@ -13,8 +13,10 @@ to be installed separately via conda first::
   conda create -n saltshaker python=3.10
   conda activate saltshaker
   conda install -c conda-forge jax
-  pip install saltshaker
-  
+  pip install saltshaker-sn
+
+Check out :ref:`gettingstarted` to start using SALTShaker.
+
 Install from GitHub
 =================================
 
