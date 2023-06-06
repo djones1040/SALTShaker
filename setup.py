@@ -21,7 +21,7 @@ LICENSE = 'BSD'
 URL = 'saltshaker.readthedocs.org'
 
 setup(
-	name='saltshaker',
+	name='saltshaker-sn',
 	version=VERSION,
         packages=find_packages('.'),
 	#packages=['bin','saltshaker','saltshaker.tests','saltshaker.data','saltshaker.simulation',
