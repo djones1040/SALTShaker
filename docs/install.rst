@@ -4,7 +4,18 @@
 Installation
 ************
 
-Install using GitHub
+Install from PyPI
+=================
+
+SALTShaker can be installed with PyPI, but jax might need
+to be installed separately via conda first::
+
+  conda create -n saltshaker python=3.10
+  conda activate saltshaker
+  conda install -c conda-forge jax
+  pip install saltshaker
+  
+Install from GitHub
 =================================
 
 Currently, the software can only be installed via GitHub::
