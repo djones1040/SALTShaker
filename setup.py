@@ -16,7 +16,7 @@ class SALTShakerTest(TestCommand):
 
 AUTHOR = 'David Jones, Rick Kessler'
 AUTHOR_EMAIL = 'david.jones@ucsc.edu'
-VERSION = '2.7'
+VERSION = '2.8'
 LICENSE = 'BSD'
 URL = 'saltshaker.readthedocs.org'
 
@@ -31,7 +31,10 @@ setup(
         #entry_points={'console_scripts':['trainsalt = saltshaker.scripts.trainsalt']},
         scripts=['saltshaker/scripts/trainsalt','saltshaker/scripts/runpipe'],
 #	scripts=['bin/trainsalt','bin/runpipe','saltshaker/validation/SynPhotPlot.py','saltshaker/validation/ValidateLightcurves.py','saltshaker/validation/ValidateModel.py','saltshaker/validation/ValidateSpectra.py','saltshaker/validation/figs/plotSALTModel.py'],
-	package_data={'': ['saltshaker/initfiles/*.dat','saltshaker/initfiles/*.txt','saltshaker/data/kcor/*.fits','saltshaker/config/*conf','saltshaker/scripts/*']},
+	#package_data={'': ['saltshaker/initfiles/*.dat','saltshaker/initfiles/*.txt','saltshaker/data/kcor/*.fits','saltshaker/config/*conf','saltshaker/scripts/*']},
+    package_data={'saltshaker.initfiles': ['*.dat','*.txt'],
+                  'saltshaker.data.kcor':['*.fits'],
+                  'saltshaker.config':['*.conf']},
 	include_package_data=True,
 	author=AUTHOR,
 	author_email=AUTHOR_EMAIL,
