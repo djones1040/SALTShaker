@@ -54,7 +54,8 @@ from jax import lax
 from collections import namedtuple
 from argparse import SUPPRESS
 
-
+from os import path
+import pickle
 
 import time
 import sys
@@ -349,19 +350,42 @@ class SALTResids:
         log.info(f'Separating spectroscopic data into {len(specpadding)} batches, at a space efficiency of {efficiency:.0%}')
         if efficiency<efficiencywarningthreshold:
             log.warning(f'Efficiency less than {efficiencywarningthreshold:.0%}, consider increasing batching of data')
-
-        log.info('Calculating cached quantities for speed in fitting loop')
+        log.info('Calculating cached quantities')
         start=time.time()
-        iterable=list(self.datadict.items())
-        #Shuffle it so that tqdm's estimates are hopefully more accurate
-        random.shuffle(iterable)
-        if sys.stdout.isatty() or in_ipynb:
-            iterable=tqdm(iterable,smoothing=.1)
-        self.datadict={snid: sn if isinstance(sn,SALTfitcacheSN) else SALTfitcacheSN(sn,self,self.kcordict,photpadding,specpadding)  for snid,sn in iterable}
-        log.info('Batching data and constructing batched methods')
-        self.allphotdata = sum([[x.photdata[lc] for lc in x.photdata ]for x in self.datadict.values() ],[])
-        self.batchedphotdata= batching.batchdatabysize(self.allphotdata)
         
+        self.allphotdata = sum([[x.photdata[lc] for lc in x.photdata ]for x in self.datadict.values() ],[])
+        self.allspecdata = sum([[x.specdata[key] for key in x.specdata ]for x in self.datadict.values() ],[])
+        
+        if bool(self.trainingcachefile) and path.exists(self.trainingcachefile):
+            log.info(f'Loading precomputed quantities from file {self.trainingcachefile}')
+            with open(self.trainingcachefile,'rb') as file: cachedfile=  pickle.load(file)
+            
+            self.datadict = cachedfile['datadict']
+            self.batchedphotdata= cachedfile['batchedphotdata']
+            self.batchedspecdata= cachedfile['batchedspecdata']
+
+        else:
+            
+            log.info('Precomputing filters')
+            iterable=list(self.datadict.items())
+            #Shuffle it so that tqdm's estimates are hopefully more accurate
+            random.shuffle(iterable)
+            if sys.stdout.isatty() or in_ipynb:
+                iterable=tqdm(iterable,smoothing=.1)
+            self.datadict={snid: sn if isinstance(sn,SALTfitcacheSN) else SALTfitcacheSN(sn,self,self.kcordict,photpadding,specpadding)  for snid,sn in iterable}
+            log.info('Batching data')
+            
+            self.batchedphotdata= batching.batchdatabysize(self.allphotdata)
+            self.batchedspecdata= batching.batchdatabysize(self.allspecdata)
+            if self.trainingcachefile:
+                log.info(f'Writing precomputed quantities to file {self.trainingcachefile}')
+                with open( self.trainingcachefile,'wb') as file:
+                    pickle.dump({'datadict':self.datadict,
+                                'batchedphotdata':self.batchedphotdata,
+                                'batchedspecdata':self.batchedspecdata},file)
+            
+        log.info('Constructing batched methods')
+      
         self.batchedphotresiduals=batching.batchedmodelfunctions(lambda *args,**kwargs: modeledtraininglightcurve.modelresidual(*args,**kwargs)['residuals'],
                                   self.batchedphotdata, modeledtraininglightcurve,
                                   flatten=True)
@@ -378,11 +402,6 @@ class SALTResids:
                                   self.batchedphotdata, modeledtraininglightcurve,
                                   ))
 
-        
-        self.allspecdata = sum([[x.specdata[key] for key in x.specdata ]for x in self.datadict.values() ],[])
-
-        self.batchedspecdata= batching.batchdatabysize(self.allspecdata)
-        
         self.batchedspecresiduals=batching.batchedmodelfunctions(lambda *args,**kwargs: modeledtrainingspectrum.modelresidual(*args,**kwargs)['residuals'],
                                   self.batchedspecdata, modeledtrainingspectrum,
                                   flatten=True)
@@ -653,6 +672,33 @@ class SALTResids:
                 yield (name,(x**2).sum(),ndof)
 
         return list(loop())
+    @partial(jaxoptions,static_argnums=[0],jitdefault=True)
+    def transformtoconstrainedparams(self,guess):
+        idxs=np.concatenate([self.ic,self.icoordinates])
+        coordinates=guess[idxs]
+        from jax.scipy import linalg as jlin
+        from functools import reduce
+        
+        def choldecorrelate(data):
+            coordinates=data
+            coordinates=coordinates-jnp.mean(coordinates,axis=1)[:,np.newaxis]
+            chol=jlin.cholesky(jnp.cov(coordinates))
+            return jlin.solve_triangular(chol, coordinates)
+
+        decorrelated=reduce(lambda x,i: choldecorrelate(x),np.arange(3),coordinates)
+        
+        for i,idx,corrected in zip(range(decorrelated.shape[0]),idxs,decorrelated):
+            if i >= self.ic.shape[0]:
+                guess=guess.at[idx].set(corrected)
+            else:
+                guess=guess.at[idx].set(corrected *jnp.std(guess[idx]))
+        coordinates=guess[idxs]
+        return guess.at[self.icomponents[:,:(self.waveknotloc.size-self.bsorder) * 2]].set(0)
+        
+    @partial(jaxoptions, static_argnums=[0,3,4,5,6 ,7],static_argnames= ['fixfluxes','fixuncertainties','dopriors','dospec','usesns'],diff_argnum=1,jitdefault=True) 
+    def constrainedlossfunction(self,params,*args,**kwargs):
+        return self.maxlikefit(self.transformtoconstrainedparams(params),*args,**kwargs)
+
 
     @partial(jaxoptions, static_argnums=[0,3,4,5,6 ,7],static_argnames= ['fixfluxes','fixuncertainties','dopriors','dospec','usesns'],diff_argnum=1,jitdefault=True) 
     def maxlikefit(
@@ -671,6 +717,7 @@ class SALTResids:
         chi2: float
             Goodness of fit of model to training data   
         """
+                
         if cachedresults is None: cachedresults=None,None
         if not (usesns is  None): raise NotImplementedError('Have not implemented a restricted set of sne')
 

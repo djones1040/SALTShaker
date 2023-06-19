@@ -45,7 +45,7 @@ from saltshaker.training.init_hsiao import init_hsiao, init_kaepora, init_errs,i
 from saltshaker.training.base import TrainSALTBase
 from saltshaker.training import saltresids
 from saltshaker.training import optimizers
-
+from saltshaker.training import colorlaw
 
 from saltshaker.validation import ValidateParams,datadensity
 from saltshaker.validation import ValidateLightcurves
@@ -171,8 +171,10 @@ class TrainSALT(TrainSALTBase):
                 phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_kaepora(
                     self.options.initm0modelfile,self.options.initm1modelfile,
                     Bfilt=self.options.initbfilt,flatnu=_flatnu,**init_options)
-
-            
+        #zero out the flux and the 1st derivative at the start of the phase range
+        m0knots[:(waveknotloc.size-self.options.bsorder) * 2]=0
+        m1knots[:(waveknotloc.size-self.options.bsorder) * 2]=0
+        
         init_options['phasesplineres'] = self.options.error_snake_phase_binsize
         init_options['wavesplineres'] = self.options.error_snake_wave_binsize
         init_options['order']=self.options.errbsorder
@@ -293,11 +295,12 @@ class TrainSALT(TrainSALTBase):
                     else:
                         clwave = np.linspace(self.options.waverange[0],self.options.waverange[1],1000)
                         salt2cl = SALT2ColorLaw([2800.,7000.], [-0.504294,0.787691,-0.461715,0.0815619])(clwave)
+                        initcolorlaw=colorlaw.getcolorlaw(self.options.colorlaw_function[0])(self.options.n_colorpars[0],self.options.colorwaverange)
                         def bestfit(p):
-                            cl_init = SALT2ColorLaw(self.options.colorwaverange, p)(clwave)
+                            cl_init = initcolorlaw(1, p,clwave)
                             return cl_init-salt2cl
 
-                        md = least_squares(bestfit,self.options.n_colorpars[0])
+                        md = least_squares(bestfit,np.zeros(self.options.n_colorpars[0]))
                         if 'termination conditions are satisfied' not in md.message and \
                            'termination condition is satisfied' not in md.message:
                             
@@ -386,10 +389,9 @@ class TrainSALT(TrainSALTBase):
 
                     zHel,x0,x1,c = datadict[sn].zHelio,guess[parlist == f'x0_{sn}'],guess[parlist == f'x1_{sn}'],guess[parlist == f'c_{sn}']
                     mwebv = datadict[sn].MWEBV
-                    colorlaw = SALT2ColorLaw(self.options.colorwaverange,guess[parlist == 'cl'])
                     
                     uncalledModel = specflux(specdata[k].tobs,specdata[k].wavelength,phase,wave,
-                                             m0,m1,colorlaw,zHel,x0,x1,c,mwebv=mwebv)
+                                             m0,m1,lambda wave : initcolorlaw( 1, guess[parlist=='cl0'],wave),zHel,x0,x1,c,mwebv=mwebv)
         
                     def recalpars(x):
                         recalexp=np.exp((drecaltermdrecal*x[1:][np.newaxis,:]).sum(axis=1))
