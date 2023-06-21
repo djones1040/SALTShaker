@@ -63,7 +63,11 @@ class SALTparameters:
         for var in self.__slots__:
             indexvar=f'i{var}'
             if isinstance(data,dict) and indexvar in data:
-                vals=parsarray[data[indexvar]]
+                if data[indexvar].size>0:
+                    
+                    vals=parsarray[data[indexvar]]
+                else:
+                    vals=np.array([])
             elif '__indexattributes__' in dir(data) and indexvar in data.__indexattributes__:
                 vals=parsarray[getattr(data,indexvar)]
                 
@@ -221,15 +225,12 @@ class modeledtraininglightcurve(modeledtrainingdata):
         self.ix0=sn.ix0
         self.ic=sn.ic
         self.iclscat=residsobj.iclscat
-        self.imodelcorrs=[residsobj.imodelcorr01]    
-        self.imodelcorrs_coordinds=[(0,1)]
-        self.imodelerrs=[residsobj.imodelerr0 ,residsobj.imodelerr1    ]
-        if residsobj.host_component:
-            self.imodelcorrs+=[(residsobj.imodelcorr0host)]
-            self.imodelcorrs_coordinds +=[(0,2)]
-            self.imodelerrs+=[residsobj.imodelerrhost]
-        self.imodelcorrs=np.array(self.imodelcorrs)
-        self.imodelerrs=np.array(self.imodelerrs)
+        self.imodelcorrs= np.array([np.arange(x,y+1) for x,y in (zip(residsobj.corrmin,residsobj.corrmax))])
+        self.imodelcorrs_coordinds= np.array([(-1,comb[1]) if 'host'== comb[0] else ((comb[0],-1) if 'host'== comb[1] else comb) for comb in residsobj.corrcombinations]
+           )
+                
+        self.imodelerrs= np.array([np.arange(x,y+1) for x,y in (zip(residsobj.errmin,residsobj.errmax))])
+
         
         self.wavebasis= residsobj.wavebasis
         
@@ -321,10 +322,10 @@ class modeledtraininglightcurve(modeledtrainingdata):
             #Redden flux coefficients
             fluxcoeffsreddened= (colorexp[np.newaxis,:]*fluxcoeffs.reshape( self.bsplinecoeffshape)).flatten()
             #Multiply spline bases by flux coefficients
-            return self.pcderivsparse @ fluxcoeffsreddened
+            return jnp.clip(self.pcderivsparse @ fluxcoeffsreddened,0,None)
         else:    
             #Integrate basis functions over wavelength and sum over flux coefficients
-            return ( self.pcderivsparse @ fluxcoeffs) @ colorexp 
+            return jnp.clip(( self.pcderivsparse @ fluxcoeffs) @ colorexp ,0,None)
 
 #    @partial(jaxoptions, diff_argnum=1)                                  
     def modelfluxvariance(self,pars):
@@ -343,7 +344,6 @@ class modeledtraininglightcurve(modeledtrainingdata):
         errorsurfaces=((coordinates[:len(pars.modelerrs),np.newaxis]*pars.modelerrs)**2 ).sum(axis=0)
         for (i,j),correlation in zip(self.imodelcorrs_coordinds,pars.modelcorrs):
             errorsurfaces= errorsurfaces+2 *correlation*coordinates[i]*coordinates[j]* pars.modelerrs[i]*pars.modelerrs[j]
-
         errorsurfaces=self.errordesignmat @ errorsurfaces
         modelfluxvar=colorexp**2 * self.varianceprefactor**2 * pars.x0**2* errorsurfaces
         return jnp.clip(modelfluxvar ,0,None)

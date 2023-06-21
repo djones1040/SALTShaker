@@ -214,13 +214,14 @@ class TrainSALT(TrainSALTBase):
         if self.options.n_colorpars:
             parlist = np.append(parlist,[[f'cl{i}']*num for i,num in enumerate(self.options.n_colorpars)])
         if self.options.error_snake_phase_binsize and self.options.error_snake_wave_binsize:
-            for i in range(self.options.n_components): parlist = np.append(parlist,['modelerr_{}'.format(i)]*n_errphaseknots*n_errwaveknots)
+            for i in range(self.options.n_errorsurfaces): 
+                parlist = np.append(parlist,['modelerr_{}'.format(i)]*n_errphaseknots*n_errwaveknots)
+                for j in range(i):
+                    parlist = np.append(parlist,[f'modelcorr_{j}{i}']*n_errphaseknots*n_errwaveknots)
             if self.options.host_component:
                 parlist = np.append(parlist,['modelerr_host']*len(mhostvarknots))
                 parlist = np.append(parlist,['modelcorr_0host']*len(mhostvarknots))
                 parlist = np.append(parlist,['modelcorr_1host']*len(mhostvarknots))
-            if self.options.n_components >= 2:
-                parlist = np.append(parlist,['modelcorr_01']*n_errphaseknots*n_errwaveknots)
         
         if self.options.n_colorscatpars:
             parlist = np.append(parlist,['clscat']*(self.options.n_colorscatpars))
@@ -315,9 +316,11 @@ class TrainSALT(TrainSALTBase):
             guess[(parlist == 'm0') & (guess < 0)] = 1e-4
             
             guess[parlist=='modelerr_0']=m0varknots
-            guess[parlist=='modelerr_1']=m1varknots
+            if self.options.n_errorsurfaces > 1:
+                guess[parlist=='modelerr_1']=m1varknots
+                guess[parlist=='modelcorr_01']=m0m1corrknots
             if self.options.host_component: guess[parlist=='modelerr_host']=1e-9 # something small...  #mhostvarknots
-            guess[parlist=='modelcorr_01']=m0m1corrknots
+            
 
             # if SN param list is provided, initialize with these params
             if self.options.snparlist:

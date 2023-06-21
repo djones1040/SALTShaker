@@ -53,6 +53,7 @@ from jax import lax
 
 from collections import namedtuple
 from argparse import SUPPRESS
+from itertools import combinations_with_replacement
 
 from os import path
 import pickle
@@ -353,8 +354,6 @@ class SALTResids:
         log.info('Calculating cached quantities')
         start=time.time()
         
-        self.allphotdata = sum([[x.photdata[lc] for lc in x.photdata ]for x in self.datadict.values() ],[])
-        self.allspecdata = sum([[x.specdata[key] for key in x.specdata ]for x in self.datadict.values() ],[])
         
         if bool(self.trainingcachefile) and path.exists(self.trainingcachefile):
             log.info(f'Loading precomputed quantities from file {self.trainingcachefile}')
@@ -363,6 +362,8 @@ class SALTResids:
             self.datadict = cachedfile['datadict']
             self.batchedphotdata= cachedfile['batchedphotdata']
             self.batchedspecdata= cachedfile['batchedspecdata']
+            self.allphotdata = sum([[x.photdata[lc] for lc in x.photdata ]for x in self.datadict.values() ],[])
+            self.allspecdata = sum([[x.specdata[key] for key in x.specdata ]for x in self.datadict.values() ],[])
 
         else:
             
@@ -374,7 +375,9 @@ class SALTResids:
                 iterable=tqdm(iterable,smoothing=.1)
             self.datadict={snid: sn if isinstance(sn,SALTfitcacheSN) else SALTfitcacheSN(sn,self,self.kcordict,photpadding,specpadding)  for snid,sn in iterable}
             log.info('Batching data')
-            
+            self.allphotdata = sum([[x.photdata[lc] for lc in x.photdata ]for x in self.datadict.values() ],[])
+            self.allspecdata = sum([[x.specdata[key] for key in x.specdata ]for x in self.datadict.values() ],[])
+
             self.batchedphotdata= batching.batchdatabysize(self.allphotdata)
             self.batchedspecdata= batching.batchdatabysize(self.allspecdata)
             if self.trainingcachefile:
@@ -515,7 +518,10 @@ class SALTResids:
                                                 help="NOT IMPLEMENTED: if set, fit for a host component.  Must equal 'mass', for now (default=%(default)s)")
         successful=successful&wrapaddingargument(config,'modelparams','n_colorpars',    nargs='+',      type=int,
                                                 help='number of degrees of the phase-independent color law polynomial (default=%(default)s)')
-                                                
+
+        successful=successful&wrapaddingargument(config,'modelparams','n_errorsurfaces',          type=int, default=2,
+                                                help='number of surfaces used for the error model (default=%(default)s)')
+
         successful=successful&wrapaddingargument(config,'modelparams','colorlaw_function',   nargs='+',      type=str,
                                                 help='color law function, see colorlaw.py (default=%(default)s)')               
 
@@ -542,24 +548,26 @@ class SALTResids:
 
     
     def set_param_indices(self):
+    
 
-        if not self.host_component:
-            self.corrcombinations=[(0,1)]#=sum([[(i,j) for j in range(i+1,self.n_components)]for i in range(self.n_components)] ,[])
-        else:
-            self.corrcombinations=[(0,1),(0,'host')]
         self.m0min = np.min(np.where(self.parlist == 'm0')[0])
         self.m0max = np.max(np.where(self.parlist == 'm0')[0])
 
-        self.errmin = [np.min(np.where(self.parlist == f'modelerr_{i}')[0]) for i in range(self.n_components)]
-        self.errmax = [np.max(np.where(self.parlist == f'modelerr_{i}')[0]) for i in range(self.n_components)]
+        self.errmin = [np.min(np.where(self.parlist == f'modelerr_{i}')[0]) for i in range(self.n_errorsurfaces)]
+        self.errmax = [np.max(np.where(self.parlist == f'modelerr_{i}')[0]) for i in range(self.n_errorsurfaces)]
         if self.host_component:
             self.errmin += [np.min(np.where(self.parlist == 'modelerr_host')[0])]
             self.errmax += [np.max(np.where(self.parlist == 'modelerr_host')[0])]
         self.errmin = tuple(self.errmin)
         self.errmax = tuple(self.errmax)
 
+        self.corrcombinations=[x for x in  combinations_with_replacement(np.arange(self.n_errorsurfaces),2) if x[0]!=x[1]]
+        if self.host_component:
+            self.corrcombinations+=[(0,'host')]#=sum([[(i,j) for j in range(i+1,self.n_components)]for i in range(self.n_components)] ,[])
+
         self.corrmin = tuple([np.min(np.where(self.parlist == 'modelcorr_{}{}'.format(i,j))[0]) for i,j in self.corrcombinations]) 
         self.corrmax = tuple([np.max(np.where(self.parlist == 'modelcorr_{}{}'.format(i,j))[0]) for i,j in self.corrcombinations]) 
+        
         self.im0 = np.where(self.parlist == 'm0')[0]
         self.im1 = np.where(self.parlist == 'm1')[0]
         self.imhost = np.where(self.parlist == 'mhost')[0]
@@ -672,6 +680,7 @@ class SALTResids:
                 yield (name,(x**2).sum(),ndof)
 
         return list(loop())
+        
     @partial(jaxoptions,static_argnums=[0],jitdefault=True)
     def transformtoconstrainedparams(self,guess):
         idxs=np.concatenate([self.ic,self.icoordinates])
@@ -696,7 +705,7 @@ class SALTResids:
         return guess.at[self.icomponents[:,:(self.waveknotloc.size-self.bsorder) * 2]].set(0)
         
     @partial(jaxoptions, static_argnums=[0,3,4,5,6 ,7],static_argnames= ['fixfluxes','fixuncertainties','dopriors','dospec','usesns'],diff_argnum=1,jitdefault=True) 
-    def constrainedlossfunction(self,params,*args,**kwargs):
+    def constrainedmaxlikefit(self,params,*args,**kwargs):
         return self.maxlikefit(self.transformtoconstrainedparams(params),*args,**kwargs)
 
 
@@ -878,7 +887,8 @@ class SALTResids:
         covmodel=[]
         corrmodel=self.CorrelationModel(Xfinal,evaluatePhase=self.phaseout,evaluateWave=self.waveout)
         for i,combination in enumerate(self.corrcombinations):
-            covmodel+= [(*combination,corrmodel[i] * errmodel[combination[0]] * errmodel[combination[1]])]
+            
+            covmodel+= [(*combination,corrmodel[i] * errmodel[combination[0]] * errmodel[-1 if combination[1]=='host' else combination[1]])]
     
         return salttrainingresult( num_lightcurves=self.num_lc,num_spectra=self.num_spectra,num_sne=len(self.datadict), parlist=self.parlist,
             params=Xfinal,params_raw=optimizedparams,phase= self.phaseout ,wave=self.waveout, 
@@ -992,6 +1002,7 @@ class SALTResids:
     
     def ErrModel(self,x,evaluatePhase=None,evaluateWave=None):
         """Returns modeled variance of SALT model components as a function of phase and wavelength"""
+        x=np.array(x)
         phase=self.phase if evaluatePhase is None else evaluatePhase
         wave=self.wave if evaluateWave is None else evaluateWave
         components=[]
@@ -1011,7 +1022,8 @@ class SALTResids:
                 components+=[  bisplev(phase,
                                wave,
                                (self.errphaseknotloc,self.errwaveknotloc,errpars,self.errbsorder,self.errbsorder))]
-            
+        if self.n_components > self.n_errorsurfaces :
+            components+=(self.n_components-self.n_errorsurfaces)*[np.zeros((phase.size,wave.size))]
         return components
 
 

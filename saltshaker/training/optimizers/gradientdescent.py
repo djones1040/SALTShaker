@@ -309,13 +309,14 @@ class rpropwithbacktracking(salttrainingoptimizer):
             if i==0:
                 log.debug(f'First iteration took {time.time()-starttime:1f} seconds')
             else:
-                 if len(self.losshistory)> numconvergence+10:
+                if len(self.losshistory)> numconvergence+10:
                     convergencecriterion= np.abs(self.losshistory[-numconvergence] - loss)
-                    if np.all( self.losshistory[-numconvergence+1:] > self.losshistory[-numconvergence] )
+                    if np.isnan(loss) or np.all( np.array(self.losshistory[-numconvergence+1:]) > self.losshistory[-numconvergence] ):
+                    
                         convergencecriterion=0
                 else:
                     convergencecriterion=np.inf
-                
+
                 
                 #signal.sosfilt(convergencefilt, -np.diff((self.losshistory[-numconvergence:]) ))[-1]
                 outtext=f'Iteration {i} , function evaluations {self.functionevals}, convergence criterion {convergencecriterion:.2g}, last diff {self.losshistory[-2]-loss:.2g}'
