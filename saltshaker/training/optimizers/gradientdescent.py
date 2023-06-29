@@ -2,8 +2,9 @@ from saltshaker.util.inpynb import in_ipynb
 from saltshaker.util.query import query_yes_no
 from saltshaker.util.jaxoptions import jaxoptions
 
-
-
+import pickle
+from os import path
+import os
 import sys
 import time
 import logging
@@ -50,7 +51,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         self.searchtolerance= options.searchtolerance
         self.searchsize = options.searchsize
         self.convergencetolerance= options.convergencetolerance
-        
+        self.outputdir=outputdir
 
         assert(0<self.searchsize<1)
         assert(0<self.searchtolerance<1)
@@ -140,6 +141,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
             X=X.at[self.saltobj.iclscat[-1]].set(-4)
             
             fitparams=~self.saltobj.iModelParam
+            fitparams=fitparams | np.isin(np.arange(self.saltobj.npar),self.saltobj.ic) | np.isin(np.arange(self.saltobj.npar),self.saltobj.iCL) 
             X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter)
             
             
@@ -207,7 +209,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         try:
             assert(~np.any(np.isnan(learningrates)) and ~ np.any(learningrates<=0))
         except Exception as e:
-            log.critical(f'Uninitialized learning rates: {", ".join(np.unique(self.saltobj.parlist[np.isnan(learningrates) |(learningrates<=0) ]))}')
+            log.debug(f'Uninitialized learning rates: {", ".join(np.unique(self.saltobj.parlist[np.isnan(learningrates) |(learningrates<=0) ]))}')
             learningrates[np.isnan(learningrates) |(learningrates<=0) ]=1e-5
         return learningrates*self.learningratesinitscale
                 
@@ -301,7 +303,10 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 if reinitialized: log.debug('Reinitialized learning rates')
             else:
                 X,Xprev,loss,sign,grad,rates = iteration(X, Xprev,loss,sign,rates)
-            X=self.saltobj.transformtoconstrainedparams(X)
+            
+            constrainedparams=  np.concatenate([self.saltobj.ic,self.saltobj.icoordinates])
+            if not np.allclose(X[constrainedparams],Xprev[constrainedparams]):
+                X=self.saltobj.constraints.transformtoconstrainedparams(X)
             
             self.losshistory+=[loss]
             self.Xhistory+=[X]
@@ -319,9 +324,9 @@ class rpropwithbacktracking(salttrainingoptimizer):
 
                 
                 #signal.sosfilt(convergencefilt, -np.diff((self.losshistory[-numconvergence:]) ))[-1]
-                outtext=f'Iteration {i} , function evaluations {self.functionevals}, convergence criterion {convergencecriterion:.2g}, last diff {self.losshistory[-2]-loss:.2g}'
+                outtext=f'Iteration {i} , function evaluations {self.functionevals}, convergence criterion {convergencecriterion:.2g}, last diff {self.losshistory[-2]-loss:.2g}, gradient magnitude {jnp.dot(grad[np.nonzero(rates)],grad[np.nonzero(rates)]):.2g}, rates magnitude {jnp.dot(rates,rates):.2g}'
                 if interactive:
-                    sys.stdout.write('\r\x1b[1K'+outtext)
+                    sys.stdout.write(f'\r\x1b[1K'+outtext.ljust(os.get_terminal_size().columns))
                 log.debug(outtext)
                 
                 if i> numconvergence+10:
@@ -343,9 +348,14 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 #if i>0: plt.text(0.7,.8,f'Last diff: {-np.diff(self.losshistory[-2:])[0]:.2g}',transform=plt.gca().transAxes)
                 display.display(plt.gcf())
                 display.clear_output(wait=True)
+        else: 
+            sys.stdout.write('\n')
+            log.info('Optimizer encountered iteration limit')
         final= startlen+np.argmin( self.losshistory[startlen:])
         X,loss=self.Xhistory[final],self.losshistory[final]
-        return self.saltobj.transformtoconstrainedparams(X),loss,rates.at[rates==0].set(initrates[rates==0])
+        with open(path.join(self.outputdir,'gradienthistory.pickle'),'wb') as file:
+            pickle.dump((self.Xhistory,self.losshistory),file)
+        return self.saltobj.constraints.transformtoconstrainedparams(X),loss,rates.at[rates==0].set(initrates[rates==0])
         
 
     def twowaybacktracking(self,X,loss,grad, searchdir,*args,**kwargs):
