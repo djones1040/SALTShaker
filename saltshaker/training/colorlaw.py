@@ -153,6 +153,27 @@ class colorlaw_intrinsic_plus_dust:
         # add two
         return c_i * iCL +  c_g * gCL
 
+@colorlaw
+class colorlaw_twocolors:
+
+    def __init__(self,n_colorpars,colorwaverange):
+        self.n_colorpars=n_colorpars
+        self.colorwaverange=colorwaverange
+        
+    def __call__(self, color,colorlawparams,wave):
+
+        c_i = color[0]
+        c_g = color[1]
+        
+        # compute colorlaw for each component
+        iCL = SALT2ColorLaw(self.colorwaverange, colorlawparams)(wave)
+        gCL = GalacticDustLaw()(wave)
+        print('intrinsic, galactic')
+        print(c_i,c_g)
+        print(colorlawparams)
+        # add two
+        return c_i * iCL +  c_g * gCL
+
 
 @colorlaw    
 class colorlaw_spare:
