@@ -670,19 +670,28 @@ class TrainSALT(TrainSALTBase):
         for i in range(self.options.n_repeat):
             
             saltfitter = optimizer(x_modelpars,saltresids,self.options.outputdir,self.options)
-
+#             with open ('multicomponent_062623/gradienthistory.pickle','rb') as file:
+#                 history=pickle.load(file)
+#                 x_modelpars=history[0][np.argmin(history[1])]
+#             break
             if returnGN:
             #This is an awful hack and should be removed
                 return saltfitter,x_modelpars
             
             # do the fitting
             x_modelpars = saltfitter.optimize( x_modelpars)
-            if self.options.errors_from_hessianapprox: sigma=saltresids.estimateparametererrorsfromhessian(x_modelpars)
-            else: sigma=None
-            trainingresult=saltresids.processoptimizedparametersforoutput(x_modelpars,sigma)
-            for k in datadict.keys():
-                trainingresult.snparams[k]['t0'] =  datadict[k].tpk_guess
-
+            
+        Xfinal= saltresids.constraints.enforcefinaldefinitions(x_modelpars,saltresids.SALTModel(x_modelpars))
+        if self.options.errors_from_hessianapprox: 
+#             sigma=np.load(path.join(self.options.outputdir,'parametercovariance.npy'))
+            sigma=saltresids.estimateparametererrorsfromhessian(Xfinal)
+            np.save(path.join(self.options.outputdir,'parametercovariance.npy'), sigma)
+        else: sigma=None
+        
+        trainingresult=saltresids.processoptimizedparametersforoutput(Xfinal,x_modelpars,sigma)
+        for k in datadict.keys():
+            trainingresult.snparams[k]['t0'] =  datadict[k].tpk_guess
+        
         log.info('Final loglike'); log.info(saltresids.maxlikefit(trainingresult.params_raw))
         log.info('Final photometric loglike'); log.info(saltresids.maxlikefit(trainingresult.params_raw,dospec=False))
         
@@ -1240,6 +1249,8 @@ config file options can be overwridden at the command line"""
         config = configparser.ConfigParser(inline_comment_prefixes='#')
         if not os.path.exists(configfile):
             raise RuntimeError(f'Configfile {configfile} doesn\'t exist!')
+            
+                    
         config.read(configfile)
 
         user_parser = salt.add_user_options(usage=self.usagestring,config=config)
@@ -1274,7 +1285,6 @@ config file options can be overwridden at the command line"""
             parser=user_parser,config=trainingconfig)
         training_parser.addhelp()
         training_options = training_parser.parse_args(args)
-
         salt.options = training_options
         salt.options.host_component= True if salt.options.host_component else False
         if training_options.fast:
@@ -1288,6 +1298,9 @@ config file options can be overwridden at the command line"""
 
         if salt.options.stage not in ['all','validate','train']:
             raise RuntimeError('stage must be one of all, validate, train')
+        with open(path.join(salt.options.outputdir,'options.json'),'w') as optfile:
+            import json
+            json.dump(vars(salt.options),optfile)
 
         return
         

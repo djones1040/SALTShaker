@@ -61,16 +61,17 @@ class SALTparameters:
     __ismapped__={'x0','c','coordinates','spcrcl'}
     def __init__(self,data,parsarray):
         for var in self.__slots__:
+            #determine appropriate indices
             indexvar=f'i{var}'
             if isinstance(data,dict) and indexvar in data:
-                if data[indexvar].size>0:
-                    
-                    vals=parsarray[data[indexvar]]
-                else:
-                    vals=np.array([])
+                idxs=data[indexvar]
             elif '__indexattributes__' in dir(data) and indexvar in data.__indexattributes__:
-                vals=parsarray[getattr(data,indexvar)]
-                
+                idxs=getattr(data,indexvar)
+            else:
+                idxs=np.array([])
+            
+            if idxs.size>0:
+                vals=parsarray[idxs]
             else:
                 vals=np.array([])
             setattr(self,var, vals)
@@ -124,7 +125,6 @@ class modeledtrainingdata(metaclass=abc.ABCMeta):
         """Calculate the predicted flux given the data and model"""
         pass
     
-#    @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],diff_argnum=1)        
     def modelloglikelihood(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False):
         resids=self.modelresidual(x,cachedresults,fixuncertainties,fixfluxes)
         
@@ -306,7 +306,6 @@ class modeledtraininglightcurve(modeledtrainingdata):
     def __len__(self):
         return self.fluxcal.size
 
-#    @partial(jaxoptions, diff_argnum=1)                              
     def modelflux(self,pars):
         if not isinstance(pars,SALTparameters):
             pars=SALTparameters(self,pars)
@@ -327,7 +326,6 @@ class modeledtraininglightcurve(modeledtrainingdata):
             #Integrate basis functions over wavelength and sum over flux coefficients
             return jnp.clip(( self.pcderivsparse @ fluxcoeffs) @ colorexp ,0,None)
 
-#    @partial(jaxoptions, diff_argnum=1)                                  
     def modelfluxvariance(self,pars):
         if not isinstance(pars,SALTparameters):
             pars=SALTparameters(self,pars)
@@ -348,14 +346,12 @@ class modeledtraininglightcurve(modeledtrainingdata):
         modelfluxvar=colorexp**2 * self.varianceprefactor**2 * pars.x0**2* errorsurfaces
         return jnp.clip(modelfluxvar ,0,None)
         
-#    @partial(jaxoptions, diff_argnum=1)                      
     def colorscatter(self,pars):
         if not isinstance(pars,SALTparameters):
             pars=SALTparameters(self,pars)
         return  jnp.exp(self.clscatderivs @ pars.clscat)
 
         
-#    @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],diff_argnum=1)        
     def modelresidual(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False):
    
         if fixfluxes:
@@ -472,15 +468,11 @@ class modeledtrainingspectrum(modeledtrainingdata):
         errordesignmat[np.arange(0,len(spectrum)),ierrorbin ]= 1
         self.errordesignmat= sparse.BCOO.from_scipy_sparse(errordesignmat)
 
-        self.imodelcorrs=[residsobj.imodelcorr01]    
-        self.imodelcorrs_coordinds=[(0,1)]
-        self.imodelerrs=[residsobj.imodelerr0 ,residsobj.imodelerr1    ]
-        if residsobj.host_component:
-            self.imodelcorrs+=[(residsobj.imodelcorr0host)]
-            self.imodelcorrs_coordinds +=[(0,2)]
-            self.imodelerrs+=[residsobj.imodelerrhost]
-        self.imodelcorrs=np.array(self.imodelcorrs)
-        self.imodelerrs=np.array(self.imodelerrs)
+        self.imodelcorrs= np.array([np.arange(x,y+1) for x,y in (zip(residsobj.corrmin,residsobj.corrmax))])
+        self.imodelcorrs_coordinds= np.array([(-1,comb[1]) if 'host'== comb[0] else ((comb[0],-1) if 'host'== comb[1] else comb) for comb in residsobj.corrcombinations]
+           )
+                
+        self.imodelerrs= np.array([np.arange(x,y+1) for x,y in (zip(residsobj.errmin,residsobj.errmax))])
 
         for attr in spectrum.__slots__:
             if attr in spectrum.__listdatakeys__ and attr in self.__slots__:
@@ -511,7 +503,6 @@ class modeledtrainingspectrum(modeledtrainingdata):
 
         return recalexp*(self.pcderivsparse @ (fluxcoeffs))
 
-#    @partial(jaxoptions, diff_argnum=1)                              
     def modelfluxvariance(self,pars):
         if not isinstance(pars,SALTparameters):
             pars=SALTparameters(self,pars)
