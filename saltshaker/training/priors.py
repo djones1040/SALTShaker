@@ -258,10 +258,9 @@ class SALTPriors:
     @nongaussianprior
     def galacticcolorprior(self,width,x):
         """Prior so that the galactic dust is greater than zero, with exponential tail"""
-        if x[self.iCg] < 0:
-            return -x[self.iCg]**2./0.01**2.
-        else:
-            return -x[self.iCg]/width
+##        jax.debug.breakpoint()
+        return jnp.select([x[self.ic[1]] < 0,x[self.ic[1]] >= 0],
+                          [-x[self.ic[1]]**2./0.01**2.,-x[self.ic[1]]/width])
         
     @prior
     def m0prior(self,width,x):

@@ -6,15 +6,19 @@ import pylab as plt
 import sys
 from scipy.interpolate import interp1d, interp2d
 from sncosmo.salt2utils import SALT2ColorLaw
+from saltshaker.training import colorlaw
 from saltshaker.initfiles import init_rootdir
 from argparse import ArgumentParser
 import logging
 log=logging.getLogger(__name__)
 from scipy.interpolate import bisplrep,bisplev,RegularGridInterpolator
+import os
 
 def mkModelPlot(
         salt3dir='modelfiles/salt3',
-        xlimits=[2000,9200],outfile=None,plotErr=True,n_colorpars=5,host_component=False):
+        xlimits=[2000,9200],outfile=None,
+        plotErr=True,n_colorpars=5,host_component=False,
+        colorlaw_function=['colorlaw_default']):
 
     plt.figure(figsize=(5,8))
     plt.subplots_adjust(left=None, bottom=None, right=None, top=None,
@@ -178,18 +182,24 @@ def mkModelPlot(
     wave = np.arange(xlimits[0],xlimits[1],1,dtype='float')
     ax3.plot(wave,colorlaw_salt2(wave),color='b',label='SALT2')
 
-    
-    with open('%s/salt3_color_correction.dat'%salt3dir) as fin:
-        lines = fin.readlines()
-    if len(lines):
-        for i in range(len(lines)):
-            lines[i] = lines[i].replace('\n','')
-        colorlaw_salt3_coeffs = np.array(lines[1:n_colorpars+1]).astype('float')
-        salt3_colormin = float(lines[n_colorpars+2].split()[1])
-        salt3_colormax = float(lines[n_colorpars+3].split()[1])
 
-        colorlaw_salt3 = SALT2ColorLaw([salt3_colormin,salt3_colormax],colorlaw_salt3_coeffs)
-        ax3.plot(wave,colorlaw_salt3(wave),color='r',label='SALT3')
+    for j,cf in enumerate(colorlaw_function):
+        clfilename = f'{salt3dir}/salt3_color_correction_{j}.dat'
+        if not os.path.exists(clfilename) and j == 0:
+            clfilename = f'{salt3dir}/salt3_color_correction.dat'
+        with open(clfilename) as fin:
+            lines = fin.readlines()
+        if len(lines):
+            for i in range(len(lines)):
+                lines[i] = lines[i].replace('\n','')
+
+            colorlaw_salt3_coeffs = np.array(lines[1:n_colorpars[j]+1]).astype('float')
+            clfun_str = lines[n_colorpars[j]+1].split()[1]
+            salt3_colormin = float(lines[n_colorpars[j]+2].split()[1])
+            salt3_colormax = float(lines[n_colorpars[j]+3].split()[1])
+            
+            colorlaw_salt3 = getattr(colorlaw, clfun_str)(len(colorlaw_salt3_coeffs),[salt3_colormin,salt3_colormax])
+            ax3.plot(wave,colorlaw_salt3(1,colorlaw_salt3_coeffs,wave),color=f'C{j}',label=f'SALT3 {clfun_str}')
 
 
 

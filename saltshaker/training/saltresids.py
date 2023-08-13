@@ -47,7 +47,7 @@ import pylab as plt
 
 import jax
 from jax import numpy as jnp
-from jaxlib.xla_extension import DeviceArray
+#from jaxlib.xla_extension import DeviceArray
 from jax.scipy import linalg as jaxlinalg
 from jax.experimental import sparse
 from jax import lax
@@ -589,7 +589,13 @@ class SALTResids:
         self.ixhost = np.array([i for i, si in enumerate(self.parlist) if si.startswith('xhost')],dtype=int)
         
         self.ic  = np.array([np.where(np.char.startswith(self.parlist,f'c{i}_'  ))[0] for i in range(len(self.n_colorpars))])
+        self.ic0  = np.where(np.char.startswith(self.parlist,'c0_'))[0]
         self.iCL = np.array([np.where(self.parlist == f'cl{i}')[0] for i in range(len(self.n_colorpars))])
+
+        # Galactic color law has "fake" free parameters so we need to ignore it
+        # during error estimation
+        iCLNG = np.where(np.array(self.colorlaw_function) != 'colorlaw_galactic')[0]
+        self.iCLNoGal = np.where(self.parlist == f'cl{iCLNG}')[0]
 
         self.ispcrcl_norm = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specx0')],dtype=int)
         if self.ispcrcl_norm.size==0: self.ispcrcl_norm=np.zeros(self.npar,dtype=bool)
@@ -646,7 +652,7 @@ class SALTResids:
                 else:
                     residuals+=[func(guess,self.neff) \
                                      for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]]
-        
+
         return  jnp.concatenate(residuals)
     
     def lsqwrap_sources(self,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None)   :
@@ -750,8 +756,9 @@ class SALTResids:
     def estimateparametererrorsfromhessian(self,X):
         """Approximate Hessian by jacobian times own transpose to determine uncertainties in flux surfaces"""
         log.info("determining M0/M1 errors by approximated Hessian")
+
         varyingParams=reduce(lambda x,y:  x | np.isin(np.arange(self.npar), y),[
-                    self.icomponents,self.iCL,self.imhost],False)    
+            self.icomponents,self.iCLNoGal,self.imhost],False)
         
         logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
         X=jnp.array(X)
@@ -781,6 +788,19 @@ class SALTResids:
     def computeuncertaintiesfromparametererrors(self,X,sigma,smoothingfactor=150):
         #Inverting cholesky matrix for speed
 
+        varyingParams=reduce(lambda x,y:  x | np.isin(np.arange(self.npar), y),[
+            self.icomponents,self.iCLNoGal,self.imhost],False)
+
+        # DJ: check for bad errors
+        iBad = np.where(np.diag(sigma)[varyingParams] == 0)[0]
+        if len(iBad):
+            raise RuntimeError('model parameters had zero uncertainty!')
+        iOK = np.where(np.diag(sigma)[~varyingParams] == 0)[0]
+        if len(iOK):
+            ### this shouldn't matter, just setting to random number
+            ### so cholesky doesn't complain
+            sigma[np.where(~varyingParams)[0][iOK],np.where(~varyingParams)[0][iOK]] = 100
+        
         preconditioning = np.diag(np.sqrt(1/np.diag(sigma)))
         L=np.diag( 1/ np.diag(preconditioning)) @ linalg.cholesky(preconditioning @ sigma @ preconditioning ,lower=True)
 

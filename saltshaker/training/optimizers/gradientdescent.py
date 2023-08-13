@@ -1,6 +1,8 @@
 from saltshaker.util.inpynb import in_ipynb
 from saltshaker.util.query import query_yes_no
 from saltshaker.util.jaxoptions import jaxoptions
+from jax import config
+#config.update("jax_debug_nans", True)
 
 import pickle
 from os import path
@@ -158,6 +160,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
             raise e
         residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'),jit=False)
         newChi=(residuals**2).sum()
+
         log.info('Final chi2: {:.2f} '.format(newChi))
         
         chi2results=self.saltobj.getChi2Contributions(X,jit=False)
@@ -227,6 +230,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 result=( x-y for x,y in zip(result,singleresult))
             except:
                 result=result-singleresult
+
         try:
             return (-x for x in result)
         except:
@@ -261,7 +265,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
             iFit=np.isin( np.arange(X.size),iFit )
         assert((iFit.dtype==bool))
         iFit=iFit & ~self.ifixedparams
-#         import pdb;pdb.set_trace()
+
         log.info('Number of parameters fit this round: {}'.format(iFit.sum()))
         startlen=len(self.Xhistory)
         rates=initrates*iFit
@@ -472,6 +476,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         Xnew=jnp.select( [less,greatereq], [ lax.cond(lossval>prevloss, lambda x,y:x , lambda x,y: y, Xprev, X), 
             X-(sign *learningrates)
         ])
+        
         #Set sign to 0 after a previous change
         sign= (sign * greatereq)
         return jnp.clip(Xnew,*self.Xbounds), lossval, sign, grad, learningrates

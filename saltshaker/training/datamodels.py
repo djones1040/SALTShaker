@@ -317,6 +317,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         #Evaluate color law at the wavelength basis centers
         colorlaw= sum([fun(c,cl,self.wavebasis) for fun,c,cl in zip(self.colorlawfunction,pars.c, pars.CL)])
         colorexp= 10. ** (  -0.4*colorlaw)
+        #jax.debug.breakpoint()
         if self.preintegratebasis:
             #Redden flux coefficients
             fluxcoeffsreddened= (colorexp[np.newaxis,:]*fluxcoeffs.reshape( self.bsplinecoeffshape)).flatten()
