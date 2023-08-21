@@ -65,7 +65,7 @@ import sncosmo
 from sncosmo.salt2utils import SALT2ColorLaw
 from sncosmo.constants import HC_ERG_AA
 
-_example_data_url = "https://github.com/djones1040/SALTShaker/raw/master/examples/saltshaker-latest-training.tgz"
+_example_data_url = "https://github.com/djones1040/SALTShaker/raw/main/examples/saltshaker-latest-training.tgz"
 _flatnu=f'{init_rootdir}/flatnu.dat'
 
 # validation utils
