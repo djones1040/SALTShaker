@@ -175,9 +175,10 @@ class SALTPriors:
             try:
                 priorFunction=self.priors[prior]
             except:
-                raise ValueError('Invalid prior supplied: {}'.format(prior)) 
+                pass
             residuals+=[jnp.atleast_1d(priorFunction(width,x))]
         residuals+=[self.boundedpriorresids(x)]
+        #jax.debug.breakpoint()
         return jnp.concatenate(  residuals)
 
     @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],diff_argnum=1)        

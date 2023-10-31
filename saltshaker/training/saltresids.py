@@ -7,7 +7,7 @@ from saltshaker.training import init_hsiao
 from saltshaker.training.datamodels import SALTfitcacheSN,modeledtraininglightcurve,modeledtrainingspectrum
 from saltshaker.training import colorlaw
 
-from saltshaker.training.priors import SALTPriors,__priors__
+from saltshaker.training.priors import SALTPriors,__priors__,__nongaussianpriors__
 from saltshaker.training.constraints import SALTconstraints
 
 from saltshaker.config.configparsing import *
@@ -155,7 +155,7 @@ class SALTResids:
             elif opt.startswith('bound_'):
                 self.boundedParams += [opt[len('bound_'):]]
                 self.bounds += [tuple([float(x) for x in self.__dict__[opt]])]
-            
+
         specrecalparams =self.parlist[(np.array([x.startswith('specrecal') for x in self.parlist]))]
         numrecalparams=[(specrecalparams==x ).sum() for x in np.unique(specrecalparams)]
         try:
@@ -541,6 +541,9 @@ class SALTResids:
                                                 help='constraints enforced on the model, see constraints.py (default=%(default)s)')               
         
         for prior in __priors__:
+                successful=successful&wrapaddingargument(config,'priors',prior ,type=float,clargformat="--prior_{key}",
+                                                        help=f"prior on {prior}",default=SUPPRESS)
+        for prior in __nongaussianpriors__:
                 successful=successful&wrapaddingargument(config,'priors',prior ,type=float,clargformat="--prior_{key}",
                                                         help=f"prior on {prior}",default=SUPPRESS)
 
