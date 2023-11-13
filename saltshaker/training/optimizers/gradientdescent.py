@@ -109,11 +109,10 @@ class rpropwithbacktracking(salttrainingoptimizer):
 
 
     def optimize(self,initvals):
-        X=initvals.copy()
+        X=self.saltobj.constraints.transformtoconstrainedparams(jnp.array(initvals))
 
         residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'),jit=False)
         oldChi=(residuals**2).sum()
-        
         log.info('Initial chi2: {:.2f} '.format(oldChi))
 
         rates=self.initializelearningrates(X)
@@ -272,9 +271,10 @@ class rpropwithbacktracking(salttrainingoptimizer):
             
         starttime=time.time()
         initvals=jnp.array(initvals)
+        
         X, Xprev,loss,sign= initvals,initvals, np.inf,np.zeros(initvals.size)
         rates=jnp.array(rates)
-        
+       
         def iteration(X, Xprev,loss,sign,rates):
             #Proposes a new value based on sign of gradient
             Xnew,newloss, newsign, newgrad,newrates  = self.rpropiter(X, Xprev,loss,sign,rates,**kwargs)

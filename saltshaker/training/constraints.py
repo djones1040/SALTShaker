@@ -32,8 +32,8 @@ class SALTconstraints:
         for k in residsobj.__dict__.keys():
             self.__dict__[k] = residsobj.__dict__[k]
         self.saltresids=residsobj
-        self.constraints={ key: partial(__possibleconstraints__[key.strip()],self) for key in self.constraint_names}
-        
+        self.constraints={ key: partial(__possibleconstraints__[key],self) for key in __possibleconstraints__}
+        self.use_constraint_names= [x.strip() for x in self.constraint_names]
         intmult = (self.wave[1]-self.wave[0])*self.fluxfactor['default']['B']
         fluxDeriv= np.zeros(self.im0.size)
         for i in range(self.im0.size):
@@ -44,7 +44,7 @@ class SALTconstraints:
 
     @partial(jaxoptions,static_argnums=[0],jitdefault=True)
     def transformtoconstrainedparams(self,guess):
-        return reduce( lambda value,function: function(value), self.constraints.values(),  guess)
+        return reduce( lambda value,name: self.constraints[name](value), self.use_constraint_names,  guess)
 
     @constraint
     def centeranddecorrelatedcolorsandcoords(self,guess):
@@ -66,6 +66,18 @@ class SALTconstraints:
             else:
                 guess=guess.at[idx].set(corrected *jnp.std(guess[idx]))
         return guess
+    
+    @constraint
+    def fixbluecolorscatter(self,guess):
+        """ Set the value of the color scatter at the minimum wavelength covered by the model to 1"""
+        clscatpars=guess[self.iclscat]
+        
+        firstterms=self.saltresids.colorscatter(guess.at[self.iclscat[0]].set(0),self.wave.min())
+        lastterm=self.saltresids.colorscatter(guess.at[self.iclscat].set(jnp.zeros(clscatpars.size).at[0].set(1)),self.wave.min())
+        return jax.lax.cond(firstterms==0,
+            lambda : guess,
+            lambda : guess.at[self.iclscat[0]].set(-jnp.log(firstterms)/jnp.log(lastterm))
+        )
         
     @constraint
     def fixbbandfluxes(self,guess):
@@ -75,10 +87,15 @@ class SALTconstraints:
         bflux= self.__maximumlightpcderiv__ @ guess[self.im0]
         guess=guess.at[self.icomponents].set( guess[self.icomponents] *bstdflux/bflux) #*  -self.bstdflux
         guess=guess.at[self.ix0].set(guess[self.ix0]*bflux/bstdflux)
+     
         
-        for comp in self.icomponents[1:]:
+        for i,comp in enumerate(self.icomponents[1:]):
             bflux=self.__maximumlightpcderiv__ @ guess[comp]
-            guess=guess.at[comp].set(guess[comp]- bflux/bstdflux * guess[self.im0])
+            ratio=bflux/bstdflux
+            indices=np.array([self.datadict[self.parlist[x0ind].split('_')[1]].icoordinates[i] for x0ind in self.ix0])
+#            guess=guess.at[self.ix0].set(guess[self.ix0]*(1+ratio*guess[indices]))
+#             guess=guess.at[self.icoordinates[i]].set( guess[self.icoordinates[i]]/(1+ratio*guess[self.icoordinates[i]]))
+            guess=guess.at[comp].set(guess[comp]-  ratio * guess[self.im0])
         return guess
     
     @constraint
@@ -230,6 +247,9 @@ class SALTconstraints:
     def twodfinaldefinitions(self,guess,components):
         if self.host_component: raise NotImplementedError()
         if self.n_errorsurfaces>1: raise NotImplementedError()
+       # guess=self.fixbbandfluxes(jnp.array(guess))
+        #guess=self.transformtoconstrainedparams(guess)
+        guess=np.array(guess)
         #KDE estimator for mutual entropy in 2D
         def mutualinformation(theta,coords):
             rot=np.array([[np.cos(theta), -np.sin(theta)],[np.sin(theta),np.cos(theta)]])
@@ -244,18 +264,20 @@ class SALTconstraints:
         rot=np.array([[np.cos(theta), -np.sin(theta)],[np.sin(theta),np.cos(theta)]])
         x1,x2= rot @ guess[self.icoordinates]
         
-        #Assign the least skewed parameter as x1
+        #Assign the most skewed parameter as x1
         statistic= lambda x: stats.normaltest(np.clip(x,*np.percentile(x,[2,98]))).statistic
-        if  statistic(x1)> statistic(x2):
+        if  statistic(x1)< statistic(x2):
             rot=rot[::-1]
             x2,x1=x1,x2
         
         m1,m2= rot @ guess[self.icomponents[1:]]
         #x1 should be positive with the flux variation in B band at 15 days
-        deltaBat15=(np.sum(self.kcordict['default']['Bpbspl'] * bisplev(np.array([15]),self.wave,(self.phaseknotloc,self.waveknotloc,m1,self.bsorder,self.bsorder))))
-        #x2 will be defined with positive skew
-        rot = np.diag([np.sign(deltaBat15),np.sign(stats.skew(x2))]) @ rot 
-        assert(np.allclose(rot @ rot.T,np.identity(2)))
+        m1deltaBat15=(np.sum(self.kcordict['default']['Bpbspl'] * bisplev(np.array([15]),self.wave,(self.phaseknotloc,self.waveknotloc,m1,self.bsorder,self.bsorder))))
+        #x2 will be defined with positive flux variation in B band at -15 days
+        m2deltaBatearly=(np.sum(self.kcordict['default']['Bpbspl'] * bisplev(np.array([-15]),self.wave,(self.phaseknotloc,self.waveknotloc,m2,self.bsorder,self.bsorder))))
+
+        rot = np.diag([np.sign(m1deltaBat15),np.sign((m2deltaBatearly))]) @ rot 
+
         #apply the rotation to the parameters
         guess[self.icomponents[1:]]= rot @ guess[self.icomponents[1:]]
         guess[self.icoordinates]=rot @ guess[self.icoordinates]
