@@ -24,6 +24,14 @@ def prior(prior):
     __priors__[prior.__name__]=prior
     return prior
 
+__nongaussianpriors__=dict()
+def nongaussianprior(prior):
+    """Decorator to register a given function as a valid non-Gaussian prior"""
+    #Check that the method accepts 4 inputs: a saltresids object, a width, parameter vector, model components
+    assert(len(signature(prior).parameters)==3 or len(signature(prior).parameters)==4)
+    __nongaussianpriors__[prior.__name__]=prior
+    return prior
+
 
 #This is taken from https://arxiv.org/pdf/1712.05151.pdf
 b=1.5
@@ -81,6 +89,7 @@ class SALTPriors:
         self.SALTModelDeriv = SALTResidsObj.SALTModelDeriv
         
         self.priors={ key: partial(__priors__[key],self) for key in __priors__}
+        self.nongaussianpriors={ key: partial(__nongaussianpriors__[key],self) for key in __nongaussianpriors__}
         if len(self.usePriors) != len(self.priorWidths):
             raise RuntimeError('length of priors does not equal length of prior widths!')
 
@@ -157,7 +166,7 @@ class SALTPriors:
         self.numresids=jax.eval_shape(self.priorresids,np.random.normal(1e-1,size=self.npar)).shape[0]
 
         
-    @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],diff_argnum=1)        
+    @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],diff_argnum=1)
     def priorresids(self,x):
         """Given a parameter vector returns a residuals vector representing the priors"""
 
@@ -166,9 +175,10 @@ class SALTPriors:
             try:
                 priorFunction=self.priors[prior]
             except:
-                raise ValueError('Invalid prior supplied: {}'.format(prior)) 
+                pass
             residuals+=[jnp.atleast_1d(priorFunction(width,x))]
         residuals+=[self.boundedpriorresids(x)]
+        #jax.debug.breakpoint()
         return jnp.concatenate(  residuals)
 
     @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],diff_argnum=1)        
@@ -179,9 +189,12 @@ class SALTPriors:
         for prior,width in self.priorexecutionlist:
             try:
                 priorFunction=self.priors[prior]
+                loglike+=-(priorFunction(width,x)**2).sum()/2
+            except KeyError:
+                priorFunction=self.nongaussianpriors[prior]
+                loglike += jnp.sum(priorFunction(width,x))
             except:
                 raise ValueError('Invalid prior supplied: {}'.format(prior)) 
-            loglike+=-(priorFunction(width,x)**2).sum()/2
         loglike+=-(self.boundedpriorresids(x)**2).sum()/2
         return loglike
 
@@ -242,7 +255,13 @@ class SALTPriors:
     def peakprior(self,width,x):
         """ At t=0, minimize time derivative of B-band lightcurve"""
         return self.__peakpriorderiv__ @ x[self.im0] /(self.bstdflux*width)
-        
+
+    @nongaussianprior
+    def galacticcolorprior(self,width,x):
+        """Prior so that the galactic dust is greater than zero, with exponential tail"""
+##        jax.debug.breakpoint()
+        return jnp.select([x[self.ic[1]] < 0,x[self.ic[1]] >= 0],
+                          [-x[self.ic[1]]**2./0.01**2.,-x[self.ic[1]]/width])
         
     @prior
     def m0prior(self,width,x):

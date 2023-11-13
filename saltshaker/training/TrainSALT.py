@@ -351,6 +351,7 @@ class TrainSALT(TrainSALTBase):
                             guess[parlist==f'x{i}_{sn}'] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
 
                         guess[parlist == 'c0_%s'%sn] = snpar['c'][iSN]
+                        guess[parlist == 'c1_%s'%sn] = np.random.exponential(0.2)
                     else:
                         log.warning(f'SN {sn} not found in SN par list {self.options.snparlist}')
                         guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
@@ -682,7 +683,6 @@ class TrainSALT(TrainSALTBase):
             sigma=saltresids.estimateparametererrorsfromhessian(Xfinal)
             np.save(path.join(self.options.outputdir,'parametercovariance.npy'), sigma)
         else: sigma=None
-        
         trainingresult=saltresids.processoptimizedparametersforoutput(Xfinal,x_modelpars,sigma)
         for k in datadict.keys():
             trainingresult.snparams[k]['t0'] =  datadict[k].tpk_guess
@@ -822,8 +822,8 @@ SIGMA_INT: 0.106  # used in simulation"""
                 for c in colorlaw:
                     print(f'{c:8.10e}',file=foutcl)
                 print(f"""Salt2ExtinctionLaw.version 1
-                Salt2ExtinctionLaw.min_lambda {self.options.colorwaverange[0]:.0f}
-                Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutcl)
+Salt2ExtinctionLaw.min_lambda {self.options.colorwaverange[0]:.0f}
+Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutcl)
         else:
             for i,name,colorlaw in (zip(range(trainingresult.clpars.shape[0]),self.options.colorlaw_function,trainingresult.clpars)):
                 with open(f'{outdir}/salt3_color_correction_{i}.dat','w') as foutcl:
@@ -831,8 +831,8 @@ SIGMA_INT: 0.106  # used in simulation"""
                     for c in colorlaw:
                         print(f'{c:8.10e}',file=foutcl)
                     print(f"""Salt2ExtinctionLaw.version {name}
-                    Salt2ExtinctionLaw.min_lambda {self.options.colorwaverange[0]:.0f}
-                    Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutcl)
+Salt2ExtinctionLaw.min_lambda {self.options.colorwaverange[0]:.0f}
+Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutcl)
 
 
         # best-fit and simulated SN params
@@ -1171,7 +1171,6 @@ SIGMA_INT: 0.106  # used in simulation"""
 
             datadict = self.mkcuts(datadict)[0]
             log.info(f'took {time.time()-tcstart:.3f} to apply cuts')
-            
             
             phasebins=np.linspace(*self.options.phaserange,int((self.options.phaserange[1]-self.options.phaserange[0])/self.options.phasesplineres)+1,True)
             wavebins=np.linspace(*self.options.waverange,int((self.options.waverange[1]-self.options.waverange[0])/self.options.wavesplineres)+1,True)

@@ -170,6 +170,19 @@ class colorlaw_intrinsic_plus_dust:
         # add two
         return c_i * iCL +  c_g * gCL
 
+@colorlaw
+class colorlaw_galactic:
+
+    def __init__(self,n_colorpars,colorwaverange):
+        self.n_colorpars=n_colorpars
+        self.colorwaverange=colorwaverange
+        
+    def __call__(self, color,colorlawparams,wave):
+
+        gCL = GalacticDustLaw()(wave)
+        # need a minus sign here to match default colorlaw
+        return -color*gCL
+
 
 @colorlaw    
 class colorlaw_spare:
