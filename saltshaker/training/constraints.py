@@ -95,8 +95,8 @@ class SALTconstraints:
             bflux=self.__maximumlightpcderiv__ @ guess[comp]
             ratio=bflux/bstdflux
             indices=np.array([self.datadict[self.parlist[x0ind].split('_')[1]].icoordinates[i] for x0ind in self.ix0])
-#            guess=guess.at[self.ix0].set(guess[self.ix0]*(1+ratio*guess[indices]))
-#             guess=guess.at[self.icoordinates[i]].set( guess[self.icoordinates[i]]/(1+ratio*guess[self.icoordinates[i]]))
+            guess=guess.at[self.ix0].set(guess[self.ix0]*(1+ratio*guess[indices]))
+            guess=guess.at[self.icoordinates].set( guess[self.icoordinates]/(1+ratio*guess[self.icoordinates[i][np.newaxis,:]]))
             guess=guess.at[comp].set(guess[comp]-  ratio * guess[self.im0])
         return guess
     
