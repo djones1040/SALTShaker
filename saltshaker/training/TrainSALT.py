@@ -150,7 +150,7 @@ class TrainSALT(TrainSALTBase):
                         'phasesplineres':self.options.phasesplineres,'wavesplineres':self.options.wavesplineres,
                         'phaseinterpres':self.options.phaseinterpres,'waveinterpres':self.options.waveinterpres,
                         'normalize':True,'order':self.options.bsorder,'use_snpca_knots':self.options.use_snpca_knots}
-                
+
         phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
             self.options.inithsiaofile,self.options.initbfilt,_flatnu,**init_options)
         if self.options.host_component:
@@ -172,8 +172,8 @@ class TrainSALT(TrainSALTBase):
                     self.options.initm0modelfile,self.options.initm1modelfile,
                     Bfilt=self.options.initbfilt,flatnu=_flatnu,**init_options)
         #zero out the flux and the 1st derivative at the start of the phase range
-        m0knots[:(waveknotloc.size-self.options.bsorder) * 2]=0
-        m1knots[:(waveknotloc.size-self.options.bsorder) * 2]=0
+        m0knots[:(waveknotloc.size-self.options.bsorder-1) * 2]=0
+        m1knots[:(waveknotloc.size-self.options.bsorder-1) * 2]=0
         
         init_options['phasesplineres'] = self.options.error_snake_phase_binsize
         init_options['wavesplineres'] = self.options.error_snake_wave_binsize
@@ -286,6 +286,10 @@ class TrainSALT(TrainSALTBase):
             for i in range(3): guess[parlist == 'modelerr_{}'.format(i)] = 1e-6 
             if self.options.n_components >= 2:
                 guess[parlist == 'm1'] = m1knots
+            if self.options.n_components >= 3:
+            
+                guess[parlist=='m2'] =( (np.arange(m0knots.size)< (n_waveknots*  (n_phaseknots//6)))
+                                       &  (np.arange(m0knots.size)> (n_waveknots* 1 ))  )*np.std(m0knots)*.2
             if self.options.host_component:
                 guess[parlist == 'mhost'] = mhostknots
             if self.options.n_colorpars:

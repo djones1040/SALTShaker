@@ -540,6 +540,9 @@ class SALTResids:
         successful=successful&wrapaddingargument(config,'modelparams','constraint_names','constraints',  default='', nargs='*',      type=str,
                                                 help='constraints enforced on the model, see constraints.py (default=%(default)s)')               
         
+        successful=successful&wrapaddingargument(config,'modelparams','secondary_constraint_names','secondary_constraints',  default=[], nargs='*',      type=str,
+                                                help='constraints enforced on the model after an initial burn-in, see constraints.py (default=%(default)s)')               
+
         for prior in __priors__:
                 successful=successful&wrapaddingargument(config,'priors',prior ,type=float,clargformat="--prior_{key}",
                                                         help=f"prior on {prior}",default=SUPPRESS)
@@ -696,9 +699,9 @@ class SALTResids:
         return list(loop())
             
 
-    @partial(jaxoptions, static_argnums=[0,3,4,5,6 ,7],static_argnames= ['fixfluxes','fixuncertainties','dopriors','dospec','usesns'],diff_argnum=1,jitdefault=True) 
-    def constrainedmaxlikefit(self,params,*args,**kwargs):
-        return self.maxlikefit(self.constraints.transformtoconstrainedparams(params),*args,**kwargs)
+    @partial(jaxoptions, static_argnums=[0,3,4,5,6 ,7],static_argnames= ['fixfluxes','fixuncertainties','dopriors','dospec','usesns','usesecondary'],diff_argnum=1,jitdefault=True) 
+    def constrainedmaxlikefit(self,params,*args,usesecondary=True,**kwargs):
+        return self.maxlikefit(self.constraints.transformtoconstrainedparams(params,usesecondary),*args,**kwargs)
 
 
     @partial(jaxoptions, static_argnums=[0,3,4,5,6 ,7],static_argnames= ['fixfluxes','fixuncertainties','dopriors','dospec','usesns'],diff_argnum=1,jitdefault=True) 

@@ -34,6 +34,8 @@ class SALTconstraints:
         self.saltresids=residsobj
         self.constraints={ key: partial(__possibleconstraints__[key],self) for key in __possibleconstraints__}
         self.use_constraint_names= [x.strip() for x in self.constraint_names]
+        self.use_secondary_constraint_names= [x.strip() for x in self.secondary_constraint_names if len(x.strip())>0]
+        
         intmult = (self.wave[1]-self.wave[0])*self.fluxfactor['default']['B']
         fluxDeriv= np.zeros(self.im0.size)
         for i in range(self.im0.size):
@@ -42,9 +44,9 @@ class SALTconstraints:
         
         self.__maximumlightpcderiv__=sparse.BCOO.fromdense(fluxDeriv)
 
-    @partial(jaxoptions,static_argnums=[0],jitdefault=True)
-    def transformtoconstrainedparams(self,guess):
-        return reduce( lambda value,name: self.constraints[name](value), self.use_constraint_names,  guess)
+    @partial(jaxoptions,static_argnums=[0,2],static_argnames=['usesecondary'],jitdefault=True)
+    def transformtoconstrainedparams(self,guess,usesecondary=True):
+        return reduce( lambda value,name: self.constraints[name](value), self.use_secondary_constraint_names + self.use_constraint_names if usesecondary else self.use_constraint_names ,  guess)
 
     @constraint
     def centeranddecorrelatedcolorsandcoords(self,guess):
@@ -137,8 +139,8 @@ class SALTconstraints:
                 log.critical("Final definitions and rescaling has not been implemented for this model configuration")
                 Xfinal=X.copy()
             except AssertionError:
-                log.critical('Rescaling components failed; photometric residuals have changed. Will finish writing output using unscaled quantities')
-                Xfinal=X.copy()
+                log.critical('Rescaling components failed; photometric residuals have changed. Will finish writing output regardless')
+                Xfinal=Xredefined.copy()
             return Xfinal
         else:
             if self.n_components==2:
@@ -248,7 +250,7 @@ class SALTconstraints:
         
     def twodfinaldefinitions(self,guess,components):
         if self.host_component: raise NotImplementedError()
-        if self.n_errorsurfaces>1: raise NotImplementedError()
+        if self.n_errorsurfaces not in [1,3]: raise NotImplementedError()
        # guess=self.fixbbandfluxes(jnp.array(guess))
         #guess=self.transformtoconstrainedparams(guess)
         guess=np.array(guess)
@@ -283,5 +285,17 @@ class SALTconstraints:
         #apply the rotation to the parameters
         guess[self.icomponents[1:]]= rot @ guess[self.icomponents[1:]]
         guess[self.icoordinates]=rot @ guess[self.icoordinates]
+        if self.n_errorsurfaces==3:
+            m1var=guess[self.parlist == 'modelerr_1']**2
+            m2var=guess[self.parlist == 'modelerr_2']**2
+            m1m2covar=guess[self.parlist == 'modelerr_1']*guess[self.parlist == 'modelerr_2']* guess[self.parlist == 'modelcorr_12']
+            varmat=np.array([[m1var,m1m2covar],[m1m2covar,m2var]])
+            result=np.array(jax.vmap(lambda x: rot @ x @ rot.T, in_axes=2,out_axes=2)(varmat))
+            m1var,m1m2covar=result[0]
+            m2var=result[1,1]
+            guess[self.parlist == 'modelerr_1']=np.sqrt(m1var)
+            guess[self.parlist == 'modelerr_2']=np.sqrt(m2var)
+            guess[self.parlist == 'modelcorr_12']=m1m2covar/np.sqrt(m1var*m2var)
+            
         return guess
 
