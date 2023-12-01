@@ -111,11 +111,10 @@ class rpropwithbacktracking(salttrainingoptimizer):
 
 
     def optimize(self,initvals):
-        X=initvals.copy()
+        X=self.saltobj.constraints.transformtoconstrainedparams(jnp.array(initvals))
 
         residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'),jit=False)
         oldChi=(residuals**2).sum()
-        
         log.info('Initial chi2: {:.2f} '.format(oldChi))
 
         rates=self.initializelearningrates(X)
@@ -129,14 +128,14 @@ class rpropwithbacktracking(salttrainingoptimizer):
             from functools import reduce
             snpars=reduce(lambda x,y:  x | np.isin(np.arange(self.saltobj.npar), y),[self.saltobj.icoordinates,self.saltobj.ix0,self.saltobj.ic],False)
 
-            X,loss,rates=self.optimizeparams(X,snpars,rates,niter=self.burninmaxiter)
+            X,loss,rates=self.optimizeparams(X,snpars,rates,niter=self.burninmaxiter,usesecondary=False)
             rates=self.initializelearningrates(X)
             log.info('Burning in flux model')
             fitparams=self.saltobj.iModelParam
-            X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.burninmaxiter) #self.gradientmaxiter)
+            X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.burninmaxiter,usesecondary=False) #self.gradientmaxiter)
             log.info('Fitting all parameters')
             fitparams=~np.isin(np.arange(self.saltobj.npar),self.saltobj.iclscat)
-            X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter)
+            X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter,usesecondary=len(self.saltobj.constraints.use_secondary_constraint_names)>0)
                         
             #Fit error model including color scatter
             log.info('Fitting color scatter')
@@ -144,7 +143,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
             
             fitparams=~self.saltobj.iModelParam
             fitparams=fitparams | np.isin(np.arange(self.saltobj.npar),self.saltobj.ic) | np.isin(np.arange(self.saltobj.npar),self.saltobj.iCL) 
-            X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter)
+            X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter,usesecondary=len(self.saltobj.constraints.use_secondary_constraint_names)>0)
             
             
         except KeyboardInterrupt as e:
@@ -276,9 +275,10 @@ class rpropwithbacktracking(salttrainingoptimizer):
             
         starttime=time.time()
         initvals=jnp.array(initvals)
+        
         X, Xprev,loss,sign= initvals,initvals, np.inf,np.zeros(initvals.size)
         rates=jnp.array(rates)
-        
+       
         def iteration(X, Xprev,loss,sign,rates):
             #Proposes a new value based on sign of gradient
             Xnew,newloss, newsign, newgrad,newrates  = self.rpropiter(X, Xprev,loss,sign,rates,**kwargs)
@@ -320,7 +320,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
             else:
                 if len(self.losshistory)> numconvergence+10:
                     convergencecriterion= np.abs(self.losshistory[-numconvergence] - loss)
-                    if np.isnan(loss) or np.all( np.array(self.losshistory[-numconvergence+1:]) > self.losshistory[-numconvergence] ):
+                    if np.isnan(loss) :#or np.all( np.array(self.losshistory[-numconvergence*2+1:]) > self.losshistory[-numconvergence*2] ):
                     
                         convergencecriterion=0
                 else:

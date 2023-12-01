@@ -150,7 +150,7 @@ class TrainSALT(TrainSALTBase):
                         'phasesplineres':self.options.phasesplineres,'wavesplineres':self.options.wavesplineres,
                         'phaseinterpres':self.options.phaseinterpres,'waveinterpres':self.options.waveinterpres,
                         'normalize':True,'order':self.options.bsorder,'use_snpca_knots':self.options.use_snpca_knots}
-                
+
         phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
             self.options.inithsiaofile,self.options.initbfilt,_flatnu,**init_options)
         if self.options.host_component:
@@ -172,8 +172,8 @@ class TrainSALT(TrainSALTBase):
                     self.options.initm0modelfile,self.options.initm1modelfile,
                     Bfilt=self.options.initbfilt,flatnu=_flatnu,**init_options)
         #zero out the flux and the 1st derivative at the start of the phase range
-        m0knots[:(waveknotloc.size-self.options.bsorder) * 2]=0
-        m1knots[:(waveknotloc.size-self.options.bsorder) * 2]=0
+        m0knots[:(waveknotloc.size-self.options.bsorder-1) * 2]=0
+        m1knots[:(waveknotloc.size-self.options.bsorder-1) * 2]=0
         
         init_options['phasesplineres'] = self.options.error_snake_phase_binsize
         init_options['wavesplineres'] = self.options.error_snake_wave_binsize
@@ -286,6 +286,10 @@ class TrainSALT(TrainSALTBase):
             for i in range(3): guess[parlist == 'modelerr_{}'.format(i)] = 1e-6 
             if self.options.n_components >= 2:
                 guess[parlist == 'm1'] = m1knots
+            if self.options.n_components >= 3:
+            
+                guess[parlist=='m2'] =( (np.arange(m0knots.size)< (n_waveknots*  (n_phaseknots//6)))
+                                       &  (np.arange(m0knots.size)> (n_waveknots* 1 ))  )*np.std(m0knots)*.2
             if self.options.host_component:
                 guess[parlist == 'mhost'] = mhostknots
             if self.options.n_colorpars:
@@ -671,10 +675,6 @@ class TrainSALT(TrainSALTBase):
         for i in range(self.options.n_repeat):
             
             saltfitter = optimizer(x_modelpars,saltresids,self.options.outputdir,self.options)
-#             with open ('multicomponent_062623/gradienthistory.pickle','rb') as file:
-#                 history=pickle.load(file)
-#                 x_modelpars=history[0][np.argmin(history[1])]
-#             break
             if returnGN:
             #This is an awful hack and should be removed
                 return saltfitter,x_modelpars
@@ -684,7 +684,6 @@ class TrainSALT(TrainSALTBase):
             
         Xfinal= saltresids.constraints.enforcefinaldefinitions(x_modelpars,saltresids.SALTModel(x_modelpars))
         if self.options.errors_from_hessianapprox: 
-#             sigma=np.load(path.join(self.options.outputdir,'parametercovariance.npy'))
             sigma=saltresids.estimateparametererrorsfromhessian(Xfinal)
             np.save(path.join(self.options.outputdir,'parametercovariance.npy'), sigma)
         else: sigma=None
@@ -1179,7 +1178,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
             
             phasebins=np.linspace(*self.options.phaserange,int((self.options.phaserange[1]-self.options.phaserange[0])/self.options.phasesplineres)+1,True)
             wavebins=np.linspace(*self.options.waverange,int((self.options.waverange[1]-self.options.waverange[0])/self.options.wavesplineres)+1,True)
-            datadensity.datadensityplot(path.join(self.options.outputdir,'datadensity.pdf') ,phasebins,wavebins,datadict,self.kcordict)
+            datadensity.datadensityplot(path.join(self.options.outputdir,'datadensity.pdf') ,phasebins,wavebins,datadict,self.kcordict,1500,200)
             # fit the model - initial pass
             if self.options.stage == "all" or self.options.stage == "train":
                 # read the data
@@ -1236,14 +1235,12 @@ usage: python TrainSALT.py -c <configfile> <options>
 config file options can be overwridden at the command line"""
 
         
-    def get_config_options(self,salt,configfile,configpositional,args=None):
+    def get_config_options(self,salt,configfile,args=None):
         
         if configfile:
             pass
-        elif configpositional:
-            configfile= configpositional
         else:
-            raise RuntimeError('Configuration file must be specified at command line')
+            raise RuntimeError('Configuration file must be specified')
 
         config = configparser.ConfigParser(inline_comment_prefixes='#')
         if not os.path.exists(configfile):
@@ -1284,6 +1281,7 @@ config file options can be overwridden at the command line"""
             parser=user_parser,config=trainingconfig)
         training_parser.addhelp()
         training_options = training_parser.parse_args(args)
+        
         salt.options = training_options
         salt.options.host_component= True if salt.options.host_component else False
         if training_options.fast:
@@ -1303,18 +1301,26 @@ config file options can be overwridden at the command line"""
 
         return
         
-    def main(self):
+    def main(self,configfile=None,args=None):
 
         salt = TrainSALT()
+        
+        if configfile is None:
+            assert(args is None)
+            parser = argparse.ArgumentParser(usage=self.usagestring, conflict_handler="resolve",add_help=False)
+            parser.add_argument('configpositional',nargs='?',default=None,type=str,help='configuration file')
+            parser.add_argument('-c','--configfile', default=None, type=str,
+                                help='configuration file')
 
-        parser = argparse.ArgumentParser(usage=self.usagestring, conflict_handler="resolve",add_help=False)
-        parser.add_argument('configpositional',nargs='?',default=None,type=str,help='configuration file')
-        parser.add_argument('-c','--configfile', default=None, type=str,
-                            help='configuration file')
 
-        options, args = parser.parse_known_args()
-
-        self.get_config_options(salt,options.configfile,options.configpositional)
+            options, _ = parser.parse_known_args()
+            configfile,configpos=options.configfile,options.configpositional
+            if configfile is None:
+                configfile=configpos
+            else:
+                raise RuntimeError('Configuration file must be specified at command line')
+        self.get_config_options(salt,configfile,args)
+        
 
         salt.main()
 

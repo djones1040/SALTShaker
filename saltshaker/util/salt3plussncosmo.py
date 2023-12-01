@@ -32,46 +32,37 @@ class SALT3PlusSource(Source):
     _SCALE_FACTOR = 1e-12
 
     def __init__(self, modeldir=None,
-                 m0file='',
-                 m1file='salt3_template_1.dat',
-                 clfile='salt3_color_correction.dat',
-                 cdfile='salt3_color_dispersion.dat',
-                 lcrv00file='salt3_lc_variance_0.dat',
-                 lcrv11file='salt3_lc_variance_1.dat',
-                 lcrv01file='salt3_lc_covariance_01.dat',
-                 name=None, version=None):
+                 name=None, version=None,modelvaronly=False,swapcoordinates=False):
 
         self.name = name
         self.version = version
         self._model = {}
         self._parameters = np.array([1.,0, 0., 0.])        
-        
+        self.ncomponents=3
+        self.modelvaronly=modelvaronly
+        self.swapcoordinates=swapcoordinates
+        #Define where the model files are found of the 
         names_or_objs = {
-                         'LCRV00': lcrv00file, 'LCRV11': lcrv11file,
-                         'LCRV01': lcrv01file,
-                         'cdfile': cdfile, 'clfile': clfile}
-
+                         'cdfile': 'salt3_color_dispersion.dat', 'clfile': 'salt3_color_correction.dat'}
+        for i in range(self.ncomponents):
+            names_or_objs[f'M{i}']=f'salt3_template_{i}.dat'
+        
+        for i in range(self.ncomponents):
+            for j in range(i+1):
+                names_or_objs[f'LCRV{j}{i}']= f'salt3_lc_variance_{i}.dat' if i==j else f'salt3_lc_covariance_{j}{i}.dat'
+        names_or_objs[f'LCRV00_model']= f'salt3_lc_model_variance_0.dat' 
+        
         # Make filenames into full paths.
         if modeldir is not None:
             for k in names_or_objs:
                 v = names_or_objs[k]
                 if (v is not None and isinstance(v, str)):
                     names_or_objs[k] = os.path.join(modeldir, v)
-            i=0
-            components={}
-            while os.path.exists(os.path.join(modeldir,f'salt3_template_{i}.dat')):
-                components[f'M{i}']=os.path.join(modeldir,f'salt3_template_{i}.dat')
-                i+=1
-        else:
-            i=0
-            components={}
-            while os.path.exists(f'salt3_template_{i}.dat'):
-                components[f'M{i}']=f'salt3_template_{i}.dat'
-                i+=1
-        self.ncomponents=len(components)
+        #while os.path.exists(f'salt3_template_{i}.dat'):
         # model components are interpolated to 2nd order
-        for key in components:
-            phase, wave, values = read_griddata_ascii(components[key])
+        for i in range(self.ncomponents):
+            key=f'M{i}'
+            phase, wave, values = read_griddata_ascii(names_or_objs[key])
             values *= self._SCALE_FACTOR
             self._model[key] = BicubicInterpolator(phase, wave, values)
 
@@ -82,10 +73,11 @@ class SALT3PlusSource(Source):
                 self._wave = wave
 
         # model covariance is interpolated to 1st order
-        for key in ['LCRV00', 'LCRV11', 'LCRV01']:
-            phase, wave, values = read_griddata_ascii(names_or_objs[key])
-            values *= self._SCALE_FACTOR**2.
-            self._model[key] = BicubicInterpolator(phase, wave, values)
+        for key in names_or_objs:
+            if key.startswith('LCRV'):
+                phase, wave, values = read_griddata_ascii(names_or_objs[key])
+                values *= self._SCALE_FACTOR**2.
+                self._model[key] = BicubicInterpolator(phase, wave, values)
 
         # Set the colorlaw based on the "color correction" file.
         self._set_colorlaw_from_file(names_or_objs['clfile'])
@@ -98,8 +90,13 @@ class SALT3PlusSource(Source):
         m0 = self._model['M0'](phase, wave)
         m1 = self._model['M1'](phase, wave)
         m2 = self._model['M2'](phase, wave)
-        return np.clip(self._parameters[0] * (m0 + self._parameters[1] * m1 + self._parameters[2] * m2) *
-                10. ** (-0.4 * self._colorlaw(wave) * self._parameters[-1]),0,None)
+        if self.swapcoordinates:                             
+            coordinates=np.array([1,self._parameters[2],self._parameters[1]] )
+        else:
+            coordinates=np.array([1,self._parameters[1],self._parameters[2]] )
+        surfaces= np.array([m0,m1,m2])
+        return np.clip(self._parameters[0] * ( surfaces.T @ coordinates ).T *
+                10. ** (-0.4 * self._colorlaw(wave) * self._parameters[-1]) ,0,None)
 
     def _bandflux_rvar_single(self, band, phase):
         """Model relative variance for a single bandpass."""
@@ -110,45 +107,43 @@ class SALT3PlusSource(Source):
                              'outside spectral range [{3:.6g}, .., {4:.6g}]'
                              .format(band.name, band.wave[0], band.wave[-1],
                                      self._wave[0], self._wave[-1]))
-
-        x1 = self._parameters[1]
-
-        # integrate m0 and m1 components
+                                     
+        if self.swapcoordinates:                             
+            coordinates=np.array([1,self._parameters[2],self._parameters[1]] )
+        else:
+            coordinates=np.array([1,self._parameters[1],self._parameters[2]] )
+        #determine flux
+        ftot=self.bandflux(band,phase)
+        # integrate bandpass
         wave, dwave = integration_grid(band.minwave(), band.maxwave(),
                                        MODEL_BANDFLUX_SPACING)
         trans = band(wave)
-        m0 = self._model['M0'](phase, wave)
-        m1 = self._model['M1'](phase, wave)
-        tmp = trans * wave
+        #calculate flux prefactor, given color and bandpass
+        fluxprefactor=((trans*wave).sum()*dwave/HC_ERG_AA*self._parameters[0] *
+                10. ** (-0.4 * self._colorlaw(np.array([band.wave_eff]))[0] * self._parameters[-1]))
+        
+        
+        #Calculate predicted variance at effective wavelength
+        if self.modelvaronly:
+            v=self._model['LCRV00_model'](phase, band.wave_eff)[:, 0]
+        else:
+            covmat=np.array([[ self._model[(f'LCRV{j}{i}' if j<i else f'LCRV{i}{j}')](phase, band.wave_eff)[:, 0]
+        
+            for i in range(self.ncomponents)] for j in range(self.ncomponents)])
 
-        # evaluate avg M0 + x1*M1 across a bandpass
-        f0 = np.sum(m0 * tmp, axis=1)/tmp.sum()
-        m1int = np.sum(m1 * tmp, axis=1)/tmp.sum()
-        ftot = f0 + x1 * m1int
-
-        # In the following, the "[:,0]" reduces from a 2-d array of shape
-        # (nphase, 1) to a 1-d array.
-        lcrv00 = self._model['LCRV00'](phase, band.wave_eff)[:, 0]
-        lcrv11 = self._model['LCRV11'](phase, band.wave_eff)[:, 0]
-        lcrv01 = self._model['LCRV01'](phase, band.wave_eff)[:, 0]
-
-        # variance in M0 + x1*M1 at the effective wavelength
-        # of a bandpass
-        v = lcrv00 + 2.0 * x1 * lcrv01 + x1 * x1 * lcrv11
+            v = coordinates @ (coordinates @ covmat ) 
+        v*=(fluxprefactor)**2
 
         # v is supposed to be variance but can go negative
         # due to interpolation.  Correct negative values to some small
         # number. (at present, use prescription of snfit : set
-        # negatives to 0.0001)
-        v[v < 0.0] = 0.0001
-
+        # negatives to 0.0001)         
+        
         # avoid warnings due to evaluating 0. / 0. in f0 / ftot
-        with np.errstate(invalid='ignore'):
-            # turn M0+x1*M1 error into a relative error
+        with np.errstate(invalid='ignore',divide='ignore'):
             result = v/ftot**2.
-
+        result= (np.clip(np.nan_to_num(result), 1e-10,None))
         # treat cases where ftot is negative the same as snfit
-        result[ftot <= 0.0] = 10000.
         return result
 
     def bandflux_rcov(self, band, phase):

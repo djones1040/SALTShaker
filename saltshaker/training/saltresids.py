@@ -47,7 +47,7 @@ import pylab as plt
 
 import jax
 from jax import numpy as jnp
-#from jaxlib.xla_extension import DeviceArray
+
 from jax.scipy import linalg as jaxlinalg
 from jax.experimental import sparse
 from jax import lax
@@ -540,6 +540,9 @@ class SALTResids:
         successful=successful&wrapaddingargument(config,'modelparams','constraint_names','constraints',  default='', nargs='*',      type=str,
                                                 help='constraints enforced on the model, see constraints.py (default=%(default)s)')               
         
+        successful=successful&wrapaddingargument(config,'modelparams','secondary_constraint_names','secondary_constraints',  default=[], nargs='*',      type=str,
+                                                help='constraints enforced on the model after an initial burn-in, see constraints.py (default=%(default)s)')               
+
         for prior in __priors__:
                 successful=successful&wrapaddingargument(config,'priors',prior ,type=float,clargformat="--prior_{key}",
                                                         help=f"prior on {prior}",default=SUPPRESS)
@@ -696,9 +699,9 @@ class SALTResids:
         return list(loop())
             
 
-    @partial(jaxoptions, static_argnums=[0,3,4,5,6 ,7],static_argnames= ['fixfluxes','fixuncertainties','dopriors','dospec','usesns'],diff_argnum=1,jitdefault=True) 
-    def constrainedmaxlikefit(self,params,*args,**kwargs):
-        return self.maxlikefit(self.constraints.transformtoconstrainedparams(params),*args,**kwargs)
+    @partial(jaxoptions, static_argnums=[0,3,4,5,6 ,7],static_argnames= ['fixfluxes','fixuncertainties','dopriors','dospec','usesns','usesecondary'],diff_argnum=1,jitdefault=True) 
+    def constrainedmaxlikefit(self,params,*args,usesecondary=True,**kwargs):
+        return self.maxlikefit(self.constraints.transformtoconstrainedparams(params,usesecondary),*args,**kwargs)
 
 
     @partial(jaxoptions, static_argnums=[0,3,4,5,6 ,7],static_argnames= ['fixfluxes','fixuncertainties','dopriors','dospec','usesns'],diff_argnum=1,jitdefault=True) 
@@ -789,7 +792,6 @@ class SALTResids:
 
 
     def computeuncertaintiesfromparametererrors(self,X,sigma,smoothingfactor=150):
-        #Inverting cholesky matrix for speed
 
         varyingParams=reduce(lambda x,y:  x | np.isin(np.arange(self.npar), y),[
             self.icomponents,self.iCLNoGal,self.imhost],False)
@@ -804,15 +806,11 @@ class SALTResids:
             ### so cholesky doesn't complain
             sigma[np.where(~varyingParams)[0][iOK],np.where(~varyingParams)[0][iOK]] = 100
         
-        preconditioning = np.diag(np.sqrt(1/np.diag(sigma)))
-        L=np.diag( 1/ np.diag(preconditioning)) @ linalg.cholesky(preconditioning @ sigma @ preconditioning ,lower=True)
-
         #Turning spline_derivs into a sparse matrix for speed
+        logging.info('Computing flux surface uncertainties')
         chunkindex,chunksize=0,10
-
-        Mhostdataerr      = np.empty((self.phaseout.size,self.waveout.size))
-        cov_M0_Mhost_data = np.empty((self.phaseout.size,self.waveout.size))
-        corrcombinations=[x for x in  combinations_with_replacement(np.arange(self.n_components),2) ]
+        assert(isinstance(self.host_component,bool))
+        corrcombinations=[x for x in  combinations_with_replacement(np.arange(self.n_components+self.host_component),2) ]
         surfaces={x:np.empty((self.phaseout.size,self.waveout.size)) for x in corrcombinations }
 
         iterable=np.arange(self.waveout.size)[::chunksize]
@@ -834,33 +832,19 @@ class SALTResids:
             mask=np.zeros((self.phaseout.size,self.waveout.size),dtype=bool)
             mask[:,chunkindex:chunkindex+chunksize]=True        
 
-            #Uncorrelated effect of parameter uncertainties on M0 and M1
             for i,j in corrcombinations:
-                firstpulls=L[:,self.icomponents[i]].astype('float32') @ spline2d.T.astype('float32')
-                secondpulls=L[:,self.icomponents[j]].astype('float32') @ spline2d.T.astype('float32')
-                surfaces[(i,j)][mask]=( firstpulls*secondpulls ).sum(axis=0)
+                #.A1 method just converts the output "matrix" type to an ndarray
+                surfaces[(i,j)][mask]=spline2d.multiply( 
+                        spline2d @ sigma[self.icomponents[i],:][:,self.icomponents[j]] 
+                    ).sum(axis= 1).A1
 
-            if self.host_component:
-                mhostpulls=L[:,self.imhost].astype('float32') @ spline2d.T.astype('float32')
-
-                m0pulls=L[:,self.icomponents[0]].astype('float32') @ spline2d.T.astype('float32')
-                Mhostdataerr[mask] =  np.sqrt((mhostpulls**2     ).sum(axis=0))
-                # should we do host covariances?
-                cov_M0_Mhost_data[mask] =     (m0pulls*mhostpulls).sum(axis=0)
 
         components=self.SALTModel(X)
 
-        stderrs=[np.clip(np.sqrt(surfaces[(i,i)]),0, np.abs(comp).max()*2) for i,comp in zip(range(self.n_components),components)]
+        stderrs=[np.clip(np.sqrt(surfaces[(i,i)]),0, np.abs(comp).max()*2) for i,comp in zip(range(self.n_components+self.host_component),(components))]
         correlations=[ ( i,j,
             np.clip(np.nan_to_num(surfaces[(i,j)]/(stderrs[i]*stderrs[j])),-1,1)*(stderrs[i]*stderrs[j]))
                     for i,j in corrcombinations if i!=j]
-
-        if self.host_component:
-            Mhost=components[-1]
-            Mhostdataerr=np.clip(Mhostdataerr,0,np.abs(Mhost).max()*2)
-            stderrs+=[Mhostdataerr]
-            correlations+=[ (0,self.n_components,cov_M0_Mhost_data )]
-
 
         return stderrs,correlations
 
@@ -904,9 +888,9 @@ class SALTResids:
     def SALTModel(self,x,evaluatePhase=None,evaluateWave=None):
         """Returns flux surfaces of SALT model"""
         components=[]
-        for i in range( self.icomponents.shape[0]):
+        for i in range( self.n_components  + self.host_component):
             comppars=x[self.icomponents[i]]
-
+            
             if self.bsorder != 0:
                 surface = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
                              self.wave if evaluateWave is None else evaluateWave,
@@ -979,17 +963,12 @@ class SALTResids:
                                    (self.errphaseknotloc,self.errwaveknotloc,errpars,self.errbsorder,self.errbsorder))]
         return components
     
-    def colorscatter(self,x,wave,varyParams=None):
+    def colorscatter(self,x,wave):
         clscatpars = x[self.parlist == 'clscat']
         pow=clscatpars.size-1-np.arange(clscatpars.size)
         coeffs=clscatpars/factorial(pow)
-        clscat=np.exp(np.poly1d(coeffs)((wave-5500)/1000))
-        if varyParams is None:
-            return clscat
-        else:
-            pow=pow[varyParams[self.parlist=='clscat']]
-            dcolorscatdx= clscat*(((wave-5500)/1000) ** (pow) )/ factorial(pow)
-            return clscat,dcolorscatdx
+        clscat=jnp.exp(jnp.polyval(coeffs,(wave-5500)/1000))
+        return clscat
         
     
     def ErrModel(self,x,evaluatePhase=None,evaluateWave=None):
