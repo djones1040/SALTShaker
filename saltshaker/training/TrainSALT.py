@@ -1247,7 +1247,7 @@ config file options can be overwridden at the command line"""
         config = configparser.ConfigParser(inline_comment_prefixes='#')
         if not os.path.exists(configfile):
             raise RuntimeError(f'Configfile {configfile} doesn\'t exist!')
-            
+
                     
         config.read(configfile)
 
@@ -1269,7 +1269,7 @@ config file options can be overwridden at the command line"""
             raise RuntimeError('can\'t find trainingconfig config file!  Checked %s'%user_options.trainingconfig)
 
         optimizer=optimizers.getoptimizer(user_options.optimizer)
-        
+
         modelconfig = configparser.ConfigParser(inline_comment_prefixes='#')
         modelconfig.read(user_options.modelconfig)
         model_parser = saltresids.SALTResids.add_model_options(
@@ -1317,10 +1317,12 @@ config file options can be overwridden at the command line"""
 
             options, _ = parser.parse_known_args()
             configfile,configpos=options.configfile,options.configpositional
-            if configfile is None:
+
+            if configfile is None and configpos is not None: 
                 configfile=configpos
-            else:
+            elif configfile is None and configpos is None:
                 raise RuntimeError('Configuration file must be specified at command line')
+
         self.get_config_options(salt,configfile,args)
         
 
