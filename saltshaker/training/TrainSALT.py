@@ -1053,7 +1053,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
             fitx1,fitc = False,False
             if self.options.n_components == 2:
                 fitx1 = True
-            if self.options.n_colorpars > 0:
+            if self.options.n_colorpars[0] > 0:
                 fitc = True
 
             if self.options.binspec:

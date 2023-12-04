@@ -281,19 +281,19 @@ def customfilt(outfile,lcfile,salt3dir,
 
 		
 	# color laws
-	try:
-		with open('%s/%s'%(salt3dir,clfile)) as fin:
-			lines = fin.readlines()
-		if len(lines):
-			for i in range(len(lines)):
-				lines[i] = lines[i].replace('\n','')
-			colorlaw_salt3_coeffs = np.array(lines[1:n_colorpars+1]).astype('float')
-			salt3_colormin = float(lines[n_colorpars+2].split()[1])
-			salt3_colormax = float(lines[n_colorpars+3].split()[1])
+	#try:
+	with open('%s/%s'%(salt3dir,clfile)) as fin:
+		lines = fin.readlines()
+	if len(lines):
+		for i in range(len(lines)):
+			lines[i] = lines[i].replace('\n','')
+		colorlaw_salt3_coeffs = np.array(lines[1:n_colorpars[0]+1]).astype('float')
+		salt3_colormin = float(lines[n_colorpars[0]+2].split()[1])
+		salt3_colormax = float(lines[n_colorpars[0]+3].split()[1])
 
-			salt3colorlaw = SALT2ColorLaw([salt3_colormin,salt3_colormax],colorlaw_salt3_coeffs)
-	except:
-		pass
+		salt3colorlaw = SALT2ColorLaw([salt3_colormin,salt3_colormax],colorlaw_salt3_coeffs)
+	#except:
+#		pass
 	salt2colorlaw = SALT2ColorLaw([2800,7000], [-0.504294,0.787691,-0.461715,0.0815619])
 
 	#print(np.sum(salt2flux_tmp[20,:]),np.sum(salt3flux[20,:]))
