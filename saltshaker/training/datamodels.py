@@ -392,23 +392,23 @@ class modeledtraininglightcurve(modeledtrainingdata):
 @register_pytree_node_class
 class modeledtrainingspectrum(modeledtrainingdata):
     __indexattributes__=[
-    'ix0','ispcrcl','icomponents', 'icoordinates',
-    'imodelcorrs', 'imodelerrs','ipad']
+        'ix0','ispcrcl','icomponents', 'icoordinates',
+        'imodelcorrs', 'imodelerrs','ipad','iCL','ic']
     __dynamicattributes__ = [
         'flux', 'wavelength','phase', 'fluxerr', 'restwavelength',
         'recaltermderivs',
         'varianceprefactor',
-        'pcderivsparse','errordesignmat','spectralsuppression','n_specrecal'
+        'pcderivsparse','errordesignmat','spectralsuppression'
      ]
     __staticattributes__=[
         'padding','imodelcorrs_coordinds',
         'errorgridshape','bsplinecoeffshape',
-        'uniqueid','colorlawfunction'
+        'uniqueid','colorlawfunction','n_specrecal'
     ]+__indexattributes__
     __slots__ = __dynamicattributes__+__staticattributes__
 
     __ismapped__={
-    'ix0','ispcrcl','icoordinates','ipad','phase','flux','fluxerr',
+        'ix0','ic','ispcrcl','icoordinates','ipad','phase','flux','fluxerr',
         'restwavelength','recaltermderivs','errordesignmat','pcderivsparse',
         'varianceprefactor','varianceprefactor','uniqueid','n_specrecal'
     }
@@ -428,8 +428,11 @@ class modeledtrainingspectrum(modeledtrainingdata):
         self.ipad= np.arange(len(spectrum)+padding )>= len(spectrum)
         self.uniqueid= f'{sn.snid}_{k}'
         self.spectralsuppression=np.sqrt(residsobj.num_phot/residsobj.num_spec)*residsobj.spec_chi2_scaling
+
+        self.iCL=residsobj.iCL
+        self.ic=sn.ic
         
-        self.colorlawfunction=residsobj.colorlawfunction        
+        self.colorlawfunction=residsobj.colorlawfunction
         self.icomponents=residsobj.icomponents
         self.icoordinates=sn.icoordinates
         mwextcurve=sn.mwextcurveint(spectrum.wavelength)
@@ -499,7 +502,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
         recalterm=jnp.clip(recalterm,-recalmax,recalmax)
         recalexp=jnp.exp(recalterm)
 
-        colorlaw= sum([fun(c,cl,self.wavebasis) for fun,c,cl in zip(self.colorlawfunction,pars.c, pars.CL)])
+        colorlaw= sum([fun(c,cl,self.restwavelength) for fun,c,cl in zip(self.colorlawfunction,pars.c, pars.CL)])
         colorexp= 10. ** (  -0.4*colorlaw)
 
         fluxcoeffs=jnp.dot(coordinates,components)*x0
