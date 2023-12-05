@@ -317,7 +317,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         #Evaluate color law at the wavelength basis centers
         colorlaw= sum([fun(c,cl,self.wavebasis) for fun,c,cl in zip(self.colorlawfunction,pars.c, pars.CL)])
         colorexp= 10. ** (  -0.4*colorlaw)
-        #jax.debug.breakpoint()
+
         if self.preintegratebasis:
             #Redden flux coefficients
             fluxcoeffsreddened= (colorexp[np.newaxis,:]*fluxcoeffs.reshape( self.bsplinecoeffshape)).flatten()
@@ -398,19 +398,19 @@ class modeledtrainingspectrum(modeledtrainingdata):
         'flux', 'wavelength','phase', 'fluxerr', 'restwavelength',
         'recaltermderivs',
         'varianceprefactor',
-        'pcderivsparse','errordesignmat','spectralsuppression'
+        'pcderivsparse','errordesignmat','spectralsuppression','n_specrecal'
      ]
     __staticattributes__=[
         'padding','imodelcorrs_coordinds',
         'errorgridshape','bsplinecoeffshape',
-        'uniqueid'
+        'uniqueid','colorlawfunction'
     ]+__indexattributes__
     __slots__ = __dynamicattributes__+__staticattributes__
 
     __ismapped__={
     'ix0','ispcrcl','icoordinates','ipad','phase','flux','fluxerr',
         'restwavelength','recaltermderivs','errordesignmat','pcderivsparse',
-        'varianceprefactor','varianceprefactor','uniqueid'
+        'varianceprefactor','varianceprefactor','uniqueid','n_specrecal'
     }
     
     def __init__(self,sn,spectrum,k,residsobj,padding=0):
@@ -418,7 +418,8 @@ class modeledtrainingspectrum(modeledtrainingdata):
             if attr in self.__slots__:
                     setattr(self,attr,getattr(spectrum,attr))
         z = sn.zHelio
-#         import pdb;pdb.set_trace()
+        self.n_specrecal = spectrum.n_specrecal
+
         padding=max(0,padding)
         self.ix0=np.where(residsobj.parlist==f'specx0_{sn.snid}_{k}')[0][0]
         self.ispcrcl=np.where(residsobj.parlist==f'specrecal_{sn.snid}_{k}')[0]
@@ -426,10 +427,9 @@ class modeledtrainingspectrum(modeledtrainingdata):
         self.padding=padding
         self.ipad= np.arange(len(spectrum)+padding )>= len(spectrum)
         self.uniqueid= f'{sn.snid}_{k}'
-        
         self.spectralsuppression=np.sqrt(residsobj.num_phot/residsobj.num_spec)*residsobj.spec_chi2_scaling
         
-        
+        self.colorlawfunction=residsobj.colorlawfunction        
         self.icomponents=residsobj.icomponents
         self.icoordinates=sn.icoordinates
         mwextcurve=sn.mwextcurveint(spectrum.wavelength)
@@ -494,15 +494,18 @@ class modeledtrainingspectrum(modeledtrainingdata):
         coeffs=pars.spcrcl
         coordinates=jnp.concatenate((jnp.ones(1), pars.coordinates))
         components=pars.components
-        
+
         recalterm=jnp.dot(self.recaltermderivs,coeffs)
         recalterm=jnp.clip(recalterm,-recalmax,recalmax)
         recalexp=jnp.exp(recalterm)
 
+        colorlaw= sum([fun(c,cl,self.wavebasis) for fun,c,cl in zip(self.colorlawfunction,pars.c, pars.CL)])
+        colorexp= 10. ** (  -0.4*colorlaw)
 
         fluxcoeffs=jnp.dot(coordinates,components)*x0
 
-        return recalexp*(self.pcderivsparse @ (fluxcoeffs))
+        return jax.lax.cond( self.n_specrecal==0, lambda : colorexp , lambda: recalexp ) * ( self.pcderivsparse @ (fluxcoeffs))
+
 
     def modelfluxvariance(self,pars):
         if not isinstance(pars,SALTparameters):
@@ -560,7 +563,7 @@ class SALTfitcacheSN(SALTtrainingSN):
     
     __slots__= ['ix0','ix1','ic', 'ixhost','icoordinates','mwextcurve','mwextcurveint','dwave','obswave','obsphase','photdata','specdata']
     
-    def __init__(self,sndata,residsobj,kcordict,lcpaddingsizes=None,specpaddingsizes=None):
+    def __init__(self,sndata,residsobj,kcordict,lcpaddingsizes=None,specpaddingsizes=None,n_specrecal=None):
         for attr in sndata.__slots__:
             if attr=='photdata' or  attr=='specdata':
                 pass

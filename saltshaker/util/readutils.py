@@ -68,9 +68,9 @@ class SALTtraininglightcurve(SALTtrainingdata):
                 
 class SALTtrainingspectrum(SALTtrainingdata):
 
-        __slots__=['flux', 'phase', 'wavelength', 'fluxerr', 'tobs','restwavelength','mjd']
+        __slots__=['flux', 'phase', 'wavelength', 'fluxerr', 'tobs','restwavelength','mjd','n_specrecal']
 
-        def __init__(self,snanaspec,z,tpk_guess,binspecres=None ):
+        def __init__(self,snanaspec,z,tpk_guess,n_specrecal=None,binspecres=None ):
                         m=snanaspec['SPECTRUM_MJD']
                         if snanaspec['FLAM'].size==0:
                                 raise SNDataReadError(f'Spectrum has no observations')
@@ -87,7 +87,8 @@ class SALTtrainingspectrum(SALTtrainingdata):
                         self.tobs=m -tpk_guess
                         self.mjd=m
                         self.phase=self.tobs/(1+z)
-                        
+                        self.n_specrecal = n_specrecal
+
                         if 'DQ' in snanaspec:
                                 iGood=(snanaspec['DQ']==1)
                         elif 'SPECFLAG' in snanaspec:
@@ -156,7 +157,7 @@ class SALTtrainingSN:
         __slots__=['survey', 'zHelio', 'MWEBV', 'snid', 'tpk_guess', 'salt2fitprob', 'photdata','specdata']
         def __init__(self,sn,
                      estimate_tpk=False,snpar=None,
-                     pkmjddict={},binspecres=None):
+                     pkmjddict={},n_specrecal=None,binspecres=None):
 
                 if 'FLT' not in sn.__dict__.keys():
                     raise SNDataReadError('can\'t find SN filters!')
@@ -233,8 +234,14 @@ class SALTtrainingSN:
                 self.specdata = {}
                 if 'SPECTRA' in sn.__dict__:
                     for speccount,k in enumerate(sn.SPECTRA):
+                        if n_specrecal is not None and k+1 in n_specrecal['N']:
+                            n_recal_pars = n_specrecal['ncalib'][n_specrecal['N'] == k+1][0]
+                        else: n_recal_pars = None
                         try:
-                            self.specdata[speccount]=SALTtrainingspectrum(sn.SPECTRA[k],self.zHelio,self.tpk_guess,binspecres=binspecres)
+                            self.specdata[speccount]=SALTtrainingspectrum(
+                                sn.SPECTRA[k],self.zHelio,self.tpk_guess,
+                                n_specrecal=n_recal_pars,
+                                binspecres=binspecres)
                         except SNDataReadError as e:
                             if hasattr(e,'message'):
                                 log.warning(f'{e.message}, skipping spectrum {k} for SN {self.snid}')
@@ -385,7 +392,7 @@ def rdkcor(surveylist,options):
         
 def rdAllData(snlists,estimate_tpk,
               dospec=False,peakmjdlist=None,
-              waverange=[2000,9200],binspecres=None,snparlist=None,maxsn=None):
+              waverange=[2000,9200],binspecres=None,snparlist=None,specrecallist=None,maxsn=None):
     datadict = {}
     if peakmjdlist:
         pksnid,pkmjd = np.loadtxt(peakmjdlist,unpack=True,dtype=str,usecols=[0,1])
@@ -396,7 +403,10 @@ def rdAllData(snlists,estimate_tpk,
         snpar = at.Table.read(snparlist,format='ascii')
         snpar['SNID'] = snpar['SNID'].astype(str)
     else: snpar = None
-
+    if specrecallist:
+        src = at.Table.read(specrecallist,format='ascii')
+        src['SNID'] = src['SNID'].astype(str)
+    
     nsnperlist = []
     for snlist in snlists.split(','):
 
@@ -418,7 +428,7 @@ def rdAllData(snlists,estimate_tpk,
     else: maxcount = [np.inf]*len(snlists.split(','))
 
     #Check whether to add the supernova to a dictionary of results; if not return False, otherwise do so and return True 
-    def processsupernovaobject(outputdict,sn,maxnum):
+    def processsupernovaobject(outputdict,sn,maxnum,n_specrecal):
 
             if 'FLT' not in sn.__dict__.keys() and \
                'BAND' in sn.__dict__.keys():
@@ -437,6 +447,7 @@ def rdAllData(snlists,estimate_tpk,
                 saltformattedsn=SALTtrainingSN(
                     sn,estimate_tpk=estimate_tpk,
                     pkmjddict=pkmjddict,snpar=snpar,
+                    n_specrecal=n_specrecal,
                     binspecres=binspecres)
             except SNDataReadError as e:
                 log.warning(e.args[0])
@@ -485,12 +496,21 @@ def rdAllData(snlists,estimate_tpk,
                             sn.SURVEY = f"{survey}({sn.SUBSURVEY})"
                         else:
                             sn.SURVEY = survey
-                        skipcount+=not processsupernovaobject(snreadinfromlist,sn,maxct)
+                        if specrecallist is not None:
+                            n_specrecal = src[src['SNID'] == snid]
+                        else:
+                            n_specrecal = None
+                        skipcount+=not processsupernovaobject(snreadinfromlist,sn,maxct,n_specrecal)
                 else:
                     if '/' not in f:
                         f = '%s/%s'%(os.path.dirname(snlist),f)
                     sn = snana.SuperNova(f,readspec=dospec)
-                    skipcount+=not processsupernovaobject(snreadinfromlist,sn,maxct)
+                    if specrecallist:
+                        n_specrecal = src[src['SNID'] == sn.SNID]
+                    else:
+                        n_specrecal = None
+                        
+                    skipcount+=not processsupernovaobject(snreadinfromlist,sn,maxct,n_specrecal)
         except BreakLoopException:
             pass
 

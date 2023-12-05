@@ -241,17 +241,18 @@ class TrainSALT(TrainSALTBase):
             specdata=datadict[sn].specdata
             photdata=datadict[sn].photdata
             for k in specdata.keys():
-                if not self.options.specrecallist:
-                    order=self.options.n_min_specrecal+int(np.log((specdata[k].wavelength.max() - \
-                        specdata[k].wavelength.min())/self.options.specrange_wavescale_specrecal) + \
-                        len(datadict[sn].filt)* self.options.n_specrecal_per_lightcurve)
-                else:
-                    spcrclcopy = spcrcldata[spcrcldata['SNID'] == sn]
-                    order = int(spcrclcopy['ncalib'][spcrclcopy['N'] == k+1])
+                order=self.options.n_min_specrecal+int(np.log((specdata[k].wavelength.max() - \
+                    specdata[k].wavelength.min())/self.options.specrange_wavescale_specrecal) + \
+                    len(datadict[sn].filt)* self.options.n_specrecal_per_lightcurve)
                 order=min(max(order,self.options.n_min_specrecal ), self.options.n_max_specrecal)
+
+                # save the order as part of the specrecal list
+                if not self.options.specrecallist or sn not in spcrcldata['SNID'] or k+1 not in spcrcldata['N']:
+                    datadict[sn].specdata[k].n_specrecal = order
+                    
                 recalParams=[f'specx0_{sn}_{k}']+[f'specrecal_{sn}_{k}']*(order-1)
                 parlist=np.append(parlist,recalParams)
-                
+
         modelconfiguration=saltresids.saltconfiguration(parlist=parlist,phaseknotloc =phaseknotloc ,waveknotloc=waveknotloc,
             errphaseknotloc=errphaseknotloc,errwaveknotloc=errwaveknotloc)
         # initial guesses
@@ -1060,12 +1061,13 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
                 binspecres = self.options.binspecres
             else:
                 binspecres = None
-            
+
             datadict = readutils.rdAllData(snlist,self.options.estimate_tpk,
                                            dospec=self.options.dospec,
                                            peakmjdlist=self.options.tmaxlist,
                                            binspecres=binspecres,snparlist=self.options.snparlist,
-                                           maxsn=self.options.maxsn)
+                                           maxsn=self.options.maxsn,
+                                           specrecallist=self.options.specrecallist)
                 
             tlc = time.time()
             count = 0
@@ -1171,7 +1173,10 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
             datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,
                                            dospec=self.options.dospec,
                                            peakmjdlist=self.options.tmaxlist,
-                                           binspecres=binspecres,snparlist=self.options.snparlist,maxsn=self.options.maxsn)
+                                           binspecres=binspecres,
+                                           snparlist=self.options.snparlist,
+                                           maxsn=self.options.maxsn,
+                                           specrecallist=self.options.specrecallist)
             log.info(f'took {time.time()-tdstart:.3f} to read in data files')
             tcstart = time.time()
 
