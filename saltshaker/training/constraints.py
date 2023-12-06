@@ -51,7 +51,6 @@ class SALTconstraints:
     @constraint
     def centeranddecorrelatedcolorsandcoords(self,guess):
         idxs=np.concatenate([self.ic[:1,:],self.icoordinates])
-        #idxs=np.concatenate([self.ic,self.icoordinates])
         coordinates=guess[idxs]
         from jax.scipy import linalg as jlin
         from functools import reduce
@@ -68,7 +67,7 @@ class SALTconstraints:
                 guess=guess.at[idx].set(corrected)
             else:
                 guess=guess.at[idx].set(corrected *jnp.std(guess[idx]))
-        #jax.debug.breakpoint()
+
         return guess
     
     @constraint

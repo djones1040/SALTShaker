@@ -18,7 +18,7 @@ def mkModelPlot(
         salt3dir='modelfiles/salt3',
         xlimits=[2000,9200],outfile=None,
         plotErr=True,n_colorpars=5,host_component=False,
-        colorlaw_function=['colorlaw_default']):
+        colorlaw_function='colorlaw_default'):
 
     plt.figure(figsize=(5,8))
     plt.subplots_adjust(left=None, bottom=None, right=None, top=None,
@@ -197,9 +197,9 @@ def mkModelPlot(
             clfun_str = lines[n_colorpars[j]+1].split()[1]
             salt3_colormin = float(lines[n_colorpars[j]+2].split()[1])
             salt3_colormax = float(lines[n_colorpars[j]+3].split()[1])
-            
-            colorlaw_salt3 = getattr(colorlaw, clfun_str)(len(colorlaw_salt3_coeffs),[salt3_colormin,salt3_colormax])
-            ax3.plot(wave,colorlaw_salt3(1,colorlaw_salt3_coeffs,wave),color=f'C{j}',label=f'SALT3 {clfun_str}')
+
+            colorlaw_salt3 = getattr(colorlaw, cf)(len(colorlaw_salt3_coeffs),[salt3_colormin,salt3_colormax])
+            ax3.plot(wave,colorlaw_salt3(1,colorlaw_salt3_coeffs,wave),color=f'C{j}',label=f'SALT3 {cf}')
 
 
 

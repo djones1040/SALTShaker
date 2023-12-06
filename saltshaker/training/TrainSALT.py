@@ -800,7 +800,7 @@ class TrainSALT(TrainSALTBase):
                 print(f'{w:.2f} {np.clip(trainingresult.clscat[j],0.,cldispersionmax):8.15e}',file=foutclscat)
 
         foutinfotext = f"""RESTLAMBDA_RANGE: {self.options.colorwaverange[0]} {self.options.colorwaverange[1]}
-COLORLAW_VERSION: 1
+COLORLAW_VERSION: {self.options.colorlaw_function[0]}
 COLORCOR_PARAMS: {self.options.colorwaverange[0]:.0f} {self.options.colorwaverange[1]:.0f}  {len(trainingresult.clpars[0])}  {' '.join(['%8.10e'%cl for cl in trainingresult.clpars[0]])}
 
 COLOR_OFFSET:  0.0
@@ -835,7 +835,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
                     print(f'{len(colorlaw):.0f}',file=foutcl)
                     for c in colorlaw:
                         print(f'{c:8.10e}',file=foutcl)
-                    print(f"""Salt2ExtinctionLaw.version {name}
+                    print(f"""Salt2ExtinctionLaw.version 1
 Salt2ExtinctionLaw.min_lambda {self.options.colorwaverange[0]:.0f}
 Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutcl)
 
@@ -957,7 +957,8 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
 
         plotSALTModel.mkModelPlot(outputdir,outfile=f'{outputdir}/SALTmodelcomp.png',
                                   xlimits=[self.options.waverange[0],self.options.waverange[1]],
-                                  n_colorpars=self.options.n_colorpars,host_component=self.options.host_component)
+                                  n_colorpars=self.options.n_colorpars,host_component=self.options.host_component,
+                                  colorlaw_function=self.options.colorlaw_function)
         SynPhotPlot.plotSynthPhotOverStretchRange(
             '{}/synthphotrange.pdf'.format(outputdir),outputdir,'SDSS')
         SynPhotPlot.overPlotSynthPhotByComponent(
