@@ -1,6 +1,12 @@
 from saltshaker.util.inpynb import in_ipynb
 from saltshaker.util.query import query_yes_no
+from saltshaker.util.jaxoptions import jaxoptions
+from jax import config
+#config.update("jax_debug_nans", True)
 
+import pickle
+from os import path
+import os
 import sys
 import time
 import logging
@@ -10,8 +16,7 @@ interactive= sys.stdout.isatty()
 try: from IPython import display
 except: pass
 
-from functools import reduce
-
+from functools import reduce,partial
 
 
 
@@ -40,7 +45,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
     def __init__(self,guess,saltresids,outputdir,options):
         super().__init__(guess,saltresids,outputdir,options)
         self.saltobj=saltresids  
-        
+        self.burninmaxiter=options.burninmaxiter
         self.gradientmaxiter=options.gradientmaxiter
         self.learningratesinitscale=options.learningratesinitscale
         self.etaplus=options.etaplus
@@ -48,7 +53,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         self.searchtolerance= options.searchtolerance
         self.searchsize = options.searchsize
         self.convergencetolerance= options.convergencetolerance
-        
+        self.outputdir=outputdir
 
         assert(0<self.searchsize<1)
         assert(0<self.searchtolerance<1)
@@ -82,8 +87,8 @@ class rpropwithbacktracking(salttrainingoptimizer):
 
         successful=wrapaddingargument(config,'rpropconfig','gradientmaxiter',  type=int,
                                                 help='Max number of gradient iterations allowed')
-                                                
-                                                
+        successful=successful&wrapaddingargument(config,'rpropconfig','burninmaxiter',  type=int,default=100,
+                                                help='Max number of gradient iterations allowed for the burnin of the flux model')
         successful=successful&wrapaddingargument(config,'rpropconfig','learningratesinitscale',  type=float,
                                                 help="""Initial scale for the learning rates""")
         successful=successful&wrapaddingargument(config,'rpropconfig','searchsize',  type=float,
@@ -106,11 +111,10 @@ class rpropwithbacktracking(salttrainingoptimizer):
 
 
     def optimize(self,initvals):
-        X=initvals.copy()
+        X=self.saltobj.constraints.transformtoconstrainedparams(jnp.array(initvals))
 
         residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'),jit=False)
         oldChi=(residuals**2).sum()
-        
         log.info('Initial chi2: {:.2f} '.format(oldChi))
 
         rates=self.initializelearningrates(X)
@@ -120,19 +124,26 @@ class rpropwithbacktracking(salttrainingoptimizer):
             if not np.isinf(X[self.saltobj.iclscat_0]):
                 X[self.saltobj.iclscat_0]=-np.inf
             
+            log.info('Fitting sn parameters')
+            from functools import reduce
+            snpars=reduce(lambda x,y:  x | np.isin(np.arange(self.saltobj.npar), y),[self.saltobj.icoordinates,self.saltobj.ix0,self.saltobj.ic],False)
+
+            X,loss,rates=self.optimizeparams(X,snpars,rates,niter=self.burninmaxiter,usesecondary=False)
+            rates=self.initializelearningrates(X)
             log.info('Burning in flux model')
             fitparams=self.saltobj.iModelParam
-            X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=100) #self.gradientmaxiter)
+            X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.burninmaxiter,usesecondary=False) #self.gradientmaxiter)
             log.info('Fitting all parameters')
             fitparams=~np.isin(np.arange(self.saltobj.npar),self.saltobj.iclscat)
-            X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter)
+            X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter,usesecondary=len(self.saltobj.constraints.use_secondary_constraint_names)>0)
                         
             #Fit error model including color scatter
             log.info('Fitting color scatter')
             X=X.at[self.saltobj.iclscat[-1]].set(-4)
             
             fitparams=~self.saltobj.iModelParam
-            X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter)
+            fitparams=fitparams | np.isin(np.arange(self.saltobj.npar),self.saltobj.ic) | np.isin(np.arange(self.saltobj.npar),self.saltobj.iCL) 
+            X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter,usesecondary=len(self.saltobj.constraints.use_secondary_constraint_names)>0)
             
             
         except KeyboardInterrupt as e:
@@ -148,6 +159,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
             raise e
         residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'),jit=False)
         newChi=(residuals**2).sum()
+
         log.info('Final chi2: {:.2f} '.format(newChi))
         
         chi2results=self.saltobj.getChi2Contributions(X,jit=False)
@@ -173,38 +185,51 @@ class rpropwithbacktracking(salttrainingoptimizer):
         """
         learningrates=np.tile(np.nan,self.saltobj.npar)
         #Parameters I expect to be more or less normal distribution, where the std gives a reasonable size to start learning
-        for idx in list(self.saltobj.icomponents)+list(self.saltobj.icoordinates)+[ self.saltobj.ic
-                ]:
+        for idx in list(self.saltobj.icomponents):
+            if np.std(X[idx])==0: learningrates[idx]=(np.std( X[self.saltobj.icomponents])*1e-2)
+            else: learningrates[idx]=(np.std( X[idx])*.1)
             
-            learningrates[idx]=np.std( X[idx])*.1
+            
+        for idx in list(self.saltobj.icoordinates)+[ self.saltobj.ic
+                ]:
+            learningrates[idx]=(np.std( X[idx])*.1)
+            
+                
+            
         learningrates[self.saltobj.imodelerr]=np.std( X[self.saltobj.imodelerr])*.1
         #x0 should very fractionally from the initialization
-        for idx in [self.saltobj.ix0]:
-            learningrates[idx]= .1* X[idx] 
+        x0=X[self.saltobj.ix0]
+        for idx in self.saltobj.ix0:
+            try:
+                learningrates[idx]= .1* max(X[idx],x0[np.nonzero(x0)].min())
+            except:
+                learningrates[idx]= 1e-3
         #The rest of the parameters are mostly dimensionless coeffs of O(1)
         for idx in [self.saltobj.iCL,self.saltobj.ispcrcl_coeffs,self.saltobj.iclscat,self.saltobj.imodelcorr]:
             learningrates[idx]=1e-2
         #Check that all parameters get an initial guess
         try:
-            assert(~np.any(np.isnan(learningrates)))
+            assert(~np.any(np.isnan(learningrates)) and ~ np.any(learningrates<=0))
         except Exception as e:
-            log.critical(f'Uninitialized learning rates: {", ".join(np.unique(self.saltobj.parlist[np.isnan(learningrates)]))}')
-            raise e
+            log.debug(f'Uninitialized learning rates: {", ".join(np.unique(self.saltobj.parlist[np.isnan(learningrates) |(learningrates<=0) ]))}')
+            learningrates[np.isnan(learningrates) |(learningrates<=0) ]=1e-5
         return learningrates*self.learningratesinitscale
-
+                
+        
     def lossfunction(self,params,*args,excludesn=None,**kwargs):
         """ 
         Passthrough function to maxlikefit, with an excludeSN keyword that removes the log-likelihood of a single SN.
         """
         if 'diff' in kwargs and "grad" in kwargs['diff']: self.functionevals +=3
         else: self.functionevals+=1
-        result= self.saltobj.maxlikefit(params,*args,**kwargs)
+        result= self.saltobj.constrainedmaxlikefit(params,*args,**kwargs)
         if excludesn: 
             singleresult=self.saltobj.datadict[excludesn].modelloglikelihood(params,*args,**kwargs)
             try: 
                 result=( x-y for x,y in zip(result,singleresult))
             except:
                 result=result-singleresult
+
         try:
             return (-x for x in result)
         except:
@@ -239,9 +264,9 @@ class rpropwithbacktracking(salttrainingoptimizer):
             iFit=np.isin( np.arange(X.size),iFit )
         assert((iFit.dtype==bool))
         iFit=iFit & ~self.ifixedparams
-#         import pdb;pdb.set_trace()
+
         log.info('Number of parameters fit this round: {}'.format(iFit.sum()))
-        
+        startlen=len(self.Xhistory)
         rates=initrates*iFit
         #Set convergence criteria
         #Low pass filter to ensure that 
@@ -250,9 +275,10 @@ class rpropwithbacktracking(salttrainingoptimizer):
             
         starttime=time.time()
         initvals=jnp.array(initvals)
+        
         X, Xprev,loss,sign= initvals,initvals, np.inf,np.zeros(initvals.size)
         rates=jnp.array(rates)
-        
+       
         def iteration(X, Xprev,loss,sign,rates):
             #Proposes a new value based on sign of gradient
             Xnew,newloss, newsign, newgrad,newrates  = self.rpropiter(X, Xprev,loss,sign,rates,**kwargs)
@@ -282,17 +308,30 @@ class rpropwithbacktracking(salttrainingoptimizer):
             else:
                 X,Xprev,loss,sign,grad,rates = iteration(X, Xprev,loss,sign,rates)
             
+            constrainedparams=  np.concatenate([self.saltobj.ic,self.saltobj.icoordinates])
+            if not np.allclose(X[constrainedparams],Xprev[constrainedparams]):
+                X=self.saltobj.constraints.transformtoconstrainedparams(X)
+            
             self.losshistory+=[loss]
             self.Xhistory+=[X]
             
             if i==0:
                 log.debug(f'First iteration took {time.time()-starttime:1f} seconds')
             else:
-                convergencecriterion= self.losshistory[-numconvergence] - loss if len(self.losshistory)> numconvergence+10 else np.inf
+                if len(self.losshistory)> numconvergence+10:
+                    convergencecriterion= np.abs(self.losshistory[-numconvergence] - loss)
+                    if np.isnan(loss) :#or np.all( np.array(self.losshistory[-numconvergence*2+1:]) > self.losshistory[-numconvergence*2] ):
+                    
+                        convergencecriterion=0
+                else:
+                    convergencecriterion=np.inf
+
+                
                 #signal.sosfilt(convergencefilt, -np.diff((self.losshistory[-numconvergence:]) ))[-1]
+                outtext=f'Iteration {i} , function evaluations {self.functionevals}, convergence criterion {convergencecriterion:.2g}, last diff {self.losshistory[-2]-loss:.2g}, gradient magnitude {jnp.dot(grad[np.nonzero(rates)],grad[np.nonzero(rates)]):.2g}, rates magnitude {jnp.dot(rates,rates):.2g}'
                 if interactive:
-                    sys.stdout.write(f'\r \x1b[1K  Iteration {i} , function evaluations {self.functionevals}, convergence criterion {convergencecriterion:.2g}, last diff {self.losshistory[-2]-loss:.2g} ')
-                log.debug(f'Iteration {i}, loss {loss:.1f}, convergence {convergencecriterion:.2g}, last diff {self.losshistory[-2]-loss:.2g}')
+                    sys.stdout.write(f'\r\x1b[1K'+outtext.ljust(os.get_terminal_size().columns))
+                log.debug(outtext)
                 
                 if i> numconvergence+10:
                     if np.all(convergencecriterion< self.convergencetolerance):
@@ -313,7 +352,14 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 #if i>0: plt.text(0.7,.8,f'Last diff: {-np.diff(self.losshistory[-2:])[0]:.2g}',transform=plt.gca().transAxes)
                 display.display(plt.gcf())
                 display.clear_output(wait=True)
-        return X,loss,rates.at[rates==0].set(initrates[rates==0])
+        else: 
+            sys.stdout.write('\n')
+            log.info('Optimizer encountered iteration limit')
+        final= startlen+np.argmin( self.losshistory[startlen:])
+        X,loss=self.Xhistory[final],self.losshistory[final]
+        with open(path.join(self.outputdir,'gradienthistory.pickle'),'wb') as file:
+            pickle.dump((self.Xhistory,self.losshistory),file)
+        return self.saltobj.constraints.transformtoconstrainedparams(X),loss,rates.at[rates==0].set(initrates[rates==0])
         
 
     def twowaybacktracking(self,X,loss,grad, searchdir,*args,**kwargs):
@@ -430,6 +476,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         Xnew=jnp.select( [less,greatereq], [ lax.cond(lossval>prevloss, lambda x,y:x , lambda x,y: y, Xprev, X), 
             X-(sign *learningrates)
         ])
+        
         #Set sign to 0 after a previous change
         sign= (sign * greatereq)
         return jnp.clip(Xnew,*self.Xbounds), lossval, sign, grad, learningrates

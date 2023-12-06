@@ -45,7 +45,7 @@ from saltshaker.training.init_hsiao import init_hsiao, init_kaepora, init_errs,i
 from saltshaker.training.base import TrainSALTBase
 from saltshaker.training import saltresids
 from saltshaker.training import optimizers
-
+from saltshaker.training import colorlaw
 
 from saltshaker.validation import ValidateParams,datadensity
 from saltshaker.validation import ValidateLightcurves
@@ -150,7 +150,7 @@ class TrainSALT(TrainSALTBase):
                         'phasesplineres':self.options.phasesplineres,'wavesplineres':self.options.wavesplineres,
                         'phaseinterpres':self.options.phaseinterpres,'waveinterpres':self.options.waveinterpres,
                         'normalize':True,'order':self.options.bsorder,'use_snpca_knots':self.options.use_snpca_knots}
-                
+
         phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
             self.options.inithsiaofile,self.options.initbfilt,_flatnu,**init_options)
         if self.options.host_component:
@@ -171,8 +171,10 @@ class TrainSALT(TrainSALTBase):
                 phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_kaepora(
                     self.options.initm0modelfile,self.options.initm1modelfile,
                     Bfilt=self.options.initbfilt,flatnu=_flatnu,**init_options)
-
-            
+        #zero out the flux and the 1st derivative at the start of the phase range
+        m0knots[:(waveknotloc.size-self.options.bsorder-1) * 2]=0
+        m1knots[:(waveknotloc.size-self.options.bsorder-1) * 2]=0
+        
         init_options['phasesplineres'] = self.options.error_snake_phase_binsize
         init_options['wavesplineres'] = self.options.error_snake_wave_binsize
         init_options['order']=self.options.errbsorder
@@ -212,19 +214,21 @@ class TrainSALT(TrainSALTBase):
         if self.options.n_colorpars:
             parlist = np.append(parlist,[[f'cl{i}']*num for i,num in enumerate(self.options.n_colorpars)])
         if self.options.error_snake_phase_binsize and self.options.error_snake_wave_binsize:
-            for i in range(self.options.n_components): parlist = np.append(parlist,['modelerr_{}'.format(i)]*n_errphaseknots*n_errwaveknots)
+            for i in range(self.options.n_errorsurfaces): 
+                parlist = np.append(parlist,['modelerr_{}'.format(i)]*n_errphaseknots*n_errwaveknots)
+                for j in range(i):
+                    parlist = np.append(parlist,[f'modelcorr_{j}{i}']*n_errphaseknots*n_errwaveknots)
             if self.options.host_component:
                 parlist = np.append(parlist,['modelerr_host']*len(mhostvarknots))
                 parlist = np.append(parlist,['modelcorr_0host']*len(mhostvarknots))
                 parlist = np.append(parlist,['modelcorr_1host']*len(mhostvarknots))
-            if self.options.n_components >= 2:
-                parlist = np.append(parlist,['modelcorr_01']*n_errphaseknots*n_errwaveknots)
         
         if self.options.n_colorscatpars:
             parlist = np.append(parlist,['clscat']*(self.options.n_colorscatpars))
 
         # SN parameters
-        parlist = np.append(parlist,sum( [[f'x{i}_{k}' for i in range(self.options.n_components)]+[f'c{i}_{k}' for i in range(len(self.options.n_colorpars)) ] for k in datadict.keys()],[]))
+        parlist = np.append(parlist,sum( [[f'x{i}_{k}' for i in range(self.options.n_components)]
+            +[f'c{i}_{k}' for i in range(len(self.options.n_colorpars)) ] for k in datadict.keys()],[]))
 
         if self.options.host_component:
             parlist = np.append(parlist,[f'xhost_{k}' for k in datadict.keys()])
@@ -237,17 +241,18 @@ class TrainSALT(TrainSALTBase):
             specdata=datadict[sn].specdata
             photdata=datadict[sn].photdata
             for k in specdata.keys():
-                if not self.options.specrecallist:
-                    order=self.options.n_min_specrecal+int(np.log((specdata[k].wavelength.max() - \
-                        specdata[k].wavelength.min())/self.options.specrange_wavescale_specrecal) + \
-                        len(datadict[sn].filt)* self.options.n_specrecal_per_lightcurve)
-                else:
-                    spcrclcopy = spcrcldata[spcrcldata['SNID'] == sn]
-                    order = int(spcrclcopy['ncalib'][spcrclcopy['N'] == k+1])
+                order=self.options.n_min_specrecal+int(np.log((specdata[k].wavelength.max() - \
+                    specdata[k].wavelength.min())/self.options.specrange_wavescale_specrecal) + \
+                    len(datadict[sn].filt)* self.options.n_specrecal_per_lightcurve)
                 order=min(max(order,self.options.n_min_specrecal ), self.options.n_max_specrecal)
+
+                # save the order as part of the specrecal list
+                if not self.options.specrecallist or sn not in spcrcldata['SNID'] or k+1 not in spcrcldata['N']:
+                    datadict[sn].specdata[k].n_specrecal = order
+                    
                 recalParams=[f'specx0_{sn}_{k}']+[f'specrecal_{sn}_{k}']*(order-1)
                 parlist=np.append(parlist,recalParams)
-                
+
         modelconfiguration=saltresids.saltconfiguration(parlist=parlist,phaseknotloc =phaseknotloc ,waveknotloc=waveknotloc,
             errphaseknotloc=errphaseknotloc,errwaveknotloc=errwaveknotloc)
         # initial guesses
@@ -282,28 +287,33 @@ class TrainSALT(TrainSALTBase):
             for i in range(3): guess[parlist == 'modelerr_{}'.format(i)] = 1e-6 
             if self.options.n_components >= 2:
                 guess[parlist == 'm1'] = m1knots
+            if self.options.n_components >= 3:
+            
+                guess[parlist=='m2'] =( (np.arange(m0knots.size)< (n_waveknots*  (n_phaseknots//6)))
+                                       &  (np.arange(m0knots.size)> (n_waveknots* 1 ))  )*np.std(m0knots)*.2
             if self.options.host_component:
                 guess[parlist == 'mhost'] = mhostknots
             if self.options.n_colorpars:
                 if self.options.initsalt2model:
-                    if len(self.options.n_colorpars)>1: raise ValueError('Multiple color laws specified with initsalt2model option')
+                    #if len(self.options.n_colorpars)>1: raise ValueError('Multiple color laws specified with initsalt2model option')
                     if self.options.n_colorpars == [4]:
                         guess[parlist == 'cl'] = [-0.504294,0.787691,-0.461715,0.0815619]
                     else:
                         clwave = np.linspace(self.options.waverange[0],self.options.waverange[1],1000)
                         salt2cl = SALT2ColorLaw([2800.,7000.], [-0.504294,0.787691,-0.461715,0.0815619])(clwave)
+                        initcolorlaw=colorlaw.getcolorlaw(self.options.colorlaw_function[0])(self.options.n_colorpars[0],self.options.colorwaverange)
                         def bestfit(p):
-                            cl_init = SALT2ColorLaw(self.options.colorwaverange, p)(clwave)
+                            cl_init = initcolorlaw(1, p,clwave)
                             return cl_init-salt2cl
 
-                        md = least_squares(bestfit,self.options.n_colorpars[0])
+                        md = least_squares(bestfit,np.zeros(self.options.n_colorpars[0]))
                         if 'termination conditions are satisfied' not in md.message and \
                            'termination condition is satisfied' not in md.message:
                             
                             raise RuntimeError('problem initializing color law!')
-                        guess[parlist == 'cl'] = md.x
+                        guess[parlist == 'cl0'] = md.x
                 else:
-                    guess[parlist == 'cl'] =[0.]*self.options.n_colorpars 
+                    guess[parlist == 'cl0'] =[0.]*self.options.n_colorpars 
             if self.options.n_colorscatpars:
 
                 guess[parlist == 'clscat'] = clscatcoeffs
@@ -311,14 +321,19 @@ class TrainSALT(TrainSALTBase):
             guess[(parlist == 'm0') & (guess < 0)] = 1e-4
             
             guess[parlist=='modelerr_0']=m0varknots
-            guess[parlist=='modelerr_1']=m1varknots
+            if self.options.n_errorsurfaces > 1:
+                guess[parlist=='modelerr_1']=m1varknots
+                guess[parlist=='modelcorr_01']=m0m1corrknots
             if self.options.host_component: guess[parlist=='modelerr_host']=1e-9 # something small...  #mhostvarknots
-            guess[parlist=='modelcorr_01']=m0m1corrknots
+            
 
             # if SN param list is provided, initialize with these params
             if self.options.snparlist:
                 snpar = Table.read(self.options.snparlist,format='ascii')
                 snpar['SNID'] = snpar['SNID'].astype(str)
+
+            from numpy.random import default_rng
+            rng = default_rng(134912348)
 
             for sn in datadict.keys():
                 if self.options.snparlist:
@@ -328,12 +343,20 @@ class TrainSALT(TrainSALTBase):
                     if len(snpar['SNID'][iSN]) > 1:
                         raise RuntimeError(f"found duplicate in parameter list for SN {snpar['SNID'][iSN][0]}")
                     if len(snpar[iSN]):
-                        guess[parlist == 'x0_%s'%sn] = snpar['x0'][iSN]
-                        guess[parlist == 'x1_%s'%sn] = snpar['x1'][iSN]
                         if self.options.host_component:
                             guess[parlist == f'xhost_{sn}'] = snpar['xhost'][iSN]
+                        
+                        for i in range((self.options.n_components)):
+                            if ('x'+str(i)) in snpar.keys():
+                                guess[parlist==f'x{i}_{sn}'] = snpar[ 'x'+str(i)][iSN]
+                            else:
+                                guess[parlist==f'x{i}_{sn}'] = rng.standard_normal()
+                        if snpar['x0'][iSN]<= 0:
+                            log.warning(f'Bad input value for {sn}: x0= {snpar["x0"][iSN]}')
+                            guess[parlist==f'x{i}_{sn}'] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
 
                         guess[parlist == 'c0_%s'%sn] = snpar['c'][iSN]
+                        guess[parlist == 'c1_%s'%sn] = np.random.exponential(0.2)
                     else:
                         log.warning(f'SN {sn} not found in SN par list {self.options.snparlist}')
                         guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
@@ -375,10 +398,9 @@ class TrainSALT(TrainSALTBase):
 
                     zHel,x0,x1,c = datadict[sn].zHelio,guess[parlist == f'x0_{sn}'],guess[parlist == f'x1_{sn}'],guess[parlist == f'c_{sn}']
                     mwebv = datadict[sn].MWEBV
-                    colorlaw = SALT2ColorLaw(self.options.colorwaverange,guess[parlist == 'cl'])
                     
                     uncalledModel = specflux(specdata[k].tobs,specdata[k].wavelength,phase,wave,
-                                             m0,m1,colorlaw,zHel,x0,x1,c,mwebv=mwebv)
+                                             m0,m1,lambda wave : initcolorlaw( 1, guess[parlist=='cl0'],wave),zHel,x0,x1,c,mwebv=mwebv)
         
                     def recalpars(x):
                         recalexp=np.exp((drecaltermdrecal*x[1:][np.newaxis,:]).sum(axis=1))
@@ -654,19 +676,22 @@ class TrainSALT(TrainSALTBase):
         for i in range(self.options.n_repeat):
             
             saltfitter = optimizer(x_modelpars,saltresids,self.options.outputdir,self.options)
-
             if returnGN:
             #This is an awful hack and should be removed
                 return saltfitter,x_modelpars
             
             # do the fitting
             x_modelpars = saltfitter.optimize( x_modelpars)
-            if self.options.errors_from_hessianapprox: sigma=saltresids.estimateparametererrorsfromhessian(x_modelpars)
-            else: sigma=None
-            trainingresult=saltresids.processoptimizedparametersforoutput(x_modelpars,sigma)
-            for k in datadict.keys():
-                trainingresult.snparams[k]['t0'] =  datadict[k].tpk_guess
-
+            
+        Xfinal= saltresids.constraints.enforcefinaldefinitions(x_modelpars,saltresids.SALTModel(x_modelpars))
+        if self.options.errors_from_hessianapprox: 
+            sigma=saltresids.estimateparametererrorsfromhessian(Xfinal)
+            np.save(path.join(self.options.outputdir,'parametercovariance.npy'), sigma)
+        else: sigma=None
+        trainingresult=saltresids.processoptimizedparametersforoutput(Xfinal,x_modelpars,sigma)
+        for k in datadict.keys():
+            trainingresult.snparams[k]['t0'] =  datadict[k].tpk_guess
+        
         log.info('Final loglike'); log.info(saltresids.maxlikefit(trainingresult.params_raw))
         log.info('Final photometric loglike'); log.info(saltresids.maxlikefit(trainingresult.params_raw,dospec=False))
         
@@ -754,7 +779,9 @@ class TrainSALT(TrainSALTBase):
             for firstind,secondind, datasurface in datacovsurfaces:
                 if firstind>secondind:
                     secondind,firstind=firstind,secondind
-                modelsurface=modelerrdict[firstind,secondind] 
+                try: modelsurface=modelerrdict[firstind,secondind] 
+                except KeyError:
+                    modelsurface=np.zeros(datasurface.shape)
                 with open(f'{outdir}/salt3_lc_covariance_{trainingresult.componentnames[firstind][1:]}{trainingresult.componentnames[secondind][1:]}.dat','w') as foutcov:
                     for i,p in enumerate(trainingresult.phase):
                         for j,w in enumerate(trainingresult.wave):
@@ -774,7 +801,7 @@ class TrainSALT(TrainSALTBase):
 
         foutinfotext = f"""RESTLAMBDA_RANGE: {self.options.colorwaverange[0]} {self.options.colorwaverange[1]}
 COLORLAW_VERSION: 1
-COLORCOR_PARAMS: {self.options.colorwaverange[0]:.0f} {self.options.colorwaverange[1]:.0f}  {len(trainingresult.clpars)}  {' '.join(['%8.10e'%cl for cl in trainingresult.clpars])}
+COLORCOR_PARAMS: {self.options.colorwaverange[0]:.0f} {self.options.colorwaverange[1]:.0f}  {len(trainingresult.clpars[0])}  {' '.join(['%8.10e'%cl for cl in trainingresult.clpars[0]])}
 
 COLOR_OFFSET:  0.0
 COLOR_DISP_MAX: {cldispersionmax:.1f}  # avoid crazy sim-mags at high-z
@@ -792,20 +819,31 @@ MAGERR_LAMREST: 0.1   100   200  # magerr minlam maxlam
 SIGMA_INT: 0.106  # used in simulation"""
         with open(f'{outdir}/SALT3.INFO','w') as foutinfo:
             print(foutinfotext,file=foutinfo)
-
-
-        with open(f'{outdir}/salt3_color_correction.dat','w') as foutcl:
-            print(f'{len(trainingresult.clpars):.0f}',file=foutcl)
-            for c in trainingresult.clpars:
-                print(f'{c:8.10e}',file=foutcl)
-            print(f"""Salt2ExtinctionLaw.version 1
-            Salt2ExtinctionLaw.min_lambda {self.options.colorwaverange[0]:.0f}
-            Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutcl)
+        if len(trainingresult.clpars)==1: 
+            colorlaw=trainingresult.clpars[0]
+            with open(f'{outdir}/salt3_color_correction.dat','w') as foutcl:
+                print(f'{len(colorlaw):.0f}',file=foutcl)
+                
+                for c in colorlaw:
+                    print(f'{c:8.10e}',file=foutcl)
+                print(f"""Salt2ExtinctionLaw.version 1
+Salt2ExtinctionLaw.min_lambda {self.options.colorwaverange[0]:.0f}
+Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutcl)
+        else:
+            for i,name,colorlaw in (zip(range(trainingresult.clpars.shape[0]),self.options.colorlaw_function,trainingresult.clpars)):
+                with open(f'{outdir}/salt3_color_correction_{i}.dat','w') as foutcl:
+                    print(f'{len(colorlaw):.0f}',file=foutcl)
+                    for c in colorlaw:
+                        print(f'{c:8.10e}',file=foutcl)
+                    print(f"""Salt2ExtinctionLaw.version {name}
+Salt2ExtinctionLaw.min_lambda {self.options.colorwaverange[0]:.0f}
+Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutcl)
 
 
         # best-fit and simulated SN params
         with open(f'{outdir}/salt3train_snparams.txt','w') as foutsn:
             print('# SN x0 x1 c t0 SIM_x0 SIM_x1 SIM_c SIM_t0 SALT2_x0 SALT2_x1 SALT2_c SALT2_t0',file=foutsn)
+            #print('# SN x0 x1 c_i c_g t0 SIM_x0 SIM_x1 SIM_c SIM_t0 SALT2_x0 SALT2_x1 SALT2_c SALT2_t0',file=foutsn)
             for snlist in self.options.snlists.split(','):
                 snlist = os.path.expandvars(snlist)
                 if not os.path.exists(snlist):
@@ -850,8 +888,9 @@ SIGMA_INT: 0.106  # used in simulation"""
                     if 't0' not in trainingresult.snparams[k].keys():
                         trainingresult.snparams[k]['t0'] = 0.0
 
-                    print(f"{k} {trainingresult.snparams[k]['x0']:8.10e} {trainingresult.snparams[k]['x1']:.10f} {trainingresult.snparams[k]['c']:.10f} {trainingresult.snparams[k]['t0']:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",file=foutsn)
-
+                    print(f"{k} {trainingresult.snparams[k]['x0']:8.10e} {trainingresult.snparams[k]['x1']:.10f} {trainingresult.snparams[k]['c'] if 'c' in trainingresult.snparams[k] else trainingresult.snparams[k]['c0']:.10f} {trainingresult.snparams[k]['t0']:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",file=foutsn)
+                    #print(f"{k} {trainingresult.snparams[k]['x0']:8.10e} {trainingresult.snparams[k]['x1']:.10f} {trainingresult.snparams[k]['c'] if 'c' in trainingresult.snparams[k] else trainingresult.snparams[k]['c0']:.10f} {trainingresult.snparams[k]['c1']:.10f} {trainingresult.snparams[k]['t0']:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",file=foutsn)
+                    
         keys=['num_lightcurves','num_spectra','num_sne']
         yamloutputdict={key.upper():getattr(trainingresult,key) for key in keys}
         yamloutputdict['CPU_MINUTES']=(time.time()-initializationtime)/60
@@ -1015,19 +1054,20 @@ SIGMA_INT: 0.106  # used in simulation"""
             fitx1,fitc = False,False
             if self.options.n_components == 2:
                 fitx1 = True
-            if self.options.n_colorpars > 0:
+            if self.options.n_colorpars[0] > 0:
                 fitc = True
 
             if self.options.binspec:
                 binspecres = self.options.binspecres
             else:
                 binspecres = None
-            
+
             datadict = readutils.rdAllData(snlist,self.options.estimate_tpk,
                                            dospec=self.options.dospec,
                                            peakmjdlist=self.options.tmaxlist,
                                            binspecres=binspecres,snparlist=self.options.snparlist,
-                                           maxsn=self.options.maxsn)
+                                           maxsn=self.options.maxsn,
+                                           specrecallist=self.options.specrecallist)
                 
             tlc = time.time()
             count = 0
@@ -1133,17 +1173,19 @@ SIGMA_INT: 0.106  # used in simulation"""
             datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,
                                            dospec=self.options.dospec,
                                            peakmjdlist=self.options.tmaxlist,
-                                           binspecres=binspecres,snparlist=self.options.snparlist,maxsn=self.options.maxsn)
+                                           binspecres=binspecres,
+                                           snparlist=self.options.snparlist,
+                                           maxsn=self.options.maxsn,
+                                           specrecallist=self.options.specrecallist)
             log.info(f'took {time.time()-tdstart:.3f} to read in data files')
             tcstart = time.time()
 
             datadict = self.mkcuts(datadict)[0]
             log.info(f'took {time.time()-tcstart:.3f} to apply cuts')
             
-            
             phasebins=np.linspace(*self.options.phaserange,int((self.options.phaserange[1]-self.options.phaserange[0])/self.options.phasesplineres)+1,True)
             wavebins=np.linspace(*self.options.waverange,int((self.options.waverange[1]-self.options.waverange[0])/self.options.wavesplineres)+1,True)
-            datadensity.datadensityplot(path.join(self.options.outputdir,'datadensity.pdf') ,phasebins,wavebins,datadict,self.kcordict)
+            datadensity.datadensityplot(path.join(self.options.outputdir,'datadensity.pdf') ,phasebins,wavebins,datadict,self.kcordict,1500,200)
             # fit the model - initial pass
             if self.options.stage == "all" or self.options.stage == "train":
                 # read the data
@@ -1200,18 +1242,18 @@ usage: python TrainSALT.py -c <configfile> <options>
 config file options can be overwridden at the command line"""
 
         
-    def get_config_options(self,salt,configfile,configpositional,args=None):
+    def get_config_options(self,salt,configfile,args=None):
         
         if configfile:
             pass
-        elif configpositional:
-            configfile= configpositional
         else:
-            raise RuntimeError('Configuration file must be specified at command line')
+            raise RuntimeError('Configuration file must be specified')
 
         config = configparser.ConfigParser(inline_comment_prefixes='#')
         if not os.path.exists(configfile):
             raise RuntimeError(f'Configfile {configfile} doesn\'t exist!')
+
+                    
         config.read(configfile)
 
         user_parser = salt.add_user_options(usage=self.usagestring,config=config)
@@ -1232,7 +1274,7 @@ config file options can be overwridden at the command line"""
             raise RuntimeError('can\'t find trainingconfig config file!  Checked %s'%user_options.trainingconfig)
 
         optimizer=optimizers.getoptimizer(user_options.optimizer)
-        
+
         modelconfig = configparser.ConfigParser(inline_comment_prefixes='#')
         modelconfig.read(user_options.modelconfig)
         model_parser = saltresids.SALTResids.add_model_options(
@@ -1246,7 +1288,7 @@ config file options can be overwridden at the command line"""
             parser=user_parser,config=trainingconfig)
         training_parser.addhelp()
         training_options = training_parser.parse_args(args)
-
+        
         salt.options = training_options
         salt.options.host_component= True if salt.options.host_component else False
         if training_options.fast:
@@ -1260,21 +1302,34 @@ config file options can be overwridden at the command line"""
 
         if salt.options.stage not in ['all','validate','train']:
             raise RuntimeError('stage must be one of all, validate, train')
+        with open(path.join(salt.options.outputdir,'options.json'),'w') as optfile:
+            import json
+            json.dump(vars(salt.options),optfile)
 
         return
         
-    def main(self):
+    def main(self,configfile=None,args=None):
 
         salt = TrainSALT()
-
-        parser = argparse.ArgumentParser(usage=self.usagestring, conflict_handler="resolve",add_help=False)
-        parser.add_argument('configpositional',nargs='?',default=None,type=str,help='configuration file')
-        parser.add_argument('-c','--configfile', default=None, type=str,
-                            help='configuration file')
-
-        options, args = parser.parse_known_args()
-
-        self.get_config_options(salt,options.configfile,options.configpositional)
         
+        if configfile is None:
+            assert(args is None)
+            parser = argparse.ArgumentParser(usage=self.usagestring, conflict_handler="resolve",add_help=False)
+            parser.add_argument('configpositional',nargs='?',default=None,type=str,help='configuration file')
+            parser.add_argument('-c','--configfile', default=None, type=str,
+                                help='configuration file')
+
+
+            options, _ = parser.parse_known_args()
+            configfile,configpos=options.configfile,options.configpositional
+
+            if configfile is None and configpos is not None: 
+                configfile=configpos
+            elif configfile is None and configpos is None:
+                raise RuntimeError('Configuration file must be specified at command line')
+
+        self.get_config_options(salt,configfile,args)
+        
+
         salt.main()
 

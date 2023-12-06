@@ -82,6 +82,8 @@ class TrainSALTBase:
                                                         help="""optional list giving number of spectral recalibration params.  Needs columns SNID, N, phase, ncalib where N is the spectrum number for a given SN, starting at 1""")
                 successful=successful&wrapaddingargument(config,'iodata','tmaxlist','tmaxlistfile',     type=str,action=FullPaths,
                                                         help="""optional space-delimited list with SN ID, tmax, tmaxerr (default=%(default)s)""")
+                successful=successful&wrapaddingargument(config,'iodata','trainingcachefile','trainingcache', default='',    type=str,action=FullPaths,
+                                                        help="""Optional file path used to store a cached version of the training data pre-computed to speed up subsequent runs. If this file exists already, it will be loaded in, otherwise it will be written to""")
         
                 #output files
                 successful=successful&wrapaddingargument(config,'iodata','outputdir',  type=str,action=FullPaths,
