@@ -764,7 +764,7 @@ class SALTResids:
     def estimateparametererrorsfromhessian(self,X,hessian=None):
         """Approximate Hessian by jacobian times own transpose to determine uncertainties in flux surfaces"""
         log.info("determining M0/M1 errors by approximated Hessian")
-
+        import pdb; pdb.set_trace()
         if hessian is None:
             varyingParams=reduce(lambda x,y:  x | np.isin(np.arange(self.npar), y),[
                 self.icomponents,self.iCLNoGal,self.imhost],False)
