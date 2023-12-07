@@ -190,7 +190,10 @@ def customfilt(outfile,lcfile,salt3dir,
     
     if not '.fits' in lcfile.lower():
         sn = snana.SuperNova(lcfile)
-        sn.REDSHIFT_HELIO = float(sn.REDSHIFT_HELIO.split('+-')[0])
+        try:
+            sn.REDSHIFT_HELIO = float(sn.REDSHIFT_HELIO.split('+-')[0])
+        except:
+            pass
         if type(sn.MWEBV)==str: sn.MWEBV = sn.MWEBV.split()[0]
     else:
         sn = snana.SuperNova(snid=snid,headfitsfile=lcfile,photfitsfile=lcfile.replace('_HEAD.FITS','_PHOT.FITS'),
