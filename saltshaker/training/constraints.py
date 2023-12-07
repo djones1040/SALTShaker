@@ -32,8 +32,12 @@ class SALTconstraints:
         for k in residsobj.__dict__.keys():
             self.__dict__[k] = residsobj.__dict__[k]
         self.saltresids=residsobj
+
         self.constraints={ key: partial(__possibleconstraints__[key],self) for key in __possibleconstraints__}
-        self.use_constraint_names= [x.strip() for x in self.constraint_names]
+        if self.constraint_names[0] == '':
+            self.use_constraint_names = []
+        else:
+            self.use_constraint_names= [x.strip() for x in self.constraint_names]
         self.use_secondary_constraint_names= [x.strip() for x in self.secondary_constraint_names if len(x.strip())>0]
         
         intmult = (self.wave[1]-self.wave[0])*self.fluxfactor['default']['B']
