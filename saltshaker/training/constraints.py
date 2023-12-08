@@ -269,16 +269,19 @@ class SALTconstraints:
         x1,x2= rot @ guess[self.icoordinates]
         
         #Assign the most skewed parameter as x1
-        statistic= lambda x: stats.normaltest(np.clip(x,*np.percentile(x,[2,98]))).statistic
-        if  statistic(x1)< statistic(x2):
+        #statistic= lambda x: stats.normaltest(np.clip(x,*np.percentile(x,[2,98]))).statistic
+        
+        #Assign the component with largest mean squared flux as M1
+        m1,m2= rot @ guess[self.icomponents[1:]]
+        if  np.mean(m1**2)< np.mean(m2**2):
             rot=rot[::-1]
             x2,x1=x1,x2
         
         m1,m2= rot @ guess[self.icomponents[1:]]
         #x1 should be positive with the flux variation in B band at 15 days
         m1deltaBat15=(np.sum(self.kcordict['default']['Bpbspl'] * bisplev(np.array([15]),self.wave,(self.phaseknotloc,self.waveknotloc,m1,self.bsorder,self.bsorder))))
-        #x2 will be defined with positive flux variation in B band at -15 days
-        m2deltaBatearly=(np.sum(self.kcordict['default']['Bpbspl'] * bisplev(np.array([-15]),self.wave,(self.phaseknotloc,self.waveknotloc,m2,self.bsorder,self.bsorder))))
+        #x2 will be defined with positive flux variation in B band at 15 days
+        m2deltaBatearly=(np.sum(self.kcordict['default']['Bpbspl'] * bisplev(np.array([15]),self.wave,(self.phaseknotloc,self.waveknotloc,m2,self.bsorder,self.bsorder))))
 
         rot = np.diag([np.sign(m1deltaBat15),np.sign((m2deltaBatearly))]) @ rot 
 
