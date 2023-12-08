@@ -111,7 +111,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
 
 
     def optimize(self,initvals):
-        X=self.saltobj.constraints.transformtoconstrainedparams(jnp.array(initvals))
+        X=initvals.copy() #self.saltobj.constraints.transformtoconstrainedparams(jnp.array(initvals))
 
         residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'),jit=False)
         oldChi=(residuals**2).sum()
@@ -320,7 +320,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
             else:
                 if len(self.losshistory)> numconvergence+10:
                     convergencecriterion= np.abs(self.losshistory[-numconvergence] - loss)
-                    if np.isnan(loss) :#or np.all( np.array(self.losshistory[-numconvergence*2+1:]) > self.losshistory[-numconvergence*2] ):
+                    if np.isnan(loss) or np.all( np.array(self.losshistory[-numconvergence*2+1:]) > self.losshistory[-numconvergence*2] ):
                     
                         convergencecriterion=0
                 else:

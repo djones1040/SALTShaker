@@ -32,8 +32,12 @@ class SALTconstraints:
         for k in residsobj.__dict__.keys():
             self.__dict__[k] = residsobj.__dict__[k]
         self.saltresids=residsobj
+
         self.constraints={ key: partial(__possibleconstraints__[key],self) for key in __possibleconstraints__}
-        self.use_constraint_names= [x.strip() for x in self.constraint_names]
+        if self.constraint_names[0] == '':
+            self.use_constraint_names = []
+        else:
+            self.use_constraint_names= [x.strip() for x in self.constraint_names]
         self.use_secondary_constraint_names= [x.strip() for x in self.secondary_constraint_names if len(x.strip())>0]
         
         intmult = (self.wave[1]-self.wave[0])*self.fluxfactor['default']['B']
@@ -51,7 +55,6 @@ class SALTconstraints:
     @constraint
     def centeranddecorrelatedcolorsandcoords(self,guess):
         idxs=np.concatenate([self.ic[:1,:],self.icoordinates])
-        #idxs=np.concatenate([self.ic,self.icoordinates])
         coordinates=guess[idxs]
         from jax.scipy import linalg as jlin
         from functools import reduce
@@ -68,7 +71,7 @@ class SALTconstraints:
                 guess=guess.at[idx].set(corrected)
             else:
                 guess=guess.at[idx].set(corrected *jnp.std(guess[idx]))
-        #jax.debug.breakpoint()
+
         return guess
     
     @constraint

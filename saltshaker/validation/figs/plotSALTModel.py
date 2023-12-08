@@ -197,9 +197,9 @@ def mkModelPlot(
             clfun_str = lines[n_colorpars[j]+1].split()[1]
             salt3_colormin = float(lines[n_colorpars[j]+2].split()[1])
             salt3_colormax = float(lines[n_colorpars[j]+3].split()[1])
-            
-            colorlaw_salt3 = getattr(colorlaw, clfun_str)(len(colorlaw_salt3_coeffs),[salt3_colormin,salt3_colormax])
-            ax3.plot(wave,colorlaw_salt3(1,colorlaw_salt3_coeffs,wave),color=f'C{j}',label=f'SALT3 {clfun_str}')
+
+            colorlaw_salt3 = getattr(colorlaw, cf)(len(colorlaw_salt3_coeffs),[salt3_colormin,salt3_colormax])
+            ax3.plot(wave,colorlaw_salt3(1,colorlaw_salt3_coeffs,wave),color=f'C{j}',label=f'SALT3 {cf}')
 
 
 

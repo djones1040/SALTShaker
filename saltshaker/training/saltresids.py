@@ -539,9 +539,10 @@ class SALTResids:
 
         successful=successful&wrapaddingargument(config,'modelparams','constraint_names','constraints',  default='', nargs='*',      type=str,
                                                 help='constraints enforced on the model, see constraints.py (default=%(default)s)')               
-        
+
         successful=successful&wrapaddingargument(config,'modelparams','secondary_constraint_names','secondary_constraints',  default=[], nargs='*',      type=str,
-                                                help='constraints enforced on the model after an initial burn-in, see constraints.py (default=%(default)s)')               
+                                                help='constraints enforced on the model after an initial burn-in, see constraints.py (default=%(default)s)')
+
 
         for prior in __priors__:
                 successful=successful&wrapaddingargument(config,'priors',prior ,type=float,clargformat="--prior_{key}",
@@ -554,6 +555,7 @@ class SALTResids:
         for param in cls.parameters:
                 successful=successful&wrapaddingargument(config,'bounds', param, type=float,nargs=3,clargformat="--bound_{key}",
                                                         help="bound on %s"%param,default=SUPPRESS)
+
         if not successful: sys.exit(1)
         return parser
 
@@ -759,37 +761,38 @@ class SALTResids:
         return results
 
 
-    def estimateparametererrorsfromhessian(self,X):
+    def estimateparametererrorsfromhessian(self,X,hessian=None):
         """Approximate Hessian by jacobian times own transpose to determine uncertainties in flux surfaces"""
         log.info("determining M0/M1 errors by approximated Hessian")
 
-        varyingParams=reduce(lambda x,y:  x | np.isin(np.arange(self.npar), y),[
-            self.icomponents,self.iCLNoGal,self.imhost],False)
-        
-        logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
-        X=jnp.array(X)
-        lsqwrap_partial=lambda x: self.lsqwrap(X.at[varyingParams].set(x),self.calculatecachedvals(X,target='variances'),suppressregularization=True)
-        jvp= wrapjvpmultipleargs(lsqwrap_partial ,[0])
-        jac = sparsejac(lsqwrap_partial,jvp,[0], True )(X[varyingParams])
-#         np.save(path.join(self.outputdir,'jac.npy'), jac)
-        hessian=(jac.T @ jac ).toarray()
-        
-        maxval=np.max( np.abs(jnp.nan_to_num(hessian,nan=0,posinf=0,neginf=0)) )
-        hessian=jnp.nan_to_num(hessian,nan=0,posinf=maxval,neginf=-maxval)
-        
-        hessian = ensurepositivedefinite(hessian)
-        #Simple preconditioning of the jacobian before attempting to invert
-        
+        if hessian is None:
+            varyingParams=reduce(lambda x,y:  x | np.isin(np.arange(self.npar), y),[
+                self.icomponents,self.iCLNoGal,self.imhost],False)
 
+            logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
+            X=jnp.array(X)
+            lsqwrap_partial=lambda x: self.lsqwrap(X.at[varyingParams].set(x),self.calculatecachedvals(X,target='variances'),suppressregularization=True)
+            jvp= wrapjvpmultipleargs(lsqwrap_partial ,[0])
+            jac = sparsejac(lsqwrap_partial,jvp,[0], True )(X[varyingParams])
+    #         np.save(path.join(self.outputdir,'jac.npy'), jac)
+
+            hessian=(jac.T @ jac ).toarray()
+
+            maxval=np.max( np.abs(jnp.nan_to_num(hessian,nan=0,posinf=0,neginf=0)) )
+            hessian=jnp.nan_to_num(hessian,nan=0,posinf=maxval,neginf=-maxval)
+
+            hessian = ensurepositivedefinite(hessian)
+            #Simple preconditioning of the jacobian before attempting to invert
+        
         scales=np.sqrt(np.diag(hessian) )
         scales[scales==0]=1
         preconditioningelementwise=np.outer( scales,scales)
+
         sigma= linalg.cho_solve( linalg.cho_factor(hessian/preconditioningelementwise), np.identity(scales.size))/preconditioningelementwise
         
         sigmafull=np.zeros((self.npar,self.npar))
         sigmafull[np.outer(varyingParams,varyingParams)]=sigma.flatten()
         return sigmafull
-
 
     def computeuncertaintiesfromparametererrors(self,X,sigma,smoothingfactor=150):
 

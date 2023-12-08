@@ -241,17 +241,18 @@ class TrainSALT(TrainSALTBase):
             specdata=datadict[sn].specdata
             photdata=datadict[sn].photdata
             for k in specdata.keys():
-                if not self.options.specrecallist:
-                    order=self.options.n_min_specrecal+int(np.log((specdata[k].wavelength.max() - \
-                        specdata[k].wavelength.min())/self.options.specrange_wavescale_specrecal) + \
-                        len(datadict[sn].filt)* self.options.n_specrecal_per_lightcurve)
-                else:
-                    spcrclcopy = spcrcldata[spcrcldata['SNID'] == sn]
-                    order = int(spcrclcopy['ncalib'][spcrclcopy['N'] == k+1])
+                order=self.options.n_min_specrecal+int(np.log((specdata[k].wavelength.max() - \
+                    specdata[k].wavelength.min())/self.options.specrange_wavescale_specrecal) + \
+                    len(datadict[sn].filt)* self.options.n_specrecal_per_lightcurve)
                 order=min(max(order,self.options.n_min_specrecal ), self.options.n_max_specrecal)
+
+                # save the order as part of the specrecal list
+                if not self.options.specrecallist or sn not in spcrcldata['SNID'] or k+1 not in spcrcldata['N']:
+                    datadict[sn].specdata[k].n_specrecal = order
+                    
                 recalParams=[f'specx0_{sn}_{k}']+[f'specrecal_{sn}_{k}']*(order-1)
                 parlist=np.append(parlist,recalParams)
-                
+
         modelconfiguration=saltresids.saltconfiguration(parlist=parlist,phaseknotloc =phaseknotloc ,waveknotloc=waveknotloc,
             errphaseknotloc=errphaseknotloc,errwaveknotloc=errwaveknotloc)
         # initial guesses
@@ -799,7 +800,7 @@ class TrainSALT(TrainSALTBase):
                 print(f'{w:.2f} {np.clip(trainingresult.clscat[j],0.,cldispersionmax):8.15e}',file=foutclscat)
 
         foutinfotext = f"""RESTLAMBDA_RANGE: {self.options.colorwaverange[0]} {self.options.colorwaverange[1]}
-COLORLAW_VERSION: 1
+COLORLAW_VERSION: {self.options.colorlaw_function[0]}
 COLORCOR_PARAMS: {self.options.colorwaverange[0]:.0f} {self.options.colorwaverange[1]:.0f}  {len(trainingresult.clpars[0])}  {' '.join(['%8.10e'%cl for cl in trainingresult.clpars[0]])}
 
 COLOR_OFFSET:  0.0
@@ -834,7 +835,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
                     print(f'{len(colorlaw):.0f}',file=foutcl)
                     for c in colorlaw:
                         print(f'{c:8.10e}',file=foutcl)
-                    print(f"""Salt2ExtinctionLaw.version {name}
+                    print(f"""Salt2ExtinctionLaw.version 1
 Salt2ExtinctionLaw.min_lambda {self.options.colorwaverange[0]:.0f}
 Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutcl)
 
@@ -842,6 +843,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
         # best-fit and simulated SN params
         with open(f'{outdir}/salt3train_snparams.txt','w') as foutsn:
             print('# SN x0 x1 c t0 SIM_x0 SIM_x1 SIM_c SIM_t0 SALT2_x0 SALT2_x1 SALT2_c SALT2_t0',file=foutsn)
+            #print('# SN x0 x1 c_i c_g t0 SIM_x0 SIM_x1 SIM_c SIM_t0 SALT2_x0 SALT2_x1 SALT2_c SALT2_t0',file=foutsn)
             for snlist in self.options.snlists.split(','):
                 snlist = os.path.expandvars(snlist)
                 if not os.path.exists(snlist):
@@ -887,7 +889,8 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
                         trainingresult.snparams[k]['t0'] = 0.0
 
                     print(f"{k} {trainingresult.snparams[k]['x0']:8.10e} {trainingresult.snparams[k]['x1']:.10f} {trainingresult.snparams[k]['c'] if 'c' in trainingresult.snparams[k] else trainingresult.snparams[k]['c0']:.10f} {trainingresult.snparams[k]['t0']:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",file=foutsn)
-
+                    #print(f"{k} {trainingresult.snparams[k]['x0']:8.10e} {trainingresult.snparams[k]['x1']:.10f} {trainingresult.snparams[k]['c'] if 'c' in trainingresult.snparams[k] else trainingresult.snparams[k]['c0']:.10f} {trainingresult.snparams[k]['c1']:.10f} {trainingresult.snparams[k]['t0']:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",file=foutsn)
+                    
         keys=['num_lightcurves','num_spectra','num_sne']
         yamloutputdict={key.upper():getattr(trainingresult,key) for key in keys}
         yamloutputdict['CPU_MINUTES']=(time.time()-initializationtime)/60
@@ -954,7 +957,8 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
 
         plotSALTModel.mkModelPlot(outputdir,outfile=f'{outputdir}/SALTmodelcomp.png',
                                   xlimits=[self.options.waverange[0],self.options.waverange[1]],
-                                  n_colorpars=self.options.n_colorpars,host_component=self.options.host_component)
+                                  n_colorpars=self.options.n_colorpars,host_component=self.options.host_component,
+                                  colorlaw_function=self.options.colorlaw_function)
         SynPhotPlot.plotSynthPhotOverStretchRange(
             '{}/synthphotrange.pdf'.format(outputdir),outputdir,'SDSS')
         SynPhotPlot.overPlotSynthPhotByComponent(
@@ -1051,19 +1055,20 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
             fitx1,fitc = False,False
             if self.options.n_components == 2:
                 fitx1 = True
-            if self.options.n_colorpars > 0:
+            if self.options.n_colorpars[0] > 0:
                 fitc = True
 
             if self.options.binspec:
                 binspecres = self.options.binspecres
             else:
                 binspecres = None
-            
+
             datadict = readutils.rdAllData(snlist,self.options.estimate_tpk,
                                            dospec=self.options.dospec,
                                            peakmjdlist=self.options.tmaxlist,
                                            binspecres=binspecres,snparlist=self.options.snparlist,
-                                           maxsn=self.options.maxsn)
+                                           maxsn=self.options.maxsn,
+                                           specrecallist=self.options.specrecallist)
                 
             tlc = time.time()
             count = 0
@@ -1169,7 +1174,10 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
             datadict = readutils.rdAllData(self.options.snlists,self.options.estimate_tpk,
                                            dospec=self.options.dospec,
                                            peakmjdlist=self.options.tmaxlist,
-                                           binspecres=binspecres,snparlist=self.options.snparlist,maxsn=self.options.maxsn)
+                                           binspecres=binspecres,
+                                           snparlist=self.options.snparlist,
+                                           maxsn=self.options.maxsn,
+                                           specrecallist=self.options.specrecallist)
             log.info(f'took {time.time()-tdstart:.3f} to read in data files')
             tcstart = time.time()
 
@@ -1245,7 +1253,7 @@ config file options can be overwridden at the command line"""
         config = configparser.ConfigParser(inline_comment_prefixes='#')
         if not os.path.exists(configfile):
             raise RuntimeError(f'Configfile {configfile} doesn\'t exist!')
-            
+
                     
         config.read(configfile)
 
@@ -1267,7 +1275,7 @@ config file options can be overwridden at the command line"""
             raise RuntimeError('can\'t find trainingconfig config file!  Checked %s'%user_options.trainingconfig)
 
         optimizer=optimizers.getoptimizer(user_options.optimizer)
-        
+
         modelconfig = configparser.ConfigParser(inline_comment_prefixes='#')
         modelconfig.read(user_options.modelconfig)
         model_parser = saltresids.SALTResids.add_model_options(
@@ -1312,13 +1320,17 @@ config file options can be overwridden at the command line"""
             parser.add_argument('-c','--configfile', default=None, type=str,
                                 help='configuration file')
 
+
             options, _ = parser.parse_known_args()
             configfile,configpos=options.configfile,options.configpositional
-            if configfile is None:
+
+            if configfile is None and configpos is not None: 
                 configfile=configpos
-            else:
+            elif configfile is None and configpos is None:
                 raise RuntimeError('Configuration file must be specified at command line')
+
         self.get_config_options(salt,configfile,args)
         
+
         salt.main()
 
