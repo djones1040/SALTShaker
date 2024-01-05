@@ -79,7 +79,6 @@ def init_salt2(m0file=None,m1file=None,M0triplet=None,M1triplet=None,
 			m1_p = np.zeros(len(new_wave_grid))
 			idx = np.where(new_wave_grid==wave.max())[0][0]
 			
-			#import pdb; pdb.set_trace()
 			m0_p[:idx+1] = m0flux[phase == p]; m1_p[:idx+1] = m1flux[phase == p]
 			m0_p[idx:] = np.interp(new_wave_grid,hwave[hphase == p],hflux[hphase == p])[idx:]*hscale; m1_p[idx:] = 0.0
 			m0_out[i,:] = m0_p
@@ -159,9 +158,7 @@ def init_hsiao(hsiaofile='initfiles/hsiao07.dat',
 							   7389., 7492., 7598., 7709., 7825., 7946., 8072., 8205., 8345.,
 							   8494., 8652., 8821., 9003.,9200.,9200.,9200.,9200.])
 
-	#try:
 	bspl = bisplrep(phase,wave,m0flux,kx=order,ky=order, tx=splinephase,ty=splinewave,task=-1,nxest=len(splinephase),nyest=len(splinewave))
-	#except: import pdb; pdb.set_trace()
 	
 	intphase = np.linspace(phaserange[0],phaserange[1]+phaseinterpres,
 						   int((phaserange[1]-phaserange[0])/phaseinterpres)+1,False)
@@ -236,7 +233,6 @@ def init_kaepora(x10file='initfiles/Kaepora_dm15_1.1.txt',
 		plt.plot(intwave,m0test,label='interp')
 		bspltmp = bspl[2].reshape([len(splinephase)-4,len(splinewave)-4])
 
-	#import pdb; pdb.set_trace()
 	return intphase,intwave,m0,m1,bspl[0],bspl[1],bspl[2],bsplm1[2]
 
 def init_errs(m0varfile=None,m0m1file=None,m1varfile=None,scalefile=None,clscatfile=None,
@@ -385,6 +381,7 @@ def init_errs_percent(
 			wave,clscat=wave[wave<9200],clscat[wave<9200]
 			pow=n_colorscatpars-1-np.arange(n_colorscatpars)
 			clscatpars=np.polyfit((wave-5500)/1000,np.log(clscat),n_colorscatpars-1)*factorial(pow)#guess[resids.iclscat]
+
 	if mhostknots is None:
 		return m0varbspl[0],m0varbspl[1],m0varbspl[2],m1varbspl[2],m0m1corrbspl[2],clscatpars
 	else:
