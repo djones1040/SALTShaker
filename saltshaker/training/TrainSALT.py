@@ -200,7 +200,7 @@ class TrainSALT(TrainSALTBase):
                 errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs_percent(**init_options)
             else:
                 errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,mhostvarknots,m0m1corrknots,clscatcoeffs=init_errs_percent(**init_options)
-                
+
         # number of parameters
         n_phaseknots,n_waveknots = len(phaseknotloc)-self.options.bsorder-1,len(waveknotloc)-self.options.bsorder-1
         n_errphaseknots,n_errwaveknots = len(errphaseknotloc)-self.options.errbsorder-1,len(errwaveknotloc)-self.options.errbsorder-1
