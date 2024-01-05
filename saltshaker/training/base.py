@@ -263,6 +263,7 @@ class TrainSALTBase:
             outdict={}
             cutdict={}
 
+            filters = []
             for snid in datadict:
                 sn=datadict[snid]
                 photdata = sn.photdata
@@ -286,6 +287,8 @@ class TrainSALTBase:
                         specdata.pop(k)
 
                 for flt in sn.filt:
+                    if flt not in filters:
+                        filters += [flt]
                     #Remove light curve outside model [rest-frame] wavelength range
                     if not self.filter_select(sn.survey,flt):  # RK Nov 7 2022
                     #if flt in self.options.__dict__[f"{sn.survey.split('(')[0]}_ignore_filters"].split(','):
@@ -315,7 +318,7 @@ class TrainSALTBase:
             log.info(f'{len(datadict)} SNe initially, {len(cutdict)} SNe cut from the sample')
             log.info('Total number of supernovae: {}'.format(len(outdict)))
             log.info( ', '.join([f'{final} {desc}' for attr,desc,initial,final,cut in zip(attrs,descriptions,initialdemos,finaldemos,sncutdemos)])+' remaining after all cuts')
-
+            log.info(f'Unique filters: {np.unique(filters)}')
             return outdict,cutdict
 
         def filter_select(self,survey,flt):
