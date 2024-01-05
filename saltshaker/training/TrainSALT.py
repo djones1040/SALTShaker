@@ -37,6 +37,7 @@ from saltshaker.util.txtobj import txtobj
 from saltshaker.util.specSynPhot import getScaleForSN
 from saltshaker.util.specrecal import SpecRecal
 from saltshaker.util.synphot import synphot
+from saltshaker.util.example_data_utils import download_dir
 
 from saltshaker.initfiles import init_rootdir
 from saltshaker.initfiles import init_rootdir as salt2dir
@@ -64,7 +65,7 @@ import sncosmo
 from sncosmo.salt2utils import SALT2ColorLaw
 from sncosmo.constants import HC_ERG_AA
 
-
+_example_data_url = "https://github.com/djones1040/SALTShaker/raw/main/examples/saltshaker-latest-training.tgz"
 _flatnu=f'{init_rootdir}/flatnu.dat'
 
 # validation utils
@@ -1309,8 +1310,14 @@ config file options can be overwridden at the command line"""
             json.dump(vars(salt.options),optfile)
 
         return
+
+    def get_example_data(self):
         
-    def main(self,configfile=None,args=None):
+        if os.path.exists('saltshaker-latest-training'):
+            raise RuntimeError("saltshaker-latest-training exists in local directory.  Please remove it before continuing")
+        download_dir(_example_data_url,os.getcwd())
+    
+    def main(self):
 
         salt = TrainSALT()
         
@@ -1320,18 +1327,23 @@ config file options can be overwridden at the command line"""
             parser.add_argument('configpositional',nargs='?',default=None,type=str,help='configuration file')
             parser.add_argument('-c','--configfile', default=None, type=str,
                                 help='configuration file')
-
+            parser.add_argument('-g','--get-example-data', default=False, action="store_true",
+                                help='download the example data')
 
             options, _ = parser.parse_known_args()
             configfile,configpos=options.configfile,options.configpositional
+
 
             if configfile is None and configpos is not None: 
                 configfile=configpos
             elif configfile is None and configpos is None:
                 raise RuntimeError('Configuration file must be specified at command line')
 
-        self.get_config_options(salt,configfile,args)
+        if options.get_example_data:
+            self.get_example_data()
+            print('example data has been downloaded to the saltshaker-latest-training directory')
+        else:
+            self.get_config_options(salt,configfile,args)
         
-
-        salt.main()
+            salt.main()
 

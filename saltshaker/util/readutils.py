@@ -498,7 +498,7 @@ def rdAllData(snlists,estimate_tpk,
                             sn.SURVEY = f"{survey}({sn.SUBSURVEY})"
                         else:
                             sn.SURVEY = survey
-                        if specrecallist is not None:
+                        if specrecallist:
                             n_specrecal = src[src['SNID'] == snid]
                         else:
                             n_specrecal = None

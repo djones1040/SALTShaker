@@ -348,10 +348,15 @@ class SALTResids:
         if efficiency<efficiencywarningthreshold:
             log.warning(f'Efficiency less than {efficiencywarningthreshold:.0%}, consider increasing batching of data')
         specdatasizes=list(getspecdatacounts(datadict))
-        specpadding,efficiency=batching.optimizepaddingsizes(self.spectroscopic_zeropadding_batches,specdatasizes)
-        log.info(f'Separating spectroscopic data into {len(specpadding)} batches, at a space efficiency of {efficiency:.0%}')
-        if efficiency<efficiencywarningthreshold:
-            log.warning(f'Efficiency less than {efficiencywarningthreshold:.0%}, consider increasing batching of data')
+        if len(specdatasizes):
+            specpadding,efficiency=batching.optimizepaddingsizes(self.spectroscopic_zeropadding_batches,specdatasizes)
+            log.info(f'Separating spectroscopic data into {len(specpadding)} batches, at a space efficiency of {efficiency:.0%}')
+            if efficiency<efficiencywarningthreshold:
+                log.warning(f'Efficiency less than {efficiencywarningthreshold:.0%}, consider increasing batching of data')
+        else:
+            specpadding = 0; efficiency = 1
+            log.info(f'no spectroscopic data, no batches needed')
+
         log.info('Calculating cached quantities')
         start=time.time()
         
@@ -684,7 +689,7 @@ class SALTResids:
     def getChi2Contributions(self,X,**kwargs):
         uncertainties= self.calculatecachedvals(X,target='variances')
         residuals= self.lsqwrap(X,uncertainties,**kwargs)
-        sourceskwargs={key:val for key in kwargs if not (key=='jit')}
+        sourceskwargs={key:val for key,val in kwargs.items() if not (key=='jit')}
         sources=self.lsqwrap_sources(X,uncertainties,**sourceskwargs)
         sources=np.array([x.split('_')[0] for x in  sources])
         assert(np.isin(sources,['reg','phot','spec','priors']).all())
@@ -772,7 +777,7 @@ class SALTResids:
 
             logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
             X=jnp.array(X)
-            lsqwrap_partial=lambda x: self.lsqwrap(X.at[varyingParams].set(x),self.calculatecachedvals(X,target='variances'),suppressregularization=True)
+            lsqwrap_partial=lambda x: self.lsqwrap(X.at[varyingParams].set(x),self.calculatecachedvals(X,target='variances'),suppressregularization=True,dospecresids=self.dospec)
             jvp= wrapjvpmultipleargs(lsqwrap_partial ,[0])
             jac = sparsejac(lsqwrap_partial,jvp,[0], True )(X[varyingParams])
     #         np.save(path.join(self.outputdir,'jac.npy'), jac)
