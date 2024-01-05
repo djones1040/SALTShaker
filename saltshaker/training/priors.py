@@ -24,6 +24,14 @@ def prior(prior):
     __priors__[prior.__name__]=prior
     return prior
 
+__nongaussianpriors__=dict()
+def nongaussianprior(prior):
+    """Decorator to register a given function as a valid non-Gaussian prior"""
+    #Check that the method accepts 4 inputs: a saltresids object, a width, parameter vector, model components
+    assert(len(signature(prior).parameters)==3 or len(signature(prior).parameters)==4)
+    __nongaussianpriors__[prior.__name__]=prior
+    return prior
+
 
 #This is taken from https://arxiv.org/pdf/1712.05151.pdf
 b=1.5
@@ -69,6 +77,8 @@ def robustcorrelation(x,y):
     
     return jnp.mean(xtrans*ytrans)
 
+def robustmean(x):
+    return jnp.mean(jpsi(x-jnp.median(x)))+jnp.median(x)
 
 class SALTPriors:
 
@@ -79,6 +89,7 @@ class SALTPriors:
         self.SALTModelDeriv = SALTResidsObj.SALTModelDeriv
         
         self.priors={ key: partial(__priors__[key],self) for key in __priors__}
+        self.nongaussianpriors={ key: partial(__nongaussianpriors__[key],self) for key in __nongaussianpriors__}
         if len(self.usePriors) != len(self.priorWidths):
             raise RuntimeError('length of priors does not equal length of prior widths!')
 
@@ -155,7 +166,7 @@ class SALTPriors:
         self.numresids=jax.eval_shape(self.priorresids,np.random.normal(1e-1,size=self.npar)).shape[0]
 
         
-    @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],diff_argnum=1)        
+    @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],diff_argnum=1)
     def priorresids(self,x):
         """Given a parameter vector returns a residuals vector representing the priors"""
 
@@ -164,9 +175,10 @@ class SALTPriors:
             try:
                 priorFunction=self.priors[prior]
             except:
-                raise ValueError('Invalid prior supplied: {}'.format(prior)) 
+                pass
             residuals+=[jnp.atleast_1d(priorFunction(width,x))]
         residuals+=[self.boundedpriorresids(x)]
+        #jax.debug.breakpoint()
         return jnp.concatenate(  residuals)
 
     @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],diff_argnum=1)        
@@ -177,9 +189,12 @@ class SALTPriors:
         for prior,width in self.priorexecutionlist:
             try:
                 priorFunction=self.priors[prior]
+                loglike+=-(priorFunction(width,x)**2).sum()/2
+            except KeyError:
+                priorFunction=self.nongaussianpriors[prior]
+                loglike += jnp.sum(priorFunction(width,x))
             except:
                 raise ValueError('Invalid prior supplied: {}'.format(prior)) 
-            loglike+=-(priorFunction(width,x)**2).sum()/2
         loglike+=-(self.boundedpriorresids(x)**2).sum()/2
         return loglike
 
@@ -189,12 +204,32 @@ class SALTPriors:
         xprime=x[self.isbounded]
         return (jnp.clip(xprime-lbound,None,0)+jnp.clip(xprime-ubound,0,None))/widths
 
+    
+    
+    @prior
+    def allcolorcoordinatemean(self,width,x):
+        idxs=np.concatenate([self.ic,self.icoordinates])
+        return jax.vmap(robustmean)(x[idxs])/width
+    
+    @prior
+    def allcoordinatestd(self,width,x):
+        idxs=np.concatenate([self.ic,self.icoordinates])
+        params=x[idxs]
+        return (jnp.var(params,axis=1)-1)/width
         
+    @prior
+    def allcolorcoordinatecorr(self,width,x):
+        idxs=np.concatenate([self.ic,self.icoordinates])
+        numparams=idxs.shape[0]
+        params=x[idxs]
+        return jnp.array(sum([ [  robustcorrelation(params[i],params[j]) for j in range(i)] for i in range(numparams)],[]))
+        
+    
     @prior
     def colorstretchcorr(self,width,x):
         """x1 should have no inner product with c"""
         x1=x[self.ix1]
-        c=x[self.ic]
+        c=x[self.ic][:,0]
         if x1.size!=c.size: return np.array([])
         return robustcorrelation(x1,c)/width
 
@@ -212,7 +247,7 @@ class SALTPriors:
         """xhost should have no inner product with c"""
 
         xhost=x[self.ixhost]
-        c=x[self.ic]
+        c=x[self.ic][:,0]
         if c.size!=xhost.size: return np.array([])
         return robustcorrelation(xhost,c)/width
 
@@ -220,7 +255,13 @@ class SALTPriors:
     def peakprior(self,width,x):
         """ At t=0, minimize time derivative of B-band lightcurve"""
         return self.__peakpriorderiv__ @ x[self.im0] /(self.bstdflux*width)
-        
+
+    @nongaussianprior
+    def galacticcolorprior(self,width,x):
+        """Prior so that the galactic dust is greater than zero, with exponential tail"""
+##        jax.debug.breakpoint()
+        return jnp.select([x[self.ic[1]] < 0,x[self.ic[1]] >= 0],
+                          [-x[self.ic[1]]**2./0.01**2.,-x[self.ic[1]]/width])
         
     @prior
     def m0prior(self,width,x):
@@ -300,105 +341,3 @@ class SALTPriors:
     
         
         
-    def satisfyDefinitions(self,X,components):
-        """Ensures that the definitions of M1,M0,x0,x1 are satisfied"""
-        X=X.copy()
-        int1d = interp1d(self.phase,components[0],axis=0,assume_sorted=True)
-        m0Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
-            (self.wave[1]-self.wave[0])*self.fluxfactor['default']['B']
-
-        int1d = interp1d(self.phase,components[1],axis=0,assume_sorted=True)
-        m1Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\
-            (self.wave[1]-self.wave[0])*self.fluxfactor['default']['B']
-        ratio=m1Bflux/m0Bflux
-        #Define M1 to have no effect on B band at t=0
-
-        if not self.host_component:
-            # re-scaling M1 isn't going to work in the host component case
-            for sn in self.datadict:
-                ix0=np.array([(x==f'x0_{sn}' ) or (x.startswith(f'specx0_{sn}_')) for x in self.parlist])
-                X[ix0]*=(1+ratio*X[f'x1_{sn}'==self.parlist])
-            X[self.ix1]/=1+ratio*X[self.ix1]
-            X[self.im1]-=ratio*X[self.im0]
-        else:
-            # we need to modify x1 and M_host to remove correlations
-            # this causes problems for the errors, but can be used in conjunction with bootstrapping
-            alpha = ((X[self.ix1]*X[self.ixhost]).sum() / (X[self.ixhost]**2).sum())
-            X[self.ix1] = X[self.ix1] - alpha*X[self.ixhost]
-            X[self.imhost] = X[self.imhost] + alpha*X[self.im1]
-
-
-        ####This code will not work if the model uncertainties are not 0th order (simple interpolation)
-        if self.errbsorder==0:
-            m0variance=X[self.imodelerr0]**2
-            m0m1covariance=X[self.imodelerr1]*X[self.imodelerr0]*X[self.imodelcorr01]
-            m1variance=X[self.imodelerr1]**2
-            
-            if not self.host_component:
-                # re-scaling M1 isn't going to work in the host component case
-                m1variance+=-2*ratio*m0m1covariance+ratio**2*m0variance
-                m0m1covariance-=m0variance*ratio
-            else:
-                mhostvariance=X[self.imodelerrhost]**2
-                m0mhostcovariance=X[self.imodelerrhost]*X[self.imodelerr0]*X[self.imodelcorr0host]
-
-        else:
-            log.critical('RESCALING ERROR TO SATISFY DEFINITIONS HAS NOT BEEN IMPLEMENTED')
-
-        #Define x1 to have mean 0
-        #m0 at peak is not modified, since m1B at peak is defined as 0
-        #Thus does not need to be recalculated for the last definition
-        meanx1=np.mean(X[self.ix1])
-        X[self.im0]+= meanx1*X[self.im1]
-        X[self.ix1]-=meanx1
-        if self.errbsorder==0:
-            m0variance+=2*meanx1*m0m1covariance+meanx1**2*m1variance
-            m0m1covariance+=m1variance*meanx1
-        else:
-            log.critical('RESCALING ERROR TO SATISFY DEFINITIONS HAS NOT BEEN IMPLEMENTED')
-
-        
-        #Define x1 to have std deviation 1
-        x1std = np.std(X[self.ix1])
-        if x1std == x1std and x1std != 0.0:
-            X[self.im1]*= x1std
-            X[self.ix1]/= x1std
-        if self.errbsorder==0:
-            m1variance*=x1std**2
-            m0m1covariance*=x1std
-        else:
-            log.critical('RESCALING ERROR TO SATISFY DEFINITIONS HAS NOT BEEN IMPLEMENTED')
-
-        #Define m0 to have a standard B-band magnitude at peak
-        self.bstdflux=(10**((self.m0guess-27.5)/-2.5) )
-        fluxratio=self.bstdflux/m0Bflux
-        X[self.im0]*=fluxratio
-        X[self.im1]*= fluxratio
-        if self.host_component: X[self.imhost]*= fluxratio
-        X[self.ix0]/=fluxratio
-        if self.errbsorder==0:
-            m1variance*=fluxratio**2
-            m0variance*=fluxratio**2
-            m0m1covariance*=fluxratio**2
-            if self.host_component:
-                mhostvariance*=fluxratio**2
-                m0mhostcovariance*=fluxratio**2
-        else:
-            log.critical('RESCALING ERROR TO SATISFY DEFINITIONS HAS NOT BEEN IMPLEMENTED')
-
-#       Define color to have 0 mean
-#       centralwavelength=self.waveBinCenters[np.arange(self.im0.size)%self.waveBinCenters.size])
-#       
-#       X[self.im0]*=
-#       stats.pearsonr(X[self.ix1],X[self.ic])
-#       
-#       X[self.ic]-=X[self.ix1]
-        if self.errbsorder==0:
-            X[self.imodelerr0]= np.sqrt(m0variance)
-            X[self.imodelcorr01]= m0m1covariance/np.sqrt(m0variance*m1variance)
-            X[self.imodelerr1]=np.sqrt(m1variance)
-            if self.host_component:
-                X[self.imodelerrhost]=np.sqrt(mhostvariance)
-                X[self.imodelcorr0host]= m0mhostcovariance/np.sqrt(m0variance*mhostvariance)
-
-        return X

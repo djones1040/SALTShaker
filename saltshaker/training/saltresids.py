@@ -2,12 +2,13 @@ from saltshaker.util.inpynb import in_ipynb
 
 from saltshaker.util.synphot import synphot
 from saltshaker.util import batching
-from saltshaker.util.jaxoptions import jaxoptions
+from saltshaker.util.jaxoptions import jaxoptions,sparsejac,wrapjvpmultipleargs
 from saltshaker.training import init_hsiao
 from saltshaker.training.datamodels import SALTfitcacheSN,modeledtraininglightcurve,modeledtrainingspectrum
 from saltshaker.training import colorlaw
 
-from saltshaker.training.priors import SALTPriors,__priors__
+from saltshaker.training.priors import SALTPriors,__priors__,__nongaussianpriors__
+from saltshaker.training.constraints import SALTconstraints
 
 from saltshaker.config.configparsing import *
 
@@ -33,7 +34,7 @@ from numpy.linalg import slogdet
 from astropy.cosmology import Planck15 as cosmo
 from multiprocessing import Pool, get_context
 from inspect import signature
-from functools import partial
+from functools import partial,reduce
 from itertools import starmap
 if in_ipynb:
     from tqdm.notebook import tqdm
@@ -46,15 +47,17 @@ import pylab as plt
 
 import jax
 from jax import numpy as jnp
-#from jaxlib.xla_extension import DeviceArray
+
 from jax.scipy import linalg as jaxlinalg
 from jax.experimental import sparse
 from jax import lax
 
 from collections import namedtuple
 from argparse import SUPPRESS
+from itertools import combinations_with_replacement
 
-
+from os import path
+import pickle
 
 import time
 import sys
@@ -152,7 +155,7 @@ class SALTResids:
             elif opt.startswith('bound_'):
                 self.boundedParams += [opt[len('bound_'):]]
                 self.bounds += [tuple([float(x) for x in self.__dict__[opt]])]
-            
+
         specrecalparams =self.parlist[(np.array([x.startswith('specrecal') for x in self.parlist]))]
         numrecalparams=[(specrecalparams==x ).sum() for x in np.unique(specrecalparams)]
         try:
@@ -307,14 +310,20 @@ class SALTResids:
             self.wavebasis=self.waveBinCenters
         else:
             self.wavebasis=self.wave 
- 
-        self.colorlawfunction=colorlaw.getcolorlaw(self.colorlaw_function)( self.n_colorpars,
-        self.colorwaverange)
-
+        
+        try:
+            assert(len(self.n_colorpars)==len(self.colorlaw_function))
+            self.ncl=len(self.colorlaw_function)
+            
+        except:
+            raise ValueError(f'Inconsistent number of color law specifications given {self.colorlaw_function} {self.n_colorpars}' )
+        self.colorlawfunction=[colorlaw.getcolorlaw(function)( npars,
+        self.colorwaverange) for function,npars in zip(self.colorlaw_function,self.n_colorpars)]
+        
 
         self.guessScale=np.ones(self.n_components)
         
-        self.relativeregularizationweights=jnp.array([1,self.m1regularization]+( [self.mhostregularization] if self.host_component else []))
+        self.relativeregularizationweights=jnp.array([1]+[self.variantregularization]*(self.n_components-1)+( [self.mhostregularization] if self.host_component else []))
         
         if self.regularize:
             self.updateEffectivePoints()
@@ -339,23 +348,53 @@ class SALTResids:
         if efficiency<efficiencywarningthreshold:
             log.warning(f'Efficiency less than {efficiencywarningthreshold:.0%}, consider increasing batching of data')
         specdatasizes=list(getspecdatacounts(datadict))
-        specpadding,efficiency=batching.optimizepaddingsizes(self.spectroscopic_zeropadding_batches,specdatasizes)
-        log.info(f'Separating spectroscopic data into {len(specpadding)} batches, at a space efficiency of {efficiency:.0%}')
-        if efficiency<efficiencywarningthreshold:
-            log.warning(f'Efficiency less than {efficiencywarningthreshold:.0%}, consider increasing batching of data')
+        if len(specdatasizes):
+            specpadding,efficiency=batching.optimizepaddingsizes(self.spectroscopic_zeropadding_batches,specdatasizes)
+            log.info(f'Separating spectroscopic data into {len(specpadding)} batches, at a space efficiency of {efficiency:.0%}')
+            if efficiency<efficiencywarningthreshold:
+                log.warning(f'Efficiency less than {efficiencywarningthreshold:.0%}, consider increasing batching of data')
+        else:
+            specpadding = 0; efficiency = 1
+            log.info(f'no spectroscopic data, no batches needed')
 
-        log.info('Calculating cached quantities for speed in fitting loop')
+        log.info('Calculating cached quantities')
         start=time.time()
-        iterable=list(self.datadict.items())
-        #Shuffle it so that tqdm's estimates are hopefully more accurate
-        random.shuffle(iterable)
-        if sys.stdout.isatty() or in_ipynb:
-            iterable=tqdm(iterable,smoothing=.1)
-        self.datadict={snid: sn if isinstance(sn,SALTfitcacheSN) else SALTfitcacheSN(sn,self,self.kcordict,photpadding,specpadding)  for snid,sn in iterable}
-        log.info('Batching data and constructing batched methods')
-        self.allphotdata = sum([[x.photdata[lc] for lc in x.photdata ]for x in self.datadict.values() ],[])
-        self.batchedphotdata= batching.batchdatabysize(self.allphotdata)
         
+        
+        if bool(self.trainingcachefile) and path.exists(self.trainingcachefile):
+            log.info(f'Loading precomputed quantities from file {self.trainingcachefile}')
+            with open(self.trainingcachefile,'rb') as file: cachedfile=  pickle.load(file)
+            
+            self.datadict = cachedfile['datadict']
+            self.batchedphotdata= cachedfile['batchedphotdata']
+            self.batchedspecdata= cachedfile['batchedspecdata']
+            self.allphotdata = sum([[x.photdata[lc] for lc in x.photdata ]for x in self.datadict.values() ],[])
+            self.allspecdata = sum([[x.specdata[key] for key in x.specdata ]for x in self.datadict.values() ],[])
+
+        else:
+            
+            log.info('Precomputing filters')
+            iterable=list(self.datadict.items())
+            #Shuffle it so that tqdm's estimates are hopefully more accurate
+            random.shuffle(iterable)
+            if sys.stdout.isatty() or in_ipynb:
+                iterable=tqdm(iterable,smoothing=.1)
+            self.datadict={snid: sn if isinstance(sn,SALTfitcacheSN) else SALTfitcacheSN(sn,self,self.kcordict,photpadding,specpadding)  for snid,sn in iterable}
+            log.info('Batching data')
+            self.allphotdata = sum([[x.photdata[lc] for lc in x.photdata ]for x in self.datadict.values() ],[])
+            self.allspecdata = sum([[x.specdata[key] for key in x.specdata ]for x in self.datadict.values() ],[])
+
+            self.batchedphotdata= batching.batchdatabysize(self.allphotdata)
+            self.batchedspecdata= batching.batchdatabysize(self.allspecdata)
+            if self.trainingcachefile:
+                log.info(f'Writing precomputed quantities to file {self.trainingcachefile}')
+                with open( self.trainingcachefile,'wb') as file:
+                    pickle.dump({'datadict':self.datadict,
+                                'batchedphotdata':self.batchedphotdata,
+                                'batchedspecdata':self.batchedspecdata},file)
+            
+        log.info('Constructing batched methods')
+      
         self.batchedphotresiduals=batching.batchedmodelfunctions(lambda *args,**kwargs: modeledtraininglightcurve.modelresidual(*args,**kwargs)['residuals'],
                                   self.batchedphotdata, modeledtraininglightcurve,
                                   flatten=True)
@@ -372,11 +411,6 @@ class SALTResids:
                                   self.batchedphotdata, modeledtraininglightcurve,
                                   ))
 
-        
-        self.allspecdata = sum([[x.specdata[key] for key in x.specdata ]for x in self.datadict.values() ],[])
-
-        self.batchedspecdata= batching.batchdatabysize(self.allspecdata)
-        
         self.batchedspecresiduals=batching.batchedmodelfunctions(lambda *args,**kwargs: modeledtrainingspectrum.modelresidual(*args,**kwargs)['residuals'],
                                   self.batchedspecdata, modeledtrainingspectrum,
                                   flatten=True)
@@ -392,8 +426,10 @@ class SALTResids:
         self.batchedspecfluxes=jax.jit(batching.batchedmodelfunctions(  modeledtrainingspectrum.modelflux,
                                   self.batchedspecdata, modeledtrainingspectrum,
                                   ))
-
+                                  
         self.priors = SALTPriors(self)
+        self.constraints=SALTconstraints(self)
+        
         log.info('Time required to calculate cached quantities {:.1f}s'.format(time.time()-start))
                 
     @classmethod
@@ -428,8 +464,8 @@ class SALTResids:
                                                 help='Weighting of wave gradient chi^2 regularization during training of model parameters (default=%(default)s)')
         successful=successful&wrapaddingargument(config,'trainingparams','regulardyad', type=float,
                                                 help='Weighting of dyadic chi^2 regularization during training of model parameters (default=%(default)s)')
-        successful=successful&wrapaddingargument(config,'trainingparams','m1regularization',     type=float,
-                                                help='Scales regularization weighting of M1 component relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','variantregularization','m1regularization',     type=float,
+                                                help='Scales regularization weighting of varying components (all other than M0) relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
         successful=successful&wrapaddingargument(config,'trainingparams','mhostregularization',  type=float,
                                                 help='Scales regularization weighting of host component relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
         successful=successful&wrapaddingargument(config,'trainingparams','spec_chi2_scaling',  type=float,
@@ -488,8 +524,15 @@ class SALTResids:
                                                 help='number of principal components of the SALT model to fit for (default=%(default)s)')
         successful=successful&wrapaddingargument(config,'modelparams','host_component', type=str,
                                                 help="NOT IMPLEMENTED: if set, fit for a host component.  Must equal 'mass', for now (default=%(default)s)")
-        successful=successful&wrapaddingargument(config,'modelparams','n_colorpars',     type=int,
+        successful=successful&wrapaddingargument(config,'modelparams','n_colorpars',    nargs='+',      type=int,
                                                 help='number of degrees of the phase-independent color law polynomial (default=%(default)s)')
+
+        successful=successful&wrapaddingargument(config,'modelparams','n_errorsurfaces',          type=int, default=2,
+                                                help='number of surfaces used for the error model (default=%(default)s)')
+
+        successful=successful&wrapaddingargument(config,'modelparams','colorlaw_function',   nargs='+',      type=str,
+                                                help='color law function, see colorlaw.py (default=%(default)s)')               
+
         successful=successful&wrapaddingargument(config,'modelparams','n_colorscatpars',         type=int,
                                                 help='number of parameters in the broadband scatter model (default=%(default)s)')
         successful=successful&wrapaddingargument(config,'modelparams','error_snake_phase_binsize',      type=float,
@@ -498,11 +541,18 @@ class SALTResids:
                                                 help='number of angstroms over which to compute scaling of error model (default=%(default)s)')
         successful=successful&wrapaddingargument(config,'modelparams','use_snpca_knots',         type=boolean_string,
                                                 help='if set, define model on SNPCA knots (default=%(default)s)')               
-        successful=successful&wrapaddingargument(config,'modelparams','colorlaw_function',         type=str,
-                                                help='color law function, see colorlaw.py (default=%(default)s)')               
 
-        # priors
+        successful=successful&wrapaddingargument(config,'modelparams','constraint_names','constraints',  default='', nargs='*',      type=str,
+                                                help='constraints enforced on the model, see constraints.py (default=%(default)s)')               
+
+        successful=successful&wrapaddingargument(config,'modelparams','secondary_constraint_names','secondary_constraints',  default=[], nargs='*',      type=str,
+                                                help='constraints enforced on the model after an initial burn-in, see constraints.py (default=%(default)s)')
+
+
         for prior in __priors__:
+                successful=successful&wrapaddingargument(config,'priors',prior ,type=float,clargformat="--prior_{key}",
+                                                        help=f"prior on {prior}",default=SUPPRESS)
+        for prior in __nongaussianpriors__:
                 successful=successful&wrapaddingargument(config,'priors',prior ,type=float,clargformat="--prior_{key}",
                                                         help=f"prior on {prior}",default=SUPPRESS)
 
@@ -510,29 +560,32 @@ class SALTResids:
         for param in cls.parameters:
                 successful=successful&wrapaddingargument(config,'bounds', param, type=float,nargs=3,clargformat="--bound_{key}",
                                                         help="bound on %s"%param,default=SUPPRESS)
+
         if not successful: sys.exit(1)
         return parser
 
     
     def set_param_indices(self):
+    
 
-        if not self.host_component:
-            self.corrcombinations=sum([[(i,j) for j in range(i+1,self.n_components)]for i in range(self.n_components)] ,[])
-        else:
-            self.corrcombinations=[(0,1),(0,'host')]
         self.m0min = np.min(np.where(self.parlist == 'm0')[0])
         self.m0max = np.max(np.where(self.parlist == 'm0')[0])
 
-        self.errmin = [np.min(np.where(self.parlist == f'modelerr_{i}')[0]) for i in range(self.n_components)]
-        self.errmax = [np.max(np.where(self.parlist == f'modelerr_{i}')[0]) for i in range(self.n_components)]
+        self.errmin = [np.min(np.where(self.parlist == f'modelerr_{i}')[0]) for i in range(self.n_errorsurfaces)]
+        self.errmax = [np.max(np.where(self.parlist == f'modelerr_{i}')[0]) for i in range(self.n_errorsurfaces)]
         if self.host_component:
             self.errmin += [np.min(np.where(self.parlist == 'modelerr_host')[0])]
             self.errmax += [np.max(np.where(self.parlist == 'modelerr_host')[0])]
         self.errmin = tuple(self.errmin)
         self.errmax = tuple(self.errmax)
 
+        self.corrcombinations=[x for x in  combinations_with_replacement(np.arange(self.n_errorsurfaces),2) if x[0]!=x[1]]
+        if self.host_component:
+            self.corrcombinations+=[(0,'host')]#=sum([[(i,j) for j in range(i+1,self.n_components)]for i in range(self.n_components)] ,[])
+
         self.corrmin = tuple([np.min(np.where(self.parlist == 'modelcorr_{}{}'.format(i,j))[0]) for i,j in self.corrcombinations]) 
         self.corrmax = tuple([np.max(np.where(self.parlist == 'modelcorr_{}{}'.format(i,j))[0]) for i,j in self.corrcombinations]) 
+        
         self.im0 = np.where(self.parlist == 'm0')[0]
         self.im1 = np.where(self.parlist == 'm1')[0]
         self.imhost = np.where(self.parlist == 'mhost')[0]
@@ -544,11 +597,19 @@ class SALTResids:
         self.im0new = np.where(self.parlist == 'm0')[0][np.array(wavemin) > 8500]
         self.im1new = np.where(self.parlist == 'm1')[0][np.array(wavemin) > 8500]
         
-        self.iCL = np.where(self.parlist == 'cl')[0]
         self.ix0 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x0') or si.startswith('specx0')],dtype=int)
         self.ix1 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x1')],dtype=int)
         self.ixhost = np.array([i for i, si in enumerate(self.parlist) if si.startswith('xhost')],dtype=int)
-        self.ic  = np.array([i for i, si in enumerate(self.parlist) if si.startswith('c_')],dtype=int)
+        
+        self.ic  = np.array([np.where(np.char.startswith(self.parlist,f'c{i}_'  ))[0] for i in range(len(self.n_colorpars))])
+        self.ic0  = np.where(np.char.startswith(self.parlist,'c0_'))[0]
+        self.iCL = np.array([np.where(self.parlist == f'cl{i}')[0] for i in range(len(self.n_colorpars))])
+
+        # Galactic color law has "fake" free parameters so we need to ignore it
+        # during error estimation
+        iCLNG = np.where(np.array(self.colorlaw_function) != 'colorlaw_galactic')[0]
+        self.iCLNoGal = np.where(self.parlist == f'cl{iCLNG}')[0]
+
         self.ispcrcl_norm = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specx0')],dtype=int)
         if self.ispcrcl_norm.size==0: self.ispcrcl_norm=np.zeros(self.npar,dtype=bool)
         self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('spec')],dtype=int) # used to be specrecal
@@ -567,12 +628,13 @@ class SALTResids:
         self.iModelParam[self.imodelerr]=False
         self.iModelParam[self.imodelcorr]=False
         self.iModelParam[self.iclscat]=False
-        
-        self.icomponents =[self.im0,self.im1]
+        self.icoordinates = np.array([np.where(np.char.startswith(self.parlist,f'x{i}') )[0]
+                    for i in range(1,self.n_components)]+list(self.ixhost)
+        )
+        self.icomponents =[np.where(self.parlist == f'm{i}')[0] for i in range(self.n_components)]
         if self.host_component:
             self.icomponents+=[self.imhost]
         self.icomponents = np.array(self.icomponents)
-        
         self.iclscat_0,self.iclscat_poly = np.array([],dtype='int'),np.array([],dtype='int')
         if len(self.ispcrcl):
             for i,parname in enumerate(np.unique(self.parlist[self.iclscat])):
@@ -603,7 +665,7 @@ class SALTResids:
                 else:
                     residuals+=[func(guess,self.neff) \
                                      for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]]
-        
+
         return  jnp.concatenate(residuals)
     
     def lsqwrap_sources(self,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None)   :
@@ -627,7 +689,7 @@ class SALTResids:
     def getChi2Contributions(self,X,**kwargs):
         uncertainties= self.calculatecachedvals(X,target='variances')
         residuals= self.lsqwrap(X,uncertainties,**kwargs)
-        sourceskwargs={key:val for key in kwargs if not (key=='jit')}
+        sourceskwargs={key:val for key,val in kwargs.items() if not (key=='jit')}
         sources=self.lsqwrap_sources(X,uncertainties,**sourceskwargs)
         sources=np.array([x.split('_')[0] for x in  sources])
         assert(np.isin(sources,['reg','phot','spec','priors']).all())
@@ -642,6 +704,12 @@ class SALTResids:
                 yield (name,(x**2).sum(),ndof)
 
         return list(loop())
+            
+
+    @partial(jaxoptions, static_argnums=[0,3,4,5,6 ,7],static_argnames= ['fixfluxes','fixuncertainties','dopriors','dospec','usesns','usesecondary'],diff_argnum=1,jitdefault=True) 
+    def constrainedmaxlikefit(self,params,*args,usesecondary=True,**kwargs):
+        return self.maxlikefit(self.constraints.transformtoconstrainedparams(params,usesecondary),*args,**kwargs)
+
 
     @partial(jaxoptions, static_argnums=[0,3,4,5,6 ,7],static_argnames= ['fixfluxes','fixuncertainties','dopriors','dospec','usesns'],diff_argnum=1,jitdefault=True) 
     def maxlikefit(
@@ -660,6 +728,7 @@ class SALTResids:
         chi2: float
             Goodness of fit of model to training data   
         """
+                
         if cachedresults is None: cachedresults=None,None
         if not (usesns is  None): raise NotImplementedError('Have not implemented a restricted set of sne')
 
@@ -697,120 +766,102 @@ class SALTResids:
         return results
 
 
-    def estimateparametererrorsfromhessian(self,X):
+    def estimateparametererrorsfromhessian(self,X,hessian=None):
         """Approximate Hessian by jacobian times own transpose to determine uncertainties in flux surfaces"""
         log.info("determining M0/M1 errors by approximated Hessian")
 
-        logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
+        if hessian is None:
+            varyingParams=reduce(lambda x,y:  x | np.isin(np.arange(self.npar), y),[
+                self.icomponents,self.iCLNoGal,self.imhost],False)
 
-        jac=self.lsqwrap(X,self.calculatecachedvals(X,target='variances'),suppressregularization=True,diff='sparsejacfwd')
+            logging.debug('Allowing parameters {np.unique(self.parlist[varyingParams])} in calculation of inverse Hessian')
+            X=jnp.array(X)
+            lsqwrap_partial=lambda x: self.lsqwrap(X.at[varyingParams].set(x),self.calculatecachedvals(X,target='variances'),suppressregularization=True,dospecresids=self.dospec)
+            jvp= wrapjvpmultipleargs(lsqwrap_partial ,[0])
+            jac = sparsejac(lsqwrap_partial,jvp,[0], True )(X[varyingParams])
+    #         np.save(path.join(self.outputdir,'jac.npy'), jac)
 
-        varyingParams=np.isin(self.parlist, ['m0','m1','mhost','cl'])
+            hessian=(jac.T @ jac ).toarray()
 
-        hessian = ensurepositivedefinite((jac.T[varyingParams,:] @ jac[:,varyingParams]).toarray())
-        #Simple preconditioning of the jacobian before attempting to invert
+            maxval=np.max( np.abs(jnp.nan_to_num(hessian,nan=0,posinf=0,neginf=0)) )
+            hessian=jnp.nan_to_num(hessian,nan=0,posinf=maxval,neginf=-maxval)
 
+            hessian = ensurepositivedefinite(hessian)
+            #Simple preconditioning of the jacobian before attempting to invert
+        
         scales=np.sqrt(np.diag(hessian) )
         scales[scales==0]=1
         preconditioningelementwise=np.outer( scales,scales)
-        sigma= linalg.cho_solve( linalg.cho_factor(hessian/preconditioningelementwise), np.identity(scales.size))/preconditioningelementwise
-        return sigma
 
+        sigma= linalg.cho_solve( linalg.cho_factor(hessian/preconditioningelementwise), np.identity(scales.size))/preconditioningelementwise
+        
+        sigmafull=np.zeros((self.npar,self.npar))
+        sigmafull[np.outer(varyingParams,varyingParams)]=sigma.flatten()
+        return sigmafull
 
     def computeuncertaintiesfromparametererrors(self,X,sigma,smoothingfactor=150):
-        varyingParams=np.isin(self.parlist, ['m0','m1','mhost','cl'])
-        #Inverting cholesky matrix for speed
-        if sigma.shape[0]==self.npar:
-            sigma=sigma[varyingParams,:][:,varyingParams]
-        preconditioning = np.diag(np.sqrt(1/np.diag(sigma)))
-        L=np.diag( 1/ np.diag(preconditioning)) @ linalg.cholesky(preconditioning @ sigma @ preconditioning ,lower=True)
+
+        varyingParams=reduce(lambda x,y:  x | np.isin(np.arange(self.npar), y),[
+            self.icomponents,self.iCLNoGal,self.imhost],False)
+
+        # DJ: check for bad errors
+        iBad = np.where(np.diag(sigma)[varyingParams] == 0)[0]
+        if len(iBad):
+            raise RuntimeError('model parameters had zero uncertainty!')
+        iOK = np.where(np.diag(sigma)[~varyingParams] == 0)[0]
+        if len(iOK):
+            ### this shouldn't matter, just setting to random number
+            ### so cholesky doesn't complain
+            sigma[np.where(~varyingParams)[0][iOK],np.where(~varyingParams)[0][iOK]] = 100
         
         #Turning spline_derivs into a sparse matrix for speed
+        logging.info('Computing flux surface uncertainties')
         chunkindex,chunksize=0,10
-        M0dataerr      = np.empty((self.phaseout.size,self.waveout.size))
-        cov_M0_M1_data = np.empty((self.phaseout.size,self.waveout.size))
-        M1dataerr      = np.empty((self.phaseout.size,self.waveout.size))
-        Mhostdataerr      = np.empty((self.phaseout.size,self.waveout.size))
-        cov_M0_Mhost_data = np.empty((self.phaseout.size,self.waveout.size))
-        
-        for chunkindex in np.arange(self.waveout.size)[::chunksize]:
-            varyparlist= self.parlist[varyingParams]
+        assert(isinstance(self.host_component,bool))
+        corrcombinations=[x for x in  combinations_with_replacement(np.arange(self.n_components+self.host_component),2) ]
+        surfaces={x:np.empty((self.phaseout.size,self.waveout.size)) for x in corrcombinations }
+
+        iterable=np.arange(self.waveout.size)[::chunksize]
+        if sys.stdout.isatty() or in_ipynb:
+            iterable=tqdm(iterable,smoothing=.1)
+
+        for chunkindex in iterable:
+
             spline_derivs = np.empty([self.phaseout.size, min(self.waveout.size-chunkindex, chunksize),self.im0.size])
             for i in range(self.im0.size):
                 if self.bsorder == 0: continue
                 spline_derivs[:,:,i]=bisplev(self.phaseout,self.waveout[chunkindex:chunkindex+chunksize],(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
-            spline2d=scisparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))[:,varyparlist=='m0']
-        
+            spline2d=scisparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))
+
             #Smooth things a bit, since this is supposed to be for broadband photometry
             if smoothingfactor>0:
                 smoothingmatrix=getgaussianfilterdesignmatrix(spline2d.shape[0],smoothingfactor/self.waveoutres)
                 spline2d=smoothingmatrix*spline2d
-            #Uncorrelated effect of parameter uncertainties on M0 and M1
-            
-            m0pulls=L[:,varyparlist=='m0'].astype('float32') @ spline2d.T.astype('float32')
-            m1pulls=L[:,varyparlist=='m1'].astype('float32') @ spline2d.T.astype('float32')
-            if self.host_component:
-                mhostpulls=L[:,varyparlist=='mhost'].astype('float32') @ spline2d.T.astype('float32')
-                
             mask=np.zeros((self.phaseout.size,self.waveout.size),dtype=bool)
             mask[:,chunkindex:chunkindex+chunksize]=True        
-            M0dataerr[mask] =  np.sqrt((m0pulls**2     ).sum(axis=0))
-            cov_M0_M1_data[mask] =     (m0pulls*m1pulls).sum(axis=0)
-            M1dataerr[mask] =  np.sqrt((m1pulls**2     ).sum(axis=0))
-            if self.host_component:
-                Mhostdataerr[mask] =  np.sqrt((mhostpulls**2     ).sum(axis=0))
-                # should we do host covariances?
-                cov_M0_Mhost_data[mask] =     (m0pulls*mhostpulls).sum(axis=0)
-                
-        correlation=cov_M0_M1_data/(M0dataerr*M1dataerr)
-        correlation[np.isnan(correlation)]=0
-        if self.host_component: M0,M1,Mhost=self.SALTModel(X)
-        else: M0,M1=self.SALTModel(X)
-        M0dataerr=np.clip(M0dataerr,0,np.abs(M0).max()*2)
-        M1dataerr=np.clip(M1dataerr,0,np.abs(M1).max()*2)
-        if self.host_component:
-            Mhostdataerr=np.clip(Mhostdataerr,0,np.abs(Mhost).max()*2)
-        correlation=np.clip(correlation,-1,1)
-        cov_M0_M1_data=correlation*(M0dataerr*M1dataerr)
-        if self.host_component:
 
-            return [M0dataerr, M1dataerr, Mhostdataerr], [(0,1,cov_M0_M1_data), (0,2,cov_M0_Mhost_data)]
-        else:
+            for i,j in corrcombinations:
+                #.A1 method just converts the output "matrix" type to an ndarray
+                surfaces[(i,j)][mask]=spline2d.multiply( 
+                        spline2d @ sigma[self.icomponents[i],:][:,self.icomponents[j]] 
+                    ).sum(axis= 1).A1
 
-            return [M0dataerr, M1dataerr], [(0,1,cov_M0_M1_data) ]
+
+        components=self.SALTModel(X)
+
+        stderrs=[np.clip(np.sqrt(surfaces[(i,i)]),0, np.abs(comp).max()*2) for i,comp in zip(range(self.n_components+self.host_component),(components))]
+        correlations=[ ( i,j,
+            np.clip(np.nan_to_num(surfaces[(i,j)]/(stderrs[i]*stderrs[j])),-1,1)*(stderrs[i]*stderrs[j]))
+                    for i,j in corrcombinations if i!=j]
+
+        return stderrs,correlations
 
     
-    def processoptimizedparametersforoutput(self,optimizedparams, parametercovariance=None):
-        X=np.array(optimizedparams)
-        Xredefined=self.priors.satisfyDefinitions(X,self.SALTModel(X))
-        logging.info('Checking that rescaling components to satisfy definitions did not modify photometry')
-        try:
-            unscaledresults={}
-            scaledresults={}
-
-            Xtmp,Xredefinedtmp = X.copy(),Xredefined.copy()
-            if self.no_transformed_err_check:
-                log.warning('parameter no_transformed_err_check set to True.  Use this option with bootstrap errors *only*')
-                Xtmp[self.imodelerr0] = 0
-                Xredefinedtmp[self.imodelerr0] = 0
-                Xtmp[self.imodelerr1] = 0
-                Xredefinedtmp[self.imodelerr1] = 0
-                Xtmp[self.imodelerrhost] = 0
-                Xredefinedtmp[self.imodelerrhost] = 0
-    
-            for sn in self.datadict:
-                for flt in self.datadict[sn].photdata:
-                    lcdata=self.datadict[sn].photdata[flt]
-                    photresidsunscaled=lcdata.modelresidual(Xtmp)
-                    photresidsrescaled=lcdata.modelresidual(Xredefinedtmp)
-                    assert(np.allclose(photresidsunscaled['residuals'],photresidsrescaled['residuals'],rtol=0.001,atol=1e-4))
-            Xfinal= Xredefined.copy()
-        except AssertionError:
-            logging.critical('Rescaling components failed; photometric residuals have changed. Will finish writing output using unscaled quantities')
-            Xfinal=X.copy()
-        
+    def processoptimizedparametersforoutput(self,rescaledparams,rawparams, parametercovariance=None):
+        X=np.array(rawparams)
+        Xfinal= np.array(rescaledparams)
         errmodel=self.ErrModel(Xfinal,evaluatePhase=self.phaseout,evaluateWave=self.waveout)
-        componentnames= ['M0','M1']+(['Mhost'] if self.host_component else [])
+        componentnames=  ['M'+str(i) for i in range(self.n_components)]+(['Mhost'] if self.host_component else [])
         
         if parametercovariance is None:
             dataerrs,datacovs=None,None
@@ -820,10 +871,11 @@ class SALTResids:
         covmodel=[]
         corrmodel=self.CorrelationModel(Xfinal,evaluatePhase=self.phaseout,evaluateWave=self.waveout)
         for i,combination in enumerate(self.corrcombinations):
-            covmodel+= [(*combination,corrmodel[i] * errmodel[combination[0]] * errmodel[combination[1]])]
+            
+            covmodel+= [(*combination,corrmodel[i] * errmodel[combination[0]] * errmodel[-1 if combination[1]=='host' else combination[1]])]
     
         return salttrainingresult( num_lightcurves=self.num_lc,num_spectra=self.num_spectra,num_sne=len(self.datadict), parlist=self.parlist,
-            params=Xfinal,params_raw=optimizedparams,phase= self.phaseout ,wave=self.waveout, 
+            params=Xfinal,params_raw=rawparams,phase= self.phaseout ,wave=self.waveout, 
             componentnames=componentnames, 
             componentsurfaces= self.SALTModel(Xfinal,evaluatePhase=self.phaseout,evaluateWave=self.waveout),
             modelerrsurfaces=errmodel,
@@ -831,64 +883,40 @@ class SALTResids:
             dataerrsurfaces =dataerrs,
             datacovsurfaces =datacovs,
              clpars= Xfinal[self.iCL] , clscat=self.colorscatter(Xfinal,self.waveout),
-            snparams= {sn: {'x0':X[self.parlist == f'x0_{sn}'][0],
-                              'x1':X[self.parlist == f'x1_{sn}'][0],
-                              'c':X[self.parlist == f'c_{sn}'][0] }                              
+            snparams= {sn: {
+                              (name if not ((name=='c0') and (len(self.n_colorpars)==1)) else 'c' 
+                              
+                              ):X[self.parlist == '_'.join([name,sn])][0] for name in (
+                                [f'x{i}' for i in range(self.n_components)]+
+                                ([f'c{i}' for i in range(len(self.n_colorpars))]
+                                )
+                              )}                              
                               for sn in self.datadict})
 
-    
     def SALTModel(self,x,evaluatePhase=None,evaluateWave=None):
         """Returns flux surfaces of SALT model"""
-        m0pars = x[self.m0min:self.m0max+1]
-
-        if self.bsorder != 0:
-            m0 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
-                         self.wave if evaluateWave is None else evaluateWave,
-                         (self.phaseknotloc,self.waveknotloc,m0pars,self.bsorder,self.bsorder))
-        else:
-            phase = self.phase if evaluatePhase is None else evaluatePhase
-            wave = self.wave if evaluateWave is None else evaluateWave
-            n_repeat_phase = int(phase.size/(self.phaseknotloc.size-1))+1
-            n_repeat_phase_extra = -1*(n_repeat_phase*(self.phaseknotloc.size-1) % phase.size)
-            if n_repeat_phase_extra == 0: n_repeat_phase_extra = None
-            n_repeat_wave = int(wave.size/(self.waveknotloc.size-1))+1
-            n_repeat_wave_extra = -1*(n_repeat_wave*(self.waveknotloc.size-1) % wave.size)
-            if n_repeat_wave_extra == 0: n_repeat_wave_extra = None
-            m0 = np.repeat(np.repeat(m0pars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),n_repeat_phase,axis=0),
-                           n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]
-
-        
-
-        if self.n_components >= 2 and self.n_components <= 3:
-            m1pars = x[self.im1]
+        components=[]
+        for i in range( self.n_components  + self.host_component):
+            comppars=x[self.icomponents[i]]
+            
             if self.bsorder != 0:
-                m1 = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
+                surface = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
                              self.wave if evaluateWave is None else evaluateWave,
-                             (self.phaseknotloc,self.waveknotloc,m1pars,self.bsorder,self.bsorder))
+                             (self.phaseknotloc,self.waveknotloc,comppars,self.bsorder,self.bsorder))
             else:
-                m1 = np.repeat(
-                    np.repeat(m1pars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),
-                              n_repeat_phase,axis=0),n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]
-
-            if self.n_components == 2 and not self.host_component:
-                components = (m0,m1)
-            elif self.host_component:
-                mhostpars = x[self.imhost]
-                if self.bsorder != 0:
-                    mhost = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
-                                 self.wave if evaluateWave is None else evaluateWave,
-                                 (self.phaseknotloc,self.waveknotloc,mhostpars,self.bsorder,self.bsorder))
-                else:
-                    mhost = np.repeat(
-                        np.repeat(mhostpars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),
-                                  n_repeat_phase,axis=0),n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]
-                components = (m0,m1,mhost)
-        elif self.n_components == 1:
-            components = (m0,)
-        else:
-            raise RuntimeError('A maximum of three principal components is allowed')
-
-        return components
+                phase = self.phase if evaluatePhase is None else evaluatePhase
+                wave = self.wave if evaluateWave is None else evaluateWave
+                n_repeat_phase = int(phase.size/(self.phaseknotloc.size-1))+1
+                n_repeat_phase_extra = -1*(n_repeat_phase*(self.phaseknotloc.size-1) % phase.size)
+                if n_repeat_phase_extra == 0: n_repeat_phase_extra = None
+                n_repeat_wave = int(wave.size/(self.waveknotloc.size-1))+1
+                n_repeat_wave_extra = -1*(n_repeat_wave*(self.waveknotloc.size-1) % wave.size)
+                if n_repeat_wave_extra == 0: n_repeat_wave_extra = None
+                surface = np.repeat(np.repeat(comppars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),n_repeat_phase,axis=0),
+                               n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]
+            components+=[surface]
+        
+        return np.array(components)
 
     def SALTModelDeriv(self,x,dx,dy,evaluatePhase=None,evaluateWave=None):
         """Returns derivatives of flux surfaces of SALT model"""
@@ -943,21 +971,17 @@ class SALTResids:
                                    (self.errphaseknotloc,self.errwaveknotloc,errpars,self.errbsorder,self.errbsorder))]
         return components
     
-    def colorscatter(self,x,wave,varyParams=None):
+    def colorscatter(self,x,wave):
         clscatpars = x[self.parlist == 'clscat']
         pow=clscatpars.size-1-np.arange(clscatpars.size)
         coeffs=clscatpars/factorial(pow)
-        clscat=np.exp(np.poly1d(coeffs)((wave-5500)/1000))
-        if varyParams is None:
-            return clscat
-        else:
-            pow=pow[varyParams[self.parlist=='clscat']]
-            dcolorscatdx= clscat*(((wave-5500)/1000) ** (pow) )/ factorial(pow)
-            return clscat,dcolorscatdx
+        clscat=jnp.exp(jnp.polyval(coeffs,(wave-5500)/1000))
+        return clscat
         
     
     def ErrModel(self,x,evaluatePhase=None,evaluateWave=None):
         """Returns modeled variance of SALT model components as a function of phase and wavelength"""
+        x=np.array(x)
         phase=self.phase if evaluatePhase is None else evaluatePhase
         wave=self.wave if evaluateWave is None else evaluateWave
         components=[]
@@ -977,7 +1001,8 @@ class SALTResids:
                 components+=[  bisplev(phase,
                                wave,
                                (self.errphaseknotloc,self.errwaveknotloc,errpars,self.errbsorder,self.errbsorder))]
-            
+        if self.n_components > self.n_errorsurfaces :
+            components+=(self.n_components-self.n_errorsurfaces)*[np.zeros((phase.size,wave.size))]
         return components
 
 

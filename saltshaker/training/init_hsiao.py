@@ -324,7 +324,7 @@ def init_errs_percent(
 		m1 = bisplev(phase,
 					 wave,
 					 (phaseknotloc,waveknotloc,m1knots,3,3))
-		return (m0*0.0000005)**2.,(m1*0.0000005)**2.
+		return (m0*0.0005)**2.,(m1*0.0005)**2.
 		
 	def loadfilewithdefault(filename,fillval=0):
 		if filename is None:

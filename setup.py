@@ -41,6 +41,7 @@ setup(
 	license=LICENSE,
 	long_description=open('README.md').read(),
 #         include_dirs=numpy.distutils.misc_util.get_numpy_include_dirs(),
+
 	install_requires=['astropy>=5.3',
                       'astroquery>=0.4.6',
                       'Cython>=0.29.35',
