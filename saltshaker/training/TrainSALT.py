@@ -201,7 +201,7 @@ class TrainSALT(TrainSALTBase):
                 errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs_percent(**init_options)
             else:
                 errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,mhostvarknots,m0m1corrknots,clscatcoeffs=init_errs_percent(**init_options)
-                
+
         # number of parameters
         n_phaseknots,n_waveknots = len(phaseknotloc)-self.options.bsorder-1,len(waveknotloc)-self.options.bsorder-1
         n_errphaseknots,n_errwaveknots = len(errphaseknotloc)-self.options.errbsorder-1,len(errwaveknotloc)-self.options.errbsorder-1
@@ -248,9 +248,10 @@ class TrainSALT(TrainSALTBase):
                 order=min(max(order,self.options.n_min_specrecal ), self.options.n_max_specrecal)
 
                 # save the order as part of the specrecal list
-                if not self.options.specrecallist or sn not in spcrcldata['SNID'] or k+1 not in spcrcldata['N']:
+                if not self.options.specrecallist or sn not in spcrcldata['SNID'] or k+1 not in spcrcldata['N'][spcrcldata['SNID'] == sn]:
                     datadict[sn].specdata[k].n_specrecal = order
-                    
+                #if datadict[sn].specdata[k].n_specrecal is None:
+                #    import pdb; pdb.set_trace()
                 recalParams=[f'specx0_{sn}_{k}']+[f'specrecal_{sn}_{k}']*(order-1)
                 parlist=np.append(parlist,recalParams)
 

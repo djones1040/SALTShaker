@@ -145,7 +145,6 @@ class rpropwithbacktracking(salttrainingoptimizer):
             fitparams=fitparams | np.isin(np.arange(self.saltobj.npar),self.saltobj.ic) | np.isin(np.arange(self.saltobj.npar),self.saltobj.iCL) 
             X,loss,rates=self.optimizeparams(X,fitparams,rates,niter=self.gradientmaxiter,usesecondary=len(self.saltobj.constraints.use_secondary_constraint_names)>0)
             
-            
         except KeyboardInterrupt as e:
             if query_yes_no("Terminate optimization loop and begin writing output?"):
                 X=self.Xhistory[np.argmin(self.losshistory)]
@@ -278,10 +277,11 @@ class rpropwithbacktracking(salttrainingoptimizer):
         
         X, Xprev,loss,sign= initvals,initvals, np.inf,np.zeros(initvals.size)
         rates=jnp.array(rates)
-       
+
         def iteration(X, Xprev,loss,sign,rates):
             #Proposes a new value based on sign of gradient
             Xnew,newloss, newsign, newgrad,newrates  = self.rpropiter(X, Xprev,loss,sign,rates,**kwargs)
+
             #Take the direction proposed and do a line-search in that direction
             searchdir=jnp.select([~jnp.isinf(X),jnp.isinf(X)], [ Xnew-X, 0])
             if newgrad @ searchdir < 0:
@@ -296,6 +296,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
                     newrates=newrates.at[~backwards].set(newrates[~backwards]*gamma)
                 else:
                     gamma=1
+
             Xnew= X+ gamma*searchdir
             return Xnew, X, newloss,newsign, newgrad,newrates
             
@@ -307,7 +308,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 if reinitialized: log.debug('Reinitialized learning rates')
             else:
                 X,Xprev,loss,sign,grad,rates = iteration(X, Xprev,loss,sign,rates)
-            
+                
             constrainedparams=  np.concatenate([self.saltobj.ic,self.saltobj.icoordinates])
             if not np.allclose(X[constrainedparams],Xprev[constrainedparams]):
                 X=self.saltobj.constraints.transformtoconstrainedparams(X)

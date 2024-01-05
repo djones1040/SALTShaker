@@ -394,7 +394,7 @@ class SALTResids:
                                 'batchedspecdata':self.batchedspecdata},file)
             
         log.info('Constructing batched methods')
-      
+
         self.batchedphotresiduals=batching.batchedmodelfunctions(lambda *args,**kwargs: modeledtraininglightcurve.modelresidual(*args,**kwargs)['residuals'],
                                   self.batchedphotdata, modeledtraininglightcurve,
                                   flatten=True)
@@ -740,6 +740,7 @@ class SALTResids:
             loglike+= (
              self.batchedspeclikelihood(guess,cachedresults[1],fixuncertainties,fixfluxes)
              )
+
         if dopriors:
             loglike+=self.priors.priorloglike(guess)
                 

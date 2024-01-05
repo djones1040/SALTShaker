@@ -232,6 +232,7 @@ class SALTtrainingSN:
                 except AssertionError:
                     raise SNDataReadError(f'No lightcurves for SN {sn.SNID}')
                 self.specdata = {}
+
                 if 'SPECTRA' in sn.__dict__:
                     for speccount,k in enumerate(sn.SPECTRA):
                         if n_specrecal is not None and k+1 in n_specrecal['N']:
@@ -457,8 +458,9 @@ def rdAllData(snlists,estimate_tpk,
             outputdict[saltformattedsn.snid]=saltformattedsn
             if len(outputdict)      >= maxnum:
                 raise BreakLoopException('Maximum number of SNe read in')
-            return True
 
+            return True
+            
 
     for snlist,maxct in zip(snlists.split(','),maxcount):
         tsn = time()
