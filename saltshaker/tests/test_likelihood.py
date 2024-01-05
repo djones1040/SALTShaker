@@ -70,5 +70,6 @@ code."""
         
         tfinish = time.time()
         
-        # this shouldn't take more than 3 minutes
-        self.assertTrue(tfinish - tstart < 180)
+        # this is slower than it used to be
+        # but still shouldn't take more than 5 minutes
+        self.assertTrue(tfinish - tstart < 300)

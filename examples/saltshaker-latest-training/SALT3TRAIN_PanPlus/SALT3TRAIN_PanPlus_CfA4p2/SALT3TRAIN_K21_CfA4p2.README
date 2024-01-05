@@ -1,0 +1,33 @@
+DOCUMENTATION:
+    PURPOSE:  Training sample for the SALT3.K21 model, the SALT3TRAIN_K21_CfA4p2 subset
+    REF: 
+    - AUTHOR: Kenworthy et al., 2021, ApJ, submitted
+      ADS:    TBD
+    - AUTHOR: Supernova Standardization Team
+      ADS:    github.com/djones1040/SALTShaker; saltshaker.readthedocs.io
+    INTENT:    Nominal
+    USAGE_KEY: VERSION_PHOTOMETRY
+    USAGE_CODE: snlc_fit.exe
+    VALIDATE_SCIENCE: Kenworthy+2021, Dai+2021 (in prep.)
+    METADATA:
+    - MWEBV: from SFD98 with SF2011 corrections (uncertainties are 5%)
+    - VPEC: from $SNANA_DIR/util/get_vpec.py, SNANA version 11_02j
+    - REDSHIFT_CMB: from $SNANA_DIR/util/get_vpec.py, SNANA version 11_02j
+    NOTES:
+    - FILTERMAP: see below for filters, zeropoints, and kcor files used with these data for SALT3.K21
+    - "KCOR" and filter files below are given with their SNDATA_ROOT paths, but they are also included in subdirectories
+      SALT3TRAIN_K21_kcor and SALT3TRAIN_K21_filters in the public data release at https://readthedocs.org/projects/saltshaker/
+    VERSION:
+    - DATE: 2021-04
+      AUTHOR: D. Jones
+DOCUMENTATION_END:
+
+KCOR file: $SNDATA_ROOT/kcor/SALT3TRAIN_K21/kcor_CFA4p2.fits
+
+FILTERMAP
+---------
+short_name full_name mag_sys zpt_offset filename
+B            CFA42-B    BD17     9.8640 $SNDATA_ROOT/filters/PS1/PS1s_RS14/PS1_CFA4/cfa4_B_p2.dat
+V            CFA42-V    BD17     9.4731 $SNDATA_ROOT/filters/PS1/PS1s_RS14/PS1_CFA4/cfa4_V_p2.dat
+r            CFA42-r    BD17     9.3632 $SNDATA_ROOT/filters/PS1/PS1s_RS14/PS1_CFA4/cfa4_r_p2.dat
+i            CFA42-i    BD17     9.2510 $SNDATA_ROOT/filters/PS1/PS1s_RS14/PS1_CFA4/cfa4_i_p2.dat
