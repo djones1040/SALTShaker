@@ -378,8 +378,8 @@ class modeledtraininglightcurve(modeledtrainingdata):
         #if clscat>0, then need to use a cholesky matrix to find pulls
         def choleskyresidsandnorm( variance,clscat,modelflux):
             cholesky=jaxlinalg.cholesky(jnp.diag(variance)+ clscat**2*jnp.outer(modelflux,modelflux),lower=True)
-            return {'residuals':jaxlinalg.solve_triangular(cholesky, modelflux-self.fluxcal,lower=True), 
-            'lognorm': -jnp.log(jnp.diag(cholesky)).sum()-zeropoint}
+            return {'residuals':jnp.nan_to_num(jaxlinalg.solve_triangular(cholesky, modelflux-self.fluxcal,lower=True),nan=0), 
+                    'lognorm': -jnp.log(jnp.diag(cholesky)).sum()-zeropoint}
         
         return choleskyresidsandnorm(variance,clscat,modelflux)
 #         return lax.cond(clscat==0, diagonalresidsandnorm, choleskyresidsandnorm, 
@@ -553,8 +553,8 @@ class modeledtrainingspectrum(modeledtrainingdata):
         numresids=(~self.ipad).sum() 
         zeropoint= ( -jnp.log(self.fluxerr).sum() - numresids/2)
 
-        return {'residuals':  self.spectralsuppression* (modelflux-self.flux)/uncertainty,
-                    'lognorm': (self.spectralsuppression**2 )*(-jnp.log(uncertainty).sum()-zeropoint)}
+        return {'residuals':  jnp.nan_to_num(self.spectralsuppression* (modelflux-self.flux)/uncertainty,nan=0),
+                'lognorm': (self.spectralsuppression**2 )*(-jnp.log(uncertainty).sum()-zeropoint)}
    
     def determineneededparameters(self,modelobj):
         return []
@@ -564,7 +564,9 @@ class SALTfitcacheSN(SALTtrainingSN):
     """Class to store SN data in addition to cached results useful in speeding up the fitter
     """
     
-    __slots__= ['ix0','ix1','ic', 'ixhost','icoordinates','mwextcurve','mwextcurveint','dwave','obswave','obsphase','photdata','specdata']
+    __slots__= ['ix0','ix1','ic', 'ixhost','icoordinates','mwextcurve',
+                'mwextcurveint','dwave','obswave','obsphase','photdata',
+                'specdata','zHelio','snid']
     
     def __init__(self,sndata,residsobj,kcordict,lcpaddingsizes=None,specpaddingsizes=None,n_specrecal=None):
         for attr in sndata.__slots__:

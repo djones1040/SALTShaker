@@ -63,8 +63,9 @@ class SALTconstraints:
         def choldecorrelate(data):
             coordinates=data
             coordinates=coordinates-jnp.mean(coordinates,axis=1)[:,np.newaxis]
-            chol=jlin.cholesky(jnp.cov(coordinates))
-            return jlin.solve_triangular(chol, coordinates)
+            chol=jlin.cholesky(jnp.cov(coordinates),lower=True)
+            return jlin.solve_triangular(chol, coordinates, lower=True)
+
         decorrelated=reduce(lambda x,i: choldecorrelate(x),np.arange(3),coordinates)
         for i,idx,corrected in zip(range(decorrelated.shape[0]),idxs,decorrelated):
             if i >= self.ic[:1,:].shape[0]:
