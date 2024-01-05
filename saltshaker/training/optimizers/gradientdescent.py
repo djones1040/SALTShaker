@@ -113,7 +113,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
     def optimize(self,initvals):
         X=initvals.copy() #self.saltobj.constraints.transformtoconstrainedparams(jnp.array(initvals))
 
-        residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'),jit=False)
+        residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'),jit=False,dospecresids=self.saltobj.dospec)
         oldChi=(residuals**2).sum()
         log.info('Initial chi2: {:.2f} '.format(oldChi))
 
@@ -157,12 +157,12 @@ class rpropwithbacktracking(salttrainingoptimizer):
         except Exception as e:
             log.exception('Error encountered in optimization, exiting')
             raise e
-        residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'),jit=False)
+        residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'),jit=False,dospecresids=self.saltobj.dospec)
         newChi=(residuals**2).sum()
 
         log.info('Final chi2: {:.2f} '.format(newChi))
         
-        chi2results=self.saltobj.getChi2Contributions(X,jit=False)
+        chi2results=self.saltobj.getChi2Contributions(X,jit=False,dospecresids=self.saltobj.dospec)
         
         for name,chi2component,dof in chi2results:
             log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/sum([x[1] for x in chi2results])*100))

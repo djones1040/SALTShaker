@@ -348,10 +348,15 @@ class SALTResids:
         if efficiency<efficiencywarningthreshold:
             log.warning(f'Efficiency less than {efficiencywarningthreshold:.0%}, consider increasing batching of data')
         specdatasizes=list(getspecdatacounts(datadict))
-        specpadding,efficiency=batching.optimizepaddingsizes(self.spectroscopic_zeropadding_batches,specdatasizes)
-        log.info(f'Separating spectroscopic data into {len(specpadding)} batches, at a space efficiency of {efficiency:.0%}')
-        if efficiency<efficiencywarningthreshold:
-            log.warning(f'Efficiency less than {efficiencywarningthreshold:.0%}, consider increasing batching of data')
+        if len(specdatasizes):
+            specpadding,efficiency=batching.optimizepaddingsizes(self.spectroscopic_zeropadding_batches,specdatasizes)
+            log.info(f'Separating spectroscopic data into {len(specpadding)} batches, at a space efficiency of {efficiency:.0%}')
+            if efficiency<efficiencywarningthreshold:
+                log.warning(f'Efficiency less than {efficiencywarningthreshold:.0%}, consider increasing batching of data')
+        else:
+            specpadding = 0; efficiency = 1
+            log.info(f'no spectroscopic data, no batches needed')
+
         log.info('Calculating cached quantities')
         start=time.time()
         
