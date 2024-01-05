@@ -1317,7 +1317,7 @@ config file options can be overwridden at the command line"""
             raise RuntimeError("saltshaker-latest-training exists in local directory.  Please remove it before continuing")
         download_dir(_example_data_url,os.getcwd())
     
-    def main(self):
+    def main(self,configfile=None,args=None):
 
         salt = TrainSALT()
         
