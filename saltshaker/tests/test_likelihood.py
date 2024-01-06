@@ -19,7 +19,8 @@ code."""
         snlist = 'testdata/data/SALT3TRAIN_K21_CSPDR3/SALT3TRAIN_K21_CSPDR3.LIST'
         tmaxlist = 'testdata/test_pkmjd.LIST'
         snparlist = 'testdata/test_pars.LIST'
-
+        specrecallist = 'testdata/test_spcrl.LIST'
+        
         salt = TrainSALT()
         configfile = 'testdata/test.conf'
         rt = RunTraining()
@@ -31,7 +32,7 @@ code."""
             dospec=True,
             peakmjdlist=tmaxlist,
             binspecres=None,snparlist=snparlist,
-            maxsn=None)
+            maxsn=None,specrecallist=specrecallist)
 
         # read the kcor file
         kcordict=readutils.rdkcor(['CSP'],salt.options)
@@ -61,7 +62,7 @@ code."""
         #    x_modelpars,
         #    0,
         #    getdatauncertainties=False)
-
+        #import pdb; pdb.set_trace()
         maxlike = saltres.maxlikefit(x_modelpars,dospec=True)
         maxlike_phot = saltres.maxlikefit(x_modelpars,dospec=False)
 
