@@ -323,7 +323,7 @@ class TrainSALTBase:
 
         def filter_select(self,survey,flt):
                 select = True
-                if flt in self.options.__dict__[f"{survey.split('(')[0]}_ignore_filters"].split(','):
+                if flt in self.options.__dict__[f"{survey.split('(')[0]}_ignore_filters"].replace(' ','').split(','):
                         select = False
 
                 lambdaeff = self.kcordict[survey][flt]['lambdaeff']
