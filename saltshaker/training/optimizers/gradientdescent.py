@@ -465,7 +465,8 @@ class rpropwithbacktracking(salttrainingoptimizer):
         """
         lossval,grad=  self.lossfunction(X,*args,**kwargs, diff='valueandgrad')
         
-        sign=jnp.sign(grad)
+        # if gradient is NaN, jax had some trouble...
+        sign=jnp.nan_to_num(jnp.sign(grad))
         indicatorvector= prevsign *sign
 
         greater= indicatorvector >0
@@ -478,8 +479,8 @@ class rpropwithbacktracking(salttrainingoptimizer):
         Xnew=jnp.select( [less,greatereq], [ lax.cond(lossval>prevloss, lambda x,y:x , lambda x,y: y, Xprev, X), 
             X-(sign *learningrates)
         ])
-        if len(Xnew[Xnew != Xnew]):
-            import pdb; pdb.set_trace()
+        #if len(Xnew[Xnew != Xnew]):
+        #    import pdb; pdb.set_trace()
         #Set sign to 0 after a previous change
         sign= (sign * greatereq)
         return jnp.clip(Xnew,*self.Xbounds), lossval, sign, grad, learningrates
