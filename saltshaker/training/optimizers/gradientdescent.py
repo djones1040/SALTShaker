@@ -223,12 +223,9 @@ class rpropwithbacktracking(salttrainingoptimizer):
         """
         if 'diff' in kwargs and "grad" in kwargs['diff']: self.functionevals +=3
         else: self.functionevals+=1
-        try:
-            result= self.saltobj.constrainedmaxlikefit(params,*args,**kwargs)
-        except:
-            import pdb; pdb.set_trace()
-        if np.isclose(np.sum(params[params != -np.inf]),164.0093,0.001):
-            import pdb; pdb.set_trace()
+
+        result= self.saltobj.constrainedmaxlikefit(params,*args,**kwargs)
+
         if excludesn: 
             singleresult=self.saltobj.datadict[excludesn].modelloglikelihood(params,*args,**kwargs)
             try: 
@@ -236,11 +233,6 @@ class rpropwithbacktracking(salttrainingoptimizer):
             except:
                 result=result-singleresult
 
-        #print('hi',np.std(params[self.saltobj.ix1]))
-        #if result != result:
-        #if 'diff' in kwargs and "grad" in kwargs['diff'] and \
-        #   len(result[1][result[1] != result[1]]):
-        #    import pdb; pdb.set_trace()
         try:
             return (-x for x in result)
         except:
@@ -310,8 +302,6 @@ class rpropwithbacktracking(salttrainingoptimizer):
                     gamma=1
 
             Xnew= X+ gamma*searchdir
-            #if np.sum(Xnew[self.saltobj.ix1]) == 0:
-            #    import pdb; pdb.set_trace()
 
             return Xnew, X, newloss,newsign, newgrad,newrates
             
@@ -326,10 +316,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 
             constrainedparams=  np.concatenate([self.saltobj.ic,self.saltobj.icoordinates])
             if not np.allclose(X[constrainedparams],Xprev[constrainedparams]):
-                Xtmp = X[:]
                 X=self.saltobj.constraints.transformtoconstrainedparams(X)
-                if len(X[X != X]):
-                    import pdb; pdb.set_trace()
             self.losshistory+=[loss]
             self.Xhistory+=[X]
             
@@ -497,7 +484,6 @@ class rpropwithbacktracking(salttrainingoptimizer):
             X-(sign *learningrates)
         ])
         
-        #    import pdb; pdb.set_trace()
         #Set sign to 0 after a previous change
         sign= (sign * greatereq)
         return jnp.clip(Xnew,*self.Xbounds), lossval, sign, grad, learningrates
