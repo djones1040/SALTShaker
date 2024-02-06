@@ -2,7 +2,9 @@ from saltshaker.util.inpynb import in_ipynb
 from saltshaker.util.query import query_yes_no
 from saltshaker.util.jaxoptions import jaxoptions
 from jax import config
+#config.update("jax_enable_x64", True)
 #config.update("jax_debug_nans", True)
+#config.update("jax_disable_jit", True)
 
 import pickle
 from os import path
@@ -221,7 +223,12 @@ class rpropwithbacktracking(salttrainingoptimizer):
         """
         if 'diff' in kwargs and "grad" in kwargs['diff']: self.functionevals +=3
         else: self.functionevals+=1
-        result= self.saltobj.constrainedmaxlikefit(params,*args,**kwargs)
+        try:
+            result= self.saltobj.constrainedmaxlikefit(params,*args,**kwargs)
+        except:
+            import pdb; pdb.set_trace()
+        if np.isclose(np.sum(params[params != -np.inf]),164.0093,0.001):
+            import pdb; pdb.set_trace()
         if excludesn: 
             singleresult=self.saltobj.datadict[excludesn].modelloglikelihood(params,*args,**kwargs)
             try: 
@@ -229,6 +236,11 @@ class rpropwithbacktracking(salttrainingoptimizer):
             except:
                 result=result-singleresult
 
+        #print('hi',np.std(params[self.saltobj.ix1]))
+        #if result != result:
+        #if 'diff' in kwargs and "grad" in kwargs['diff'] and \
+        #   len(result[1][result[1] != result[1]]):
+        #    import pdb; pdb.set_trace()
         try:
             return (-x for x in result)
         except:
@@ -298,6 +310,9 @@ class rpropwithbacktracking(salttrainingoptimizer):
                     gamma=1
 
             Xnew= X+ gamma*searchdir
+            #if np.sum(Xnew[self.saltobj.ix1]) == 0:
+            #    import pdb; pdb.set_trace()
+
             return Xnew, X, newloss,newsign, newgrad,newrates
             
         for i in range(niter):
@@ -311,8 +326,10 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 
             constrainedparams=  np.concatenate([self.saltobj.ic,self.saltobj.icoordinates])
             if not np.allclose(X[constrainedparams],Xprev[constrainedparams]):
+                Xtmp = X[:]
                 X=self.saltobj.constraints.transformtoconstrainedparams(X)
-            
+                if len(X[X != X]):
+                    import pdb; pdb.set_trace()
             self.losshistory+=[loss]
             self.Xhistory+=[X]
             
@@ -463,8 +480,9 @@ class rpropwithbacktracking(salttrainingoptimizer):
         https://doi.org/10.1016/S0925-2312(01)00700-7
         """
         lossval,grad=  self.lossfunction(X,*args,**kwargs, diff='valueandgrad')
-        
-        sign=jnp.sign(grad)
+
+        # if gradient is NaN, jax had some trouble...
+        sign=jnp.nan_to_num(jnp.sign(grad))
         indicatorvector= prevsign *sign
 
         greater= indicatorvector >0
@@ -474,10 +492,12 @@ class rpropwithbacktracking(salttrainingoptimizer):
 
         learningrates = jnp.clip (jnp.select([less,eq,greater], [learningrates*self.etaminus,learningrates,learningrates*self.etaplus ] ), self.minlearning,self.maxlearning)
 
-        Xnew=jnp.select( [less,greatereq], [ lax.cond(lossval>prevloss, lambda x,y:x , lambda x,y: y, Xprev, X), 
+        Xnew=jnp.select( [less,greatereq], [
+            lax.cond(lossval>prevloss, lambda x,y:x , lambda x,y: y, Xprev, X), 
             X-(sign *learningrates)
         ])
-        
+        #if np.sum(Xnew[self.saltobj.ix1]) == 0.0:
+        #    import pdb; pdb.set_trace()
         #Set sign to 0 after a previous change
         sign= (sign * greatereq)
         return jnp.clip(Xnew,*self.Xbounds), lossval, sign, grad, learningrates
