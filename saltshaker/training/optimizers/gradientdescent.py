@@ -2,7 +2,7 @@ from saltshaker.util.inpynb import in_ipynb
 from saltshaker.util.query import query_yes_no
 from saltshaker.util.jaxoptions import jaxoptions
 from jax import config
-#config.update("jax_enable_x64", True)
+config.update("jax_enable_x64", True)
 #config.update("jax_debug_nans", True)
 #config.update("jax_disable_jit", True)
 
@@ -480,7 +480,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         https://doi.org/10.1016/S0925-2312(01)00700-7
         """
         lossval,grad=  self.lossfunction(X,*args,**kwargs, diff='valueandgrad')
-
+        
         # if gradient is NaN, jax had some trouble...
         sign=jnp.nan_to_num(jnp.sign(grad))
         indicatorvector= prevsign *sign
@@ -496,7 +496,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
             lax.cond(lossval>prevloss, lambda x,y:x , lambda x,y: y, Xprev, X), 
             X-(sign *learningrates)
         ])
-        #if np.sum(Xnew[self.saltobj.ix1]) == 0.0:
+        
         #    import pdb; pdb.set_trace()
         #Set sign to 0 after a previous change
         sign= (sign * greatereq)
