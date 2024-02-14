@@ -84,6 +84,8 @@ class lcfitting_validplots(ValidPlots):
 			left=None, bottom=0.2, right=None, top=None, wspace=0, hspace=0)
 		fr = txtobj(self.inputfile,fitresheader=True)
 		ax = plt.axes()
+		if not hasattr(fr,'HOST_LOGMASS'):
+			fr.__dict__['HOST_LOGMASS'] = None
 		fr = getmu.getmu(fr)
 
 		def errfnc(x):
@@ -108,7 +110,7 @@ class lcfitting_validplots(ValidPlots):
 		ax.xaxis.set_ticklabels(['0.01','0.02','0.05','0.1','0.2','0.3','0.5','1.0'])
 
 		ax.set_xlabel('$z_{CMB}$',fontsize=15)
-		ax.set_ylabel('$\mu - \mu_{\Lambda CDM}$',fontsize=15)
+		ax.set_ylabel('$\mu - \mu_{L CDM}$',fontsize=15)
 		
 		plt.savefig('%s%s_hubble.png'%(self.outputdir,self.prefix))
 
@@ -150,7 +152,7 @@ class getmu_validplots(ValidPlots):
 		ax.xaxis.set_ticklabels(['0.01','0.02','0.05','0.1','0.2','0.3','0.5','1.0'])
 
 		ax.set_xlabel('$z_{CMB}$',fontsize=15)
-		ax.set_ylabel('$\mu - \mu_{\Lambda CDM}$',fontsize=15)
+		ax.set_ylabel('$\mu - \mu_{L CDM}$',fontsize=15)
 		
 		plt.savefig('%s%s_BBC_hubble_prelim.png'%(self.outputdir,self.prefix))
 
