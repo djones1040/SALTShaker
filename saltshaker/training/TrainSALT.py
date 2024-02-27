@@ -1110,7 +1110,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
 
             for sn,l in zip(plotsnlist,snfilelist):
 
-                if not i % 12:
+                if not i % 15:
                     fig = plt.figure()
                 try:
                     ax1 = plt.subplot(gs1[i % 15]); ax2 = plt.subplot(gs1[(i+1) % 15]); ax3 = plt.subplot(gs1[(i+2) % 15]); ax4 = plt.subplot(gs1[(i+3) % 15]); ax5 = plt.subplot(gs1[(i+4) % 15])
@@ -1139,18 +1139,18 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
                     snid=snidval)
                 salt2_chi2tot += salt2chi2
                 salt3_chi2tot += salt3chi2
-                if i % 12 == 8:
+                if i % 15 == 10:
                     pdf_pages.savefig()
                     plt.close('all')
                 else:
-                    for ax in [ax1,ax2,ax3,ax4]:
+                    for ax in [ax1,ax2,ax3,ax4,ax5]:
                         ax.xaxis.set_ticklabels([])
                         ax.set_xlabel(None)
-                i += 4
+                i += 5
                 count += 1
             log.info(f'plotted light curves for {count} SNe')
             log.info(f'total chi^2 is {salt2_chi2tot:.1f} for SALT2 and {salt3_chi2tot:.1f} for SALT3')
-        if not i %12 ==0:
+        if not i %15 ==0:
             pdf_pages.savefig()
         pdf_pages.close()
         log.info(f'plotting light curves took {time.time()-tlc:.1f}')
