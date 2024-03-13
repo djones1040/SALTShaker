@@ -686,6 +686,8 @@ class TrainSALT(TrainSALTBase):
             x_modelpars = saltfitter.optimize( x_modelpars)
             
         Xfinal= saltresids.constraints.enforcefinaldefinitions(x_modelpars,saltresids.SALTModel(x_modelpars))
+        # hack!
+        self.options.errors_from_hessianapprox = False
         if self.options.errors_from_hessianapprox: 
             sigma=saltresids.estimateparametererrorsfromhessian(Xfinal)
             np.save(path.join(self.options.outputdir,'parametercovariance.npy'), sigma)
@@ -1156,6 +1158,11 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
         log.info(f'plotting light curves took {time.time()-tlc:.1f}')
         
     def main(self,returnGN=False):
+        import jax
+
+        jax.profiler.start_trace("/tmp/tensorboard")
+
+        
         try:
             stage='initialization'
             if not len(self.surveylist):
@@ -1221,7 +1228,9 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
             log.exception(f'Exception raised during {stage}')
             if stage != 'validation':
                 raise RuntimeError("Training exited unexpectedly")
-        
+
+        jax.profiler.stop_trace()
+            
     def createGaussNewton(self):
 
         fitter,saltfitter,modelpars = self.main(returnGN=True)
@@ -1318,7 +1327,7 @@ config file options can be overwridden at the command line"""
         download_dir(_example_data_url,os.getcwd())
     
     def main(self,configfile=None,args=None):
-
+        
         salt = TrainSALT()
         
         if configfile is None:

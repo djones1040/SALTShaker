@@ -236,7 +236,8 @@ def customfilt(outfile,lcfile,salt3dir,
         if bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+sn.REDSHIFT_HELIO) > 2800 and \
            bandpassdict[sn.SURVEY][flt]['lambdaeff']/(1+sn.REDSHIFT_HELIO) < 9000 and\
            '-u' not in bandpassdict[sn.SURVEY][flt]['fullname']:
-            data.add_row((m,flt,flx*10**(0.4*bandpassdict[sn.SURVEY][flt]['primarymag']),flxe*10**(0.4*bandpassdict[sn.SURVEY][flt]['primarymag']),
+            data.add_row((m,flt,flx*10**(0.4*bandpassdict[sn.SURVEY][flt]['primarymag']),
+                          flxe*10**(0.4*bandpassdict[sn.SURVEY][flt]['primarymag']),
                           27.5,sys)) #+bandpassdict[sn.SURVEY][flt]['zpoff']
                 
                 
