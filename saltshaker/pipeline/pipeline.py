@@ -71,6 +71,7 @@ class SALT3pipe():
         self.finput = finput
         self.BYOSED = BYOSED()
         self.TrainSim = Simulation()
+        self.InitLCFit = LCFitting()
         self.Training = Training()
         self.TestSim = Simulation()
         self.LCFitting = LCFitting()
@@ -138,6 +139,7 @@ class SALT3pipe():
         self.genversion_split_biascor = self._get_config_option(config,'pipeline','genversion_split_biascor')
 
         if n_lcfit >= 1:
+            self.InitLCFit = [LCFitting() for i in range(n_lcfit)]
             self.LCFitting = [LCFitting() for i in range(n_lcfit)]
         if n_biascorlcfit >= 1:
             self.BiascorLCFit = [LCFitting(biascor=True) for i in range(n_biascorlcfit)]
@@ -163,7 +165,7 @@ class SALT3pipe():
             else:
                 pipepro.setkeys = None
                 
-            if prostr.startswith('lcfit'):
+            if prostr.startswith('lcfit') or prostr.startswith('initlcfit'):
                 niter = n_lcfit
             elif prostr.startswith('biascorlcfit'):
                 niter = n_biascorlcfit
@@ -252,12 +254,29 @@ class SALT3pipe():
                             print('making validation plots in %s/'%self.plotdir)
                             pipepro.validplot_run()
                     else:
-                        raise RuntimeError("Something went wrong..")
+                        if 'sim' in prostr.lower() and 'byosed' in self.pipepros:
+                            # rerun sim to see if byosed seg fault resolves
+                            for i in range(0,3):
+                                print("Rerun byosed sim due to unknown seg fault, {} try".format(i))
+                                pipepro.run(batch=pipepro.batch,translate=pipepro.translate)
+                                if pipepro.success:
+                                    pipepro.extract_gzfitres()
+                                    if pipepro.validplots:
+                                        print('making validation plots in %s/'%self.plotdir)
+                                        pipepro.validplot_run()
+                                    break
+                                else:                           
+                                    raise RuntimeError("Something went wrong..")
                 else:
+                    if 'initlcfit' in prostr.lower():
+                        saltpars_dflist = []
                     for i in range(len(pipepro)):
                         pipepro[i].run(batch=pipepro[i].batch,translate=pipepro[i].translate)
                         if pipepro[i].success:
                             pipepro[i].extract_gzfitres()
+                            if 'initlcfit' in prostr.lower(): #read in saltpars from initial fit
+                                saltpars = pipepro[i].get_init_saltpars()
+                                saltpars_dflist.append(saltpars)
                             if pipepro[i].validplots:
                                 print('making validation plots in %s/'%self.plotdir)
                                 pipepro[i].validplot_run()
@@ -269,6 +288,21 @@ class SALT3pipe():
                 pickle.dump(self, open(picklename, "wb" ) )
                 print("Wrote pipeline object as {}".format(picklename))
                 raise RuntimeError("Something went wrong..")
+            if 'initlcfit' in prostr.lower():
+                #write out initpar file
+                df = pd.concat(saltpars_dflist)
+                outdir = self.Training._get_output_info().loc[self.Training._get_output_info().key=='outputdir','value'].values[0]
+                fname = os.path.join(outdir,'snparlist.txt')
+                fname_tpk = os.path.join(outdir,'tmaxlist.txt')
+                if not os.path.exists(outdir):
+                    os.makedirs(outdir)
+                if os.path.exists(fname):
+                    print("removing old file {}".format(fname))
+                    os.system("rm {}".format(fname))
+                with open(fname, 'w') as f:
+                    f.write('# SNID zHelio x0 x1 c FITPROB\n')
+                    df[['SNID','zHelio','x0','x1','c','FITPROB']].to_csv(f,index=False,sep=' ',header=None)   
+                df[['SNID','PKMJD']].to_csv(fname_tpk,sep=' ',index=False,header=None)
                 
         if not isinstance(self.lastpipepro,list):
             self.success = self.lastpipepro.success
@@ -285,20 +319,28 @@ class SALT3pipe():
             try:
                 outnamelist = []
                 for p in self.pipepros:
-                    prooutname = self._get_pipepro_from_string(p).outname if not isinstance(self._get_pipepro_from_string(p),list) else [pi.outname for pi in self._get_pipepro_from_string(p)]
+                    prooutname = self._get_pipepro_from_string(p).outname if not isinstance(self._get_pipepro_from_string(p),list) else [pi.outname for pi in self._get_pipepro_from_string(p)]                       
+                    if prooutname is None:
+                        continue
                     if isinstance(prooutname,list):
                         outnamelist += prooutname
+                    elif isinstance(prooutname,dict):
+                        outnamelist += [prooutname[key] for key in prooutname.keys()]
                     else:
                         outnamelist += [prooutname]
+
+                dirnames = []
                 for i,outname_unique in enumerate(np.unique(list(outnamelist))):
-#                     print(outname_unique)
-                    dirname = os.path.dirname(outname_unique)
+                    dirnames.append(os.path.dirname(outname_unique))
+                # print(dirnames)
+
+                for i,dirname in enumerate(np.unique(dirnames)):
                     if dirname != '':
                         tarcommand = 'tar -zcvf {}/tempfiles.{}_{}.tar.gz {}/*.temp.{}*'.format(dirname,self.timestamp,i,dirname,self.timestamp)
                     else:
                         tarcommand = 'tar -zcvf tempfiles.{}_{}.tar.gz *.temp.{}*'.format(self.timestamp,i,self.timestamp)
                     tarcommand += ' --remove-files'
-                    print(tarcommand)
+                    print(tarcommand)      
                     os.system(tarcommand)
             except Exception as e:
                 print("[WARNING] Unable to pack all temp files")
@@ -334,7 +376,6 @@ class SALT3pipe():
         for i,pro1 in enumerate(pro1list):
             for j,pro2 in enumerate(pro2list):
                 pro1_out = pro1.glueto(pro2)
-
                 if isinstance(pro1, Simulation):
                     pro1_out_dict = pro1_out.copy()
                     if isinstance(pro2, LCFitting):
@@ -352,7 +393,7 @@ class SALT3pipe():
                                 pro2_in.loc[pro2_in['tag']==tag,'value'] = pro1_out
                     elif isinstance(pro2, Training):
                         pro2_in = pro2._get_input_info()
-                        for tag in ['io','kcor','subsurvey_list']:     
+                        for tag in ['io','kcor','subsurvey_list','ignore_filters']:     
                             pro1_out = pro1_out_dict[tag]
                             if isinstance(pro1_out,list) or isinstance(pro1_out,np.ndarray): 
                                 if tag == 'io':
@@ -380,14 +421,30 @@ class SALT3pipe():
                                             pro2_in = pd.concat([pro2_in,df_newrow])
                                         if pro1_out[int(i)] is not None:
                                             pro2_in.loc[(pro2_in['tag']==tag) & (pro2_in['section']==section),'value'] = pro1_out[int(i)]
-                                        
                             else:
-                                pro2_in.loc[pro2_in['tag']==tag,'value'] = pro1_out
+                                if tag == 'ignore_filters':
+                                    for i,survey in zip(pro1_out_dict['ind'],pro1_out_dict['survey']):
+                                        if pro2.drop_sim_versions is not None and str(i) in pro2.drop_sim_versions.split(','):
+                                            continue
+                                        section = 'survey_{}'.format(survey.strip())
+                                        if section not in pro2_in.loc[pro2_in['tag']==tag,'section'].values:
+                                            df_newrow = pd.DataFrame([{'section':'survey_{}'.format(survey),'key':'ignore_filters',
+                                                                       'value':'','tag':tag,'label':'main'}])
+                                            pro2_in = pd.concat([pro2_in,df_newrow])
+                                else:
+                                    pro2_in.loc[pro2_in['tag']==tag,'value'] = pro1_out
 
                 elif isinstance(pro1, Training) and isinstance(pro2, LCFitting):
                     pro2_in = pro2._get_input_info().loc[on]
 #                     pro2_in['value'] = pro1_out
                     pro2_in['value'] = os.path.join(os.getcwd(),pro1_out)
+    
+                elif isinstance(pro1,LCFitting) and isinstance(pro2, Training):
+                    outdir = pro2._get_output_info().loc[pro2._get_output_info().key=='outputdir','value'].values[0]
+                    fname = os.path.join(outdir,'snparlist.txt')
+                    fname_tpk = os.path.join(outdir,'tmaxlist.txt')
+                    pro2_in = pd.DataFrame([{'label':'main','section':'iodata','key':'snparlist','value':fname},
+                               {'label':'main','section':'iodata','key':'tmaxlist','value':fname_tpk}])
                     
                 elif isinstance(pro2, GetMu):
                     if pro1.biascor:
@@ -415,8 +472,9 @@ class SALT3pipe():
 #                     print(pro2_in)
                     
                 else:
-                    pro2_in = pro2._get_input_info().loc[0]
-                    pro2_in['value'] = pro1_out
+#                     pro2_in = pro2._get_input_info().loc[0]
+                    pro2_in = pro2._get_input_info()
+                    pro2_in['value'] = pd.Series([pro1_out]*len(pro2_in['value']))
                 if isinstance(pro2_in,pd.DataFrame):
                     setkeys = pro2_in
                 else:
@@ -503,6 +561,8 @@ class SALT3pipe():
             pipepro = self.TrainSim
         elif pipepro_str.lower().startswith("testsim"):
             pipepro = self.TestSim
+        elif pipepro_str.lower().startswith("initlcfit"):
+            pipepro = self.InitLCFit
         else:
             raise ValueError("Unknow pipeline procedure:",pipepro.strip())
         return pipepro
@@ -543,7 +603,7 @@ class SALT3pipe():
     
     def _drop_empty_string(self,arr):
         return [x for x in arr if x != '']
-
+    
 
 class PipeProcedure():
     def __init__(self):
@@ -747,6 +807,11 @@ class BYOSED(PyPipeProcedure):
             return "BYOSED {}/".format(os.path.dirname(self.byosed_default))
         else:
             raise ValueError("byosed can only glue to sim")
+           
+    def gen_input(self,outname="pipeline_generalpy_input.input"):
+        self.outname = outname
+        self.finput,self.keys = _gen_general_python_input(basefilename=self.baseinput,setkeys=self.setkeys,
+                                                          outname=outname,delimiter=' ')
 
 class Simulation(PipeProcedure):
     
@@ -788,7 +853,7 @@ class Simulation(PipeProcedure):
         df = pd.DataFrame()
         key = 'GENMODEL'
         keystrs = [x.split('[')[0] for x in self.keys.keys()]
-        keyarr = [x for x in self.keys.keys() if x.startswith(key)]    
+        keyarr = [x for x in self.keys.keys() if x.startswith(key) and '_' not in x]  
         df0 = {}
         if len(keyarr ) > 0:
             for ki in keyarr:
@@ -888,7 +953,7 @@ class Simulation(PipeProcedure):
                 survey = [surveynames[i]['SURVEY'] for i in ind]
                 subsurvey_list = [surveynames[i]['SUBSURVEY_LIST'] for i in ind]
                 
-            return {'io':output,'kcor':kcor,'ind':ind,'survey':survey,'subsurvey_list':subsurvey_list}
+            return {'io':output,'kcor':kcor,'ind':ind,'survey':survey,'subsurvey_list':subsurvey_list,'ignore_filters':''}
 #             return ["{}/{}.LIST".format(res,prefix) for res,prefix in zip(outdirs,df.loc[df.key=='GENVERSION','value'].values)]
         elif pipepro.lower().startswith('lcfit'):
 #             print(df)
@@ -983,7 +1048,7 @@ class Simulation(PipeProcedure):
 #         print(self.keys)
         genmodel_dict = {}
         for key,value in self.keys.items():
-            if key.startswith('GENMODEL'):
+            if key.startswith('GENMODEL') and "_" not in key:
                 if '[' in key: label = key.split('[')[1].split(']')[0]
                 else: label = 0
                 genmodel_dict[label] = value
@@ -1012,7 +1077,9 @@ class Simulation(PipeProcedure):
             if (not genmodel_file.startswith('$') and not genmodel_file.startswith('/')) and \
               ('.' not in genmodel_file or os.path.split(genmodel_file)[0] != '' or \
               (not os.path.exists(os.path.expandvars('$SNDATA_ROOT/models/{}/{}'.format(genmodel_file.split('.')[0],genmodel_file))))):
+#                 import pdb; pdb.set_trace()
                 genmodel_file = '%s/%s'%(cwd,genmodel_file)
+                print("GENMODEL changed to:", genmodel_file)
             if isbyosed:
                 genmodel_file = 'BYOSED %s'%genmodel_file
             label = 'GENMODEL[{}]'.format(label)
@@ -1047,7 +1114,7 @@ class Training(PyPipeProcedure):
     def glueto(self,pipepro):
         if not isinstance(pipepro,str):
             pipepro = type(pipepro).__name__
-        if pipepro.lower().startswith('lcfit'):
+        if pipepro.lower().startswith('lcfit') or pipepro.lower().startswith('sim'):
             outdir = self._get_output_info().value.values[0]
             ##copy necessary files to a model folder in SNDATA_ROOT
 #             modeldir = 'lcfitting/SALT3.test'
@@ -1056,9 +1123,9 @@ class Training(PyPipeProcedure):
 #             self.__copy_salt2info(modeldir,template_file='lcfitting/SALT2.INFO')
             self._set_output_info(modeldir)
 #             os.environ['SNANA_MODELPATH'] = os.path.join(os.getcwd(),'lcfitting') #caused a bug
-            return modeldir
+            return modeldir            
         else:
-            raise ValueError("training can only glue to lcfit")
+            raise ValueError("training can only glue to lcfit and sim")
 
     def gen_input(self,outname=[]):
         self.outname = outname
@@ -1249,8 +1316,10 @@ class LCFitting(PipeProcedure):
             else:
                 outprefix = abspath_for_getmu(str(output_df.loc['TEXTFILE_PREFIX','value']).strip())
                 return str(outprefix)+'.FITRES.TEXT'
+        elif pipepro.lower().startswith('training'):
+            return None
         else:
-            raise ValueError("lcfitting can only glue to getmu")
+            raise ValueError("lcfitting can only glue to getmu or training")
 
     def get_outdirs(self):
         return abspath_for_getmu(self._get_output_info().value.values[0])
@@ -1357,6 +1426,13 @@ class LCFitting(PipeProcedure):
         gzfiles = glob.glob('%s/*/FITOPT000.FITRES.gz'%self.keys['header']['outdir'].strip())
         for gzfile in gzfiles:
             os.system('gunzip {}'.format(gzfile))
+            
+    def get_init_saltpars(self):
+        outdir = self.get_outdirs()
+        f = glob.glob('%s/*/FITOPT000*.FITRES*'%outdir)[0]
+        df = pd.read_csv(f,sep='\s+',comment='#')
+        df = df.rename(columns={"zHEL": "zHelio","CID":"SNID"})
+        return df[['SNID','zHelio','x0','x1','c','FITPROB','PKMJD']]
             
 class GetMu(PipeProcedure):
             
@@ -1624,7 +1700,7 @@ def _run_batch_pro(pro,args,done_file=None):
 
 
 def _gen_general_python_input(basefilename=None,setkeys=None,
-                              outname=None):
+                              outname=None,delimiter=','):
 
     config = configparser.ConfigParser()
     if not os.path.isfile(basefilename):
@@ -1647,8 +1723,10 @@ def _gen_general_python_input(basefilename=None,setkeys=None,
             if not isinstance(values,list): values = [values]
             config[sec][key] = ''
             for value in values:
+                if value is None:
+                    continue
                 print("Adding/modifying key {}={} in [{}]".format(key,value,sec))
-                config[sec][key] = config[sec][key] + '%s,'%value
+                config[sec][key] = config[sec][key] + '%s%s'%(value,delimiter)
             config[sec][key] = config[sec][key][:-1]
         with _open_shared_file(outname, 'w') as f:
             config.write(f)
@@ -1819,6 +1897,7 @@ def _gen_snana_sim_input(basefilename=None,setkeys=None,
     else:
         setkeys = pd.DataFrame(setkeys).dropna(subset=['key'])
         if np.any(setkeys.key.duplicated()):
+            print(setkeys)
             raise ValueError("Check for duplicated entries for",setkeys.key[setkeys.key.duplicated()].unique())
 
         config = {}
@@ -2107,11 +2186,11 @@ def _write_nml_to_file(nml,filename,headerlines=[],append=False):
             lines.append('&'+key.upper()+'\n')
             for key2 in nml[key].keys():
                 value = nmlval_to_abspath(key2,nml[key][key2])
-                if isinstance(value,str) and not value.replace(".","").isdigit():
+                if isinstance(value,str) and not value.replace(".","").replace(",","").isdigit() and not value in ['T','F','True','False']:
                     value = "'{}'".format(value.replace("'",""))
                 elif isinstance(value,list):
                     vlist_to_join = [x for x in value if x is not None]
-                    value = ','.join(["'{}'".format(str(x.replace("'",""))) if isinstance(x,str) and not x.replace(".","").isdigit() else str(x) for x in vlist_to_join])
+                    value = ','.join(["'{}'".format(str(x.replace("'",""))) if isinstance(x,str) and not x.replace(".","").replace(",","").isdigit() else str(x) for x in vlist_to_join])
                 # outfile.write("  {} = {}".format(key2.upper(),value))
                 # outfile.write("\n")
                 valstr = "  {} = {}\n".format(key2.upper(),value)

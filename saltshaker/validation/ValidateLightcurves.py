@@ -420,13 +420,14 @@ def customfilt(outfile,lcfile,salt3dir,
                  bbox={'facecolor':'1.0','edgecolor':'1.0','alpha':0.7,'pad':0})
 
 
-    for ax in [ax1,ax2,ax3,ax4]:
+    for ax in [ax1,ax2,ax3,ax4,ax5]:
         ax.set_xlabel('Phase')
         ax.set_xlim([-20,50])
     ax1.set_ylabel('Flux')
     ax2.yaxis.set_ticklabels([])
     ax3.yaxis.set_ticklabels([])
     ax4.yaxis.set_ticklabels([])
+    ax5.yaxis.set_ticklabels([])
     #import pdb; pdb.set_trace()
     return salt2_chi2tot,salt3_chi2tot
     
