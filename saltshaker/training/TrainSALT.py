@@ -1158,10 +1158,6 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
         log.info(f'plotting light curves took {time.time()-tlc:.1f}')
         
     def main(self,returnGN=False):
-        import jax
-
-        jax.profiler.start_trace("/tmp/tensorboard")
-
         
         try:
             stage='initialization'
@@ -1265,7 +1261,6 @@ config file options can be overwridden at the command line"""
         if not os.path.exists(configfile):
             raise RuntimeError(f'Configfile {configfile} doesn\'t exist!')
 
-                    
         config.read(configfile)
 
         user_parser = salt.add_user_options(usage=self.usagestring,config=config)
@@ -1286,7 +1281,6 @@ config file options can be overwridden at the command line"""
             raise RuntimeError('can\'t find trainingconfig config file!  Checked %s'%user_options.trainingconfig)
 
         optimizer=optimizers.getoptimizer(user_options.optimizer)
-
         modelconfig = configparser.ConfigParser(inline_comment_prefixes='#')
         modelconfig.read(user_options.modelconfig)
         model_parser = saltresids.SALTResids.add_model_options(
