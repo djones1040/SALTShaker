@@ -606,7 +606,7 @@ class TrainSALT(TrainSALTBase):
 
             log.info('message: %s'%message)
             log.info('Final loglike'); saltfitter.maxlikefit(trainingresult_bs.params_raw)
-            log.info('Final photometric loglike'); saltfitter.maxlikefit(trainingresult_bs.params_raw,dospec=False)
+            #log.info('Final photometric loglike'); saltfitter.maxlikefit(trainingresult_bs.params_raw,dospec=False)
             
             log.info(trainingresult_bs.params.size)
 
@@ -697,7 +697,7 @@ class TrainSALT(TrainSALTBase):
             trainingresult.snparams[k]['t0'] =  datadict[k].tpk_guess
         
         log.info('Final loglike'); log.info(saltresids.maxlikefit(trainingresult.params_raw))
-        log.info('Final photometric loglike'); log.info(saltresids.maxlikefit(trainingresult.params_raw,dospec=False))
+        #log.info('Final photometric loglike'); log.info(saltresids.maxlikefit(trainingresult.params_raw,dospec=False))
         
         log.info(trainingresult.params.size)
 
@@ -1225,7 +1225,6 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
             if stage != 'validation':
                 raise RuntimeError("Training exited unexpectedly")
 
-        jax.profiler.stop_trace()
             
     def createGaussNewton(self):
 
@@ -1337,15 +1336,16 @@ config file options can be overwridden at the command line"""
             configfile,configpos=options.configfile,options.configpositional
 
 
+        if options.get_example_data:
+            self.get_example_data()
+            print('example data has been downloaded to the saltshaker-latest-training directory')
+        else:
             if configfile is None and configpos is not None: 
                 configfile=configpos
             elif configfile is None and configpos is None:
                 raise RuntimeError('Configuration file must be specified at command line')
 
-        if options.get_example_data:
-            self.get_example_data()
-            print('example data has been downloaded to the saltshaker-latest-training directory')
-        else:
+            
             self.get_config_options(salt,configfile,args)
         
             salt.main()
