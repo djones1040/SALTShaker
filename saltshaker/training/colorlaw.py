@@ -3,6 +3,7 @@ from scipy.interpolate import interp1d
 from jax import numpy as jnp
 
 import jax
+jax.config.update('jax_platform_name', 'cpu')
 
 __colorlaws__=dict()
 def colorlaw(colorlaw):
@@ -181,7 +182,7 @@ class colorlaw_galactic:
 
         gCL = GalacticDustLaw()(wave)
         # need a minus sign here to match default colorlaw
-        return -color*gCL
+        return color*gCL
 
 
 @colorlaw    

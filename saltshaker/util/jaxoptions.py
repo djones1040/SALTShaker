@@ -1,4 +1,5 @@
 import jax
+jax.config.update('jax_platform_name', 'cpu')
 from jax.experimental import sparse
 from scipy import sparse as scisparse 
 import sys

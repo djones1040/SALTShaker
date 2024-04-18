@@ -1,5 +1,7 @@
 from saltshaker.training import datamodels
 import jax
+jax.config.update('jax_platform_name', 'cpu')
+
 from jax import numpy as jnp
 from jax.experimental import sparse
 import numpy as np

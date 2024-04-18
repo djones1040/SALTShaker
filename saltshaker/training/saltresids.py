@@ -46,6 +46,8 @@ mpl.use('agg')
 import pylab as plt
 
 import jax
+jax.config.update('jax_platform_name', 'cpu')
+
 from jax import numpy as jnp
 
 from jax.scipy import linalg as jaxlinalg
@@ -392,13 +394,13 @@ class SALTResids:
                     pickle.dump({'datadict':self.datadict,
                                 'batchedphotdata':self.batchedphotdata,
                                 'batchedspecdata':self.batchedspecdata},file)
-            
+
         log.info('Constructing batched methods')
 
         self.batchedphotresiduals=batching.batchedmodelfunctions(lambda *args,**kwargs: modeledtraininglightcurve.modelresidual(*args,**kwargs)['residuals'],
                                   self.batchedphotdata, modeledtraininglightcurve,
                                   flatten=True)
-        
+
         self.batchedphotlikelihood=batching.batchedmodelfunctions(lambda *args,**kwargs: modeledtraininglightcurve.modelloglikelihood(*args,**kwargs),
                                   self.batchedphotdata, modeledtraininglightcurve,
                                   sum=True)
@@ -431,6 +433,7 @@ class SALTResids:
         self.constraints=SALTconstraints(self)
         
         log.info('Time required to calculate cached quantities {:.1f}s'.format(time.time()-start))
+
                 
     @classmethod
     def add_model_options(cls,parser,config,addargsonly=False):
@@ -544,7 +547,6 @@ class SALTResids:
 
         successful=successful&wrapaddingargument(config,'modelparams','constraint_names','constraints',  default='', nargs='*',      type=str,
                                                 help='constraints enforced on the model, see constraints.py (default=%(default)s)')               
-
         successful=successful&wrapaddingargument(config,'modelparams','secondary_constraint_names','secondary_constraints',  default=[], nargs='*',      type=str,
                                                 help='constraints enforced on the model after an initial burn-in, see constraints.py (default=%(default)s)')
 
@@ -561,7 +563,9 @@ class SALTResids:
                 successful=successful&wrapaddingargument(config,'bounds', param, type=float,nargs=3,clargformat="--bound_{key}",
                                                         help="bound on %s"%param,default=SUPPRESS)
 
-        if not successful: sys.exit(1)
+        if not successful:
+            raise RuntimeError('issue with arguments in modelconfig file')
+
         return parser
 
     
@@ -708,7 +712,16 @@ class SALTResids:
 
     @partial(jaxoptions, static_argnums=[0,3,4,5,6 ,7],static_argnames= ['fixfluxes','fixuncertainties','dopriors','dospec','usesns','usesecondary'],diff_argnum=1,jitdefault=True) 
     def constrainedmaxlikefit(self,params,*args,usesecondary=True,**kwargs):
-        return self.maxlikefit(self.constraints.transformtoconstrainedparams(params,usesecondary),*args,**kwargs)
+        mxlk = self.maxlikefit(self.constraints.transformtoconstrainedparams(params,usesecondary),*args,**kwargs)
+
+        #def debug_fn():
+        #    jax.debug.breakpoint()
+        #def blank_fn():
+        #    return
+        #lax.cond(jnp.isin(jnp.nan,mxlk), debug_fn , blank_fn)
+        #if jnp.isnan(mxlk).any():
+        #jax.debug.breakpoint()
+        return mxlk
 
 
     @partial(jaxoptions, static_argnums=[0,3,4,5,6 ,7],static_argnames= ['fixfluxes','fixuncertainties','dopriors','dospec','usesns'],diff_argnum=1,jitdefault=True) 

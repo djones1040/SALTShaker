@@ -1,8 +1,7 @@
-
 import numpy as np
-
 from jax import numpy as jnp
 import jax
+jax.config.update('jax_platform_name', 'cpu')
 from jax import lax
 from jax.experimental import sparse 
 from saltshaker.util.jaxoptions import jaxoptions
