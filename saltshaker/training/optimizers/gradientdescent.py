@@ -225,8 +225,14 @@ class rpropwithbacktracking(salttrainingoptimizer):
         if 'diff' in kwargs and "grad" in kwargs['diff']: self.functionevals +=3
         else: self.functionevals+=1
 
+        # this needs to be run in batches
+        # contrainedmaxlikefit needs the full sample
         result= self.saltobj.constrainedmaxlikefit(params,*args,**kwargs)
-
+        # result
+        # diff = grad, the function returns value instead of gradient
+        # result_total += result
+        # note value_and_grad will return a tuple, so 1st and 2nd element summed separately
+        
         if excludesn: 
             singleresult=self.saltobj.datadict[excludesn].modelloglikelihood(params,*args,**kwargs)
             try: 

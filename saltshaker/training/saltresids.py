@@ -712,6 +712,8 @@ class SALTResids:
 
     @partial(jaxoptions, static_argnums=[0,3,4,5,6 ,7],static_argnames= ['fixfluxes','fixuncertainties','dopriors','dospec','usesns','usesecondary'],diff_argnum=1,jitdefault=True) 
     def constrainedmaxlikefit(self,params,*args,usesecondary=True,**kwargs):
+        # this needs to be run in batches
+        # but in a loop outside of jax, so one level up
         mxlk = self.maxlikefit(self.constraints.transformtoconstrainedparams(params,usesecondary),*args,**kwargs)
 
         #def debug_fn():
@@ -724,6 +726,8 @@ class SALTResids:
         return mxlk
 
 
+    # split maxlikefit into 1) function with regularization,priors, 2) phot/spec that can be run in batches
+    # sum each of the values and gradients independently
     @partial(jaxoptions, static_argnums=[0,3,4,5,6 ,7],static_argnames= ['fixfluxes','fixuncertainties','dopriors','dospec','usesns'],diff_argnum=1,jitdefault=True) 
     def maxlikefit(
             self,guess,cachedresults=None,fixuncertainties=False,fixfluxes=False,dopriors=True,dospec=True,usesns=None):
@@ -745,6 +749,7 @@ class SALTResids:
         if cachedresults is None: cachedresults=None,None
         if not (usesns is  None): raise NotImplementedError('Have not implemented a restricted set of sne')
 
+        # cachedresults[0] is the photometric data
         loglike=(self.batchedphotlikelihood (guess,cachedresults[0],fixuncertainties,fixfluxes))
 
         
