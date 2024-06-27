@@ -227,6 +227,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
 
         # this needs to be run in batches
         # contrainedmaxlikefit needs the full sample
+        import pdb; pdb.set_trace()
         result= self.saltobj.constrainedmaxlikefit(params,*args,**kwargs)
         # result
         # diff = grad, the function returns value instead of gradient
@@ -291,6 +292,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
 
         def iteration(X, Xprev,loss,sign,rates):
             #Proposes a new value based on sign of gradient
+
             Xnew,newloss, newsign, newgrad,newrates  = self.rpropiter(X, Xprev,loss,sign,rates,**kwargs)
 
             #Take the direction proposed and do a line-search in that direction
@@ -473,6 +475,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         References
         https://doi.org/10.1016/S0925-2312(01)00700-7
         """
+
         lossval,grad=  self.lossfunction(X,*args,**kwargs, diff='valueandgrad')
         
         # if gradient is NaN, jax had some trouble...

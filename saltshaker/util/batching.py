@@ -66,6 +66,8 @@ def batchdatabysize(data):
     
     #Given a batch of data, unpacks it and stacks it along the first axis for use with jax's vmap method   
     def repackforvmap(data):
+        jax.clear_caches()
+
         __ismapped__=data[0].__ismapped__
         #Given n data with m attributes, this yields an n x m list of lists
         unpacked=[x.unpack() for x in data]
@@ -93,7 +95,7 @@ def batchdatabysize(data):
 #BCOO(float64[1, 10, 2849], nse=288, n_batch=1)
             elif isinstance(vals[0],scisparse._lil.lil_matrix):
                 tmp = sparse.BCOO.fromdense(
-                    np.concatenate([np.array(x.todense()).reshape((1,*x.shape)) for x in vals]),
+                    np.concatenate([np.array(x.todense()).reshape((1,*x.shape)) for x in vals]).astype('float32'),
                     n_batch=1
                 )
                  #.update_layout(n_batch=1)
