@@ -385,8 +385,11 @@ class SALTResids:
             log.info('Batching data')
             self.allphotdata = sum([[x.photdata[lc] for lc in x.photdata ]for x in self.datadict.values() ],[])
             self.allspecdata = sum([[x.specdata[key] for key in x.specdata ]for x in self.datadict.values() ],[])
-
+            import tracemalloc
+            tracemalloc.start()
             self.batchedphotdata= batching.batchdatabysize(self.allphotdata)
+            print(tracemalloc.get_traced_memory())
+            tracemalloc.stop()
             self.batchedspecdata= batching.batchdatabysize(self.allspecdata)
             if self.trainingcachefile:
                 log.info(f'Writing precomputed quantities to file {self.trainingcachefile}')
@@ -400,7 +403,6 @@ class SALTResids:
         self.batchedphotresiduals=batching.batchedmodelfunctions(lambda *args,**kwargs: modeledtraininglightcurve.modelresidual(*args,**kwargs)['residuals'],
                                   self.batchedphotdata, modeledtraininglightcurve,
                                   flatten=True)
-
         self.batchedphotlikelihood=batching.batchedmodelfunctions(lambda *args,**kwargs: modeledtraininglightcurve.modelloglikelihood(*args,**kwargs),
                                   self.batchedphotdata, modeledtraininglightcurve,
                                   sum=True)
