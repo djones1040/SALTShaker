@@ -274,8 +274,9 @@ class modeledtraininglightcurve(modeledtrainingdata):
             else:
                 
                 splinebasisconvolutions+=[decayFactor*(derivInterp[pdx,:,:]*reddenedpassband[:,np.newaxis])]
-        self.pcderivsparse=(sparse.BCOO.fromdense( np.stack(splinebasisconvolutions+ [np.zeros(splinebasisconvolutions[-1].shape) ] *padding)))
-#########################################################################################
+        #self.pcderivsparse=(sparse.BCOO.fromdense( np.stack(splinebasisconvolutions+ [np.zeros(splinebasisconvolutions[-1].shape) ] *padding)))
+        self.pcderivsparse=(np.stack(splinebasisconvolutions+ [np.zeros(splinebasisconvolutions[-1].shape) ] *padding))
+        #########################################################################################
         
         #Quantities used in computation of model uncertainties
         #Color law derivatives at filter effective wavelength
@@ -292,8 +293,9 @@ class modeledtraininglightcurve(modeledtrainingdata):
         
         errordesignmat=scisparse.lil_matrix((len(lc)+padding,residsobj.imodelerr0.size ))
         errordesignmat[np.arange(0,len(lc)),ierrorbin ]= 1
-        self.errordesignmat= sparse.BCOO.from_scipy_sparse(errordesignmat)
-        
+        #self.errordesignmat= sparse.BCOO.from_scipy_sparse(errordesignmat)
+        self.errordesignmat= errordesignmat
+        #import pdb; pdb.set_trace()
         
         pow=self.iclscat.size-1-np.arange(self.iclscat.size)
         colorscateval=((self.lambdaeffrest-5500)/1000)

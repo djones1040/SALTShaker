@@ -4,6 +4,7 @@ jax.config.update('jax_platform_name', 'cpu')
 
 from jax import numpy as jnp
 from jax.experimental import sparse
+from scipy import sparse as scisparse
 import numpy as np
 
 from scipy import optimize, stats
@@ -74,8 +75,32 @@ def batchdatabysize(data):
 
             vals=([(unpacked[i][j]) for i in range(len(unpacked))])
             #If it's a sparse array, concatenate along new "batched" axis for use with vmap
-            if isinstance(vals[0],sparse.BCOO) : 
-                yield sparse.bcoo_concatenate([x.reshape((1,*x.shape)).update_layout(n_batch=1) for x in vals] ,dimension=0)
+            if isinstance(vals[0],sparse.BCOO) :
+                tmp2 = [x.reshape((1,*x.shape)).update_layout(n_batch=1) for x in vals]
+                tmp = sparse.bcoo_concatenate(tmp2 ,dimension=0)
+                #import pdb; pdb.set_trace()
+                yield tmp
+                # BCOO(float64[37, 10, 77], nse=10, n_batch=1)
+                # BCOO(float64[4, 28, 77], nse=28, n_batch=1)
+                # [BCOO(float64[1, 10, 77], nse=9, n_batch=1), BCOO(float64[1, 10, 77], nse=10, n_batch=1), BCOO(float64[1, 10, 77], nse=10, n_batch=1), BCOO(float64[1, 10, 77], nse=10, n_batch=1), BCOO(float64[1, 10, 77], nse=9, n_batch=1), BCOO(float64[1, 10, 77], nse=10, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=10, n_batch=1), BCOO(float64[1, 10, 77], nse=6, n_batch=1), BCOO(float64[1, 10, 77], nse=4, n_batch=1), BCOO(float64[1, 10, 77], nse=4, n_batch=1), BCOO(float64[1, 10, 77], nse=4, n_batch=1), BCOO(float64[1, 10, 77], nse=4, n_batch=1), BCOO(float64[1, 10, 77], nse=10, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=10, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=7, n_batch=1), BCOO(float64[1, 10, 77], nse=7, n_batch=1), BCOO(float64[1, 10, 77], nse=7, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=7, n_batch=1), BCOO(float64[1, 10, 77], nse=7, n_batch=1), BCOO(float64[1, 10, 77], nse=7, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=9, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=7, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=7, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=7, n_batch=1), BCOO(float64[1, 10, 77], nse=10, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1)]
+                #(Pdb) sparse.bcoo_concatenate(tmp2,dimension=0)
+#BCOO(float64[37, 10, 77], nse=10, n_batch=1)
+#(Pdb) sparse.bcoo_concatenate(tmp2,dimension=)
+#*** SyntaxError: invalid syntax
+#(Pdb) sparse.bcoo_concatenate(tmp2,dimension=1)
+#BCOO(float64[1, 370, 77], nse=288, n_batch=1)
+#(Pdb) sparse.bcoo_concatenate(tmp2,dimension=2)
+#BCOO(float64[1, 10, 2849], nse=288, n_batch=1)
+            elif isinstance(vals[0],scisparse._lil.lil_matrix):
+                tmp = sparse.BCOO.fromdense(
+                    np.concatenate([np.array(x.todense()).reshape((1,*x.shape)) for x in vals]),
+                    n_batch=1
+                )
+                 #.update_layout(n_batch=1)
+                #if varname == 'pcderivsparse':
+                #    import pdb; pdb.set_trace()
+                     #BCOO(float64[37, 10, 2520], nse=1920, n_batch=1)
+                yield tmp
             else: 
                 if not (varname in __ismapped__ ):
                     #If an attribute is not to be mapped over, the single value is set, and it is verified that it is the same for all elements
