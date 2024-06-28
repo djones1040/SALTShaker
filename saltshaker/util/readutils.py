@@ -45,9 +45,11 @@ class SALTtraininglightcurve(SALTtrainingdata):
         
         __slots__=['mjd','tobs','phase','fluxcal','fluxcalerr','filt']
         
-        def __init__(self,z,tpk_guess,flt,sn ):
+        def __init__(self,z,tpk_guess,flt,sn,phaserange):
                 assert((sn.FLT==flt).sum()>0)
-                inlightcurve= (sn.FLT==flt)
+                tobs_full=(sn.MJD-tpk_guess)
+                phase=tobs_full/(1+z)
+                inlightcurve= (sn.FLT==flt) & (phase > phaserange[0]) & (phase < phaserange[1])
                 self.mjd=sn.MJD[inlightcurve]
                 sortinds=np.argsort(self.mjd)
                 self.mjd=self.mjd[sortinds]
@@ -157,7 +159,7 @@ class SALTtrainingSN:
         __slots__=['survey', 'zHelio', 'MWEBV', 'snid', 'tpk_guess', 'salt2fitprob', 'photdata','specdata']
         def __init__(self,sn,
                      estimate_tpk=False,snpar=None,
-                     pkmjddict={},n_specrecal=None,binspecres=None):
+                     pkmjddict={},n_specrecal=None,binspecres=None,phaserange=[-20,50]):
 
                 if 'FLT' not in sn.__dict__.keys():
                     raise SNDataReadError('can\'t find SN filters!')
@@ -227,7 +229,7 @@ class SALTtrainingSN:
                 self.tpk_guess=tpk
                 self.salt2fitprob=fitprob
                 
-                self.photdata = {flt:SALTtraininglightcurve(self.zHelio,tpk_guess= self.tpk_guess,flt=flt, sn=sn) for flt in np.unique(sn.FLT)}
+                self.photdata = {flt:SALTtraininglightcurve(self.zHelio,tpk_guess= self.tpk_guess,flt=flt, sn=sn, phaserange=phaserange) for flt in np.unique(sn.FLT)}
                 try: assert(len(self.photdata)>0)
                 except AssertionError:
                     raise SNDataReadError(f'No lightcurves for SN {sn.SNID}')
@@ -393,7 +395,8 @@ def rdkcor(surveylist,options):
         
 def rdAllData(snlists,estimate_tpk,
               dospec=False,peakmjdlist=None,
-              waverange=[2000,9200],binspecres=None,snparlist=None,specrecallist=None,maxsn=None):
+              waverange=[2000,9200],phaserange=[-20.,50.],
+              binspecres=None,snparlist=None,specrecallist=None,maxsn=None):
     datadict = {}
     if peakmjdlist:
         pksnid,pkmjd = np.loadtxt(peakmjdlist,unpack=True,dtype=str,usecols=[0,1])
@@ -446,10 +449,12 @@ def rdAllData(snlists,estimate_tpk,
 
             try:
                 saltformattedsn=SALTtrainingSN(
-                    sn,estimate_tpk=estimate_tpk,
-                    pkmjddict=pkmjddict,snpar=snpar,
-                    n_specrecal=n_specrecal,
-                    binspecres=binspecres)
+                        sn,estimate_tpk=estimate_tpk,
+                        pkmjddict=pkmjddict,snpar=snpar,
+                        n_specrecal=n_specrecal,
+                        binspecres=binspecres,
+                        phaserange=phaserange
+                )
             except SNDataReadError as e:
                 log.warning(e.args[0])
                 return False
@@ -484,6 +489,7 @@ def rdAllData(snlists,estimate_tpk,
                     survey = fits.getval( f, 'SURVEY')
                     Nsn = fits.getval( f, 'NAXIS2', ext=1 )
                     snidlist = np.array([ int( hdata[isn]['SNID'] ) for isn in range(Nsn) ])
+                    
                     if os.path.exists(f.replace('_HEAD.FITS','_SPEC.FITS')):
                         specfitsfile = f.replace('_HEAD.FITS','_SPEC.FITS')
                     else: specfitsfile = None

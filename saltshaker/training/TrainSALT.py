@@ -1182,7 +1182,9 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
                                            binspecres=binspecres,
                                            snparlist=self.options.snparlist,
                                            maxsn=self.options.maxsn,
-                                           specrecallist=self.options.specrecallist)
+                                           specrecallist=self.options.specrecallist,
+                                           waverange=self.options.waverange,
+                                           phaserange=self.options.phaserange)
             log.info(f'took {time.time()-tdstart:.3f} to read in data files')
             tcstart = time.time()
 
