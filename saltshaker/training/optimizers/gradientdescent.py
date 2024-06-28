@@ -227,7 +227,6 @@ class rpropwithbacktracking(salttrainingoptimizer):
 
         # this needs to be run in batches
         # contrainedmaxlikefit needs the full sample
-        import pdb; pdb.set_trace()
         result= self.saltobj.constrainedmaxlikefit(params,*args,**kwargs)
         # result
         # diff = grad, the function returns value instead of gradient
