@@ -362,58 +362,86 @@ class SALTResids:
         log.info('Calculating cached quantities')
         start=time.time()
         
-        
-        if bool(self.trainingcachefile) and path.exists(self.trainingcachefile):
-            log.info(f'Loading precomputed quantities from file {self.trainingcachefile}')
-            with open(self.trainingcachefile,'rb') as file: cachedfile=  pickle.load(file)
-            
-            self.datadict = cachedfile['datadict']
-            self.batchedphotdata= cachedfile['batchedphotdata']
-            self.batchedspecdata= cachedfile['batchedspecdata']
-            self.allphotdata = sum([[x.photdata[lc] for lc in x.photdata ]for x in self.datadict.values() ],[])
-            self.allspecdata = sum([[x.specdata[key] for key in x.specdata ]for x in self.datadict.values() ],[])
 
-        else:
+        #if bool(self.trainingcachefile) and path.exists(self.trainingcachefile):
+            # D. Jones - disabling for now:
+        #    log.info(f'Loading precomputed quantities from file {self.trainingcachefile}')
+        #    with open(self.trainingcachefile,'rb') as file: cachedfile=  pickle.load(file)
             
-            log.info('Precomputing filters')
-            iterable=list(self.datadict.items())
-            #Shuffle it so that tqdm's estimates are hopefully more accurate
-            random.shuffle(iterable)
-            if sys.stdout.isatty() or in_ipynb:
-                iterable=tqdm(iterable,smoothing=.1)
-            self.datadict={snid: sn if isinstance(sn,SALTfitcacheSN) else SALTfitcacheSN(sn,self,self.kcordict,photpadding,specpadding)  for snid,sn in iterable}
-            log.info('Batching data')
-            self.allphotdata = sum([[x.photdata[lc] for lc in x.photdata ]for x in self.datadict.values() ],[])
-            self.allspecdata = sum([[x.specdata[key] for key in x.specdata ]for x in self.datadict.values() ],[])
-            import tracemalloc
-            tracemalloc.start()
-            self.batchedphotdata= batching.batchdatabysize(self.allphotdata)
-            print(tracemalloc.get_traced_memory())
-            tracemalloc.stop()
-            self.batchedspecdata= batching.batchdatabysize(self.allspecdata)
-            if self.trainingcachefile:
-                log.info(f'Writing precomputed quantities to file {self.trainingcachefile}')
-                with open( self.trainingcachefile,'wb') as file:
-                    pickle.dump({'datadict':self.datadict,
-                                'batchedphotdata':self.batchedphotdata,
-                                'batchedspecdata':self.batchedspecdata},file)
+        #    self.datadict = cachedfile['datadict']
+        #    self.batchedphotdata= cachedfile['batchedphotdata']
+        #    self.batchedspecdata= cachedfile['batchedspecdata']
+        #    self.allphotdata = sum([[x.photdata[lc] for lc in x.photdata ]for x in self.datadict.values() ],[])
+        #    self.allspecdata = sum([[x.specdata[key] for key in x.specdata ]for x in self.datadict.values() ],[])
+
+        #else:
+            
+        log.info('Precomputing filters')
+        iterable=list(self.datadict.items())
+        #Shuffle it so that tqdm's estimates are hopefully more accurate
+        random.shuffle(iterable)
+        if sys.stdout.isatty() or in_ipynb:
+            iterable=tqdm(iterable,smoothing=.1)
+        self.datadict={snid: sn if isinstance(sn,SALTfitcacheSN) else SALTfitcacheSN(sn,self,self.kcordict,photpadding,specpadding)  for snid,sn in iterable}
+        log.info('Batching data')
+        self.allphotdata = sum([[x.photdata[lc] for lc in x.photdata ]for x in self.datadict.values() ],[])
+        self.allspecdata = sum([[x.specdata[key] for key in x.specdata ]for x in self.datadict.values() ],[])
+
+
+        self.batchedspecdata= batching.batchdatabysize(self.allspecdata)
+        #if self.trainingcachefile:
+        #    log.info(f'Writing precomputed quantities to file {self.trainingcachefile}')
+        #    with open( self.trainingcachefile,'wb') as file:
+        #        pickle.dump({'datadict':self.datadict,
+        #                     'batchedphotdata':self.batchedphotdata,
+        #                     'batchedspecdata':self.batchedspecdata},file)
 
         log.info('Constructing batched methods')
 
-        self.batchedphotresiduals=batching.batchedmodelfunctions(lambda *args,**kwargs: modeledtraininglightcurve.modelresidual(*args,**kwargs)['residuals'],
-                                  self.batchedphotdata, modeledtraininglightcurve,
-                                  flatten=True)
-        self.batchedphotlikelihood=batching.batchedmodelfunctions(lambda *args,**kwargs: modeledtraininglightcurve.modelloglikelihood(*args,**kwargs),
-                                  self.batchedphotdata, modeledtraininglightcurve,
-                                  sum=True)
+        # D. Jones: n_memory_batches would be a user option
+        self.n_memory_batches = 1
+        # ugly, but ok for now:
+        #for i in range(len(self.allphotdata)):
+        #    del self.allphotdata[i].colorlawfunction
+        
+        self.allbatchedphotdata= batching.batchdatabysize(self.allphotdata)
+        self.batchedphotdata = []
+        for i in range(self.n_memory_batches):
+            self.batchedphotdata += [batching.batchdatabysize(self.allphotdata[int(i/self.n_memory_batches*len(self.allphotdata)):int((i+1)/self.n_memory_batches*len(self.allphotdata))])]
 
-        self.batchedphotvariances=jax.jit(batching.batchedmodelfunctions(  modeledtraininglightcurve.modelfluxvariance,
-                                  self.batchedphotdata, modeledtraininglightcurve,
-                                  ))
+        self.batchedphotresiduals=batching.batchedphotmodelfunctions(
+            lambda *args,**kwargs: modeledtraininglightcurve.modelresidual(*args,**kwargs)['residuals'],
+            self.allbatchedphotdata,
+            modeledtraininglightcurve,
+            self.colorlawfunction,
+            flatten=True
+        )
+        
+        self.batchedphotlikelihood=batching.batchedphotmodelfunctions(
+            lambda *args,**kwargs: modeledtraininglightcurve.modelloglikelihood(*args,**kwargs),
+            self.allbatchedphotdata,
+            modeledtraininglightcurve,
+            self.colorlawfunction,
+            sum=True
+        )
+
+        self.batchedphotvariances=jax.jit(
+            batching.batchedphotmodelfunctions(
+                modeledtraininglightcurve.modelfluxvariance,
+                self.allbatchedphotdata,
+                modeledtraininglightcurve,
+                self.colorlawfunction,
+            )
+        )
                                   
-        self.batchedphotfluxes=jax.jit(batching.batchedmodelfunctions(  modeledtraininglightcurve.modelflux,
-                                  self.batchedphotdata, modeledtraininglightcurve,
-                                  ))
+        self.batchedphotfluxes=jax.jit(
+            batching.batchedphotmodelfunctions(
+                modeledtraininglightcurve.modelflux,
+                self.allbatchedphotdata,
+                modeledtraininglightcurve,
+                self.colorlawfunction
+            )
+        )
 
         self.batchedspecresiduals=batching.batchedmodelfunctions(lambda *args,**kwargs: modeledtrainingspectrum.modelresidual(*args,**kwargs)['residuals'],
                                   self.batchedspecdata, modeledtrainingspectrum,
@@ -649,13 +677,13 @@ class SALTResids:
 
 
     @partial(jaxoptions, static_argnums=[0,3,4,5,6],static_argnames= ['dopriors','dospecresids','usesns','suppressregularization'],diff_argnum=1,jitdefault=True) 
-    def lsqwrap(self,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None,suppressregularization=False):
+    def lsqwrap(self,guess,batcheddata,uncertainties,dopriors=True,dospecresids=True,usesns=None,suppressregularization=False):
         """
         """
         residuals = []
         if not (usesns is  None): raise NotImplementedError('Have not implemented a restricted set of sne')
         lcuncertainties,specuncertainties=uncertainties
-        residuals+=[ self.batchedphotresiduals(guess,lcuncertainties,fixuncertainties=True) ]
+        residuals += [self.batchedphotresiduals(guess,batcheddata,lcuncertainties,fixuncertainties=True)]
 
         
         if dospecresids:
@@ -768,18 +796,102 @@ class SALTResids:
                 loglike+=sum([-(func(guess,self.neff)**2).sum()/2. for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]] )
         return loglike
 
+    @partial(jaxoptions, static_argnums=[0,4,5,6,7 ,8],static_argnames= ['fixfluxes','fixuncertainties','dopriors','dospec','usesns'],diff_argnum=1,jitdefault=True) 
+    def maxlikefitphot(
+            self,guess,batcheddata=None,cachedresults=None,fixuncertainties=False,fixfluxes=False,dopriors=True,dospec=True,usesns=None):
+        """
+        Calculates the likelihood of given SALT model to photometric and spectroscopic data given during initialization
+        
+        Parameters
+        ----------
+        x : array
+            SALT model parameters
+                    
+        Returns
+        -------
+        
+        chi2: float
+            Goodness of fit of model to training data   
+        """
+                
+        if cachedresults is None: cachedresults=None,None
+        if not (usesns is  None): raise NotImplementedError('Have not implemented a restricted set of sne')
 
-    def calculatecachedvals(self,x,target=None):
-        if target == 'fluxes' : return [self.batchedphotfluxes(x),self.batchedspecfluxes(x)]
-        if target=='variances': return [self.batchedphotvariances(x),self.batchedspecvariances(x)]
+        # cachedresults[0] is the photometric data
+        loglike=(self.batchedphotlikelihood (guess,batcheddata,cachedresults,fixuncertainties,fixfluxes))
+        
+        return loglike
+
+    @partial(jaxoptions, static_argnums=[0,3,4,5,6 ,7],static_argnames= ['fixfluxes','fixuncertainties','dopriors','dospec','usesns'],diff_argnum=1,jitdefault=True) 
+    def maxlikefitspec(
+            self,guess,cachedresults=None,fixuncertainties=False,fixfluxes=False,dopriors=True,dospec=True,usesns=None):
+        """
+        Calculates the likelihood of given SALT model to photometric and spectroscopic data given during initialization
+        
+        Parameters
+        ----------
+        x : array
+            SALT model parameters
+                    
+        Returns
+        -------
+        
+        chi2: float
+            Goodness of fit of model to training data   
+        """
+                
+        if cachedresults is None: cachedresults=None,None
+        if not (usesns is  None): raise NotImplementedError('Have not implemented a restricted set of sne')
+        
+        if dospec:
+            
+            loglike = (
+             float(self.batchedspeclikelihood(guess,cachedresults[1],fixuncertainties,fixfluxes))
+             )
+
+        else:
+            loglike = (0.0)
+
+        return loglike
+
+    
+    @partial(jaxoptions, static_argnums=[0,3,4,5,6 ,7],static_argnames= ['fixfluxes','fixuncertainties','dopriors','dospec','usesns'],diff_argnum=1,jitdefault=True) 
+    def maxlikefitpriors(
+            self,guess,cachedresults=None,fixuncertainties=False,fixfluxes=False,dopriors=True,dospec=True,usesns=None):
+        """
+        Calculates the likelihood of given SALT model to photometric and spectroscopic data given during initialization
+        
+        Parameters
+        ----------
+        x : array
+            SALT model parameters
+                    
+        Returns
+        -------
+        
+        chi2: float
+            Goodness of fit of model to training data   
+        """
+        
+        if dopriors:
+            loglike=self.priors.priorloglike(guess)
+                
+            if self.regularize:
+                loglike+=sum([-(func(guess,self.neff)**2).sum()/2. for func in [self.dyadicRegularization,self.phaseGradientRegularization,self.waveGradientRegularization]] )
+        return loglike
+
+    
+    def calculatecachedvals(self,x,batcheddata,target=None):
+        if target == 'fluxes' : return [self.batchedphotfluxes(x,batcheddata),self.batchedspecfluxes(x)]
+        if target=='variances': return [self.batchedphotvariances(x,batcheddata),self.batchedspecvariances(x)]
         
     def bestfitsinglebandnormalizationsforSN(self,x,sn):
         sndata=self.datadict[sn]
         for flt in sndata.photdata:
             lcdata=sndata.photdata[flt]
-            designmatrix=lcdata.modelflux(x)
+            designmatrix=lcdata.modelflux(x,self.colorlawfunction)
             vals=lcdata.fluxcal
-            variance=lcdata.fluxcalerr**2 +lcdata.modelfluxvariance(x)
+            variance=lcdata.fluxcalerr**2 +lcdata.modelfluxvariance(x,self.colorlawfunction)
             
             normvariance=1/(designmatrix**2/variance).sum()
             normalization=(designmatrix*vals/variance).sum()*normvariance

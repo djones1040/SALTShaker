@@ -74,39 +74,25 @@ def batchdatabysize(data):
         
         #Want to convert that into an m-element list of n-element arrays or single values
         for j,varname in enumerate( data[0].__slots__):
-
+            # we'll pass this one separately
+            
             vals=([(unpacked[i][j]) for i in range(len(unpacked))])
             #If it's a sparse array, concatenate along new "batched" axis for use with vmap
             if isinstance(vals[0],sparse.BCOO) :
-                tmp2 = [x.reshape((1,*x.shape)).update_layout(n_batch=1) for x in vals]
-                tmp = sparse.bcoo_concatenate(tmp2 ,dimension=0)
-                #import pdb; pdb.set_trace()
-                yield tmp
-                # BCOO(float64[37, 10, 77], nse=10, n_batch=1)
-                # BCOO(float64[4, 28, 77], nse=28, n_batch=1)
-                # [BCOO(float64[1, 10, 77], nse=9, n_batch=1), BCOO(float64[1, 10, 77], nse=10, n_batch=1), BCOO(float64[1, 10, 77], nse=10, n_batch=1), BCOO(float64[1, 10, 77], nse=10, n_batch=1), BCOO(float64[1, 10, 77], nse=9, n_batch=1), BCOO(float64[1, 10, 77], nse=10, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=10, n_batch=1), BCOO(float64[1, 10, 77], nse=6, n_batch=1), BCOO(float64[1, 10, 77], nse=4, n_batch=1), BCOO(float64[1, 10, 77], nse=4, n_batch=1), BCOO(float64[1, 10, 77], nse=4, n_batch=1), BCOO(float64[1, 10, 77], nse=4, n_batch=1), BCOO(float64[1, 10, 77], nse=10, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=10, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=7, n_batch=1), BCOO(float64[1, 10, 77], nse=7, n_batch=1), BCOO(float64[1, 10, 77], nse=7, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=7, n_batch=1), BCOO(float64[1, 10, 77], nse=7, n_batch=1), BCOO(float64[1, 10, 77], nse=7, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=9, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=7, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=7, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1), BCOO(float64[1, 10, 77], nse=7, n_batch=1), BCOO(float64[1, 10, 77], nse=10, n_batch=1), BCOO(float64[1, 10, 77], nse=8, n_batch=1)]
-                #(Pdb) sparse.bcoo_concatenate(tmp2,dimension=0)
-#BCOO(float64[37, 10, 77], nse=10, n_batch=1)
-#(Pdb) sparse.bcoo_concatenate(tmp2,dimension=)
-#*** SyntaxError: invalid syntax
-#(Pdb) sparse.bcoo_concatenate(tmp2,dimension=1)
-#BCOO(float64[1, 370, 77], nse=288, n_batch=1)
-#(Pdb) sparse.bcoo_concatenate(tmp2,dimension=2)
-#BCOO(float64[1, 10, 2849], nse=288, n_batch=1)
+
+                yield sparse.bcoo_concatenate([x.reshape((1,*x.shape)).update_layout(n_batch=1) for x in vals] ,dimension=0)
             elif isinstance(vals[0],scisparse._lil.lil_matrix):
-                tmp = sparse.BCOO.fromdense(
+                yield sparse.BCOO.fromdense(
                     np.concatenate([np.array(x.todense()).reshape((1,*x.shape)) for x in vals]).astype('float32'),
                     n_batch=1
                 )
-                 #.update_layout(n_batch=1)
-                #if varname == 'pcderivsparse':
-                #    import pdb; pdb.set_trace()
-                     #BCOO(float64[37, 10, 2520], nse=1920, n_batch=1)
-                yield tmp
-            else: 
+            else:
                 if not (varname in __ismapped__ ):
                     #If an attribute is not to be mapped over, the single value is set, and it is verified that it is the same for all elements
                     assert(np.all(vals[0]==vals), "Unmapped quantity different between different objects")
+                    #if varname == 'colorlawfunction':
+                    #    yield [0.]
+                    #else:
                     yield vals[0]
                 else:
                     yield  np.stack(vals,axis=0) 
@@ -183,6 +169,74 @@ def batchedmodelfunctions(function,batcheddata, dtype,flatten=False,sum=False):
 #             except Exception as e:
 #                 print(e)
 #                 import pdb;pdb.set_trace()
+            if flatten: mapped=mapped.flatten()
+            if sum: 
+                result+=mapped.sum()
+            else:
+                result+=[mapped ]
+        if flatten:
+            return jnp.concatenate(result)
+        else: 
+            return result
+    return vectorized
+
+def batchedphotmodelfunctions(function, batcheddata, dtype, colorlawfunction, flatten=False,sum=False):
+    """Constructor function to map a function that takes a modeledtrainingdata object as first arg and a SALTparameters object as second arg over batched, zero-padded data"""
+    if issubclass(dtype,datamodels.modeledtrainingdata) :
+        pass
+    elif dtype in ['light-curves','spectra']:
+        if dtype=='light-curves':
+            dtype=datamodels.modeledtraininglightcurve
+        else:
+            dtype=datamodels.modeledtrainingspectrum
+    else:
+        raise ValueError(f'Invalid datatype {dtype}')
+
+    
+    def vectorized(pars,batcheddata,*batchedargs,**batchedkwargs):
+
+        batchedindexed = []
+        for i,batch in enumerate(batcheddata):
+            batcheddict = {}
+            for x,y in zip(dtype.__slots__,batch):
+                if x in dtype.__indexattributes__:
+                    batcheddict[x] = y
+            batchedindexed += [batcheddict]
+        
+        if sum: result=0
+        else: result=[]
+        if len(batchedargs)==0:
+            batchedargs=[[]]*len(batcheddata)
+        else:
+            batchedargs= list(zip(*[x if hasattr(x,'__len__') else [x]*len(batcheddata) for x in batchedargs]))
+        
+        if (batchedkwargs)=={}:
+            batchedkwargs=[{}]*len(batcheddata)
+        else:
+            batchedkwargs= [{y:x[i] if hasattr(x,'__len__') else x for y,x in batchedkwargs.items()}
+                            for i in range(len(batcheddata))]
+        for batch,indexdict,args,kwargs in zip(batcheddata,batchedindexed,batchedargs,batchedkwargs):
+
+            def funpacked (lc,pars,kwargs,*args):
+                lc= dtype.repack(lc)
+                pars=datamodels.SALTparameters.tree_unflatten((),pars)
+
+                return function(lc,pars,colorlawfunction,*args,**kwargs)
+
+            newpars=datamodels.SALTparameters(indexdict, pars)
+            parsvmapped=newpars.tree_flatten()[0]
+            newargs=kwargs,*args
+
+            #Determine which axes of the arguments correspond to the lightcurve data
+            targetsize=indexdict['ix0'].size
+            #The batched data has prenoted which arguments are to be mapped over; otherwise need to attempt to determine it programatically
+
+            inaxes= [(0 if (x in dtype.__ismapped__) else None) for x in dtype.__slots__],newpars.mappingaxes,*walkargumenttree(newargs,targetsize)
+            mapped=jax.vmap(  funpacked,in_axes= 
+                inaxes
+                        )(
+                batch,list(parsvmapped),*newargs
+            )
             if flatten: mapped=mapped.flatten()
             if sum: 
                 result+=mapped.sum()

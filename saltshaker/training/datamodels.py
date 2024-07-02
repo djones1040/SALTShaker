@@ -72,7 +72,10 @@ class SALTparameters:
                 idxs=np.array([])
             
             if idxs.size>0:
-                vals=parsarray[idxs]
+                try:
+                    vals=parsarray[idxs]
+                except:
+                    import pdb; pdb.set_trace()
             else:
                 vals=np.array([])
             setattr(self,var, vals)
@@ -126,8 +129,8 @@ class modeledtrainingdata(metaclass=abc.ABCMeta):
         """Calculate the predicted flux given the data and model"""
         pass
     
-    def modelloglikelihood(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False):
-        resids=self.modelresidual(x,cachedresults,fixuncertainties,fixfluxes)
+    def modelloglikelihood(self,x,colorlawfunction,cachedresults=None,fixuncertainties=False,fixfluxes=False):
+        resids=self.modelresidual(x,colorlawfunction,cachedresults,fixuncertainties,fixfluxes)
         
         return resids['lognorm']- ((resids['residuals']**2).sum() / 2.)
 
@@ -178,8 +181,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
     __staticattributes__=[
         'preintegratebasis',
         'imodelcorrs_coordinds',
-        'bsplinecoeffshape','errorgridshape','uniqueid',
-        'colorlawfunction'
+        'bsplinecoeffshape','errorgridshape','uniqueid'
     ]
     
     __slots__ = __dynamicattributes__+__staticattributes__
@@ -201,7 +203,10 @@ class modeledtraininglightcurve(modeledtrainingdata):
         padding=max(0,padding)
         self.padding=padding
         self.ipad= np.arange(len(lc)+padding )>= len(lc)
-        self.uniqueid= f'{sn.snid}_{lc.filt}'
+        # filt -> number with ord function to keep jax happy
+        # chr will return it to a letter
+        # probably need a bit flag or something smarter long term
+        self.uniqueid= int(f'{sn.snid}{ord(lc.filt)}')
         #Define quantities for synthetic photometry
         filtwave = kcordict[sn.survey][lc.filt]['filtwave']
         filttrans = kcordict[sn.survey][lc.filt]['filttrans']
@@ -216,7 +221,8 @@ class modeledtraininglightcurve(modeledtrainingdata):
         self.lambdaeff = kcordict[sn.survey][lc.filt]['lambdaeff']    
         self.lambdaeffrest= self.lambdaeff/(1+z)    
         self.bsplinecoeffshape=(residsobj.phaseBins[0].size,residsobj.waveBins[0].size)        
-        
+
+        # DJ Hack!!
         self.preintegratebasis=residsobj.preintegrate_photometric_passband
         
         self.icoordinates=sn.icoordinates
@@ -235,7 +241,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         
         self.wavebasis= residsobj.wavebasis
         
-        self.colorlawfunction=residsobj.colorlawfunction
+        #self.colorlawfunction=residsobj.colorlawfunction
         clippedphase=np.clip(self.phase,residsobj.phase.min(),residsobj.phase.max())
 #########################################################################################
         #Evaluating a bunch of quantities used in the flux model
@@ -309,7 +315,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
     def __len__(self):
         return self.fluxcal.size
 
-    def modelflux(self,pars):
+    def modelflux(self,pars,colorlawfunction):
         if not isinstance(pars,SALTparameters):
             pars=SALTparameters(self,pars)
         #Evaluate the coefficients of the spline bases
@@ -318,7 +324,8 @@ class modeledtraininglightcurve(modeledtrainingdata):
 
         fluxcoeffs=jnp.dot(coordinates,pars.components)*pars.x0
         #Evaluate color law at the wavelength basis centers
-        colorlaw= sum([fun(c,cl,self.wavebasis) for fun,c,cl in zip(self.colorlawfunction,pars.c, pars.CL)])
+        # D. Jones: passing color law function
+        colorlaw= sum([fun(c,cl,self.wavebasis) for fun,c,cl in zip(colorlawfunction,pars.c, pars.CL)])
         colorexp= 10. ** (  -0.4*colorlaw)
 
         if self.preintegratebasis:
@@ -330,13 +337,13 @@ class modeledtraininglightcurve(modeledtrainingdata):
             #Integrate basis functions over wavelength and sum over flux coefficients
             return jnp.clip(( self.pcderivsparse @ fluxcoeffs) @ colorexp ,0,None)
 
-    def modelfluxvariance(self,pars):
+    def modelfluxvariance(self,pars,colorlawfunction):
         if not isinstance(pars,SALTparameters):
             pars=SALTparameters(self,pars)
 
         #Exponentiate and multiply by color
         
-        colorlaw= sum([fun(c,cl,self.lambdaeffrest) for fun,c,cl in zip(self.colorlawfunction,pars.c, pars.CL)])
+        colorlaw= sum([fun(c,cl,self.lambdaeffrest) for fun,c,cl in zip(colorlawfunction,pars.c, pars.CL)])
         colorexp= 10. ** (  -0.4*colorlaw)
 
           #Evaluate model uncertainty
@@ -356,12 +363,12 @@ class modeledtraininglightcurve(modeledtrainingdata):
         return  jnp.exp(self.clscatderivs @ pars.clscat)
 
         
-    def modelresidual(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False):
+    def modelresidual(self,x,colorlawfunction,cachedresults=None,fixuncertainties=False,fixfluxes=False):
    
         if fixfluxes:
             modelflux=cachedresults
         else:
-            modelflux=self.modelflux(x)
+            modelflux=self.modelflux(x,colorlawfunction)
 
         if fixuncertainties:
             if isinstance(cachedresults,tuple):
@@ -369,7 +376,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
             else:
                 modelvariance,clscat=cachedresults,0
         else:
-            modelvariance=self.modelfluxvariance(x)
+            modelvariance=self.modelfluxvariance(x,colorlawfunction)
             clscat=self.colorscatter(x)
 
         variance=self.fluxcalerr**2 + modelvariance  
@@ -618,7 +625,7 @@ class SALTfitcacheSN(SALTtrainingSN):
         return paramsneeded
     
     
-    @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],diff_argnum=1)              
+    @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],diff_argnum=1)
     def modelloglikelihood(self,*args,**kwargs):
         return sum([lc.modelloglikelihood(*args,**kwargs) for lc in self.photdata.values()])+sum([spec.modelloglikelihood(*args,**kwargs) for spec in self.specdata.values()])
 

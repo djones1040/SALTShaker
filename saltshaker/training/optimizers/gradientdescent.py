@@ -2,7 +2,7 @@ from saltshaker.util.inpynb import in_ipynb
 from saltshaker.util.query import query_yes_no
 from saltshaker.util.jaxoptions import jaxoptions
 from jax import config
-config.update("jax_enable_x64", True)
+#config.update("jax_enable_x64", True)
 config.update('jax_platform_name', 'cpu')
 #config.update("jax_debug_nans", True)
 #config.update("jax_disable_jit", True)
@@ -116,7 +116,10 @@ class rpropwithbacktracking(salttrainingoptimizer):
     def optimize(self,initvals):
         X=initvals.copy() #self.saltobj.constraints.transformtoconstrainedparams(jnp.array(initvals))
 
-        residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'),jit=False,dospecresids=self.saltobj.dospec)
+        #import pdb; pdb.set_trace()
+        self.saltobj.maxlikefitphot(X,self.saltobj.allbatchedphotdata)
+        import pdb; pdb.set_trace()
+        #residuals=self.saltobj.lsqwrap(X,self.saltobj.allbatchedphotdata,self.saltobj.calculatecachedvals(X,self.saltobj.allbatchedphotdata,'variances'),jit=False,dospecresids=self.saltobj.dospec)
         oldChi=(residuals**2).sum()
         log.info('Initial chi2: {:.2f} '.format(oldChi))
 
@@ -227,7 +230,22 @@ class rpropwithbacktracking(salttrainingoptimizer):
 
         # this needs to be run in batches
         # contrainedmaxlikefit needs the full sample
-        result= self.saltobj.constrainedmaxlikefit(params,*args,**kwargs)
+        ##result= self.saltobj.constrainedmaxlikefit(params,*args,**kwargs)
+
+        transformedParams = self.saltobj.constraints.transformtoconstrainedparams(params,kwargs['usesecondary'])
+        kwargs.pop('usesecondary')
+        result = self.saltobj.maxlikefitpriors(transformedParams,*args,**kwargs)
+        #import pdb; pdb.set_trace()
+        #for i in range(self.saltobj.n_memory_batches):
+        if isinstance(result,tuple):
+            result_tuple = self.saltobj.maxlikefitphot(transformedParams,self.saltobj.allbatchedphotdata,*args,**kwargs)
+            result = (result[0] + result_tuple[0], result[1] + result_tuple[1])
+            result_tuple = self.saltobj.maxlikefitspec(transformedParams,*args,**kwargs)
+            result = (result[0] + result_tuple[0], result[1] + result_tuple[1])
+        else:
+            result += self.saltobj.maxlikefitphot(transformedParams,self.saltobj.allbatchedphotdata,*args,**kwargs)
+            result += self.saltobj.maxlikefitspec(transformedParams,*args,**kwargs)
+        #import pdb; pdb.set_trace()
         # result
         # diff = grad, the function returns value instead of gradient
         # result_total += result
