@@ -3,6 +3,7 @@ from saltshaker.util.query import query_yes_no
 from saltshaker.util.jaxoptions import jaxoptions
 from jax import config
 config.update("jax_enable_x64", True)
+config.update('jax_platform_name', 'cpu')
 #config.update("jax_debug_nans", True)
 #config.update("jax_disable_jit", True)
 
@@ -23,8 +24,7 @@ from functools import reduce,partial
 
 
 import numpy as np
-from jax import numpy as jnp
-from jax import lax
+from jax import numpy as jnp, lax, profiler
 
 from saltshaker.config.configparsing import *
 
@@ -40,23 +40,13 @@ log=logging.getLogger(__name__)
 
 
 class rpropwithbacktracking(salttrainingoptimizer):
-
     configoptionnames=set()
-    
-    
+
     def __init__(self,guess,saltresids,outputdir,options):
         super().__init__(guess,saltresids,outputdir,options)
         self.saltobj=saltresids  
-        self.burninmaxiter=options.burninmaxiter
-        self.gradientmaxiter=options.gradientmaxiter
-        self.learningratesinitscale=options.learningratesinitscale
-        self.etaplus=options.etaplus
-        self.etaminus=options.etaminus
-        self.searchtolerance= options.searchtolerance
-        self.searchsize = options.searchsize
-        self.convergencetolerance= options.convergencetolerance
-        self.outputdir=outputdir
-
+        for x in self.configoptionnames:
+     	    self.__dict__[x]=getattr(options,x)
         assert(0<self.searchsize<1)
         assert(0<self.searchtolerance<1)
         assert(0<self.etaminus<1)
@@ -103,8 +93,9 @@ class rpropwithbacktracking(salttrainingoptimizer):
                                                 help="""Amount by which to increase learning rates when applicable (must be greater than 1)""")
         successful=successful&wrapaddingargument(config,'rpropconfig','convergencetolerance',  type=float,
                                                 help=""" Convergence criterion, will abort when change in loss is consistently less than this (must be greater than 0)""")
+        successful=successful&wrapaddingargument(config,'rpropconfig','memorydebug',  type=boolean_string, default=False,
+                                                help=""" This is a flag to enable memory profiling""")
 
-                                                        
         if not successful: sys.exit(1)
 
         return parser
@@ -120,7 +111,8 @@ class rpropwithbacktracking(salttrainingoptimizer):
         log.info('Initial chi2: {:.2f} '.format(oldChi))
 
         rates=self.initializelearningrates(X)
-
+        if self.memorydebug:
+           profiler.save_device_memory_profile(path.join(self.outputdir, 'memory_init.profile'))
         try:
             #First fit with color scatter fixed
             if not np.isinf(X[self.saltobj.iclscat_0]):
@@ -330,7 +322,8 @@ class rpropwithbacktracking(salttrainingoptimizer):
                         convergencecriterion=0
                 else:
                     convergencecriterion=np.inf
-
+                if (i%100 == 99) and self.memorydebug:
+                   profiler.save_device_memory_profile(path.join(self.outputdir, f'memory_eval{self.functionevals}.profile'))
                 
                 #signal.sosfilt(convergencefilt, -np.diff((self.losshistory[-numconvergence:]) ))[-1]
                 outtext=f'Iteration {i} , function evaluations {self.functionevals}, convergence criterion {convergencecriterion:.2g}, last diff {self.losshistory[-2]-loss:.2g}, gradient magnitude {jnp.dot(grad[np.nonzero(rates)],grad[np.nonzero(rates)]):.2g}, rates magnitude {jnp.dot(rates,rates):.2g}'

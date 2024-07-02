@@ -1185,7 +1185,11 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
                                            specrecallist=self.options.specrecallist)
             log.info(f'took {time.time()-tdstart:.3f} to read in data files')
             tcstart = time.time()
-
+            for snid,sn in datadict.items():
+                for filt in sn.filt:
+                    if filt not in self.kcordict[sn.survey]:
+                        if filt not in self.options.__dict__[f"{sn.survey.split('(')[0]}_ignore_filters"].replace(' ','').split(','): 
+                            raise ValueError(f'Kcor file missing key {filt} from survey {sn.survey} for sn {snid}; valid keys are {", ".join([x for x in self.kcordict[sn.survey] if "lambdaeff" in self.kcordict[sn.survey][x]])}')
             datadict = self.mkcuts(datadict)[0]
             log.info(f'took {time.time()-tcstart:.3f} to apply cuts')
             

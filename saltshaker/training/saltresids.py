@@ -545,7 +545,7 @@ class SALTResids:
         successful=successful&wrapaddingargument(config,'modelparams','constraint_names','constraints',  default='', nargs='*',      type=str,
                                                 help='constraints enforced on the model, see constraints.py (default=%(default)s)')               
 
-        successful=successful&wrapaddingargument(config,'modelparams','secondary_constraint_names','secondary_constraints',  default=[], nargs='*',      type=str,
+        successful=successful&wrapaddingargument(config,'modelparams','secondary_constraint_names','secondary_constraints',  default='', nargs='*',      type=str,
                                                 help='constraints enforced on the model after an initial burn-in, see constraints.py (default=%(default)s)')
 
 
