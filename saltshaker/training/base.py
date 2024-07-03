@@ -322,14 +322,14 @@ class TrainSALTBase:
             return outdict,cutdict
 
         def filter_select(self,survey,flt):
-                select = True
                 if flt in self.options.__dict__[f"{survey.split('(')[0]}_ignore_filters"].replace(' ','').split(','):
-                        select = False
+                    return  False
 
-                lambdaeff = self.kcordict[survey][flt]['lambdaeff']
-                if lambdaeff < self.options.filtercen_obs_waverange[0] or \
-                   lambdaeff > self.options.filtercen_obs_waverange[1] :
-                        select = False                
+                else:
+                    lambdaeff = self.kcordict[survey][flt]['lambdaeff']
+                    if lambdaeff < self.options.filtercen_obs_waverange[0] or \
+                                 lambdaeff > self.options.filtercen_obs_waverange[1] :
+                         return False
 
-                return select                
+                return True 
                 # end filter_select
