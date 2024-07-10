@@ -326,7 +326,10 @@ class TrainSALTBase:
                 if flt in self.options.__dict__[f"{survey.split('(')[0]}_ignore_filters"].replace(' ','').split(','):
                         select = False
 
-                lambdaeff = self.kcordict[survey][flt]['lambdaeff']
+                try: lambdaeff = self.kcordict[survey][flt]['lambdaeff']
+                except KeyError as e: 
+                    log.error(f'{flt} not found in kcor for {survey}; valid keys are {", ".join([x for x in self.kcordict[survey] if "lambdaeff" in self.kcordict[survey][x]])}')
+                    raise e
                 if lambdaeff < self.options.filtercen_obs_waverange[0] or \
                    lambdaeff > self.options.filtercen_obs_waverange[1] :
                         select = False                

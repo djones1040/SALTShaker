@@ -20,6 +20,7 @@ import pylab as plt
 import os
 from os import path
 import subprocess
+import warnings
 
 from scipy.interpolate import interp1d
 from scipy.special import factorial
@@ -128,6 +129,67 @@ def specflux(obsphase,obswave,m0phase,m0wave,m0flux,m1flux,colorlaw,z,x0,x1,c,mw
 
     return modelflux_wave
 
+def calcadaptivewaveknots(datadict,tuningcoeff,waverange,wavesplineres,order):
+    waves=[]
+    snrsq=[]
+
+    for sn in datadict.values():
+        for spec in sn.specdata.values():
+            waves+=[spec.wavelength/(1+sn.zHelio)]
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                snrsq+=[np.hypot(np.nan_to_num(spec.fluxerr/spec.flux,False,1000),.1)**(-2)]
+    snrsq=np.concatenate(snrsq)
+    waves=np.concatenate(waves)
+    idx=np.argsort(waves)
+    waves=waves[idx]
+    snrsq=snrsq[idx]
+
+    projection=np.cumsum(snrsq)/snrsq.sum() + tuningcoeff*(waves-waves.min())/(waves.max()-waves.min())
+    projection/=projection.max()
+    n=10
+    olddiff=np.inf
+    while n<(waverange[1]-waverange[0])/wavesplineres:
+        n+=1
+        knots=np.interp(np.linspace(0,1,n,True),projection,waves)
+        diff=np.abs(np.min(np.diff(knots))- wavesplineres)
+        if olddiff<diff: break
+        olddiff=diff
+    n=n-1
+    knots=np.interp(np.linspace(0,1,n,True),projection,waves)
+    return np.concatenate([[waverange[0]]*(order+1), knots[1:-1] , [waverange[1]]*(order+1)])
+
+def getsplineknots(datadict,phaserange=[-20,50],waverange=[2000,9200],phasesplineres=3.2,wavesplineres=72,order=3,use_snpca_knots=False,adaptivewaveknots=None):
+    
+    if use_snpca_knots:
+        log.warning('SNPCA knot option enabled, overriding spline specifications')
+        splinephase = np.array([-20.0,-20.0,-20.0,-20.0,-16.72,-12.90,-8.20,-3.85,-0.08,3.65,7.91,12.54,16.89,20.87,25.22,30.94,38.59,50.0,50.0,50.0,50.0])
+        splinewave = np.array([2000., 2000., 2000., 2000., 2067., 2133., 2198., 2262., 2325., 2387., 2449., 2510.,
+                               2570., 2630., 2689., 2748., 2806., 2863., 2920., 2977., 3033.,
+                               3089., 3145., 3200., 3255., 3310., 3364., 3418., 3472., 3526.,
+                               3580., 3633., 3687., 3740., 3793., 3846., 3899., 3952., 4005.,
+                               4058., 4111., 4164., 4217., 4270., 4323., 4377., 4430., 4484.,
+                               4538., 4592., 4646., 4700., 4755., 4810., 4865., 4921., 4977.,
+                               5033., 5090., 5147., 5205., 5263., 5322., 5381., 5441., 5501.,
+                               5563., 5624., 5687., 5750., 5814., 5879., 5946.,
+                               6012., 6081., 6150., 6220., 6292., 6365., 6439., 6515.,
+                               6593., 6672., 6754., 6837., 6922., 7010., 7101., 7194., 7290.,
+                               7389., 7492., 7598., 7709., 7825., 7946., 8072., 8205., 8345.,
+                               8494., 8652., 8821., 9003.,9200.,9200.,9200.,9200.])
+    
+    else:
+        splinephase = np.linspace(phaserange[0],phaserange[1],int((phaserange[1]-phaserange[0])/phasesplineres)+1,True)
+        splinephase[:order+1]=splinephase[0]
+        splinephase[-(order+1):]=splinephase[-1]
+        if adaptivewaveknots is None:
+            splinewave	= np.linspace(waverange[0],waverange[1],int((waverange[1]-waverange[0])/wavesplineres)+1,True)
+            splinewave[:order+1]=splinewave[0]
+            splinewave[-(order+1):]=splinewave[-1]
+        else:
+            splinewave= calcadaptivewaveknots(datadict,adaptivewaveknots,waverange,wavesplineres,order)
+            
+    return splinephase,splinewave
+
 
 class TrainSALT(TrainSALTBase):
 
@@ -145,44 +207,54 @@ class TrainSALT(TrainSALTBase):
         
         if self.options.initm0modelfile and not os.path.exists(self.options.initm0modelfile):
             raise RuntimeError('model initialization file not found in local directory or %s'%init_rootdir)
-
+    
         # initial guesses
         init_options = {'phaserange':self.options.phaserange,'waverange':self.options.waverange,
                         'phasesplineres':self.options.phasesplineres,'wavesplineres':self.options.wavesplineres,
-                        'phaseinterpres':self.options.phaseinterpres,'waveinterpres':self.options.waveinterpres,
-                        'normalize':True,'order':self.options.bsorder,'use_snpca_knots':self.options.use_snpca_knots}
-
-        phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
-            self.options.inithsiaofile,self.options.initbfilt,_flatnu,**init_options)
-        if self.options.host_component:
-            mhostknots = m0knots*0.01 # 1% of M0?  why not
+                        'order':self.options.bsorder,'use_snpca_knots':self.options.use_snpca_knots,
+                        'adaptivewaveknots':self.options.adaptivewaveknots}
         
+        phaseknotloc,waveknotloc= getsplineknots(datadict,**init_options)
+        
+        init_options={'phaseinterpres':self.options.phaseinterpres,
+               'waveinterpres':self.options.waveinterpres, 'splinephase':phaseknotloc,'splinewave':waveknotloc,
+               'order':self.options.bsorder
+        }
         if self.options.initsalt2model:
             if self.options.initm0modelfile =='':
+                log.info('Loading SALT2 M0')
                 self.options.initm0modelfile=f'{init_rootdir}/salt2_template_0.dat'
             if self.options.initm1modelfile  =='':
+                log.info('Loading SALT2 M1')
                 self.options.initm1modelfile=f'{init_rootdir}/salt2_template_1.dat'
-
+    
         if self.options.initm0modelfile and self.options.initm1modelfile:
             if self.options.initsalt2model:
+                log.info('Initializing from provided SALT surfaces')
                 phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_salt2(
                     m0file=self.options.initm0modelfile,m1file=self.options.initm1modelfile,
                     Bfilt=self.options.initbfilt,flatnu=_flatnu,**init_options)
             else:
+                log.info('Initializing from provided kaepora surfaces')
                 phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_kaepora(
                     self.options.initm0modelfile,self.options.initm1modelfile,
                     Bfilt=self.options.initbfilt,flatnu=_flatnu,**init_options)
+        else: 
+            log.info('Initializing from Hsiao template')
+            phase,wave,m0,m1,phaseknotloc,waveknotloc,m0knots,m1knots = init_hsiao(
+                self.options.inithsiaofile,self.options.initbfilt,_flatnu,**init_options)
+        if self.options.host_component:
+            mhostknots = m0knots*0.01 # 1% of M0?  why not
+                
         #zero out the flux and the 1st derivative at the start of the phase range
         m0knots[:(waveknotloc.size-self.options.bsorder-1) * 2]=0
         m1knots[:(waveknotloc.size-self.options.bsorder-1) * 2]=0
+    
+        init_options = {'phaserange':self.options.phaserange,'waverange':self.options.waverange,
+                        'phaseinterpres':self.options.phaseinterpres, 'waveinterpres':self.options.waveinterpres,
+                        'phasesplineres':self.options.error_snake_phase_binsize,'wavesplineres':self.options.error_snake_wave_binsize,
+                        'order':self.options.errbsorder,'n_colorscatpars':self.options.n_colorscatpars}            
         
-        init_options['phasesplineres'] = self.options.error_snake_phase_binsize
-        init_options['wavesplineres'] = self.options.error_snake_wave_binsize
-        init_options['order']=self.options.errbsorder
-        init_options['n_colorscatpars']=self.options.n_colorscatpars
-            
-        
-        del init_options['use_snpca_knots']
         if self.options.initsalt2var:
             errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs(
                  *['%s/%s'%(init_rootdir,x) for x in ['salt2_lc_relative_variance_0.dat','salt2_lc_relative_covariance_01.dat','salt2_lc_relative_variance_1.dat','salt2_lc_dispersion_scaling.dat','salt2_color_dispersion.dat']],**init_options)
@@ -196,12 +268,12 @@ class TrainSALT(TrainSALTBase):
             init_options['m1knots'] = m1knots
             if self.options.host_component:
                 init_options['mhostknots'] = mhostknots
-
+    
             if not self.options.host_component:
                 errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,m0m1corrknots,clscatcoeffs=init_errs_percent(**init_options)
             else:
                 errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,mhostvarknots,m0m1corrknots,clscatcoeffs=init_errs_percent(**init_options)
-
+    
         # number of parameters
         n_phaseknots,n_waveknots = len(phaseknotloc)-self.options.bsorder-1,len(waveknotloc)-self.options.bsorder-1
         n_errphaseknots,n_errwaveknots = len(errphaseknotloc)-self.options.errbsorder-1,len(errwaveknotloc)-self.options.errbsorder-1
@@ -226,14 +298,14 @@ class TrainSALT(TrainSALTBase):
         
         if self.options.n_colorscatpars:
             parlist = np.append(parlist,['clscat']*(self.options.n_colorscatpars))
-
+    
         # SN parameters
         parlist = np.append(parlist,sum( [[f'x{i}_{k}' for i in range(self.options.n_components)]
             +[f'c{i}_{k}' for i in range(len(self.options.n_colorpars)) ] for k in datadict.keys()],[]))
-
+    
         if self.options.host_component:
             parlist = np.append(parlist,[f'xhost_{k}' for k in datadict.keys()])
-
+    
         if self.options.specrecallist:
             spcrcldata = Table.read(self.options.specrecallist,format='ascii')
             
@@ -246,7 +318,7 @@ class TrainSALT(TrainSALTBase):
                     specdata[k].wavelength.min())/self.options.specrange_wavescale_specrecal) + \
                     len(datadict[sn].filt)* self.options.n_specrecal_per_lightcurve)
                 order=min(max(order,self.options.n_min_specrecal ), self.options.n_max_specrecal)
-
+    
                 # save the order as part of the specrecal list
                 if not self.options.specrecallist or sn not in spcrcldata['SNID'] or k+1 not in spcrcldata['N'][spcrcldata['SNID'] == sn]:
                     datadict[sn].specdata[k].n_specrecal = order
@@ -254,7 +326,7 @@ class TrainSALT(TrainSALTBase):
                 #    import pdb; pdb.set_trace()
                 recalParams=[f'specx0_{sn}_{k}']+[f'specrecal_{sn}_{k}']*(order-1)
                 parlist=np.append(parlist,recalParams)
-
+    
         modelconfiguration=saltresids.saltconfiguration(parlist=parlist,phaseknotloc =phaseknotloc ,waveknotloc=waveknotloc,
             errphaseknotloc=errphaseknotloc,errwaveknotloc=errwaveknotloc)
         # initial guesses
@@ -307,7 +379,7 @@ class TrainSALT(TrainSALTBase):
                         def bestfit(p):
                             cl_init = initcolorlaw(1, p,clwave)
                             return cl_init-salt2cl
-
+    
                         md = least_squares(bestfit,np.zeros(self.options.n_colorpars[0]))
                         if 'termination conditions are satisfied' not in md.message and \
                            'termination condition is satisfied' not in md.message:
@@ -317,9 +389,9 @@ class TrainSALT(TrainSALTBase):
                 else:
                     guess[parlist == 'cl0'] =[0.]*self.options.n_colorpars 
             if self.options.n_colorscatpars:
-
+    
                 guess[parlist == 'clscat'] = clscatcoeffs
-
+    
             guess[(parlist == 'm0') & (guess < 0)] = 1e-4
             
             guess[parlist=='modelerr_0']=m0varknots
@@ -328,15 +400,15 @@ class TrainSALT(TrainSALTBase):
                 guess[parlist=='modelcorr_01']=m0m1corrknots
             if self.options.host_component: guess[parlist=='modelerr_host']=1e-9 # something small...  #mhostvarknots
             
-
+    
             # if SN param list is provided, initialize with these params
             if self.options.snparlist:
                 snpar = Table.read(self.options.snparlist,format='ascii')
                 snpar['SNID'] = snpar['SNID'].astype(str)
-
+    
             from numpy.random import default_rng
             rng = default_rng(134912348)
-
+    
             for sn in datadict.keys():
                 if self.options.snparlist:
                     # hacky matching, but SN names are a mess as usual
@@ -355,14 +427,14 @@ class TrainSALT(TrainSALTBase):
                                 guess[parlist==f'x{i}_{sn}'] = rng.standard_normal()
                         if snpar['x0'][iSN]<= 0:
                             log.warning(f'Bad input value for {sn}: x0= {snpar["x0"][iSN]}')
-                            guess[parlist==f'x{i}_{sn}'] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
-
+                            guess[parlist==f'x0_{sn}'] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
+    
                         guess[parlist == 'c0_%s'%sn] = snpar['c'][iSN]
                         guess[parlist == 'c1_%s'%sn] = np.random.exponential(0.2)
                     else:
                         log.warning(f'SN {sn} not found in SN par list {self.options.snparlist}')
                         guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
-
+    
                 elif 'SIM_SALT2x1' in datadict[sn].__dict__.keys():
                     # simulated samples need an initialization list also
                     # initializing to sim. values is not the best but running SNANA fits adds a lot of overhead
@@ -372,11 +444,11 @@ class TrainSALT(TrainSALTBase):
                     guess[parlist == 'c0_%s'%sn] = datadict[sn].SIM_SALT2c
                 else:
                     guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
-
+    
                     
                 for k in datadict[sn].specdata : 
                     guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]
-
+    
             # let's redefine x1 before we start
             ratio = RatioToSatisfyDefinitions(phase,wave,self.kcordict,[m0,m1])
             ix1 = np.array([i for i, si in enumerate(parlist) if si.startswith('x1')],dtype=int)
@@ -386,7 +458,7 @@ class TrainSALT(TrainSALTBase):
             if x1std == x1std and x1std != 0.0:
                 guess[ix1]/= x1std
                 
-
+    
             # spectral params
             for sn in datadict.keys():
                 specdata=datadict[sn].specdata
@@ -397,7 +469,7 @@ class TrainSALT(TrainSALTBase):
                     pow=(order)-np.arange(order)
                     recalCoord=(specdata[k].wavelength-np.mean(specdata[k].wavelength))/2500
                     drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
-
+    
                     zHel,x0,x1,c = datadict[sn].zHelio,guess[parlist == f'x0_{sn}'],guess[parlist == f'x1_{sn}'],guess[parlist == f'c_{sn}']
                     mwebv = datadict[sn].MWEBV
                     
@@ -407,13 +479,13 @@ class TrainSALT(TrainSALTBase):
                     def recalpars(x):
                         recalexp=np.exp((drecaltermdrecal*x[1:][np.newaxis,:]).sum(axis=1))
                         return (x[0]*uncalledModel*recalexp - specdata[k].flux)/specdata[k].fluxerr
-
+    
                     md = least_squares(recalpars,[np.median(specdata[k].flux)/np.median(uncalledModel)]+list(guess[parlist == 'specrecal_{}_{}'.format(sn,k)]))
-
+    
                     guess[parlist == f'specx0_{sn}_{k}' ]= md.x[0]*x0
                     guess[parlist == f'specrecal_{sn}_{k}'] = md.x[1:]
-
-
+    
+    
         if self.options.fix_salt2components_initdir:
             log.info(f"resuming from output directory {self.options.fix_salt2components_initdir}")
             
@@ -436,7 +508,7 @@ class TrainSALT(TrainSALTBase):
                 except:
                     log.info(f'Could not initializing parameter {key} from previous training')
                     pass
-
+    
                     
         return guess,modelconfiguration
 

@@ -506,6 +506,10 @@ class SALTResids:
                                                 help='for model uncertainty splines/polynomial funcs, order of the function (default=%(default)s)')
         successful=successful&wrapaddingargument(config,'modelparams','bsorder','interporder',     type=int,
                                                 help='for model splines/polynomial funcs, order of the function (default=%(default)s)')
+
+        successful=successful&wrapaddingargument(config,'modelparams','adaptivewaveknots',  type=float,default=None,
+                                                help='If enabled, adaptively scales the wavelength spacing of knots. High values give ~ linear spacing, low values reduce resolution where spectra are not present (default=%(default)s)')
+
         successful=successful&wrapaddingargument(config,'modelparams','wavesplineres',  type=float,
                                                 help='number of angstroms between each wavelength spline knot (default=%(default)s)')
         successful=successful&wrapaddingargument(config,'modelparams','phasesplineres', type=float,

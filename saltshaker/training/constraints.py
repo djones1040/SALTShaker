@@ -105,14 +105,18 @@ class SALTconstraints:
             guess=guess.at[self.icoordinates].set( guess[self.icoordinates]/(1+ratio*guess[self.icoordinates[i][np.newaxis,:]]))
             guess=guess.at[comp].set(guess[comp]-  ratio * guess[self.im0])
         return guess
-    
+        
+    @constraint
+    def fixblueflux(self,guess):
+        return guess.at[self.icomponents[:,::(self.waveknotloc.size-self.bsorder-1) ]].set(0)
+
     @constraint
     def fixinitialflux(self,guess):
-        return guess.at[self.icomponents[:,:(self.waveknotloc.size-self.bsorder) ]].set(0)
+        return guess.at[self.icomponents[:,:(self.waveknotloc.size-self.bsorder-1) ]].set(0)
         
     @constraint
     def fixinitialderivative(self,guess):
-        numwavepars=(self.waveknotloc.size-self.bsorder)
+        numwavepars=(self.waveknotloc.size-self.bsorder-1)
         return guess.at[self.icomponents[:,numwavepars:2*numwavepars ]].set(0)
     
     

@@ -278,7 +278,10 @@ class SALTPriors:
         """host component should have zero flux at t=0 in the B band.  Not sure if needed"""
         return self.__maximumlightpcderiv__ @ x[self.imhost] / (self.bstdflux* width)
 
-    
+    @prior
+    def bluefluxprior(self,width,guess):
+        return guess[self.icomponents[:,::(self.waveknotloc.size-self.bsorder-1) ]].flatten() / width
+
     @prior
     def recalprior(self,width,x):
         """Prior on all spectral recalibration"""
