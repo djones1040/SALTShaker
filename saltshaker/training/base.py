@@ -322,9 +322,8 @@ class TrainSALTBase:
             return outdict,cutdict
 
         def filter_select(self,survey,flt):
-                select = True
                 if flt in self.options.__dict__[f"{survey.split('(')[0]}_ignore_filters"].replace(' ','').split(','):
-                        select = False
+                    return  False
 
                 try: lambdaeff = self.kcordict[survey][flt]['lambdaeff']
                 except KeyError as e: 
@@ -334,5 +333,5 @@ class TrainSALTBase:
                    lambdaeff > self.options.filtercen_obs_waverange[1] :
                         select = False                
 
-                return select                
+                return True 
                 # end filter_select

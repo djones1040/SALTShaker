@@ -408,7 +408,6 @@ class TrainSALT(TrainSALTBase):
     
             from numpy.random import default_rng
             rng = default_rng(134912348)
-    
             for sn in datadict.keys():
                 if self.options.snparlist:
                     # hacky matching, but SN names are a mess as usual
@@ -426,9 +425,9 @@ class TrainSALT(TrainSALTBase):
                             else:
                                 guess[parlist==f'x{i}_{sn}'] = rng.standard_normal()
                         if snpar['x0'][iSN]<= 0:
-                            log.warning(f'Bad input value for {sn}: x0= {snpar["x0"][iSN]}')
+                            log.warning(f'Bad input value for {sn}: x0={ float(snpar["x0"][iSN])}')
                             guess[parlist==f'x0_{sn}'] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
-    
+
                         guess[parlist == 'c0_%s'%sn] = snpar['c'][iSN]
                         guess[parlist == 'c1_%s'%sn] = np.random.exponential(0.2)
                     else:

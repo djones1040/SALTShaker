@@ -47,6 +47,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         self.saltobj=saltresids  
         for x in self.configoptionnames:
      	    self.__dict__[x]=getattr(options,x)
+        self.outputdir=options.outputdir
         assert(0<self.searchsize<1)
         assert(0<self.searchtolerance<1)
         assert(0<self.etaminus<1)
