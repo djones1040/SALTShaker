@@ -182,12 +182,13 @@ def getsplineknots(datadict,phaserange=[-20,50],waverange=[2000,9200],phasesplin
         splinephase[:order+1]=splinephase[0]
         splinephase[-(order+1):]=splinephase[-1]
         if adaptivewaveknots is None:
+
             splinewave	= np.linspace(waverange[0],waverange[1],int((waverange[1]-waverange[0])/wavesplineres)+1,True)
             splinewave[:order+1]=splinewave[0]
             splinewave[-(order+1):]=splinewave[-1]
         else:
             splinewave= calcadaptivewaveknots(datadict,adaptivewaveknots,waverange,wavesplineres,order)
-            
+            log.info(f'Wave knot locations adaptively set to {splinewave} in angstroms')
     return splinephase,splinewave
 
 
@@ -215,7 +216,6 @@ class TrainSALT(TrainSALTBase):
                         'adaptivewaveknots':self.options.adaptivewaveknots}
         
         phaseknotloc,waveknotloc= getsplineknots(datadict,**init_options)
-        
         init_options={'phaseinterpres':self.options.phaseinterpres,
                'waveinterpres':self.options.waveinterpres, 'splinephase':phaseknotloc,'splinewave':waveknotloc,
                'order':self.options.bsorder
