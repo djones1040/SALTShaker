@@ -23,7 +23,7 @@ from scipy.stats import norm
 from scipy.ndimage import gaussian_filter1d
 from scipy.special import factorial
 from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
-from scipy.integrate import trapz
+from scipy.integrate import trapezoid as trapz
 from scipy import linalg
 from scipy import sparse as scisparse
 
