@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # D. Jones - 11/1/2019
 from scipy.interpolate import interp1d
-from scipy.integrate import trapz
+from scipy.integrate import trapezoid as trapz
 import numpy as np
 from saltshaker.util.synphot import synphot
 from sncosmo.constants import HC_ERG_AA
