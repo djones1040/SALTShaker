@@ -101,6 +101,8 @@ class TrainSALTBase:
                                                         help="""if set, only train on SNe with spectra (default=%(default)s)""")
                 successful=successful&wrapaddingargument(config,'iodata','filter_mass_tolerance',  type=float,
                                                         help='Mass of filter transmission allowed outside of model wavelength range (default=%(default)s)')
+                successful=successful&wrapaddingargument(config,'iodata', 'spectra_cut',  type=float , help='Makes cut so that only spectra of S/N > 5 are used ')
+
 
                 msg = "range of obs filter central wavelength (A)"
                 successful=successful&wrapaddingargument(config, 'iodata',
@@ -277,7 +279,11 @@ class TrainSALTBase:
                        spectrum.phase>self.options.phaserange[1]-3:
                         specdata.pop(k)
                         continue
-
+                     #import pdb; pdb.set_trace()
+                    if np.median(spectrum.flux/spectrum.fluxerr) <self.options.spectra_cut:
+                        specdata.pop(k)
+                        continue
+      
                     #remove spectral data outside wavelength range
                     inwaverange=(spectrum.wavelength>(self.options.waverange[0]*(1+z)))&(spectrum.wavelength<(self.options.waverange[1]*(1+z)))
                     clippedspectrum=spectrum.clip(inwaverange)
