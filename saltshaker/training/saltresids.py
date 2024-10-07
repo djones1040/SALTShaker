@@ -27,6 +27,7 @@ from scipy.integrate import trapezoid as trapz
 from scipy import linalg
 from scipy import sparse as scisparse
 
+import glob
 import numpy as np
 from numpy.random import standard_normal
 from numpy.linalg import slogdet
@@ -384,8 +385,19 @@ class SALTResids:
             self.allphotdata = sum([[x.photdata[lc] for lc in x.photdata ]for x in self.datadict.values() ],[])
             self.allspecdata = sum([[x.specdata[key] for key in x.specdata ]for x in self.datadict.values() ],[])
 
-            self.batchedphotdata= batching.batchdatabysize(self.allphotdata)
-            self.batchedspecdata= batching.batchdatabysize(self.allspecdata)
+            #self.batchedphotdata= batching.batchdatabysize(self.allphotdata)
+            #self.batchedspecdata= batching.batchdatabysize(self.allspecdata)
+            batching.batchdatabysize(self.allphotdata,self.outputdir,prefix='phot')
+            self.batchedphotdata = []
+            for cachefile in glob.glob(f'{self.outputdir}/caching_phot_*.pkl'):
+                with open(cachefile,'rb') as fin: 
+                    self.batchedphotdata += [pickle.load(fin)['data']]
+            batching.batchdatabysize(self.allspecdata,self.outputdir,prefix='spec')
+            self.batchedspecdata = []
+            for cachefile in glob.glob(f'{self.outputdir}/caching_spec_*.pkl'):
+                with open(cachefile,'rb') as fin: 
+                    self.batchedspecdata += [pickle.load(fin)['data']]
+            
             if self.trainingcachefile:
                 log.info(f'Writing precomputed quantities to file {self.trainingcachefile}')
                 with open( self.trainingcachefile,'wb') as file:

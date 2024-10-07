@@ -3,6 +3,7 @@ import jax
 from jax import numpy as jnp
 from jax.experimental import sparse
 import numpy as np
+import pickle
 
 from scipy import optimize, stats
 
@@ -47,7 +48,7 @@ def optimizepaddingsizes(numbatches,datasizes):
 
 
 
-def batchdatabysize(data):
+def batchdatabysize(data,outdir,prefix=''):
     """ Given a set of  data, divide them into batches each of a fixed size, for easy use with jax's batching methods. Quantities that are marked as 'mapped' by their objects will be turned into arrays, otherwise the values are tested for equality and given as unmapped objects  """
     batcheddata={ }
 
@@ -82,7 +83,12 @@ def batchdatabysize(data):
                 else:
                     yield  np.stack(vals,axis=0) 
     #Returns a list of batches of data suitable for use with the batchedmodelfunctions function
-    return [list(repackforvmap(x)) for x in batcheddata.values()]
+    for i,x in enumerate(batcheddata.values()):
+        jax.clear_caches()
+        with open(f'{outdir}/caching_{prefix}_{i}.pkl','wb') as fout:
+            pickle.dump({'data':list(repackforvmap(x))},fout)
+
+    #return [list(repackforvmap(x)) for x in batcheddata.values()]
 
 
 
