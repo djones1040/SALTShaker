@@ -254,7 +254,10 @@ class TrainSALT(TrainSALTBase):
                 #    import pdb; pdb.set_trace()
                 recalParams=[f'specx0_{sn}_{k}']+[f'specrecal_{sn}_{k}']*(order-1)
                 parlist=np.append(parlist,recalParams)
-
+        if self.options.usesurverrfloors:
+            filtlist= set(sum([list(sn.photdata.keys()) for sn in datadict.values()],[]) )
+            parlist=np.append(parlist, [f'surverrfloor_{x}' for x in filtlist])
+            
         modelconfiguration=saltresids.saltconfiguration(parlist=parlist,phaseknotloc =phaseknotloc ,waveknotloc=waveknotloc,
             errphaseknotloc=errphaseknotloc,errwaveknotloc=errwaveknotloc)
         # initial guesses
@@ -385,7 +388,9 @@ class TrainSALT(TrainSALTBase):
             if x1std == x1std and x1std != 0.0:
                 guess[ix1]/= x1std
                 
-
+            if self.options.usesurverrfloors:
+                guess[np.char.startswith(parlist,'surverrfloor')]=np.log(0.005)
+            
             # spectral params
             for sn in datadict.keys():
                 specdata=datadict[sn].specdata
@@ -1269,7 +1274,6 @@ config file options can be overwridden at the command line"""
         user_options = user_parser.parse_known_args(args)[0]
 
         loggerconfig.dictconfigfromYAML(user_options.loggingconfig,user_options.outputdir)
-
         if not os.path.exists(user_options.modelconfig):
             print('warning : model config file %s doesn\'t exist.  Trying package directory'%user_options.modelconfig)
             user_options.modelconfig = '%s/%s'%(config_rootdir,user_options.modelconfig)
@@ -1350,6 +1354,6 @@ config file options can be overwridden at the command line"""
 
             
             self.get_config_options(salt,configfile,args)
-        
+            
             salt.main()
 

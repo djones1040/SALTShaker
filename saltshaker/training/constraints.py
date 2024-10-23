@@ -105,7 +105,12 @@ class SALTconstraints:
             guess=guess.at[self.icoordinates].set( guess[self.icoordinates]/(1+ratio*guess[self.icoordinates[i][np.newaxis,:]]))
             guess=guess.at[comp].set(guess[comp]-  ratio * guess[self.im0])
         return guess
-    
+
+    @constraint
+    def positiveerrfloors(self,guess):
+        return guess.at[self.isurverrfloor].set(jnp.exp(guess[self.isurverrfloor]))
+        
+        
     @constraint
     def fixinitialflux(self,guess):
         return guess.at[self.icomponents[:,:(self.waveknotloc.size-self.bsorder) ]].set(0)

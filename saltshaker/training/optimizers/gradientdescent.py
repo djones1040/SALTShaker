@@ -332,7 +332,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
                     sys.stdout.write(f'\r\x1b[1K'+outtext.ljust(os.get_terminal_size().columns))
                 log.debug(outtext)
                 
-                if i> numconvergence+10:
+                if i> numconvergence+100:
                     if np.all(convergencecriterion< self.convergencetolerance):
                         sys.stdout.write('\n')
                         log.info('Convergence achieved')

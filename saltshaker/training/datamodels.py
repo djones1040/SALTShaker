@@ -57,8 +57,8 @@ def toidentifier(input):
 @register_pytree_node_class
 class SALTparameters:          
     __slots__=['x0','coordinates','components','c','CL',
-    'modelcorrs','modelerrs','spcrcl','clscat']
-    __ismapped__={'x0','c','coordinates','spcrcl'}
+    'modelcorrs','modelerrs','spcrcl','clscat','surverrfloor']
+    __ismapped__={'x0','c','coordinates','spcrcl','surverrfloor'}
     def __init__(self,data,parsarray):
         for var in self.__slots__:
             #determine appropriate indices
@@ -163,7 +163,7 @@ class modeledtrainingdata(metaclass=abc.ABCMeta):
     
 @register_pytree_node_class
 class modeledtraininglightcurve(modeledtrainingdata):
-    __indexattributes__=['iCL','ix0','ic','icoordinates', 'icomponents','imodelcorrs', 'imodelerrs','iclscat','ipad']
+    __indexattributes__=['iCL','ix0','ic','icoordinates', 'icomponents','imodelcorrs', 'imodelerrs','iclscat','ipad','isurverrfloor']
     
     __dynamicattributes__= [
         'phase','fluxcal','fluxcalerr',
@@ -184,7 +184,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
     __slots__ = __dynamicattributes__+__staticattributes__
     
     __ismapped__={
-    'ix0','ic','icoordinates','ipad','phase','fluxcal','fluxcalerr',
+    'ix0','ic','icoordinates','isurverrfloor','ipad','phase','fluxcal','fluxcalerr',
         'lambdaeff','lambdaeffrest','errordesignmat','pcderivsparse',
         'varianceprefactor',
         'clscatderivs',
@@ -230,7 +230,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
            )
                 
         self.imodelerrs= np.array([np.arange(x,y+1) for x,y in (zip(residsobj.errmin,residsobj.errmax))])
-
+        self.isurverrfloor= np.where(residsobj.parlist== f'surverrfloor_{lc.filt}')[0]
         
         self.wavebasis= residsobj.wavebasis
         
@@ -344,9 +344,13 @@ class modeledtraininglightcurve(modeledtrainingdata):
         for (i,j),correlation in zip(self.imodelcorrs_coordinds,pars.modelcorrs):
             errorsurfaces= errorsurfaces+2 *correlation*coordinates[i]*coordinates[j]* pars.modelerrs[i]*pars.modelerrs[j]
         errorsurfaces=self.errordesignmat @ errorsurfaces
-        modelfluxvar=colorexp**2 * self.varianceprefactor**2 * pars.x0**2* errorsurfaces
-        return jnp.clip(modelfluxvar ,0,None)
-        
+
+        modelfluxvar=jnp.clip(colorexp**2 * self.varianceprefactor**2 * pars.x0**2* errorsurfaces ,0,None)
+        if self.isurverrfloor.size>0:
+            return jnp.hypot(modelfluxvar, pars.surverrfloor * self.modelflux(pars) )
+        else:
+            return modelfluxvar
+            
     def colorscatter(self,pars):
         if not isinstance(pars,SALTparameters):
             pars=SALTparameters(self,pars)

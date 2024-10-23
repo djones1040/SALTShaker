@@ -4,6 +4,7 @@ from jax import numpy as jnp
 from jax.experimental import sparse
 import numpy as np
 import pickle
+import glob
 
 from scipy import optimize, stats
 
@@ -84,9 +85,13 @@ def batchdatabysize(data,outdir,prefix=''):
                     yield  np.stack(vals,axis=0) 
     #Returns a list of batches of data suitable for use with the batchedmodelfunctions function
     for i,x in enumerate(batcheddata.values()):
-        jax.clear_caches()
+        try: jax.clear_caches()
+        except: pass
         with open(f'{outdir}/caching_{prefix}_{i}.pkl','wb') as fout:
             pickle.dump({'data':list(repackforvmap(x))},fout)
+    for cachefile in glob.glob(f'{outdir}/caching_{prefix}_*.pkl'):
+        with open(cachefile,'rb') as fin: 
+            yield pickle.load(fin)['data']
 
     #return [list(repackforvmap(x)) for x in batcheddata.values()]
 
