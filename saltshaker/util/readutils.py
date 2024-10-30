@@ -153,6 +153,7 @@ class SALTtrainingspectrum(SALTtrainingdata):
                 return len(self.wavelength)
                         
 class SALTtrainingSN:
+
         __slots__=['survey', 'zHelio', 'MWEBV', 'snid', 'tpk_guess', 'salt2fitprob', 'photdata','specdata','SIM_SALT2x0','SIM_SALT2x1','SIM_SALT2c']
         def __init__(self,sn,
                      estimate_tpk=False,snpar=None,
