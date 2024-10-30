@@ -38,6 +38,7 @@ from saltshaker.util.specSynPhot import getScaleForSN
 from saltshaker.util.specrecal import SpecRecal
 from saltshaker.util.synphot import synphot
 from saltshaker.util.example_data_utils import download_dir
+from saltshaker.util import compute_survey_stats
 
 from saltshaker.initfiles import init_rootdir
 from saltshaker.initfiles import init_rootdir as salt2dir
@@ -822,6 +823,10 @@ MAGERR_LAMREST: 0.1   100   200  # magerr minlam maxlam
 SIGMA_INT: 0.106  # used in simulation"""
         with open(f'{outdir}/SALT3.INFO','w') as foutinfo:
             print(foutinfotext,file=foutinfo)
+            print('# SURVEY STATS',file=fout)
+            print('# SURVEY N_SN N_SPEC',file=fout)
+            for k,v in self.survey_stats_dict.items():
+                print(f"#{k} {v[0]} {v[1]}",file=fout)
         if len(trainingresult.clpars)==1: 
             colorlaw=trainingresult.clpars[0]
             with open(f'{outdir}/salt3_color_correction.dat','w') as foutcl:
@@ -1072,7 +1077,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
                                            binspecres=binspecres,snparlist=self.options.snparlist,
                                            maxsn=self.options.maxsn,
                                            specrecallist=self.options.specrecallist)
-                
+            self.survey_stats_dict = compute_survey_stats.sn_numbers(datadict)
             tlc = time.time()
             count = 0
             salt2_chi2tot,salt3_chi2tot = 0,0
