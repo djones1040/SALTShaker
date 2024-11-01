@@ -153,8 +153,7 @@ class SALTtrainingspectrum(SALTtrainingdata):
                 return len(self.wavelength)
                         
 class SALTtrainingSN:
-
-        __slots__=['survey', 'zHelio', 'MWEBV', 'snid', 'tpk_guess', 'salt2fitprob', 'photdata','specdata']
+        __slots__=['survey', 'zHelio', 'MWEBV', 'snid', 'tpk_guess', 'salt2fitprob', 'photdata','specdata','SIM_SALT2x0','SIM_SALT2x1','SIM_SALT2c']
         def __init__(self,sn,
                      estimate_tpk=False,snpar=None,
                      pkmjddict={},n_specrecal=None,binspecres=None):
@@ -208,10 +207,13 @@ class SALTtrainingSN:
                         fitprob = -99
                 else:
                     fitprob = -99
-                    if 'SIM_SALT2x0' in sn.__dict__.keys(): self.SIM_SALT2x0 = sn.SIM_SALT2x0
-                    if 'SIM_SALT2x1' in sn.__dict__.keys(): self.SIM_SALT2x1 = sn.SIM_SALT2x1
-                    if 'SIM_SALT2c' in sn.__dict__.keys(): self.SIM_SALT2c = sn.SIM_SALT2c
-                    
+                keys=['SIM_SALT2x0', 'SIM_SALT2x1', 'SIM_SALT2c']
+                if all([key in sn.__dict__ for key in keys]):
+                    for key in keys:
+                        setattr(self,key,getattr(sn,key))
+                else: 
+                    for key in keys:
+                        setattr(self,key,None)
                 #Find E(B-V) from Milky Way
                 if 'MWEBV' in sn.__dict__.keys():
                     try: self.MWEBV = float(sn.MWEBV.split()[0])

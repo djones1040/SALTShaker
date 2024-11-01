@@ -362,7 +362,7 @@ class TrainSALT(TrainSALTBase):
                         log.warning(f'SN {sn} not found in SN par list {self.options.snparlist}')
                         guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
 
-                elif 'SIM_SALT2x1' in datadict[sn].__dict__.keys():
+                elif not (datadict[sn].SIM_SALT2x1 is None):
                     # simulated samples need an initialization list also
                     # initializing to sim. values is not the best but running SNANA fits adds a lot of overhead
                     log.info(f'initializing parameters using simulated values for SN {sn}')
