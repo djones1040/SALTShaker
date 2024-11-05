@@ -823,10 +823,10 @@ MAGERR_LAMREST: 0.1   100   200  # magerr minlam maxlam
 SIGMA_INT: 0.106  # used in simulation"""
         with open(f'{outdir}/SALT3.INFO','w') as foutinfo:
             print(foutinfotext,file=foutinfo)
-            print('# SURVEY STATS',file=fout)
-            print('# SURVEY N_SN N_SPEC',file=fout)
+            print('# SURVEY STATS',file=foutinfo)
+            print('# SURVEY N_SN N_SPEC',file=foutinfo)
             for k,v in self.survey_stats_dict.items():
-                print(f"#{k} {v[0]} {v[1]}",file=fout)
+                print(f"#{k} {v[0]} {v[1]}",file=foutinfo)
         if len(trainingresult.clpars)==1: 
             colorlaw=trainingresult.clpars[0]
             with open(f'{outdir}/salt3_color_correction.dat','w') as foutcl:
@@ -1077,7 +1077,6 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
                                            binspecres=binspecres,snparlist=self.options.snparlist,
                                            maxsn=self.options.maxsn,
                                            specrecallist=self.options.specrecallist)
-            self.survey_stats_dict = compute_survey_stats.sn_numbers(datadict)
             tlc = time.time()
             count = 0
             salt2_chi2tot,salt3_chi2tot = 0,0
@@ -1195,6 +1194,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
                         if filt not in self.options.__dict__[f"{sn.survey.split('(')[0]}_ignore_filters"].replace(' ','').split(','): 
                             raise ValueError(f'Kcor file missing key {filt} from survey {sn.survey} for sn {snid}; valid keys are {", ".join([x for x in self.kcordict[sn.survey] if "lambdaeff" in self.kcordict[sn.survey][x]])}')
             datadict = self.mkcuts(datadict)[0]
+            self.survey_stats_dict = compute_survey_stats.sn_numbers(datadict)
             log.info(f'took {time.time()-tcstart:.3f} to apply cuts')
             
             phasebins=np.linspace(*self.options.phaserange,int((self.options.phaserange[1]-self.options.phaserange[0])/self.options.phasesplineres)+1,True)
