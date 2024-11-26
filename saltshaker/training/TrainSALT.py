@@ -777,6 +777,9 @@ class TrainSALT(TrainSALTBase):
                 with open(f'{outdir}/salt3_lc_model_covariance_{trainingresult.componentnames[firstind][1:]}{trainingresult.componentnames[secondind][1:]}.dat','w') as foutcov:
                     for i,p in enumerate(trainingresult.phase):
                         for j,w in enumerate(trainingresult.wave):
+                            if covsurface[i,j] != covsurface[i,j]: covsurface[i,j] = 0
+                            elif covsurface[i,j] > 1: covsurface[i,j] = 1
+                            elif covsurface[i,j] < -1: covsurface[i,j] = -1
                             foutcov.write(f'{p:.1f} {w:.2f} {covsurface[i,j]:8.15e}\n')
         
             #Loop through and write the data covariance surfaces, including model error
@@ -789,6 +792,9 @@ class TrainSALT(TrainSALTBase):
                 with open(f'{outdir}/salt3_lc_covariance_{trainingresult.componentnames[firstind][1:]}{trainingresult.componentnames[secondind][1:]}.dat','w') as foutcov:
                     for i,p in enumerate(trainingresult.phase):
                         for j,w in enumerate(trainingresult.wave):
+                            if modelsurface[i,j] != modelsurface[i,j]: modelsurface[i,j] = 0
+                            elif modelsurface[i,j] > 1: modelsurface[i,j] = 1
+                            elif modelsurface[i,j] < -1: modelsurface[i,j] = -1
                             foutcov.write(f'{p:.1f} {w:.2f} {modelsurface[i,j]+datasurface[i,j]:8.15e}\n')
         
         #Write dispersion file, with everything set to 1
@@ -804,7 +810,7 @@ class TrainSALT(TrainSALTBase):
                 print(f'{w:.2f} {np.clip(trainingresult.clscat[j],0.,cldispersionmax):8.15e}',file=foutclscat)
 
         foutinfotext = f"""RESTLAMBDA_RANGE: {self.options.colorwaverange[0]} {self.options.colorwaverange[1]}
-COLORLAW_VERSION: {self.options.colorlaw_function[0]}
+COLORLAW_VERSION: 1
 COLORCOR_PARAMS: {self.options.colorwaverange[0]:.0f} {self.options.colorwaverange[1]:.0f}  {len(trainingresult.clpars[0])}  {' '.join(['%8.10e'%cl for cl in trainingresult.clpars[0]])}
 
 COLOR_OFFSET:  0.0
