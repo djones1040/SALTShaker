@@ -15,6 +15,13 @@ to be installed separately via conda first::
   conda install -c conda-forge jax
   pip install saltshaker-sn
 
+If you have trouble with importing the extinction module
+when running SALTShaker after performing these steps, you
+can most likely fix the issue with::
+
+  pip uninstall sncosmo
+  conda install -c conda-forge sncosmo
+  
 Check out :ref:`gettingstarted` to start using SALTShaker.
 
 Install from GitHub
