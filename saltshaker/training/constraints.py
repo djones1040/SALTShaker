@@ -247,7 +247,7 @@ class SALTconstraints:
 
         if (self.errbsorder==0) and (self.n_errorsurfaces>1):
             X[self.imodelerr0]= np.sqrt(m0variance)
-            X[self.imodelcorr01]= m0m1covariance/np.sqrt(m0variance*m1variance)
+            X[self.imodelcorr01]= m0m1covariance/np.clip(np.sqrt(m0variance*m1variance), 1e-30,None)
             X[self.imodelerr1]=np.sqrt(m1variance)
             if self.host_component:
                 X[self.imodelerrhost]=np.sqrt(mhostvariance)

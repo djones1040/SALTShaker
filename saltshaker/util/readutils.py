@@ -199,7 +199,6 @@ class SALTtrainingSN:
                     tpkmsg = 'success: peak MJD found in LC file'
                 if 'success' not in tpkmsg:
                     raise SNDataReadError(f'can\'t estimate t_max for SN {sn.SNID}: {tpkmsg}')
-
                 # to allow a fitprob cut
                 if snpar is not None:
                     if 'FITPROB' in snpar.keys() and str(sn.SNID) in snpar['SNID']:

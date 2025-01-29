@@ -274,6 +274,7 @@ class TrainSALT(TrainSALTBase):
             else:
                 errphaseknotloc,errwaveknotloc,m0varknots,m1varknots,mhostvarknots,m0m1corrknots,clscatcoeffs=init_errs_percent(**init_options)
     
+        m0varknots*=self.options.errinitializationscale
         # number of parameters
         n_phaseknots,n_waveknots = len(phaseknotloc)-self.options.bsorder-1,len(waveknotloc)-self.options.bsorder-1
         n_errphaseknots,n_errwaveknots = len(errphaseknotloc)-self.options.errbsorder-1,len(errwaveknotloc)-self.options.errbsorder-1
@@ -892,6 +893,14 @@ MAGERR_LAMOBS:  0.0  2000  4000  # magerr minlam maxlam
 MAGERR_LAMREST: 0.1   100   200  # magerr minlam maxlam
 
 SIGMA_INT: 0.106  # used in simulation"""
+        if self.options.calibrationshiftfile:
+            foutinfotext+= '\n\n'
+            with open(self.options.calibrationshiftfile,'r') as file:
+                for line in file:
+                   if len(line.strip()):
+                      line=line.split()
+                      line[0]=line[0]+':'
+                      foutinfotext+= ' '.join(line)+'\n'
         with open(f'{outdir}/SALT3.INFO','w') as foutinfo:
             print(foutinfotext,file=foutinfo)
         if len(trainingresult.clpars)==1: 

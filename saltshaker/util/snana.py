@@ -438,6 +438,8 @@ class SuperNova( object ) :
             line = data[i]
             if(len(line.strip())==0) : continue
             if line.startswith("#") : continue 
+            elif "#" in line : 
+                line=line.split('#')[0]
             if line.startswith('END:') : break
             if line.startswith('VARLIST:'):
                 colnames = line.split()[1:]

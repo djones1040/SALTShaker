@@ -94,6 +94,7 @@ def generateerrortolerantaddmethod(parser):
                     parser.add_argument_with_config_default(*args,**kwargs)
                     return True
             except Exception as e:
+                    print(args,kwargs)
                     log.error('\n'.join(e.args))
                     return False
         return wraparg

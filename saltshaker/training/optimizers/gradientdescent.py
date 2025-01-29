@@ -66,6 +66,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         self.functionevals=0
         self.losshistory=[]
         self.Xhistory=[]
+        self.blobhistory=[]
         
     @classmethod
     def add_training_options(cls,parser,config):
@@ -267,7 +268,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         #Set convergence criteria
         #Low pass filter to ensure that 
 #         convergencefilt=signal.butter(4,2e-2,output='sos')
-        numconvergence=10
+        numconvergence=30
             
         starttime=time.time()
         initvals=jnp.array(initvals)
@@ -312,11 +313,11 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 X=self.saltobj.constraints.transformtoconstrainedparams(X)
             self.losshistory+=[loss]
             self.Xhistory+=[X]
-            
+            self.blobhistory+=[(rates,)] 
             if i==0:
                 log.debug(f'First iteration took {time.time()-starttime:1f} seconds')
             else:
-                if len(self.losshistory)> numconvergence+10:
+                if len(self.losshistory)> (numconvergence*2+1):
                     convergencecriterion= np.abs(self.losshistory[-numconvergence] - loss)
                     if np.isnan(loss) or np.all( np.array(self.losshistory[-numconvergence*2+1:]) > self.losshistory[-numconvergence*2] ):
                     
@@ -357,7 +358,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         final= startlen+np.argmin( self.losshistory[startlen:])
         X,loss=self.Xhistory[final],self.losshistory[final]
         with open(path.join(self.outputdir,'gradienthistory.pickle'),'wb') as file:
-            pickle.dump((self.Xhistory,self.losshistory),file)
+            pickle.dump((self.Xhistory,self.losshistory,self.blobhistory),file)
         return self.saltobj.constraints.transformtoconstrainedparams(X),loss,rates.at[rates==0].set(initrates[rates==0])
         
 

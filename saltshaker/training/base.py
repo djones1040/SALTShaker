@@ -156,6 +156,8 @@ class TrainSALTBase:
                                                         help="Minimum FITPROB for including SNe (default=%(default)s)")
                 successful=successful&wrapaddingargument(config,'trainparams','errors_from_hessianapprox',     type=boolean_string,
                                                         help="if set, get model surface errors from an approximated Hessian matrix (default=%(default)s)")
+                successful=successful&wrapaddingargument(config,'trainparams','errinitializationscale',         type=float, default=1.,
+                                                        help="""If true, initialize model uncertainty parameters from prior SALT2 model""")
                 successful=successful&wrapaddingargument(config,'trainparams','errors_from_bootstrap',     type=boolean_string,
                                                         help="if set, get model surface errors from bootstrapping (default=%(default)s)")
                 successful=successful&wrapaddingargument(config,'trainparams','n_bootstrap',     type=int,
