@@ -645,7 +645,7 @@ class SALTResids:
         if self.usesurverrfloors:
             self.isurverrfloor= np.where( np.char.startswith( self.parlist,'surverrfloor'))[0]
         else:
-            self.isurverrfloor = np.array([]) 
+            self.isurverrfloor = np.array([],dtype=int) 
         self.iModelParam=np.ones(self.npar,dtype=bool)
         self.iModelParam[self.imodelerr]=False
         self.iModelParam[self.imodelcorr]=False
