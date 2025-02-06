@@ -208,9 +208,18 @@ class SALTtrainingSN:
                         fitprob = -99
                 else:
                     fitprob = -99
-                    if 'SIM_SALT2x0' in sn.__dict__.keys(): self.SIM_SALT2x0 = sn.SIM_SALT2x0
-                    if 'SIM_SALT2x1' in sn.__dict__.keys(): self.SIM_SALT2x1 = sn.SIM_SALT2x1
-                    if 'SIM_SALT2c' in sn.__dict__.keys(): self.SIM_SALT2c = sn.SIM_SALT2c
+                if 'SIM_SALT2x0' in sn.__dict__.keys():
+                    self.SIM_SALT2x0 = sn.SIM_SALT2x0
+                else:
+                    self.SIM_SALT2x0 = None
+                if 'SIM_SALT2x1' in sn.__dict__.keys():
+                    self.SIM_SALT2x1 = sn.SIM_SALT2x1
+                else:
+                    self.SIM_SALT2x1 = None
+                if 'SIM_SALT2c' in sn.__dict__.keys():
+                    self.SIM_SALT2c = sn.SIM_SALT2c
+                else:
+                    self.SIM_SALT2c = None
                     
                 #Find E(B-V) from Milky Way
                 if 'MWEBV' in sn.__dict__.keys():
