@@ -57,8 +57,8 @@ def toidentifier(input):
 @register_pytree_node_class
 class SALTparameters:          
     __slots__=['x0','coordinates','components','c','CL',
-    'modelcorrs','modelerrs','spcrcl','clscat','surverrfloor']
-    __ismapped__={'x0','c','coordinates','spcrcl','surverrfloor'}
+    'modelcorrs','modelerrs','spcrcl','clscat','surverrfloor','specerror']
+    __ismapped__={'x0','c','coordinates','spcrcl','surverrfloor','specerror'}
     def __init__(self,data,parsarray):
         for var in self.__slots__:
             #determine appropriate indices
@@ -282,7 +282,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         #Prefactor for variance
         self.varianceprefactor=fluxfactor*(pbspl.sum())*dwave* _SCALE_FACTOR*sn.mwextcurveint(self.lambdaeff) /(1+z)
         #Identify the relevant error model parameters
-        if saltresidsobj.errbsorder==0:
+        if residsobj.errbsorder==0:
             errorwaveind=np.searchsorted(residsobj.errwaveknotloc,self.lambdaeffrest)-1
             errorphaseind=(np.searchsorted(residsobj.errphaseknotloc,clippedphase)-1)
             self.errorgridshape=(residsobj.errphaseknotloc.size-1,residsobj.errwaveknotloc.size-1)
@@ -406,24 +406,24 @@ class modeledtraininglightcurve(modeledtrainingdata):
 class modeledtrainingspectrum(modeledtrainingdata):
     __indexattributes__=[
         'ix0','ispcrcl','icomponents', 'icoordinates',
-        'imodelcorrs', 'imodelerrs','ipad','iCL','ic']
+        'ipad','iCL','ic','ispecerror']
     __dynamicattributes__ = [
         'flux', 'wavelength','phase', 'fluxerr', 'restwavelength',
         'recaltermderivs',
-        'varianceprefactor',
-        'pcderivsparse','errordesignmat','spectralsuppression'
+        
+        'pcderivsparse','spectralsuppression'
      ]
     __staticattributes__=[
-        'padding','imodelcorrs_coordinds',
-        'errorgridshape','bsplinecoeffshape',
+        'padding',
+        'bsplinecoeffshape',
         'uniqueid','colorlawfunction','n_specrecal'
     ]+__indexattributes__
     __slots__ = __dynamicattributes__+__staticattributes__
 
     __ismapped__={
         'ix0','ic','ispcrcl','icoordinates','ipad','phase','flux','fluxerr',
-        'restwavelength','recaltermderivs','errordesignmat','pcderivsparse',
-        'varianceprefactor','varianceprefactor','uniqueid','n_specrecal'
+        'restwavelength','recaltermderivs','pcderivsparse',
+       'uniqueid','n_specrecal','ispecerrosr'
     }
     
     def __init__(self,sn,spectrum,k,residsobj,padding=0):
@@ -472,34 +472,8 @@ class modeledtrainingspectrum(modeledtrainingdata):
         self.recaltermderivs=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
         self.recaltermderivs=np.concatenate((self.recaltermderivs,np.zeros((padding,pow.size))))
         
-        self.varianceprefactor= _SCALE_FACTOR*sn.mwextcurveint(self.wavelength) /(1+z)
-        self.varianceprefactor= np.concatenate((self.varianceprefactor, np.zeros(padding)))
-        if saltresidsobj.errbsorder==0:
-            errorwaveind=np.searchsorted(residsobj.errwaveknotloc,self.restwavelength)-1
-            errorphaseind=(np.searchsorted(residsobj.errphaseknotloc,self.phase)-1)
-            self.errorgridshape=(residsobj.errphaseknotloc.size-1,residsobj.errwaveknotloc.size-1)
-            phaseindtemp=np.tile(errorphaseind,errorwaveind.size )
-            ierrorbin=np.ravel_multi_index((phaseindtemp,errorwaveind),self.errorgridshape)
-            errordesignmat=scisparse.lil_matrix((len(spectrum)+padding,residsobj.imodelerr0.size ))
-            errordesignmat[np.arange(0,len(spectrum)),ierrorbin ]= 1
-            self.errordesignmat= sparse.BCOO.from_scipy_sparse(errordesignmat)
-        else:
-            inds=np.array(range(residsobj.imodelerr0.size))
-            derivInterp=np.zeros((spectrum.wavelength.size,residsobj.imodelerr0.size))     
-            phaseind,waveind=inds//(residsobj.errwaveknotloc.size-residsobj.errbsorder-1),inds%(residsobj.errwaveknotloc.size-residsobj.errbsorder-1)
-            inphase=((self.phase>= residsobj.phaseknotloc[np.newaxis,phaseind])&(self.phase<=residsobj.phaseknotloc[np.newaxis,phaseind+residsobj.bsorder+1])).any(axis=0)
-            inwave=(( self.restwavelength.max()>=residsobj.waveknotloc[waveind])&(self.restwavelength.min()<=residsobj.waveknotloc[waveind+residsobj.bsorder+1]))
-            isrelevant=inphase&inwave
-            for i in np.where(isrelevant)[0]:
-                derivInterp[:,i] = bisplev(clippedphase ,self.lambdaeffrest,(residsobj.errphaseknotloc,residsobj.errwaveknotloc,np.arange(residsobj.imodelerr0.size)==i, residsobj.errbsorder,residsobj.errbsorder))
-            self.errordesignmat= sparse.BCOO.fromdense(np.concatenate((derivInterp,np.zeros((padding,residsobj.imodelerr0.size)))))
-
-        self.imodelcorrs= np.array([np.arange(x,y+1) for x,y in (zip(residsobj.corrmin,residsobj.corrmax))])
-        self.imodelcorrs_coordinds= np.array([(-1,comb[1]) if 'host'== comb[0] else ((comb[0],-1) if 'host'== comb[1] else comb) for comb in residsobj.corrcombinations]
-           )
+        self.ispecerror=np.where(residsobj.parlist== f'specerror_{sn.snid}_{k}')[0][0]
                 
-        self.imodelerrs= np.array([np.arange(x,y+1) for x,y in (zip(residsobj.errmin,residsobj.errmax))])
-
         for attr in spectrum.__slots__:
             if attr in spectrum.__listdatakeys__ and attr in self.__slots__:
                 setattr(self,attr,np.concatenate((getattr(self,attr),np.zeros(padding))))
@@ -535,25 +509,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
     def modelfluxvariance(self,pars):
         if not isinstance(pars,SALTparameters):
             pars=SALTparameters(self,pars)
-        x0=pars.x0
-        #Define recalibration factor
-        coeffs=pars.spcrcl
-        coordinates=jnp.concatenate((jnp.ones(1), pars.coordinates))
-        components=pars.components
-        errs= pars.modelerrs
-
-        recalterm=jnp.dot(self.recaltermderivs,coeffs)
-        recalterm=jnp.clip(recalterm,-recalmax,recalmax)
-        recalexp=jnp.exp(recalterm)
-
-        #Evaluate model uncertainty
-        #errorsurfaces=(coordinates,errs)**2
-        errorsurfaces=((coordinates[:len(errs),np.newaxis]*errs)**2 ).sum(axis=0)
-        for (i,j),correlation in zip(self.imodelcorrs_coordinds,pars.modelcorrs):
-            errorsurfaces= errorsurfaces+2*correlation*coordinates[i]*coordinates[j]* errs[i]*errs[j]
-        errorsurfaces=self.errordesignmat @ errorsurfaces
-        modelfluxvar=recalexp**2 * self.varianceprefactor**2 * x0**2* errorsurfaces
-        return jnp.clip(modelfluxvar ,0,None)
+        return pars.specerror**2
 
 
 #    @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],diff_argnum=1)        

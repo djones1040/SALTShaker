@@ -253,7 +253,8 @@ class TrainSALT(TrainSALTBase):
                 #if datadict[sn].specdata[k].n_specrecal is None:
                 #    import pdb; pdb.set_trace()
                 recalParams=[f'specx0_{sn}_{k}']+[f'specrecal_{sn}_{k}']*(order-1)
-                parlist=np.append(parlist,recalParams)
+                
+                parlist=np.append(parlist,recalParams+[f'specerror_{sn}_{k}'])
         if self.options.usesurverrfloors:
             filtlist= set(sum([list(sn.photdata.keys()) for sn in datadict.values()],[]) )
             parlist=np.append(parlist, [f'surverrfloor_{x}' for x in filtlist])
@@ -378,7 +379,7 @@ class TrainSALT(TrainSALTBase):
                     
                 for k in datadict[sn].specdata : 
                     guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]
-
+                    guess[parlist==f'specerror_{sn}_{k}']=  np.median(datadict[sn].specdata[k].flux) * 1e-3
             # let's redefine x1 before we start
             ratio = RatioToSatisfyDefinitions(phase,wave,self.kcordict,[m0,m1])
             ix1 = np.array([i for i, si in enumerate(parlist) if si.startswith('x1')],dtype=int)
@@ -391,7 +392,7 @@ class TrainSALT(TrainSALTBase):
             if self.options.usesurverrfloors:
                 guess[np.char.startswith(parlist,'surverrfloor')]=np.log(0.005)
             
-            # spectral params
+            # spectral paramss
             for sn in datadict.keys():
                 specdata=datadict[sn].specdata
                 photdata=datadict[sn].photdata
