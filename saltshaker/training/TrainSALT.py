@@ -244,7 +244,7 @@ class TrainSALT(TrainSALTBase):
             for k in specdata.keys():
                 order=self.options.n_min_specrecal+int(np.log((specdata[k].wavelength.max() - \
                     specdata[k].wavelength.min())/self.options.specrange_wavescale_specrecal) + \
-                    len(datadict[sn].filt)* self.options.n_specrecal_per_lightcurve)
+                    len(photdata)* self.options.n_specrecal_per_lightcurve)
                 order=min(max(order,self.options.n_min_specrecal ), self.options.n_max_specrecal)
 
                 # save the order as part of the specrecal list

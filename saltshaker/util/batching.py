@@ -82,7 +82,9 @@ def batchdatabysize(data,outdir,prefix=''):
                     assert(np.all(vals[0]==vals), "Unmapped quantity different between different objects")
                     yield vals[0]
                 else:
-                    yield  np.stack(vals,axis=0) 
+                    #If an attribute is to be mapped over, the values are stacked along the first axis
+                    #Ensures dimensionality is correct
+                    yield  np.atleast_1d( np.stack(vals,axis=0) )
     #Returns a list of batches of data suitable for use with the batchedmodelfunctions function
     for i,x in enumerate(batcheddata.values()):
         try: jax.clear_caches()

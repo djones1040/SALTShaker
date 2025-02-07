@@ -423,7 +423,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
     __ismapped__={
         'ix0','ic','ispcrcl','icoordinates','ipad','phase','flux','fluxerr',
         'restwavelength','recaltermderivs','pcderivsparse',
-       'uniqueid','n_specrecal','ispecerrosr'
+       'uniqueid','n_specrecal','ispecerror'
     }
     
     def __init__(self,sn,spectrum,k,residsobj,padding=0):
@@ -473,7 +473,6 @@ class modeledtrainingspectrum(modeledtrainingdata):
         self.recaltermderivs=np.concatenate((self.recaltermderivs,np.zeros((padding,pow.size))))
         
         self.ispecerror=np.where(residsobj.parlist== f'specerror_{sn.snid}_{k}')[0][0]
-                
         for attr in spectrum.__slots__:
             if attr in spectrum.__listdatakeys__ and attr in self.__slots__:
                 setattr(self,attr,np.concatenate((getattr(self,attr),np.zeros(padding))))
@@ -509,7 +508,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
     def modelfluxvariance(self,pars):
         if not isinstance(pars,SALTparameters):
             pars=SALTparameters(self,pars)
-        return pars.specerror**2
+        return jnp.tile(pars.specerror**2,self.flux.size)
 
 
 #    @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],diff_argnum=1)        

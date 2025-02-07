@@ -198,6 +198,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 learningrates[idx]= .1* max(X[idx],x0[np.nonzero(x0)].min())
             except:
                 learningrates[idx]= 1e-3
+        learningrates[self.saltobj.ispecerror]= .1* np.clip(X[self.saltobj.ispecerror],X[self.saltobj.ispecerror][np.nonzero(X[self.saltobj.ispecerror])].min() ,None)
         #The rest of the parameters are mostly dimensionless coeffs of O(1)
         for idx in [self.saltobj.iCL,self.saltobj.ispcrcl_coeffs,self.saltobj.iclscat,self.saltobj.imodelcorr]:
             learningrates[idx]=1e-2
