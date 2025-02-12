@@ -379,7 +379,7 @@ class TrainSALT(TrainSALTBase):
                     
                 for k in datadict[sn].specdata : 
                     guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]
-                    guess[parlist==f'specerror_{sn}_{k}']=  np.median(datadict[sn].specdata[k].flux) * 1e-3
+                    guess[parlist==f'specerror_{sn}_{k}']=  np.median(np.abs(datadict[sn].specdata[k].flux)) * 1e-3
             # let's redefine x1 before we start
             ratio = RatioToSatisfyDefinitions(phase,wave,self.kcordict,[m0,m1])
             ix1 = np.array([i for i, si in enumerate(parlist) if si.startswith('x1')],dtype=int)

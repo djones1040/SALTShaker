@@ -629,7 +629,8 @@ class SALTResids:
         self.imodelcorr01 = np.array([i for i, si in enumerate(self.parlist) if si==('modelcorr_01')],dtype=int)
         self.imodelcorr0host = np.array([i for i, si in enumerate(self.parlist) if si==('modelcorr_0host')],dtype=int)
         self.iclscat = np.where(self.parlist=='clscat')[0]
-        self.ispecerror=np.where(np.char.startswith(self.parlist,'specerror') )[0] 
+        self.ispecerror=np.where(np.char.startswith(self.parlist,'specerror') )
+        [0] 
         self.icoordinates = np.array([np.where(np.char.startswith(self.parlist,f'x{i}') )[0]
                     for i in range(1,self.n_components)]+list(self.ixhost)
         )
@@ -651,6 +652,7 @@ class SALTResids:
         self.iModelParam[self.imodelcorr]=False
         self.iModelParam[self.iclscat]=False
         self.iModelParam[self.isurverrfloor]=False
+        self.iModelParam[self.ispecerror]=False
 
     @partial(jaxoptions, static_argnums=[0,3,4,5,6],static_argnames= ['dopriors','dospecresids','usesns','suppressregularization'],diff_argnum=1,jitdefault=True) 
     def lsqwrap(self,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None,suppressregularization=False):

@@ -282,10 +282,10 @@ class modeledtraininglightcurve(modeledtrainingdata):
         #Prefactor for variance
         self.varianceprefactor=fluxfactor*(pbspl.sum())*dwave* _SCALE_FACTOR*sn.mwextcurveint(self.lambdaeff) /(1+z)
         #Identify the relevant error model parameters
+        self.errorgridshape= (residsobj.errphaseknotloc.size-1-residsobj.errbsorder,residsobj.errwaveknotloc.size-1-residsobj.errbsorder)
         if residsobj.errbsorder==0:
             errorwaveind=np.searchsorted(residsobj.errwaveknotloc,self.lambdaeffrest)-1
             errorphaseind=(np.searchsorted(residsobj.errphaseknotloc,clippedphase)-1)
-            self.errorgridshape=(residsobj.errphaseknotloc.size-1,residsobj.errwaveknotloc.size-1)
             waveindtemp=np.array([errorwaveind for x in errorphaseind])
             ierrorbin=np.ravel_multi_index((errorphaseind,waveindtemp),self.errorgridshape)
             
@@ -302,7 +302,8 @@ class modeledtraininglightcurve(modeledtrainingdata):
             for i in np.where(isrelevant)[0]:
                 derivInterp[:,i] = bisplev(clippedphase ,self.lambdaeffrest,(residsobj.errphaseknotloc,residsobj.errwaveknotloc,np.arange(residsobj.imodelerr0.size)==i, residsobj.errbsorder,residsobj.errbsorder))
             self.errordesignmat= sparse.BCOO.fromdense(np.concatenate((derivInterp,np.zeros((padding,residsobj.imodelerr0.size)))))
-        
+            
+            
         pow=self.iclscat.size-1-np.arange(self.iclscat.size)
         colorscateval=((self.lambdaeffrest-5500)/1000)
         
