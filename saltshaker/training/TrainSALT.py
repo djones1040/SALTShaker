@@ -12,6 +12,7 @@ import pickle
 import copy
 import yaml
 import time
+import glob
 initializationtime=time.time()
 import matplotlib as mpl
 mpl.use('agg')
@@ -844,6 +845,9 @@ SIGMA_INT: 0.106  # used in simulation"""
             print('# SURVEY N_SN N_SPEC',file=foutinfo)
             for k,v in self.survey_stats_dict.items():
                 print(f"#{k} {v[0]} {v[1]}",file=foutinfo)
+            print('# SURVEY N_SN N_SPEC SNID',file=foutinfo)
+            for k,v in self.survey_stats_dict.items():
+                print(f"#{k} {v[0]} {v[1]} {v[2]}",file=foutinfo)
         if len(trainingresult.clpars)==1: 
             colorlaw=trainingresult.clpars[0]
             with open(f'{outdir}/salt3_color_correction.dat','w') as foutcl:
@@ -1094,6 +1098,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
                                            binspecres=binspecres,snparlist=self.options.snparlist,
                                            maxsn=self.options.maxsn,
                                            specrecallist=self.options.specrecallist)
+            self.survey_stats_dict = compute_survey_stats.sn_numbers(datadict)
             tlc = time.time()
             count = 0
             salt2_chi2tot,salt3_chi2tot = 0,0
@@ -1208,10 +1213,11 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
             for snid,sn in datadict.items():
                 for filt in sn.filt:
                     if filt not in self.kcordict[sn.survey]:
-                        if filt not in self.options.__dict__[f"{sn.survey.split('(')[0]}_ignore_filters"].replace(' ','').split(','): 
+                        if filt not in self.options.__dict__[f"{sn.survey.split('(')[0]}_ignore_filters"].replace(' ','').split(','):
+                            import pdb; pdb.set_trace() 
                             raise ValueError(f'Kcor file missing key {filt} from survey {sn.survey} for sn {snid}; valid keys are {", ".join([x for x in self.kcordict[sn.survey] if "lambdaeff" in self.kcordict[sn.survey][x]])}')
             datadict = self.mkcuts(datadict)[0]
-            self.survey_stats_dict = compute_survey_stats.sn_numbers(datadict)
+            self.survey_stats_dict = compute_survey_stats.sn_numbers(datadict)  
             log.info(f'took {time.time()-tcstart:.3f} to apply cuts')
             
             phasebins=np.linspace(*self.options.phaserange,int((self.options.phaserange[1]-self.options.phaserange[0])/self.options.phasesplineres)+1,True)
@@ -1221,6 +1227,11 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
             if self.options.stage == "all" or self.options.stage == "train":
                 # read the data
                 stage='training'
+                
+                # remove old cache files
+                cachefiles = glob.glob(f"{self.options.outputdir}/caching_*pkl")
+                for c in cachefiles:
+                    os.system(f'rm {c}')
                 x_modelpars,saltresids=self.initializesaltmodelobject(datadict)
                 if not returnGN:
                     trainingresult,chain,loglikes,saltfitter = self.fitSALTModel(datadict,x_modelpars,saltresids,returnGN=returnGN)
