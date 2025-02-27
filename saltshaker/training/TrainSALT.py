@@ -56,6 +56,7 @@ from saltshaker.validation import ValidateModel
 from saltshaker.validation import CheckSALTParams
 from saltshaker.validation.figs import plotSALTModel
 from saltshaker.validation import SynPhotPlot
+from saltshaker.validation import kene_plot
 
 from saltshaker.data import data_rootdir
 
@@ -363,7 +364,7 @@ class TrainSALT(TrainSALTBase):
                         log.warning(f'SN {sn} not found in SN par list {self.options.snparlist}')
                         guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
 
-                elif 'SIM_SALT2x1' in datadict[sn].__dict__.keys():
+                elif 'SIM_SALT2x1' in datadict[sn]:
                     # simulated samples need an initialization list also
                     # initializing to sim. values is not the best but running SNANA fits adds a lot of overhead
                     log.info(f'initializing parameters using simulated values for SN {sn}')
@@ -752,6 +753,9 @@ class TrainSALT(TrainSALTBase):
                     for j,w in enumerate(trainingresult.wave):
                         foutmodel.write(f'{p:.1f} {w:.2f} {fluxmodel[i,j]:8.15e}\n')
                         if not self.options.use_previous_errors:
+                            if errmodel[i,j] != errmodel[i,j]: errmodel[i,j] = 0
+                            elif errmodel[i,j] > 1: errmodel[i,j] = 1
+                            elif errmodel[i,j] < -1: errmodel[i,j] = -1
                             foutmodelerr.write(f'{p:.1f} {w:.2f} {errmodel[i,j]**2.:8.15e}\n')
                             foutdataerr.write(f'{p:.1f} {w:.2f} {errmodel[i,j]**2.+errdata[i,j]**2.:8.15e}\n')
         
@@ -777,6 +781,9 @@ class TrainSALT(TrainSALTBase):
                 with open(f'{outdir}/salt3_lc_model_covariance_{trainingresult.componentnames[firstind][1:]}{trainingresult.componentnames[secondind][1:]}.dat','w') as foutcov:
                     for i,p in enumerate(trainingresult.phase):
                         for j,w in enumerate(trainingresult.wave):
+                            if covsurface[i,j] != covsurface[i,j]: covsurface[i,j] = 0
+                            elif covsurface[i,j] > 1: covsurface[i,j] = 1
+                            elif covsurface[i,j] < -1: covsurface[i,j] = -1
                             foutcov.write(f'{p:.1f} {w:.2f} {covsurface[i,j]:8.15e}\n')
         
             #Loop through and write the data covariance surfaces, including model error
@@ -789,6 +796,9 @@ class TrainSALT(TrainSALTBase):
                 with open(f'{outdir}/salt3_lc_covariance_{trainingresult.componentnames[firstind][1:]}{trainingresult.componentnames[secondind][1:]}.dat','w') as foutcov:
                     for i,p in enumerate(trainingresult.phase):
                         for j,w in enumerate(trainingresult.wave):
+                            if modelsurface[i,j] != modelsurface[i,j]: modelsurface[i,j] = 0
+                            elif modelsurface[i,j] > 1: modelsurface[i,j] = 1
+                            elif modelsurface[i,j] < -1: modelsurface[i,j] = -1
                             foutcov.write(f'{p:.1f} {w:.2f} {modelsurface[i,j]+datasurface[i,j]:8.15e}\n')
         
         #Write dispersion file, with everything set to 1
@@ -804,7 +814,8 @@ class TrainSALT(TrainSALTBase):
                 print(f'{w:.2f} {np.clip(trainingresult.clscat[j],0.,cldispersionmax):8.15e}',file=foutclscat)
 
         foutinfotext = f"""RESTLAMBDA_RANGE: {self.options.colorwaverange[0]} {self.options.colorwaverange[1]}
-COLORLAW_VERSION: {self.options.colorlaw_function[0]}
+#COLORLAW_VERSION: {self.options.colorlaw_function[0]}
+COLORLAW_VERSION: 1
 COLORCOR_PARAMS: {self.options.colorwaverange[0]:.0f} {self.options.colorwaverange[1]:.0f}  {len(trainingresult.clpars[0])}  {' '.join(['%8.10e'%cl for cl in trainingresult.clpars[0]])}
 
 COLOR_OFFSET:  0.0
@@ -877,13 +888,13 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
                         if str(k) != str(sn.SNID): continue
 
                         sn.SNID = str(sn.SNID)
-                        if 'SIM_SALT2x0' in sn.__dict__.keys(): SIM_x0 = sn.SIM_SALT2x0
+                        if 'SIM_SALT2x0' in sn: SIM_x0 = sn.SIM_SALT2x0
                         else: SIM_x0 = -99
-                        if 'SIM_SALT2x1' in sn.__dict__.keys(): SIM_x1 = sn.SIM_SALT2x1
+                        if 'SIM_SALT2x1' in sn: SIM_x1 = sn.SIM_SALT2x1
                         else: SIM_x1 = -99
-                        if 'SIM_SALT2c' in sn.__dict__.keys(): SIM_c = sn.SIM_SALT2c
+                        if 'SIM_SALT2c' in sn: SIM_c = sn.SIM_SALT2c
                         else: SIM_c = -99
-                        if 'SIM_PEAKMJD' in sn.__dict__.keys(): SIM_PEAKMJD = float(sn.SIM_PEAKMJD.split()[0])
+                        if 'SIM_PEAKMJD' in sn: SIM_PEAKMJD = float(sn.SIM_PEAKMJD.split()[0])
                         else: SIM_PEAKMJD = -99
                         break
                     if not foundfile:
@@ -909,7 +920,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
 
     def salt2fit(self,sn,datadict):
 
-        if 'FLT' not in sn.__dict__.keys():
+        if 'FLT' not in sn.keys():
             sn.FLT = sn.BAND[:]
         for flt in np.unique(sn.FLT):
             filtwave = self.kcordict[sn.SURVEY][flt]['filtwave']
@@ -1195,6 +1206,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
                         if filt not in self.options.__dict__[f"{sn.survey.split('(')[0]}_ignore_filters"].replace(' ','').split(','): 
                             raise ValueError(f'Kcor file missing key {filt} from survey {sn.survey} for sn {snid}; valid keys are {", ".join([x for x in self.kcordict[sn.survey] if "lambdaeff" in self.kcordict[sn.survey][x]])}')
             datadict = self.mkcuts(datadict)[0]
+            self.survey_stats_dict = compute_survey_stats.sn_numbers(datadict)
             log.info(f'took {time.time()-tcstart:.3f} to apply cuts')
             
             phasebins=np.linspace(*self.options.phaserange,int((self.options.phaserange[1]-self.options.phaserange[0])/self.options.phasesplineres)+1,True)

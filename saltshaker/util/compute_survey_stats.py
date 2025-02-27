@@ -5,17 +5,20 @@ def sn_numbers(datadict):
 
     surveys = []
     n_spectra = []
+    SNIDs = []
     for k in datadict.keys():
         surveys += [datadict[k].survey]
         n_spectra += [len(datadict[k].specdata.keys())]
-    surveys,n_spectra = np.array(surveys),np.array(n_spectra)
+        SNIDs.append(k)
+    surveys,n_spectra,SNIDs = np.array(surveys),np.array(n_spectra),np.array(SNIDs)
 
     unique_surveys,counts = np.unique(surveys,return_counts=True)
 
     survey_stats_dict = {}
     for u,c in zip(unique_surveys,counts):
         ns = np.sum(n_spectra[surveys == u])
-        logging.info(f'survey: {u}, N_SNE: {c}, N_spectra: {ns}')
-        survey_stats_dict[u] = (c,ns)
+        survey_snids = SNIDs[surveys==u]
+        logging.info(f'survey: {u}, N_SNE: {c}, N_spectra: {ns}, SNIDs: {list(survey_snids)}')
+        survey_stats_dict[u] = (c,ns,list(survey_snids))
 
     return survey_stats_dict
