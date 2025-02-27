@@ -207,6 +207,7 @@ class SALTtrainingSN:
                         fitprob = -99
                 else:
                     fitprob = -99
+
                 keys=['SIM_SALT2x0', 'SIM_SALT2x1', 'SIM_SALT2c']
                 if all([key in sn.__dict__ for key in keys]):
                     for key in keys:
@@ -214,6 +215,7 @@ class SALTtrainingSN:
                 else: 
                     for key in keys:
                         setattr(self,key,None)
+
                 #Find E(B-V) from Milky Way
                 if 'MWEBV' in sn.__dict__.keys():
                     try: self.MWEBV = float(sn.MWEBV.split()[0])

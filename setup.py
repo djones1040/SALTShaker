@@ -15,8 +15,8 @@ class SALTShakerTest(TestCommand):
 		sys.exit(errno)
 
 AUTHOR = 'David Jones, Rick Kessler'
-AUTHOR_EMAIL = 'david.jones@ucsc.edu'
-VERSION = '1.3'
+AUTHOR_EMAIL = 'dojones@hawaii.edu'
+VERSION = '1.4'
 LICENSE = 'BSD'
 URL = 'saltshaker.readthedocs.org'
 

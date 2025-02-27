@@ -84,7 +84,8 @@ def batchdatabysize(data,outdir,prefix=''):
                     yield  np.stack(vals,axis=0) 
     #Returns a list of batches of data suitable for use with the batchedmodelfunctions function
     for i,x in enumerate(batcheddata.values()):
-        jax.clear_caches()
+        try: jax.clear_caches()
+        except: pass
         with open(f'{outdir}/caching_{prefix}_{i}.pkl','wb') as fout:
             pickle.dump({'data':list(repackforvmap(x))},fout)
 
