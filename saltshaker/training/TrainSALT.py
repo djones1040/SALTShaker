@@ -364,7 +364,7 @@ class TrainSALT(TrainSALTBase):
                         log.warning(f'SN {sn} not found in SN par list {self.options.snparlist}')
                         guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
 
-                elif 'SIM_SALT2x1' in datadict[sn]:
+                elif not (datadict[sn].SIM_SALT2x1 is None):
                     # simulated samples need an initialization list also
                     # initializing to sim. values is not the best but running SNANA fits adds a lot of overhead
                     log.info(f'initializing parameters using simulated values for SN {sn}')
@@ -814,7 +814,10 @@ class TrainSALT(TrainSALTBase):
                 print(f'{w:.2f} {np.clip(trainingresult.clscat[j],0.,cldispersionmax):8.15e}',file=foutclscat)
 
         foutinfotext = f"""RESTLAMBDA_RANGE: {self.options.colorwaverange[0]} {self.options.colorwaverange[1]}
+<<<<<<< HEAD
 #COLORLAW_VERSION: {self.options.colorlaw_function[0]}
+=======
+>>>>>>> 4aaec43e3b8a51e05bb4f0cdfa0df2329d6c7f4c
 COLORLAW_VERSION: 1
 COLORCOR_PARAMS: {self.options.colorwaverange[0]:.0f} {self.options.colorwaverange[1]:.0f}  {len(trainingresult.clpars[0])}  {' '.join(['%8.10e'%cl for cl in trainingresult.clpars[0]])}
 
@@ -834,10 +837,10 @@ MAGERR_LAMREST: 0.1   100   200  # magerr minlam maxlam
 SIGMA_INT: 0.106  # used in simulation"""
         with open(f'{outdir}/SALT3.INFO','w') as foutinfo:
             print(foutinfotext,file=foutinfo)
-            print('# SURVEY STATS',file=fout)
-            print('# SURVEY N_SN N_SPEC',file=fout)
+            print('# SURVEY STATS',file=foutinfo)
+            print('# SURVEY N_SN N_SPEC',file=foutinfo)
             for k,v in self.survey_stats_dict.items():
-                print(f"#{k} {v[0]} {v[1]}",file=fout)
+                print(f"#{k} {v[0]} {v[1]}",file=foutinfo)
         if len(trainingresult.clpars)==1: 
             colorlaw=trainingresult.clpars[0]
             with open(f'{outdir}/salt3_color_correction.dat','w') as foutcl:
@@ -1088,7 +1091,6 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
                                            binspecres=binspecres,snparlist=self.options.snparlist,
                                            maxsn=self.options.maxsn,
                                            specrecallist=self.options.specrecallist)
-            self.survey_stats_dict = compute_survey_stats.sn_numbers(datadict)
             tlc = time.time()
             count = 0
             salt2_chi2tot,salt3_chi2tot = 0,0
