@@ -891,14 +891,14 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
                         if str(k) != str(sn.SNID): continue
 
                         sn.SNID = str(sn.SNID)
-                        if 'SIM_SALT2x0' in sn: SIM_x0 = sn.SIM_SALT2x0
+                        if 'SIM_SALT2x0' in sn.__dict__: SIM_x0 = sn.SIM_SALT2x0
                         else: SIM_x0 = -99
-                        if 'SIM_SALT2x1' in sn: SIM_x1 = sn.SIM_SALT2x1
+                        if 'SIM_SALT2x1' in sn.__dict__: SIM_x1 = sn.SIM_SALT2x1
                         else: SIM_x1 = -99
-                        if 'SIM_SALT2c' in sn: SIM_c = sn.SIM_SALT2c
+                        if 'SIM_SALT2c' in sn.__dict__: SIM_c = sn.SIM_SALT2c
                         else: SIM_c = -99
-                        if 'SIM_PEAKMJD' in sn: SIM_PEAKMJD = float(sn.SIM_PEAKMJD.split()[0])
-                        else: SIM_PEAKMJD = -99
+                        if 'SIM_PEAKMJD' in sn.__dict__: SIM_PEAKMJD = float(sn.SIM_PEAKMJD.split()[0])
+			            else: SIM_PEAKMJD = -99
                         break
                     if not foundfile:
                         SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD,salt2x0,salt2x1,salt2c,salt2t0 = -99,-99,-99,-99,-99,-99,-99,-99
