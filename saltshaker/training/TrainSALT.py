@@ -355,7 +355,7 @@ class TrainSALT(TrainSALTBase):
                                 guess[parlist==f'x{i}_{sn}'] = snpar[ 'x'+str(i)][iSN]
                             else:
                                 guess[parlist==f'x{i}_{sn}'] = rng.standard_normal()
-                        if snpar['x0'][iSN]<= 0:
+                        if float(snpar['x0'][iSN])<= 0:
                             log.warning(f'Bad input value for {sn}: x0={ float(snpar["x0"][iSN])}')
                             guess[parlist==f'x0_{sn}'] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
 

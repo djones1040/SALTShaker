@@ -24,10 +24,15 @@ class SNCut:
                 self.__valfunction__=valfunction
                 
         def cutvalue(self,sn):
-                return self.__valfunction__(sn)
+                value = self.__valfunction__(sn)
+                print(dir(sn))
+                return float(value)
 
         def passescut(self,sn):
-                return self.cutvalue(sn)>=self.requirement
+                value = self.cutvalue(sn)
+                if self.requirement is None:
+                        return bool(value)
+                return value>=self.requirement
 
 class TrainSALTBase:
         def __init__(self):
@@ -239,6 +244,8 @@ class TrainSALTBase:
                    SNCut('epochs near peak',1,lambda sn: sum([ ((sn.photdata[flt].phase > -10) & (sn.photdata[flt].phase < 5)).sum() for flt in sn.photdata])),
                    SNCut('epochs post peak',1,lambda sn: sum([      ((sn.photdata[flt].phase > 5) & (sn.photdata[flt].phase < 20)).sum() for flt in sn.photdata])),
                    SNCut('filters near peak',2,lambda sn: sum([ (((sn.photdata[flt].phase > -8) & (sn.photdata[flt].phase < 10)).sum())>0 for flt in sn.photdata])),
+                   SNCut('x1 range', None, lambda sn: -3<sn.SIM_SALT2x1<3),
+                   SNCut('c range', None, lambda sn: -0.3<sn.SIM_SALT2c<0.3),
                    SNCut('salt2 fitprob',self.options.fitprobmin,checkfitprob)]
             if self.options.keeponlyspec:
                 cuts+=[ SNCut('spectra', 1, lambda sn: sn.num_spec)]
