@@ -404,7 +404,6 @@ class SALTResids:
                     pickle.dump({'datadict':self.datadict,
                                 'batchedphotdata':self.batchedphotdata,
                                 'batchedspecdata':self.batchedspecdata},file)
-            
         log.info('Constructing batched methods')
 
         self.batchedphotresiduals=batching.batchedmodelfunctions(lambda *args,**kwargs: modeledtraininglightcurve.modelresidual(*args,**kwargs)['residuals'],
@@ -443,7 +442,9 @@ class SALTResids:
         self.constraints=SALTconstraints(self)
         
         log.info('Time required to calculate cached quantities {:.1f}s'.format(time.time()-start))
-                
+        
+            
+        
     @classmethod
     def add_model_options(cls,parser,config,addargsonly=False):
         if parser == None:
@@ -1124,3 +1125,12 @@ class SALTResids:
 
         return  (normalization[np.newaxis,:]* ( dfluxdwave / neff[:,np.newaxis] )).flatten()
 
+    def dumptofile(self,filename,pars):
+    
+        result=(f"{'SNID': >20} {'FILT': >20} {'RESTPHASE': >11} {'RESTWAVE': >11} {'DATAFLUX': >11} {'FLUXERR': >11} {'MODELFLUX': >11} {'MODELFLUXERR': >12} {'RES': >11}\n")
+        for sn in self.datadict.values():
+            result+=sn.dumptostring(pars)+'\n'
+        result=result[:-1]
+        with open(filename,'w') as file:
+            file.write(result)
+        

@@ -56,7 +56,7 @@ from saltshaker.validation import ValidateModel
 from saltshaker.validation import CheckSALTParams
 from saltshaker.validation.figs import plotSALTModel
 from saltshaker.validation import SynPhotPlot
-from saltshaker.validation import kene_plot
+# from saltshaker.validation import kene_plot
 
 from saltshaker.data import data_rootdir
 
@@ -632,7 +632,8 @@ class TrainSALT(TrainSALTBase):
     
     def initializesaltmodelobject(self,datadict):
         x_modelpars,modelconfiguration = self.initialParameters(datadict)
-        return x_modelpars,saltresids.SALTResids(datadict,self.kcordict,modelconfiguration,self.options)
+        fitterobj=saltresids.SALTResids(datadict,self.kcordict,modelconfiguration,self.options)
+        return x_modelpars,fitterobj
 
     def fitSALTModel(self,datadict,x_modelpars,saltresids,returnGN=True):
         # check for option inconsistency
@@ -674,7 +675,8 @@ class TrainSALT(TrainSALTBase):
             x_modelpars = copy.deepcopy(x_modelpars_bs)
 
         optimizer=optimizers.getoptimizer(self.options.optimizer)
-        
+        saltresids.dumptofile(path.join(self.options.outputdir,'initdump.txt'),x_modelpars)
+
         log.info('training on %i SNe!'%len(datadict.keys()))
         for i in range(self.options.n_repeat):
             
@@ -696,6 +698,7 @@ class TrainSALT(TrainSALTBase):
         trainingresult=saltresids.processoptimizedparametersforoutput(Xfinal,x_modelpars,sigma)
         for k in datadict.keys():
             trainingresult.snparams[k]['t0'] =  datadict[k].tpk_guess
+        saltresids.dumptofile(path.join(self.options.outputdir,'finaldump.txt'),Xfinal)
         
         log.info('Final loglike'); log.info(saltresids.maxlikefit(trainingresult.params_raw))
         #log.info('Final photometric loglike'); log.info(saltresids.maxlikefit(trainingresult.params_raw,dospec=False))
@@ -889,7 +892,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
                             l = f"{os.path.dirname(snlist)}/{l}"
                         sn = snana.SuperNova(l)
                         if str(k) != str(sn.SNID): continue
-
+    
                         sn.SNID = str(sn.SNID)
                         if 'SIM_SALT2x0' in sn.__dict__: SIM_x0 = sn.SIM_SALT2x0
                         else: SIM_x0 = -99
@@ -898,7 +901,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
                         if 'SIM_SALT2c' in sn.__dict__: SIM_c = sn.SIM_SALT2c
                         else: SIM_c = -99
                         if 'SIM_PEAKMJD' in sn.__dict__: SIM_PEAKMJD = float(sn.SIM_PEAKMJD.split()[0])
-			            else: SIM_PEAKMJD = -99
+                        else: SIM_PEAKMJD = -99
                         break
                     if not foundfile:
                         SIM_x0,SIM_x1,SIM_c,SIM_PEAKMJD,salt2x0,salt2x1,salt2c,salt2t0 = -99,-99,-99,-99,-99,-99,-99,-99

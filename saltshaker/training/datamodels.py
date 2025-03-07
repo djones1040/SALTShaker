@@ -352,6 +352,14 @@ class modeledtraininglightcurve(modeledtrainingdata):
             pars=SALTparameters(self,pars)
         return  jnp.exp(self.clscatderivs @ pars.clscat)
 
+    def dumptostring(self,pars):
+        if not isinstance(pars,SALTparameters):
+            pars=SALTparameters(self,pars)
+        fluxes=self.modelflux(pars)
+        variances=self.modelfluxvariance(pars)
+        res=self.modelresidual(pars)
+        for i in np.where(~self.ipad)[0]:
+            yield (f"{self.uniqueid.split('_')[0]: >20} {self.uniqueid.split('_')[1]: >20} {self.phase[i]: >11.1f} {self.lambdaeffrest: >11.0f} {self.fluxcal[i]: >11.4e} {self.fluxcalerr[i]: >11.4e} {fluxes[i]: >11.4e} {np.sqrt(variances[i]): >12.4e} {res['residuals'][i]: >11.2e}")
         
     def modelresidual(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False):
    
@@ -615,7 +623,17 @@ class SALTfitcacheSN(SALTtrainingSN):
             paramsneeded+= self.specdata[k].determineneededparameters(self,modelobj)
         return paramsneeded
     
-    
+    def dumptostring(self,pars):
+        #Dumps a printout of current model and data values to a string
+#         if not isinstance(pars,SALTparameters):
+#             pars=SALTparameters(self,pars)
+        result=''
+        for data in self.photdata.values():
+            result+='\n'.join(list(data.dumptostring(pars)))+'\n'
+        result=result[:-1]
+        return result
+        
+
     @partial(jaxoptions, static_argnums=[3,4],static_argnames= ['fixuncertainties','fixfluxes'],diff_argnum=1)              
     def modelloglikelihood(self,*args,**kwargs):
         return sum([lc.modelloglikelihood(*args,**kwargs) for lc in self.photdata.values()])+sum([spec.modelloglikelihood(*args,**kwargs) for spec in self.specdata.values()])
