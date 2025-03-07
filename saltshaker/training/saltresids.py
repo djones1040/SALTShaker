@@ -621,11 +621,12 @@ class SALTResids:
         self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('spec')],dtype=int) # used to be specrecal
         self.ispcrcl_coeffs = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specrecal')],dtype=int) # used to be specrecal
         if self.ispcrcl.size==0: self.ispcrcl=np.zeros(self.npar,dtype=bool)
-        self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr')],dtype=int)
+        import pdb;pdb.set_trace()
+        self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr') or si.startswith('specmodelerr')],dtype=int)
         self.imodelerr0 = np.array([i for i, si in enumerate(self.parlist) if si ==('modelerr_0')],dtype=int)
         self.imodelerr1 = np.array([i for i, si in enumerate(self.parlist) if si==('modelerr_1')],dtype=int)
         self.imodelerrhost = np.array([i for i, si in enumerate(self.parlist) if si==('modelerr_host')],dtype=int)
-        self.imodelcorr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelcorr')],dtype=int)
+        self.imodelcorr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelcorr') or si.startswith('specmodelcorr')],dtype=int)
         self.imodelcorr01 = np.array([i for i, si in enumerate(self.parlist) if si==('modelcorr_01')],dtype=int)
         self.imodelcorr0host = np.array([i for i, si in enumerate(self.parlist) if si==('modelcorr_0host')],dtype=int)
         self.iclscat = np.where(self.parlist=='clscat')[0]

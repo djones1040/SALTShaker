@@ -219,6 +219,10 @@ class TrainSALT(TrainSALTBase):
                 parlist = np.append(parlist,['modelerr_{}'.format(i)]*n_errphaseknots*n_errwaveknots)
                 for j in range(i):
                     parlist = np.append(parlist,[f'modelcorr_{j}{i}']*n_errphaseknots*n_errwaveknots)
+            for i in range(self.options.n_errorsurfaces): 
+                parlist = np.append(parlist,['specmodelerr_{}'.format(i)]*n_errphaseknots*n_errwaveknots)
+                for j in range(i):
+                    parlist = np.append(parlist,[f'specmodelcorr_{j}{i}']*n_errphaseknots*n_errwaveknots)
             if self.options.host_component:
                 parlist = np.append(parlist,['modelerr_host']*len(mhostvarknots))
                 parlist = np.append(parlist,['modelcorr_0host']*len(mhostvarknots))
@@ -254,7 +258,7 @@ class TrainSALT(TrainSALTBase):
                 #    import pdb; pdb.set_trace()
                 recalParams=[f'specx0_{sn}_{k}']+[f'specrecal_{sn}_{k}']*(order-1)
                 
-                parlist=np.append(parlist,recalParams+[f'specerror_{sn}_{k}'])
+                parlist=np.append(parlist,recalParams )
         if self.options.usesurverrfloors:
             filtlist= set(sum([list(sn.photdata.keys()) for sn in datadict.values()],[]) )
             parlist=np.append(parlist, [f'surverrfloor_{x}' for x in filtlist])
@@ -327,8 +331,10 @@ class TrainSALT(TrainSALTBase):
             guess[(parlist == 'm0') & (guess < 0)] = 1e-4
             
             guess[parlist=='modelerr_0']=m0varknots
+            guess[parlist=='specmodelerr_0']=m0varknots
             if self.options.n_errorsurfaces > 1:
                 guess[parlist=='modelerr_1']=m1varknots
+                guess[parlist=='specmodelerr_1']=m1varknots
                 guess[parlist=='modelcorr_01']=m0m1corrknots
             if self.options.host_component: guess[parlist=='modelerr_host']=1e-9 # something small...  #mhostvarknots
             
@@ -379,7 +385,6 @@ class TrainSALT(TrainSALTBase):
                     
                 for k in datadict[sn].specdata : 
                     guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]
-                    guess[parlist==f'specerror_{sn}_{k}']=  np.median(datadict[sn].specdata[k].flux) * 1e-3
             # let's redefine x1 before we start
             ratio = RatioToSatisfyDefinitions(phase,wave,self.kcordict,[m0,m1])
             ix1 = np.array([i for i, si in enumerate(parlist) if si.startswith('x1')],dtype=int)

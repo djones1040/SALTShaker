@@ -151,12 +151,13 @@ class rpropwithbacktracking(salttrainingoptimizer):
         except Exception as e:
             log.exception('Error encountered in optimization, exiting')
             raise e
-        residuals=self.saltobj.lsqwrap(X,self.saltobj.calculatecachedvals(X,'variances'),jit=False,dospecresids=self.saltobj.dospec)
+        Xtransformed=self.saltobj.constraints.transformtoconstrainedparams(X)
+        residuals=self.saltobj.lsqwrap(Xtransformed,self.saltobj.calculatecachedvals(Xtransformed,'variances'),jit=False,dospecresids=self.saltobj.dospec)
         newChi=(residuals**2).sum()
 
         log.info('Final chi2: {:.2f} '.format(newChi))
         
-        chi2results=self.saltobj.getChi2Contributions(X,jit=False,dospecresids=self.saltobj.dospec)
+        chi2results=self.saltobj.getChi2Contributions(Xtransformed,jit=False,dospecresids=self.saltobj.dospec)
         
         for name,chi2component,dof in chi2results:
             log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/sum([x[1] for x in chi2results])*100))
@@ -198,7 +199,6 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 learningrates[idx]= .1* max(X[idx],x0[np.nonzero(x0)].min())
             except:
                 learningrates[idx]= 1e-3
-        learningrates[self.saltobj.ispecerror]= .1* np.clip(X[self.saltobj.ispecerror],X[self.saltobj.ispecerror][np.nonzero(X[self.saltobj.ispecerror])].min() ,None)
         #The rest of the parameters are mostly dimensionless coeffs of O(1)
         for idx in [self.saltobj.iCL,self.saltobj.ispcrcl_coeffs,self.saltobj.iclscat,self.saltobj.imodelcorr]:
             learningrates[idx]=1e-2
