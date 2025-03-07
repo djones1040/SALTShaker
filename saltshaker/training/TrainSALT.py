@@ -56,7 +56,7 @@ from saltshaker.validation import ValidateModel
 from saltshaker.validation import CheckSALTParams
 from saltshaker.validation.figs import plotSALTModel
 from saltshaker.validation import SynPhotPlot
-# from saltshaker.validation import kene_plot
+from saltshaker.validation import kene_plot
 
 from saltshaker.data import data_rootdir
 
