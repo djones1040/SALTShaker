@@ -27,13 +27,3 @@ v
 SIMLOGS_SIM*
 *temp*
 *.pickle
-examples/saltshaker_jax_example/SALT3TRAIN_PanPlus/SALT3TRAIN_PanPlus_CfA4p2/CFA4p2_2010dt.dat
-examples/saltshaker_jax_example/SALT3TRAIN_PanPlus/SALT3TRAIN_PanPlus_CSPDR3/CSPDR3_2004ef.dat
-examples/saltshaker_jax_example/SALT3TRAIN_PanPlus/SALT3TRAIN_PanPlus_SDSS/SDSS_762.dat
-examples/saltshaker_jax_example/SALT3TRAIN_PanPlus/SALT3TRAIN_PanPlus_SDSS/SDSS_10028.dat
-examples/saltshaker_jax_example/SALT3TRAIN_PanPlus/SALT3TRAIN_PanPlus_SDSS/SDSS_10028.dat 2
-examples/saltshaker_jax_example/SALT3TRAIN_PanPlus/SALT3TRAIN_PanPlus_SDSS/SDSS_12843.dat
-examples/SALT3TRAIN_K21_PUBLIC/SALT3TRAIN_PanPlus/SALT3TRAIN_K21_SDSS/SDSS_2005hc.dat
-examples/saltshaker_jax_example/Color Law Dev.ipynb
-examples/saltshaker_jax_example/ColorDev.ipynb
-examples/saltshaker_jax_example/SALT3TRAIN_PanPlus.zip
