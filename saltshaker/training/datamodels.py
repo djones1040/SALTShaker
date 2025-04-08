@@ -1,17 +1,14 @@
 from saltshaker.util.readutils import SALTtrainingSN,SALTtraininglightcurve,SALTtrainingspectrum
 
 
-from sncosmo.salt2utils import SALT2ColorLaw
-
 from scipy.special import factorial
-from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
+from scipy.interpolate import bisplev
 from scipy import sparse as scisparse
 import numpy as np
 
 from jax import numpy as jnp
 import jax
 from jax.experimental import sparse
-from jax import lax
 from jax.scipy import linalg as jaxlinalg
 from jax.tree_util import register_pytree_node_class
 
@@ -20,12 +17,9 @@ from functools import partial
 from saltshaker.util.jaxoptions import jaxoptions,sparsejaxoptions
 
 import extinction
-import copy
 import warnings
 import logging
 import abc
-
-from typing import NamedTuple
 
 log=logging.getLogger(__name__)
 
@@ -40,15 +34,60 @@ def __anyinnonzeroareaforsplinebasis__(phase,wave,phaseknotloc,waveknotloc,bsord
     phaseindex,waveindex=i//(waveknotloc.size-bsorder-1), i% (waveknotloc.size-bsorder-1)
     return ((phase>=phaseknotloc[phaseindex])&(phase<=phaseknotloc[phaseindex+bsorder+1])).any() and ((wave>=waveknotloc[waveindex])&(wave<=waveknotloc[waveindex+bsorder+1])).any() 
 
-def jaxrankOneCholesky(variance,beta,v):
-    Lprime=jnp.zeros((variance.size,variance.size))
-    b=1
-    for j in range(v.size):
-        Lprime=Lprime.at[j,j].set(jnp.sqrt(variance[j]+beta/b*v[j]**2))
-        gamma=(b*variance[j]+beta*v[j]**2)
-        Lprime=Lprime.at[j+1:,j].set(Lprime[j,j]*beta*v[j+1:]*v[j]/gamma)
-        b=b+beta*v[j]**2/variance[j]
-    return Lprime
+def mvn_likelihood_simplified_cov(x, mu, D_diag, u):
+    """
+    Compute the likelihood of a multivariate normal distribution with
+    covariance matrix Sigma = diag(D_diag) + u*u^T
+    
+    Parameters:
+    -----------
+    x : jnp.ndarray
+        Observed vector (or batch of vectors) of shape (..., d)
+    mu : jnp.ndarray
+        Mean vector of shape (d,)
+    D_diag : jnp.ndarray
+        Diagonal elements of the diagonal matrix D, shape (d,)
+    u : jnp.ndarray
+        Vector for the outer product, shape (d,)
+        
+    Returns:
+    --------
+    likelihood : jnp.ndarray
+        The likelihood value(s)
+    """
+    # Get dimensions
+    d = mu.shape[0]
+    
+    # Center the data
+    x_centered = x - mu
+    
+    # Compute D^(-1)
+    D_inv_diag = 1.0 / D_diag
+    
+    # Compute u^T D^(-1) u
+    u_D_inv_u = jnp.sum(u * D_inv_diag * u)
+    
+    # Compute log determinant using the matrix determinant lemma
+    # |D + uu^T| = |D| * (1 + u^T D^(-1) u)
+    log_det = jnp.sum(jnp.log(D_diag)) + jnp.log(1.0 + u_D_inv_u)
+    
+    # Compute D^(-1) x
+    D_inv_x = x_centered * D_inv_diag
+    
+    # Compute u^T D^(-1) x
+    u_D_inv_x = jnp.sum(u * D_inv_x, axis=-1)
+    
+    # Compute the quadratic form (x - μ)^T Σ^(-1) (x - μ) using Sherman-Morrison formula
+    # (D + uu^T)^(-1) = D^(-1) - (D^(-1)u u^T D^(-1))/(1 + u^T D^(-1) u)
+    quad_form_1 = jnp.sum(x_centered * D_inv_x, axis=-1)
+    quad_form_2 = (u_D_inv_x ** 2) / (1.0 + u_D_inv_u)
+    quad_form = quad_form_1 - quad_form_2
+    
+    # Compute log likelihood
+    log_likelihood = -0.5 * (d * jnp.log(2.0 * jnp.pi) + log_det + quad_form)
+    
+    # Return likelihood
+    return (log_likelihood)
 
 def toidentifier(input):
     return "x"+str(abs(hash(input)))
@@ -365,7 +404,25 @@ class modeledtraininglightcurve(modeledtrainingdata):
             pars=SALTparameters(self,pars)
         return  jnp.exp(self.clscatderivs @ pars.clscat)
 
-        
+    def modelloglikelihood(self, x, cachedresults=None, fixuncertainties=False, fixfluxes=False):
+        if fixfluxes:
+            modelflux=cachedresults
+        else:
+            modelflux=self.modelflux(x)
+
+        if fixuncertainties:
+            if isinstance(cachedresults,tuple):
+                modelvariance,clscat=cachedresults
+            else:
+                modelvariance,clscat=cachedresults,0
+        else:
+            modelvariance=self.modelfluxvariance(x)
+            clscat=self.colorscatter(x)
+
+        variance=self.fluxcalerr**2 + modelvariance  
+        zeropoint= jax.scipy.stats.norm.logpdf(self.fluxcalerr*(~self.ipad),0,self.fluxcalerr).sum()
+        return mvn_likelihood_simplified_cov(self.fluxcal,modelflux,D_diag=variance,u=clscat*modelflux)-zeropoint
+    
     def modelresidual(self,x,cachedresults=None,fixuncertainties=False,fixfluxes=False):
    
         if fixfluxes:
@@ -382,9 +439,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
             modelvariance=self.modelfluxvariance(x)
             clscat=self.colorscatter(x)
 
-        variance=self.fluxcalerr**2 + modelvariance  
-        sigma=jnp.sqrt(variance)
-        
+        variance=self.fluxcalerr**2 + modelvariance          
         numresids=(~self.ipad).sum() 
         zeropoint= ( -jnp.log(self.fluxcalerr).sum() - numresids/2)
         
@@ -397,7 +452,14 @@ class modeledtraininglightcurve(modeledtrainingdata):
         return choleskyresidsandnorm(variance,clscat,modelflux)
 #         return lax.cond(clscat==0, diagonalresidsandnorm, choleskyresidsandnorm, 
 #              variance,clscat,modelflux )
-
+    def dumptostring(self,pars):
+        if not isinstance(pars,SALTparameters):
+            pars=SALTparameters(self,pars)
+        fluxes=self.modelflux(pars)
+        variances=self.modelfluxvariance(pars)
+        res=self.modelresidual(pars)
+        for i in np.where(~self.ipad)[0]:
+            yield (f"{self.uniqueid.split('_')[0]: >20} {self.uniqueid.split('_')[1]: >20} {self.phase[i]: >11.1f} {self.lambdaeffrest: >11.0f} {self.fluxcal[i]: >11.4e} {self.fluxcalerr[i]: >11.4e} {fluxes[i]: >11.4e} {np.sqrt(variances[i]): >12.4e} {res['residuals'][i]: >11.2e}")
   
   
 
@@ -422,7 +484,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
 
     __ismapped__={
         'ix0','ic','ispcrcl','icoordinates','ipad','phase','flux','fluxerr',
-        'restwavelength','recaltermderivs','pcderivsparse',
+        'restwavelength','recaltermderivs','pcderivsparse','errordesignmat',
        'uniqueid','n_specrecal'
     }
     
@@ -440,7 +502,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
         self.padding=padding
         self.ipad= np.arange(len(spectrum)+padding )>= len(spectrum)
         self.uniqueid= f'{sn.snid}_{k}'
-        self.spectralsuppression=np.sqrt(residsobj.num_phot/residsobj.num_spec)*residsobj.spec_chi2_scaling
+        self.spectralsuppression=min(np.sqrt(residsobj.num_phot/residsobj.num_spec)*residsobj.spec_chi2_scaling,1)
 
         self.iCL=residsobj.iCL
         self.ic=sn.ic
@@ -634,6 +696,14 @@ class SALTfitcacheSN(SALTtrainingSN):
     def modelloglikelihood(self,*args,**kwargs):
         return sum([lc.modelloglikelihood(*args,**kwargs) for lc in self.photdata.values()])+sum([spec.modelloglikelihood(*args,**kwargs) for spec in self.specdata.values()])
 
-
+    def dumptostring(self,pars):
+        #Dumps a printout of current model and data values to a string
+#         if not isinstance(pars,SALTparameters):
+#             pars=SALTparameters(self,pars)
+        result=''
+        for data in self.photdata.values():
+            result+='\n'.join(list(data.dumptostring(pars)))+'\n'
+        result=result[:-1]
+        return result
 
 

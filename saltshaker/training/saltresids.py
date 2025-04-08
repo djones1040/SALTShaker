@@ -621,7 +621,6 @@ class SALTResids:
         self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('spec')],dtype=int) # used to be specrecal
         self.ispcrcl_coeffs = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specrecal')],dtype=int) # used to be specrecal
         if self.ispcrcl.size==0: self.ispcrcl=np.zeros(self.npar,dtype=bool)
-        import pdb;pdb.set_trace()
         self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr') or si.startswith('specmodelerr')],dtype=int)
         self.imodelerr0 = np.array([i for i, si in enumerate(self.parlist) if si ==('modelerr_0')],dtype=int)
         self.imodelerr1 = np.array([i for i, si in enumerate(self.parlist) if si==('modelerr_1')],dtype=int)
@@ -702,10 +701,11 @@ class SALTResids:
         residuals= self.lsqwrap(X,uncertainties,**kwargs)
         sourceskwargs={key:val for key,val in kwargs.items() if not (key=='jit')}
         sources=self.lsqwrap_sources(X,uncertainties,**sourceskwargs)
-        sources=np.array([x.split('_')[0] for x in  sources])
-        assert(np.isin(sources,['reg','phot','spec','priors']).all())
+        sources=np.array(sources)
+        #sources=np.array([x.split('_')[0] for x in  sources])
+        assert(np.isin(sources,['reg_dyad','reg_phase','reg_wave','phot','spec','priors']).all())
         def loop():
-            for name,abbrev in [('Photometric', 'phot'),('Spectroscopic','spec'),('Prior','priors'),('Regularization','reg')]:
+            for name,abbrev in [('Photometric', 'phot'),('Spectroscopic','spec'),('Prior','priors'),('Dyadic Regularization','reg_dyad'),('Phase Regularization','reg_phase'),('Wave Regularization','reg_wave')]:
                 x=residuals[sources==abbrev]
                 #Number of data points shouldn't include the padding
                 if abbrev=='phot': ndof=self.num_phot
@@ -1100,26 +1100,37 @@ class SALTResids:
         dfluxdwave=self.dcompdwavederiv @ coeffs.T
         dfluxdphase=self.dcompdphasederiv @ coeffs.T
         d2fluxdphasedwave=self.ddcompdwavedphase @ coeffs.T
-
+        if self.regularizationScaleMethod=='clippedflux': denominator=jnp.clip(jnp.abs(fluxes),jnp.percentile(jnp.abs(fluxes),20),None)
+        elif self.regularizationScaleMethod=='fixed': denominator=1
+        else: raise ValueError('Unknown regularization scale method %s'%self.regularizationScaleMethod)
+        
         #Normalization (divided by total number of bins so regularization weights don't have to change with different bin sizes)
         normalization=jnp.sqrt( self.regulardyad*self.relativeregularizationweights/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1))**2.)
         #0 if model is locally separable in phase and wavelength i.e. flux=g(phase)* h(wavelength) for arbitrary functions g and h
-        numerator=(dfluxdphase *dfluxdwave -d2fluxdphasedwave *fluxes )
+        numerator=(dfluxdphase *dfluxdwave -d2fluxdphasedwave *fluxes ) / denominator**2
         return (normalization[np.newaxis,:]* (numerator / (  neff[:,np.newaxis] ))).flatten()  
   
     def phaseGradientRegularization(self, x, neff):
         coeffs=x[self.icomponents]
+        fluxes= self.componentderiv @ coeffs.T
+        if self.regularizationScaleMethod=='clippedflux': denominator=jnp.clip(jnp.abs(fluxes),jnp.percentile(jnp.abs(fluxes),20),None)
+        elif self.regularizationScaleMethod=='fixed': denominator=1
+        else: raise ValueError('Unknown regularization scale method %s'%self.regularizationScaleMethod)
 
         dfluxdphase=self.dcompdphasederiv @ coeffs.T
         normalization=jnp.sqrt(self.regulargradientphase *self.relativeregularizationweights /( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
-        return (normalization[np.newaxis,:]* ( dfluxdphase / neff[:,np.newaxis]  )).flatten()
+        return (normalization[np.newaxis,:]* ( dfluxdphase /denominator / neff[:,np.newaxis]  )).flatten()
 
 
     def waveGradientRegularization(self, x, neff):
         coeffs=x[self.icomponents]
+        fluxes= self.componentderiv @ coeffs.T
+        if self.regularizationScaleMethod=='clippedflux': denominator=jnp.clip(jnp.abs(fluxes),jnp.percentile(jnp.abs(fluxes),20),None)
+        elif self.regularizationScaleMethod=='fixed': denominator=1
+        else: raise ValueError('Unknown regularization scale method %s'%self.regularizationScaleMethod)
 
         dfluxdwave=self.dcompdwavederiv @ coeffs.T
         normalization=jnp.sqrt(self.regulargradientwave *self.relativeregularizationweights/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
 
-        return  (normalization[np.newaxis,:]* ( dfluxdwave / neff[:,np.newaxis] )).flatten()
+        return  (normalization[np.newaxis,:]* ( dfluxdwave /denominator / neff[:,np.newaxis] )).flatten()
 

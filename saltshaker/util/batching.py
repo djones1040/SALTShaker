@@ -9,6 +9,8 @@ import glob
 from scipy import optimize, stats
 
 import warnings
+import logging
+log=logging.getLogger(__name__)
 
 
 def optimizepaddingsizes(numbatches,datasizes):
@@ -158,6 +160,14 @@ def batchedmodelfunctions(function,batcheddata, dtype,flatten=False,sum=False):
             targetsize=indexdict['ix0'].size
             #The batched data has prenoted which arguments are to be mapped over; otherwise need to attempt to determine it programatically
 #             try:
+            for y,x in zip(batch,dtype.__slots__):
+                if not (x in dtype.__ismapped__) and not x == 'uniqueid':
+                    try: 
+                        if y.shape[0]==targetsize:
+                            log.critical(f'Possible conflict in index mapping, ensure {x} is declared in datamodels as a mapped argument')
+                    except:
+                        pass
+                    
             inaxes= [(0 if (x in dtype.__ismapped__) else None) for x in dtype.__slots__],newpars.mappingaxes,*walkargumenttree(newargs,targetsize)
             mapped=jax.vmap(  funpacked,in_axes= 
                 inaxes
