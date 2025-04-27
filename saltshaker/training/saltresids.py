@@ -280,7 +280,7 @@ class SALTResids:
         self.phaseRegularizationPoints=(self.phaseRegularizationBins[1:]+self.phaseRegularizationBins[:-1])/2
         self.waveRegularizationPoints=(self.waveRegularizationBins[1:]+self.waveRegularizationBins[:-1])/2
 
-
+        self.regularizationscalemin=40
         basisfunctions=[bisplev(
                 self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i*(self.waveBins[0].size),self.bsorder,self.bsorder)) for i in range(self.phaseBins[0].size) ]
         self.phaseBinCenters=np.array(
@@ -1100,7 +1100,7 @@ class SALTResids:
         dfluxdwave=self.dcompdwavederiv @ coeffs.T
         dfluxdphase=self.dcompdphasederiv @ coeffs.T
         d2fluxdphasedwave=self.ddcompdwavedphase @ coeffs.T
-        if self.regularizationScaleMethod=='clippedflux': denominator=jnp.clip(jnp.abs(fluxes),jnp.percentile(jnp.abs(fluxes),20),None)
+        if self.regularizationScaleMethod=='clippedflux': denominator=jnp.clip(jnp.abs(fluxes),0.004,None)
         elif self.regularizationScaleMethod=='fixed': denominator=1
         else: raise ValueError('Unknown regularization scale method %s'%self.regularizationScaleMethod)
         
@@ -1113,7 +1113,7 @@ class SALTResids:
     def phaseGradientRegularization(self, x, neff):
         coeffs=x[self.icomponents]
         fluxes= self.componentderiv @ coeffs.T
-        if self.regularizationScaleMethod=='clippedflux': denominator=jnp.clip(jnp.abs(fluxes),jnp.percentile(jnp.abs(fluxes),20),None)
+        if self.regularizationScaleMethod=='clippedflux': denominator=jnp.clip(jnp.abs(fluxes),0.004,None)
         elif self.regularizationScaleMethod=='fixed': denominator=1
         else: raise ValueError('Unknown regularization scale method %s'%self.regularizationScaleMethod)
 
@@ -1125,7 +1125,7 @@ class SALTResids:
     def waveGradientRegularization(self, x, neff):
         coeffs=x[self.icomponents]
         fluxes= self.componentderiv @ coeffs.T
-        if self.regularizationScaleMethod=='clippedflux': denominator=jnp.clip(jnp.abs(fluxes),jnp.percentile(jnp.abs(fluxes),20),None)
+        if self.regularizationScaleMethod=='clippedflux': denominator=jnp.clip(jnp.abs(fluxes),0.004,None)
         elif self.regularizationScaleMethod=='fixed': denominator=1
         else: raise ValueError('Unknown regularization scale method %s'%self.regularizationScaleMethod)
 
