@@ -683,8 +683,6 @@ class TrainSALT(TrainSALTBase):
             x_modelpars = saltfitter.optimize( x_modelpars)
             
         Xfinal= saltresids.constraints.enforcefinaldefinitions(x_modelpars,saltresids.SALTModel(x_modelpars))
-        # hack!
-        self.options.errors_from_hessianapprox = False
         if self.options.errors_from_hessianapprox: 
             sigma=saltresids.estimateparametererrorsfromhessian(Xfinal)
             np.save(path.join(self.options.outputdir,'parametercovariance.npy'), sigma)
