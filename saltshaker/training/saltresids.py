@@ -472,6 +472,8 @@ class SALTResids:
                                                 help='Weighting of dyadic chi^2 regularization during training of model parameters (default=%(default)s)')
         successful=successful&wrapaddingargument(config,'trainingparams','variantregularization','m1regularization',     type=float,
                                                 help='Scales regularization weighting of varying components (all other than M0) relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'trainingparams','waveregularizationreweighting',     type=float, default=0,
+                                                help='Scales wave gradient regularization by a wavelength factor  (default=%(default)s)')
         successful=successful&wrapaddingargument(config,'trainingparams','mhostregularization',  type=float,
                                                 help='Scales regularization weighting of host component relative to M0 weighting (>1 increases smoothing of M1)  (default=%(default)s)')
         successful=successful&wrapaddingargument(config,'trainingparams','spec_chi2_scaling',  type=float,
@@ -1128,9 +1130,8 @@ class SALTResids:
         if self.regularizationScaleMethod=='clippedflux': denominator=jnp.clip(jnp.abs(fluxes),0.004,None)
         elif self.regularizationScaleMethod=='fixed': denominator=1
         else: raise ValueError('Unknown regularization scale method %s'%self.regularizationScaleMethod)
-
         dfluxdwave=self.dcompdwavederiv @ coeffs.T
-        normalization=jnp.sqrt(self.regulargradientwave *self.relativeregularizationweights/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1)))
-
+        normalization=jnp.sqrt(self.regulargradientwave *self.relativeregularizationweights/( (self.waveBins[0].size-1) *(self.phaseBins[0].size-1))) 
+        dfluxdwave = (dfluxdwave.reshape(self.phaseRegularizationPoints.size,self.waveRegularizationPoints.size,2) * (( self.waveRegularizationPoints / self.waveRegularizationPoints.max())**self.waveregularizationreweighting)[np.newaxis,:,np.newaxis]).reshape(self.phaseRegularizationPoints.size*self.waveRegularizationPoints.size,2) 
         return  (normalization[np.newaxis,:]* ( dfluxdwave /denominator / neff[:,np.newaxis] )).flatten()
 
