@@ -103,7 +103,7 @@ class TrainSALTBase:
                                                         help="""if set, only train on SNe with spectra (default=%(default)s)""")
                 successful=successful&wrapaddingargument(config,'iodata','filter_mass_tolerance',  type=float,
                                                         help='Mass of filter transmission allowed outside of model wavelength range (default=%(default)s)')
-                successful=successful&wrapaddingargument(config,'iodata', 'spectra_cut',  type=float , help='Makes cut so that only spectra of certain S/N are used ',default=0)
+                successful=successful&wrapaddingargument(config,'iodata', 'spectra_cut',  type=float , help='Makes cut so that only spectra of certain S/N are used ',default=1)
 
 
                 msg = "range of obs filter central wavelength (A)"
