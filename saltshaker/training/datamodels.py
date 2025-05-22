@@ -57,8 +57,8 @@ def toidentifier(input):
 @register_pytree_node_class
 class SALTparameters:          
     __slots__=['x0','coordinates','components','c','CL',
-    'modelcorrs','modelerrs','spcrcl','clscat']
-    __ismapped__={'x0','c','coordinates','spcrcl'}
+    'modelcorrs','modelerrs','spcrcl','clscat','surverrfloor']
+    __ismapped__={'x0','c','coordinates','spcrcl','surverrfloor'}
     def __init__(self,data,parsarray):
         for var in self.__slots__:
             #determine appropriate indices
@@ -163,7 +163,7 @@ class modeledtrainingdata(metaclass=abc.ABCMeta):
     
 @register_pytree_node_class
 class modeledtraininglightcurve(modeledtrainingdata):
-    __indexattributes__=['iCL','ix0','ic','icoordinates', 'icomponents','imodelcorrs', 'imodelerrs','iclscat','ipad']
+    __indexattributes__=['iCL','ix0','ic','icoordinates', 'icomponents','imodelcorrs', 'imodelerrs','iclscat','ipad','isurverrfloor']
     
     __dynamicattributes__= [
         'phase','fluxcal','fluxcalerr',
@@ -184,7 +184,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
     __slots__ = __dynamicattributes__+__staticattributes__
     
     __ismapped__={
-    'ix0','ic','icoordinates','ipad','phase','fluxcal','fluxcalerr',
+    'ix0','ic','icoordinates','isurverrfloor','ipad','phase','fluxcal','fluxcalerr',
         'lambdaeff','lambdaeffrest','errordesignmat','pcderivsparse',
         'varianceprefactor',
         'clscatderivs',
@@ -230,7 +230,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
            )
                 
         self.imodelerrs= np.array([np.arange(x,y+1) for x,y in (zip(residsobj.errmin,residsobj.errmax))])
-
+        self.isurverrfloor= np.where(residsobj.parlist== f'surverrfloor_{lc.filt}')[0]
         
         self.wavebasis= residsobj.wavebasis
         
@@ -281,18 +281,27 @@ class modeledtraininglightcurve(modeledtrainingdata):
 
         #Prefactor for variance
         self.varianceprefactor=fluxfactor*(pbspl.sum())*dwave* _SCALE_FACTOR*sn.mwextcurveint(self.lambdaeff) /(1+z)
-        
         #Identify the relevant error model parameters
-        errorwaveind=np.searchsorted(residsobj.errwaveknotloc,self.lambdaeffrest)-1
-        errorphaseind=(np.searchsorted(residsobj.errphaseknotloc,clippedphase)-1)
-        self.errorgridshape=(residsobj.errphaseknotloc.size-1,residsobj.errwaveknotloc.size-1)
-        waveindtemp=np.array([errorwaveind for x in errorphaseind])
-        ierrorbin=np.ravel_multi_index((errorphaseind,waveindtemp),self.errorgridshape)
-        
-        errordesignmat=scisparse.lil_matrix((len(lc)+padding,residsobj.imodelerr0.size ))
-        errordesignmat[np.arange(0,len(lc)),ierrorbin ]= 1
-        self.errordesignmat= sparse.BCOO.from_scipy_sparse(errordesignmat)
-        
+        if residsobj.errbsorder==0:
+            errorwaveind=np.searchsorted(residsobj.errwaveknotloc,self.lambdaeffrest)-1
+            errorphaseind=(np.searchsorted(residsobj.errphaseknotloc,clippedphase)-1)
+            self.errorgridshape=(residsobj.errphaseknotloc.size-1,residsobj.errwaveknotloc.size-1)
+            waveindtemp=np.array([errorwaveind for x in errorphaseind])
+            ierrorbin=np.ravel_multi_index((errorphaseind,waveindtemp),self.errorgridshape)
+            
+            errordesignmat=scisparse.lil_matrix((len(lc)+padding,residsobj.imodelerr0.size ))
+            errordesignmat[np.arange(0,len(lc)),ierrorbin ]= 1
+            self.errordesignmat= sparse.BCOO.from_scipy_sparse(errordesignmat)
+        else:
+            inds=np.array(range(residsobj.imodelerr0.size))
+            derivInterp=np.zeros((clippedphase.size,residsobj.imodelerr0.size))     
+            phaseind,waveind=inds//(residsobj.errwaveknotloc.size-residsobj.errbsorder-1),inds%(residsobj.errwaveknotloc.size-residsobj.errbsorder-1)
+            inphase=((clippedphase[:,np.newaxis]>= residsobj.phaseknotloc[np.newaxis,phaseind])&(clippedphase[:,np.newaxis]<=residsobj.phaseknotloc[np.newaxis,phaseind+residsobj.bsorder+1])).any(axis=0)
+            inwave=(( self.lambdaeffrest>=residsobj.waveknotloc[waveind])&(self.lambdaeffrest<=residsobj.waveknotloc[waveind+residsobj.bsorder+1]))
+            isrelevant=inphase&inwave
+            for i in np.where(isrelevant)[0]:
+                derivInterp[:,i] = bisplev(clippedphase ,self.lambdaeffrest,(residsobj.errphaseknotloc,residsobj.errwaveknotloc,np.arange(residsobj.imodelerr0.size)==i, residsobj.errbsorder,residsobj.errbsorder))
+            self.errordesignmat= sparse.BCOO.fromdense(np.concatenate((derivInterp,np.zeros((padding,residsobj.imodelerr0.size)))))
         
         pow=self.iclscat.size-1-np.arange(self.iclscat.size)
         colorscateval=((self.lambdaeffrest-5500)/1000)
@@ -344,9 +353,13 @@ class modeledtraininglightcurve(modeledtrainingdata):
         for (i,j),correlation in zip(self.imodelcorrs_coordinds,pars.modelcorrs):
             errorsurfaces= errorsurfaces+2 *correlation*coordinates[i]*coordinates[j]* pars.modelerrs[i]*pars.modelerrs[j]
         errorsurfaces=self.errordesignmat @ errorsurfaces
-        modelfluxvar=colorexp**2 * self.varianceprefactor**2 * pars.x0**2* errorsurfaces
-        return jnp.clip(modelfluxvar ,0,None)
-        
+
+        modelfluxvar=jnp.clip(colorexp**2 * self.varianceprefactor**2 * pars.x0**2* errorsurfaces ,0,None)
+        if self.isurverrfloor.size>0:
+            return jnp.hypot(modelfluxvar, pars.surverrfloor * self.modelflux(pars) )
+        else:
+            return modelfluxvar
+            
     def colorscatter(self,pars):
         if not isinstance(pars,SALTparameters):
             pars=SALTparameters(self,pars)
@@ -401,24 +414,24 @@ class modeledtraininglightcurve(modeledtrainingdata):
 class modeledtrainingspectrum(modeledtrainingdata):
     __indexattributes__=[
         'ix0','ispcrcl','icomponents', 'icoordinates',
-        'imodelcorrs', 'imodelerrs','ipad','iCL','ic']
+        'ipad','iCL','ic','imodelerrs','imodelcorrs','imodelcorrs_coordinds']
     __dynamicattributes__ = [
         'flux', 'wavelength','phase', 'fluxerr', 'restwavelength',
         'recaltermderivs',
-        'varianceprefactor',
-        'pcderivsparse','errordesignmat','spectralsuppression'
+        'varianceprefactor','errordesignmat',
+        'pcderivsparse','spectralsuppression'
      ]
     __staticattributes__=[
-        'padding','imodelcorrs_coordinds',
-        'errorgridshape','bsplinecoeffshape',
+        'padding',
+        'bsplinecoeffshape','errorgridshape',
         'uniqueid','colorlawfunction','n_specrecal'
     ]+__indexattributes__
     __slots__ = __dynamicattributes__+__staticattributes__
 
     __ismapped__={
         'ix0','ic','ispcrcl','icoordinates','ipad','phase','flux','fluxerr',
-        'restwavelength','recaltermderivs','errordesignmat','pcderivsparse',
-        'varianceprefactor','varianceprefactor','uniqueid','n_specrecal'
+        'restwavelength','recaltermderivs','pcderivsparse',
+       'uniqueid','n_specrecal'
     }
     
     def __init__(self,sn,spectrum,k,residsobj,padding=0):
@@ -466,37 +479,40 @@ class modeledtrainingspectrum(modeledtrainingdata):
         #recalCoord=(residsobj.waveBinCenters-jnp.mean(self.wavelength))/residsobj.specrange_wavescale_specrecal
         self.recaltermderivs=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
         self.recaltermderivs=np.concatenate((self.recaltermderivs,np.zeros((padding,pow.size))))
-        
+
         self.varianceprefactor= _SCALE_FACTOR*sn.mwextcurveint(self.wavelength) /(1+z)
+        self.errorgridshape=(residsobj.errphaseknotloc.size-residsobj.errbsorder-1,residsobj.errwaveknotloc.size-residsobj.errbsorder-1)
         self.varianceprefactor= np.concatenate((self.varianceprefactor, np.zeros(padding)))
-        
-        errorwaveind=np.searchsorted(residsobj.errwaveknotloc,self.restwavelength)-1
-        errorphaseind=(np.searchsorted(residsobj.errphaseknotloc,self.phase)-1)
-        self.errorgridshape=(residsobj.errphaseknotloc.size-1,residsobj.errwaveknotloc.size-1)
-        phaseindtemp=np.tile(errorphaseind,errorwaveind.size )
-        try: ierrorbin=np.ravel_multi_index((phaseindtemp,errorwaveind),self.errorgridshape)
-        except: import pdb;pdb.set_trace()
-        errordesignmat=scisparse.lil_matrix((len(spectrum)+padding,residsobj.imodelerr0.size ))
-        errordesignmat[np.arange(0,len(spectrum)),ierrorbin ]= 1
-        self.errordesignmat= sparse.BCOO.from_scipy_sparse(errordesignmat)
+        if residsobj.errbsorder==0:
+            errorwaveind=np.searchsorted(residsobj.errwaveknotloc,self.restwavelength)-1
+            errorphaseind=(np.searchsorted(residsobj.errphaseknotloc,self.phase)-1)
+            phaseindtemp=np.tile(errorphaseind,errorwaveind.size )
+            ierrorbin=np.ravel_multi_index((phaseindtemp,errorwaveind),self.errorgridshape)
+            errordesignmat=scisparse.lil_matrix((len(spectrum)+padding,residsobj.imodelerr0.size ))
+            errordesignmat[np.arange(0,len(spectrum)),ierrorbin ]= 1
+            self.errordesignmat= sparse.BCOO.from_scipy_sparse(errordesignmat)
+        else:
+            inds=np.array(range(residsobj.imodelerr0.size))
+            derivInterp=np.zeros((spectrum.wavelength.size,residsobj.imodelerr0.size))     
+            phaseind,waveind=inds//(residsobj.errwaveknotloc.size-residsobj.errbsorder-1),inds%(residsobj.errwaveknotloc.size-residsobj.errbsorder-1)
+            inphase=((self.phase>= residsobj.phaseknotloc[np.newaxis,phaseind])&(self.phase<=residsobj.phaseknotloc[np.newaxis,phaseind+residsobj.bsorder+1])).any(axis=0)
+            inwave=(( self.restwavelength.max()>=residsobj.waveknotloc[waveind])&(self.restwavelength.min()<=residsobj.waveknotloc[waveind+residsobj.bsorder+1]))
+            isrelevant=inphase&inwave
+            for i in np.where(isrelevant)[0]:
+                derivInterp[:,i] = bisplev(clippedphase ,self.lambdaeffrest,(residsobj.errphaseknotloc,residsobj.errwaveknotloc,np.arange(residsobj.imodelerr0.size)==i, residsobj.errbsorder,residsobj.errbsorder))
+            self.errordesignmat= sparse.BCOO.fromdense(np.concatenate((derivInterp,np.zeros((padding,residsobj.imodelerr0.size)))))
 
-        self.imodelcorrs= np.array([np.arange(x,y+1) for x,y in (zip(residsobj.corrmin,residsobj.corrmax))])
-        self.imodelcorrs_coordinds= np.array([(-1,comb[1]) if 'host'== comb[0] else ((comb[0],-1) if 'host'== comb[1] else comb) for comb in residsobj.corrcombinations]
-           )
-                
-        self.imodelerrs= np.array([np.arange(x,y+1) for x,y in (zip(residsobj.errmin,residsobj.errmax))])
-
+        self.imodelerrs = np.array([(np.where(residsobj.parlist == f'specmodelerr_{i}')[0]) for i in range(residsobj.n_errorsurfaces)])
+        self.imodelcorrs = np.array([( np.where(residsobj.parlist == 'specmodelcorr_{}{}'.format(i,j))[0]) for i,j in residsobj.corrcombinations])
+        self.imodelcorrs_coordinds= np.array([(-1,comb[1]) if 'host'== comb[0] else ((comb[0],-1) if 'host'== comb[1] else comb) for comb in residsobj.corrcombinations])
         for attr in spectrum.__slots__:
             if attr in spectrum.__listdatakeys__ and attr in self.__slots__:
                 setattr(self,attr,np.concatenate((getattr(self,attr),np.zeros(padding))))
         self.fluxerr[self.ipad]=1
-
-        
         
     def __len__(self):
         return self.flux.size
                 
-#    @partial(jaxoptions, diff_argnum=1)                      
     def modelflux(self,pars):
         if not isinstance(pars,SALTparameters):
             pars=SALTparameters(self,pars)
@@ -525,7 +541,6 @@ class modeledtrainingspectrum(modeledtrainingdata):
         #Define recalibration factor
         coeffs=pars.spcrcl
         coordinates=jnp.concatenate((jnp.ones(1), pars.coordinates))
-        components=pars.components
         errs= pars.modelerrs
 
         recalterm=jnp.dot(self.recaltermderivs,coeffs)

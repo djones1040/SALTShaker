@@ -4,7 +4,6 @@ import jax
 from jax import lax
 from jax.experimental import sparse 
 
-
 from functools import partial
 from saltshaker.util.jaxoptions import jaxoptions
 
@@ -291,7 +290,7 @@ class SALTPriors:
                 recalterm=spectrum.recaltermderivs[::thinning,:] @ coeffs
 
                 residuals+=[(recalterm/width)]
-        return jnp.concatenate(residuals)
+        return jnp.concatenate(residuals) if len(residuals)>0 else np.array([])
     
     @prior
     def m0positiveprior(self,width,x):
@@ -334,7 +333,11 @@ class SALTPriors:
     def m1endalllam(self,width,x):
         """Prior such that at early times there is no flux"""
         return self.__initialphasepcderiv__ @ x[self.im1]/width
-                    
+    @nongaussianprior
+    def surverrfloorprior(self,width,x):
+        """Prior such that at early times there is no flux"""
+        return   jax.scipy.stats.gamma.logpdf(x[self.isurverrfloor],2,scale=width)
+                   
         
         
 

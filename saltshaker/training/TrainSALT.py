@@ -222,6 +222,10 @@ class TrainSALT(TrainSALTBase):
                 parlist = np.append(parlist,['modelerr_{}'.format(i)]*n_errphaseknots*n_errwaveknots)
                 for j in range(i):
                     parlist = np.append(parlist,[f'modelcorr_{j}{i}']*n_errphaseknots*n_errwaveknots)
+            for i in range(self.options.n_errorsurfaces): 
+                parlist = np.append(parlist,['specmodelerr_{}'.format(i)]*n_errphaseknots*n_errwaveknots)
+                for j in range(i):
+                    parlist = np.append(parlist,[f'specmodelcorr_{j}{i}']*n_errphaseknots*n_errwaveknots)
             if self.options.host_component:
                 parlist = np.append(parlist,['modelerr_host']*len(mhostvarknots))
                 parlist = np.append(parlist,['modelcorr_0host']*len(mhostvarknots))
@@ -247,7 +251,7 @@ class TrainSALT(TrainSALTBase):
             for k in specdata.keys():
                 order=self.options.n_min_specrecal+int(np.log((specdata[k].wavelength.max() - \
                     specdata[k].wavelength.min())/self.options.specrange_wavescale_specrecal) + \
-                    len(datadict[sn].filt)* self.options.n_specrecal_per_lightcurve)
+                    len(photdata)* self.options.n_specrecal_per_lightcurve)
                 order=min(max(order,self.options.n_min_specrecal ), self.options.n_max_specrecal)
 
                 # save the order as part of the specrecal list
@@ -256,8 +260,12 @@ class TrainSALT(TrainSALTBase):
                 #if datadict[sn].specdata[k].n_specrecal is None:
                 #    import pdb; pdb.set_trace()
                 recalParams=[f'specx0_{sn}_{k}']+[f'specrecal_{sn}_{k}']*(order-1)
-                parlist=np.append(parlist,recalParams)
-
+                
+                parlist=np.append(parlist,recalParams )
+        if self.options.usesurverrfloors:
+            filtlist= set(sum([list(sn.photdata.keys()) for sn in datadict.values()],[]) )
+            parlist=np.append(parlist, [f'surverrfloor_{x}' for x in filtlist])
+            
         modelconfiguration=saltresids.saltconfiguration(parlist=parlist,phaseknotloc =phaseknotloc ,waveknotloc=waveknotloc,
             errphaseknotloc=errphaseknotloc,errwaveknotloc=errwaveknotloc)
         # initial guesses
@@ -328,8 +336,10 @@ class TrainSALT(TrainSALTBase):
             guess[(parlist == 'm0') & (guess < 0)] = 1e-4
             
             guess[parlist=='modelerr_0']=m0varknots
+            guess[parlist=='specmodelerr_0']=m0varknots
             if self.options.n_errorsurfaces > 1:
                 guess[parlist=='modelerr_1']=m1varknots
+                guess[parlist=='specmodelerr_1']=m1varknots
                 guess[parlist=='modelcorr_01']=m0m1corrknots
             if self.options.host_component: guess[parlist=='modelerr_host']=1e-9 # something small...  #mhostvarknots
             
@@ -380,7 +390,6 @@ class TrainSALT(TrainSALTBase):
                     
                 for k in datadict[sn].specdata : 
                     guess[parlist==f'specx0_{sn}_{k}']= guess[parlist == 'x0_%s'%sn]
-
             # let's redefine x1 before we start
             ratio = RatioToSatisfyDefinitions(phase,wave,self.kcordict,[m0,m1])
             ix1 = np.array([i for i, si in enumerate(parlist) if si.startswith('x1')],dtype=int)
@@ -390,8 +399,10 @@ class TrainSALT(TrainSALTBase):
             if x1std == x1std and x1std != 0.0:
                 guess[ix1]/= x1std
                 
-
-            # spectral params
+            if self.options.usesurverrfloors:
+                guess[np.char.startswith(parlist,'surverrfloor')]=np.log(0.005)
+            
+            # spectral paramss
             for sn in datadict.keys():
                 specdata=datadict[sn].specdata
                 photdata=datadict[sn].photdata
@@ -690,8 +701,8 @@ class TrainSALT(TrainSALTBase):
             
             # do the fitting
             x_modelpars = saltfitter.optimize( x_modelpars)
-            
-        Xfinal= saltresids.constraints.enforcefinaldefinitions(x_modelpars,saltresids.SALTModel(x_modelpars))
+        Xfinal=saltresids.constraints.transformtoconstrainedparams(x_modelpars)
+        Xfinal= saltresids.constraints.enforcefinaldefinitions(Xfinal,saltresids.SALTModel(x_modelpars))
         # hack!
         self.options.errors_from_hessianapprox = False
         if self.options.errors_from_hessianapprox: 
@@ -1304,7 +1315,6 @@ config file options can be overwridden at the command line"""
         user_options = user_parser.parse_known_args(args)[0]
 
         loggerconfig.dictconfigfromYAML(user_options.loggingconfig,user_options.outputdir)
-
         if not os.path.exists(user_options.modelconfig):
             print('warning : model config file %s doesn\'t exist.  Trying package directory'%user_options.modelconfig)
             user_options.modelconfig = '%s/%s'%(config_rootdir,user_options.modelconfig)
@@ -1385,6 +1395,6 @@ config file options can be overwridden at the command line"""
 
             
             self.get_config_options(salt,configfile,args)
-        
+            
             salt.main()
 

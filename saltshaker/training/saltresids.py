@@ -387,16 +387,10 @@ class SALTResids:
 
             #self.batchedphotdata= batching.batchdatabysize(self.allphotdata)
             #self.batchedspecdata= batching.batchdatabysize(self.allspecdata)
-            batching.batchdatabysize(self.allphotdata,self.outputdir,prefix='phot')
-            self.batchedphotdata = []
-            for cachefile in glob.glob(f'{self.outputdir}/caching_phot_*.pkl'):
-                with open(cachefile,'rb') as fin: 
-                    self.batchedphotdata += [pickle.load(fin)['data']]
-            batching.batchdatabysize(self.allspecdata,self.outputdir,prefix='spec')
-            self.batchedspecdata = []
-            for cachefile in glob.glob(f'{self.outputdir}/caching_spec_*.pkl'):
-                with open(cachefile,'rb') as fin: 
-                    self.batchedspecdata += [pickle.load(fin)['data']]
+            
+            self.batchedphotdata = list(batching.batchdatabysize(self.allphotdata,self.outputdir,prefix='phot'))
+            
+            self.batchedspecdata = list(batching.batchdatabysize(self.allspecdata,self.outputdir,prefix='spec'))
             
             if self.trainingcachefile:
                 log.info(f'Writing precomputed quantities to file {self.trainingcachefile}')
@@ -628,19 +622,16 @@ class SALTResids:
         self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('spec')],dtype=int) # used to be specrecal
         self.ispcrcl_coeffs = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specrecal')],dtype=int) # used to be specrecal
         if self.ispcrcl.size==0: self.ispcrcl=np.zeros(self.npar,dtype=bool)
-        self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr')],dtype=int)
+        import pdb;pdb.set_trace()
+        self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr') or si.startswith('specmodelerr')],dtype=int)
         self.imodelerr0 = np.array([i for i, si in enumerate(self.parlist) if si ==('modelerr_0')],dtype=int)
         self.imodelerr1 = np.array([i for i, si in enumerate(self.parlist) if si==('modelerr_1')],dtype=int)
         self.imodelerrhost = np.array([i for i, si in enumerate(self.parlist) if si==('modelerr_host')],dtype=int)
-        self.imodelcorr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelcorr')],dtype=int)
+        self.imodelcorr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelcorr') or si.startswith('specmodelcorr')],dtype=int)
         self.imodelcorr01 = np.array([i for i, si in enumerate(self.parlist) if si==('modelcorr_01')],dtype=int)
         self.imodelcorr0host = np.array([i for i, si in enumerate(self.parlist) if si==('modelcorr_0host')],dtype=int)
         self.iclscat = np.where(self.parlist=='clscat')[0]
-
-        self.iModelParam=np.ones(self.npar,dtype=bool)
-        self.iModelParam[self.imodelerr]=False
-        self.iModelParam[self.imodelcorr]=False
-        self.iModelParam[self.iclscat]=False
+        self.ispecerror=np.where(np.char.startswith(self.parlist,'specerror') )[0] 
         self.icoordinates = np.array([np.where(np.char.startswith(self.parlist,f'x{i}') )[0]
                     for i in range(1,self.n_components)]+list(self.ixhost)
         )
@@ -653,7 +644,15 @@ class SALTResids:
             for i,parname in enumerate(np.unique(self.parlist[self.iclscat])):
                 self.iclscat_0 = np.append(self.iclscat_0,np.where(self.parlist == parname)[0][-1])
                 self.iclscat_poly = np.append(self.iclscat_poly,np.where(self.parlist == parname)[0][:-1])        
-
+        if self.usesurverrfloors:
+            self.isurverrfloor= np.where( np.char.startswith( self.parlist,'surverrfloor'))[0]
+        else:
+            self.isurverrfloor = np.array([],dtype=int) 
+        self.iModelParam=np.ones(self.npar,dtype=bool)
+        self.iModelParam[self.imodelerr]=False
+        self.iModelParam[self.imodelcorr]=False
+        self.iModelParam[self.iclscat]=False
+        self.iModelParam[self.isurverrfloor]=False
 
     @partial(jaxoptions, static_argnums=[0,3,4,5,6],static_argnames= ['dopriors','dospecresids','usesns','suppressregularization'],diff_argnum=1,jitdefault=True) 
     def lsqwrap(self,guess,uncertainties,dopriors=True,dospecresids=True,usesns=None,suppressregularization=False):

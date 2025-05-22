@@ -69,6 +69,8 @@ class TrainSALTBase:
                 successful=True
                 successful=successful&wrapaddingargument(config,'iodata','calibrationshiftfile',type=str,action=FullPaths,default='',
                                                         help='file containing a list of changes to zeropoint and central wavelength of filters by survey')
+                successful=successful&wrapaddingargument(config,'iodata','calibrationcovariance',type=str,action=FullPaths,default='',
+                                                        help='file containing a list of filters and a covariance matrix ')
                 successful=successful&wrapaddingargument(config,'iodata','calib_survey_ignore',type=boolean_string,
                                                         help='if True, ignore survey names when applying shifts to filters')
                 successful=successful&wrapaddingargument(config,'iodata','loggingconfig','loggingconfigfile',  type=str,action=FullPaths,default='',
@@ -107,6 +109,7 @@ class TrainSALTBase:
                 successful=successful&wrapaddingargument(config,'iodata','filter_mass_tolerance',  type=float,
                                                         help='Mass of filter transmission allowed outside of model wavelength range (default=%(default)s)')
                 successful=successful&wrapaddingargument(config,'iodata', 'spectra_cut',  type=float , help='Makes cut so that only spectra of certain S/N are used ',default=1)
+
 
 
                 msg = "range of obs filter central wavelength (A)"
@@ -154,6 +157,8 @@ class TrainSALTBase:
 
                 successful=successful&wrapaddingargument(config,'trainparams','regularize',     type=boolean_string,
                                                         help='turn on regularization if set (default=%(default)s)')
+                successful=successful&wrapaddingargument(config,'trainparams','usesurverrfloors',     type=boolean_string, default=False,
+                                                        help='turn on fitted error floors for each survey/filter combination if set (default=%(default)s)')
 
                 successful=successful&wrapaddingargument(config,'trainparams','optimizer',     type=str,
                                                         help="Choice of optimizer to use (default=%(default)s)")
@@ -243,12 +248,20 @@ class TrainSALTBase:
             cuts= [SNCut('total epochs',4,lambda sn: sum([ ((sn.photdata[flt].phase > -10) & (sn.photdata[flt].phase < 35)).sum() for flt in sn.photdata])),
                    SNCut('epochs near peak',1,lambda sn: sum([ ((sn.photdata[flt].phase > -10) & (sn.photdata[flt].phase < 5)).sum() for flt in sn.photdata])),
                    SNCut('epochs post peak',1,lambda sn: sum([      ((sn.photdata[flt].phase > 5) & (sn.photdata[flt].phase < 20)).sum() for flt in sn.photdata])),
+<<<<<<< HEAD
                    SNCut('filters near peak',2,lambda sn: sum([ (((sn.photdata[flt].phase > -8) & (sn.photdata[flt].phase < 10)).sum())>0 for flt in sn.photdata])),
                    SNCut('salt2 fitprob',self.options.fitprobmin,checkfitprob)] 
 
                    #SNCut('x1 range', None, lambda sn: -3<sn.SIM_SALT2x1<3),
                    #SNCut('c range', None, lambda sn: -0.3<sn.SIM_SALT2c<0.3),
                    #SNCut('salt2 fitprob',self.options.fitprobmin,checkfitprob)]
+=======
+                   SNCut('filters near peak',3,lambda sn: sum([ (((sn.photdata[flt].phase > -8) & (sn.photdata[flt].phase < 10)).sum())>0 for flt in sn.photdata])),
+                   SNCut('salt2 fitprob',self.options.fitprobmin,checkfitprob),
+                   SNCut('total bands',3,lambda sn: sum([ ((sn.photdata[flt].phase > -10) & (sn.photdata[flt].phase < 35)).sum() for flt in sn.photdata]))
+                   ]
+                   
+>>>>>>> origin/detachedspecmodel
             if self.options.keeponlyspec:
                 cuts+=[ SNCut('spectra', 1, lambda sn: sn.num_spec)]
             return cuts
@@ -289,9 +302,6 @@ class TrainSALTBase:
                         specdata.pop(k)
                         continue
                      #import pdb; pdb.set_trace()
-                    if np.median(spectrum.flux/spectrum.fluxerr) <self.options.spectra_cut:
-                        specdata.pop(k)
-                        continue
       
                     #remove spectral data outside wavelength range
                     inwaverange=(spectrum.wavelength>(self.options.waverange[0]*(1+z)))&(spectrum.wavelength<(self.options.waverange[1]*(1+z)))
@@ -300,6 +310,10 @@ class TrainSALTBase:
                         specdata[k]=clippedspectrum
                     else:
                         specdata.pop(k)
+                        continue
+                    if np.median(spectrum.flux/spectrum.fluxerr) <self.options.spectra_cut:
+                        specdata.pop(k)
+                        continue
 
                 for flt in sn.filt:
                     if flt not in filters:

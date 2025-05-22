@@ -159,7 +159,6 @@ class rpropwithbacktracking(salttrainingoptimizer):
         log.info('Final chi2: {:.2f} '.format(newChi))
         
         chi2results=self.saltobj.getChi2Contributions(Xtransformed,jit=False,dospecresids=self.saltobj.dospec)
- 
         for name,chi2component,dof in chi2results:
             log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/sum([x[1] for x in chi2results])*100))
 
@@ -203,11 +202,12 @@ class rpropwithbacktracking(salttrainingoptimizer):
         #The rest of the parameters are mostly dimensionless coeffs of O(1)
         for idx in [self.saltobj.iCL,self.saltobj.ispcrcl_coeffs,self.saltobj.iclscat,self.saltobj.imodelcorr]:
             learningrates[idx]=1e-2
+        learningrates[self.saltobj.isurverrfloor]=1e-2
         #Check that all parameters get an initial guess
         try:
             assert(~np.any(np.isnan(learningrates)) and ~ np.any(learningrates<=0))
         except Exception as e:
-            log.debug(f'Uninitialized learning rates: {", ".join(np.unique(self.saltobj.parlist[np.isnan(learningrates) |(learningrates<=0) ]))}')
+            log.warning(f'Uninitialized learning rates: {", ".join(np.unique(self.saltobj.parlist[np.isnan(learningrates) |(learningrates<=0) ]))}')
             learningrates[np.isnan(learningrates) |(learningrates<=0) ]=1e-5
         return learningrates*self.learningratesinitscale
                 
@@ -311,7 +311,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 
             constrainedparams=  np.concatenate([self.saltobj.ic,self.saltobj.icoordinates])
             if not np.allclose(X[constrainedparams],Xprev[constrainedparams]):
-                X=self.saltobj.constraints.transformtoconstrainedparams(X)
+                X=self.saltobj.constraints.centeranddecorrelatedcolorsandcoords(X)
             self.losshistory+=[loss]
             self.Xhistory+=[X]
             
@@ -334,7 +334,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
                     sys.stdout.write(f'\r\x1b[1K'+outtext.ljust(os.get_terminal_size().columns))
                 log.debug(outtext)
                 
-                if i> numconvergence+10:
+                if i> numconvergence+100:
                     if np.all(convergencecriterion< self.convergencetolerance):
                         sys.stdout.write('\n')
                         log.info('Convergence achieved')
@@ -360,7 +360,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         X,loss=self.Xhistory[final],self.losshistory[final]
         with open(path.join(self.outputdir,'gradienthistory.pickle'),'wb') as file:
             pickle.dump((self.Xhistory,self.losshistory),file)
-        return self.saltobj.constraints.transformtoconstrainedparams(X),loss,rates.at[rates==0].set(initrates[rates==0])
+        return X,loss,rates.at[rates==0].set(initrates[rates==0])
         
 
     def twowaybacktracking(self,X,loss,grad, searchdir,*args,**kwargs):
