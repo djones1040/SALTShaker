@@ -25,7 +25,7 @@ class SNCut:
                 
         def cutvalue(self,sn):
                 value = self.__valfunction__(sn)
-                print(dir(sn))
+                #print(dir(sn))
                 return float(value)
 
         def passescut(self,sn):
@@ -244,9 +244,11 @@ class TrainSALTBase:
                    SNCut('epochs near peak',1,lambda sn: sum([ ((sn.photdata[flt].phase > -10) & (sn.photdata[flt].phase < 5)).sum() for flt in sn.photdata])),
                    SNCut('epochs post peak',1,lambda sn: sum([      ((sn.photdata[flt].phase > 5) & (sn.photdata[flt].phase < 20)).sum() for flt in sn.photdata])),
                    SNCut('filters near peak',2,lambda sn: sum([ (((sn.photdata[flt].phase > -8) & (sn.photdata[flt].phase < 10)).sum())>0 for flt in sn.photdata])),
-                   SNCut('x1 range', None, lambda sn: -3<sn.SIM_SALT2x1<3),
-                   SNCut('c range', None, lambda sn: -0.3<sn.SIM_SALT2c<0.3),
-                   SNCut('salt2 fitprob',self.options.fitprobmin,checkfitprob)]
+                   SNCut('salt2 fitprob',self.options.fitprobmin,checkfitprob)] 
+
+                   #SNCut('x1 range', None, lambda sn: -3<sn.SIM_SALT2x1<3),
+                   #SNCut('c range', None, lambda sn: -0.3<sn.SIM_SALT2c<0.3),
+                   #SNCut('salt2 fitprob',self.options.fitprobmin,checkfitprob)]
             if self.options.keeponlyspec:
                 cuts+=[ SNCut('spectra', 1, lambda sn: sn.num_spec)]
             return cuts

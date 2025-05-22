@@ -318,7 +318,9 @@ class TrainSALT(TrainSALTBase):
                             raise RuntimeError('problem initializing color law!')
                         guess[parlist == 'cl0'] = md.x
                 else:
-                    guess[parlist == 'cl0'] =[0.]*self.options.n_colorpars 
+                    #print(f"self.options.n_colorpars: {self.options.n_colorpars}")
+                    n_colorpars = self.options.n_colorpars[0]
+                    guess[parlist == 'cl0'] =[0.]* n_colorpars 
             if self.options.n_colorscatpars:
 
                 guess[parlist == 'clscat'] = clscatcoeffs
@@ -841,13 +843,13 @@ MAGERR_LAMREST: 0.1   100   200  # magerr minlam maxlam
 SIGMA_INT: 0.106  # used in simulation"""
         with open(f'{outdir}/SALT3.INFO','w') as foutinfo:
             print(foutinfotext,file=foutinfo)
-            print('# SURVEY STATS',file=foutinfo)
+            #print('# SURVEY STATS',file=foutinfo)
             print('# SURVEY N_SN N_SPEC',file=foutinfo)
             for k,v in self.survey_stats_dict.items():
-                print(f"#{k} {v[0]} {v[1]}",file=foutinfo)
-            print('# SURVEY N_SN N_SPEC SNID',file=foutinfo)
-            for k,v in self.survey_stats_dict.items():
-                print(f"#{k} {v[0]} {v[1]} {v[2]}",file=foutinfo)
+                print(f"# {k} {v[0]} {v[1]}",file=foutinfo)
+            #print('# SURVEY N_SN N_SPEC SNID',file=foutinfo)
+            #for k,v in self.survey_stats_dict.items():
+            #    print(f"#{k} {v[0]} {v[1]} {v[2]}",file=foutinfo)
         if len(trainingresult.clpars)==1: 
             colorlaw=trainingresult.clpars[0]
             with open(f'{outdir}/salt3_color_correction.dat','w') as foutcl:

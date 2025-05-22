@@ -192,7 +192,7 @@ def init_kaepora(x10file='initfiles/Kaepora_dm15_1.1.txt',
 				 flatnu='initfiles/flatnu.dat',
 				 phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
 				 waveinterpres=2.0,phasesplineres=3.2,wavesplineres=72,
-				 days_interp=5,debug=False,normalize=True):
+				 days_interp=5,debug=False,normalize=True, order=3,use_snpca_knots=True):   #kene - added order and use_snpca_knots to make look like init_salt2 method above
 
 	phase,wave,flux = np.loadtxt(x10file,unpack=True)
 	x11phase,x11wave,x11flux = np.loadtxt(x11file,unpack=True)
@@ -205,16 +205,16 @@ def init_kaepora(x10file='initfiles/Kaepora_dm15_1.1.txt',
 		
 	#m1phase = phase*1.1
 	splinephase = np.linspace(phaserange[0],phaserange[1],
-							  (phaserange[1]-phaserange[0])/phasesplineres,False)
+							 int((phaserange[1]-phaserange[0])/phasesplineres)+1,True)  #kene - added all the int in the 4 lines below and set them to True.
 	splinewave = np.linspace(waverange[0],waverange[1],
-							 (waverange[1]-waverange[0])/wavesplineres,False)
+							 int((waverange[1]-waverange[0])/wavesplineres)+1,True)
 	bspl = bisplrep(phase,wave,m0flux,kx=3,ky=3,
 					tx=splinephase,ty=splinewave,task=-1)
 
 	intphase = np.linspace(phaserange[0],phaserange[1],
-						   (phaserange[1]-phaserange[0])/phaseinterpres,False)
+						   int((phaserange[1]-phaserange[0])/phaseinterpres)+1,True)
 	intwave = np.linspace(waverange[0],waverange[1],
-						  (waverange[1]-waverange[0])/waveinterpres,False)
+						  int((waverange[1]-waverange[0])/waveinterpres)+1,True)
 
 
 	m0 = bisplev(intphase,intwave,bspl)
