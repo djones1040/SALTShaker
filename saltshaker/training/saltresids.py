@@ -1134,3 +1134,84 @@ class SALTResids:
 
         return  (normalization[np.newaxis,:]* ( dfluxdwave /denominator / neff[:,np.newaxis] )).flatten()
 
+def fourierRegularization(self, x, neff):
+    coeffs = x[self.icomponents]
+    
+    # Get fluxes at regularization points
+    fluxes = self.componentderiv @ coeffs.T
+    
+    # Reshape into 2D surfaces (phase × wavelength)
+    surfaces = fluxes.reshape(
+                             self.phaseRegularizationPoints.size, 
+                             self.waveRegularizationPoints.size, len(self.icomponents))
+    
+    regularization = []
+    for i, surface in enumerate(surfaces):
+        # Create wavelength-dependent smoothness profile
+        # Higher values = less smoothing (more features allowed)
+        wave_centers = self.waveRegularizationPoints
+        
+        # Define where you want more/less smoothing
+        # Creates a bell-shaped profile with more features allowed in optical region
+        # Define where you want more/less smoothing
+        # Creates a bell-shaped profile in log wavelength space
+        optical_center = 4000  # Angstroms - center in optical blue region
+        log_width = 0.4       # Width in log space (natural logarithm)
+
+        # Calculate profile using log-wavelength distance
+        # This creates a symmetric bell curve in log space
+        smoothness_profile = jnp.exp(-0.5 * (jnp.log(wave_centers / optical_center) / log_width)**2)
+
+        # Min value of 0.1 means UV/IR still allowed some features, just fewer
+        smoothness_profile = 0.1 + 0.9 * smoothness_profile        
+        # Compute 2D FFT of the surface
+        fft_surface = jnp.fft.fft2(surface)
+        
+        # Create frequency grids
+        kp = jnp.fft.fftfreq(surface.shape[0])  # phase frequencies
+        kw = jnp.fft.fftfreq(surface.shape[1])  # wavelength frequencies
+        kp_grid, kw_grid = jnp.meshgrid(kp, kw, indexing='ij')
+        
+        # Calculate frequency magnitude 
+        freq_magnitude = jnp.sqrt(kp_grid**2 + kw_grid**2)
+        
+        # Apply wavelength-dependent penalty
+        # First, create a penalty template based on frequency
+        base_penalty = freq_magnitude**2
+        
+        # Apply wavelength-dependent scaling to each frequency component
+        # This requires incorporating the spatial information into the frequency domain
+        # We use a wavelet-like approach by creating multiple scaled versions of the penalty
+        penalty = jnp.zeros_like(base_penalty)
+        
+        # For each wavelength region, apply appropriate frequency penalties
+        for j in range(surface.shape[1]):
+            # Create wavelength-specific mask in spatial domain
+            wave_mask = jnp.zeros(surface.shape[1])
+            wave_mask = wave_mask.at[j].set(1.0)
+            
+            # Transform to frequency domain
+            wave_mask_freq = jnp.fft.fft(wave_mask)
+            
+            # Apply convolution in freq domain to select this wavelength region
+            # For each wavelength position, add its contribution with appropriate scaling
+            scale_factor = 1.0 / smoothness_profile[j]  # Invert so higher values = more smoothing
+            
+            # Use outer product to create 2D mask for this wavelength
+            for k in range(surface.shape[0]):
+                wave_penalty = scale_factor * base_penalty[k, :]
+                penalty = penalty.at[k, :].set(penalty[k, :] + wave_mask_freq * wave_penalty)
+        
+        # Apply penalty to power spectrum and sum
+        power_spectrum = jnp.abs(fft_surface)**2
+        component_reg = jnp.sum(power_spectrum * penalty)
+        
+        # Apply component-specific weighting
+        component_reg *= self.relativeregularizationweights[i]
+        regularization.append(component_reg)
+    
+    # Combine all components and normalize
+    normalization = jnp.sqrt(self.fourier_reg_weight / 
+                          ((self.waveBins[0].size-1) * (self.phaseBins[0].size-1)))
+    
+    return (normalization * jnp.array(regularization).sum() ).flatten()

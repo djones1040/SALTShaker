@@ -2,7 +2,7 @@ from saltshaker.util.readutils import SALTtrainingSN,SALTtraininglightcurve,SALT
 
 
 from scipy.special import factorial
-from scipy.interpolate import bisplev
+from scipy.interpolate import bisplev, interp1d
 from scipy import sparse as scisparse
 import numpy as np
 
