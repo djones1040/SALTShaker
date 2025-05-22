@@ -321,10 +321,10 @@ class modeledtraininglightcurve(modeledtrainingdata):
         #Prefactor for variance
         self.varianceprefactor=fluxfactor*(pbspl.sum())*dwave* _SCALE_FACTOR*sn.mwextcurveint(self.lambdaeff) /(1+z)
         #Identify the relevant error model parameters
+        self.errorgridshape=(residsobj.errphaseknotloc.size-1,residsobj.errwaveknotloc.size-1)
         if residsobj.errbsorder==0:
             errorwaveind=np.searchsorted(residsobj.errwaveknotloc,self.lambdaeffrest)-1
             errorphaseind=(np.searchsorted(residsobj.errphaseknotloc,clippedphase)-1)
-            self.errorgridshape=(residsobj.errphaseknotloc.size-1,residsobj.errwaveknotloc.size-1)
             waveindtemp=np.array([errorwaveind for x in errorphaseind])
             ierrorbin=np.ravel_multi_index((errorphaseind,waveindtemp),self.errorgridshape)
             
@@ -549,11 +549,11 @@ class modeledtrainingspectrum(modeledtrainingdata):
             inds=np.array(range(residsobj.imodelerr0.size))
             derivInterp=np.zeros((spectrum.wavelength.size,residsobj.imodelerr0.size))     
             phaseind,waveind=inds//(residsobj.errwaveknotloc.size-residsobj.errbsorder-1),inds%(residsobj.errwaveknotloc.size-residsobj.errbsorder-1)
-            inphase=((self.phase>= residsobj.phaseknotloc[np.newaxis,phaseind])&(self.phase<=residsobj.phaseknotloc[np.newaxis,phaseind+residsobj.bsorder+1])).any(axis=0)
-            inwave=(( self.restwavelength.max()>=residsobj.waveknotloc[waveind])&(self.restwavelength.min()<=residsobj.waveknotloc[waveind+residsobj.bsorder+1]))
+            inphase=((self.phase>= residsobj.phaseknotloc[np.newaxis,phaseind])&(self.phase<=residsobj.phaseknotloc[np.newaxis,phaseind+residsobj.errbsorder+1])).any(axis=0)
+            inwave=(( self.restwavelength.max()>=residsobj.waveknotloc[waveind])&(self.restwavelength.min()<=residsobj.waveknotloc[waveind+residsobj.errbsorder+1]))
             isrelevant=inphase&inwave
             for i in np.where(isrelevant)[0]:
-                derivInterp[:,i] = bisplev(clippedphase ,self.lambdaeffrest,(residsobj.errphaseknotloc,residsobj.errwaveknotloc,np.arange(residsobj.imodelerr0.size)==i, residsobj.errbsorder,residsobj.errbsorder))
+                derivInterp[:,i] = bisplev(spectrum.phase,self.restwavelength,(residsobj.errphaseknotloc,residsobj.errwaveknotloc,np.arange(residsobj.imodelerr0.size)==i, residsobj.errbsorder,residsobj.errbsorder))
             self.errordesignmat= sparse.BCOO.fromdense(np.concatenate((derivInterp,np.zeros((padding,residsobj.imodelerr0.size)))))
 
         self.imodelerrs = np.array([(np.where(residsobj.parlist == f'specmodelerr_{i}')[0]) for i in range(residsobj.n_errorsurfaces)])
