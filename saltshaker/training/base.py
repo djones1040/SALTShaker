@@ -134,6 +134,9 @@ class TrainSALTBase:
                 
                 successful=successful&wrapaddingargument(config,'iodata','fix_salt2components_initdir',  type=str,
                                                         help="""if set, initialize component params from this directory (default=%(default)s)""")
+                successful=successful&wrapaddingargument(
+                     config,'iodata','datacut_minz_minlam',  type=float, nargs=2, default=None,
+                    help="""if set, allows a minimum redshift and rest-frame wavelength below which data are removed.  This is to facilitate tests for redshift-dependent evolution in subsets of the data; Wang et al. in prep. (default=%(default)s)""")
 
                 #validation option
                 successful=successful&wrapaddingargument(config,'iodata','validate_modelonly',  type=boolean_string,
@@ -287,18 +290,33 @@ class TrainSALTBase:
                     #remove spectral data outside wavelength range
                     inwaverange=(spectrum.wavelength>(self.options.waverange[0]*(1+z)))&(spectrum.wavelength<(self.options.waverange[1]*(1+z)))
                     clippedspectrum=spectrum.clip(inwaverange)
+                    spec_exists = True
                     if len(clippedspectrum):
                         specdata[k]=clippedspectrum
                     else:
                         specdata.pop(k)
+                        spec_exists = False
 
+                    # remove spectral data below our other (optional) wavelength limit
+                    if self.options.datacut_minz_minlam[0] is not None and z < self.options.datacut_minz_minlam[0] and spec_exists:
+                        inwaverange=(spectrum.wavelength>(self.options.datacut_minz_minlam[1]*(1+z)))&(spectrum.wavelength<(self.options.waverange[1]*(1+z)))
+                        clippedspectrum=spectrum.clip(inwaverange)
+                        if len(clippedspectrum):
+                            specdata[k]=clippedspectrum
+                        else:
+                            specdata.pop(k)
+                        
                 for flt in sn.filt:
                     if flt not in filters:
                         filters += [flt]
+
+                    lambdaeff = self.kcordict[sn.survey][flt]['lambdaeff']
                     #Remove light curve outside model [rest-frame] wavelength range
                     if not self.filter_select(sn.survey,flt):  # RK Nov 7 2022
-                    #if flt in self.options.__dict__[f"{sn.survey.split('(')[0]}_ignore_filters"].split(','):
                         photdata.pop(flt)  # remove filter
+                    elif self.options.datacut_minz_minlam[0] is not None and \
+                         z < self.options.datacut_minz_minlam[0] and lambdaeff < self.options.datacut_minz_minlam[1]*(1+z):
+                        photdata.pop(flt)
                     elif self.checkFilterMass(z,sn.survey,flt):
                         lightcurve=sn.photdata[flt]
                         #Remove photometric data outside phase range
@@ -337,5 +355,6 @@ class TrainSALTBase:
                                  lambdaeff > self.options.filtercen_obs_waverange[1] :
                          return False
 
+                     
                 return True 
                 # end filter_select
