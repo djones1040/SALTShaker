@@ -158,11 +158,6 @@ class rpropwithbacktracking(salttrainingoptimizer):
         log.info('Final chi2: {:.2f} '.format(newChi))
         
         chi2results=self.saltobj.getChi2Contributions(Xtransformed,jit=False,dospecresids=self.saltobj.dospec)
-<<<<<<< HEAD
-        
-=======
- 
->>>>>>> main
         for name,chi2component,dof in chi2results:
             log.info('{} chi2/dof is {:.1f} ({:.2f}% of total chi2)'.format(name,chi2component/dof,chi2component/sum([x[1] for x in chi2results])*100))
 
