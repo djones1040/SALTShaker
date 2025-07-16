@@ -622,7 +622,7 @@ class SALTResids:
         self.ispcrcl = np.array([i for i, si in enumerate(self.parlist) if si.startswith('spec')],dtype=int) # used to be specrecal
         self.ispcrcl_coeffs = np.array([i for i, si in enumerate(self.parlist) if si.startswith('specrecal')],dtype=int) # used to be specrecal
         if self.ispcrcl.size==0: self.ispcrcl=np.zeros(self.npar,dtype=bool)
-        import pdb;pdb.set_trace()
+
         self.imodelerr = np.array([i for i, si in enumerate(self.parlist) if si.startswith('modelerr') or si.startswith('specmodelerr')],dtype=int)
         self.imodelerr0 = np.array([i for i, si in enumerate(self.parlist) if si ==('modelerr_0')],dtype=int)
         self.imodelerr1 = np.array([i for i, si in enumerate(self.parlist) if si==('modelerr_1')],dtype=int)

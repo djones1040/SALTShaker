@@ -431,7 +431,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
     __ismapped__={
         'ix0','ic','ispcrcl','icoordinates','ipad','phase','flux','fluxerr',
         'restwavelength','recaltermderivs','pcderivsparse',
-       'uniqueid','n_specrecal'
+       'uniqueid','n_specrecal','varianceprefactor','errordesignmat'
     }
     
     def __init__(self,sn,spectrum,k,residsobj,padding=0):
