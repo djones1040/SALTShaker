@@ -11,7 +11,7 @@ from saltshaker.util.synphot import synphot
 from scipy.interpolate import interp1d
 from sncosmo.constants import HC_ERG_AA
 from saltshaker.initfiles import init_rootdir
-from saltshaker.training.init_hsiao import synphotB
+from saltshaker.training.init_templates import synphotB
 from sncosmo.salt2utils import SALT2ColorLaw
 import extinction
 import copy

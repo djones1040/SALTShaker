@@ -1,6 +1,15 @@
+"""
+Interactive user query utilities.
+
+Functions
+---------
+query_yes_no
+    Prompt user for yes/no confirmation.
+"""
 import sys
 
-#Taken from http://code.activestate.com/recipes/577058/
+
+# Taken from http://code.activestate.com/recipes/577058/
 def query_yes_no(question, default="yes"):
     """Ask a yes/no question via raw_input() and return their answer.
 

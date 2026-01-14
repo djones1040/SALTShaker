@@ -1,5 +1,22 @@
 #!/usr/bin/env python
-"""very basic utilities for dealing w/ fitres objects"""
+"""
+Distance modulus utilities for SNANA light curve fit results.
+
+This module provides functions for computing distance moduli from
+SNANA FITRES files containing SALT light curve fit parameters (x0, x1, c)
+using the Tripp formula: mu = mB + alpha*x1 - beta*c + M
+
+Also includes quality cuts for cosmological analyses.
+
+Functions
+---------
+getmu
+    Add distance modulus to a FITRES object.
+salt2mu
+    Compute distance modulus from SALT parameters.
+mkcuts
+    Apply standard cosmology quality cuts to FITRES data.
+"""
 import numpy as np
 from saltshaker.util import cosmo
 

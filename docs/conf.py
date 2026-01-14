@@ -21,7 +21,7 @@ import os
 import sys
 import sphinx_rtd_theme
 import sphinx_gallery
-# sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('..'))  # Add package root to path
 
 
 # -- General configuration ------------------------------------------------
@@ -35,11 +35,42 @@ import sphinx_gallery
 # ones.
 extensions = ['sphinx.ext.autodoc',
 			  'sphinx.ext.autosummary',
+			  'sphinx.ext.napoleon',  # Support for NumPy-style docstrings
 			  'sphinx.ext.intersphinx',
 			  'sphinx.ext.inheritance_diagram',
 			  'sphinx.ext.mathjax',
 #			  'sphinx.ext.linkcode',
 			  'sphinx_gallery.gen_gallery']
+
+# Napoleon settings for NumPy-style docstrings
+napoleon_google_docstring = False
+napoleon_numpy_docstring = True
+napoleon_include_init_with_doc = True
+napoleon_include_private_with_doc = False
+napoleon_include_special_with_doc = True
+napoleon_use_admonition_for_examples = False
+napoleon_use_admonition_for_notes = False
+napoleon_use_admonition_for_references = False
+napoleon_use_ivar = False
+napoleon_use_param = True
+napoleon_use_rtype = True
+napoleon_type_aliases = None
+
+# Autodoc settings
+autodoc_default_options = {
+    'members': True,
+    'member-order': 'bysource',
+    'special-members': '__init__',
+    'undoc-members': True,
+    'show-inheritance': True,
+}
+autosummary_generate = True
+
+# Sphinx-gallery configuration
+sphinx_gallery_conf = {
+    'examples_dirs': [],  # No example galleries for now
+    'gallery_dirs': [],
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

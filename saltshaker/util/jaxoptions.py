@@ -1,6 +1,26 @@
+"""
+JAX differentiation and compilation utilities.
+
+This module provides decorator functions that wrap JAX operations to allow
+flexible switching between different differentiation modes (forward/reverse AD,
+sparse Jacobians) and JIT compilation at runtime.
+
+Functions
+---------
+jaxoptions
+    Decorator to wrap a function with configurable JAX transforms.
+sparsejaxoptions
+    Decorator for sparse-aware JAX transforms.
+sparsejac
+    Construct sparse Jacobian matrices.
+wrapjvpmultipleargs
+    Wrap JVP for functions with multiple arguments.
+wrapvjpmultipleargs
+    Wrap VJP for functions with multiple arguments.
+"""
 import jax
 from jax.experimental import sparse
-from scipy import sparse as scisparse 
+from scipy import sparse as scisparse
 import sys
 from jax import numpy as jnp
 from tqdm.notebook import trange

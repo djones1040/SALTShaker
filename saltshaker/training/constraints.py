@@ -1,21 +1,44 @@
+"""
+Parameter constraints for SALT3 model training.
 
+This module provides hard constraints on model parameters that are
+enforced during optimization. Unlike priors (soft constraints),
+these constraints transform parameters to satisfy exact definitions.
+
+Classes
+-------
+SALTconstraints
+    Handler for applying parameter constraints during optimization.
+
+Functions
+---------
+constraint
+    Decorator to register a constraint function.
+
+Notes
+-----
+Key constraints include:
+- fixbbandfluxes: Normalize M0 B-band flux, set M1 B-band flux to zero
+- centeranddecorrelatedcolorsandcoords: Decorrelate SN parameters
+- enforcefinaldefinitions: Apply SALT model definitions at output
+"""
 import numpy as np
 
 from jax import numpy as jnp
 import jax
 from jax import lax
-from jax.experimental import sparse 
+from jax.experimental import sparse
 from saltshaker.util.jaxoptions import jaxoptions
 
-from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
+from scipy.interpolate import splprep, splev, bisplev, bisplrep, interp1d, interp2d, RegularGridInterpolator, RectBivariateSpline
 from scipy import stats
 
-from functools import partial,reduce
+from functools import partial, reduce
 from inspect import signature
 
-__possibleconstraints__=dict()
+__possibleconstraints__ = dict()
 import logging
-log=logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
 def constraint(fun):
@@ -27,8 +50,26 @@ def constraint(fun):
 
 
 class SALTconstraints:
+    """
+    Handler for parameter constraints in SALT3 training.
 
-    def __init__(self,residsobj):
+    Applies hard constraints to parameters during optimization to
+    satisfy SALT model definitions (e.g., x1 mean=0, std=1).
+
+    Parameters
+    ----------
+    residsobj : SALTResids
+        Parent residuals object providing parameter indices and options.
+
+    Attributes
+    ----------
+    constraints : dict
+        Dictionary of registered constraint functions.
+    use_constraint_names : list
+        List of constraint names to apply.
+    """
+
+    def __init__(self, residsobj):
         for k in residsobj.__dict__.keys():
             self.__dict__[k] = residsobj.__dict__[k]
         self.saltresids=residsobj
@@ -48,9 +89,26 @@ class SALTconstraints:
         
         self.__maximumlightpcderiv__=sparse.BCOO.fromdense(fluxDeriv)
 
-    @partial(jaxoptions,static_argnums=[0,2],static_argnames=['usesecondary'],jitdefault=True)
-    def transformtoconstrainedparams(self,guess,usesecondary=True):
-        return reduce( lambda value,name: self.constraints[name](value), self.use_secondary_constraint_names + self.use_constraint_names if usesecondary else self.use_constraint_names ,  guess)
+    @partial(jaxoptions, static_argnums=[0, 2], static_argnames=['usesecondary'], jitdefault=True)
+    def transformtoconstrainedparams(self, guess, usesecondary=True):
+        """
+        Apply all active constraints to parameter vector.
+
+        Parameters
+        ----------
+        guess : ndarray
+            Unconstrained parameter values.
+        usesecondary : bool, optional
+            If True, also apply secondary constraints. Default is True.
+
+        Returns
+        -------
+        ndarray
+            Constrained parameter values.
+        """
+        return reduce(lambda value, name: self.constraints[name](value),
+                      self.use_secondary_constraint_names + self.use_constraint_names if usesecondary else self.use_constraint_names,
+                      guess)
 
     @constraint
     def centeranddecorrelatedcolorsandcoords(self,guess):
@@ -121,8 +179,30 @@ class SALTconstraints:
         return guess.at[self.icomponents[:,numwavepars:2*numwavepars ]].set(0)
     
     
-    def enforcefinaldefinitions(self,X,components,checkerrors=True):
-        X=np.array(X)
+    def enforcefinaldefinitions(self, X, components, checkerrors=True):
+        """
+        Enforce SALT model definitions on final parameters.
+
+        Transforms the fitted parameters so they satisfy the standard
+        SALT definitions: x1 has mean=0 and std=1, M1 has zero B-band
+        flux at peak, M0 has standard B-band magnitude.
+
+        Parameters
+        ----------
+        X : ndarray
+            Fitted parameter values.
+        components : ndarray
+            Evaluated model component surfaces.
+        checkerrors : bool, optional
+            If True, verify photometric residuals are unchanged.
+            Default is True.
+
+        Returns
+        -------
+        ndarray
+            Parameters satisfying SALT definitions.
+        """
+        X = np.array(X)
         if checkerrors:
             try:
                 Xredefined=self.enforcefinaldefinitions(X,self.saltresids.SALTModel(X),False)

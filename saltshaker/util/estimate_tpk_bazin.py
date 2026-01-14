@@ -1,4 +1,17 @@
 #!/usr/bin/env python
+"""
+Peak time estimation using Bazin function fits.
+
+This module provides functions to estimate the time of peak brightness
+for supernova light curves by fitting the Bazin analytical function.
+
+Functions
+---------
+bazin
+    Bazin analytical light curve function.
+estimate_tpk_bazin
+    Estimate peak time by fitting Bazin function to light curve data.
+"""
 import numpy as np
 from scipy.optimize import minimize
 from scipy.optimize import least_squares
@@ -6,9 +19,33 @@ from scipy.optimize import least_squares
 import logging
 log=logging.getLogger(__name__)
 
+
 def bazin(time, A, B, t0, tfall, trise):
-	X = np.exp(-(time - t0) / tfall) / (1 + np.exp((time - t0) / trise))
-	return A * X + B
+    """
+    Bazin analytical light curve function.
+
+    Parameters
+    ----------
+    time : array_like
+        Time values.
+    A : float
+        Amplitude parameter.
+    B : float
+        Baseline offset.
+    t0 : float
+        Reference time.
+    tfall : float
+        Fall timescale.
+    trise : float
+        Rise timescale.
+
+    Returns
+    -------
+    array_like
+        Model flux values.
+    """
+    X = np.exp(-(time - t0) / tfall) / (1 + np.exp((time - t0) / trise))
+    return A * X + B
 
 def estimate_tpk_bazin(time, flux, fluxerr, t0=None, max_nfev=10000000):
 

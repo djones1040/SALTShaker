@@ -1,185 +1,125 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8">
-  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Spectroscopic and Photometric Training Data &mdash; SALT3 Training  documentation</title>
-  
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=fd3f3429" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery.css?v=d2d258e8" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery-binder.css?v=f4aeca0c" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery-dataframe.css?v=2082cf3c" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery-rendered-html.css?v=1277b6f3" />
 
   
-  
-  
-  
-
-  
-
-  
-  
-    
-
-  
-
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/gallery.css" type="text/css" />
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9a2dae69"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Training the SALT3 Model" href="training.html" />
-    <link rel="prev" title="Installation" href="install.html" /> 
-
-  
-  <script src="_static/js/modernizr.min.js"></script>
-
+    <link rel="prev" title="Getting Started Quickly" href="gettingstarted.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
-
-   
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
-
-    
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
-        <div class="wy-side-nav-search">
-          
+        <div class="wy-side-nav-search" >
 
           
-            <a href="index.html" class="icon icon-home"> SALT3 Training
           
-
-          
+          <a href="index.html" class="icon icon-home">
+            SALT3 Training
           </a>
-
-          
-            
-            
-          
-
-          
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
 </div>
-
-          
-        </div>
-
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gettingstarted.html">Getting Started Quickly</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Spectroscopic and Photometric Training Data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="training.html">Training the SALT3 Model</a></li>
-<li class="toctree-l1"><a class="reference internal" href="simulation.html">Creating Simulated Data</a></li>
-<li class="toctree-l1"><a class="reference internal" href="validation.html">Validating the Trained Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="simulation.html">Flexible Simulated Data with BYOSED</a></li>
 <li class="toctree-l1"><a class="reference internal" href="pipeline.html">Running the Pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 </ul>
 
-            
-          
         </div>
       </div>
     </nav>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="index.html">SALT3 Training</a>
-        
       </nav>
 
-
       <div class="wy-nav-content">
-        
         <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
+          <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-    
-      <li><a href="index.html">Docs</a> &raquo;</li>
-        
-      <li>Spectroscopic and Photometric Training Data</li>
-    
-    
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Spectroscopic and Photometric Training Data</li>
       <li class="wy-breadcrumbs-aside">
-        
-            
             <a href="_sources/data.rst.txt" rel="nofollow"> View page source</a>
-          
-        
       </li>
-    
   </ul>
-
-  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-            
-  <div class="section" id="spectroscopic-and-photometric-training-data">
-<h1>Spectroscopic and Photometric Training Data<a class="headerlink" href="#spectroscopic-and-photometric-training-data" title="Permalink to this headline">¶</a></h1>
-<p>A number of light curves and spectra are provided
-in the <code class="code docutils literal"><span class="pre">examples/exampledata/</span></code> directory
+             
+  <section id="spectroscopic-and-photometric-training-data">
+<h1>Spectroscopic and Photometric Training Data<a class="headerlink" href="#spectroscopic-and-photometric-training-data" title="Link to this heading">¶</a></h1>
+<p>SALTShaker input files use <a class="reference external" href="http://http://snana.uchicago.edu/">SNANA</a> format,
+which allows easy synergy between model training and SN simulations, light-curve
+fitting, and systematic uncertainty estimation.  The SNANA-formatted data
+necessary for training includes photometry, spectroscopy, and filter
+functions/photometric system information.</p>
+<p>For photometry and spectroscopy, a number of light curves and spectra are provided
+in the <code class="code docutils literal notranslate"><span class="pre">examples/SALT3TRAIN_K21_PUBLIC/</span></code> directory
 for training.  Light curves and spectra are
-combined into a single <a class="reference external" href="http://http://snana.uchicago.edu/">SNANA-formatted</a>
-file.</p>
-<div class="section" id="data-format">
-<span id="id1"></span><h2>Data Format<a class="headerlink" href="#data-format" title="Permalink to this headline">¶</a></h2>
+combined into a single file.  The training data themselves are described
+in Kenworthy et al., 2021.</p>
+<p>For the photometric information, so-called “kcor” files - which confusingly contain no <em>k</em>-corrections - are given in the
+<code class="code docutils literal notranslate"><span class="pre">examples/SALT3TRAIN_K21_PUBLIC/kcor</span></code> directory.  These FITS-formatted files define
+the photometric system associated with each survey that comprises the training sample.
+The SNANA function <code class="code docutils literal notranslate"><span class="pre">kcor.exe</span></code> will create these files from the <code class="code docutils literal notranslate"><span class="pre">.input</span></code> files in the
+same directory if anything needs to be adjusted.  “kcor” files contain filter transmission
+functions, AB, BD17, or Vega spectra depending on the photometric system of the data, zeropoint offsets,
+and optional shifts to the central wavelength of each filter.</p>
+<section id="photometry-and-spectroscopy-format">
+<span id="data-format"></span><h2>Photometry and Spectroscopy Format<a class="headerlink" href="#photometry-and-spectroscopy-format" title="Link to this heading">¶</a></h2>
 <p><a class="reference external" href="http://http://snana.uchicago.edu/">SNANA</a> file format
 consists of a number of header keys giving information
-about each SN, followed by photometry and spectroscopy.
-Example SNANA-formatted data with both photometry and
-spectra are provided in the <code class="code docutils literal"><span class="pre">examples/exampledata/phot+specdata/</span></code>
-directory.</p>
+about each SN, followed by photometry and spectroscopy.</p>
 <p>An example of the minimum required header is below:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">SURVEY</span><span class="p">:</span>  <span class="n">PS1MD</span> <span class="c1"># matches SN to the filter functions given by each kcor file</span>
-<span class="n">SNID</span><span class="p">:</span>  <span class="n">ASASSN</span><span class="o">-</span><span class="mi">16</span><span class="n">bc</span> <span class="c1"># SN identifier</span>
-<span class="n">REDSHIFT_HELIO</span><span class="p">:</span>  <span class="mf">0.05</span> <span class="o">+-</span> <span class="mf">0.01</span> <span class="c1"># needed so that SALT model can be redshifted to match the data</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SURVEY</span><span class="p">:</span> <span class="n">FOUNDATION</span>
+<span class="n">SNID</span><span class="p">:</span> <span class="n">ASASSN</span><span class="o">-</span><span class="mi">15</span><span class="n">bc</span>
+<span class="n">RA</span><span class="p">:</span> <span class="mf">61.5609874</span>
+<span class="n">DEC</span><span class="p">:</span> <span class="o">-</span><span class="mf">8.8856098</span>
+<span class="n">MWEBV</span><span class="p">:</span> <span class="mf">0.037</span> <span class="c1"># Schlafly &amp; Finkbeiner MW E(B-V)</span>
 </pre></div>
 </div>
 <p>Below the header, the photometry is included in the following
 format:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">NOBS</span><span class="p">:</span> <span class="mi">64</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">NOBS</span><span class="p">:</span> <span class="mi">64</span>
 <span class="n">NVAR</span><span class="p">:</span>   <span class="mi">7</span>
 <span class="n">VARLIST</span><span class="p">:</span>  <span class="n">MJD</span>  <span class="n">FLT</span> <span class="n">FIELD</span>   <span class="n">FLUXCAL</span>   <span class="n">FLUXCALERR</span>    <span class="n">MAG</span>     <span class="n">MAGERR</span>
-<span class="n">OBS</span><span class="p">:</span> <span class="mf">57422.54</span> <span class="n">g</span> <span class="n">NULL</span>  <span class="mf">21576.285</span> <span class="mf">214.793</span> <span class="mf">16.665</span> <span class="mf">0.011</span>
-<span class="n">OBS</span><span class="p">:</span> <span class="mf">57428.47</span> <span class="n">g</span> <span class="n">NULL</span>  <span class="mf">30454.989</span> <span class="mf">229.733</span> <span class="mf">16.291</span> <span class="mf">0.008</span>
-<span class="n">OBS</span><span class="p">:</span> <span class="mf">57436.55</span> <span class="n">g</span> <span class="n">NULL</span>  <span class="mf">26053.054</span> <span class="mf">253.839</span> <span class="mf">16.460</span> <span class="mf">0.011</span>
-<span class="n">OBS</span><span class="p">:</span> <span class="mf">57449.46</span> <span class="n">g</span> <span class="n">NULL</span>  <span class="mf">11357.888</span> <span class="mf">158.107</span> <span class="mf">17.362</span> <span class="mf">0.015</span>
+<span class="n">OBS</span><span class="p">:</span> <span class="mf">57422.54</span> <span class="n">g</span> <span class="n">VOID</span>  <span class="mf">21576.285</span> <span class="mf">214.793</span> <span class="mf">16.665</span> <span class="mf">0.011</span>
+<span class="n">OBS</span><span class="p">:</span> <span class="mf">57428.47</span> <span class="n">g</span> <span class="n">VOID</span>  <span class="mf">30454.989</span> <span class="mf">229.733</span> <span class="mf">16.291</span> <span class="mf">0.008</span>
+<span class="n">OBS</span><span class="p">:</span> <span class="mf">57436.55</span> <span class="n">g</span> <span class="n">VOID</span>  <span class="mf">26053.054</span> <span class="mf">253.839</span> <span class="mf">16.460</span> <span class="mf">0.011</span>
+<span class="n">OBS</span><span class="p">:</span> <span class="mf">57449.46</span> <span class="n">g</span> <span class="n">VOID</span>  <span class="mf">11357.888</span> <span class="mf">158.107</span> <span class="mf">17.362</span> <span class="mf">0.015</span>
 <span class="o">...</span>
 <span class="n">END_PHOTOMETRY</span><span class="p">:</span>
 </pre></div>
@@ -189,14 +129,14 @@ FLUXCAL, and FLUXCALERR values.  FLUXCAL and FLUXCALERR use a
 zeropoint of 27.5 mag.</p>
 <p>The beginning of the spectroscopy section is identified by the following
 header lines:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">NVAR_SPEC</span><span class="p">:</span> <span class="mi">3</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">NVAR_SPEC</span><span class="p">:</span> <span class="mi">3</span>
 <span class="n">VARNAMES_SPEC</span><span class="p">:</span> <span class="n">LAMAVG</span>  <span class="n">FLAM</span>  <span class="n">FLAMERR</span>
 </pre></div>
 </div>
 <p>Where the columns are wavelength (angstrom), flux (erg/cm^2/s/A), and flux
 uncertainty (not currently used).  Each spectrum has
 the following format:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">SPECTRUM_ID</span><span class="p">:</span>       <span class="mi">1</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SPECTRUM_ID</span><span class="p">:</span>       <span class="mi">1</span>
 <span class="n">SPECTRUM_MJD</span><span class="p">:</span>      <span class="mf">54998.378</span>  <span class="c1"># Tobs =  -13.832</span>
 <span class="n">SPECTRUM_TEXPOSE</span><span class="p">:</span>  <span class="mf">100000.000</span>  <span class="c1"># seconds</span>
 <span class="n">SPECTRUM_NLAM</span><span class="p">:</span>     <span class="mi">352</span> <span class="p">(</span><span class="n">of</span> <span class="mi">352</span><span class="p">)</span>  <span class="c1"># Number of valid wavelength bins</span>
@@ -209,71 +149,34 @@ the following format:</p>
 <span class="n">END_SPECTRUM</span><span class="p">:</span>
 </pre></div>
 </div>
-<p>the <code class="code docutils literal"><span class="pre">salt3/util/</span></code> directory will soon include utilities for
-adding ASCII spectra to a pre-existing light curve file.</p>
-</div>
-</div>
+</section>
+</section>
 
 
            </div>
-           
           </div>
-          <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="training.html" class="btn btn-neutral float-right" title="Training the SALT3 Model" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
-        <a href="install.html" class="btn btn-neutral" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="gettingstarted.html" class="btn btn-neutral float-left" title="Getting Started Quickly" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="training.html" class="btn btn-neutral float-right" title="Training the SALT3 Model" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
-  
 
   <hr/>
 
   <div role="contentinfo">
-    <p>
-        &copy; Copyright 2018, David Jones, Rick Kessler.
-
-    </p>
+    <p>&#169; Copyright 2018, David Jones, Rick Kessler.</p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
 
 </footer>
-
         </div>
       </div>
-
     </section>
-
   </div>
-  
-
-
-  
-
-    <script type="text/javascript">
-        var DOCUMENTATION_OPTIONS = {
-            URL_ROOT:'./',
-            VERSION:'',
-            LANGUAGE:'None',
-            COLLAPSE_INDEX:false,
-            FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true,
-            SOURCELINK_SUFFIX: '.txt'
-        };
-    </script>
-      <script type="text/javascript" src="_static/jquery.js"></script>
-      <script type="text/javascript" src="_static/underscore.js"></script>
-      <script type="text/javascript" src="_static/doctools.js"></script>
-      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-
-  
-
-  <script type="text/javascript" src="_static/js/theme.js"></script>
-
-  <script type="text/javascript">
+  <script>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });

@@ -104,6 +104,7 @@ are given in :ref:`pipeline`.
    training
    simulation
    pipeline
+   api
    
 
 Indices and tables

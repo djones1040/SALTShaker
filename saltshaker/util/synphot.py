@@ -1,13 +1,65 @@
 #!/usr/bin/env python
-#import pysynphot
+"""
+Synthetic photometry utilities.
+
+This module provides functions for computing synthetic photometry from
+spectra and filter throughput curves. Used throughout SALTShaker for
+converting model spectra to observed magnitudes and fluxes.
+
+Functions
+---------
+synphot
+    Compute synthetic magnitude from spectrum and filter.
+synflux
+    Compute synthetic flux from spectrum and filter throughput.
+"""
 import numpy as np
 from sncosmo.constants import HC_ERG_AA
 import logging
 log=logging.getLogger(__name__)
+
+
 def synphot(wave,flux,zpoff=0,filtfile=None,primarywave=[],primaryflux=[],
 			filtwave=[],filttp=[],
 			plot=False,oplot=False,allowneg=False):
+	"""
+	Compute synthetic magnitude from a spectrum through a filter.
 
+	Parameters
+	----------
+	wave : array_like
+		Wavelength array in Angstroms.
+	flux : array_like
+		Flux array (flux density per wavelength).
+	zpoff : float, optional
+		Zeropoint offset to add to the magnitude. Default is 0.
+	filtfile : str, optional
+		Path to filter throughput file (two columns: wavelength, throughput).
+	primarywave : array_like, optional
+		Wavelength array for primary standard (not currently used).
+	primaryflux : array_like, optional
+		Flux array for primary standard (not currently used).
+	filtwave : array_like, optional
+		Filter wavelength array (alternative to filtfile).
+	filttp : array_like, optional
+		Filter throughput array (alternative to filtfile).
+	plot : bool, optional
+		If True, plot the result. Default is False.
+	oplot : bool, optional
+		If True, overplot on existing figure. Default is False.
+	allowneg : bool, optional
+		If True, allow negative throughput values. Default is False.
+
+	Returns
+	-------
+	float
+		Synthetic AB magnitude.
+
+	Raises
+	------
+	RuntimeError
+		If neither filtfile nor (filtwave, filttp) are provided.
+	"""
 	if filtfile:
 		mag = zpoff - 2.5 * np.log10( synflux(wave,flux,pb=filtfile,plot=plot,oplot=oplot,
 									   allowneg=allowneg))
@@ -28,6 +80,41 @@ def synphot(wave,flux,zpoff=0,filtfile=None,primarywave=[],primaryflux=[],
 	return(mag)
 
 def synflux(x,spc,pb=None,plot=False,oplot=False,allowneg=False,pbx=[],pby=[]):
+	"""
+	Compute synthetic flux from a spectrum through a filter passband.
+
+	Integrates the spectrum weighted by the filter throughput to compute
+	the mean flux density in photon-counting units.
+
+	Parameters
+	----------
+	x : array_like
+		Wavelength array in Angstroms.
+	spc : array_like
+		Spectrum flux array (erg/s/cm^2/A).
+	pb : str, optional
+		Path to passband file (two columns: wavelength, throughput).
+	plot : bool, optional
+		If True, plot the result. Default is False.
+	oplot : bool, optional
+		If True, overplot on existing figure. Default is False.
+	allowneg : bool, optional
+		If True, allow negative throughput values. Default is False.
+	pbx : array_like, optional
+		Passband wavelength array (alternative to pb file).
+	pby : array_like, optional
+		Passband throughput array (alternative to pb file).
+
+	Returns
+	-------
+	float
+		Synthetic flux in photon-counting units (photons/s/cm^2/Hz).
+
+	Raises
+	------
+	RuntimeError
+		If neither pb nor (pbx, pby) are provided.
+	"""
 	import numpy as np
 
 	nx = len(x)

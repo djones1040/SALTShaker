@@ -1,3 +1,18 @@
+"""
+SNANA FITRES file manipulation utilities.
+
+This module provides functions for reading, writing, and applying cuts
+to SNANA FITRES files, which contain light curve fit results.
+
+Functions
+---------
+readfitres
+    Read an SNANA FITRES file into an object.
+writefitres
+    Write fit results to an SNANA FITRES file.
+cutFitRes
+    Apply selection cuts to a FITRES file.
+"""
 import sys,os
 import numpy as np
 import logging

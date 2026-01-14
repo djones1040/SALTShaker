@@ -1,166 +1,96 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8">
-  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Running the Pipeline &mdash; SALT3 Training  documentation</title>
-  
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=fd3f3429" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery.css?v=d2d258e8" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery-binder.css?v=f4aeca0c" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery-dataframe.css?v=2082cf3c" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery-rendered-html.css?v=1277b6f3" />
 
   
-  
-  
-  
-
-  
-
-  
-  
-    
-
-  
-
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/gallery.css" type="text/css" />
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9a2dae69"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="prev" title="Validating the Trained Model" href="validation.html" /> 
-
-  
-  <script src="_static/js/modernizr.min.js"></script>
-
+    <link rel="next" title="API Reference" href="api.html" />
+    <link rel="prev" title="Flexible Simulated Data with BYOSED" href="simulation.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
-
-   
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
-
-    
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
-        <div class="wy-side-nav-search">
-          
+        <div class="wy-side-nav-search" >
 
           
-            <a href="index.html" class="icon icon-home"> SALT3 Training
           
-
-          
+          <a href="index.html" class="icon icon-home">
+            SALT3 Training
           </a>
-
-          
-            
-            
-          
-
-          
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
 </div>
-
-          
-        </div>
-
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gettingstarted.html">Getting Started Quickly</a></li>
 <li class="toctree-l1"><a class="reference internal" href="data.html">Spectroscopic and Photometric Training Data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="training.html">Training the SALT3 Model</a></li>
-<li class="toctree-l1"><a class="reference internal" href="simulation.html">Creating Simulated Data</a></li>
-<li class="toctree-l1"><a class="reference internal" href="validation.html">Validating the Trained Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="simulation.html">Flexible Simulated Data with BYOSED</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Running the Pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 </ul>
 
-            
-          
         </div>
       </div>
     </nav>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="index.html">SALT3 Training</a>
-        
       </nav>
 
-
       <div class="wy-nav-content">
-        
         <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
+          <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-    
-      <li><a href="index.html">Docs</a> &raquo;</li>
-        
-      <li>Running the Pipeline</li>
-    
-    
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Running the Pipeline</li>
       <li class="wy-breadcrumbs-aside">
-        
-            
             <a href="_sources/pipeline.rst.txt" rel="nofollow"> View page source</a>
-          
-        
       </li>
-    
   </ul>
-
-  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-            
-  <div class="section" id="running-the-pipeline">
-<h1>Running the Pipeline<a class="headerlink" href="#running-the-pipeline" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="pipeline-discription">
-<h2>Pipeline Discription<a class="headerlink" href="#pipeline-discription" title="Permalink to this headline">¶</a></h2>
-<p>The SALT3 Training pipeline consists of several procedures that will be run in series. The pipeline modifies a base input file to create a customized one and calls the external program with the customized input. Details are described below.</p>
-</div>
-<div class="section" id="param-file">
-<h2>Param File<a class="headerlink" href="#param-file" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="general-structure">
-<h3>General Structure<a class="headerlink" href="#general-structure" title="Permalink to this headline">¶</a></h3>
+             
+  <section id="running-the-pipeline">
+<span id="pipeline"></span><h1>Running the Pipeline<a class="headerlink" href="#running-the-pipeline" title="Link to this heading">¶</a></h1>
+<section id="pipeline-discription">
+<h2>Pipeline Discription<a class="headerlink" href="#pipeline-discription" title="Link to this heading">¶</a></h2>
+<p>The SALT3 Training pipeline consists of several procedures that will be run in series. The pipeline modifies a base input file to create a customized one and calls the external program with the customized input. Details are described below and the pipeline will be described and published in Dai et al. (in prep.).</p>
+</section>
+<section id="param-file">
+<h2>Param File<a class="headerlink" href="#param-file" title="Link to this heading">¶</a></h2>
+<section id="general-structure">
+<h3>General Structure<a class="headerlink" href="#general-structure" title="Link to this heading">¶</a></h3>
 <p>Each section in the param file defines one procedure in the pipeline. The gerenal structure is as follows:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">Procedure</span> <span class="n">Name</span><span class="p">]</span> <span class="p">([</span><span class="n">byosed</span><span class="p">],</span> <span class="p">[</span><span class="n">simulation</span><span class="p">],</span> <span class="p">[</span><span class="n">training</span><span class="p">],</span> <span class="p">[</span><span class="n">lcfitting</span><span class="p">],</span> <span class="p">[</span><span class="n">cosmology</span><span class="p">],</span> <span class="o">...</span><span class="p">)</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">Procedure</span> <span class="n">Name</span><span class="p">]</span> <span class="p">([</span><span class="n">byosed</span><span class="p">],</span> <span class="p">[</span><span class="n">simulation</span><span class="p">],</span> <span class="p">[</span><span class="n">training</span><span class="p">],</span> <span class="p">[</span><span class="n">lcfitting</span><span class="p">],</span> <span class="p">[</span><span class="n">cosmology</span><span class="p">],</span> <span class="o">...</span><span class="p">)</span>
 
 <span class="c1"># external program to call</span>
 <span class="n">pro</span> <span class="o">=</span>
@@ -173,86 +103,175 @@
 
 <span class="c1"># define the section (optional), key and value to be added or changed from the base input</span>
 
-<span class="n">set_key</span><span class="o">=</span><span class="p">[</span><span class="n">SECTION1</span><span class="p">]</span> <span class="p">[</span><span class="n">KEY</span><span class="p">]</span> <span class="p">[</span><span class="n">VALUE</span><span class="p">]</span>
+<span class="n">set_key</span><span class="o">=</span> <span class="p">[</span><span class="n">NCOL</span><span class="p">]</span> <span class="c1"># 2 if no section or 3 if section exists in the config file</span>
+    <span class="p">[</span><span class="n">SECTION1</span><span class="p">]</span> <span class="p">[</span><span class="n">KEY</span><span class="p">]</span> <span class="p">[</span><span class="n">VALUE</span><span class="p">]</span>
     <span class="p">[</span><span class="n">SECTION2</span><span class="p">]</span> <span class="p">[</span><span class="n">KEY2</span><span class="p">]</span> <span class="p">[</span><span class="n">VALUE2</span><span class="p">]</span>
     <span class="p">[</span><span class="n">SECTION2</span><span class="p">]</span> <span class="p">[</span><span class="n">KEY3</span><span class="p">]</span> <span class="p">[</span><span class="n">VALUE3</span><span class="p">]</span>
 </pre></div>
 </div>
-</div>
-</div>
-<div class="section" id="id1">
-<h2>Running the Pipeline<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="the-pipeline-class">
-<h3>The pipeline class<a class="headerlink" href="#the-pipeline-class" title="Permalink to this headline">¶</a></h3>
-<p>The pipeline can be run using the SALT3pipe class:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pipeline.pipeline</span> <span class="k">import</span> <span class="o">*</span>
+</section>
+<section id="batch-mode">
+<h3>Batch mode<a class="headerlink" href="#batch-mode" title="Link to this heading">¶</a></h3>
+<p>The pipeline supports batch submission for certain stages (e.g. simulation, lcfitting, …)</p>
+<p>set <cite>batch=True</cite> under that stage.</p>
+</section>
+</section>
+<section id="id1">
+<h2>Running the Pipeline<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h2>
+<section id="the-pipeline-class">
+<h3>The pipeline class<a class="headerlink" href="#the-pipeline-class" title="Link to this heading">¶</a></h3>
+<p>The pipeline can be run using the SALT3pipe class.  In
+the <code class="code docutils literal notranslate"><span class="pre">examples/pipelinetest</span></code> directory,
+you can run the pipeline with the following commands:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">salt3.pipeline.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
 <span class="n">pipe</span> <span class="o">=</span> <span class="n">SALT3pipe</span><span class="p">(</span><span class="n">finput</span><span class="o">=</span><span class="s1">&#39;sampleinput.txt&#39;</span><span class="p">)</span>
+<span class="n">pipe</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
 <span class="n">pipe</span><span class="o">.</span><span class="n">configure</span><span class="p">()</span>
 <span class="n">pipe</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
 </pre></div>
 </div>
+</section>
+<section id="building-the-pipeline-with-selected-stages">
+<h3>Building the pipeline with selected stages<a class="headerlink" href="#building-the-pipeline-with-selected-stages" title="Link to this heading">¶</a></h3>
+<p>The <code class="code docutils literal notranslate"><span class="pre">build</span></code> method need to be called before <code class="code docutils literal notranslate"><span class="pre">configure</span></code> and <code class="code docutils literal notranslate"><span class="pre">run</span></code>
+The default pipeline includes all the stages. Currently they are <code class="code docutils literal notranslate"><span class="pre">['byosed','sim','train','lcfit','getmu','cosmofit']</span></code> or <code class="code docutils literal notranslate"><span class="pre">['data','train','lcfit','getmu','cosmofit']</span></code>, depending on the value of the <code class="code docutils literal notranslate"><span class="pre">data</span></code> option.
+This can be set simply by</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pipe</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
+</pre></div>
 </div>
+<p>The option <code class="code docutils literal notranslate"><span class="pre">data</span></code> can be turned on/off to use data/sims, for example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pipe</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
 </div>
+<p>The default value is <code class="code docutils literal notranslate"><span class="pre">data=True</span></code></p>
+<p>To specify or skip certain stages, set the option <code class="code docutils literal notranslate"><span class="pre">mode='customize'</span></code>, and specify/skip stages using <code class="code docutils literal notranslate"><span class="pre">onlyrun</span></code>/<code class="code docutils literal notranslate"><span class="pre">skip</span></code>. Note that the only one of the options can be set.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pipe</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;customize&#39;</span><span class="p">,</span><span class="n">onlyrun</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;lcfit&#39;</span><span class="p">,</span><span class="s1">&#39;getmu&#39;</span><span class="p">,</span><span class="s1">&#39;cosmofit&#39;</span><span class="p">])</span>
+</pre></div>
 </div>
+<p>Once the <code class="code docutils literal notranslate"><span class="pre">build</span></code> method is called, the <code class="code docutils literal notranslate"><span class="pre">configure</span></code> method need to be called following it so that the input files are properly configured.</p>
+</section>
+<section id="connecting-the-input-output-of-different-stages-using-the-glue-method">
+<h3>Connecting the input/output of different stages using the ‘glue’ method<a class="headerlink" href="#connecting-the-input-output-of-different-stages-using-the-glue-method" title="Link to this heading">¶</a></h3>
+<p>The <code class="code docutils literal notranslate"><span class="pre">glue</span></code> method can be called so that the input and output of the gluing stages are properly connected. This will overwrite the config (input) files of the stages and should be called after <code class="code docutils literal notranslate"><span class="pre">configure</span></code>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pipe</span><span class="o">.</span><span class="n">glue</span><span class="p">([</span><span class="s1">&#39;sim&#39;</span><span class="p">,</span><span class="s1">&#39;train&#39;</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>For some stages that are connected with multiple stages, the <code class="code docutils literal notranslate"><span class="pre">on</span></code> option specify what input/output files to glue on:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pipe</span><span class="o">.</span><span class="n">glue</span><span class="p">([</span><span class="s1">&#39;train&#39;</span><span class="p">,</span><span class="s1">&#39;lcfit&#39;</span><span class="p">],</span><span class="n">on</span><span class="o">=</span><span class="s1">&#39;model&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pipe</span><span class="o">.</span><span class="n">glue</span><span class="p">([</span><span class="s1">&#39;sim&#39;</span><span class="p">,</span><span class="s1">&#39;lcfit&#39;</span><span class="p">],</span><span class="n">on</span><span class="o">=</span><span class="s1">&#39;phot&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="id2">
+<h3>Running the pipeline<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h3>
+<p>After calling <code class="code docutils literal notranslate"><span class="pre">build</span></code> and <code class="code docutils literal notranslate"><span class="pre">glue</span></code>, call the <code class="code docutils literal notranslate"><span class="pre">run</span></code> method the execute the pipeline:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pipe</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Note the <code class="code docutils literal notranslate"><span class="pre">build</span></code>, <code class="code docutils literal notranslate"><span class="pre">configure</span></code>, <code class="code docutils literal notranslate"><span class="pre">glue</span></code> and <code class="code docutils literal notranslate"><span class="pre">run</span></code> methods can be called multiple times to build a customized pipeline. Keep in mind each time <code class="code docutils literal notranslate"><span class="pre">configure</span></code> is called, it modifies the config (input) file of certain stages in specified in <code class="code docutils literal notranslate"><span class="pre">build</span></code>; and each time <code class="code docutils literal notranslate"><span class="pre">glue</span></code> is called, it overwrites the existing config (input) file. So these methods should be called logically given how the pipeline is run.</p>
+<p>The following example will run the Simulation and Training stages first with their input/output properly connected, then run the LCfitting, Getmu, and Cosmofit stages. Since to glue Training and Lcfitting (lcfitting using the trained model), the training code need to be run first so that the trained model files exist.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">test_pipeline</span><span class="p">():</span>
+    <span class="n">pipe</span> <span class="o">=</span> <span class="n">SALT3pipe</span><span class="p">(</span><span class="n">finput</span><span class="o">=</span><span class="s1">&#39;sampleinput.txt&#39;</span><span class="p">)</span>
+    <span class="n">pipe</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;customize&#39;</span><span class="p">,</span><span class="n">onlyrun</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;byosed&#39;</span><span class="p">,</span><span class="s1">&#39;sim&#39;</span><span class="p">,</span><span class="s1">&#39;train&#39;</span><span class="p">])</span>
+    <span class="n">pipe</span><span class="o">.</span><span class="n">configure</span><span class="p">()</span>
+    <span class="n">pipe</span><span class="o">.</span><span class="n">glue</span><span class="p">([</span><span class="s1">&#39;sim&#39;</span><span class="p">,</span><span class="s1">&#39;train&#39;</span><span class="p">])</span>
+    <span class="n">pipe</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+    <span class="n">pipe</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;customize&#39;</span><span class="p">,</span><span class="n">onlyrun</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;lcfit&#39;</span><span class="p">,</span><span class="s1">&#39;getmu&#39;</span><span class="p">,</span><span class="s1">&#39;cosmofit&#39;</span><span class="p">])</span>
+    <span class="n">pipe</span><span class="o">.</span><span class="n">configure</span><span class="p">()</span>
+    <span class="n">pipe</span><span class="o">.</span><span class="n">glue</span><span class="p">([</span><span class="s1">&#39;train&#39;</span><span class="p">,</span><span class="s1">&#39;lcfit&#39;</span><span class="p">],</span><span class="n">on</span><span class="o">=</span><span class="s1">&#39;model&#39;</span><span class="p">)</span>
+    <span class="n">pipe</span><span class="o">.</span><span class="n">glue</span><span class="p">([</span><span class="s1">&#39;sim&#39;</span><span class="p">,</span><span class="s1">&#39;lcfit&#39;</span><span class="p">],</span><span class="n">on</span><span class="o">=</span><span class="s1">&#39;phot&#39;</span><span class="p">)</span>
+    <span class="n">pipe</span><span class="o">.</span><span class="n">glue</span><span class="p">([</span><span class="s1">&#39;lcfit&#39;</span><span class="p">,</span><span class="s1">&#39;getmu&#39;</span><span class="p">])</span>
+    <span class="n">pipe</span><span class="o">.</span><span class="n">glue</span><span class="p">([</span><span class="s1">&#39;getmu&#39;</span><span class="p">,</span><span class="s1">&#39;cosmofit&#39;</span><span class="p">])</span>
+    <span class="n">pipe</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="running-the-pipeline-using-the-runpipe-py-utility-batch-submission-supported">
+<h2>Running the Pipeline using the <cite>runpipe.py</cite> utility [batch submission supported]<a class="headerlink" href="#running-the-pipeline-using-the-runpipe-py-utility-batch-submission-supported" title="Link to this heading">¶</a></h2>
+<p>Currently the <cite>runpipe.py</cite> utility is under <cite>salt3/pipeline/</cite>. We plan to pre-install it in the future.</p>
+<section id="using-runpipe-py">
+<h3>Using <cite>runpipe.py</cite><a class="headerlink" href="#using-runpipe-py" title="Link to this heading">¶</a></h3>
+<p>To use the utility, first define the environmental variable <cite>MY_SALT3_DIR</cite>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">export</span> <span class="n">MY_SALT3_DIR</span><span class="o">=</span><span class="s1">&#39;THE_SALT3_DIRECTORY&#39;</span>
+</pre></div>
+</div>
+<p>Then in the terminal call:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>python $MY_SALT3_DIR/SALT3/salt3/pipeline/runpipe.py -[OPTIONS] [OPTVALUES]
+</pre></div>
+</div>
+<p>To see the currently available options, use</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>python $MY_SALT3_DIR/SALT3/salt3/pipeline/runpipe.py --help
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">usage</span><span class="p">:</span> <span class="n">runpipe</span><span class="o">.</span><span class="n">py</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">PIPEINPUT</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">mypipe</span> <span class="n">MYPIPE</span><span class="p">]</span>
+                  <span class="p">[</span><span class="o">--</span><span class="n">batch_mode</span> <span class="n">BATCH_MODE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">batch_script</span> <span class="n">BATCH_SCRIPT</span><span class="p">]</span>
+                  <span class="p">[</span><span class="o">--</span><span class="n">randseed</span> <span class="n">RANDSEED</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">fseeds</span> <span class="n">FSEEDS</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">num</span> <span class="n">NUM</span><span class="p">]</span>
+                  <span class="p">[</span><span class="o">--</span><span class="n">norun</span><span class="p">]</span>
+
+<span class="n">Run</span> <span class="n">SALT3</span> <span class="n">Pipe</span><span class="o">.</span>
+
+<span class="n">optional</span> <span class="n">arguments</span><span class="p">:</span>
+  <span class="o">-</span><span class="n">h</span><span class="p">,</span> <span class="o">--</span><span class="n">help</span>            <span class="n">show</span> <span class="n">this</span> <span class="n">help</span> <span class="n">message</span> <span class="ow">and</span> <span class="n">exit</span>
+  <span class="o">-</span><span class="n">c</span> <span class="n">PIPEINPUT</span>          <span class="n">pipeline</span> <span class="nb">input</span> <span class="n">file</span>
+  <span class="o">--</span><span class="n">mypipe</span> <span class="n">MYPIPE</span>       <span class="n">define</span> <span class="n">your</span> <span class="n">own</span> <span class="n">pipe</span> <span class="ow">in</span> <span class="n">yourownfilename</span><span class="o">.</span><span class="n">py</span>
+  <span class="o">--</span><span class="n">batch_mode</span> <span class="n">BATCH_MODE</span>
+                        <span class="o">&gt;</span><span class="mi">0</span> <span class="n">to</span> <span class="n">specify</span> <span class="n">how</span> <span class="n">many</span> <span class="n">batch</span> <span class="n">jobs</span> <span class="n">to</span> <span class="n">submit</span>
+  <span class="o">--</span><span class="n">batch_script</span> <span class="n">BATCH_SCRIPT</span>
+                        <span class="n">base</span> <span class="n">batch</span> <span class="n">submission</span> <span class="n">script</span>
+  <span class="o">--</span><span class="n">randseed</span> <span class="n">RANDSEED</span>   <span class="p">[</span><span class="n">internal</span> <span class="n">use</span><span class="p">]</span> <span class="n">specify</span> <span class="n">randseed</span> <span class="k">for</span> <span class="n">single</span> <span class="n">simulation</span>
+  <span class="o">--</span><span class="n">fseeds</span> <span class="n">FSEEDS</span>       <span class="n">provide</span> <span class="n">a</span> <span class="nb">list</span> <span class="n">of</span> <span class="n">randseeds</span> <span class="k">for</span> <span class="n">multiple</span> <span class="n">batch</span> <span class="n">jobs</span>
+  <span class="o">--</span><span class="n">num</span> <span class="n">NUM</span>             <span class="p">[</span><span class="n">internal</span> <span class="n">use</span><span class="p">]</span> <span class="n">suffix</span> <span class="k">for</span> <span class="n">multiple</span> <span class="n">batch</span> <span class="n">jobs</span>
+  <span class="o">--</span><span class="n">norun</span>               <span class="nb">set</span> <span class="n">to</span> <span class="n">only</span> <span class="n">check</span> <span class="n">configurations</span> <span class="n">without</span> <span class="n">launch</span> <span class="n">jobs</span>
+</pre></div>
+</div>
+</section>
+<section id="define-your-own-pipeline">
+<h3>Define your own pipeline<a class="headerlink" href="#define-your-own-pipeline" title="Link to this heading">¶</a></h3>
+<p>Define your own pipeline is supported by <cite>runpipe.py</cite>.</p>
+<p>Simply write your own pipeline in a <cite>MYPIPE.py</cite> (name can be arbitrary) file and use the <cite>–mypipe MYPIPE</cite> flag when calling the program. Make sure to drop the <cite>pipe.run()</cite> line, the pipeline will be called and run in the program. Example <cite>MYPIPE.py</cite> file:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">MyPipe</span><span class="p">(</span><span class="n">finput</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">SALT3pipe</span>
+    <span class="c1"># write your own pipeline here</span>
+    <span class="n">pipe</span> <span class="o">=</span> <span class="n">SALT3pipe</span><span class="p">(</span><span class="n">finput</span><span class="p">)</span>
+    <span class="n">pipe</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;customize&#39;</span><span class="p">,</span><span class="n">onlyrun</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;byosed&#39;</span><span class="p">,</span><span class="s1">&#39;sim&#39;</span><span class="p">,</span><span class="s1">&#39;train&#39;</span><span class="p">,</span><span class="s1">&#39;lcfit&#39;</span><span class="p">])</span>
+    <span class="n">pipe</span><span class="o">.</span><span class="n">configure</span><span class="p">()</span>
+    <span class="n">pipe</span><span class="o">.</span><span class="n">glue</span><span class="p">([</span><span class="s1">&#39;sim&#39;</span><span class="p">,</span><span class="s1">&#39;train&#39;</span><span class="p">])</span>
+    <span class="n">pipe</span><span class="o">.</span><span class="n">glue</span><span class="p">([</span><span class="s1">&#39;sim&#39;</span><span class="p">,</span><span class="s1">&#39;lcfit&#39;</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">pipe</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
 
 
            </div>
-           
           </div>
-          <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-      
-        <a href="validation.html" class="btn btn-neutral" title="Validating the Trained Model" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="simulation.html" class="btn btn-neutral float-left" title="Flexible Simulated Data with BYOSED" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="api.html" class="btn btn-neutral float-right" title="API Reference" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
-  
 
   <hr/>
 
   <div role="contentinfo">
-    <p>
-        &copy; Copyright 2018, David Jones, Rick Kessler.
-
-    </p>
+    <p>&#169; Copyright 2018, David Jones, Rick Kessler.</p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
 
 </footer>
-
         </div>
       </div>
-
     </section>
-
   </div>
-  
-
-
-  
-
-    <script type="text/javascript">
-        var DOCUMENTATION_OPTIONS = {
-            URL_ROOT:'./',
-            VERSION:'',
-            LANGUAGE:'None',
-            COLLAPSE_INDEX:false,
-            FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true,
-            SOURCELINK_SUFFIX: '.txt'
-        };
-    </script>
-      <script type="text/javascript" src="_static/jquery.js"></script>
-      <script type="text/javascript" src="_static/underscore.js"></script>
-      <script type="text/javascript" src="_static/doctools.js"></script>
-      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-
-  
-
-  <script type="text/javascript" src="_static/js/theme.js"></script>
-
-  <script type="text/javascript">
+  <script>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });

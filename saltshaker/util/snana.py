@@ -1,3 +1,21 @@
+"""
+SNANA file format I/O utilities.
+
+This module provides classes for reading supernova data in SNANA format,
+supporting both ASCII (.dat) files and FITS binary tables.
+
+Classes
+-------
+SuperNova
+    Container for supernova photometry and metadata from SNANA files.
+SuperNovaSpectrum
+    Container for a single spectrum from SNANA spectrum files.
+
+Notes
+-----
+SNANA is a software package for supernova light curve analysis. See
+https://snana.uchicago.edu/ for documentation on file formats.
+"""
 from __future__ import print_function
 
 import os
@@ -123,13 +141,66 @@ class SuperNovaSpectrum( object ) :
             self.__dict__[col] = array( self.__dict__[col] )
         return( None )
 
-class SuperNova( object ) : 
-    """ object class for a single SN extracted from SNANA sim tables
-        or from a SNANA-style .DAT file
+class SuperNova(object):
     """
-    
-    def __init__( self, datfile=None, headfitsfile=None, photfitsfile=None, specfitsfile=None, snid=None, verbose=False, simdir=None, readspec=True ) : 
-        """ Read in header info (z,type,etc) and full light curve data.
+    Container for supernova data from SNANA files.
+
+    Reads photometry, spectroscopy, and metadata from either ASCII .dat files
+    or FITS binary tables in SNANA format.
+
+    Parameters
+    ----------
+    datfile : str, optional
+        Path to SNANA ASCII data file.
+    headfitsfile : str, optional
+        Path to FITS header file (*_HEAD.FITS).
+    photfitsfile : str, optional
+        Path to FITS photometry file (*_PHOT.FITS).
+    specfitsfile : str, optional
+        Path to FITS spectroscopy file (*_SPEC.FITS).
+    snid : int or str, optional
+        Supernova ID (required when reading from FITS).
+    verbose : bool, optional
+        Print status messages.
+    readspec : bool, optional
+        If True, read spectroscopic data. Default is True.
+
+    Attributes
+    ----------
+    SNID : str
+        Supernova identifier.
+    MJD : ndarray
+        Modified Julian Dates of photometric observations.
+    FLT : ndarray
+        Filter names for each observation.
+    FLUXCAL : ndarray
+        Calibrated flux values.
+    FLUXCALERR : ndarray
+        Flux uncertainties.
+    SPECTRA : dict
+        Dictionary of spectroscopic data keyed by spectrum index.
+    REDSHIFT_HELIO : float
+        Heliocentric redshift.
+    SURVEY : str
+        Survey name.
+
+    Examples
+    --------
+    From ASCII file::
+
+        sn = SuperNova('path/to/sn2011fe.dat')
+
+    From FITS files::
+
+        sn = SuperNova(snid=12345,
+                       headfitsfile='data_HEAD.FITS',
+                       photfitsfile='data_PHOT.FITS')
+    """
+
+    def __init__(self, datfile=None, headfitsfile=None, photfitsfile=None,
+                 specfitsfile=None, snid=None, verbose=False, simdir=None,
+                 readspec=True):
+        """Read in header info (z,type,etc) and full light curve data.
         For simulated SNe stored in fits tables, user must provide the simname and snid,
         and the data are collected from binary fits tables, assumed to exist 
         within the $SNDATA_ROOT/SIM/ directory tree. 

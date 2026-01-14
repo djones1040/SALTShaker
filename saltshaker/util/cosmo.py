@@ -1,11 +1,44 @@
 from __future__ import print_function
 #!/usr/bin/env python
+"""
+Cosmology calculator.
+
+This module provides functions for computing cosmological distances,
+ages, and related quantities. Adapted from Ned Wright's cosmology
+calculator (www.astro.ucla.edu/~wright/CosmoCalc.html).
+
+Supports flat and non-flat universes with dark energy equation of state
+w(a) = w0 + wa(1-a).
+
+Functions
+---------
+calculate
+    Compute all cosmological quantities at redshift z.
+DL
+    Luminosity distance.
+DC
+    Comoving radial distance.
+DA
+    Angular diameter distance.
+mu
+    Distance modulus.
+agez
+    Age of the universe at redshift z.
+zfromt
+    Redshift corresponding to a given cosmic age.
+zfromd
+    Redshift corresponding to a given distance.
+volume
+    Comoving volume out to redshift z.
+E
+    Dimensionless expansion rate H(z)/H0.
+"""
 # 2009-07-23 S.Rodney
-# adapted from James Schombert's python version 
-# of Ned Wright's cosmology calculator 
+# adapted from James Schombert's python version
+# of Ned Wright's cosmology calculator
 #  (www.astro.ucla.edu/~wright/CosmoCalc.html)
 #
-#  WORK IN PROGRESS : 
+#  WORK IN PROGRESS :
 #    STILL NEED TO EXTRACT SOME OTHER FUNCTIONS FROM CALCULATE
 
 helpstring = '''

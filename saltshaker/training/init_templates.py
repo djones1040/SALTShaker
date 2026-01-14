@@ -1,6 +1,25 @@
 #!/usr/bin/env python
+"""
+Model initialization from spectral templates.
+
+This module provides functions to initialize SALT3 model components (M0, M1)
+and error surfaces from spectral templates like Hsiao07, SALT2, or Kaepora.
+
+Functions
+---------
+init_hsiao
+    Initialize M0/M1 from the Hsiao07 SN Ia template.
+init_salt2
+    Initialize from existing SALT2 model files.
+init_kaepora
+    Initialize from Kaepora spectral templates.
+init_errs
+    Initialize model error surfaces from SALT2 error files.
+synphotB
+    Compute synthetic B-band magnitude.
+"""
 import numpy as np
-from scipy.interpolate import bisplrep,bisplev,RegularGridInterpolator
+from scipy.interpolate import bisplrep, bisplev, RegularGridInterpolator
 from scipy.interpolate import interp1d
 from sncosmo.constants import HC_ERG_AA
 from saltshaker.initfiles import init_rootdir
@@ -8,7 +27,7 @@ from scipy.optimize import least_squares
 from scipy.special import factorial
 
 import logging
-log=logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 _SCALE_FACTOR = 1e-12
 

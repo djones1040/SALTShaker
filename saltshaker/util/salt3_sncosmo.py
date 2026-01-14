@@ -1,3 +1,15 @@
+"""
+SALT3 source model for sncosmo.
+
+This module provides the SALT3Source class, an sncosmo-compatible
+implementation of the SALT3 Type Ia supernova spectral timeseries model.
+Used for light curve fitting and synthetic photometry generation.
+
+Classes
+-------
+SALT3Source
+    SALT3 spectral timeseries model for sncosmo.
+"""
 import abc
 import os
 from collections import OrderedDict as odict
