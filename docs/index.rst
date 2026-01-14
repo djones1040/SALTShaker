@@ -100,6 +100,7 @@ are given in :ref:`pipeline`.
 
    install
    gettingstarted
+   configuration
    data
    training
    simulation
