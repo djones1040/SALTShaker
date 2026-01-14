@@ -38,6 +38,64 @@ def init_salt2(m0file=None,m1file=None,M0triplet=None,M1triplet=None,
 			   phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
 			   waveinterpres=2.0,phasesplineres=3.2,wavesplineres=72,
 			   days_interp=5,debug=False,normalize=True,order=3,use_snpca_knots=True):
+	"""
+	Initialize SALT3 model components from existing SALT2 model files.
+
+	Reads M0 and M1 spectral surfaces from SALT2-format ASCII files and
+	constructs B-spline representations for use in SALT3 training. If the
+	requested wavelength range extends beyond the input data, the Hsiao
+	template is used to extrapolate.
+
+	Parameters
+	----------
+	m0file : str, optional
+		Path to M0 model file (phase, wavelength, flux columns).
+	m1file : str, optional
+		Path to M1 model file (phase, wavelength, flux columns).
+	M0triplet : tuple, optional
+		Alternative to m0file: (phase, wave, flux) arrays.
+	M1triplet : tuple, optional
+		Alternative to m1file: (phase, wave, flux) arrays.
+	Bfilt : str
+		Path to B-band filter transmission file for normalization.
+	hsiaofile : str
+		Path to Hsiao template for wavelength extrapolation.
+	phaserange : list
+		[min, max] rest-frame phase in days relative to B-max.
+	waverange : list
+		[min, max] rest-frame wavelength in Angstroms.
+	phaseinterpres : float
+		Phase resolution for output grid (days).
+	waveinterpres : float
+		Wavelength resolution for output grid (Angstroms).
+	phasesplineres : float
+		Spacing between phase B-spline knots (days).
+	wavesplineres : float
+		Spacing between wavelength B-spline knots (Angstroms).
+	order : int
+		B-spline order (default 3 = cubic).
+	use_snpca_knots : bool
+		If True, use SALT2/SNPCA knot locations instead of uniform grid.
+
+	Returns
+	-------
+	intphase : ndarray
+		Phase grid for the output model.
+	intwave : ndarray
+		Wavelength grid for the output model.
+	m0 : ndarray
+		M0 surface evaluated on the output grid.
+	m1 : ndarray
+		M1 surface evaluated on the output grid.
+	phase_knots : ndarray
+		Phase knot locations for B-spline.
+	wave_knots : ndarray
+		Wavelength knot locations for B-spline.
+	m0_coeffs : ndarray
+		B-spline coefficients for M0.
+	m1_coeffs : ndarray
+		B-spline coefficients for M1.
+	"""
 
 	if m0file:
 		phase,wave,m0flux = np.loadtxt(m0file,unpack=True)
@@ -142,7 +200,64 @@ def init_hsiao(hsiaofile='initfiles/hsiao07.dat',
 			   phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
 			   waveinterpres=2.0,phasesplineres=3.2,wavesplineres=72,
 			   days_interp=5,debug=False,normalize=True,order=3,use_snpca_knots=False):
+	"""
+	Initialize SALT3 model components from the Hsiao07 SN Ia template.
 
+	Creates initial M0 and M1 surfaces from the Hsiao et al. (2007) spectral
+	template. M0 is set to the normalized Hsiao spectrum, and M1 is derived
+	by computing the difference between the original and a time-stretched
+	version (approximating the effect of light curve width variation).
+
+	Parameters
+	----------
+	hsiaofile : str
+		Path to Hsiao07 template file (phase, wavelength, flux columns).
+	Bfilt : str
+		Path to B-band filter transmission file for normalization.
+	flatnu : str
+		Path to flat-spectrum reference file for normalization.
+	phaserange : list
+		[min, max] rest-frame phase in days relative to B-max.
+	waverange : list
+		[min, max] rest-frame wavelength in Angstroms.
+	phaseinterpres : float
+		Phase resolution for output grid (days).
+	waveinterpres : float
+		Wavelength resolution for output grid (Angstroms).
+	phasesplineres : float
+		Spacing between phase B-spline knots (days).
+	wavesplineres : float
+		Spacing between wavelength B-spline knots (Angstroms).
+	normalize : bool
+		If True, normalize to standard SN Ia absolute magnitude.
+	order : int
+		B-spline order (default 3 = cubic).
+	use_snpca_knots : bool
+		If True, use SALT2/SNPCA knot locations instead of uniform grid.
+
+	Returns
+	-------
+	intphase : ndarray
+		Phase grid for the output model.
+	intwave : ndarray
+		Wavelength grid for the output model.
+	m0 : ndarray
+		M0 surface evaluated on the output grid.
+	m1 : ndarray
+		M1 surface evaluated on the output grid.
+	phase_knots : ndarray
+		Phase knot locations for B-spline.
+	wave_knots : ndarray
+		Wavelength knot locations for B-spline.
+	m0_coeffs : ndarray
+		B-spline coefficients for M0.
+	m1_coeffs : ndarray
+		B-spline coefficients for M1.
+
+	References
+	----------
+	Hsiao, E. Y., et al. 2007, ApJ, 663, 1187
+	"""
 	phase,wave,flux = np.loadtxt(hsiaofile,unpack=True)
 	
 	refWave,refFlux=np.loadtxt(flatnu,unpack=True)
@@ -259,6 +374,53 @@ def init_errs(m0varfile=None,m0m1file=None,m1varfile=None,scalefile=None,clscatf
 			  phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
 			  waveinterpres=10.0,phasesplineres=6,wavesplineres=1200,n_colorscatpars=4,
 			  order=3,normalize=True):
+	"""
+	Initialize model error surfaces from SALT2 error files.
+
+	Reads variance and covariance surfaces for M0 and M1 from SALT2-format
+	files and constructs B-spline representations. Also initializes color
+	scatter parameters if provided.
+
+	Parameters
+	----------
+	m0varfile : str, optional
+		Path to M0 variance file (phase, wavelength, variance columns).
+	m0m1file : str, optional
+		Path to M0-M1 covariance file.
+	m1varfile : str, optional
+		Path to M1 variance file.
+	scalefile : str, optional
+		Path to error scaling file (for systematic adjustments).
+	clscatfile : str, optional
+		Path to color scatter file for initializing color dispersion.
+	phaserange : list
+		[min, max] rest-frame phase in days.
+	waverange : list
+		[min, max] rest-frame wavelength in Angstroms.
+	phasesplineres : float
+		Spacing between phase B-spline knots (days).
+	wavesplineres : float
+		Spacing between wavelength B-spline knots (Angstroms).
+	n_colorscatpars : int
+		Number of polynomial parameters for color scatter model.
+	order : int
+		B-spline order (0 for piecewise constant, 3 for cubic).
+
+	Returns
+	-------
+	phase_knots : ndarray
+		Phase knot locations.
+	wave_knots : ndarray
+		Wavelength knot locations.
+	m0var_coeffs : ndarray
+		B-spline coefficients for M0 standard deviation.
+	m1var_coeffs : ndarray
+		B-spline coefficients for M1 standard deviation.
+	m0m1corr_coeffs : ndarray
+		B-spline coefficients for M0-M1 correlation.
+	clscatpars : ndarray
+		Color scatter polynomial coefficients.
+	"""
 	splinephase = np.linspace(phaserange[0],phaserange[1],int((phaserange[1]-phaserange[0])/phasesplineres)+1,True)
 	splinewave	= np.linspace(waverange[0],waverange[1],int((waverange[1]-waverange[0])/wavesplineres)+1,True)
 
@@ -485,6 +647,30 @@ def get_hsiao(hsiaofile='initfiles/hsiao07.dat',
 
 def synphotB(sourcewave,sourceflux,zpoff,redshift=0,
 			 Bfilt='initfiles/Bessell90_B.dat'):
+	"""
+	Compute synthetic B-band magnitude from a spectrum.
+
+	Convolves the input spectrum with a B-band filter transmission curve
+	and returns the resulting magnitude.
+
+	Parameters
+	----------
+	sourcewave : ndarray
+		Rest-frame wavelength array in Angstroms.
+	sourceflux : ndarray
+		Flux array in erg/s/cm^2/Angstrom.
+	zpoff : float
+		Zeropoint offset to add to the magnitude.
+	redshift : float, optional
+		Redshift to apply to the source spectrum.
+	Bfilt : str
+		Path to B-band filter transmission file.
+
+	Returns
+	-------
+	float
+		Synthetic B-band magnitude.
+	"""
 	obswave = sourcewave*(1+redshift)
 
 	filtwave,filttrans = np.genfromtxt(Bfilt,unpack=True)
@@ -499,6 +685,30 @@ def synphotB(sourcewave,sourceflux,zpoff,redshift=0,
 
 def synphotBflux(sourcewave,sourceflux,zpoff,redshift=0,
 			 Bfilt='initfiles/Bessell90_B.dat'):
+	"""
+	Compute synthetic B-band flux from a spectrum.
+
+	Convolves the input spectrum with a B-band filter transmission curve
+	and returns the resulting flux (not magnitude).
+
+	Parameters
+	----------
+	sourcewave : ndarray
+		Rest-frame wavelength array in Angstroms.
+	sourceflux : ndarray
+		Flux array in erg/s/cm^2/Angstrom.
+	zpoff : float
+		Zeropoint offset (unused, kept for API compatibility).
+	redshift : float, optional
+		Redshift to apply to the source spectrum.
+	Bfilt : str
+		Path to B-band filter transmission file.
+
+	Returns
+	-------
+	float
+		Synthetic B-band flux in erg/s/cm^2/Hz.
+	"""
 	obswave = sourcewave*(1+redshift)
 
 	filtwave,filttrans = np.genfromtxt(Bfilt,unpack=True)
