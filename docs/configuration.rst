@@ -5,8 +5,8 @@ Configuration
 =============
 
 SALTShaker uses a two-level configuration system: a main configuration file
-that specifies paths and key training options, and a secondary ``training.conf``
-file containing model and optimizer hyperparameters. Command-line arguments
+that specifies paths and key training options, and three secondary configuration files
+file containing logging options, model structure, and optimizer hyperparameters. Command-line arguments
 can override any configuration option.
 
 Configuration files use INI format with sections denoted by ``[section_name]``.
@@ -57,7 +57,7 @@ Input Files
        ``examples/SALT3TRAIN_K21_PUBLIC/``.
    * - ``snparlist``
      - path
-     - Initial SN parameters from a previous SALT2 fit. Columns: SNID,
+     - Initial SN parameters from a SALT fit. Columns: SNID,
        zHelio, x0, x1, c, FITPROB. The FITPROB column is used for quality cuts.
    * - ``specrecallist``
      - path
@@ -74,11 +74,11 @@ Input Files
      - YAML file configuring logging output. Default: ``logging.yaml``.
    * - ``trainingconfig``
      - path
-     - Path to secondary configuration file with model/training hyperparameters.
+     - Path to secondary configuration file with training hyperparameters.
        Default: ``training.conf`` (searches package directory if not found locally).
    * - ``modelconfig``
      - path
-     - Configuration file describing model construction.
+     - Path to secondary configuration file describing model construction.
 
 Output Files
 ^^^^^^^^^^^^
@@ -96,7 +96,7 @@ Output Files
        color law, error model, and validation plots.
    * - ``yamloutputfile``
      - path
-     - File for YAML summary of the training process. Default: ``/dev/null``.
+     - File for YAML summary of the training process for use by SNANA. Default: ``/dev/null``.
    * - ``trainingcachefile``
      - path
      - Cache file for pre-processed training data. If exists, loads cached data;
@@ -127,7 +127,7 @@ Data Selection
        Filters exceeding this are excluded. Default: 0.01.
    * - ``spectra_cut``
      - float
-     - Minimum median S/N for including spectra. Default: 0 (no cut).
+     - Minimum median S/N for including spectra. Default: 0 (no cut), but this is recommended.
    * - ``filtercen_obs_waverange``
      - float float
      - Observed-frame wavelength range (Angstroms) for filter central wavelengths.
@@ -352,11 +352,11 @@ Memory/Performance
      - bool
      - Fit error floors for each survey/filter combination. Default: False.
 
-Optimizer Internals
-^^^^^^^^^^^^^^^^^^^
+Gauss-Newton Optimizer
+^^^^^^^^^^^^^^^^^^^^^^
 
-These options control internal behavior of the Gauss-Newton optimizer and
-rarely need modification.
+These options control the Gauss-Newton optimizer (default). Set ``optimizer = gaussnewton``
+in ``[trainparams]`` to use this optimizer.
 
 .. list-table::
    :widths: 25 15 60
@@ -365,22 +365,10 @@ rarely need modification.
    * - Option
      - Type
      - Description
-   * - ``dampingscalerate``
-     - float
-     - Controls how quickly the Levenberg-Marquardt damping parameter is
-       adjusted during optimization. Higher values allow faster adaptation.
-   * - ``lsmrmaxiter``
+   * - ``gaussnewton_maxiter``
      - int
-     - Maximum iterations allowed for the LSMR linear solver within each
-       Gauss-Newton step.
-   * - ``preconditioningmaxiter``
-     - int
-     - Number of operations used to evaluate preconditioning for the linear
-       system.
-   * - ``preconditioningchunksize``
-     - int
-     - Batch size for evaluating preconditioning scales. Increasing may
-       improve memory performance at cost of speed.
+     - Maximum number of Gauss-Newton iterations before stopping. Training
+       will end early if convergence is achieved. Default: 30.
    * - ``fitting_sequence``
      - str
      - Order in which parameter groups are fit within each iteration.
@@ -388,6 +376,23 @@ rarely need modification.
        ``spectralrecalibration``, ``sn``. Use comma-separated list for
        custom sequence, or ``default`` for standard approach.
        Default: default.
+   * - ``dampingscalerate``
+     - float
+     - Controls how quickly the Levenberg-Marquardt damping parameter is
+       adjusted during optimization. Higher values allow faster adaptation
+       but may cause instability.
+   * - ``lsmrmaxiter``
+     - int
+     - Maximum iterations allowed for the LSMR linear solver within each
+       Gauss-Newton step. LSMR solves the linearized least-squares problem.
+   * - ``preconditioningmaxiter``
+     - int
+     - Number of operations used to evaluate preconditioning for the linear
+       system. Preconditioning improves convergence of the iterative solver.
+   * - ``preconditioningchunksize``
+     - int
+     - Batch size for evaluating preconditioning scales. Increasing may
+       improve memory performance at cost of speed.
    * - ``fit_tpkoff``
      - bool
      - *Deprecated.* Previously allowed fitting time-of-maximum offset as a
@@ -396,6 +401,59 @@ rarely need modification.
      - bool
      - For host-mass SALTShaker: ignore x1/xhost de-correlation error issues.
        Bootstrap errors are required if enabled. Default: False.
+
+
+RProp Optimizer (Gradient Descent)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+These options control the RProp with backtracking optimizer, an alternative
+gradient-based method. Set ``optimizer = rpropwithbacktracking`` in
+``[trainparams]`` to use this optimizer. Options are specified in a
+``[rpropconfig]`` section in the training config file.
+
+.. list-table::
+   :widths: 25 15 60
+   :header-rows: 1
+
+   * - Option
+     - Type
+     - Description
+   * - ``gradientmaxiter``
+     - int
+     - Maximum number of gradient descent iterations allowed before
+       termination.
+   * - ``burninmaxiter``
+     - int
+     - Maximum iterations for the burn-in phase, which fits the flux model
+       before enabling full parameter optimization. Default: 100.
+   * - ``learningratesinitscale``
+     - float
+     - Global scale factor applied to initial learning rates. Higher values
+       mean larger initial steps.
+   * - ``searchsize``
+     - float
+     - Step size for backtracking line search, expressed as a fraction.
+       Must be between 0 and 1.
+   * - ``searchtolerance``
+     - float
+     - Armijo criterion tolerance for line search. Smaller values impose
+       looser constraints on step acceptance. Must be between 0 and 1.
+   * - ``etaminus``
+     - float
+     - Factor by which to decrease learning rates when the gradient changes
+       sign (indicating overshoot). Must be between 0 and 1.
+   * - ``etaplus``
+     - float
+     - Factor by which to increase learning rates when the gradient maintains
+       direction (indicating efficient descent). Must be greater than 1.
+   * - ``convergencetolerance``
+     - float
+     - Convergence threshold. Optimization terminates when the change in loss
+       is consistently below this value. Must be greater than 0.
+   * - ``memorydebug``
+     - bool
+     - Enable JAX memory profiling. Writes memory profiles to the output
+       directory for debugging memory issues. Default: False.
 
 
 [trainingparams] - Training Hyperparameters
