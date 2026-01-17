@@ -609,292 +609,292 @@ class TrainSALTBase:
             sys.exit(1)
         return parser
 
-        def snshouldbecut(self, sn, cuts):
+    def snshouldbecut(self, sn, cuts):
 
-            passescuts = [cut.passescut(sn) for cut in cuts]
+        passescuts = [cut.passescut(sn) for cut in cuts]
 
-            if not all(passescuts):  # or iPreMaxCut < 2 or medSNR < 10:
-                log.debug("SN %s fails cuts" % sn.snid)
-                log.debug(
-                    ", ".join(
-                        [
-                            f"{cut.cutvalue(sn)} {cut.description} ({cut.requirement} needed)"
-                            for cut in cuts
-                        ]
-                    )
+        if not all(passescuts):  # or iPreMaxCut < 2 or medSNR < 10:
+            log.debug("SN %s fails cuts" % sn.snid)
+            log.debug(
+                ", ".join(
+                    [
+                        f"{cut.cutvalue(sn)} {cut.description} ({cut.requirement} needed)"
+                        for cut in cuts
+                    ]
                 )
-
-            return not all(passescuts)
-
-        def checkFilterMass(self, z, survey, flt):
-
-            try:
-                filtwave = self.kcordict[survey][flt]["filtwave"]
-            except:
-                raise RuntimeError(
-                    f"filter {flt} not found in kcor file for survey {survey}.  Check your config file"
-                )
-            try:
-                filttrans = self.kcordict[survey][flt]["filttrans"]
-            except:
-                raise RuntimeError(
-                    "filter %s not found in kcor file for SN %s" % (flt, sn)
-                )
-
-            # Check how much mass of the filter is inside the wavelength range
-            filtRange = (filtwave / (1 + z) > self.options.waverange[0]) & (
-                filtwave / (1 + z) < self.options.waverange[1]
-            )
-            return (
-                np.trapz(
-                    (filttrans * filtwave / (1 + z))[filtRange],
-                    filtwave[filtRange] / (1 + z),
-                )
-                / np.trapz(filttrans * filtwave / (1 + z), filtwave / (1 + z))
-                > 1 - self.options.filter_mass_tolerance
             )
 
-        def getcuts(self):
-            """
-            Return list of SNCut objects defining the sample selection.
+        return not all(passescuts)
+
+    def checkFilterMass(self, z, survey, flt):
+
+        try:
+            filtwave = self.kcordict[survey][flt]["filtwave"]
+        except:
+            raise RuntimeError(
+                f"filter {flt} not found in kcor file for survey {survey}.  Check your config file"
+            )
+        try:
+            filttrans = self.kcordict[survey][flt]["filttrans"]
+        except:
+            raise RuntimeError(
+                "filter %s not found in kcor file for SN %s" % (flt, sn)
+            )
+
+        # Check how much mass of the filter is inside the wavelength range
+        filtRange = (filtwave / (1 + z) > self.options.waverange[0]) & (
+            filtwave / (1 + z) < self.options.waverange[1]
+        )
+        return (
+            np.trapz(
+                (filttrans * filtwave / (1 + z))[filtRange],
+                filtwave[filtRange] / (1 + z),
+            )
+            / np.trapz(filttrans * filtwave / (1 + z), filtwave / (1 + z))
+            > 1 - self.options.filter_mass_tolerance
+        )
+
+    def getcuts(self):
+        """
+        Return list of SNCut objects defining the sample selection.
+
+        Returns
+        -------
+        list of SNCut
+            Cut objects for epochs, phase coverage, filters, and optionally spectra.
+        """
+
+        def checkfitprob(sn):
+            hasvalidfitprob = sn.salt2fitprob != -99
+            if hasvalidfitprob:
+                return sn.salt2fitprob
+            else:
+                log.warning(
+                    f"SN {sn.snid} does not have a valid salt2 fitprob, including in sample"
+                )
+                return 1
+
+        cuts = [
+            SNCut(
+                "total epochs",
+                4,
+                lambda sn: sum(
+                    [
+                        (
+                            (sn.photdata[flt].phase > -10)
+                            & (sn.photdata[flt].phase < 35)
+                        ).sum()
+                        for flt in sn.photdata
+                    ]
+                ),
+            ),
+            SNCut(
+                "epochs near peak",
+                1,
+                lambda sn: sum(
+                    [
+                        (
+                            (sn.photdata[flt].phase > -10)
+                            & (sn.photdata[flt].phase < 5)
+                        ).sum()
+                        for flt in sn.photdata
+                    ]
+                ),
+            ),
+            SNCut(
+                "epochs post peak",
+                1,
+                lambda sn: sum(
+                    [
+                        (
+                            (sn.photdata[flt].phase > 5)
+                            & (sn.photdata[flt].phase < 20)
+                        ).sum()
+                        for flt in sn.photdata
+                    ]
+                ),
+            ),
+            SNCut(
+                "filters near peak",
+                3,
+                lambda sn: sum(
+                    [
+                        (
+                            (
+                                (sn.photdata[flt].phase > -8)
+                                & (sn.photdata[flt].phase < 10)
+                            ).sum()
+                        )
+                        > 0
+                        for flt in sn.photdata
+                    ]
+                ),
+            ),
+            SNCut("salt2 fitprob", self.options.fitprobmin, checkfitprob),
+            SNCut(
+                "total bands",
+                3,
+                lambda sn: sum(
+                    [
+                        (
+                            (sn.photdata[flt].phase > -10)
+                            & (sn.photdata[flt].phase < 35)
+                        ).sum()
+                        for flt in sn.photdata
+                    ]
+                ),
+            ),
+        ]
+
+        if self.options.keeponlyspec:
+            cuts += [SNCut("spectra", 1, lambda sn: sn.num_spec)]
+        return cuts
+
+    def mkcuts(self, datadict):
+        """
+            Apply quality cuts to the training sample.
+
+            Filters supernovae and their data based on phase range, wavelength
+            coverage, epoch requirements, and other quality criteria.
+
+            Parameters
+            ----------
+            datadict : dict
+        Dictionary of training data keyed by SN ID.
 
             Returns
             -------
-            list of SNCut
-                Cut objects for epochs, phase coverage, filters, and optionally spectra.
-            """
+            outdict : dict
+        SNe that pass all cuts.
+            cutdict : dict
+        SNe that were cut from the sample.
 
-            def checkfitprob(sn):
-                hasvalidfitprob = sn.salt2fitprob != -99
-                if hasvalidfitprob:
-                    return sn.salt2fitprob
-                else:
-                    log.warning(
-                        f"SN {sn.snid} does not have a valid salt2 fitprob, including in sample"
-                    )
-                    return 1
+            Notes
+            -----
+            Default cuts require:
+            - 4 epochs at -10 < phase < 35 days
+            - 1 measurement near peak (-10 < phase < 5)
+            - 1 measurement post-peak (5 < phase < 20)
+            - 3 filters with coverage near peak
+            - SALT2 fitprob > fitprobmin (if available)
+        """
+        # Define cuts
+        cuts = self.getcuts()
 
-            cuts = [
-                SNCut(
-                    "total epochs",
-                    4,
-                    lambda sn: sum(
-                        [
-                            (
-                                (sn.photdata[flt].phase > -10)
-                                & (sn.photdata[flt].phase < 35)
-                            ).sum()
-                            for flt in sn.photdata
-                        ]
-                    ),
-                ),
-                SNCut(
-                    "epochs near peak",
-                    1,
-                    lambda sn: sum(
-                        [
-                            (
-                                (sn.photdata[flt].phase > -10)
-                                & (sn.photdata[flt].phase < 5)
-                            ).sum()
-                            for flt in sn.photdata
-                        ]
-                    ),
-                ),
-                SNCut(
-                    "epochs post peak",
-                    1,
-                    lambda sn: sum(
-                        [
-                            (
-                                (sn.photdata[flt].phase > 5)
-                                & (sn.photdata[flt].phase < 20)
-                            ).sum()
-                            for flt in sn.photdata
-                        ]
-                    ),
-                ),
-                SNCut(
-                    "filters near peak",
-                    3,
-                    lambda sn: sum(
-                        [
-                            (
-                                (
-                                    (sn.photdata[flt].phase > -8)
-                                    & (sn.photdata[flt].phase < 10)
-                                ).sum()
-                            )
-                            > 0
-                            for flt in sn.photdata
-                        ]
-                    ),
-                ),
-                SNCut("salt2 fitprob", self.options.fitprobmin, checkfitprob),
-                SNCut(
-                    "total bands",
-                    3,
-                    lambda sn: sum(
-                        [
-                            (
-                                (sn.photdata[flt].phase > -10)
-                                & (sn.photdata[flt].phase < 35)
-                            ).sum()
-                            for flt in sn.photdata
-                        ]
-                    ),
-                ),
-            ]
+        # Record initial demographics of the sample
+        sumattr = (
+            lambda x, sndict: len(sndict)
+            if x == "num_sn"
+            else sum([getattr(sndict[snid], x) for snid in sndict])
+        )
+        descriptionandattrs = [
+            ("photometric observations", "num_photobs"),
+            ("spectroscopic observations", "num_specobs"),
+            ("light-curves", "num_lc"),
+            ("spectra", "num_spec"),
+        ]
+        descriptions, attrs = zip(*descriptionandattrs)
 
-            if self.options.keeponlyspec:
-                cuts += [SNCut("spectra", 1, lambda sn: sn.num_spec)]
-            return cuts
+        initialdemos = [sumattr(attr, datadict) for attr in attrs]
+        outdict = {}
+        cutdict = {}
 
-        def mkcuts(self, datadict):
-            """
-                Apply quality cuts to the training sample.
+        filters = []
+        for snid in datadict:
+            sn = datadict[snid]
+            photdata = sn.photdata
+            specdata = sn.specdata
+            z = sn.zHelio
 
-                Filters supernovae and their data based on phase range, wavelength
-                coverage, epoch requirements, and other quality criteria.
-
-                Parameters
-                ----------
-                datadict : dict
-            Dictionary of training data keyed by SN ID.
-
-                Returns
-                -------
-                outdict : dict
-            SNe that pass all cuts.
-                cutdict : dict
-            SNe that were cut from the sample.
-
-                Notes
-                -----
-                Default cuts require:
-                - 4 epochs at -10 < phase < 35 days
-                - 1 measurement near peak (-10 < phase < 5)
-                - 1 measurement post-peak (5 < phase < 20)
-                - 3 filters with coverage near peak
-                - SALT2 fitprob > fitprobmin (if available)
-            """
-            # Define cuts
-            cuts = self.getcuts()
-
-            # Record initial demographics of the sample
-            sumattr = (
-                lambda x, sndict: len(sndict)
-                if x == "num_sn"
-                else sum([getattr(sndict[snid], x) for snid in sndict])
-            )
-            descriptionandattrs = [
-                ("photometric observations", "num_photobs"),
-                ("spectroscopic observations", "num_specobs"),
-                ("light-curves", "num_lc"),
-                ("spectra", "num_spec"),
-            ]
-            descriptions, attrs = zip(*descriptionandattrs)
-
-            initialdemos = [sumattr(attr, datadict) for attr in attrs]
-            outdict = {}
-            cutdict = {}
-
-            filters = []
-            for snid in datadict:
-                sn = datadict[snid]
-                photdata = sn.photdata
-                specdata = sn.specdata
-                z = sn.zHelio
-
-                for k in list(specdata.keys()):
-                    # Remove spectra outside phase range
-                    spectrum = specdata[k]
-                    if (
-                        spectrum.phase < self.options.phaserange[0]
-                        or spectrum.phase > self.options.phaserange[1] - 3
-                    ):
-                        specdata.pop(k)
-                        continue
-                    # remove spectral data outside wavelength range
-                    inwaverange = (
-                        spectrum.wavelength > (self.options.waverange[0] * (1 + z))
-                    ) & (spectrum.wavelength < (self.options.waverange[1] * (1 + z)))
-                    clippedspectrum = spectrum.clip(inwaverange)
-                    if len(clippedspectrum):
-                        specdata[k] = clippedspectrum
-                    else:
-                        specdata.pop(k)
-                        continue
-                    if (
-                        np.median(spectrum.flux / spectrum.fluxerr)
-                        < self.options.spectra_cut
-                    ):
-                        specdata.pop(k)
-                        continue
-
-                for flt in sn.filt:
-                    if flt not in filters:
-                        filters += [flt]
-                    # Remove light curve outside model [rest-frame] wavelength range
-                    if not self.filter_select(sn.survey, flt):  # RK Nov 7 2022
-                        # if flt in self.options.__dict__[f"{sn.survey.split('(')[0]}_ignore_filters"].split(','):
-                        photdata.pop(flt)  # remove filter
-                    elif self.checkFilterMass(z, sn.survey, flt):
-                        lightcurve = sn.photdata[flt]
-                        # Remove photometric data outside phase range
-                        inphaserange = (
-                            lightcurve.phase > self.options.phaserange[0]
-                        ) & (lightcurve.phase < self.options.phaserange[1])
-                        clippedlightcurve = lightcurve.clip(inphaserange)
-                        if len(clippedlightcurve):
-                            photdata[flt] = clippedlightcurve
-                        else:
-                            photdata.pop(flt)
-                    else:
-                        sn.photdata.pop(flt)
-                # Check if SN passes all cuts
-                if self.snshouldbecut(sn, cuts):
-                    cutdict[snid] = sn
-                else:
-                    outdict[snid] = sn
-
-            finaldemos = [sumattr(attr, outdict) for attr in attrs]
-            sncutdemos = [sumattr(attr, cutdict) for attr in attrs]
-            for attr, desc, initial, final, cut in zip(
-                attrs, descriptions, initialdemos, finaldemos, sncutdemos
-            ):
-                log.info(
-                    f"{initial-(final+cut)} {desc} removed as a result of cuts for phase and wavelength range"
-                )
-
-            log.info(
-                f"{len(datadict)} SNe initially, {len(cutdict)} SNe cut from the sample"
-            )
-            log.info("Total number of supernovae: {}".format(len(outdict)))
-            log.info(
-                ", ".join(
-                    [
-                        f"{final} {desc}"
-                        for attr, desc, initial, final, cut in zip(
-                            attrs, descriptions, initialdemos, finaldemos, sncutdemos
-                        )
-                    ]
-                )
-                + " remaining after all cuts"
-            )
-            log.info(f"Unique filters: {np.unique(filters)}")
-            return outdict, cutdict
-
-        def filter_select(self, survey, flt):
-            if flt in self.options.__dict__[
-                f"{survey.split('(')[0]}_ignore_filters"
-            ].replace(" ", "").split(","):
-                return False
-            else:
-                lambdaeff = self.kcordict[survey][flt]["lambdaeff"]
+            for k in list(specdata.keys()):
+                # Remove spectra outside phase range
+                spectrum = specdata[k]
                 if (
-                    lambdaeff < self.options.filtercen_obs_waverange[0]
-                    or lambdaeff > self.options.filtercen_obs_waverange[1]
+                    spectrum.phase < self.options.phaserange[0]
+                    or spectrum.phase > self.options.phaserange[1] - 3
                 ):
-                    return False
-            return True
+                    specdata.pop(k)
+                    continue
+                # remove spectral data outside wavelength range
+                inwaverange = (
+                    spectrum.wavelength > (self.options.waverange[0] * (1 + z))
+                ) & (spectrum.wavelength < (self.options.waverange[1] * (1 + z)))
+                clippedspectrum = spectrum.clip(inwaverange)
+                if len(clippedspectrum):
+                    specdata[k] = clippedspectrum
+                else:
+                    specdata.pop(k)
+                    continue
+                if (
+                    np.median(spectrum.flux / spectrum.fluxerr)
+                    < self.options.spectra_cut
+                ):
+                    specdata.pop(k)
+                    continue
+
+            for flt in sn.filt:
+                if flt not in filters:
+                    filters += [flt]
+                # Remove light curve outside model [rest-frame] wavelength range
+                if not self.filter_select(sn.survey, flt):  # RK Nov 7 2022
+                    # if flt in self.options.__dict__[f"{sn.survey.split('(')[0]}_ignore_filters"].split(','):
+                    photdata.pop(flt)  # remove filter
+                elif self.checkFilterMass(z, sn.survey, flt):
+                    lightcurve = sn.photdata[flt]
+                    # Remove photometric data outside phase range
+                    inphaserange = (
+                        lightcurve.phase > self.options.phaserange[0]
+                    ) & (lightcurve.phase < self.options.phaserange[1])
+                    clippedlightcurve = lightcurve.clip(inphaserange)
+                    if len(clippedlightcurve):
+                        photdata[flt] = clippedlightcurve
+                    else:
+                        photdata.pop(flt)
+                else:
+                    sn.photdata.pop(flt)
+            # Check if SN passes all cuts
+            if self.snshouldbecut(sn, cuts):
+                cutdict[snid] = sn
+            else:
+                outdict[snid] = sn
+
+        finaldemos = [sumattr(attr, outdict) for attr in attrs]
+        sncutdemos = [sumattr(attr, cutdict) for attr in attrs]
+        for attr, desc, initial, final, cut in zip(
+            attrs, descriptions, initialdemos, finaldemos, sncutdemos
+        ):
+            log.info(
+                f"{initial-(final+cut)} {desc} removed as a result of cuts for phase and wavelength range"
+            )
+
+        log.info(
+            f"{len(datadict)} SNe initially, {len(cutdict)} SNe cut from the sample"
+        )
+        log.info("Total number of supernovae: {}".format(len(outdict)))
+        log.info(
+            ", ".join(
+                [
+                    f"{final} {desc}"
+                    for attr, desc, initial, final, cut in zip(
+                        attrs, descriptions, initialdemos, finaldemos, sncutdemos
+                    )
+                ]
+            )
+            + " remaining after all cuts"
+        )
+        log.info(f"Unique filters: {np.unique(filters)}")
+        return outdict, cutdict
+
+    def filter_select(self, survey, flt):
+        if flt in self.options.__dict__[
+            f"{survey.split('(')[0]}_ignore_filters"
+        ].replace(" ", "").split(","):
+            return False
+        else:
+            lambdaeff = self.kcordict[survey][flt]["lambdaeff"]
+            if (
+                lambdaeff < self.options.filtercen_obs_waverange[0]
+                or lambdaeff > self.options.filtercen_obs_waverange[1]
+            ):
+                return False
+        return True

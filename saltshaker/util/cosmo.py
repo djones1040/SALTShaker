@@ -346,12 +346,13 @@ def DLFw( z, w=-1, Om=0.3, H0=70, unit=None, debug=False ):
 def DL( z, Om=0.3, Ode=0.7, w0=-1, wa=0,
         H0=70, unit=None, Flat=False, Lambda=False,
         debug=False ):
-    """ luminosity distance calculation allowing w!=-1 
-    and allowing w to vary with time using a linear parameterization:
-       w(a) = w0 + wa(1-a)
-    To get a constant w, just set wa=0 and use w0 as w. 
-    Set Flat==True to enforce a flat universe (Ode=1-Om)
-    Lambda=True to force a constant w=-1
+    """
+    Luminosity distance calculation allowing w!=-1.
+
+    Allows w to vary with time using a linear parameterization:
+    ``w(a) = w0 + wa(1-a)``. To get a constant w, just set wa=0 and
+    use w0 as w. Set Flat=True to enforce a flat universe (Ode=1-Om).
+    Set Lambda=True to force a constant w=-1.
     """
     from scipy import integrate as scint
     from numpy import iterable, array, sqrt, append, \

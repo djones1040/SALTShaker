@@ -174,9 +174,9 @@ class ConfigWithCommandLineOverrideParser(EnvAwareArgumentParser):
             One or more key names to look for in the section.
         **kwargs
             Additional arguments passed to add_argument().
-            Special kwargs:
-            - clargformat : str, format for CLI argument name
-              (default: '--{key}', use 'prependsection' for '--{section}_{key}')
+            Special kwargs include ``clargformat`` (str), which sets the format
+            for CLI argument name (default: '--{key}', use 'prependsection'
+            for '--{section}_{key}').
 
         Raises
         ------
