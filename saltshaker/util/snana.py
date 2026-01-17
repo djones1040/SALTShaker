@@ -153,11 +153,11 @@ class SuperNova(object):
     datfile : str, optional
         Path to SNANA ASCII data file.
     headfitsfile : str, optional
-        Path to FITS header file (*_HEAD.FITS).
+        Path to FITS header file (``*_HEAD.FITS``).
     photfitsfile : str, optional
-        Path to FITS photometry file (*_PHOT.FITS).
+        Path to FITS photometry file (``*_PHOT.FITS``).
     specfitsfile : str, optional
-        Path to FITS spectroscopy file (*_SPEC.FITS).
+        Path to FITS spectroscopy file (``*_SPEC.FITS``).
     snid : int or str, optional
         Supernova ID (required when reading from FITS).
     verbose : bool, optional
@@ -912,41 +912,49 @@ NSPECTRA:  %i
 
     
     def plotLightCurve(self, ytype='flux', xtype='mjd', bands='all', mjdpk=None,
-                       showlegend=False, showpkmjdrange=False, 
-                       showsalt2fit=False, showclassfit=False, 
-                       showclasstable=True, 
-                       filled=False, autozoom=True, 
-                       savefig='', verbose=False,  **kwarg ) : 
-        """ Plot the observed multi-color light curve data. 
-        WFC3-IR filters are plotted as circles with solid lines
-        ACS-WFC bands are squares with dashed lines
-        WFC3-UVIS filters are shown as triangles with dotted lines
-                
-          OPTIONS 
-        ytype : 'flux', 'mag', 'chi2Ia', 'chi2Ibc', 'chi2II'  
-            - Default of 'flux' uses SNANA's FLUXCAL units, ZPT:27.5
-            - The 'chi2' options presume an existing maxLikeModel, and plot
-              the chi2 contribution from each light curve point 
-        xtype : 'mjd', 'tobs', 'trest'  (tobs and trest are days rel. to peak)
-        bands : list of SNANA filter IDs or 'all'  (e.g.  bands='HJW')
+                       showlegend=False, showpkmjdrange=False,
+                       showsalt2fit=False, showclassfit=False,
+                       showclasstable=True,
+                       filled=False, autozoom=True,
+                       savefig='', verbose=False,  **kwarg ) :
+        """
+        Plot the observed multi-color light curve data.
 
-        showlegend : put a legend in the upper corner
-        showpkmjdrange : add a vertical line and bar marking the range of PKMJD
-        showsalt2fit : overplot the best-fit SALT2 model (if available)
-        showclassfit : 'Ia.maxlike', 'II.maxlike', 'Ibc.maxlike', 'Ia.maxprob', 'II.maxprob', 'Ibc.maxprob' 
-            overplot the best-fit model (either max likelihood or max posterior probability) 
-            for the given class from a (previously executed) classification simulation. 
-        showclasstable : print a table of parameter values and chi2 statistics for the 
-            best-fit model on the right side of the figure
-        savefig : filename for saving the figure directly to disk (extension sets the filetype)
+        WFC3-IR filters are plotted as circles with solid lines,
+        ACS-WFC bands are squares with dashed lines,
+        WFC3-UVIS filters are shown as triangles with dotted lines.
 
-           (The following options are typically used for plotting finely sampled models, 
-            like a SALT2 model fit or a max likelihood model from a classification sim)
-        filled : plot semi-transparent filled curves instead of points and connecting lines
-        autozoom : True/False to toggle on/off the automatic rescaling 
-
-        Any additional keyword args are passed to the matplotlib.pyplot.plot() function 
-          (e.g: ms=10, ls=' '  to plot large markers with no lines)
+        Parameters
+        ----------
+        ytype : str
+            Y-axis type: 'flux', 'mag', 'chi2Ia', 'chi2Ibc', or 'chi2II'.
+            Default of 'flux' uses SNANA's FLUXCAL units, ZPT:27.5.
+            The 'chi2' options presume an existing maxLikeModel.
+        xtype : str
+            X-axis type: 'mjd', 'tobs', or 'trest' (tobs and trest are
+            days relative to peak).
+        bands : list or str
+            List of SNANA filter IDs or 'all' (e.g. bands='HJW').
+        showlegend : bool
+            Put a legend in the upper corner.
+        showpkmjdrange : bool
+            Add a vertical line and bar marking the range of PKMJD.
+        showsalt2fit : bool
+            Overplot the best-fit SALT2 model (if available).
+        showclassfit : str
+            One of 'Ia.maxlike', 'II.maxlike', 'Ibc.maxlike', 'Ia.maxprob',
+            'II.maxprob', 'Ibc.maxprob'. Overplot the best-fit model for
+            the given class from a classification simulation.
+        showclasstable : bool
+            Print a table of parameter values and chi2 statistics.
+        savefig : str
+            Filename for saving the figure directly to disk.
+        filled : bool
+            Plot semi-transparent filled curves instead of points.
+        autozoom : bool
+            Toggle on/off the automatic rescaling.
+        **kwarg
+            Additional keyword args passed to matplotlib.pyplot.plot().
         """ 
         from matplotlib.patches import FancyArrowPatch
         fig = p.gcf()

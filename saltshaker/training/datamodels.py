@@ -1061,7 +1061,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
 
         variance = self.fluxerr**2 + modelvariance
 
-        uncertainty = jax.lax.stop_gradient(jnp.sqrt(variance))
+        uncertainty = jnp.sqrt(variance)
 
         numresids = (~self.ipad).sum()
         zeropoint = -jnp.log(self.fluxerr).sum() - numresids / 2

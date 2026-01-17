@@ -66,6 +66,45 @@ autodoc_default_options = {
 }
 autosummary_generate = True
 
+# Intersphinx mapping to link to external documentation (e.g., numpy)
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'numpy': ('https://numpy.org/doc/stable/', None),
+    'scipy': ('https://docs.scipy.org/doc/scipy/', None),
+    'astropy': ('https://docs.astropy.org/en/stable/', None),
+}
+
+# Suppress warnings for duplicate object descriptions (common with class attributes)
+# and undefined references from external library docstrings
+suppress_warnings = [
+    'ref.ref',           # Undefined label references (e.g., from numpy docstrings)
+]
+
+# Suppress duplicate object warnings by filtering them
+import logging
+
+class DuplicateObjectFilter(logging.Filter):
+    def filter(self, record):
+        return 'duplicate object description' not in record.getMessage()
+
+# Apply filter to Sphinx logger
+logging.getLogger('sphinx').addFilter(DuplicateObjectFilter())
+
+# Exclude re-exported functions from external libraries
+def autodoc_skip_member(app, what, name, obj, skip, options):
+    """Skip members that are imported from external libraries."""
+    # Skip numpy's standard_normal which is re-exported
+    if name == 'standard_normal':
+        return True
+    return skip
+
+def setup(app):
+    app.connect('autodoc-skip-member', autodoc_skip_member)
+
+# Attributes that cause duplicate warnings - exclude from inherited-members
+# These are documented in the class but also appear in autosummary
+autodoc_default_options['inherited-members'] = False
+
 # Sphinx-gallery configuration
 sphinx_gallery_conf = {
     'examples_dirs': [],  # No example galleries for now
