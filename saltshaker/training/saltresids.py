@@ -673,18 +673,19 @@ class SALTResids:
                 [],
             )
 
-            # self.batchedphotdata= batching.batchdatabysize(self.allphotdata)
-            # self.batchedspecdata= batching.batchdatabysize(self.allspecdata)
+            cache_to_disk = getattr(self, 'cache_batches_to_disk', False)
 
             self.batchedphotdata = list(
                 batching.batchdatabysize(
-                    self.allphotdata, self.outputdir, prefix="phot"
+                    self.allphotdata, self.outputdir, prefix="phot",
+                    cache_to_disk=cache_to_disk,
                 )
             )
 
             self.batchedspecdata = list(
                 batching.batchdatabysize(
-                    self.allspecdata, self.outputdir, prefix="spec"
+                    self.allspecdata, self.outputdir, prefix="spec",
+                    cache_to_disk=cache_to_disk,
                 )
             )
 
@@ -1546,28 +1547,7 @@ class SALTResids:
         diff_argnum=1,
         jitdefault=True,
     )
-    def maxlikefit(self, x, *args, **kwargs):
-        """
-        Compute negative log-likelihood for maximum likelihood fitting.
-
-        Computes the full Gaussian log-likelihood including both the
-        chi-squared term and the log-determinant normalization term,
-        enabling simultaneous fitting of model errors.
-
-        Parameters
-        ----------
-        x : ndarray
-            Current parameter values.
-        *args, **kwargs
-            Passed to likelihood calculation.
-
-        Returns
-        -------
-        float
-            Negative log-likelihood: 0.5 * (chi^2 + sum(log(variance))).
-        """
-
-    def _maxlikefit(
+    def maxlikefit(
         self,
         guess,
         cachedresults=None,
@@ -1578,18 +1558,33 @@ class SALTResids:
         usesns=None,
     ):
         """
-        Calculates the likelihood of given SALT model to photometric and spectroscopic data given during initialization
+        Compute negative log-likelihood for maximum likelihood fitting.
+
+        Computes the full Gaussian log-likelihood including both the
+        chi-squared term and the log-determinant normalization term,
+        enabling simultaneous fitting of model errors.
 
         Parameters
         ----------
-        x : array
-            SALT model parameters
+        guess : ndarray
+            Current parameter values.
+        cachedresults : tuple or None
+            Precomputed flux or variance values.
+        fixuncertainties : bool
+            If True, use cached uncertainties.
+        fixfluxes : bool
+            If True, use cached fluxes.
+        dopriors : bool
+            If True, include prior and regularization terms.
+        dospec : bool
+            If True, include spectroscopic likelihood.
+        usesns : list or None
+            Restrict to specific supernovae (not yet implemented).
 
         Returns
         -------
-
-        chi2: float
-            Goodness of fit of model to training data
+        float
+            Negative log-likelihood.
         """
 
         if cachedresults is None:

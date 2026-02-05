@@ -24,6 +24,7 @@ from jax.experimental import sparse
 import numpy as np
 import pickle
 import glob
+import os
 
 from scipy import optimize, stats
 
@@ -83,8 +84,24 @@ def optimizepaddingsizes(numbatches, datasizes):
     return padsizes, sum(datasizes) / finalspacecost
 
 
-def batchdatabysize(data, outdir, prefix=""):
-    """Given a set of  data, divide them into batches each of a fixed size, for easy use with jax's batching methods. Quantities that are marked as 'mapped' by their objects will be turned into arrays, otherwise the values are tested for equality and given as unmapped objects"""
+def batchdatabysize(data, outdir=None, prefix="", cache_to_disk=False):
+    """Given a set of data, divide them into batches each of a fixed size,
+    for easy use with jax's batching methods. Quantities that are marked as
+    'mapped' by their objects will be turned into arrays, otherwise the values
+    are tested for equality and given as unmapped objects.
+
+    Parameters
+    ----------
+    data : list
+        List of modeledtrainingdata objects to batch.
+    outdir : str, optional
+        Output directory for disk caching. Required if cache_to_disk is True.
+    prefix : str
+        Prefix for cache file names (e.g. 'phot', 'spec').
+    cache_to_disk : bool
+        If True, serialize batches to disk to reduce memory usage.
+        Useful for older JAX versions with memory issues.
+    """
     batcheddata = {}
 
     for x in data:
@@ -92,7 +109,6 @@ def batchdatabysize(data, outdir, prefix=""):
         key = len(x)
         # assign data to an appropriate entry in dictionary based on length
         if key in batcheddata:
-
             batcheddata[key] += [x]
         else:
             batcheddata[key] = [x]
@@ -115,30 +131,49 @@ def batchdatabysize(data, outdir, prefix=""):
                 )
             else:
                 if not (varname in __ismapped__):
-                    # If an attribute is not to be mapped over, the single value is set, and it is verified that it is the same for all elements
-                    assert (
-                        np.all(vals[0] == vals),
-                        "Unmapped quantity different between different objects",
-                    )
+                    # If an attribute is not to be mapped over, the single value is set
+                    # Verify that it is the same for all elements in the batch
+                    def values_equal(v1, v2):
+                        """Compare two values for equality, handling arrays, tuples, and objects."""
+                        if v1 is v2:
+                            return True
+                        try:
+                            if isinstance(v1, np.ndarray) and isinstance(v2, np.ndarray):
+                                return np.array_equal(v1, v2)
+                            if isinstance(v1, (tuple, list)) and isinstance(v2, (tuple, list)):
+                                if len(v1) != len(v2):
+                                    return False
+                                return all(values_equal(a, b) for a, b in zip(v1, v2))
+                            return v1 == v2
+                        except (ValueError, TypeError):
+                            return v1 is v2
+
+                    if not all(values_equal(vals[0], v) for v in vals[1:]):
+                        log.warning(f"Unmapped quantity '{varname}' differs between objects in batch: shapes {[np.shape(v) for v in vals]}, values {vals[:3]}")
                     yield vals[0]
                 else:
                     # If an attribute is to be mapped over, the values are stacked along the first axis
                     # Ensures dimensionality is correct
                     yield np.atleast_1d(np.stack(vals, axis=0))
 
-    # Returns a list of batches of data suitable for use with the batchedmodelfunctions function
-    for i, x in enumerate(batcheddata.values()):
-        try:
-            jax.clear_caches()
-        except:
-            pass
-        with open(f"{outdir}/caching_{prefix}_{i}.pkl", "wb") as fout:
-            pickle.dump({"data": list(repackforvmap(x))}, fout)
-    for cachefile in glob.glob(f"{outdir}/caching_{prefix}_*.pkl"):
-        with open(cachefile, "rb") as fin:
-            yield pickle.load(fin)["data"]
-
-    # return [list(repackforvmap(x)) for x in batcheddata.values()]
+    if cache_to_disk:
+        # Serialize batches to disk and read back to reduce memory footprint
+        # Clean up stale cache files from previous runs
+        for stale in glob.glob(f"{outdir}/caching_{prefix}_*.pkl"):
+            os.remove(stale)
+        for i, x in enumerate(batcheddata.values()):
+            try:
+                jax.clear_caches()
+            except:
+                pass
+            with open(f"{outdir}/caching_{prefix}_{i}.pkl", "wb") as fout:
+                pickle.dump({"data": list(repackforvmap(x))}, fout)
+        for cachefile in sorted(glob.glob(f"{outdir}/caching_{prefix}_*.pkl")):
+            with open(cachefile, "rb") as fin:
+                yield pickle.load(fin)["data"]
+    else:
+        for x in batcheddata.values():
+            yield list(repackforvmap(x))
 
 
 def walkargumenttree(x, targetsize, ncalls=0):

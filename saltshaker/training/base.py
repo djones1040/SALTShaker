@@ -570,6 +570,14 @@ class TrainSALTBase:
             type=int,
             help="Number of batches to divide the spectroscopic data into when zero-padding. Increasing this value may improve memory performance at the cost of speed (default=%(default)s)",
         )
+        successful = successful & wrapaddingargument(
+            config,
+            "trainparams",
+            "cache_batches_to_disk",
+            type=boolean_string,
+            default="False",
+            help="If True, write batched data to pickle files on disk to reduce memory usage. Useful for older JAX versions with memory issues (default=%(default)s)",
+        )
 
         # survey definitions
         self.surveylist = [
