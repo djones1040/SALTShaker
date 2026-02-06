@@ -217,6 +217,13 @@ class SuperNova(object):
             gotphot = self.getphotfits( photfitsfile )
             if specfitsfile is not None and readspec: gotspec = self.getspecfits( specfitsfile )
             else: self.SPECTRA = {}
+        elif headfits and photfits and snid:
+            self.snid = snid
+            # read in header and light curve data from binary fits tables 
+            gothd = self.getheadfits( headfits=headfits )
+            gotphot = self.getphotfits( photfits=photfits )
+            if specfits is not None and readspec: gotspec = self.getspecfits( specfits=specfits )
+            else: self.SPECTRA = {}
         elif datfile :  
             if verbose : print("Reading in data from light curve file %s"%(datfile))
             self.readdatfile( datfile, readspec=readspec ) 
@@ -536,7 +543,8 @@ class SuperNova(object):
                 val = line[colon+1:].strip()
                 
                 if key.lower() in ['name'  , 'snid'  ,  'nickname'  ,'cid'  , 'iauname' ]:
-                    self.__dict__[ key ] = val
+#                    import pdb; pdb.set_trace()
+                    self.__dict__[ key ] = val.split('#')[0].strip()
                 else:
                     self.__dict__[ key ] = str2num(val)
 
@@ -798,7 +806,7 @@ NSPECTRA:  %i
         return( None )
 
     
-    def getheadfits( self, headfitsfile ) :
+    def getheadfits( self, headfitsfile=None, headfits=None ) :
         """ read header data for the given SN from a binary fits table
         generated using the SNANA Monte Carlo simulator (GENSOURCE=RANDOM)
         """
@@ -810,11 +818,16 @@ NSPECTRA:  %i
         #self.simnum = None
         #if not len( headfitsfiles ) : return(False)
         #for headfits in headfitsfiles:
-        hhead = fits.getheader( headfitsfile, ext=1 ) 
-        hdata = fits.getdata( headfitsfile, ext=1 ) 
+        if headfitsfile is not None:
+            hhead = fits.getheader( headfitsfile, ext=1 ) 
+            hdata = fits.getdata( headfitsfile, ext=1 )
+            self.headfitswithsnid = headfitsfile
+        else:
+            hhead = headfits[1].header
+            hdata = headfits[1].data
 
         #self.simnum = int(headfitsfile.split('-')[-1].split('_HEAD')[0])
-        self.headfitswithsnid = headfitsfile
+ 
 
         # collect header data into object properties.
         Nsn = hhead['NAXIS2']    # num. of rows in the table = num. of simulated SNe
@@ -838,7 +851,7 @@ NSPECTRA:  %i
         return(True)
         raise RuntimeError( "SNID %s is not in %s"%(self.snid,headfits) )
         
-    def getphotfits( self, photfitsfile ) :
+    def getphotfits( self, photfitsfile=None, photfits=None ) :
         """ read phot data for the given SN from the photometry fits table
         generated using the SNANA Monte Carlo simulator (GENSOURCE=RANDOM)
         """
@@ -847,10 +860,14 @@ NSPECTRA:  %i
         #simdatadir = os.path.join( sndataroot,'SIM/%s'%self.simdir )
         #photfitsfiles = glob.glob(os.path.join( simdatadir, self.headfitswithsnid.replace('HEAD','PHOT')))
         #if not len( photfitsfiles ) : return(False)
-        #for photfits in photfitsfiles:
-        phead = fits.getheader( photfitsfile, ext=1 ) 
-        pdata = fits.getdata( photfitsfile, ext=1 ) 
-
+        #for photfits in photfitsfiles
+        if photfitsfile is not None:
+            phead = fits.getheader( photfitsfile, ext=1 ) 
+            pdata = fits.getdata( photfitsfile, ext=1 ) 
+        else:
+            phead = photfits[1].header
+            pdata = photfits[1].data
+        
         # find pointers to beginning and end of the obs sequence
         sndata = pdata[ self.PTROBS_MIN-1:self.PTROBS_MAX ]
 
@@ -860,7 +877,7 @@ NSPECTRA:  %i
             self.__dict__[ phead['TTYPE%i'%(ipcol+1)] ] = np.array( [ sndata[irow][ipcol] for irow in range(self.NOBS) ] )
         return( True )
 
-    def getspecfits( self, specfitsfile ) :
+    def getspecfits( self, specfitsfile=None, specfits=None ) :
         """ read phot data for the given SN from the photometry fits table
         generated using the SNANA Monte Carlo simulator (GENSOURCE=RANDOM)
         """
@@ -871,8 +888,11 @@ NSPECTRA:  %i
         #if not len( photfitsfiles ) : return(False)
         #for photfits in photfitsfiles:
 
-        hdu = fits.open(specfitsfile)
-
+        if specfitsfile is not None:
+            hdu = fits.open(specfitsfile)
+        else:
+            hdu = specfits
+            
         #to adapt to snana spectra format change
         headertbl_idx = [hdu[i].name for i in range(len(hdu))].index('SPECTRO_HEADER')
         fluxtbl_idx = [hdu[i].name for i in range(len(hdu))].index('SPECTRO_FLUX')

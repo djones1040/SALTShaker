@@ -1232,21 +1232,14 @@ class TrainSALT(TrainSALTBase):
                 return saltfitter, x_modelpars
 
             # do the fitting
-            x_modelpars = saltfitter.optimize(x_modelpars)
-        Xfinal = saltresids.constraints.transformtoconstrainedparams(x_modelpars)
-        Xfinal = saltresids.constraints.enforcefinaldefinitions(
-            Xfinal, saltresids.SALTModel(x_modelpars)
-        )
-        # hack!
-        self.options.errors_from_hessianapprox = False
-        if self.options.errors_from_hessianapprox:
-            sigma = saltresids.estimateparametererrorsfromhessian(Xfinal)
-            np.save(path.join(self.options.outputdir, "parametercovariance.npy"), sigma)
-        else:
-            sigma = None
-        trainingresult = saltresids.processoptimizedparametersforoutput(
-            Xfinal, x_modelpars, sigma
-        )
+            x_modelpars = saltfitter.optimize( x_modelpars)
+            
+        Xfinal= saltresids.constraints.enforcefinaldefinitions(x_modelpars,saltresids.SALTModel(x_modelpars))
+        if self.options.errors_from_hessianapprox: 
+            sigma=saltresids.estimateparametererrorsfromhessian(Xfinal)
+            np.save(path.join(self.options.outputdir,'parametercovariance.npy'), sigma)
+        else: sigma=None
+        trainingresult=saltresids.processoptimizedparametersforoutput(Xfinal,x_modelpars,sigma)
         for k in datadict.keys():
             trainingresult.snparams[k]["t0"] = datadict[k].tpk_guess
 
