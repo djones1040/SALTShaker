@@ -142,7 +142,29 @@ salttrainingresult = namedtuple(
 
 
 def ensurepositivedefinite(matrix, maxiter=5):
+    """
+    Ensure a matrix is positive definite by adding to diagonal.
 
+    Iteratively adds small positive values to the diagonal until the
+    minimum eigenvalue is positive, making the matrix invertible.
+
+    Parameters
+    ----------
+    matrix : ndarray
+        Square matrix to make positive definite.
+    maxiter : int, optional
+        Maximum iterations to attempt. Default is 5.
+
+    Returns
+    -------
+    ndarray
+        Positive definite matrix.
+
+    Raises
+    ------
+    ValueError
+        If matrix cannot be made positive definite within maxiter.
+    """
     for i in range(maxiter):
         try:
             mineigenval = np.linalg.eigvalsh(matrix)[0]
@@ -158,6 +180,24 @@ def ensurepositivedefinite(matrix, maxiter=5):
 
 
 def getgaussianfilterdesignmatrix(shape, smoothing):
+    """
+    Create a sparse design matrix for Gaussian smoothing.
+
+    Builds a banded sparse matrix that applies Gaussian smoothing when
+    multiplied with a vector. Used for smoothing covariance estimates.
+
+    Parameters
+    ----------
+    shape : int
+        Size of the output vector (matrix will be shape x shape).
+    smoothing : float
+        Standard deviation of Gaussian kernel in array units.
+
+    Returns
+    -------
+    scipy.sparse.csr_matrix
+        Sparse smoothing design matrix.
+    """
     windowsize = 10 + shape % 2
     window = gaussian_filter1d(
         1.0 * (np.arange(windowsize) == windowsize // 2), smoothing
@@ -252,12 +292,16 @@ class SALTResids:
 
     def __init__(self, datadict, kcordict, saltconfiguration, options):
         inittime = time.time()
+
+        # ===== Basic initialization =====
+        # Store input data and configuration
         self.nstep = 0
         self.datadict = datadict
         self.kcordict = kcordict
 
         self.nsn = len(self.datadict.keys())
 
+        # Unpack configuration into instance attributes
         for key, value in saltconfiguration._asdict().items():
             self.__dict__[key] = value
 
@@ -267,6 +311,9 @@ class SALTResids:
         self.npar = len(self.parlist)
         assert type(self.parlist) == np.ndarray
 
+        # ===== Extract priors and bounds from options =====
+        # Options prefixed with 'prior_' define Gaussian priors
+        # Options prefixed with 'bound_' define hard bounds on parameters
         self.usePriors = []
         self.priorWidths = []
         self.boundedParams = []
@@ -280,6 +327,8 @@ class SALTResids:
                 self.boundedParams += [opt[len("bound_") :]]
                 self.bounds += [tuple([float(x) for x in self.__dict__[opt]])]
 
+        # ===== Validate spectral recalibration parameters =====
+        # JAX-compiled code requires consistent number of recal params per spectrum
         specrecalparams = self.parlist[
             (np.array([x.startswith("specrecal") for x in self.parlist]))
         ]
@@ -292,16 +341,18 @@ class SALTResids:
             raise NotImplementedError(
                 "Varying number of spectral recalibration parameters unimplemented in jax-compiled code"
             )
-        # pre-set some indices
+        # Pre-compute parameter index arrays for efficient slicing
         self.set_param_indices()
 
-        # set some phase/wavelength arrays
+        # ===== Phase/wavelength grid setup =====
+        # Internal grids for model evaluation (higher resolution)
         self.phase = np.linspace(
             self.phaserange[0],
             self.phaserange[1],
             int((self.phaserange[1] - self.phaserange[0]) / self.phaseinterpres) + 1,
             True,
         )
+        # Output grids for saved surfaces (can be lower resolution)
         self.phaseout = np.linspace(
             self.phaserange[0],
             self.phaserange[1],
@@ -325,9 +376,11 @@ class SALTResids:
 
         self.neff = 0
 
-        self.m0guess = -19.49  # 10**(-0.4*(-19.49-27.5))
+        self.m0guess = -19.49  # Approximate SN Ia peak absolute magnitude
         self.extrapolateDecline = 0.015
-        # set up the filters
+
+        # ===== Filter and photometric calibration setup =====
+        # Compute standard star magnitudes and flux conversion factors for each filter
         self.stdmag = {}
         self.fluxfactor = {}
 
@@ -441,7 +494,7 @@ class SALTResids:
         pbspl /= denom * HC_ERG_AA
         self.kcordict["default"]["Vpbspl"] = pbspl
 
-        # Count number of photometric and spectroscopic points
+        # ===== Data counting =====
         self.num_spec = sum([datadict[sn].num_specobs for sn in datadict])
         self.num_spectra = sum([datadict[sn].num_spec for sn in datadict])
         self.num_lc = sum([datadict[sn].num_lc for sn in datadict])
@@ -449,6 +502,7 @@ class SALTResids:
 
         starttime = time.time()
 
+        # ===== B-spline basis function setup for regularization =====
         # Store the lower and upper edges of the phase/wavelength basis functions
         self.phaseBins = (
             self.phaseknotloc[: -(self.bsorder + 1)],
@@ -516,7 +570,8 @@ class SALTResids:
             self.ddcompdwavedphase,
         ) = regularizationDerivs
 
-        # Color law initialization
+        # ===== Color law initialization =====
+        # Set up wavelength-dependent color law (extinction curve)
         if self.preintegrate_photometric_passband:
             self.wavebasis = self.waveBinCenters
         else:
@@ -537,6 +592,8 @@ class SALTResids:
 
         self.guessScale = np.ones(self.n_components)
 
+        # ===== Regularization weights =====
+        # Different components can have different regularization strengths
         self.relativeregularizationweights = jnp.array(
             [1]
             + [self.variantregularization] * (self.n_components - 1)
@@ -546,6 +603,8 @@ class SALTResids:
         if self.regularize:
             self.updateEffectivePoints()
 
+        # ===== Data batching setup =====
+        # Group observations by size for efficient JAX vmap operations
         def getphotdatacounts(datadict):
             for snid, sn in datadict.items():
                 for flt, lc in sn.photdata.items():
@@ -586,6 +645,8 @@ class SALTResids:
             efficiency = 1
             log.info(f"no spectroscopic data, no batches needed")
 
+        # ===== Cache handling =====
+        # Load or compute filter responses and model basis functions for each SN
         log.info("Calculating cached quantities")
         start = time.time()
 
@@ -672,6 +733,8 @@ class SALTResids:
                         file,
                     )
 
+        # ===== Construct batched residual/likelihood functions =====
+        # These wrap the per-observation methods to operate on batched data with vmap
         log.info("Constructing batched methods")
 
         self.batchedphotresiduals = batching.batchedmodelfunctions(
@@ -753,6 +816,27 @@ class SALTResids:
 
     @classmethod
     def add_model_options(cls, parser, config, addargsonly=False):
+        """
+        Add SALT model training options to an argument parser.
+
+        Configures command-line and config-file options for training parameters,
+        regularization, priors, and bounds. Options are registered both for
+        parsing and for tracking which options are model-specific.
+
+        Parameters
+        ----------
+        parser : ConfigWithCommandLineOverrideParser or None
+            Argument parser to add options to. If None, creates new parser.
+        config : dict
+            Configuration dictionary with default values.
+        addargsonly : bool, optional
+            If True, only register option names without adding to parser.
+
+        Returns
+        -------
+        ConfigWithCommandLineOverrideParser
+            Parser with model options added.
+        """
         if parser == None:
             parser = ConfigWithCommandLineOverrideParser(
                 usage="", conflict_handler="resolve"
@@ -1154,7 +1238,13 @@ class SALTResids:
         return parser
 
     def set_param_indices(self):
+        """
+        Pre-compute parameter index arrays for efficient slicing.
 
+        Sets up index arrays (im0, im1, ix0, ix1, iCL, etc.) that map parameter
+        names to positions in the parameter vector. These enable fast extraction
+        of parameter subsets during model evaluation.
+        """
         self.m0min = np.min(np.where(self.parlist == "m0")[0])
         self.m0max = np.max(np.where(self.parlist == "m0")[0])
 
@@ -1424,6 +1514,31 @@ class SALTResids:
     def lsqwrap_sources(
         self, guess, uncertainties, dopriors=True, dospecresids=True, usesns=None
     ):
+        """
+        Get labels identifying the source of each residual element.
+
+        Returns a list of strings indicating which data source (photometry,
+        spectroscopy, priors, regularization) each element of the residual
+        vector from lsqwrap corresponds to. Useful for diagnosing chi-squared.
+
+        Parameters
+        ----------
+        guess : ndarray
+            Current parameter values (used to determine array shapes).
+        uncertainties : tuple
+            Cached photometric and spectroscopic uncertainties.
+        dopriors : bool, optional
+            Include prior residual labels. Default is True.
+        dospecresids : bool, optional
+            Include spectroscopic residual labels. Default is True.
+        usesns : list, optional
+            Subset of SNIDs (not implemented).
+
+        Returns
+        -------
+        list of str
+            Labels for each residual element.
+        """
         numresids = lambda func: jax.eval_shape(func, guess).shape[0]
         numresids_reg = lambda func: jax.eval_shape(func, guess, self.neff).shape[0]
 
@@ -1497,6 +1612,27 @@ class SALTResids:
         jitdefault=True,
     )
     def constrainedmaxlikefit(self, params, *args, usesecondary=True, **kwargs):
+        """
+        Compute likelihood with constrained parameter transformation.
+
+        Wrapper around maxlikefit that first transforms unconstrained
+        parameters to their constrained values (e.g., enforcing M0=1 at
+        peak in B-band). Used during optimization to maintain constraints.
+
+        Parameters
+        ----------
+        params : ndarray
+            Unconstrained parameter values.
+        usesecondary : bool, optional
+            Apply secondary constraints. Default is True.
+        *args, **kwargs
+            Passed to maxlikefit.
+
+        Returns
+        -------
+        float
+            Negative log-likelihood of constrained parameters.
+        """
         return self.maxlikefit(
             self.constraints.transformtoconstrainedparams(params, usesecondary),
             *args,
@@ -1588,12 +1724,48 @@ class SALTResids:
         return loglike
 
     def calculatecachedvals(self, x, target=None):
+        """
+        Compute cached flux or variance values for all data.
+
+        Pre-computes model predictions that can be reused during optimization
+        when only a subset of parameters are being varied.
+
+        Parameters
+        ----------
+        x : ndarray
+            Current parameter values.
+        target : {'fluxes', 'variances'}, optional
+            Which quantities to compute.
+
+        Returns
+        -------
+        list
+            [photometric_values, spectroscopic_values] for requested target.
+        """
         if target == "fluxes":
             return [self.batchedphotfluxes(x), self.batchedspecfluxes(x)]
         if target == "variances":
             return [self.batchedphotvariances(x), self.batchedspecvariances(x)]
 
     def bestfitsinglebandnormalizationsforSN(self, x, sn):
+        """
+        Compute optimal flux normalization for each filter of a single SN.
+
+        Analytically solves for the best-fit x0 parameter for each passband
+        independently, useful for diagnostics and initialization.
+
+        Parameters
+        ----------
+        x : ndarray
+            Current parameter values.
+        sn : str
+            Supernova ID.
+
+        Returns
+        -------
+        dict
+            Dictionary mapping filter names to (normalization, variance) tuples.
+        """
         sndata = self.datadict[sn]
         for flt in sndata.photdata:
             lcdata = sndata.photdata[flt]
@@ -1656,7 +1828,30 @@ class SALTResids:
         return sigmafull
 
     def computeuncertaintiesfromparametererrors(self, X, sigma, smoothingfactor=150):
+        """
+        Propagate parameter covariance to flux surface uncertainties.
 
+        Uses linear error propagation through the spline basis functions
+        to compute the uncertainty on the M0, M1, and Mhost flux surfaces
+        at each phase/wavelength point.
+
+        Parameters
+        ----------
+        X : ndarray
+            Best-fit parameter values.
+        sigma : ndarray
+            Parameter covariance matrix.
+        smoothingfactor : float, optional
+            Gaussian smoothing width in Angstroms for output uncertainties.
+            Default is 150.
+
+        Returns
+        -------
+        stderrs : list of ndarray
+            Standard error surfaces for each component.
+        correlations : list of tuple
+            (i, j, correlation_surface) for each component pair.
+        """
         varyingParams = reduce(
             lambda x, y: x | np.isin(np.arange(self.npar), y),
             [self.icomponents, self.iCLNoGal, self.imhost],
@@ -1959,6 +2154,24 @@ class SALTResids:
         return components
 
     def colorscatter(self, x, wave):
+        """
+        Compute wavelength-dependent intrinsic color scatter.
+
+        Evaluates the polynomial model for additional color-dependent
+        scatter beyond what the color law captures.
+
+        Parameters
+        ----------
+        x : ndarray
+            Current parameter values.
+        wave : ndarray
+            Wavelength array in Angstroms.
+
+        Returns
+        -------
+        ndarray
+            Color scatter amplitude at each wavelength.
+        """
         clscatpars = x[self.parlist == "clscat"]
         pow = clscatpars.size - 1 - np.arange(clscatpars.size)
         coeffs = clscatpars / factorial(pow)
@@ -2069,6 +2282,20 @@ class SALTResids:
         )  # [self.neff,np.tile(10,self.neff.shape)])
 
     def plotEffectivePoints(self, phases=None, output=None):
+        """
+        Plot the effective number of data points constraining each grid cell.
+
+        Visualizes the neff array used for regularization weighting,
+        either as a 2D heatmap or as 1D slices at specific phases.
+
+        Parameters
+        ----------
+        phases : array-like, optional
+            If provided, plot neff vs wavelength at these specific phases.
+            If None, plot full 2D heatmap.
+        output : str, optional
+            If provided, save figure to this path instead of displaying.
+        """
         import matplotlib.pyplot as plt
 
         if phases is None:
