@@ -476,36 +476,18 @@ class SALTResids:
 
         self.regularizationscalemin = 40
         basisfunctions = [
-            bisplev(
-                self.phase,
-                self.wave,
-                (
-                    self.phaseknotloc,
-                    self.waveknotloc,
-                    np.arange(self.im0.size) == i * (self.waveBins[0].size),
-                    self.bsorder,
-                    self.bsorder,
-                ),
-            )
-            for i in range(self.phaseBins[0].size)
-        ]
+            bisplev(self.phase, self.wave,
+                    (self.phaseknotloc, self.waveknotloc,
+                     np.arange(self.im0.size) == i * (self.waveBins[0].size),
+                     self.bsorder, self.bsorder))
+            for i in range(self.phaseBins[0].size)]
         self.phaseBinCenters = np.array(
-            [(self.phase[:, np.newaxis] * x).sum() / x.sum() for x in basisfunctions]
-        )
+            [(self.phase[:, np.newaxis] * x).sum() / x.sum() for x in basisfunctions])
         basisfunctions = [
-            bisplev(
-                self.phase,
-                self.wave,
-                (
-                    self.phaseknotloc,
-                    self.waveknotloc,
-                    np.arange(self.im0.size) == i,
-                    self.bsorder,
-                    self.bsorder,
-                ),
-            )
-            for i in range(self.waveBins[0].size)
-        ]
+            bisplev(self.phase, self.wave,
+                    (self.phaseknotloc, self.waveknotloc,
+                     np.arange(self.im0.size) == i, self.bsorder, self.bsorder))
+            for i in range(self.waveBins[0].size)]
 
         self.waveBinCenters = np.array(
             [(self.wave[np.newaxis, :] * x).sum() / x.sum() for x in basisfunctions]
@@ -513,13 +495,8 @@ class SALTResids:
 
         # Find the basis functions evaluated at the centers of the basis functions for use in the regularization derivatives
         regularizationDerivs = [
-            np.zeros(
-                (
-                    self.phaseRegularizationPoints.size
-                    * self.waveRegularizationPoints.size,
-                    self.im0.size,
-                )
-            )
+            np.zeros((self.phaseRegularizationPoints.size * self.waveRegularizationPoints.size,
+                      self.im0.size))
             for i in range(4)
         ]
         for i in range(len(self.im0)):
@@ -527,18 +504,10 @@ class SALTResids:
                 if self.bsorder == 0:
                     continue
                 regularizationDerivs[j][:, i] = bisplev(
-                    self.phaseRegularizationPoints,
-                    self.waveRegularizationPoints,
-                    (
-                        self.phaseknotloc,
-                        self.waveknotloc,
-                        np.arange(self.im0.size) == i,
-                        self.bsorder,
-                        self.bsorder,
-                    ),
-                    dx=derivs[0],
-                    dy=derivs[1],
-                ).flatten()
+                    self.phaseRegularizationPoints, self.waveRegularizationPoints,
+                    (self.phaseknotloc, self.waveknotloc, np.arange(self.im0.size) == i,
+                     self.bsorder, self.bsorder),
+                    dx=derivs[0], dy=derivs[1]).flatten()
         regularizationDerivs = map(sparse.BCOO.fromdense, regularizationDerivs)
         (
             self.componentderiv,
@@ -1738,16 +1707,9 @@ class SALTResids:
                 if self.bsorder == 0:
                     continue
                 spline_derivs[:, :, i] = bisplev(
-                    self.phaseout,
-                    self.waveout[chunkindex : chunkindex + chunksize],
-                    (
-                        self.phaseknotloc,
-                        self.waveknotloc,
-                        np.arange(self.im0.size) == i,
-                        self.bsorder,
-                        self.bsorder,
-                    ),
-                )
+                    self.phaseout, self.waveout[chunkindex : chunkindex + chunksize],
+                    (self.phaseknotloc, self.waveknotloc, np.arange(self.im0.size) == i,
+                     self.bsorder, self.bsorder))
             spline2d = scisparse.csr_matrix(spline_derivs.reshape(-1, self.im0.size))
 
             # Smooth things a bit, since this is supposed to be for broadband photometry
@@ -1892,14 +1854,8 @@ class SALTResids:
                 surface = bisplev(
                     self.phase if evaluatePhase is None else evaluatePhase,
                     self.wave if evaluateWave is None else evaluateWave,
-                    (
-                        self.phaseknotloc,
-                        self.waveknotloc,
-                        comppars,
-                        self.bsorder,
-                        self.bsorder,
-                    ),
-                )
+                    (self.phaseknotloc, self.waveknotloc, comppars,
+                     self.bsorder, self.bsorder))
             else:
                 phase = self.phase if evaluatePhase is None else evaluatePhase
                 wave = self.wave if evaluateWave is None else evaluateWave
@@ -1947,16 +1903,8 @@ class SALTResids:
             m1 = bisplev(
                 self.phase if evaluatePhase is None else evaluatePhase,
                 self.wave if evaluateWave is None else evaluateWave,
-                (
-                    self.phaseknotloc,
-                    self.waveknotloc,
-                    m1pars,
-                    self.bsorder,
-                    self.bsorder,
-                ),
-                dx=dx,
-                dy=dy,
-            )
+                (self.phaseknotloc, self.waveknotloc, m1pars, self.bsorder, self.bsorder),
+                dx=dx, dy=dy)
             if self.n_components == 2 and not self.host_component:
                 components = (m0, m1)
             elif self.host_component:
@@ -1964,17 +1912,9 @@ class SALTResids:
                 mhost = bisplev(
                     self.phase if evaluatePhase is None else evaluatePhase,
                     self.wave if evaluateWave is None else evaluateWave,
-                    (
-                        self.phaseknotloc,
-                        self.waveknotloc,
-                        mhostpars,
-                        self.bsorder,
-                        self.bsorder,
-                    ),
-                    dx=dx,
-                    dy=dy,
-                )
-
+                    (self.phaseknotloc, self.waveknotloc, mhostpars,
+                     self.bsorder, self.bsorder),
+                    dx=dx, dy=dy)
                 components = (m0, m1, mhost)
         elif self.n_components == 1:
             components = (m0,)
@@ -2006,29 +1946,16 @@ class SALTResids:
                 )
                 gridwave, gridphase = np.meshgrid(wave, phase)
                 clipinterp = lambda x, y: interp(
-                    (
-                        np.clip(x, binphasecenter.min(), binphasecenter.max()),
-                        np.clip(y, binwavecenter.min(), binwavecenter.max()),
-                    )
-                )
+                    (np.clip(x, binphasecenter.min(), binphasecenter.max()),
+                     np.clip(y, binwavecenter.min(), binwavecenter.max())))
                 result = clipinterp(gridphase.flatten(), gridwave.flatten()).reshape(
-                    (phase.size, wave.size)
-                )
+                    (phase.size, wave.size))
                 components += [result]
             else:
                 components += [
-                    bisplev(
-                        phase,
-                        wave,
-                        (
-                            self.errphaseknotloc,
-                            self.errwaveknotloc,
-                            errpars,
-                            self.errbsorder,
-                            self.errbsorder,
-                        ),
-                    )
-                ]
+                    bisplev(phase, wave,
+                            (self.errphaseknotloc, self.errwaveknotloc, errpars,
+                             self.errbsorder, self.errbsorder))]
         return components
 
     def colorscatter(self, x, wave):
@@ -2062,31 +1989,17 @@ class SALTResids:
                     0,
                 )
                 clipinterp = lambda x, y: interp(
-                    (
-                        np.clip(x, binphasecenter.min(), binphasecenter.max()),
-                        np.clip(y, binwavecenter.min(), binwavecenter.max()),
-                    )
-                )
+                    (np.clip(x, binphasecenter.min(), binphasecenter.max()),
+                     np.clip(y, binwavecenter.min(), binwavecenter.max())))
                 gridwave, gridphase = np.meshgrid(wave, phase)
                 result = clipinterp(gridphase.flatten(), gridwave.flatten()).reshape(
-                    (phase.size, wave.size)
-                )
+                    (phase.size, wave.size))
                 components += [result]
             else:
-
                 components += [
-                    bisplev(
-                        phase,
-                        wave,
-                        (
-                            self.errphaseknotloc,
-                            self.errwaveknotloc,
-                            errpars,
-                            self.errbsorder,
-                            self.errbsorder,
-                        ),
-                    )
-                ]
+                    bisplev(phase, wave,
+                            (self.errphaseknotloc, self.errwaveknotloc, errpars,
+                             self.errbsorder, self.errbsorder))]
         if self.n_components > self.n_errorsurfaces:
             components += (self.n_components - self.n_errorsurfaces) * [
                 np.zeros((phase.size, wave.size))

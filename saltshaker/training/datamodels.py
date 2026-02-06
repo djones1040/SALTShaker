@@ -297,14 +297,8 @@ class SALTparameters:
         list
             List of axis specifications (0 or None) for each attribute in __slots__.
         """
-        return [
-            (
-                (0 if x in self.__ismapped__ else None)
-                if getattr(self, x).size > 0
-                else None
-            )
-            for x in self.__slots__
-        ]
+        return [((0 if x in self.__ismapped__ else None) if getattr(self, x).size > 0 else None)
+                for x in self.__slots__]
 
     @classmethod
     def tree_unflatten(cls, aux_data, children):
@@ -661,16 +655,9 @@ class modeledtraininglightcurve(modeledtrainingdata):
         ), inds % (residsobj.waveknotloc.size - residsobj.bsorder - 1)
 
         # Check which basis functions overlap with our observation phases
-        inphase = (
-            (
-                clippedphase[:, np.newaxis]
-                >= residsobj.phaseknotloc[np.newaxis, phaseind]
-            )
-            & (
-                clippedphase[:, np.newaxis]
-                <= residsobj.phaseknotloc[np.newaxis, phaseind + residsobj.bsorder + 1]
-            )
-        ).any(axis=0)
+        inphase = ((clippedphase[:, np.newaxis] >= residsobj.phaseknotloc[np.newaxis, phaseind])
+                   & (clippedphase[:, np.newaxis]
+                      <= residsobj.phaseknotloc[np.newaxis, phaseind + residsobj.bsorder + 1])).any(axis=0)
         # Check which basis functions overlap with filter wavelength range
         inwave = (wave.max() >= residsobj.waveknotloc[waveind]) & (
             wave.min() <= residsobj.waveknotloc[waveind + residsobj.bsorder + 1]
@@ -782,18 +769,9 @@ class modeledtraininglightcurve(modeledtrainingdata):
                 residsobj.errwaveknotloc.size - residsobj.errbsorder - 1
             ), inds % (residsobj.errwaveknotloc.size - residsobj.errbsorder - 1)
             # Find relevant error basis functions (same logic as flux basis)
-            inphase = (
-                (
-                    clippedphase[:, np.newaxis]
-                    >= residsobj.phaseknotloc[np.newaxis, phaseind]
-                )
-                & (
-                    clippedphase[:, np.newaxis]
-                    <= residsobj.phaseknotloc[
-                        np.newaxis, phaseind + residsobj.bsorder + 1
-                    ]
-                )
-            ).any(axis=0)
+            inphase = ((clippedphase[:, np.newaxis] >= residsobj.phaseknotloc[np.newaxis, phaseind])
+                       & (clippedphase[:, np.newaxis]
+                          <= residsobj.phaseknotloc[np.newaxis, phaseind + residsobj.bsorder + 1])).any(axis=0)
             inwave = (self.lambdaeffrest >= residsobj.waveknotloc[waveind]) & (
                 self.lambdaeffrest
                 <= residsobj.waveknotloc[waveind + residsobj.bsorder + 1]

@@ -559,13 +559,9 @@ class TrainSALT(TrainSALTBase):
             if self.options.n_components >= 3:
 
                 guess[parlist == "m2"] = (
-                    (
-                        (np.arange(m0knots.size) < (n_waveknots * (n_phaseknots // 6)))
-                        & (np.arange(m0knots.size) > (n_waveknots * 1))
-                    )
-                    * np.std(m0knots)
-                    * 0.2
-                )
+                    ((np.arange(m0knots.size) < (n_waveknots * (n_phaseknots // 6)))
+                     & (np.arange(m0knots.size) > (n_waveknots * 1)))
+                    * np.std(m0knots) * 0.2)
             if self.options.host_component:
                 guess[parlist == "mhost"] = mhostknots
             if self.options.n_colorpars:
@@ -1330,21 +1326,9 @@ class TrainSALT(TrainSALTBase):
 
         if trainingresult.datacovsurfaces is None:
             datacovsurfaces = sum(
-                [
-                    [
-                        (
-                            i,
-                            j,
-                            np.zeros(
-                                (trainingresult.phase.size, trainingresult.wave.size)
-                            ),
-                        )
-                        for j in range(i + 1, len(trainingresult.componentnames))
-                    ]
-                    for i in range(len(trainingresult.componentnames))
-                ],
-                [],
-            )
+                [[(i, j, np.zeros((trainingresult.phase.size, trainingresult.wave.size)))
+                  for j in range(i + 1, len(trainingresult.componentnames))]
+                 for i in range(len(trainingresult.componentnames))], [])
         else:
             datacovsurfaces = trainingresult.datacovsurfaces
 
@@ -1616,16 +1600,8 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
                 < 9200
                 and "-u" not in self.kcordict[sn.SURVEY][flt]["fullname"]
             ):
-                data.add_row(
-                    (
-                        m,
-                        flt,
-                        flx,
-                        flxe,
-                        27.5 + self.kcordict[sn.SURVEY][flt]["zpoff"],
-                        sys,
-                    )
-                )
+                data.add_row((m, flt, flx, flxe,
+                              27.5 + self.kcordict[sn.SURVEY][flt]["zpoff"], sys))
             sysdict[flt] = sys
 
         flux = sn.FLUXCAL

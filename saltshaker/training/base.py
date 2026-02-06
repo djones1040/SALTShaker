@@ -683,75 +683,27 @@ class TrainSALTBase:
                 return 1
 
         cuts = [
-            SNCut(
-                "total epochs",
-                4,
-                lambda sn: sum(
-                    [
-                        (
-                            (sn.photdata[flt].phase > -10)
-                            & (sn.photdata[flt].phase < 35)
-                        ).sum()
-                        for flt in sn.photdata
-                    ]
-                ),
-            ),
-            SNCut(
-                "epochs near peak",
-                1,
-                lambda sn: sum(
-                    [
-                        (
-                            (sn.photdata[flt].phase > -10)
-                            & (sn.photdata[flt].phase < 5)
-                        ).sum()
-                        for flt in sn.photdata
-                    ]
-                ),
-            ),
-            SNCut(
-                "epochs post peak",
-                1,
-                lambda sn: sum(
-                    [
-                        (
-                            (sn.photdata[flt].phase > 5)
-                            & (sn.photdata[flt].phase < 20)
-                        ).sum()
-                        for flt in sn.photdata
-                    ]
-                ),
-            ),
-            SNCut(
-                "filters near peak",
-                3,
-                lambda sn: sum(
-                    [
-                        (
-                            (
-                                (sn.photdata[flt].phase > -8)
-                                & (sn.photdata[flt].phase < 10)
-                            ).sum()
-                        )
-                        > 0
-                        for flt in sn.photdata
-                    ]
-                ),
-            ),
+            SNCut("total epochs", 4,
+                  lambda sn: sum([((sn.photdata[flt].phase > -10)
+                                   & (sn.photdata[flt].phase < 35)).sum()
+                                  for flt in sn.photdata])),
+            SNCut("epochs near peak", 1,
+                  lambda sn: sum([((sn.photdata[flt].phase > -10)
+                                   & (sn.photdata[flt].phase < 5)).sum()
+                                  for flt in sn.photdata])),
+            SNCut("epochs post peak", 1,
+                  lambda sn: sum([((sn.photdata[flt].phase > 5)
+                                   & (sn.photdata[flt].phase < 20)).sum()
+                                  for flt in sn.photdata])),
+            SNCut("filters near peak", 3,
+                  lambda sn: sum([((sn.photdata[flt].phase > -8)
+                                   & (sn.photdata[flt].phase < 10)).sum() > 0
+                                  for flt in sn.photdata])),
             SNCut("salt2 fitprob", self.options.fitprobmin, checkfitprob),
-            SNCut(
-                "total bands",
-                3,
-                lambda sn: sum(
-                    [
-                        (
-                            (sn.photdata[flt].phase > -10)
-                            & (sn.photdata[flt].phase < 35)
-                        ).sum()
-                        for flt in sn.photdata
-                    ]
-                ),
-            ),
+            SNCut("total bands", 3,
+                  lambda sn: sum([((sn.photdata[flt].phase > -10)
+                                   & (sn.photdata[flt].phase < 35)).sum()
+                                  for flt in sn.photdata])),
         ]
 
         if self.options.keeponlyspec:

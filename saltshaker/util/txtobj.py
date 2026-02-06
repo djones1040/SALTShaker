@@ -235,20 +235,12 @@ class txtobj:
             for c, i in zip(coldefs, range(len(coldefs))):
                 try:
                     self.__dict__[c] = np.concatenate(
-                        (
-                            self.__dict__[c],
-                            np.genfromtxt(filename, unpack=True, usecols=[i]),
-                        )
-                    )
+                        (self.__dict__[c],
+                         np.genfromtxt(filename, unpack=True, usecols=[i])))
                 except:
                     self.__dict__[c] = np.concatenate(
-                        (
-                            self.__dict__[c],
-                            np.genfromtxt(
-                                filename, unpack=True, usecols=[i], dtype="str"
-                            ),
-                        )
-                    )
+                        (self.__dict__[c],
+                         np.genfromtxt(filename, unpack=True, usecols=[i], dtype="str")))
             self.filename = np.append(
                 self.filename,
                 np.array(
