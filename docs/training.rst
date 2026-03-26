@@ -133,6 +133,10 @@ n_components                   2                 number of model components (M0,
 error_snake_phase_binsize      6                 spacing in days for the SALT error model B-spline interpolation
 error_snake_wave_binsize       1200              spacing in Angstroms for the SALT error model B-spline interpolation
 use_snpca_knots                False             if true, use the knot locations from the SALT2 training
+surface_type                   bspline           surface parameterization: ``bspline`` (default) or ``tt`` (Tensor Train). See :doc:`tt_surfaces` for details.
+tt_rank                        5                 TT decomposition rank (only used when ``surface_type = tt``)
+tt_mass_bins                   0                 number of host-mass grid points for TT mass dimension (0 = disabled)
+tt_mass_range                  7.0,12.0          log10(M★/M☉) range for the mass grid
 
 [priors]                                         key is the name of a decorator in :code:`training/priors.py`; value determines the (semi-arbitrary) width of each prior
 x1mean                         0.1               mean x1 = 0
