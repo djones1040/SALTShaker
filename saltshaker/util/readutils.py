@@ -154,7 +154,7 @@ class SALTtrainingspectrum(SALTtrainingdata):
                         
 class SALTtrainingSN:
 
-        __slots__=['survey', 'zHelio', 'MWEBV', 'snid', 'tpk_guess', 'salt2fitprob', 'photdata','specdata','SIM_SALT2x0','SIM_SALT2x1','SIM_SALT2c']
+        __slots__=['survey', 'zHelio', 'MWEBV', 'snid', 'tpk_guess', 'salt2fitprob', 'photdata','specdata','SIM_SALT2x0','SIM_SALT2x1','SIM_SALT2c','host_logmass']
         def __init__(self,sn,
                      estimate_tpk=False,snpar=None,
                      pkmjddict={},n_specrecal=None,binspecres=None):
@@ -235,6 +235,16 @@ class SALTtrainingSN:
                 self.snid=sn.SNID
                 self.tpk_guess=tpk
                 self.salt2fitprob=fitprob
+
+                # Host galaxy stellar mass (optional, for TT mass dimension)
+                if hasattr(sn, 'HOSTGAL_LOGMASS'):
+                    try: self.host_logmass = float(str(sn.HOSTGAL_LOGMASS).split()[0])
+                    except: self.host_logmass = 10.0  # default
+                elif hasattr(sn, 'HOST_LOGMASS'):
+                    try: self.host_logmass = float(str(sn.HOST_LOGMASS).split()[0])
+                    except: self.host_logmass = 10.0
+                else:
+                    self.host_logmass = 10.0  # default: median mass
                 
                 self.photdata = {flt:SALTtraininglightcurve(self.zHelio,tpk_guess= self.tpk_guess,flt=flt, sn=sn) for flt in np.unique(sn.FLT)}
                 try: assert(len(self.photdata)>0)

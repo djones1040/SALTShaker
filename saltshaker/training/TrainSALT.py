@@ -207,11 +207,28 @@ class TrainSALT(TrainSALTBase):
         n_errphaseknots,n_errwaveknots = len(errphaseknotloc)-self.options.errbsorder-1,len(errwaveknotloc)-self.options.errbsorder-1
         n_sn = len(datadict.keys())
         parlist=[]
+
+        # Surface parameterization
+        surface_type = getattr(self.options, 'surface_type', 'bspline')
+        if surface_type == 'tt':
+            from saltshaker.training.tt_surfaces import (
+                bspline_to_tt_cores, init_mass_core, tt_cores_to_params,
+                make_mass_knots)
+            tt_rank = getattr(self.options, 'tt_rank', 5)
+            tt_mass_bins = getattr(self.options, 'tt_mass_bins', 0)
+            # 2D TT: n_phase*r + r*n_wave per component
+            n_tt_2d = n_phaseknots * tt_rank + tt_rank * n_waveknots
+            # 3D mass core: r * n_mass * r per component
+            n_tt_mass = tt_rank * tt_mass_bins * tt_rank if tt_mass_bins > 0 else 0
+            n_params_per_component = n_tt_2d + n_tt_mass
+        else:
+            n_params_per_component = n_phaseknots * n_waveknots
+
         # set up the list of parameters
         for i in range(self.options.n_components):
-            parlist = np.append(parlist,['m'+str(i)]*(n_phaseknots*n_waveknots))
+            parlist = np.append(parlist,['m'+str(i)]*n_params_per_component)
         if self.options.host_component:
-            parlist = np.append(parlist,['mhost']*(n_phaseknots*n_waveknots))
+            parlist = np.append(parlist,['mhost']*n_params_per_component)
         if self.options.n_colorpars:
             parlist = np.append(parlist,[[f'cl{i}']*num for i,num in enumerate(self.options.n_colorpars)])
         if self.options.error_snake_phase_binsize and self.options.error_snake_wave_binsize:
@@ -283,16 +300,38 @@ class TrainSALT(TrainSALTBase):
                     sys.exit(1)
         else:
             m0knots[m0knots == 0] = 1e-4
-            guess[parlist == 'm0'] = m0knots
-            for i in range(3): guess[parlist == 'modelerr_{}'.format(i)] = 1e-6 
+            if surface_type == 'tt':
+                # Convert B-spline coefficients to TT core parameters
+                m0_core_p, m0_core_w = bspline_to_tt_cores(
+                    m0knots, n_phaseknots, n_waveknots, tt_rank)
+                m0_core_mass = init_mass_core(tt_rank, tt_mass_bins) if tt_mass_bins > 0 else None
+                m0_tt_params, _ = tt_cores_to_params(m0_core_p, m0_core_w, m0_core_mass)
+                guess[parlist == 'm0'] = m0_tt_params
+            else:
+                guess[parlist == 'm0'] = m0knots
+            for i in range(3): guess[parlist == 'modelerr_{}'.format(i)] = 1e-6
             if self.options.n_components >= 2:
-                guess[parlist == 'm1'] = m1knots
+                if surface_type == 'tt':
+                    m1_core_p, m1_core_w = bspline_to_tt_cores(
+                        m1knots, n_phaseknots, n_waveknots, tt_rank)
+                    m1_core_mass = init_mass_core(tt_rank, tt_mass_bins) if tt_mass_bins > 0 else None
+                    m1_tt_params, _ = tt_cores_to_params(m1_core_p, m1_core_w, m1_core_mass)
+                    guess[parlist == 'm1'] = m1_tt_params
+                else:
+                    guess[parlist == 'm1'] = m1knots
             if self.options.n_components >= 3:
-            
+
                 guess[parlist=='m2'] =( (np.arange(m0knots.size)< (n_waveknots*  (n_phaseknots//6)))
                                        &  (np.arange(m0knots.size)> (n_waveknots* 1 ))  )*np.std(m0knots)*.2
             if self.options.host_component:
-                guess[parlist == 'mhost'] = mhostknots
+                if surface_type == 'tt':
+                    mhost_core_p, mhost_core_w = bspline_to_tt_cores(
+                        mhostknots, n_phaseknots, n_waveknots, tt_rank)
+                    mhost_core_mass = init_mass_core(tt_rank, tt_mass_bins) if tt_mass_bins > 0 else None
+                    mhost_tt_params, _ = tt_cores_to_params(mhost_core_p, mhost_core_w, mhost_core_mass)
+                    guess[parlist == 'mhost'] = mhost_tt_params
+                else:
+                    guess[parlist == 'mhost'] = mhostknots
             if self.options.n_colorpars:
                 if self.options.initsalt2model:
                     #if len(self.options.n_colorpars)>1: raise ValueError('Multiple color laws specified with initsalt2model option')
@@ -318,7 +357,8 @@ class TrainSALT(TrainSALTBase):
 
                 guess[parlist == 'clscat'] = clscatcoeffs
 
-            guess[(parlist == 'm0') & (guess < 0)] = 1e-4
+            if surface_type != 'tt':
+                guess[(parlist == 'm0') & (guess < 0)] = 1e-4
             
             guess[parlist=='modelerr_0']=m0varknots
             if self.options.n_errorsurfaces > 1:

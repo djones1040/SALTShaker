@@ -36,6 +36,30 @@ recalmax=20
 
 _SCALE_FACTOR = 1e-12
 
+
+def _expand_tt_components_impl(components, tt_core_sizes, host_logmass, tt_mass_knots):
+    """Expand TT core parameters to full B-spline coefficient vectors.
+
+    For each component, unpacks TT cores from the flat parameter vector
+    and computes core_phase @ [mass_matrix @] core_wave to produce
+    a full (n_phase * n_wave) coefficient vector compatible with pcderivsparse.
+
+    This is JAX-differentiable — gradients flow through the matrix products.
+    """
+    from saltshaker.training.tt_surfaces import jax_params_to_tt_cores, _interp_mass_core
+    expanded = []
+    for i in range(components.shape[0]):
+        comp_params = components[i]
+        sizes = tt_core_sizes[i]
+        core_p, core_w, core_m = jax_params_to_tt_cores(comp_params, sizes)
+        if core_m is not None and tt_mass_knots is not None:
+            mass_matrix = _interp_mass_core(
+                core_m, host_logmass, jnp.array(tt_mass_knots))
+            expanded.append((core_p @ mass_matrix @ core_w).ravel())
+        else:
+            expanded.append((core_p @ core_w).ravel())
+    return jnp.stack(expanded)
+
 def __anyinnonzeroareaforsplinebasis__(phase,wave,phaseknotloc,waveknotloc,bsorder,i):
     phaseindex,waveindex=i//(waveknotloc.size-bsorder-1), i% (waveknotloc.size-bsorder-1)
     return ((phase>=phaseknotloc[phaseindex])&(phase<=phaseknotloc[phaseindex+bsorder+1])).any() and ((wave>=waveknotloc[waveindex])&(wave<=waveknotloc[waveindex+bsorder+1])).any() 
@@ -173,13 +197,18 @@ class modeledtraininglightcurve(modeledtrainingdata):
         'clscatderivs',
         'wavebasis',
         'padding',
+        'host_logmass',
     ]+__indexattributes__
     __staticattributes__=[
         'preintegratebasis',
         'imodelcorrs_coordinds',
         'bsplinecoeffshape','errorgridshape','uniqueid',
-        'colorlawfunction'
+        'colorlawfunction',
+        'surface_type',
     ]
+    # TT attributes stored outside __slots__ to avoid JAX vmap serialization.
+    _tt_core_sizes = None
+    _tt_mass_knots = None
     
     __slots__ = __dynamicattributes__+__staticattributes__
     
@@ -188,7 +217,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         'lambdaeff','lambdaeffrest','errordesignmat','pcderivsparse',
         'varianceprefactor',
         'clscatderivs',
-        'padding','uniqueid'
+        'padding','host_logmass'
     }
 
     def __init__(self,sn,lc,residsobj,kcordict,padding=0):
@@ -201,6 +230,15 @@ class modeledtraininglightcurve(modeledtrainingdata):
         self.padding=padding
         self.ipad= np.arange(len(lc)+padding )>= len(lc)
         self.uniqueid= f'{sn.snid}_{lc.filt}'
+
+        # TT surface config: surface_type is int (0=bspline, 1=tt) for JAX compat
+        self.surface_type = 1 if getattr(residsobj, 'surface_type', 'bspline') == 'tt' else 0
+        self.host_logmass = getattr(sn, 'host_logmass', 10.0)
+        # Store TT config at class level (same for all SNe, avoids JAX vmap issues)
+        cls = type(self)
+        cls._tt_core_sizes = getattr(residsobj, 'tt_core_sizes', None)
+        cls._tt_mass_knots = getattr(residsobj, 'tt_mass_knots', None)
+
         #Define quantities for synthetic photometry
         filtwave = kcordict[sn.survey][lc.filt]['filtwave']
         filttrans = kcordict[sn.survey][lc.filt]['filttrans']
@@ -246,17 +284,21 @@ class modeledtraininglightcurve(modeledtrainingdata):
 
         wave=residsobj.wave[waveidxs]
         #Evaluate the b-spline basis functions for this passband
-        #Evaluate parameters only for relevant portions of phase/wavelength space        
-        inds=np.array(range(residsobj.im0.size))
+        #Evaluate parameters only for relevant portions of phase/wavelength space
+        # For TT surfaces, pcderivsparse is still computed over the full B-spline
+        # basis (n_bspline_coeffs columns). modelflux() expands TT cores to
+        # full B-spline coefficients before multiplying by pcderivsparse.
+        n_bspline = getattr(residsobj, 'n_bspline_coeffs', residsobj.im0.size)
+        inds=np.array(range(n_bspline))
         phaseind,waveind=inds//(residsobj.waveknotloc.size-residsobj.bsorder-1),inds%(residsobj.waveknotloc.size-residsobj.bsorder-1)
         inphase=((clippedphase[:,np.newaxis]>= residsobj.phaseknotloc[np.newaxis,phaseind])&(clippedphase[:,np.newaxis]<=residsobj.phaseknotloc[np.newaxis,phaseind+residsobj.bsorder+1])).any(axis=0)
         inwave=((wave.max()>=residsobj.waveknotloc[waveind])&(wave.min()<=residsobj.waveknotloc[waveind+residsobj.bsorder+1]))
 
         isrelevant=inphase&inwave
         #Array output indices match time along 0th axis, wavelength along 1st axis
-        derivInterp=np.zeros((clippedphase.size,waveidxs.sum(),residsobj.im0.size))        
+        derivInterp=np.zeros((clippedphase.size,waveidxs.sum(),n_bspline))
         for i in np.where(isrelevant)[0]:
-                derivInterp[:,:,i] = bisplev(clippedphase ,wave,(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(residsobj.im0.size)==i, residsobj.bsorder,residsobj.bsorder))
+                derivInterp[:,:,i] = bisplev(clippedphase ,wave,(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(n_bspline)==i, residsobj.bsorder,residsobj.bsorder))
 
         splinebasisconvolutions=[]
         #Redden passband transmission by MW extinction, multiply by scalar factors
@@ -306,14 +348,25 @@ class modeledtraininglightcurve(modeledtrainingdata):
     def __len__(self):
         return self.fluxcal.size
 
+    def _expand_tt_components(self, components):
+        cls = type(self)
+        return _expand_tt_components_impl(
+            components, cls._tt_core_sizes, self.host_logmass, cls._tt_mass_knots)
+
     def modelflux(self,pars):
         if not isinstance(pars,SALTparameters):
             pars=SALTparameters(self,pars)
-        #Evaluate the coefficients of the spline bases
-        
-        coordinates=jnp.concatenate((jnp.ones(1), pars.coordinates))
 
-        fluxcoeffs=jnp.dot(coordinates,pars.components)*pars.x0
+        # For TT surfaces: expand TT cores → full B-spline coefficients
+        # so pcderivsparse (which is computed on the B-spline basis) works
+        if self.surface_type == 1:
+            components = self._expand_tt_components(pars.components)
+        else:
+            components = pars.components
+
+        coordinates = jnp.concatenate((jnp.ones(1), pars.coordinates))
+        fluxcoeffs = jnp.dot(coordinates, components) * pars.x0
+
         #Evaluate color law at the wavelength basis centers
         colorlaw= sum([fun(c,cl,self.wavebasis) for fun,c,cl in zip(self.colorlawfunction,pars.c, pars.CL)])
         colorexp= 10. ** (  -0.4*colorlaw)
@@ -323,7 +376,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
             fluxcoeffsreddened= (colorexp[np.newaxis,:]*fluxcoeffs.reshape( self.bsplinecoeffshape)).flatten()
             #Multiply spline bases by flux coefficients
             return jnp.clip(self.pcderivsparse @ fluxcoeffsreddened,0,None)
-        else:    
+        else:
             #Integrate basis functions over wavelength and sum over flux coefficients
             return jnp.clip(( self.pcderivsparse @ fluxcoeffs) @ colorexp ,0,None)
 
@@ -400,25 +453,45 @@ class modeledtrainingspectrum(modeledtrainingdata):
         'varianceprefactor',
         'pcderivsparse','errordesignmat','spectralsuppression'
      ]
+    __dynamicattributes__ = [
+        'flux', 'wavelength','phase', 'fluxerr', 'restwavelength',
+        'recaltermderivs',
+        'varianceprefactor',
+        'pcderivsparse','errordesignmat','spectralsuppression',
+        'host_logmass',
+     ]
     __staticattributes__=[
         'padding','imodelcorrs_coordinds',
         'errorgridshape','bsplinecoeffshape',
-        'uniqueid','colorlawfunction','n_specrecal'
+        'uniqueid','colorlawfunction','n_specrecal',
+        'surface_type',
     ]+__indexattributes__
     __slots__ = __dynamicattributes__+__staticattributes__
+
+    # TT config at class level (same for all SNe)
+    _tt_core_sizes = None
+    _tt_mass_knots = None
 
     __ismapped__={
         'ix0','ic','ispcrcl','icoordinates','ipad','phase','flux','fluxerr',
         'restwavelength','recaltermderivs','errordesignmat','pcderivsparse',
-        'varianceprefactor','varianceprefactor','uniqueid','n_specrecal'
+        'varianceprefactor','varianceprefactor','n_specrecal',
+        'host_logmass'
     }
-    
+
     def __init__(self,sn,spectrum,k,residsobj,padding=0):
         for attr in spectrum.__slots__:
             if attr in self.__slots__:
                     setattr(self,attr,getattr(spectrum,attr))
         z = sn.zHelio
         self.n_specrecal = spectrum.n_specrecal
+
+        # TT surface config
+        self.surface_type = 1 if getattr(residsobj, 'surface_type', 'bspline') == 'tt' else 0
+        self.host_logmass = getattr(sn, 'host_logmass', 10.0)
+        cls = type(self)
+        cls._tt_core_sizes = getattr(residsobj, 'tt_core_sizes', None)
+        cls._tt_mass_knots = getattr(residsobj, 'tt_mass_knots', None)
 
         padding=max(0,padding)
         self.ix0=np.where(residsobj.parlist==f'specx0_{sn.snid}_{k}')[0][0]
@@ -439,19 +512,20 @@ class modeledtrainingspectrum(modeledtrainingdata):
 
         wave=self.restwavelength
         #Evaluate the b-spline basis functions for this passband
-        #Evaluate parameters only for relevant portions of phase/wavelength space        
-        inds=np.array(range(residsobj.im0.size))
+        #Evaluate parameters only for relevant portions of phase/wavelength space
+        n_bspline = getattr(residsobj, 'n_bspline_coeffs', residsobj.im0.size)
+        inds=np.array(range(n_bspline))
         phaseind,waveind=inds//(residsobj.waveknotloc.size-residsobj.bsorder-1),inds%(residsobj.waveknotloc.size-residsobj.bsorder-1)
         inphase=((self.phase>= residsobj.phaseknotloc[phaseind])&(self.phase<=residsobj.phaseknotloc[phaseind+residsobj.bsorder+1]))
         inwave=((wave.max()>=residsobj.waveknotloc[waveind])&(wave.min()<=residsobj.waveknotloc[waveind+residsobj.bsorder+1]))
 
         isrelevant=inphase&inwave
 
-        derivInterp=np.zeros((spectrum.wavelength.size,residsobj.im0.size))
+        derivInterp=np.zeros((spectrum.wavelength.size,n_bspline))
         for i in np.where(isrelevant)[0]:
-                derivInterp[:,i] = bisplev(spectrum.phase,self.restwavelength,(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(residsobj.im0.size)==i, residsobj.bsorder,residsobj.bsorder))
+                derivInterp[:,i] = bisplev(spectrum.phase,self.restwavelength,(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(n_bspline)==i, residsobj.bsorder,residsobj.bsorder))
         derivInterp=derivInterp*(_SCALE_FACTOR/(1+z)*mwextcurve)[:,np.newaxis]
-        self.pcderivsparse=sparse.BCOO.fromdense(np.concatenate((derivInterp,np.zeros((padding,residsobj.im0.size)))))        
+        self.pcderivsparse=sparse.BCOO.fromdense(np.concatenate((derivInterp,np.zeros((padding,n_bspline)))))        
 
         pow=self.ispcrcl.size-np.arange(self.ispcrcl.size)
         recalCoord=(self.wavelength-np.mean(self.wavelength))/residsobj.specrange_wavescale_specrecal
@@ -487,8 +561,13 @@ class modeledtrainingspectrum(modeledtrainingdata):
         
     def __len__(self):
         return self.flux.size
-                
-#    @partial(jaxoptions, diff_argnum=1)                      
+
+    def _expand_tt_components(self, components):
+        cls = type(self)
+        return _expand_tt_components_impl(
+            components, cls._tt_core_sizes, self.host_logmass, cls._tt_mass_knots)
+
+#    @partial(jaxoptions, diff_argnum=1)
     def modelflux(self,pars):
         if not isinstance(pars,SALTparameters):
             pars=SALTparameters(self,pars)
@@ -496,7 +575,12 @@ class modeledtrainingspectrum(modeledtrainingdata):
         #Define recalibration factor
         coeffs=pars.spcrcl
         coordinates=jnp.concatenate((jnp.ones(1), pars.coordinates))
-        components=pars.components
+
+        # For TT surfaces: expand TT cores → full B-spline coefficients
+        if self.surface_type == 1:
+            components = self._expand_tt_components(pars.components)
+        else:
+            components = pars.components
 
         recalterm=jnp.dot(self.recaltermderivs,coeffs)
         recalterm=jnp.clip(recalterm,-recalmax,recalmax)
@@ -566,7 +650,7 @@ class SALTfitcacheSN(SALTtrainingSN):
     
     __slots__= ['ix0','ix1','ic', 'ixhost','icoordinates','mwextcurve',
                 'mwextcurveint','dwave','obswave','obsphase','photdata',
-                'specdata','zHelio','snid']
+                'specdata','zHelio','snid','host_logmass']
     
     def __init__(self,sndata,residsobj,kcordict,lcpaddingsizes=None,specpaddingsizes=None,n_specrecal=None):
         for attr in sndata.__slots__:
