@@ -10,4 +10,4 @@ class config_test(unittest.TestCase):
         salt = TrainSALT()
         configfile = 'testdata/test.conf'
         rt = RunTraining()
-        rt.get_config_options(salt,configfile,None)
+        rt.get_config_options(salt,configfile,[])

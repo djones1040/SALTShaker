@@ -6,7 +6,8 @@ from numpy.linalg import inv,pinv,norm
 
 import time,copy,extinction,pickle
 
-from scipy.interpolate import splprep,splev,BSpline,griddata,bisplev,bisplrep,interp1d,interp2d
+from scipy.interpolate import splprep,splev,BSpline,griddata,interp1d,interp2d
+from saltshaker.util.jax_bspline import jax_bisplev as bisplev
 from scipy.integrate import trapezoid as trapz, simpson as simps
 from scipy.optimize import minimize, least_squares,minimize_scalar,lsq_linear
 from scipy.ndimage import gaussian_filter1d

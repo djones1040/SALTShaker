@@ -1,5 +1,10 @@
 from . import *
 import logging
+import numpy as np
+
+# NumPy 2.x compatibility: np.trapz was removed in favor of np.trapezoid
+if not hasattr(np, 'trapz'):
+    np.trapz = np.trapezoid
 
 __version__='2.0.0devKene0'
 

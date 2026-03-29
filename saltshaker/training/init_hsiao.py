@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import numpy as np
-from scipy.interpolate import bisplrep,bisplev,RegularGridInterpolator
+from scipy.interpolate import RegularGridInterpolator
+from saltshaker.util.jax_bspline import jax_bisplev as bisplev, jax_bisplrep as bisplrep
 from scipy.interpolate import interp1d
 from sncosmo.constants import HC_ERG_AA
 from saltshaker.initfiles import init_rootdir

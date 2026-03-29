@@ -82,33 +82,32 @@ None,'jacfwd','jacrev','jvp','vjp',
         compilefunc=(jax.jit if jitted else blank)
         for difftype in gradoptions:
             compileargs=[static_argnums,static_argnames,]
-            match difftype:
-                case 'valueandgrad':
-                    gradfunc= jax.value_and_grad(fun,argnums=diff_argnum)
-                case 'grad':
-                    gradfunc= jax.grad(fun,argnums=diff_argnum)
-                case 'jacfwd':
-                    gradfunc= jax.jacfwd(fun,argnums=[diff_argnum] )
-                case 'jacrev':
-                    gradfunc= jax.jacrev(fun,argnums=[diff_argnum] )
-                case 'jvp':
-                    gradfunc=wrapjvpmultipleargs(fun,argnums=[diff_argnum] )
-                    if not (static_argnums is None): compileargs[0]=[x+1 for x in static_argnums]
-                case 'vjp':
-                    gradfunc=wrapvjpmultipleargs(fun,argnums=[diff_argnum] )
-                    if not (static_argnums is None): compileargs[0]=[x+1 for x in static_argnums]
-                case 'sparsejacfwd':
-                    permutations[(jitted,difftype)]= sparsejac( 
-                        permutations[(jitted,None)],
-                        permutations[(jitted, 'jvp')],[diff_argnum],True)
-                    continue
-                case 'sparsejacrev':
-                    permutations[(jitted,difftype)]= sparsejac( 
-                        permutations[(jitted,None)],
-                        permutations[(jitted, 'vjp')],[diff_argnum],False)
-                    continue
-                case None:
-                    gradfunc=fun
+            if difftype == 'valueandgrad':
+                gradfunc= jax.value_and_grad(fun,argnums=diff_argnum)
+            elif difftype == 'grad':
+                gradfunc= jax.grad(fun,argnums=diff_argnum)
+            elif difftype == 'jacfwd':
+                gradfunc= jax.jacfwd(fun,argnums=[diff_argnum] )
+            elif difftype == 'jacrev':
+                gradfunc= jax.jacrev(fun,argnums=[diff_argnum] )
+            elif difftype == 'jvp':
+                gradfunc=wrapjvpmultipleargs(fun,argnums=[diff_argnum] )
+                if not (static_argnums is None): compileargs[0]=[x+1 for x in static_argnums]
+            elif difftype == 'vjp':
+                gradfunc=wrapvjpmultipleargs(fun,argnums=[diff_argnum] )
+                if not (static_argnums is None): compileargs[0]=[x+1 for x in static_argnums]
+            elif difftype == 'sparsejacfwd':
+                permutations[(jitted,difftype)]= sparsejac(
+                    permutations[(jitted,None)],
+                    permutations[(jitted, 'jvp')],[diff_argnum],True)
+                continue
+            elif difftype == 'sparsejacrev':
+                permutations[(jitted,difftype)]= sparsejac(
+                    permutations[(jitted,None)],
+                    permutations[(jitted, 'vjp')],[diff_argnum],False)
+                continue
+            else:  # None
+                gradfunc=fun
             permutations[(jitted,difftype)]= compilefunc(gradfunc,
                     static_argnums= compileargs[0],static_argnames=compileargs[1])
             

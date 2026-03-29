@@ -4,10 +4,34 @@ from jax import numpy as jnp
 from jax.experimental import sparse
 import numpy as np
 import pickle
+import logging
+import os
 
 from scipy import optimize, stats
 
 import warnings
+
+log = logging.getLogger(__name__)
+
+def _get_device_list():
+    """Get available JAX devices, respecting SALTSHAKER_NUM_GPUS env var."""
+    platform = os.environ.get('SALTSHAKER_JAX_PLATFORM', 'cpu')
+    if platform == 'gpu':
+        try:
+            devices = jax.devices('gpu')
+            max_gpus = int(os.environ.get('SALTSHAKER_NUM_GPUS', len(devices)))
+            devices = devices[:max_gpus]
+            if devices:
+                log.info(f"Using {len(devices)} GPU(s): {[d.id for d in devices]}")
+                return devices
+        except RuntimeError:
+            pass
+    return jax.devices('cpu')[:1]
+
+
+# Whether to use gradient checkpointing (remat) to reduce GPU memory.
+# Set SALTSHAKER_GRADIENT_CHECKPOINT=1 to enable.
+_USE_GRADIENT_CHECKPOINT = os.environ.get('SALTSHAKER_GRADIENT_CHECKPOINT', '0') == '1'
 
 
 def optimizepaddingsizes(numbatches,datasizes):
@@ -109,7 +133,13 @@ def walkargumenttree(x,targetsize,ncalls=0):
     else : return None
 
 def batchedmodelfunctions(function,batcheddata, dtype,flatten=False,sum=False):
-    """Constructor function to map a function that takes a modeledtrainingdata object as first arg and a SALTparameters object as second arg over batched, zero-padded data"""
+    """Constructor function to map a function that takes a modeledtrainingdata object as first arg and a SALTparameters object as second arg over batched, zero-padded data.
+
+    When multiple GPUs are available (SALTSHAKER_JAX_PLATFORM=gpu), batches are
+    distributed across devices for parallel evaluation. Each GPU processes a
+    subset of the SN batches independently, and results are gathered on the
+    first device.
+    """
     if issubclass(dtype,datamodels.modeledtrainingdata) :
         pass
     elif dtype in ['light-curves','spectra']:
@@ -120,9 +150,13 @@ def batchedmodelfunctions(function,batcheddata, dtype,flatten=False,sum=False):
     else:
         raise ValueError(f'Invalid datatype {dtype}')
 
-    batchedindexed= [dict([(x,y) for x,y in zip(dtype.__slots__,batch) if x in 
+    batchedindexed= [dict([(x,y) for x,y in zip(dtype.__slots__,batch) if x in
                  dtype.__indexattributes__ ]) for batch in batcheddata]
-    
+
+    # Get available devices for multi-GPU distribution
+    devices = _get_device_list()
+    n_devices = len(devices)
+
     def vectorized(pars,*batchedargs,**batchedkwargs):
         if sum: result=0
         else: result=[]
@@ -130,13 +164,13 @@ def batchedmodelfunctions(function,batcheddata, dtype,flatten=False,sum=False):
             batchedargs=[[]]*len(batcheddata)
         else:
             batchedargs= list(zip(*[x if hasattr(x,'__len__') else [x]*len(batcheddata) for x in batchedargs]))
-        
+
         if (batchedkwargs)=={}:
             batchedkwargs=[{}]*len(batcheddata)
         else:
             batchedkwargs= [{y:x[i] if hasattr(x,'__len__') else x for y,x in batchedkwargs.items()}
                             for i in range(len(batcheddata))]
-        for batch,indexdict,args,kwargs in zip(batcheddata,batchedindexed,batchedargs,batchedkwargs):
+        for batch_idx, (batch,indexdict,args,kwargs) in enumerate(zip(batcheddata,batchedindexed,batchedargs,batchedkwargs)):
 
             def funpacked (lc,pars,kwargs,*args):
                 lc= dtype.repack(lc)
@@ -153,21 +187,45 @@ def batchedmodelfunctions(function,batcheddata, dtype,flatten=False,sum=False):
             #The batched data has prenoted which arguments are to be mapped over; otherwise need to attempt to determine it programatically
 #             try:
             inaxes= [(0 if (x in dtype.__ismapped__) else None) for x in dtype.__slots__],newpars.mappingaxes,*walkargumenttree(newargs,targetsize)
-            mapped=jax.vmap(  funpacked,in_axes= 
-                inaxes
-                        )(
-                batch,list(parsvmapped),*newargs
-            )
+
+            # Wrap vmap with optional gradient checkpointing to reduce memory
+            vmap_fn = jax.vmap(funpacked, in_axes=inaxes)
+            if _USE_GRADIENT_CHECKPOINT:
+                vmap_fn = jax.checkpoint(vmap_fn)
+
+            # Multi-GPU: place batch data on assigned device
+            if n_devices > 1:
+                device = devices[batch_idx % n_devices]
+                # Only move JAX-compatible arrays to device; skip strings/objects
+                def _safe_device_put(x, dev):
+                    if isinstance(x, (list, tuple)):
+                        return type(x)(_safe_device_put(v, dev) for v in x)
+                    elif hasattr(x, 'dtype') and x.dtype.kind in ('f', 'i', 'u', 'b', 'c'):
+                        return jax.device_put(x, dev)
+                    else:
+                        return x
+                batch_on_device = _safe_device_put(batch, device)
+                pars_on_device = _safe_device_put(list(parsvmapped), device)
+                args_on_device = _safe_device_put(newargs, device)
+                mapped = vmap_fn(
+                    batch_on_device, pars_on_device, *args_on_device
+                )
+                # Gather result back to first device
+                mapped = jax.device_put(mapped, devices[0])
+            else:
+                mapped = vmap_fn(
+                    batch,list(parsvmapped),*newargs
+                )
 #             except Exception as e:
 #                 print(e)
 #                 import pdb;pdb.set_trace()
             if flatten: mapped=mapped.flatten()
-            if sum: 
+            if sum:
                 result+=mapped.sum()
             else:
                 result+=[mapped ]
         if flatten:
             return jnp.concatenate(result)
-        else: 
+        else:
             return result
     return vectorized

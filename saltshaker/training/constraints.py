@@ -7,7 +7,8 @@ from jax import lax
 from jax.experimental import sparse 
 from saltshaker.util.jaxoptions import jaxoptions
 
-from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
+from scipy.interpolate import splprep,splev,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
+from saltshaker.util.jax_bspline import jax_bisplev as bisplev
 from scipy import stats
 
 from functools import partial,reduce
@@ -41,11 +42,14 @@ class SALTconstraints:
         self.use_secondary_constraint_names= [x.strip() for x in self.secondary_constraint_names if len(x.strip())>0]
         
         intmult = (self.wave[1]-self.wave[0])*self.fluxfactor['default']['B']
-        fluxDeriv= np.zeros(self.im0.size)
-        for i in range(self.im0.size):
-            derivInterp = bisplev(np.array([0]),self.wave,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
-            fluxDeriv[i] = np.sum( self.kcordict['default']['Bpbspl'] * derivInterp)*intmult 
-        
+        n_bs = getattr(self, 'n_bspline_coeffs', self.im0.size)
+        from saltshaker.util.jax_bspline import compute_derivInterp_spec_fast
+        # Evaluate all basis functions at phase=0 in one call
+        derivInterp_all = compute_derivInterp_spec_fast(
+            0.0, self.wave, self.phaseknotloc, self.waveknotloc, self.bsorder, n_bs)
+        # derivInterp_all is (n_wave, n_bs); integrate against passband
+        fluxDeriv = np.sum(self.kcordict['default']['Bpbspl'][:, np.newaxis] * derivInterp_all, axis=0) * intmult
+
         self.__maximumlightpcderiv__=sparse.BCOO.fromdense(fluxDeriv)
 
     @partial(jaxoptions,static_argnums=[0,2],static_argnames=['usesecondary'],jitdefault=True)
@@ -90,6 +94,10 @@ class SALTconstraints:
     @constraint
     def fixbbandfluxes(self,guess):
         #set M0 flux to fiducial standard, and the other components to 0 B-band flux
+        if getattr(self, 'surface_type', 'bspline') == 'tt':
+            # TT params can't be directly rescaled as B-spline coefficients.
+            # Skip this constraint — the priors handle the normalization.
+            return guess
 
         bstdflux=(10**((self.m0guess-27.5)/-2.5) )
         bflux= self.__maximumlightpcderiv__ @ guess[self.im0]
@@ -108,10 +116,14 @@ class SALTconstraints:
     
     @constraint
     def fixinitialflux(self,guess):
+        if getattr(self, 'surface_type', 'bspline') == 'tt':
+            return guess
         return guess.at[self.icomponents[:,:(self.waveknotloc.size-self.bsorder) ]].set(0)
-        
+
     @constraint
     def fixinitialderivative(self,guess):
+        if getattr(self, 'surface_type', 'bspline') == 'tt':
+            return guess
         numwavepars=(self.waveknotloc.size-self.bsorder)
         return guess.at[self.icomponents[:,numwavepars:2*numwavepars ]].set(0)
     
@@ -156,6 +168,11 @@ class SALTconstraints:
             
     def onedfinaldefinitions(self,X,components):
         """Ensures that the definitions of M1,M0,x0,x1 are satisfied"""
+        if getattr(self, 'surface_type', 'bspline') == 'tt':
+            # TT params can't be directly rescaled as B-spline coefficients.
+            # Return unmodified — the TT decomposition preserves the
+            # relative structure; absolute normalization is handled by x0.
+            return X
         X=X.copy()
         int1d = interp1d(self.phase,components[0],axis=0,assume_sorted=True)
         m0Bflux = np.sum(self.kcordict['default']['Bpbspl']*int1d([0]), axis=1)*\

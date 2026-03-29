@@ -22,7 +22,8 @@ from scipy.optimize import minimize, least_squares
 from scipy.stats import norm
 from scipy.ndimage import gaussian_filter1d
 from scipy.special import factorial
-from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
+from scipy.interpolate import splprep,splev,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
+from saltshaker.util.jax_bspline import jax_bisplev as bisplev
 from scipy.integrate import trapezoid as trapz
 from scipy import linalg
 from scipy import sparse as scisparse
@@ -165,7 +166,15 @@ class SALTResids:
             raise NotImplementedError('Varying number of spectral recalibration parameters unimplemented in jax-compiled code')
         # pre-set some indices
         self.set_param_indices()
-        
+
+        # TT surface setup (only when surface_type='tt')
+        # Strategy: TT stores fewer parameters in the flat vector, but all
+        # B-spline basis evaluation uses the expanded coefficient matrix.
+        # The optimizer updates TT parameters; we convert to/from B-spline
+        # coefficients at the boundary.
+        if getattr(self, 'surface_type', 'bspline') == 'tt':
+            self._setup_tt_surfaces()
+
         # set some phase/wavelength arrays
         self.phase = np.linspace(self.phaserange[0],self.phaserange[1],
                                  int((self.phaserange[1]-self.phaserange[0])/self.phaseinterpres)+1,True)
@@ -280,30 +289,68 @@ class SALTResids:
         self.phaseRegularizationPoints=(self.phaseRegularizationBins[1:]+self.phaseRegularizationBins[:-1])/2
         self.waveRegularizationPoints=(self.waveRegularizationBins[1:]+self.waveRegularizationBins[:-1])/2
 
+        from saltshaker.util.jax_bspline import (
+            _bspline_basis_1d_all, compute_derivInterp_fast,
+            _bspline_basis_deriv_1d_all)
 
-        basisfunctions=[bisplev(
-                self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i*(self.waveBins[0].size),self.bsorder,self.bsorder)) for i in range(self.phaseBins[0].size) ]
-        self.phaseBinCenters=np.array(
+        if getattr(self, 'surface_type', 'bspline') == 'tt':
+            # TT surfaces: bin centers are midpoints of knot intervals
+            self.phaseBinCenters = 0.5 * (self.phaseBins[0] + self.phaseBins[1])
+            self.waveBinCenters = 0.5 * (self.waveBins[0] + self.waveBins[1])
+        else:
+            # Compute bin centers using fast tensor-product basis (no bisplev)
+            B_phase = _bspline_basis_1d_all(self.phase, self.phaseknotloc, self.bsorder)
+            B_wave = _bspline_basis_1d_all(self.wave, self.waveknotloc, self.bsorder)
+            n_wave_basis = self.waveBins[0].size
+            # Phase bin centers: for each phase basis function i, evaluate the
+            # 2D basis with coeffs = delta(i * n_wave_basis) and compute
+            # weighted mean of phase. Equivalent to using the 1D phase basis.
+            self.phaseBinCenters = np.array([
+                np.sum(self.phase * B_phase[:, i]) / np.sum(B_phase[:, i])
+                if np.sum(B_phase[:, i]) > 0 else 0.5 * (self.phaseBins[0][i] + self.phaseBins[1][i])
+                for i in range(self.phaseBins[0].size)])
+            # Wave bin centers: same logic for wavelength
+            self.waveBinCenters = np.array([
+                np.sum(self.wave * B_wave[:, i]) / np.sum(B_wave[:, i])
+                if np.sum(B_wave[:, i]) > 0 else 0.5 * (self.waveBins[0][i] + self.waveBins[1][i])
+                for i in range(self.waveBins[0].size)])
 
-            [(self.phase[:,np.newaxis]* x).sum()/x.sum() for x in basisfunctions ])
-        basisfunctions=[bisplev(
-                self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder)) for i in range(self.waveBins[0].size) ]
 
-        self.waveBinCenters=np.array(
-            [(self.wave[np.newaxis,:]*  x ).sum()/x.sum() for x in basisfunctions])
 
-        
-        
         #Find the basis functions evaluated at the centers of the basis functions for use in the regularization derivatives
-        regularizationDerivs=[np.zeros((self.phaseRegularizationPoints.size*self.waveRegularizationPoints.size,self.im0.size)) for i in range(4)]
-        for i in range(len(self.im0)):
-            for j,derivs in enumerate([(0,0),(1,0),(0,1),(1,1)]):
-                if self.bsorder == 0: continue
-                regularizationDerivs[j][:,i]=bisplev(
-                    self.phaseRegularizationPoints,self.waveRegularizationPoints,
-                    (self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder),
-                    dx=derivs[0],dy=derivs[1]).flatten()
-        regularizationDerivs=map(sparse.BCOO.fromdense,regularizationDerivs)
+        if getattr(self, 'surface_type', 'bspline') == 'tt':
+            # TT surfaces: regularization is applied directly to TT cores, not via
+            # B-spline basis derivatives. Create zero placeholders to keep downstream
+            # code happy (regularization contribution will be zero).
+            n_reg = self.phaseRegularizationPoints.size * self.waveRegularizationPoints.size
+            regularizationDerivs = [sparse.BCOO.fromdense(
+                np.zeros((n_reg, self.im0.size))) for _ in range(4)]
+        else:
+            n_bs = self.im0.size
+            # Compute 1D basis matrices and their derivatives at regularization points
+            B_p = _bspline_basis_1d_all(self.phaseRegularizationPoints, self.phaseknotloc, self.bsorder)
+            B_w = _bspline_basis_1d_all(self.waveRegularizationPoints, self.waveknotloc, self.bsorder)
+            dB_p = _bspline_basis_deriv_1d_all(self.phaseRegularizationPoints, self.phaseknotloc, self.bsorder)
+            dB_w = _bspline_basis_deriv_1d_all(self.waveRegularizationPoints, self.waveknotloc, self.bsorder)
+
+            n_p = B_p.shape[1]
+            n_w = B_w.shape[1]
+            regularizationDerivs = []
+            for (dx, dy), Bp, Bw in [
+                ((0, 0), B_p, B_w),
+                ((1, 0), dB_p, B_w),
+                ((0, 1), B_p, dB_w),
+                ((1, 1), dB_p, dB_w),
+            ]:
+                if self.bsorder == 0:
+                    regularizationDerivs.append(sparse.BCOO.fromdense(
+                        np.zeros((self.phaseRegularizationPoints.size * self.waveRegularizationPoints.size, n_bs))))
+                    continue
+                # Tensor product: (n_phase_reg, n_wave_reg, n_p, n_w) -> (n_reg, n_bs)
+                deriv = (Bp[:, np.newaxis, :, np.newaxis] *
+                         Bw[np.newaxis, :, np.newaxis, :]).reshape(
+                    self.phaseRegularizationPoints.size * self.waveRegularizationPoints.size, n_p * n_w)
+                regularizationDerivs.append(sparse.BCOO.fromdense(deriv))
         self.componentderiv,self.dcompdphasederiv,self.dcompdwavederiv,self.ddcompdwavedphase =regularizationDerivs
 
         #Color law initialization
@@ -378,9 +425,30 @@ class SALTResids:
             iterable=list(self.datadict.items())
             #Shuffle it so that tqdm's estimates are hopefully more accurate
             random.shuffle(iterable)
-            if sys.stdout.isatty() or in_ipynb:
-                iterable=tqdm(iterable,smoothing=.1)
-            self.datadict={snid: sn if isinstance(sn,SALTfitcacheSN) else SALTfitcacheSN(sn,self,self.kcordict,photpadding,specpadding)  for snid,sn in iterable}
+
+            n_workers = getattr(getattr(self, 'options', None), 'n_precompute_workers', 1)
+            if n_workers > 1:
+                log.info(f'Using {n_workers} threads for parallel precomputation')
+                from concurrent.futures import ThreadPoolExecutor, as_completed
+                def _precompute_sn(snid_sn):
+                    snid, sn = snid_sn
+                    if isinstance(sn, SALTfitcacheSN):
+                        return snid, sn
+                    return snid, SALTfitcacheSN(sn, self, self.kcordict, photpadding, specpadding)
+                results = {}
+                with ThreadPoolExecutor(max_workers=n_workers) as executor:
+                    futures = {executor.submit(_precompute_sn, item): item[0] for item in iterable}
+                    completed = as_completed(futures)
+                    if sys.stdout.isatty() or in_ipynb:
+                        completed = tqdm(completed, total=len(futures), smoothing=.1)
+                    for future in completed:
+                        snid, sn = future.result()
+                        results[snid] = sn
+                self.datadict = results
+            else:
+                if sys.stdout.isatty() or in_ipynb:
+                    iterable=tqdm(iterable,smoothing=.1)
+                self.datadict={snid: sn if isinstance(sn,SALTfitcacheSN) else SALTfitcacheSN(sn,self,self.kcordict,photpadding,specpadding)  for snid,sn in iterable}
             log.info('Batching data')
             self.allphotdata = sum([[x.photdata[lc] for lc in x.photdata ]for x in self.datadict.values() ],[])
             self.allspecdata = sum([[x.specdata[key] for key in x.specdata ]for x in self.datadict.values() ],[])
@@ -552,7 +620,16 @@ class SALTResids:
         successful=successful&wrapaddingargument(config,'modelparams','error_snake_wave_binsize',  type=float,
                                                 help='number of angstroms over which to compute scaling of error model (default=%(default)s)')
         successful=successful&wrapaddingargument(config,'modelparams','use_snpca_knots',         type=boolean_string,
-                                                help='if set, define model on SNPCA knots (default=%(default)s)')               
+                                                help='if set, define model on SNPCA knots (default=%(default)s)')
+
+        successful=successful&wrapaddingargument(config,'modelparams','surface_type',  type=str, default='bspline',
+                                                help='surface parameterization: bspline (default) or tt (Tensor Train) (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','tt_rank',  type=int, default=5,
+                                                help='TT decomposition rank when surface_type=tt (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','tt_mass_bins',  type=int, default=0,
+                                                help='number of host mass grid points for TT mass dimension; 0=no mass axis (default=%(default)s)')
+        successful=successful&wrapaddingargument(config,'modelparams','tt_mass_range',  nargs=2, type=float,
+                                                help='log10(M*/Msun) range for TT mass axis (default=%(default)s)')
 
         successful=successful&wrapaddingargument(config,'modelparams','constraint_names','constraints',  default='', nargs='*',      type=str,
                                                 help='constraints enforced on the model, see constraints.py (default=%(default)s)')               
@@ -602,12 +679,17 @@ class SALTResids:
         self.im1 = np.where(self.parlist == 'm1')[0]
         self.imhost = np.where(self.parlist == 'mhost')[0]
         
-        wavemin = []
-        for i in range(self.im0.size):
-            wavemin += [self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),
-                                          i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]][0]]
-        self.im0new = np.where(self.parlist == 'm0')[0][np.array(wavemin) > 8500]
-        self.im1new = np.where(self.parlist == 'm1')[0][np.array(wavemin) > 8500]
+        if getattr(self, 'surface_type', 'bspline') == 'tt':
+            # TT params don't map 1:1 to wavelength bins
+            self.im0new = np.array([], dtype=int)
+            self.im1new = np.array([], dtype=int)
+        else:
+            wavemin = []
+            for i in range(self.im0.size):
+                wavemin += [self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),
+                                              i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]][0]]
+            self.im0new = np.where(self.parlist == 'm0')[0][np.array(wavemin) > 8500]
+            self.im1new = np.where(self.parlist == 'm1')[0][np.array(wavemin) > 8500]
         
         self.ix0 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x0') or si.startswith('specx0')],dtype=int)
         self.ix1 = np.array([i for i, si in enumerate(self.parlist) if si.startswith('x1')],dtype=int)
@@ -782,6 +864,8 @@ class SALTResids:
     def estimateparametererrorsfromhessian(self,X,hessian=None):
         """Approximate Hessian by jacobian times own transpose to determine uncertainties in flux surfaces"""
         log.info("determining M0/M1 errors by approximated Hessian")
+        import gc; gc.collect()
+        jax.clear_caches()
 
         if hessian is None:
             varyingParams=reduce(lambda x,y:  x | np.isin(np.arange(self.npar), y),[
@@ -791,10 +875,11 @@ class SALTResids:
             X=jnp.array(X)
             lsqwrap_partial=lambda x: self.lsqwrap(X.at[varyingParams].set(x),self.calculatecachedvals(X,target='variances'),suppressregularization=True,dospecresids=self.dospec)
             jvp= wrapjvpmultipleargs(lsqwrap_partial ,[0])
+
             jac = sparsejac(lsqwrap_partial,jvp,[0], True )(X[varyingParams])
-    #         np.save(path.join(self.outputdir,'jac.npy'), jac)
 
             hessian=(jac.T @ jac ).toarray()
+            del jac
 
             maxval=np.max( np.abs(jnp.nan_to_num(hessian,nan=0,posinf=0,neginf=0)) )
             hessian=jnp.nan_to_num(hessian,nan=0,posinf=maxval,neginf=-maxval)
@@ -840,11 +925,15 @@ class SALTResids:
 
         for chunkindex in iterable:
 
-            spline_derivs = np.empty([self.phaseout.size, min(self.waveout.size-chunkindex, chunksize),self.im0.size])
-            for i in range(self.im0.size):
-                if self.bsorder == 0: continue
-                spline_derivs[:,:,i]=bisplev(self.phaseout,self.waveout[chunkindex:chunkindex+chunksize],(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
-            spline2d=scisparse.csr_matrix(spline_derivs.reshape(-1,self.im0.size))
+            n_bs = getattr(self, 'n_bspline_coeffs', self.im0.size)
+            if self.bsorder == 0:
+                spline_derivs = np.zeros([self.phaseout.size, min(self.waveout.size-chunkindex, chunksize), n_bs])
+            else:
+                from saltshaker.util.jax_bspline import compute_derivInterp_fast
+                spline_derivs = compute_derivInterp_fast(
+                    self.phaseout, self.waveout[chunkindex:chunkindex+chunksize],
+                    self.phaseknotloc, self.waveknotloc, self.bsorder, n_bs)
+            spline2d=scisparse.csr_matrix(spline_derivs.reshape(-1,n_bs))
 
             #Smooth things a bit, since this is supposed to be for broadband photometry
             if smoothingfactor>0:
@@ -878,7 +967,13 @@ class SALTResids:
         
         if parametercovariance is None:
             dataerrs,datacovs=None,None
-        else : 
+        elif getattr(self, 'surface_type', 'bspline') == 'tt':
+            # TT mode: uncertainty propagation from TT cores to flux surfaces
+            # requires the Jacobian of the TT expansion, which is not yet
+            # implemented. Skip for now — Hessian covariance is still saved.
+            log.warning("Skipping flux surface uncertainty propagation for TT mode (not yet implemented)")
+            dataerrs,datacovs=None,None
+        else :
             dataerrs,datacovs=self.computeuncertaintiesfromparametererrors( X,parametercovariance)
         
         covmodel=[]
@@ -906,16 +1001,80 @@ class SALTResids:
                               )}                              
                               for sn in self.datadict})
 
+    def _setup_tt_surfaces(self):
+        """Set up TT-specific attributes for surface evaluation.
+
+        Called during __init__ when surface_type='tt'. Computes the
+        phase/wavelength knot centers that the TT cores are defined on,
+        and stores the core shapes for each component.
+
+        Key design: pcderivsparse is still computed over the B-spline basis
+        (n_bspline_coeffs columns). In modelflux(), TT cores are expanded
+        to full B-spline coefficient vectors before multiplying by pcderivsparse.
+        JAX autodiff handles the gradient through the expansion.
+        """
+        from saltshaker.training.tt_surfaces import make_mass_knots
+
+        n_phase = self.phaseknotloc.size - self.bsorder - 1
+        n_wave = self.waveknotloc.size - self.bsorder - 1
+        rank = getattr(self, 'tt_rank', 5)
+
+        # The number of B-spline coefficients per component (used by pcderivsparse)
+        self.n_bspline_coeffs = n_phase * n_wave
+
+        # Centers of B-spline knot intervals — the grid the TT cores live on
+        self.tt_phase_centers = 0.5 * (self.phaseknotloc[:n_phase] +
+                                        self.phaseknotloc[self.bsorder + 1:
+                                                           self.bsorder + 1 + n_phase])
+        self.tt_wave_centers = 0.5 * (self.waveknotloc[:n_wave] +
+                                       self.waveknotloc[self.bsorder + 1:
+                                                         self.bsorder + 1 + n_wave])
+
+        # Mass knots (if mass dimension is enabled)
+        tt_mass_bins = getattr(self, 'tt_mass_bins', 0)
+        tt_mass_range = getattr(self, 'tt_mass_range', [7.0, 12.0])
+        if tt_mass_bins > 0:
+            self.tt_mass_knots = make_mass_knots(tt_mass_bins, tuple(tt_mass_range))
+        else:
+            self.tt_mass_knots = None
+
+        # Core sizes for each component
+        # 2D: core_phase (n_phase, r) + core_wave (r, n_wave)
+        # 3D: + core_mass (r, n_mass, r)
+        self.tt_core_sizes = []
+        for i in range(self.n_components + self.host_component):
+            sizes = {
+                'phase_shape': (n_phase, rank),
+                'wave_shape': (rank, n_wave),
+                'n_phase': n_phase,
+                'n_wave': n_wave,
+            }
+            if tt_mass_bins > 0:
+                sizes['mass_shape'] = (rank, tt_mass_bins, rank)
+            self.tt_core_sizes.append(sizes)
+
     def SALTModel(self,x,evaluatePhase=None,evaluateWave=None):
         """Returns flux surfaces of SALT model"""
         components=[]
         for i in range( self.n_components  + self.host_component):
             comppars=x[self.icomponents[i]]
-            
-            if self.bsorder != 0:
+
+            if getattr(self, 'surface_type', 'bspline') == 'tt':
+                from saltshaker.training.tt_surfaces import tt_surface_on_grid, params_to_tt_cores
+                core_phase, core_wave, core_mass = params_to_tt_cores(
+                    comppars, self.tt_core_sizes[i])
+                surface = tt_surface_on_grid(
+                    core_phase, core_wave,
+                    self.tt_phase_centers, self.tt_wave_centers,
+                    self.phase if evaluatePhase is None else evaluatePhase,
+                    self.wave if evaluateWave is None else evaluateWave,
+                    bsorder=self.bsorder)
+                components+=[surface]
+            elif self.bsorder != 0:
                 surface = bisplev(self.phase if evaluatePhase is None else evaluatePhase,
                              self.wave if evaluateWave is None else evaluateWave,
                              (self.phaseknotloc,self.waveknotloc,comppars,self.bsorder,self.bsorder))
+                components+=[surface]
             else:
                 phase = self.phase if evaluatePhase is None else evaluatePhase
                 wave = self.wave if evaluateWave is None else evaluateWave
@@ -927,8 +1086,8 @@ class SALTResids:
                 if n_repeat_wave_extra == 0: n_repeat_wave_extra = None
                 surface = np.repeat(np.repeat(comppars.reshape([self.phaseknotloc.size-1,self.waveknotloc.size-1]),n_repeat_phase,axis=0),
                                n_repeat_wave,axis=1)[:n_repeat_phase_extra,:n_repeat_wave_extra]
-            components+=[surface]
-        
+                components+=[surface]
+
         return np.array(components)
 
     def SALTModelDeriv(self,x,dx,dy,evaluatePhase=None,evaluateWave=None):

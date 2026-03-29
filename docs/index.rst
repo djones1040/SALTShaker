@@ -102,6 +102,7 @@ are given in :ref:`pipeline`.
    gettingstarted
    data
    training
+   tt_surfaces
    simulation
    pipeline
    

@@ -3,7 +3,9 @@ from saltshaker.util.query import query_yes_no
 from saltshaker.util.jaxoptions import jaxoptions
 from jax import config
 config.update("jax_enable_x64", True)
-config.update('jax_platform_name', 'cpu')
+import os
+_jax_platform = os.environ.get('SALTSHAKER_JAX_PLATFORM', 'cpu')
+config.update('jax_platform_name', _jax_platform)
 #config.update("jax_debug_nans", True)
 #config.update("jax_disable_jit", True)
 

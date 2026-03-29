@@ -10,7 +10,8 @@ from saltshaker.util.jaxoptions import jaxoptions
 
 from inspect import signature
 
-from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
+from scipy.interpolate import splprep,splev,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
+from saltshaker.util.jax_bspline import jax_bisplev as bisplev
 from sncosmo.salt2utils import SALT2ColorLaw
 from scipy.special import factorial
 import logging
@@ -111,49 +112,38 @@ class SALTPriors:
             
         self.isbounded=np.where(~np.isinf(widths))[0]
         self.parameterbounds= lower[self.isbounded],upper[self.isbounded],widths[self.isbounded]
-     
-        m0Bderivjac= np.zeros(self.im0.size)
+
+        # TT support: store whether we need to expand TT params to B-spline space
+        self._use_tt = getattr(self, 'surface_type', 'bspline') == 'tt'
+        if self._use_tt:
+            self._tt_core_sizes = getattr(self, 'tt_core_sizes', None)
+
+        from saltshaker.util.jax_bspline import (
+            compute_derivInterp_spec_fast, compute_derivInterp_spec_fast_dx,
+            compute_derivInterp_fast)
+
+        n_bs = getattr(self, 'n_bspline_coeffs', self.im0.size)
         passbandColorExp = self.kcordict['default']['Bpbspl']
         intmult = (self.wave[1]-self.wave[0])*self.fluxfactor['default']['B']
-        for i in range(self.im0.size):
-            waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
-            phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
-            #Check if this filter is inside values affected by changes in knot i
-            minlam=np.min(self.kcordict['default']['Bwave'][self.kcordict['default']['Btp'] > 0.01])
-            maxlam=np.max(self.kcordict['default']['Bwave'][self.kcordict['default']['Btp'] > 0.01])
 
-            if waverange[0] > maxlam or waverange[1] < minlam:
-                pass
-            if (0>=phaserange[0] ) & (0<=phaserange[1]):
-                #Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
-                #Integrate only over wavelengths within the relevant range
-                inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
-                derivInterp = bisplev(np.array([0]),self.wave[inbounds],(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder),dx=1) 
-                m0Bderivjac[i] = np.sum( passbandColorExp[inbounds] * derivInterp)*intmult 
+        # Peak prior derivative (phase derivative dx=1 at phase=0)
+        derivInterp_dx = compute_derivInterp_spec_fast_dx(
+            0.0, self.wave, self.phaseknotloc, self.waveknotloc, self.bsorder, n_bs, dx=1)
+        m0Bderivjac = np.sum(passbandColorExp[:, np.newaxis] * derivInterp_dx, axis=0) * intmult
         self.__peakpriorderiv__=sparse.BCOO.fromdense(m0Bderivjac)
-   
-        fluxDeriv= np.zeros(self.im0.size)
-        for i in range(self.im0.size):
-            waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
-            phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
-            #Check if this filter is inside values affected by changes in knot i
-            minlam=np.min(self.kcordict['default']['Bwave'][self.kcordict['default']['Btp'] > 0.01])
-            maxlam=np.max(self.kcordict['default']['Bwave'][self.kcordict['default']['Btp'] > 0.01])
-            if waverange[0] > maxlam or waverange[1] < minlam:
-                pass
-            if (0>=phaserange[0] ) & (0<=phaserange[1]):
-                #Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
-                #Integrate only over wavelengths within the relevant range
-                inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
-                derivInterp = bisplev(np.array([0]),self.wave[inbounds],(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
-                fluxDeriv[i] = np.sum( passbandColorExp[inbounds] * derivInterp)*intmult 
+
+        # Maximum light derivative (no phase derivative, at phase=0)
+        derivInterp_all = compute_derivInterp_spec_fast(
+            0.0, self.wave, self.phaseknotloc, self.waveknotloc, self.bsorder, n_bs)
+        fluxDeriv = np.sum(passbandColorExp[:, np.newaxis] * derivInterp_all, axis=0) * intmult
         self.__maximumlightpcderiv__=sparse.BCOO.fromdense(fluxDeriv)
 
-
+        # Initial phase derivative (2 phase points, thinned wavelength grid)
         thinning=4
-        jacobian=np.zeros((2*self.wave[::thinning].size,self.im0.size))
-        for i in range(self.im0.size):
-            jacobian[:,i] = bisplev(self.phase[:2],self.wave[::thinning],(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder)).flatten()
+        jacobian = compute_derivInterp_fast(
+            self.phase[:2], self.wave[::thinning],
+            self.phaseknotloc, self.waveknotloc, self.bsorder, n_bs)
+        jacobian = jacobian.reshape(2 * self.wave[::thinning].size, n_bs)
         self.__initialphasepcderiv__=sparse.BCOO.fromdense(jacobian)
         
         
@@ -251,10 +241,32 @@ class SALTPriors:
         if c.size!=xhost.size: return np.array([])
         return robustcorrelation(xhost,c)/width
 
+    def _expand_m0(self, x):
+        """Get M0 coefficients in B-spline space (expanding from TT if needed)."""
+        params = x[self.im0]
+        if self._use_tt and self._tt_core_sizes is not None:
+            from jax import numpy as jnp
+            from saltshaker.training.tt_surfaces import jax_params_to_tt_cores
+            sizes = self._tt_core_sizes[0]
+            core_p, core_w, _ = jax_params_to_tt_cores(params, sizes)
+            return (core_p @ core_w).ravel()
+        return params
+
+    def _expand_m1(self, x):
+        """Get M1 coefficients in B-spline space (expanding from TT if needed)."""
+        params = x[self.im1]
+        if self._use_tt and self._tt_core_sizes is not None:
+            from jax import numpy as jnp
+            from saltshaker.training.tt_surfaces import jax_params_to_tt_cores
+            sizes = self._tt_core_sizes[1] if len(self._tt_core_sizes) > 1 else self._tt_core_sizes[0]
+            core_p, core_w, _ = jax_params_to_tt_cores(params, sizes)
+            return (core_p @ core_w).ravel()
+        return params
+
     @prior
     def peakprior(self,width,x):
         """ At t=0, minimize time derivative of B-band lightcurve"""
-        return self.__peakpriorderiv__ @ x[self.im0] /(self.bstdflux*width)
+        return self.__peakpriorderiv__ @ self._expand_m0(x) /(self.bstdflux*width)
 
     @nongaussianprior
     def galacticcolorprior(self,width,x):
@@ -266,16 +278,21 @@ class SALTPriors:
     @prior
     def m0prior(self,width,x):
         """Prior on the magnitude of the M0 component at t=0"""
-        return (self.__maximumlightpcderiv__ @ x[self.im0] -self.bstdflux)/ (self.bstdflux* width)
+        return (self.__maximumlightpcderiv__ @ self._expand_m0(x) -self.bstdflux)/ (self.bstdflux* width)
 
     @prior
     def m1prior(self,width,x):
         """M1 should have zero flux at t=0 in the B band"""        
-        return self.__maximumlightpcderiv__ @ x[self.im1] / (self.bstdflux* width)
+        return self.__maximumlightpcderiv__ @ self._expand_m1(x) / (self.bstdflux* width)
 
     @prior
     def hostpeakprior(self,width,x):
         """host component should have zero flux at t=0 in the B band.  Not sure if needed"""
+        if self._use_tt and self._tt_core_sizes is not None:
+            from saltshaker.training.tt_surfaces import jax_params_to_tt_cores
+            sizes = self._tt_core_sizes[-1]
+            core_p, core_w, _ = jax_params_to_tt_cores(x[self.imhost], sizes)
+            return self.__maximumlightpcderiv__ @ (core_p @ core_w).ravel() / (self.bstdflux* width)
         return self.__maximumlightpcderiv__ @ x[self.imhost] / (self.bstdflux* width)
 
     
@@ -328,12 +345,12 @@ class SALTPriors:
     @prior
     def m0endalllam(self,width,x):
         """Prior such that at early times there is no flux"""
-        return self.__initialphasepcderiv__ @ x[self.im0]/width
+        return self.__initialphasepcderiv__ @ self._expand_m0(x)/width
 
     @prior
     def m1endalllam(self,width,x):
         """Prior such that at early times there is no flux"""
-        return self.__initialphasepcderiv__ @ x[self.im1]/width
+        return self.__initialphasepcderiv__ @ self._expand_m1(x)/width
                     
         
         
