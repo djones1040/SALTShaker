@@ -1,6 +1,6 @@
 import os
 import glob
-from scipy.interpolate import bisplev, bisplrep
+from saltshaker.util.jax_bspline import jax_bisplev as bisplev, jax_bisplrep as bisplrep
 from scipy.interpolate import interp1d
 import numpy as np
 from astropy.io import ascii

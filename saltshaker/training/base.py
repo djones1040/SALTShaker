@@ -97,6 +97,8 @@ class TrainSALTBase:
                                                         help="""if set, look for spectra in the snlist files (default=%(default)s)""")
                 successful=successful&wrapaddingargument(config,'iodata','maxsn',  type=nonetype_or_int,
                                                         help="""sets maximum number of SNe to fit for debugging (default=%(default)s)""")
+                successful=successful&wrapaddingargument(config,'iodata','n_precompute_workers',  type=int,
+                                                        help="""number of threads for parallel filter precomputation (1=serial, default=%(default)s)""",default=1)
                 successful=successful&wrapaddingargument(config,'iodata','keeponlyspec',         type=boolean_string,
                                                         help="""if set, only train on SNe with spectra (default=%(default)s)""")
                 successful=successful&wrapaddingargument(config,'iodata','filter_mass_tolerance',  type=float,

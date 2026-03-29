@@ -4,8 +4,10 @@ from saltshaker.util.readutils import SALTtrainingSN,SALTtraininglightcurve,SALT
 from sncosmo.salt2utils import SALT2ColorLaw
 
 from scipy.special import factorial
-from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
+from scipy.interpolate import splprep,splev,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
+from saltshaker.util.jax_bspline import jax_bisplev as bisplev
 from scipy import sparse as scisparse
+from saltshaker.util.jax_bspline import compute_derivInterp_fast, compute_derivInterp_spec_fast
 import numpy as np
 
 from jax import numpy as jnp
@@ -296,9 +298,9 @@ class modeledtraininglightcurve(modeledtrainingdata):
 
         isrelevant=inphase&inwave
         #Array output indices match time along 0th axis, wavelength along 1st axis
-        derivInterp=np.zeros((clippedphase.size,waveidxs.sum(),n_bspline))
-        for i in np.where(isrelevant)[0]:
-                derivInterp[:,:,i] = bisplev(clippedphase ,wave,(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(n_bspline)==i, residsobj.bsorder,residsobj.bsorder))
+        derivInterp = compute_derivInterp_fast(
+            clippedphase, wave, residsobj.phaseknotloc, residsobj.waveknotloc,
+            residsobj.bsorder, n_bspline, isrelevant=isrelevant)
 
         splinebasisconvolutions=[]
         #Redden passband transmission by MW extinction, multiply by scalar factors
@@ -521,9 +523,10 @@ class modeledtrainingspectrum(modeledtrainingdata):
 
         isrelevant=inphase&inwave
 
-        derivInterp=np.zeros((spectrum.wavelength.size,n_bspline))
-        for i in np.where(isrelevant)[0]:
-                derivInterp[:,i] = bisplev(spectrum.phase,self.restwavelength,(residsobj.phaseknotloc,residsobj.waveknotloc,np.arange(n_bspline)==i, residsobj.bsorder,residsobj.bsorder))
+        derivInterp = compute_derivInterp_spec_fast(
+            spectrum.phase, self.restwavelength, residsobj.phaseknotloc,
+            residsobj.waveknotloc, residsobj.bsorder, n_bspline,
+            isrelevant=isrelevant)
         derivInterp=derivInterp*(_SCALE_FACTOR/(1+z)*mwextcurve)[:,np.newaxis]
         self.pcderivsparse=sparse.BCOO.fromdense(np.concatenate((derivInterp,np.zeros((padding,n_bspline)))))        
 

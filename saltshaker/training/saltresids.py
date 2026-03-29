@@ -22,7 +22,8 @@ from scipy.optimize import minimize, least_squares
 from scipy.stats import norm
 from scipy.ndimage import gaussian_filter1d
 from scipy.special import factorial
-from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
+from scipy.interpolate import splprep,splev,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
+from saltshaker.util.jax_bspline import jax_bisplev as bisplev
 from scipy.integrate import trapezoid as trapz
 from scipy import linalg
 from scipy import sparse as scisparse
@@ -288,24 +289,34 @@ class SALTResids:
         self.phaseRegularizationPoints=(self.phaseRegularizationBins[1:]+self.phaseRegularizationBins[:-1])/2
         self.waveRegularizationPoints=(self.waveRegularizationBins[1:]+self.waveRegularizationBins[:-1])/2
 
+        from saltshaker.util.jax_bspline import (
+            _bspline_basis_1d_all, compute_derivInterp_fast,
+            _bspline_basis_deriv_1d_all)
+
         if getattr(self, 'surface_type', 'bspline') == 'tt':
             # TT surfaces: bin centers are midpoints of knot intervals
             self.phaseBinCenters = 0.5 * (self.phaseBins[0] + self.phaseBins[1])
             self.waveBinCenters = 0.5 * (self.waveBins[0] + self.waveBins[1])
         else:
-            basisfunctions=[bisplev(
-                    self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i*(self.waveBins[0].size),self.bsorder,self.bsorder)) for i in range(self.phaseBins[0].size) ]
-            self.phaseBinCenters=np.array(
+            # Compute bin centers using fast tensor-product basis (no bisplev)
+            B_phase = _bspline_basis_1d_all(self.phase, self.phaseknotloc, self.bsorder)
+            B_wave = _bspline_basis_1d_all(self.wave, self.waveknotloc, self.bsorder)
+            n_wave_basis = self.waveBins[0].size
+            # Phase bin centers: for each phase basis function i, evaluate the
+            # 2D basis with coeffs = delta(i * n_wave_basis) and compute
+            # weighted mean of phase. Equivalent to using the 1D phase basis.
+            self.phaseBinCenters = np.array([
+                np.sum(self.phase * B_phase[:, i]) / np.sum(B_phase[:, i])
+                if np.sum(B_phase[:, i]) > 0 else 0.5 * (self.phaseBins[0][i] + self.phaseBins[1][i])
+                for i in range(self.phaseBins[0].size)])
+            # Wave bin centers: same logic for wavelength
+            self.waveBinCenters = np.array([
+                np.sum(self.wave * B_wave[:, i]) / np.sum(B_wave[:, i])
+                if np.sum(B_wave[:, i]) > 0 else 0.5 * (self.waveBins[0][i] + self.waveBins[1][i])
+                for i in range(self.waveBins[0].size)])
 
-                [(self.phase[:,np.newaxis]* x).sum()/x.sum() for x in basisfunctions ])
-            basisfunctions=[bisplev(
-                    self.phase,self.wave,(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder)) for i in range(self.waveBins[0].size) ]
 
-            self.waveBinCenters=np.array(
-                [(self.wave[np.newaxis,:]*  x ).sum()/x.sum() for x in basisfunctions])
 
-        
-        
         #Find the basis functions evaluated at the centers of the basis functions for use in the regularization derivatives
         if getattr(self, 'surface_type', 'bspline') == 'tt':
             # TT surfaces: regularization is applied directly to TT cores, not via
@@ -315,15 +326,31 @@ class SALTResids:
             regularizationDerivs = [sparse.BCOO.fromdense(
                 np.zeros((n_reg, self.im0.size))) for _ in range(4)]
         else:
-            regularizationDerivs=[np.zeros((self.phaseRegularizationPoints.size*self.waveRegularizationPoints.size,self.im0.size)) for i in range(4)]
-            for i in range(len(self.im0)):
-                for j,derivs in enumerate([(0,0),(1,0),(0,1),(1,1)]):
-                    if self.bsorder == 0: continue
-                    regularizationDerivs[j][:,i]=bisplev(
-                        self.phaseRegularizationPoints,self.waveRegularizationPoints,
-                        (self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder),
-                        dx=derivs[0],dy=derivs[1]).flatten()
-            regularizationDerivs=list(map(sparse.BCOO.fromdense,regularizationDerivs))
+            n_bs = self.im0.size
+            # Compute 1D basis matrices and their derivatives at regularization points
+            B_p = _bspline_basis_1d_all(self.phaseRegularizationPoints, self.phaseknotloc, self.bsorder)
+            B_w = _bspline_basis_1d_all(self.waveRegularizationPoints, self.waveknotloc, self.bsorder)
+            dB_p = _bspline_basis_deriv_1d_all(self.phaseRegularizationPoints, self.phaseknotloc, self.bsorder)
+            dB_w = _bspline_basis_deriv_1d_all(self.waveRegularizationPoints, self.waveknotloc, self.bsorder)
+
+            n_p = B_p.shape[1]
+            n_w = B_w.shape[1]
+            regularizationDerivs = []
+            for (dx, dy), Bp, Bw in [
+                ((0, 0), B_p, B_w),
+                ((1, 0), dB_p, B_w),
+                ((0, 1), B_p, dB_w),
+                ((1, 1), dB_p, dB_w),
+            ]:
+                if self.bsorder == 0:
+                    regularizationDerivs.append(sparse.BCOO.fromdense(
+                        np.zeros((self.phaseRegularizationPoints.size * self.waveRegularizationPoints.size, n_bs))))
+                    continue
+                # Tensor product: (n_phase_reg, n_wave_reg, n_p, n_w) -> (n_reg, n_bs)
+                deriv = (Bp[:, np.newaxis, :, np.newaxis] *
+                         Bw[np.newaxis, :, np.newaxis, :]).reshape(
+                    self.phaseRegularizationPoints.size * self.waveRegularizationPoints.size, n_p * n_w)
+                regularizationDerivs.append(sparse.BCOO.fromdense(deriv))
         self.componentderiv,self.dcompdphasederiv,self.dcompdwavederiv,self.ddcompdwavedphase =regularizationDerivs
 
         #Color law initialization
@@ -398,9 +425,30 @@ class SALTResids:
             iterable=list(self.datadict.items())
             #Shuffle it so that tqdm's estimates are hopefully more accurate
             random.shuffle(iterable)
-            if sys.stdout.isatty() or in_ipynb:
-                iterable=tqdm(iterable,smoothing=.1)
-            self.datadict={snid: sn if isinstance(sn,SALTfitcacheSN) else SALTfitcacheSN(sn,self,self.kcordict,photpadding,specpadding)  for snid,sn in iterable}
+
+            n_workers = getattr(getattr(self, 'options', None), 'n_precompute_workers', 1)
+            if n_workers > 1:
+                log.info(f'Using {n_workers} threads for parallel precomputation')
+                from concurrent.futures import ThreadPoolExecutor, as_completed
+                def _precompute_sn(snid_sn):
+                    snid, sn = snid_sn
+                    if isinstance(sn, SALTfitcacheSN):
+                        return snid, sn
+                    return snid, SALTfitcacheSN(sn, self, self.kcordict, photpadding, specpadding)
+                results = {}
+                with ThreadPoolExecutor(max_workers=n_workers) as executor:
+                    futures = {executor.submit(_precompute_sn, item): item[0] for item in iterable}
+                    completed = as_completed(futures)
+                    if sys.stdout.isatty() or in_ipynb:
+                        completed = tqdm(completed, total=len(futures), smoothing=.1)
+                    for future in completed:
+                        snid, sn = future.result()
+                        results[snid] = sn
+                self.datadict = results
+            else:
+                if sys.stdout.isatty() or in_ipynb:
+                    iterable=tqdm(iterable,smoothing=.1)
+                self.datadict={snid: sn if isinstance(sn,SALTfitcacheSN) else SALTfitcacheSN(sn,self,self.kcordict,photpadding,specpadding)  for snid,sn in iterable}
             log.info('Batching data')
             self.allphotdata = sum([[x.photdata[lc] for lc in x.photdata ]for x in self.datadict.values() ],[])
             self.allspecdata = sum([[x.specdata[key] for key in x.specdata ]for x in self.datadict.values() ],[])
@@ -878,10 +926,13 @@ class SALTResids:
         for chunkindex in iterable:
 
             n_bs = getattr(self, 'n_bspline_coeffs', self.im0.size)
-            spline_derivs = np.empty([self.phaseout.size, min(self.waveout.size-chunkindex, chunksize), n_bs])
-            for i in range(n_bs):
-                if self.bsorder == 0: continue
-                spline_derivs[:,:,i]=bisplev(self.phaseout,self.waveout[chunkindex:chunkindex+chunksize],(self.phaseknotloc,self.waveknotloc,np.arange(n_bs)==i,self.bsorder,self.bsorder))
+            if self.bsorder == 0:
+                spline_derivs = np.zeros([self.phaseout.size, min(self.waveout.size-chunkindex, chunksize), n_bs])
+            else:
+                from saltshaker.util.jax_bspline import compute_derivInterp_fast
+                spline_derivs = compute_derivInterp_fast(
+                    self.phaseout, self.waveout[chunkindex:chunkindex+chunksize],
+                    self.phaseknotloc, self.waveknotloc, self.bsorder, n_bs)
             spline2d=scisparse.csr_matrix(spline_derivs.reshape(-1,n_bs))
 
             #Smooth things a bit, since this is supposed to be for broadband photometry

@@ -17,7 +17,8 @@ All functions are JAX-compatible for autodiff in the training loop.
 """
 
 import numpy as np
-from scipy.interpolate import bisplev, RectBivariateSpline
+from scipy.interpolate import RectBivariateSpline
+from saltshaker.util.jax_bspline import jax_bisplev as bisplev
 
 import jax
 from jax import numpy as jnp

@@ -7,7 +7,8 @@ from jax import lax
 from jax.experimental import sparse 
 from saltshaker.util.jaxoptions import jaxoptions
 
-from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
+from scipy.interpolate import splprep,splev,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
+from saltshaker.util.jax_bspline import jax_bisplev as bisplev
 from scipy import stats
 
 from functools import partial,reduce
@@ -42,11 +43,13 @@ class SALTconstraints:
         
         intmult = (self.wave[1]-self.wave[0])*self.fluxfactor['default']['B']
         n_bs = getattr(self, 'n_bspline_coeffs', self.im0.size)
-        fluxDeriv= np.zeros(n_bs)
-        for i in range(n_bs):
-            derivInterp = bisplev(np.array([0]),self.wave,(self.phaseknotloc,self.waveknotloc,np.arange(n_bs)==i,self.bsorder,self.bsorder))
-            fluxDeriv[i] = np.sum( self.kcordict['default']['Bpbspl'] * derivInterp)*intmult 
-        
+        from saltshaker.util.jax_bspline import compute_derivInterp_spec_fast
+        # Evaluate all basis functions at phase=0 in one call
+        derivInterp_all = compute_derivInterp_spec_fast(
+            0.0, self.wave, self.phaseknotloc, self.waveknotloc, self.bsorder, n_bs)
+        # derivInterp_all is (n_wave, n_bs); integrate against passband
+        fluxDeriv = np.sum(self.kcordict['default']['Bpbspl'][:, np.newaxis] * derivInterp_all, axis=0) * intmult
+
         self.__maximumlightpcderiv__=sparse.BCOO.fromdense(fluxDeriv)
 
     @partial(jaxoptions,static_argnums=[0,2],static_argnames=['usesecondary'],jitdefault=True)
