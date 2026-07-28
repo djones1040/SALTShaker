@@ -355,7 +355,7 @@ class TrainSALT(TrainSALTBase):
                             guess[parlist==f'x0_{sn}'] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
 
                         guess[parlist == 'c0_%s'%sn] = snpar['c'][iSN]
-                        guess[parlist == 'c1_%s'%sn] = np.random.exponential(0.2)
+                        guess[parlist == 'c1_%s'%sn] = rng.exponential(0.2)
                     else:
                         log.warning(f'SN {sn} not found in SN par list {self.options.snparlist}')
                         guess[parlist == 'x0_%s'%sn] = 10**(-0.4*(cosmo.distmod(datadict[sn].zHelio).value-19.36-10.635))
