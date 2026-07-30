@@ -106,7 +106,6 @@ class rpropwithbacktracking(salttrainingoptimizer):
 
     def optimize(self,initvals):
         X=initvals.copy() #self.saltobj.constraints.transformtoconstrainedparams(jnp.array(initvals))
-
         Xtransformed=self.saltobj.constraints.transformtoconstrainedparams(X)
         residuals=self.saltobj.lsqwrap(Xtransformed,self.saltobj.calculatecachedvals(Xtransformed,'variances'),jit=False,dospecresids=self.saltobj.dospec)
         oldChi=(residuals**2).sum()

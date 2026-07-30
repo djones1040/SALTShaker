@@ -21,7 +21,7 @@ import os
 import sys
 import sphinx_rtd_theme
 import sphinx_gallery
-# sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('..'))  # Add package root to path
 
 
 # -- General configuration ------------------------------------------------
@@ -35,11 +35,81 @@ import sphinx_gallery
 # ones.
 extensions = ['sphinx.ext.autodoc',
 			  'sphinx.ext.autosummary',
+			  'sphinx.ext.napoleon',  # Support for NumPy-style docstrings
 			  'sphinx.ext.intersphinx',
 			  'sphinx.ext.inheritance_diagram',
 			  'sphinx.ext.mathjax',
 #			  'sphinx.ext.linkcode',
 			  'sphinx_gallery.gen_gallery']
+
+# Napoleon settings for NumPy-style docstrings
+napoleon_google_docstring = False
+napoleon_numpy_docstring = True
+napoleon_include_init_with_doc = True
+napoleon_include_private_with_doc = False
+napoleon_include_special_with_doc = True
+napoleon_use_admonition_for_examples = False
+napoleon_use_admonition_for_notes = False
+napoleon_use_admonition_for_references = False
+napoleon_use_ivar = False
+napoleon_use_param = True
+napoleon_use_rtype = True
+napoleon_type_aliases = None
+
+# Autodoc settings
+autodoc_default_options = {
+    'members': True,
+    'member-order': 'bysource',
+    'special-members': '__init__',
+    'undoc-members': True,
+    'show-inheritance': True,
+}
+autosummary_generate = True
+
+# Intersphinx mapping to link to external documentation (e.g., numpy)
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'numpy': ('https://numpy.org/doc/stable/', None),
+    'scipy': ('https://docs.scipy.org/doc/scipy/', None),
+    'astropy': ('https://docs.astropy.org/en/stable/', None),
+}
+
+# Suppress warnings for duplicate object descriptions (common with class attributes)
+# and undefined references from external library docstrings
+suppress_warnings = [
+    'ref.ref',           # Undefined label references (e.g., from numpy docstrings)
+]
+
+# Suppress duplicate object warnings by filtering them
+import logging
+
+class DuplicateObjectFilter(logging.Filter):
+    def filter(self, record):
+        return 'duplicate object description' not in record.getMessage()
+
+# Apply filter to Sphinx logger
+logging.getLogger('sphinx').addFilter(DuplicateObjectFilter())
+
+# Exclude re-exported functions from external libraries
+def autodoc_skip_member(app, what, name, obj, skip, options):
+    """Skip members that are imported from external libraries."""
+    # Skip numpy's standard_normal which is re-exported
+    if name == 'standard_normal':
+        return True
+    return skip
+
+def setup(app):
+    app.connect('autodoc-skip-member', autodoc_skip_member)
+
+# Attributes that cause duplicate warnings - exclude from inherited-members
+# These are documented in the class but also appear in autosummary
+autodoc_default_options['inherited-members'] = False
+
+# Sphinx-gallery configuration
+sphinx_gallery_conf = {
+    'examples_dirs': [],  # No example galleries for now
+    'gallery_dirs': [],
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -72,7 +142,7 @@ release = ''
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = 'en'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -92,7 +162,7 @@ todo_include_todos = False
 # a list of builtin themes.
 #
 html_theme = "sphinx_rtd_theme"
-html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+# html_theme_path is no longer needed with modern sphinx_rtd_theme
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the

@@ -1,247 +1,204 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8">
-  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
-  <title>SALT3 (Under Development) &mdash; SALT3 Training  documentation</title>
-  
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SALTShaker and SALT3 &mdash; SALT3 Training  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=fd3f3429" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery.css?v=d2d258e8" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery-binder.css?v=f4aeca0c" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery-dataframe.css?v=2082cf3c" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery-rendered-html.css?v=1277b6f3" />
 
   
-  
-  
-  
-
-  
-
-  
-  
-    
-
-  
-
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/gallery.css" type="text/css" />
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9a2dae69"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Installation" href="install.html" /> 
-
-  
-  <script src="_static/js/modernizr.min.js"></script>
-
 </head>
 
-<body class="wy-body-for-nav">
-
-   
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
-
-    
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
-        <div class="wy-side-nav-search">
-          
+        <div class="wy-side-nav-search" >
 
           
-            <a href="#" class="icon icon-home"> SALT3 Training
           
-
-          
+          <a href="#" class="icon icon-home">
+            SALT3 Training
           </a>
-
-          
-            
-            
-          
-
-          
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
 </div>
-
-          
-        </div>
-
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gettingstarted.html">Getting Started Quickly</a></li>
 <li class="toctree-l1"><a class="reference internal" href="data.html">Spectroscopic and Photometric Training Data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="training.html">Training the SALT3 Model</a></li>
-<li class="toctree-l1"><a class="reference internal" href="simulation.html">Creating Simulated Data</a></li>
-<li class="toctree-l1"><a class="reference internal" href="validation.html">Validating the Trained Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="simulation.html">Flexible Simulated Data with BYOSED</a></li>
 <li class="toctree-l1"><a class="reference internal" href="pipeline.html">Running the Pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 </ul>
 
-            
-          
         </div>
       </div>
     </nav>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="#">SALT3 Training</a>
-        
       </nav>
 
-
       <div class="wy-nav-content">
-        
         <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
+          <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-    
-      <li><a href="#">Docs</a> &raquo;</li>
-        
-      <li>SALT3 (<strong>Under Development</strong>)</li>
-    
-    
+      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">SALTShaker and SALT3</li>
       <li class="wy-breadcrumbs-aside">
-        
-            
             <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
-          
-        
       </li>
-    
   </ul>
-
-  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-            
-  <div class="section" id="salt3-under-development">
-<h1>SALT3 (<strong>Under Development</strong>)<a class="headerlink" href="#salt3-under-development" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="overview">
-<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
-<blockquote>
-<div><p>SALT is a model of Type Ia supernovae
+             
+  <section id="saltshaker-and-salt3">
+<h1>SALTShaker and SALT3<a class="headerlink" href="#saltshaker-and-salt3" title="Link to this heading">¶</a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
+<p>SALT is a model of Type Ia supernovae (SNe Ia)
 that accounts for spectral variations as
-a function of shape and color (Guy et al.,
-2007; Guy et al., 2010; Betoule et al., 2014).  The goal
-of the SALT3 software is to retrain the SALT model
-from 2800 to 11,000 Angstroms to make use
-of izY data from PS1, LSST, and WFIRST.</p>
-<img alt="_images/schematic.png" src="_images/schematic.png" />
+a function of shape and color
+(<a class="reference external" href="https://ui.adsabs.harvard.edu/abs/2007A%26A...466...11G/abstract">Guy et al., 2007</a>;
+<a class="reference external" href="https://ui.adsabs.harvard.edu/abs/2010A%26A...523A...7G/abstract">Guy et al., 2010</a>;
+<a class="reference external" href="https://ui.adsabs.harvard.edu/abs/2014A%26A...568A..22B/abstract">Betoule et al., 2014</a>).
+With SALTShaker we have developed an open-source
+model training framework and created the “SALT3” model.
+We more than doubled the amount of photometric and
+spectroscopic data used for model training and
+have extended the SALT framework to 11,000 Angstroms.  In the coming years, SALT3 will make use
+of data from the Vera Rubin Observatory,
+and the <em>Nancy Grace Roman Space Telescope</em> and can be re-trained easily in
+the coming years as more SN Ia data become available.</p>
+<p>Please report bugs, issues and requests via the <a class="reference external" href="https://github.com/djones1040/SALTShaker/issues">SALTShaker GitHub page</a>.</p>
+</section>
+<section id="salt3-model-and-training-data">
+<h2>SALT3 Model and Training Data<a class="headerlink" href="#salt3-model-and-training-data" title="Link to this heading">¶</a></h2>
+<p>The latest version of the SALT3 model has been released in:</p>
+<p><a class="reference external" href="https://ui.adsabs.harvard.edu/abs/2023MNRAS.520.5209T/abstract">Taylor et al., 2023, MNRAS, 520, 5209T</a></p>
+<p>This model includes full re-calibration of the SALT3 training data (<a class="reference external" href="https://arxiv.org/abs/2112.03864">Brout et al., 2021</a>) to match SALT training sets used in the <a class="reference external" href="https://ui.adsabs.harvard.edu/abs/2022ApJ...938..113S/abstract">Pantheon+ analysis</a>.  Other SALT3 publications include:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://ui.adsabs.harvard.edu/abs/2021ApJ...911...96P/abstract">Pierel et al., 2021, ApJ, 911, 96P</a>: model-independent simulation framework for SALT3 validation.</p></li>
+<li><p><a class="reference external" href="https://ui.adsabs.harvard.edu/abs/2021ApJ...923..265K/abstract">Kenworthy et al., 2021, ApJ, 923, 265K</a>: SALT3 model and SALTShaker framework.</p></li>
+<li><p><a class="reference external" href="https://ui.adsabs.harvard.edu/abs/2022ApJ...939...11P/abstract">Pierel et al., 2022, ApJ, 939, 11P</a>: A near-infrared extension to the SALT3 model.</p></li>
+<li><p><a class="reference external" href="https://ui.adsabs.harvard.edu/abs/2022arXiv221206879D/abstract">Dai et al., 2023, ApJ, in press</a>: SALT3 model validation with extensive simulations and full training pipeline.</p></li>
+<li><p><a class="reference external" href="https://ui.adsabs.harvard.edu/abs/2022arXiv220905584J/abstract">Jones et al., 2023, ApJ, in press</a>: a host-galaxy mass-dependent SALT3 model.</p></li>
+</ul>
+<p>The latest SALT3 model files are linked <a class="reference external" href="_static/salt3-f22.tar.gz">here</a>.
+SALT3 light curve fits can be performed using <a class="reference external" href="https://sncosmo.readthedocs.io/en/latest/">sncosmo</a>
+(currently the <a class="reference external" href="https://github.com/sncosmo/sncosmo">latest version</a> on GitHub is required)
+or <a class="reference external" href="https://snana.uchicago.edu/">SNANA</a> with the SALT3.K21
+model, with a brief sncosmo example given below.</p>
+<p>The latest SALT3 training data is also fully public and included <a class="reference external" href="_static/SALT3TRAIN_K21-Frag.tgz">here</a>.  This release includes all photometry and spectra
+along with everything required to run the code.  Once SALTShaker has been installed via the instructions in <a class="reference internal" href="install.html#install"><span class="std std-ref">Installation</span></a>, the SALT3 model can be
+(re)trained following the instructions in <a class="reference internal" href="gettingstarted.html#gettingstarted"><span class="std std-ref">Getting Started Quickly</span></a>.</p>
+</section>
+<section id="example-salt3-fit">
+<h2>Example SALT3 Fit<a class="headerlink" href="#example-salt3-fit" title="Link to this heading">¶</a></h2>
+<p>Fitting SN Ia data with SALT3 can be done through the sncosmo or
+SNANA software packages.  With sncosmo, the fitting can be performed
+in nearly the exact same way as SALT2.  Here is the example from the sncosmo
+documentation, altered to use the SALT3 model.  First, install the latest
+version of sncosmo; SALT3 is included beginning in version 2.5.0:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span> <span class="n">sncosmo</span>
+</pre></div>
+</div>
+<p>or:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">sncosmo</span>
+</pre></div>
+</div>
+<p>Then, in a python terminal:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">sncosmo</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">sncosmo</span><span class="o">.</span><span class="n">load_example_data</span><span class="p">()</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">sncosmo</span><span class="o">.</span><span class="n">Model</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="s1">&#39;salt3&#39;</span><span class="p">)</span>
+<span class="n">res</span><span class="p">,</span> <span class="n">fitted_model</span> <span class="o">=</span> <span class="n">sncosmo</span><span class="o">.</span><span class="n">fit_lc</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span>
+                                  <span class="p">[</span><span class="s1">&#39;z&#39;</span><span class="p">,</span> <span class="s1">&#39;t0&#39;</span><span class="p">,</span> <span class="s1">&#39;x0&#39;</span><span class="p">,</span> <span class="s1">&#39;x1&#39;</span><span class="p">,</span> <span class="s1">&#39;c&#39;</span><span class="p">],</span>
+                                  <span class="n">bounds</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;z&#39;</span><span class="p">:(</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">)})</span>
+<span class="n">sncosmo</span><span class="o">.</span><span class="n">plot_lc</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="n">fitted_model</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="n">res</span><span class="o">.</span><span class="n">errors</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="pipeline">
+<h2>Pipeline<a class="headerlink" href="#pipeline" title="Link to this heading">¶</a></h2>
+<p>In <a class="reference external" href="https://ui.adsabs.harvard.edu/abs/2022arXiv221206879D/abstract">Dai et al., 2023</a> we present a pipeline to fully test and validate the
+SALT3 model in the context of cosmological measurements.  Defails
+are given in <a class="reference internal" href="pipeline.html#pipeline"><span class="std std-ref">Running the Pipeline</span></a>.</p>
+<blockquote>
+<div><img alt="_images/schematic.png" src="_images/schematic.png" />
 </div></blockquote>
 <div class="toctree-wrapper compound">
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gettingstarted.html">Getting Started Quickly</a></li>
 <li class="toctree-l1"><a class="reference internal" href="data.html">Spectroscopic and Photometric Training Data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="training.html">Training the SALT3 Model</a></li>
-<li class="toctree-l1"><a class="reference internal" href="simulation.html">Creating Simulated Data</a></li>
-<li class="toctree-l1"><a class="reference internal" href="validation.html">Validating the Trained Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="simulation.html">Flexible Simulated Data with BYOSED</a></li>
 <li class="toctree-l1"><a class="reference internal" href="pipeline.html">Running the Pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 </ul>
 </div>
-</div>
-<div class="section" id="indices-and-tables">
-<h2>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="indices-and-tables">
+<h2>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Link to this heading">¶</a></h2>
 <ul class="simple">
-<li><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></li>
-<li><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></li>
-<li><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></li>
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
 </ul>
-</div>
-</div>
+</section>
+</section>
 
 
            </div>
-           
           </div>
-          <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="install.html" class="btn btn-neutral float-right" title="Installation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="install.html" class="btn btn-neutral float-right" title="Installation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
-  
 
   <hr/>
 
   <div role="contentinfo">
-    <p>
-        &copy; Copyright 2018, David Jones, Rick Kessler.
-
-    </p>
+    <p>&#169; Copyright 2018, David Jones, Rick Kessler.</p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
 
 </footer>
-
         </div>
       </div>
-
     </section>
-
   </div>
-  
-
-
-  
-
-    <script type="text/javascript">
-        var DOCUMENTATION_OPTIONS = {
-            URL_ROOT:'./',
-            VERSION:'',
-            LANGUAGE:'None',
-            COLLAPSE_INDEX:false,
-            FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true,
-            SOURCELINK_SUFFIX: '.txt'
-        };
-    </script>
-      <script type="text/javascript" src="_static/jquery.js"></script>
-      <script type="text/javascript" src="_static/underscore.js"></script>
-      <script type="text/javascript" src="_static/doctools.js"></script>
-      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-
-  
-
-  <script type="text/javascript" src="_static/js/theme.js"></script>
-
-  <script type="text/javascript">
+  <script>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });

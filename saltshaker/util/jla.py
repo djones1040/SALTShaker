@@ -1,3 +1,17 @@
+"""
+JLA (Joint Light-curve Analysis) file format I/O.
+
+This module provides classes for reading supernova light curve and spectrum
+data in the JLA file format used by the Joint Light-curve Analysis project.
+Includes conversion utilities to SNANA format.
+
+Classes
+-------
+SuperNova
+    JLA light curve data for a single supernova.
+SuperNovaSpectrum
+    JLA spectrum data for a single observation.
+"""
 from __future__ import print_function
 
 import os
@@ -5,6 +19,7 @@ import time
 import numpy as np
 import glob
 from astropy.time import Time
+
 
 class SuperNova( object ) : 
 	""" object class for a single SN extracted from JLA lc-snname.list file

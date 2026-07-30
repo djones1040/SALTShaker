@@ -11,7 +11,7 @@ from saltshaker.util.synphot import synphot
 from scipy.interpolate import interp1d
 from sncosmo.constants import HC_ERG_AA
 from saltshaker.initfiles import init_rootdir
-from saltshaker.training.init_hsiao import synphotB
+from saltshaker.training.init_templates import synphotB
 from sncosmo.salt2utils import SALT2ColorLaw
 import extinction
 import copy
@@ -281,7 +281,7 @@ def customfilt(outfile,lcfile,salt3dir,
         #salt2m1phase,salt2m1wave,salt2m1flux = np.genfromtxt('{}/salt2_template_1.dat'.format(salt2dir),unpack=True)
         #salt2phase = np.interp(salt3wave,salt2wave,salt2phase)
         #salt2flux = np.interp(salt3wave,salt2wave,salt2flux)
-        from scipy.interpolate import interp1d
+        #from scipy.interpolate import interp1d
         int1dwave = interp1d(np.unique(salt2wave_tmp),salt2flux_tmp,axis=1,fill_value="extrapolate")
         salt2m0flux_tmp = int1dwave(salt3wave)
         int1dphase = interp1d(np.unique(salt2phase_tmp),salt2m0flux_tmp,axis=0,fill_value="extrapolate")

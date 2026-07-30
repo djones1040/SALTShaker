@@ -1,16 +1,56 @@
-##import numpy as np
+"""
+Color law implementations for SALT3 model.
+
+This module provides wavelength-dependent color correction laws used
+in the SALT3 model. The color law describes how the SN spectrum is
+modified as a function of the color parameter c.
+
+Classes
+-------
+SALT2ColorLaw
+    Polynomial color law matching SALT2 parameterization.
+GalacticDustLaw
+    Calzetti-style dust attenuation law.
+colorlaw_default
+    Standard SALT2-style polynomial color law.
+colorlaw_intrinsic_plus_dust
+    Two-component model separating intrinsic and dust color.
+
+Functions
+---------
+colorlaw
+    Decorator to register a color law class.
+getcolorlaw
+    Retrieve a registered color law by name.
+"""
 from scipy.interpolate import interp1d
 from jax import numpy as jnp
 
 import jax
 
-__colorlaws__=dict()
+__colorlaws__ = dict()
+
+
 def colorlaw(colorlaw):
-    """Decorator to register a given function as a valid prior"""
-    __colorlaws__[colorlaw.__name__]=colorlaw
+    """Decorator to register a color law class."""
+    __colorlaws__[colorlaw.__name__] = colorlaw
     return colorlaw
 
+
 def getcolorlaw(color_name):
+    """
+    Retrieve a registered color law by name.
+
+    Parameters
+    ----------
+    color_name : str
+        Name of the color law class.
+
+    Returns
+    -------
+    class
+        The color law class.
+    """
     return __colorlaws__[color_name]
 
 SALT2CL_B = 4302.57
@@ -18,7 +58,28 @@ SALT2CL_V = 5428.55
 SALT2CL_V_MINUS_B = SALT2CL_V - SALT2CL_B
 
 class SALT2ColorLaw:
-    def __init__(self,wave_range,coeffs):
+    """
+    SALT2-style polynomial color law.
+
+    The color law CL(lambda) is defined such that:
+    flux_colored = flux * 10^(-0.4 * c * CL(lambda))
+
+    where CL(B) = 0 and CL(V) = -1 by construction.
+
+    Parameters
+    ----------
+    wave_range : tuple
+        (min_wave, max_wave) in Angstroms for polynomial validity.
+    coeffs : array_like
+        Polynomial coefficients for the color law.
+
+    Notes
+    -----
+    Outside the valid wavelength range, the color law is linearly
+    extrapolated to avoid discontinuities.
+    """
+
+    def __init__(self, wave_range, coeffs):
         
         if len(coeffs) > 6:
             raise ValueError("number of coefficients must be equal to or "
@@ -54,14 +115,23 @@ class SALT2ColorLaw:
              self.p_hi + self.pprime_hi * (l - self.l_hi)])
 
 def k_Calzetti(wav,RV):
-    ''' Calzetti model (Calzetti et al. 2000)
-    https://ui.adsabs.harvard.edu/abs/2000ApJ...533..682C/abstract
-    inputs:
-        wav: wavelength to be evaluated (in Angstroms)
-        RV: slope
-    output:
-        kCal: A numpy array with ratio of attenuation A_lambda/E(B-V)
-    '''
+    """
+    Calzetti model (Calzetti et al. 2000).
+
+    Reference: https://ui.adsabs.harvard.edu/abs/2000ApJ...533..682C/abstract
+
+    Parameters
+    ----------
+    wav : array_like
+        Wavelength to be evaluated (in Angstroms).
+    RV : float
+        Slope parameter.
+
+    Returns
+    -------
+    kCal : ndarray
+        Ratio of attenuation A_lambda/E(B-V).
+    """
 
     # sanity check
     # DJ removed because jax is annoying
@@ -87,8 +157,21 @@ def k_Salim(wave,RV):
     raise NotImplementedError
     
 class GalacticDustLaw:
-    def __init__(self,
-                 RV=3.1,dust_model='Calzetti'):
+    """
+    Galactic dust attenuation law.
+
+    Implements dust attenuation following Calzetti et al. (2000),
+    normalized so that CL(B) = 0 and CL(V) = -1.
+
+    Parameters
+    ----------
+    RV : float, optional
+        Total-to-selective extinction ratio. Default is 3.1.
+    dust_model : str, optional
+        Dust model to use ('Calzetti' or 'Salim'). Default is 'Calzetti'.
+    """
+
+    def __init__(self, RV=3.1, dust_model='Calzetti'):
 
         self.RV = RV
 
@@ -100,13 +183,19 @@ class GalacticDustLaw:
         self.gCL_model = gCL_MODELS[dust_model]
 
     def __call__(self,wave):
-        ''' Designed to be used for SALT3 color law model
-        inputs:
-            wave: array or scalar of wavelength to be evaluated (in Angstrom)
-            RV: R_V (attenuation slope)
-        output:
-            color law values
-        '''
+        """
+        Compute color law values for SALT3 model.
+
+        Parameters
+        ----------
+        wave : array_like or scalar
+            Wavelength to be evaluated (in Angstroms).
+
+        Returns
+        -------
+        CL : ndarray or scalar
+            Color law values.
+        """
 
         # handle both scalar and array
         wave_arr = jnp.atleast_1d(wave)
@@ -124,8 +213,18 @@ class GalacticDustLaw:
 
 @colorlaw
 class colorlaw_default:
+    """
+    Default SALT2-style polynomial color law.
 
-    def __init__(self,n_colorpars,colorwaverange):
+    Parameters
+    ----------
+    n_colorpars : int
+        Number of polynomial coefficients.
+    colorwaverange : tuple
+        (min_wave, max_wave) in Angstroms.
+    """
+
+    def __init__(self, n_colorpars, colorwaverange):
         self.n_colorpars=n_colorpars
         self.colorwaverange=colorwaverange
 
@@ -152,8 +251,22 @@ class colorlaw_separatecolors:
 
 @colorlaw
 class colorlaw_intrinsic_plus_dust:
+    """
+    Two-component color law separating intrinsic SN color from dust.
 
-    def __init__(self,n_colorpars,colorwaverange):
+    Splits the total color c into intrinsic (c_i) and galactic dust (c_g)
+    components using an empirical relation, then applies different
+    color laws to each component.
+
+    Parameters
+    ----------
+    n_colorpars : int
+        Number of polynomial coefficients for intrinsic color law.
+    colorwaverange : tuple
+        (min_wave, max_wave) in Angstroms.
+    """
+
+    def __init__(self, n_colorpars, colorwaverange):
         self.n_colorpars=n_colorpars
         self.colorwaverange=colorwaverange
         self.c_coeffs=[0.0727, 0.57, 1.58]

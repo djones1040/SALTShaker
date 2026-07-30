@@ -1,4 +1,16 @@
+"""
+Example data download utilities.
+
+This module provides functions to download example training data
+and model files from remote servers.
+
+Functions
+---------
+download_dir
+    Download and extract a remote tarball to a local directory.
+"""
 import os
+
 
 def download_dir(remote_url, dirname):
     """
