@@ -831,10 +831,6 @@ class TrainSALT(TrainSALTBase):
                 print(f'{w:.2f} {np.clip(trainingresult.clscat[j],0.,cldispersionmax):8.15e}',file=foutclscat)
 
         foutinfotext = f"""RESTLAMBDA_RANGE: {self.options.colorwaverange[0]} {self.options.colorwaverange[1]}
-<<<<<<< HEAD
-#COLORLAW_VERSION: {self.options.colorlaw_function[0]}
-=======
->>>>>>> 4aaec43e3b8a51e05bb4f0cdfa0df2329d6c7f4c
 COLORLAW_VERSION: 1
 COLORCOR_PARAMS: {self.options.colorwaverange[0]:.0f} {self.options.colorwaverange[1]:.0f}  {len(trainingresult.clpars[0])}  {' '.join(['%8.10e'%cl for cl in trainingresult.clpars[0]])}
 
@@ -1223,12 +1219,42 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",file=foutc
                                            specrecallist=self.options.specrecallist)
             log.info(f'took {time.time()-tdstart:.3f} to read in data files')
             tcstart = time.time()
+            problems = []
+            for snid, sn in datadict.items():
+                for filt in sn.filt:
+                    if filt not in self.kcordict[sn.survey]:
+                        ignore = self.options.__dict__[
+                            f"{sn.survey.split('(')[0]}_ignore_filters"
+                        ].replace(' ', '').split(',')
+                        if filt not in ignore:
+                            problems.append((snid, sn.survey, filt))
+            if problems:
+                for snid, survey, filt in problems:
+                    log.error(f"MISSING FILTER: sn={snid}  survey={survey!r}  filt={filt!r}")
+                # show valid keys per survey once
+                for survey in sorted({p[1] for p in problems}):
+                    valid = [x for x in self.kcordict[survey]
+                             if "lambdaeff" in self.kcordict[survey][x]]
+                    log.error(f"  valid kcor filters for {survey!r}: {valid}")
+                raise ValueError(f"{len(problems)} SN/filter combos missing from kcor; see log above")
+            
+"""
+            #Edited section - 
+            problems = []
             for snid,sn in datadict.items():
                 for filt in sn.filt:
                     if filt not in self.kcordict[sn.survey]:
                         if filt not in self.options.__dict__[f"{sn.survey.split('(')[0]}_ignore_filters"].replace(' ','').split(','):
-                            import pdb; pdb.set_trace() 
+                            valid_keys = [x for x in self.kcordict[sn.survey] if 'lambdaeff' in self.kcordict[sn.survey][x]]
+                            log.error(
+                                f"MISSING FILTER: sn={snid}  survey={sn.survey!r}  "
+                                f"filt={filt!r}  (all filts for this sn: {sn.filt})  "
+                                f"valid kcor keys for this survey: {valid_keys}"
+                            )
+                            #import pdb; pdb.set_trace() 
                             raise ValueError(f'Kcor file missing key {filt} from survey {sn.survey} for sn {snid}; valid keys are {", ".join([x for x in self.kcordict[sn.survey] if "lambdaeff" in self.kcordict[sn.survey][x]])}')
+
+"""
             datadict = self.mkcuts(datadict)[0]
             self.survey_stats_dict = compute_survey_stats.sn_numbers(datadict)  
             log.info(f'took {time.time()-tcstart:.3f} to apply cuts')
