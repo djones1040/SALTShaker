@@ -158,6 +158,12 @@ class SuperNova(object):
         Path to FITS photometry file (``*_PHOT.FITS``).
     specfitsfile : str, optional
         Path to FITS spectroscopy file (``*_SPEC.FITS``).
+    headfits : astropy.io.fits header object, optional
+        FITS header object (from ``*_HEAD.FITS``).
+    photfits : astropy.io.fits data object, optional
+        FITS photometry table (from ``*_PHOT.FITS``).
+    specfits : astropy.io.fits data object, optional
+        FITS spectroscopy table (from ``*_SPEC.FITS``).
     snid : int or str, optional
         Supernova ID (required when reading from FITS).
     verbose : bool, optional
@@ -198,7 +204,8 @@ class SuperNova(object):
     """
 
     def __init__(self, datfile=None, headfitsfile=None, photfitsfile=None,
-                 specfitsfile=None, snid=None, verbose=False, simdir=None,
+                 specfitsfile=None,headfits=None,photfits=None,
+                 specfits=None,snid=None, verbose=False, simdir=None,
                  readspec=True):
         """Read in header info (z,type,etc) and full light curve data.
         For simulated SNe stored in fits tables, user must provide the simname and snid,
