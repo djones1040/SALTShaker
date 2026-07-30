@@ -798,8 +798,13 @@ class TrainSALT(TrainSALTBase):
             for j,w in enumerate(trainingresult.wave):
                 print(f'{w:.2f} {np.clip(trainingresult.clscat[j],0.,cldispersionmax):8.15e}',file=foutclscat)
 
+        if 'default' in self.options.colorlaw_function[0]:
+            colorlaw_func = 1
+        else:
+            colorlaw_func = self.options.colorlaw_function[0]
+
         foutinfotext = f"""RESTLAMBDA_RANGE: {self.options.colorwaverange[0]} {self.options.colorwaverange[1]}
-COLORLAW_VERSION: {self.options.colorlaw_function[0]}
+COLORLAW_VERSION: {colorlaw_func}
 COLORCOR_PARAMS: {self.options.colorwaverange[0]:.0f} {self.options.colorwaverange[1]:.0f}  {len(trainingresult.clpars[0])}  {' '.join(['%8.10e'%cl for cl in trainingresult.clpars[0]])}
 
 COLOR_OFFSET:  0.0
