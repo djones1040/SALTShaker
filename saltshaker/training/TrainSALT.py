@@ -257,8 +257,6 @@ class TrainSALT(TrainSALTBase):
                 # save the order as part of the specrecal list
                 if not self.options.specrecallist or sn not in spcrcldata['SNID'] or k+1 not in spcrcldata['N'][spcrcldata['SNID'] == sn]:
                     datadict[sn].specdata[k].n_specrecal = order
-                #if datadict[sn].specdata[k].n_specrecal is None:
-                #    import pdb; pdb.set_trace()
                 recalParams=[f'specx0_{sn}_{k}']+[f'specrecal_{sn}_{k}']*(order-1)
                 
                 parlist=np.append(parlist,recalParams )
@@ -701,10 +699,8 @@ class TrainSALT(TrainSALTBase):
             
             # do the fitting
             x_modelpars = saltfitter.optimize( x_modelpars)
-        Xfinal=saltresids.constraints.transformtoconstrainedparams(x_modelpars)
-        Xfinal= saltresids.constraints.enforcefinaldefinitions(Xfinal,saltresids.SALTModel(x_modelpars))
-        # hack!
-        self.options.errors_from_hessianapprox = False
+            
+        Xfinal= saltresids.constraints.enforcefinaldefinitions(x_modelpars,saltresids.SALTModel(x_modelpars))
         if self.options.errors_from_hessianapprox: 
             sigma=saltresids.estimateparametererrorsfromhessian(Xfinal)
             np.save(path.join(self.options.outputdir,'parametercovariance.npy'), sigma)
