@@ -960,6 +960,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         float
             Log-likelihood value.
         """
+
         if fixfluxes:
             modelflux = cachedresults
         else:
