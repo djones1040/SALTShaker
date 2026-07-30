@@ -1,20 +1,46 @@
+"""
+Prior definitions for SALT3 model training.
+
+This module defines Gaussian and non-Gaussian priors used to constrain
+the SALT3 model during training. Priors are registered using decorators
+and applied via the SALTPriors class.
+
+Classes
+-------
+SALTPriors
+    Handler for computing prior residuals and log-likelihoods.
+
+Functions
+---------
+prior
+    Decorator to register a Gaussian prior function.
+nongaussianprior
+    Decorator to register a non-Gaussian prior function.
+
+Notes
+-----
+Available priors include:
+- Population priors: x1mean, x1std, colormean, colorstretchcorr
+- Model priors: m0prior, m1prior, peakprior
+- Recalibration priors: recalprior
+- Boundary priors: bounded parameter constraints
+"""
 import numpy as np
 from jax import numpy as jnp
 import jax
 from jax import lax
-from jax.experimental import sparse 
-
+from jax.experimental import sparse
 
 from functools import partial
 from saltshaker.util.jaxoptions import jaxoptions
 
 from inspect import signature
 
-from scipy.interpolate import splprep,splev,bisplev,bisplrep,interp1d,interp2d,RegularGridInterpolator,RectBivariateSpline
+from scipy.interpolate import splprep, splev, bisplev, bisplrep, interp1d, interp2d, RegularGridInterpolator, RectBivariateSpline
 from sncosmo.salt2utils import SALT2ColorLaw
 from scipy.special import factorial
 import logging
-log=logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 __priors__=dict()
 def prior(prior):
@@ -81,8 +107,31 @@ def robustmean(x):
     return jnp.mean(jpsi(x-jnp.median(x)))+jnp.median(x)
 
 class SALTPriors:
+    """
+    Handler for prior probabilities in SALT3 training.
 
-    def __init__(self,SALTResidsObj):
+    Manages Gaussian and non-Gaussian priors on model parameters,
+    including population statistics (x1, c distributions), model
+    normalization, and parameter bounds.
+
+    Parameters
+    ----------
+    SALTResidsObj : SALTResids
+        Parent residuals object providing parameter indices and options.
+
+    Attributes
+    ----------
+    priors : dict
+        Dictionary of registered Gaussian prior functions.
+    nongaussianpriors : dict
+        Dictionary of registered non-Gaussian prior functions.
+    parameterbounds : tuple
+        Lower bounds, upper bounds, and widths for bounded parameters.
+    priorexecutionlist : list
+        List of (prior_name, width) tuples to evaluate.
+    """
+
+    def __init__(self, SALTResidsObj):
         for k in SALTResidsObj.__dict__.keys():
             self.__dict__[k] = SALTResidsObj.__dict__[k]
         self.SALTModel = SALTResidsObj.SALTModel
@@ -166,11 +215,23 @@ class SALTPriors:
         self.numresids=jax.eval_shape(self.priorresids,np.random.normal(1e-1,size=self.npar)).shape[0]
 
         
-    @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],diff_argnum=1)
-    def priorresids(self,x):
-        """Given a parameter vector returns a residuals vector representing the priors"""
+    @partial(jaxoptions, static_argnums=[0], static_argnames=['self'], diff_argnum=1)
+    def priorresids(self, x):
+        """
+        Compute prior residuals for least-squares fitting.
 
-        residuals=[]
+        Parameters
+        ----------
+        x : ndarray
+            Current parameter values.
+
+        Returns
+        -------
+        ndarray
+            Concatenated residual vector from all active priors.
+            For Gaussian priors, residual = (value - target) / width.
+        """
+        residuals = []
         for prior,width in self.priorexecutionlist:
             try:
                 priorFunction=self.priors[prior]
@@ -181,11 +242,23 @@ class SALTPriors:
         #jax.debug.breakpoint()
         return jnp.concatenate(  residuals)
 
-    @partial(jaxoptions, static_argnums=[0],static_argnames= ['self'],diff_argnum=1)        
-    def priorloglike(self,x):
-        """Given a parameter vector returns a residuals vector representing the priors"""
+    @partial(jaxoptions, static_argnums=[0], static_argnames=['self'], diff_argnum=1)
+    def priorloglike(self, x):
+        """
+        Compute total prior log-likelihood.
 
-        loglike=0.
+        Parameters
+        ----------
+        x : ndarray
+            Current parameter values.
+
+        Returns
+        -------
+        float
+            Sum of log-likelihoods from all active priors.
+            Includes both Gaussian (-0.5 * residual^2) and non-Gaussian terms.
+        """
+        loglike = 0.
         for prior,width in self.priorexecutionlist:
             try:
                 priorFunction=self.priors[prior]
@@ -291,7 +364,7 @@ class SALTPriors:
                 recalterm=spectrum.recaltermderivs[::thinning,:] @ coeffs
 
                 residuals+=[(recalterm/width)]
-        return jnp.concatenate(residuals)
+        return jnp.concatenate(residuals) if len(residuals)>0 else np.array([])
     
     @prior
     def m0positiveprior(self,width,x):
@@ -334,7 +407,11 @@ class SALTPriors:
     def m1endalllam(self,width,x):
         """Prior such that at early times there is no flux"""
         return self.__initialphasepcderiv__ @ x[self.im1]/width
-                    
+    @nongaussianprior
+    def surverrfloorprior(self,width,x):
+        """Prior such that at early times there is no flux"""
+        return   jax.scipy.stats.gamma.logpdf(x[self.isurverrfloor],2,scale=width)
+                   
         
         
 

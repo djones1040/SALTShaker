@@ -1,7 +1,21 @@
 #!/usr/bin/env python
-"""initial recalibration of spectra to the photometric
-data itself"""
+"""
+Spectral recalibration utilities.
 
+This module provides functions to recalibrate spectra to match concurrent
+photometric observations. The recalibration applies a smooth wavelength-dependent
+correction (polynomial in log-space) to bring synthetic photometry of the
+spectrum into agreement with observed photometry.
+
+Functions
+---------
+SpecRecal
+    Main function to compute recalibration coefficients.
+chifunc
+    Chi-squared objective function for recalibration fit.
+recalfunc
+    Apply recalibration coefficients to get correction factors.
+"""
 from scipy.optimize import minimize
 from scipy.interpolate import interp1d
 from scipy.integrate import trapezoid as trapz
@@ -12,7 +26,41 @@ from scipy.special import factorial
 import pylab as plt
 
 def SpecRecal(photdata,specdata,kcordict,survey,specrange_wavescale_specrecal,nrecalpars=0,doplot=False,sn=None):
+	"""
+	Compute spectral recalibration coefficients from photometry.
 
+	Fits a smooth wavelength-dependent correction to the spectrum such that
+	synthetic photometry matches observed photometry in overlapping filters.
+
+	This is only used during initial data preparation before training begins.
+	During the main optimization, recalibration parameters are fit simultaneously
+	with other model parameters.
+
+	Parameters
+	----------
+	photdata : dict
+		Photometric data with keys 'mjd', 'filt', 'fluxcal', 'fluxcalerr'.
+	specdata : dict
+		Spectral data with keys 'wavelength', 'flux', 'fluxerr', 'mjd'.
+	kcordict : dict
+		K-correction dictionary with filter definitions and primary standards.
+	survey : str
+		Survey name key into kcordict.
+	specrange_wavescale_specrecal : float
+		Wavelength scale for normalizing the recalibration polynomial.
+	nrecalpars : int, optional
+		Number of polynomial recalibration parameters. Default is 0.
+	doplot : bool, optional
+		If True, plot recalibration results. Default is False.
+	sn : str, optional
+		Supernova name for plot labeling.
+
+	Returns
+	-------
+	list
+		Recalibration coefficients [scale, poly_coeffs...]. The spectrum
+		should be divided by recalfunc(coeffs, wavelength) to apply correction.
+	"""
 	# from photdata, find all obs w/i two days of phase
 	# of those, choose the closest in each filter
 	# if nothing exists, relax to four days

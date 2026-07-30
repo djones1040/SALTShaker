@@ -1,4 +1,5 @@
 .. raw:: html
+
     <style media="screen" type="text/css">
       h1 { display:none; }
       th { display:none; }
@@ -47,13 +48,13 @@ This model includes full re-calibration of the SALT3 training data (`Brout et al
 
 - `Jones et al., 2023, ApJ, in press <https://ui.adsabs.harvard.edu/abs/2022arXiv220905584J/abstract>`_: a host-galaxy mass-dependent SALT3 model.
 
-The latest SALT3 model files are linked `here <_static/salt3-f22.tar.gz>`_.
-SALT3 light curve fits can be performed using `sncosmo <https://sncosmo.readthedocs.io/en/latest/>`_ 
-(currently the `latest version <https://github.com/sncosmo/sncosmo>`_ on GitHub is required)
-or `SNANA <https://snana.uchicago.edu/>`_ with the SALT3.K21
+The latest SALT3 model files are linked `here (model) <_static/salt3-f22.tar.gz>`__.
+SALT3 light curve fits can be performed using `sncosmo <https://sncosmo.readthedocs.io/en/latest/>`__
+(currently the `latest version <https://github.com/sncosmo/sncosmo>`__ on GitHub is required)
+or `SNANA <https://snana.uchicago.edu/>`__ with the SALT3.K21
 model, with a brief sncosmo example given below.
 
-The latest SALT3 training data is also fully public and included `here <_static/SALT3TRAIN_K21-Frag.tgz>`_.  This release includes all photometry and spectra
+The latest SALT3 training data is also fully public and included `here (training data) <_static/SALT3TRAIN_K21-Frag.tgz>`__.  This release includes all photometry and spectra
 along with everything required to run the code.  Once SALTShaker has been installed via the instructions in :ref:`install`, the SALT3 model can be
 (re)trained following the instructions in :ref:`gettingstarted`.
 
@@ -100,10 +101,13 @@ are given in :ref:`pipeline`.
 
    install
    gettingstarted
+   configuration
    data
    training
+   validation
    simulation
    pipeline
+   api
    
 
 Indices and tables

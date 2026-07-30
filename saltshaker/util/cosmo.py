@@ -1,11 +1,44 @@
 from __future__ import print_function
 #!/usr/bin/env python
+"""
+Cosmology calculator.
+
+This module provides functions for computing cosmological distances,
+ages, and related quantities. Adapted from Ned Wright's cosmology
+calculator (www.astro.ucla.edu/~wright/CosmoCalc.html).
+
+Supports flat and non-flat universes with dark energy equation of state
+w(a) = w0 + wa(1-a).
+
+Functions
+---------
+calculate
+    Compute all cosmological quantities at redshift z.
+DL
+    Luminosity distance.
+DC
+    Comoving radial distance.
+DA
+    Angular diameter distance.
+mu
+    Distance modulus.
+agez
+    Age of the universe at redshift z.
+zfromt
+    Redshift corresponding to a given cosmic age.
+zfromd
+    Redshift corresponding to a given distance.
+volume
+    Comoving volume out to redshift z.
+E
+    Dimensionless expansion rate H(z)/H0.
+"""
 # 2009-07-23 S.Rodney
-# adapted from James Schombert's python version 
-# of Ned Wright's cosmology calculator 
+# adapted from James Schombert's python version
+# of Ned Wright's cosmology calculator
 #  (www.astro.ucla.edu/~wright/CosmoCalc.html)
 #
-#  WORK IN PROGRESS : 
+#  WORK IN PROGRESS :
 #    STILL NEED TO EXTRACT SOME OTHER FUNCTIONS FROM CALCULATE
 
 helpstring = '''
@@ -313,12 +346,13 @@ def DLFw( z, w=-1, Om=0.3, H0=70, unit=None, debug=False ):
 def DL( z, Om=0.3, Ode=0.7, w0=-1, wa=0,
         H0=70, unit=None, Flat=False, Lambda=False,
         debug=False ):
-    """ luminosity distance calculation allowing w!=-1 
-    and allowing w to vary with time using a linear parameterization:
-       w(a) = w0 + wa(1-a)
-    To get a constant w, just set wa=0 and use w0 as w. 
-    Set Flat==True to enforce a flat universe (Ode=1-Om)
-    Lambda=True to force a constant w=-1
+    """
+    Luminosity distance calculation allowing w!=-1.
+
+    Allows w to vary with time using a linear parameterization:
+    ``w(a) = w0 + wa(1-a)``. To get a constant w, just set wa=0 and
+    use w0 as w. Set Flat=True to enforce a flat universe (Ode=1-Om).
+    Set Lambda=True to force a constant w=-1.
     """
     from scipy import integrate as scint
     from numpy import iterable, array, sqrt, append, \

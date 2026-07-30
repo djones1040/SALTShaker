@@ -1,192 +1,125 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8">
-  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
-  <title>Creating Simulated Data &mdash; SALT3 Training  documentation</title>
-  
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flexible Simulated Data with BYOSED &mdash; SALT3 Training  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=fd3f3429" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery.css?v=d2d258e8" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery-binder.css?v=f4aeca0c" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery-dataframe.css?v=2082cf3c" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery-rendered-html.css?v=1277b6f3" />
 
   
-  
-  
-  
-
-  
-
-  
-  
-    
-
-  
-
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/gallery.css" type="text/css" />
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9a2dae69"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Validating the Trained Model" href="validation.html" />
+    <link rel="next" title="Running the Pipeline" href="pipeline.html" />
     <link rel="prev" title="Training the SALT3 Model" href="training.html" /> 
-
-  
-  <script src="_static/js/modernizr.min.js"></script>
-
 </head>
 
-<body class="wy-body-for-nav">
-
-   
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
-
-    
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
-        <div class="wy-side-nav-search">
-          
+        <div class="wy-side-nav-search" >
 
           
-            <a href="index.html" class="icon icon-home"> SALT3 Training
           
-
-          
+          <a href="index.html" class="icon icon-home">
+            SALT3 Training
           </a>
-
-          
-            
-            
-          
-
-          
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
 </div>
-
-          
-        </div>
-
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gettingstarted.html">Getting Started Quickly</a></li>
 <li class="toctree-l1"><a class="reference internal" href="data.html">Spectroscopic and Photometric Training Data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="training.html">Training the SALT3 Model</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Creating Simulated Data</a></li>
-<li class="toctree-l1"><a class="reference internal" href="validation.html">Validating the Trained Model</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Flexible Simulated Data with BYOSED</a></li>
 <li class="toctree-l1"><a class="reference internal" href="pipeline.html">Running the Pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 </ul>
 
-            
-          
         </div>
       </div>
     </nav>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="index.html">SALT3 Training</a>
-        
       </nav>
 
-
       <div class="wy-nav-content">
-        
         <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
+          <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-    
-      <li><a href="index.html">Docs</a> &raquo;</li>
-        
-      <li>Creating Simulated Data</li>
-    
-    
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Flexible Simulated Data with BYOSED</li>
       <li class="wy-breadcrumbs-aside">
-        
-            
             <a href="_sources/simulation.rst.txt" rel="nofollow"> View page source</a>
-          
-        
       </li>
-    
   </ul>
-
-  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-            
-  <div class="section" id="creating-simulated-data">
-<h1>Creating Simulated Data<a class="headerlink" href="#creating-simulated-data" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="byo-sed">
-<h2>BYO SED<a class="headerlink" href="#byo-sed" title="Permalink to this headline">¶</a></h2>
+             
+  <section id="flexible-simulated-data-with-byosed">
+<h1>Flexible Simulated Data with BYOSED<a class="headerlink" href="#flexible-simulated-data-with-byosed" title="Link to this heading">¶</a></h1>
+<section id="build-your-own-sed">
+<h2>“Build Your Own” SED<a class="headerlink" href="#build-your-own-sed" title="Link to this heading">¶</a></h2>
 <p>The BYOSED framework allows any spectrophotometric model to be used
 as the underlying template to generate simulated Type Ia light curve data
-with SNANA. By default, this model is the Hsiao+07 model (initfiles/Hsiao07.dat).
-This can be replaced by any model</p>
-</div>
-<div class="section" id="param-file-basics">
-<h2>Param File Basics<a class="headerlink" href="#param-file-basics" title="Permalink to this headline">¶</a></h2>
+with SNANA.
+This framework is published in
+<a class="reference external" href="https://ui.adsabs.harvard.edu/abs/2020arXiv201207811P/abstract">Pierel et al., 2021</a>.
+By default, this model is the Hsiao+07 model (initfiles/Hsiao07.dat).
+This can be replaced by any model.</p>
+</section>
+<section id="param-file-basics">
+<h2>Param File Basics<a class="headerlink" href="#param-file-basics" title="Link to this heading">¶</a></h2>
 <p>The only file to set up is the BYOSED.params file. This contains the general aspects
 of the simulated SN you want to create using BYOSED, and any warping effects you
 want to add in. This file is separated into the following required and optional sections:</p>
-<div class="section" id="main">
-<h3>[MAIN]<a class="headerlink" href="#main" title="Permalink to this headline">¶</a></h3>
+<section id="main">
+<h3>[MAIN]<a class="headerlink" href="#main" title="Link to this heading">¶</a></h3>
 <p><strong>(Required)</strong></p>
 <p>This section contains <strong>SED_FILE</strong> (name of SED file), as well as <strong>MAGSMEAR</strong> (magnitude
 smearing) and <strong>MAGOFF</strong> (magnitude offsets) definitions to be applied to the base SED defined by
 sed_file. You may also define <strong>CLOBBER</strong> and <strong>VERBOSE</strong> flags here as well. This section may look
 like the following:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
 
 <span class="n">SED_FILE</span><span class="p">:</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
 <span class="n">MAGSMEAR</span><span class="p">:</span> <span class="mf">0.0</span>
 <span class="n">MAGOFF</span><span class="p">:</span> <span class="mf">0.0</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="flags">
-<h3>[FLAGS]<a class="headerlink" href="#flags" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="flags">
+<h3>[FLAGS]<a class="headerlink" href="#flags" title="Link to this heading">¶</a></h3>
 <p><strong>(Optional)</strong></p>
 <p>This section allows you to simply turn warping effects defined in the next section(s) on and off. If
 this section exists, then it supersedes later sections and defines the warping effects to be used.
 If it does not exist, all defined warping effects are used. Adding this onto the <strong>[MAIN]</strong> section,
 the params file might now look like the following:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
 
 <span class="n">SED_FILE</span><span class="p">:</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
 <span class="n">MAGSMEAR</span><span class="p">:</span> <span class="mf">0.0</span>
@@ -202,10 +135,10 @@ the params file might now look like the following:</p>
 <p>In this case, a magnitude smearing of 0.1 would be applied to the Hsiao model at all wavelengths,
 and some color and stretch effects are applied as well based on functions you will
 define in the next sections.</p>
-</div>
-</div>
-<div class="section" id="warping-effects">
-<h2>Warping Effects<a class="headerlink" href="#warping-effects" title="Permalink to this headline">¶</a></h2>
+</section>
+</section>
+<section id="warping-effects">
+<h2>Warping Effects<a class="headerlink" href="#warping-effects" title="Link to this heading">¶</a></h2>
 <p>The following sections contain all of the various wavelength/phase dependent effects that you want
 to apply to your SED. In this case, based on the <strong>[FLAGS]</strong> section, you must have a “COLOR” section
 and a “STRETCH” section. You can name effects whatever you want <strong>with the exception of a “color law”
@@ -213,38 +146,38 @@ effect, which must be named **”COLOR”</strong>, as long as the name of your 
 name in the <strong>[FLAGS]</strong> section are identical. Creating a warping effect section requires the following
 variables in no particular order:</p>
 <ol class="arabic simple">
-<li>DIST_PEAK</li>
+<li><p>DIST_PEAK</p></li>
 </ol>
 <blockquote>
 <div><ul class="simple">
-<li>The PEAK of an (a)symmetric Gaussian that will define the distribution for the scale parameter</li>
+<li><p>The PEAK of an (a)symmetric Gaussian that will define the distribution for the scale parameter</p></li>
 </ul>
 </div></blockquote>
 <ol class="arabic simple" start="2">
-<li>DIST_SIGMA</li>
+<li><p>DIST_SIGMA</p></li>
 </ol>
 <blockquote>
 <div><ul class="simple">
-<li>The “low” and “high” standard deviations of the same distribution</li>
+<li><p>The “low” and “high” standard deviations of the same distribution</p></li>
 </ul>
 </div></blockquote>
 <ol class="arabic simple" start="3">
-<li>DIST_LIMITS</li>
+<li><p>DIST_LIMITS</p></li>
 </ol>
 <blockquote>
 <div><ul class="simple">
-<li>The lower and upper cutoff you would like for the same distribution</li>
+<li><p>The lower and upper cutoff you would like for the same distribution</p></li>
 </ul>
 </div></blockquote>
 <ol class="arabic simple" start="6">
-<li>DIST_FUNCTION</li>
+<li><p>DIST_FUNCTION</p></li>
 </ol>
 <blockquote>
 <div><ul class="simple">
-<li>A file name to be read that contains a list of phase, wave, value like the following:</li>
+<li><p>A file name to be read that contains a list of phase, wave, value like the following:</p></li>
 </ul>
 </div></blockquote>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1">#p w v</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1">#p w v</span>
 <span class="o">-</span><span class="mi">20</span> <span class="mi">1000</span> <span class="mf">25.75805</span>
 <span class="o">-</span><span class="mi">20</span> <span class="mi">1010</span> <span class="mf">25.64852</span>
 <span class="o">-</span><span class="mi">20</span> <span class="mi">1020</span> <span class="mf">25.53899</span>
@@ -259,7 +192,7 @@ where I have defined color and stretch effects in my <strong>[FLAGS]</strong> se
 sections. If I do not define a <strong>[FLAGS]</strong> section, then whatever sections that exist apart from
 the <strong>[MAIN]</strong> section are assumed to be warping effects. One such section might look like the
 following:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">COLOR</span><span class="p">]</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">COLOR</span><span class="p">]</span>
 
 <span class="n">WARP_FUNCTION</span><span class="p">:</span> <span class="n">color_func</span><span class="o">.</span><span class="n">dat</span>
 <span class="n">DIST_PEAK</span><span class="p">:</span> <span class="mf">0.0</span>
@@ -268,7 +201,7 @@ following:</p>
 </pre></div>
 </div>
 <p>All together, after adding in the stretch section as well, a <strong>BYOSED.params</strong> file might look something like this:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
 
 <span class="n">SED_FILE</span><span class="p">:</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
 <span class="n">MAGSMEAR</span><span class="p">:</span> <span class="mf">0.0</span>
@@ -297,7 +230,7 @@ following:</p>
 </div>
 <p>Or, if you do not define a flags section, color and stretch will automatically be used as
 warping effects with the following <strong>BYOSED.params</strong> file:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">MAIN</span><span class="p">]</span>
 
 <span class="n">SED_FILE</span><span class="p">:</span> <span class="n">Hsiao07</span><span class="o">.</span><span class="n">dat</span>
 <span class="n">MAGSMEAR</span><span class="p">:</span> <span class="mf">0.0</span>
@@ -318,91 +251,56 @@ warping effects with the following <strong>BYOSED.params</strong> file:</p>
 <span class="n">DIST_LIMITS</span><span class="p">:</span> <span class="o">-</span><span class="mf">2.5</span> <span class="mf">2.5</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="final-notes">
-<h2>Final Notes<a class="headerlink" href="#final-notes" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="final-notes">
+<h2>Final Notes<a class="headerlink" href="#final-notes" title="Link to this heading">¶</a></h2>
 <p>Now you can replace the Hsiao template with your own template SED, and start adding in warping
 effects. This warping process is designed so that as many effects as you would like can be
 included. Anything but a color effect (which should affect the final SED as a function of
 wavelength and possibly phase) is applied additively, while the color effect is applied
 multiplicatively. This is similar to the existing SALT2 framework. For the example file
 above, the final flux would look like this</p>
-<div class="math">
+<div class="math notranslate nohighlight">
 \[F(\lambda,\phi)=A\Big[H(\lambda,\phi)+S(\lambda,\phi)s\Big]\times10^{-0.4C(\lambda,\phi)c}\]</div>
 <p>Where here F is the final flux, H is the Hsiao template, S is the defined stretch function,
 C is the defined color function, s is the scale parameter pulled from the distribution defined
 for the stretch function, and c is the scale parameter pulled from the distribution defined
 for the color function. In principle this could look like the following if you had N such effects:</p>
-<div class="math">
+<div class="math notranslate nohighlight">
 \[F(\lambda,\phi)=A\Big[H(\lambda,\phi)+X_1(\lambda,\phi)x_1+X_2(\lambda,\phi)x_2+...+X_N(\lambda,\phi)x_N\Big]\times10^{-0.4C(\lambda,\phi)c}\]</div>
-</div>
-<div class="section" id="example-files">
-<h2>Example Files<a class="headerlink" href="#example-files" title="Permalink to this headline">¶</a></h2>
-<p>These are example files that can be used for your <a class="reference download internal" href="_downloads/Hsiao07.dat" download=""><code class="xref download docutils literal"><span class="pre">sed_file</span></code></a> and <a class="reference download internal" href="_downloads/BYOSED.params" download=""><code class="xref download docutils literal"><span class="pre">BYOSED.params</span></code></a>.
-The color and stretch functions are defined by accompanying <a class="reference download internal" href="_downloads/color_func.dat" download=""><code class="xref download docutils literal"><span class="pre">color</span></code></a> and <a class="reference download internal" href="_downloads/stretch_func.dat" download=""><code class="xref download docutils literal"><span class="pre">stretch</span></code></a> files.</p>
-</div>
-</div>
+</section>
+<section id="example-files">
+<h2>Example Files<a class="headerlink" href="#example-files" title="Link to this heading">¶</a></h2>
+<p>These are example files that can be used for your <a class="reference download internal" download="" href="_downloads/1083370a1cbe8ffe476d120043a9737d/Hsiao07.dat"><code class="xref download docutils literal notranslate"><span class="pre">sed_file</span></code></a> and <a class="reference download internal" download="" href="_downloads/f18364d24041b9306d963b227b4d990c/BYOSED.params"><code class="xref download docutils literal notranslate"><span class="pre">BYOSED.params</span></code></a>.
+The color and stretch functions are defined by accompanying <a class="reference download internal" download="" href="_downloads/763abd8a5a69b37d7f56f9d844bc671e/color_func.dat"><code class="xref download docutils literal notranslate"><span class="pre">color</span></code></a> and <a class="reference download internal" download="" href="_downloads/0823745f56174c85ece8e66b1334ecdb/stretch_func.dat"><code class="xref download docutils literal notranslate"><span class="pre">stretch</span></code></a> files.</p>
+</section>
+</section>
 
 
            </div>
-           
           </div>
-          <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="validation.html" class="btn btn-neutral float-right" title="Validating the Trained Model" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
-        <a href="training.html" class="btn btn-neutral" title="Training the SALT3 Model" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="training.html" class="btn btn-neutral float-left" title="Training the SALT3 Model" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="pipeline.html" class="btn btn-neutral float-right" title="Running the Pipeline" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
-  
 
   <hr/>
 
   <div role="contentinfo">
-    <p>
-        &copy; Copyright 2018, David Jones, Rick Kessler.
-
-    </p>
+    <p>&#169; Copyright 2018, David Jones, Rick Kessler.</p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
 
 </footer>
-
         </div>
       </div>
-
     </section>
-
   </div>
-  
-
-
-  
-
-    <script type="text/javascript">
-        var DOCUMENTATION_OPTIONS = {
-            URL_ROOT:'./',
-            VERSION:'',
-            LANGUAGE:'None',
-            COLLAPSE_INDEX:false,
-            FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true,
-            SOURCELINK_SUFFIX: '.txt'
-        };
-    </script>
-      <script type="text/javascript" src="_static/jquery.js"></script>
-      <script type="text/javascript" src="_static/underscore.js"></script>
-      <script type="text/javascript" src="_static/doctools.js"></script>
-      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-
-  
-
-  <script type="text/javascript" src="_static/js/theme.js"></script>
-
-  <script type="text/javascript">
+  <script>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
