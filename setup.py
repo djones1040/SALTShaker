@@ -40,6 +40,7 @@ setup(
 	author_email=AUTHOR_EMAIL,
 	license=LICENSE,
 	long_description=open('README.md').read(),
+    long_description_content_type="text/markdown",
 #         include_dirs=numpy.distutils.misc_util.get_numpy_include_dirs(),
 
 	install_requires=['astropy>=5.3',
