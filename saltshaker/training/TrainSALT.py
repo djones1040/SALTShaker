@@ -1437,12 +1437,79 @@ MAGERR_LAMOBS:  0.0  2000  4000  # magerr minlam maxlam
 MAGERR_LAMREST: 0.1   100   200  # magerr minlam maxlam
 
 SIGMA_INT: 0.106  # used in simulation"""
-        with open(f"{outdir}/SALT3.INFO", "w") as foutinfo:
+                SIGMA_INT: 0.106  # used in simulation"""
+
+        # ---- training-sample statistics (computed from the post-cuts datadict:
+        #      these are exactly the SNe/spectra actually used in the training) ----
+        try:
+            per_sn = []  # (snid, survey, n_spec, zHelio)
+            for snid, sn in datadict.items():
+                survey = str(getattr(sn, 'survey', 'UNKNOWN')).strip()
+                n_spec = getattr(sn, 'num_spec', None)
+                if n_spec is None:                      # fallback if accessor absent
+                    sd = getattr(sn, 'specdata', None)
+                    n_spec = len(sd) if sd else 0
+                per_sn.append((str(snid), survey, int(n_spec),
+                               getattr(sn, 'zHelio', float('nan'))))
+
+            n_sn_total   = len(per_sn)
+            n_spec_total = sum(n for _, _, n, _ in per_sn)
+            n_sn_wspec   = sum(1 for _, _, n, _ in per_sn if n > 0)
+
+            survey_stats = {}  # survey -> [n_sn, n_spec]
+            for _, survey, n_spec, _ in per_sn:
+                survey_stats.setdefault(survey, [0, 0])
+                survey_stats[survey][0] += 1
+                survey_stats[survey][1] += n_spec
+        except Exception as e:
+            log.warning(f"could not compute training-sample stats: {e}")
+            per_sn, survey_stats = [], {}
+            n_sn_total = n_spec_total = n_sn_wspec = 0
+
+        with open(f'{outdir}/SALT3.INFO', 'w') as foutinfo:
             print(foutinfotext, file=foutinfo)
+            # commented block -> ignored by SNANA/sncosmo parsers
+            print('#', file=foutinfo)
+            print('# ==================== TRAINING SAMPLE ====================', file=foutinfo)
+            print(f'# N_SN:            {n_sn_total}', file=foutinfo)
+            print(f'# N_SPEC:          {n_spec_total}', file=foutinfo)
+            print(f'# N_SN_WITH_SPEC:  {n_sn_wspec}', file=foutinfo)
+            print(f'# N_SURVEYS:       {len(survey_stats)}', file=foutinfo)
+            print('#', file=foutinfo)
+            print('# SURVEY                          N_SN   N_SPEC', file=foutinfo)
+            for survey in sorted(survey_stats):
+                nsn, nspec = survey_stats[survey]
+                print(f'# {survey:<28} {nsn:>6} {nspec:>8}', file=foutinfo)
+            print('# Per-SN listing -> SALT3_TRAINING_STATS.txt', file=foutinfo)
+            print('# ========================================================', file=foutinfo)
+
+        # ---- detailed per-SN table (separate, machine-readable) ----
+        try:
+            with open(f'{outdir}/SALT3_TRAINING_STATS.txt', 'w') as foutstats:
+                print('# Per-SN training-sample statistics', file=foutstats)
+                print(f'# N_SN={n_sn_total}  N_SPEC={n_spec_total}  '
+                      f'N_SN_WITH_SPEC={n_sn_wspec}  N_SURVEYS={len(survey_stats)}',
+                      file=foutstats)
+                print('#', file=foutstats)
+                print('# Per-survey totals:  SURVEY  N_SN  N_SPEC', file=foutstats)
+                for survey in sorted(survey_stats):
+                    nsn, nspec = survey_stats[survey]
+                    print(f'#   {survey:<28} {nsn:>6} {nspec:>8}', file=foutstats)
+                print('#', file=foutstats)
+                print('VARNAMES: SNID SURVEY N_SPEC zHELIO', file=foutstats)
+                for snid, survey, n_spec, zhel in sorted(per_sn, key=lambda r: (r[1], r[0])):
+                    try:
+                        zstr = f'{float(zhel):.5f}'
+                    except (TypeError, ValueError):
+                        zstr = 'nan'
+                    print(f'SN: {snid} {survey} {n_spec} {zstr}', file=foutstats)
+        except Exception as e:
+            log.warning(f"could not write SALT3_TRAINING_STATS.txt: {e}")
+
         if len(trainingresult.clpars) == 1:
             colorlaw = trainingresult.clpars[0]
-            with open(f"{outdir}/salt3_color_correction.dat", "w") as foutcl:
-                print(f"{len(colorlaw):.0f}", file=foutcl)
+            with open(f'{outdir}/salt3_color_correction.dat', 'w') as foutcl:
+                print(f'{len(colorlaw):.0f}', file=foutcl)
 
                 for c in colorlaw:
                     print(f"{c:8.10e}", file=foutcl)
