@@ -437,5 +437,5 @@ if __name__ == "__main__":
 		parser.outdir=(parser.salt3dir)
 	plotSynthPhotOverStretchRange('{}/synthphotrange.pdf'.format(parser.outdir),parser.salt3dir,parser.filterset)
 	overPlotSynthPhotByComponent('{}/synthphotoverplot.pdf'.format(parser.outdir),parser.salt3dir,parser.filterset)
-	plotSynthPhotOverStretchRangeNIR('{}/synthphotrangeNIR.pdf'.format(parser.outdir),parser.salt3dir)	
+	#plotSynthPhotOverStretchRangeNIR('{}/synthphotrangeNIR.pdf'.format(parser.outdir),parser.salt3dir)	
 

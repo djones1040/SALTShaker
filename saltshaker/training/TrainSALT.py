@@ -47,6 +47,7 @@ import yaml
 import time
 
 initializationtime = time.time()
+
 import matplotlib as mpl
 
 mpl.use("agg")
@@ -73,6 +74,7 @@ from saltshaker.util.specSynPhot import getScaleForSN
 from saltshaker.util.specrecal import SpecRecal
 from saltshaker.util.synphot import synphot
 from saltshaker.util.example_data_utils import download_dir
+from saltshaker.util import compute_survey_stats
 
 from saltshaker.initfiles import init_rootdir
 from saltshaker.initfiles import init_rootdir as salt2dir
@@ -97,6 +99,7 @@ from saltshaker.validation import ValidateModel
 from saltshaker.validation import CheckSALTParams
 from saltshaker.validation.figs import plotSALTModel
 from saltshaker.validation import SynPhotPlot
+from saltshaker.validation import kene_plot
 
 from saltshaker.data import data_rootdir
 
@@ -1245,8 +1248,6 @@ class TrainSALT(TrainSALTBase):
 
         log.info("Final loglike")
         log.info(saltresids.maxlikefit(trainingresult.params_raw))
-        # log.info('Final photometric loglike'); log.info(saltresids.maxlikefit(trainingresult.params_raw,dospec=False))
-
         log.info(trainingresult.params.size)
 
         if "chain" in saltfitter.__dict__.keys():
