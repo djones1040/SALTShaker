@@ -1437,10 +1437,21 @@ MAGERR_LAMOBS:  0.0  2000  4000  # magerr minlam maxlam
 MAGERR_LAMREST: 0.1   100   200  # magerr minlam maxlam
 
 SIGMA_INT: 0.106  # used in simulation"""
+        # per-survey summary statistics of the training sample
+        surveystats = {}
+        for sn in datadict.values():
+            nsn, nspec = surveystats.get(sn.survey, (0, 0))
+            surveystats[sn.survey] = (nsn + 1, nspec + len(sn.specdata))
+
+        surveylines = ["# SURVEY N_SN N_SPEC  (per-spectrum details in salt3train_specinfo.txt)"]
+        for survey, (nsn, nspec) in sorted(surveystats.items()):
+            surveylines.append(f"# {survey} {nsn} {nspec}")
+        foutinfotext += "\n" + "\n".join(surveylines)
         with open(f"{outdir}/SALT3.INFO", "w") as foutinfo:
             print(foutinfotext, file=foutinfo)
         if len(trainingresult.clpars) == 1:
             colorlaw = trainingresult.clpars[0]
+            
             with open(f"{outdir}/salt3_color_correction.dat", "w") as foutcl:
                 print(f"{len(colorlaw):.0f}", file=foutcl)
 
