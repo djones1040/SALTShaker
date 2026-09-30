@@ -1566,11 +1566,31 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
                         file=foutsn,
                     )
                     # print(f"{k} {trainingresult.snparams[k]['x0']:8.10e} {trainingresult.snparams[k]['x1']:.10f} {trainingresult.snparams[k]['c'] if 'c' in trainingresult.snparams[k] else trainingresult.snparams[k]['c0']:.10f} {trainingresult.snparams[k]['c1']:.10f} {trainingresult.snparams[k]['t0']:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",file=foutsn)
-
+ # per-spectrum listing: which spectra belong to which SN
+        with open(f"{outdir}/salt3train_specinfo.txt", "w") as foutspec:
+            print(
+                "# SNID SURVEY SPECID MJD PHASE_REST WAVE_MIN WAVE_MAX N_WAVE N_SPECRECAL",
+                file=foutspec,
+            )
+            for snid, sn in datadict.items():
+                for k, spec in sn.specdata.items():
+                    mjd = getattr(spec, "mjd", -99)
+                    # tobs is observer-frame days relative to peak; convert to rest frame
+                    phase = np.mean(np.atleast_1d(spec.tobs)) / (1 + sn.zHelio)
+                    nrecal = getattr(spec, "n_specrecal", -99)
+                    print(
+                        f"{snid} {sn.survey} {k} {mjd:.3f} {phase:.2f} "
+                        f"{spec.wavelength.min():.1f} {spec.wavelength.max():.1f} "
+                        f"{len(spec.wavelength)} {nrecal}",
+                        file=foutspec,
+                    )
+        
         keys = ["num_lightcurves", "num_spectra", "num_sne"]
+        
         yamloutputdict = {key.upper(): getattr(trainingresult, key) for key in keys}
         yamloutputdict["CPU_MINUTES"] = (time.time() - initializationtime) / 60
         yamloutputdict["ABORT_IF_ZERO"] = 1
+        
         with open(f"{self.options.yamloutputfile}", "w") as file:
             yaml.dump(yamloutputdict, file)
 
