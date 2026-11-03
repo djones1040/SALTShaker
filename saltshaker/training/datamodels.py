@@ -1120,10 +1120,15 @@ class modeledtrainingspectrum(modeledtrainingdata):
         "phase",
         "flux",
         "fluxerr",
+        "wavelength",
         "restwavelength",
         "recaltermderivs",
         "pcderivsparse",
         "errordesignmat",
+        # Per-spectrum (redshift, MW extinction, padding zeros); if unmapped,
+        # every spectrum in a batch would use the first spectrum's prefactor
+        "varianceprefactor",
+        "padding",
         "uniqueid",
         "n_specrecal",
     }

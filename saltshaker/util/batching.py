@@ -148,8 +148,15 @@ def batchdatabysize(data, outdir=None, prefix="", cache_to_disk=False):
                         except (ValueError, TypeError):
                             return v1 is v2
 
+                    # Only the first object's value is passed to the batched
+                    # function, so a differing value would silently be wrong
+                    # for every other object in the batch
                     if not all(values_equal(vals[0], v) for v in vals[1:]):
-                        log.warning(f"Unmapped quantity '{varname}' differs between objects in batch: shapes {[np.shape(v) for v in vals]}, values {vals[:3]}")
+                        raise ValueError(
+                            f"Unmapped quantity '{varname}' of {type(data[0]).__name__} "
+                            f"differs between objects in a batch (shapes "
+                            f"{[np.shape(v) for v in vals]}); declare it in __ismapped__"
+                        )
                     yield vals[0]
                 else:
                     # If an attribute is to be mapped over, the values are stacked along the first axis
