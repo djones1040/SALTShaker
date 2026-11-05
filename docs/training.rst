@@ -134,7 +134,9 @@ n_colorscatpars                5                 number of parameters used to de
 n_components                   2                 number of model components (M0, M1) - additional components not yet allowed
 error_snake_phase_binsize      6                 spacing in days for the SALT error model B-spline interpolation
 error_snake_wave_binsize       1200              spacing in Angstroms for the SALT error model B-spline interpolation
-use_snpca_knots                False             if true, use the knot locations from the SALT2 training
+use_snpca_knots                False             if true, use the knot locations from the SALT2 training.  Legacy option, only used if :code:`splineknotspacingmethod` is not set
+splineknotspacingmethod        not set           spacing of model knots: :code:`uniform`, :code:`snpca` (SALT2 training locations), or :code:`adaptive` (wavelength knots follow the density of the spectra, with :code:`wavesplineres` as the smallest spacing)
+adaptive_waveknots_tuning      1                 for adaptive knots, high values give ~ uniform spacing, low values reduce resolution where spectra are not present
 
 [priors]                                         key is the name of a decorator in :code:`training/priors.py`; value determines the (semi-arbitrary) width of each prior
 x1mean                         0.1               mean x1 = 0

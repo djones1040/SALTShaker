@@ -650,7 +650,13 @@ Interpolation
      - B-spline order for error model interpolation. Default: 0.
    * - ``use_snpca_knots``
      - bool
-     - Use knot locations from SALT2 training. Default: False.
+     - Use knot locations from SALT2 training. Legacy option, only used if ``splineknotspacingmethod`` is not set. Default: False.
+   * - ``splineknotspacingmethod``
+     - str
+     - Spacing of model knots: ``uniform``, ``snpca`` (SALT2 training locations), or ``adaptive`` (wavelength knots follow the density of the spectra, with ``wavesplineres`` as the smallest spacing). Default: not set.
+   * - ``adaptive_waveknots_tuning``
+     - float
+     - For adaptive knots, high values give approximately uniform spacing, low values reduce resolution where spectra are not present. Default: 1.
 
 Model Components
 ^^^^^^^^^^^^^^^^

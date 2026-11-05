@@ -1174,7 +1174,23 @@ class SALTResids:
             "modelparams",
             "use_snpca_knots",
             type=boolean_string,
-            help="if set, define model on SNPCA knots (default=%(default)s)",
+            help="if set, define model on SNPCA knots; legacy option used if splineknotspacingmethod is unset (default=%(default)s)",
+        )
+        successful = successful & wrapaddingargument(
+            config,
+            "modelparams",
+            "splineknotspacingmethod",
+            type=str,
+            default="",
+            help="spacing of model spline knots: uniform, snpca, or adaptive, which spaces wavelength knots according to the density of the spectra (default=%(default)s)",
+        )
+        successful = successful & wrapaddingargument(
+            config,
+            "modelparams",
+            "adaptive_waveknots_tuning",
+            type=float,
+            default=1.0,
+            help="for adaptive knots, high values give ~ uniform spacing, low values reduce resolution where spectra are not present (default=%(default)s)",
         )
 
         successful = successful & wrapaddingargument(

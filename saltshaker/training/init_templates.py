@@ -15,9 +15,13 @@ init_kaepora
     Initialize from Kaepora spectral templates.
 init_errs
     Initialize model error surfaces from SALT2 error files.
+getsplineknots
+    Choose the phase and wavelength knot locations of the model.
 synphotB
     Compute synthetic B-band magnitude.
 """
+import warnings
+
 import numpy as np
 from scipy.interpolate import bisplrep, bisplev, RegularGridInterpolator
 from scipy.interpolate import interp1d
@@ -31,13 +35,126 @@ log = logging.getLogger(__name__)
 
 _SCALE_FACTOR = 1e-12
 
+_SNPCA_PHASE_KNOTS = np.array([-20.0,-20.0,-20.0,-20.0,-16.72,-12.90,-8.20,-3.85,-0.08,3.65,7.91,12.54,16.89,20.87,25.22,30.94,38.59,50.0,50.0,50.0,50.0])
+_SNPCA_WAVE_KNOTS = np.array([2000., 2000., 2000., 2000., 2067., 2133., 2198., 2262., 2325., 2387., 2449., 2510.,
+							  2570., 2630., 2689., 2748., 2806., 2863., 2920., 2977., 3033.,
+							  3089., 3145., 3200., 3255., 3310., 3364., 3418., 3472., 3526.,
+							  3580., 3633., 3687., 3740., 3793., 3846., 3899., 3952., 4005.,
+							  4058., 4111., 4164., 4217., 4270., 4323., 4377., 4430., 4484.,
+							  4538., 4592., 4646., 4700., 4755., 4810., 4865., 4921., 4977.,
+							  5033., 5090., 5147., 5205., 5263., 5322., 5381., 5441., 5501.,
+							  5563., 5624., 5687., 5750., 5814., 5879., 5946.,
+							  6012., 6081., 6150., 6220., 6292., 6365., 6439., 6515.,
+							  6593., 6672., 6754., 6837., 6922., 7010., 7101., 7194., 7290.,
+							  7389., 7492., 7598., 7709., 7825., 7946., 8072., 8205., 8345.,
+							  8494., 8652., 8821., 9003.,9200.,9200.,9200.,9200.])
+
+def calcadaptivewaveknots(datadict,tuningcoeff,waverange,wavesplineres,order):
+	"""
+	Place wavelength knots according to the density of the training spectra.
+
+	Knots are spaced evenly in the cumulative SNR^2 of the spectral data, added
+	to a linear ramp in wavelength. The number of knots is the largest that
+	keeps every knot spacing at least wavesplineres.
+
+	Parameters
+	----------
+	datadict : dict
+		Dictionary of training data, keyed by SN ID.
+	tuningcoeff : float
+		Weight of the linear ramp. High values give approximately uniform
+		spacing, low values reduce resolution where spectra are not present.
+	waverange : list
+		[min, max] rest-frame wavelength in Angstroms.
+	wavesplineres : float
+		Smallest spacing between knots (Angstroms).
+	order : int
+		B-spline order.
+
+	Returns
+	-------
+	ndarray
+		Wavelength knot locations, with the end knots repeated order+1 times.
+	"""
+	waves=[]
+	snrsq=[]
+
+	for sn in datadict.values():
+		for spec in sn.specdata.values():
+			waves+=[spec.wavelength/(1+sn.zHelio)]
+			with warnings.catch_warnings():
+				warnings.simplefilter('ignore')
+				snrsq+=[np.hypot(np.nan_to_num(spec.fluxerr/spec.flux,False,1000),.1)**(-2)]
+	if not len(waves):
+		raise ValueError('Adaptive wavelength knots require spectra in the training sample')
+	snrsq=np.concatenate(snrsq)
+	waves=np.concatenate(waves)
+	idx=np.argsort(waves)
+	waves=waves[idx]
+	snrsq=snrsq[idx]
+
+	projection=np.cumsum(snrsq)/snrsq.sum() + tuningcoeff*(waves-waves.min())/(waves.max()-waves.min())
+	projection/=projection.max()
+	# one knot step must cover the largest rise of the projection over wavesplineres
+	windowend=np.searchsorted(waves,waves+wavesplineres,side='right')-1
+	maxstep=(projection[windowend]-projection).max()
+	n=int(1/maxstep)+1
+	knots=np.interp(np.linspace(0,1,n,True),projection,waves)
+	return np.concatenate([[waverange[0]]*(order+1), knots[1:-1] , [waverange[1]]*(order+1)])
+
+def getsplineknots(phaserange,waverange,phasesplineres,wavesplineres,order,
+				   splineknotspacingmethod='uniform',datadict=None,adaptive_waveknots_tuning=1.):
+	"""
+	Choose the phase and wavelength knot locations of the model.
+
+	Parameters
+	----------
+	phaserange : list
+		[min, max] rest-frame phase in days relative to B-max.
+	waverange : list
+		[min, max] rest-frame wavelength in Angstroms.
+	phasesplineres : float
+		Spacing between phase B-spline knots (days).
+	wavesplineres : float
+		Spacing between wavelength B-spline knots (Angstroms). The smallest
+		spacing if splineknotspacingmethod is 'adaptive'.
+	order : int
+		B-spline order.
+	splineknotspacingmethod : {'uniform', 'snpca', 'adaptive'}
+		'uniform' spaces knots evenly, 'snpca' uses the SALT2/SNPCA knots, and
+		'adaptive' spaces wavelength knots according to the density of the
+		spectra in datadict, with uniform phase knots.
+	datadict : dict, optional
+		Dictionary of training data, required if splineknotspacingmethod is
+		'adaptive'.
+	adaptive_waveknots_tuning : float
+		High values give approximately uniform spacing of adaptive knots, low
+		values reduce resolution where spectra are not present.
+
+	Returns
+	-------
+	splinephase : ndarray
+		Phase knot locations.
+	splinewave : ndarray
+		Wavelength knot locations.
+	"""
+	if splineknotspacingmethod not in ('uniform','snpca','adaptive'):
+		raise ValueError(f'Unknown spline knot spacing method {splineknotspacingmethod}, valid options are uniform, snpca, adaptive')
+	if splineknotspacingmethod=='snpca':
+		return _SNPCA_PHASE_KNOTS.copy(),_SNPCA_WAVE_KNOTS.copy()
+	splinephase = np.linspace(phaserange[0],phaserange[1],int((phaserange[1]-phaserange[0])/phasesplineres)+1,True)
+	if splineknotspacingmethod=='adaptive':
+		return splinephase,calcadaptivewaveknots(datadict or {},adaptive_waveknots_tuning,waverange,wavesplineres,order)
+	return splinephase,np.linspace(waverange[0],waverange[1],int((waverange[1]-waverange[0])/wavesplineres)+1,True)
+
 def init_salt2(m0file=None,m1file=None,M0triplet=None,M1triplet=None,
 			   Bfilt='initfiles/Bessell90_B.dat',
 			   flatnu='initfiles/flatnu.dat',
 			   hsiaofile=f'{init_rootdir}/hsiao07.dat',
 			   phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
 			   waveinterpres=2.0,phasesplineres=3.2,wavesplineres=72,
-			   days_interp=5,debug=False,normalize=True,order=3,use_snpca_knots=True):
+			   days_interp=5,debug=False,normalize=True,order=3,splineknotspacingmethod='uniform',
+			   datadict=None,adaptive_waveknots_tuning=1.):
 	"""
 	Initialize SALT3 model components from existing SALT2 model files.
 
@@ -74,8 +191,12 @@ def init_salt2(m0file=None,m1file=None,M0triplet=None,M1triplet=None,
 		Spacing between wavelength B-spline knots (Angstroms).
 	order : int
 		B-spline order (default 3 = cubic).
-	use_snpca_knots : bool
-		If True, use SALT2/SNPCA knot locations instead of uniform grid.
+	splineknotspacingmethod : {'uniform', 'snpca', 'adaptive'}
+		How knots are placed, see getsplineknots.
+	datadict : dict, optional
+		Training data, required for adaptive knots.
+	adaptive_waveknots_tuning : float
+		See getsplineknots.
 
 	Returns
 	-------
@@ -104,23 +225,8 @@ def init_salt2(m0file=None,m1file=None,M0triplet=None,M1triplet=None,
 					 (wave >= waverange[0]-wavesplineres*0) & (wave <= waverange[1]+wavesplineres*0))[0]
 	phase,wave,m0flux = phase[iGood],wave[iGood],m0flux[iGood]	
 	
-	splinephase = np.linspace(phaserange[0],phaserange[1],int((phaserange[1]-phaserange[0])/phasesplineres)+1,True)
-	splinewave	= np.linspace(waverange[0],waverange[1],int((waverange[1]-waverange[0])/wavesplineres)+1,True)
-
-	if use_snpca_knots:
-		splinephase = np.array([-20.0,-20.0,-20.0,-20.0,-16.72,-12.90,-8.20,-3.85,-0.08,3.65,7.91,12.54,16.89,20.87,25.22,30.94,38.59,50.0,50.0,50.0,50.0])
-		splinewave = np.array([2000., 2000., 2000., 2000., 2067., 2133., 2198., 2262., 2325., 2387., 2449., 2510.,
-							   2570., 2630., 2689., 2748., 2806., 2863., 2920., 2977., 3033.,
-							   3089., 3145., 3200., 3255., 3310., 3364., 3418., 3472., 3526.,
-							   3580., 3633., 3687., 3740., 3793., 3846., 3899., 3952., 4005.,
-							   4058., 4111., 4164., 4217., 4270., 4323., 4377., 4430., 4484.,
-							   4538., 4592., 4646., 4700., 4755., 4810., 4865., 4921., 4977.,
-							   5033., 5090., 5147., 5205., 5263., 5322., 5381., 5441., 5501.,
-							   5563., 5624., 5687., 5750., 5814., 5879., 5946.,
-							   6012., 6081., 6150., 6220., 6292., 6365., 6439., 6515.,
-							   6593., 6672., 6754., 6837., 6922., 7010., 7101., 7194., 7290.,
-							   7389., 7492., 7598., 7709., 7825., 7946., 8072., 8205., 8345.,
-							   8494., 8652., 8821., 9003.,9200.,9200.,9200.,9200.])
+	splinephase,splinewave = getsplineknots(phaserange,waverange,phasesplineres,wavesplineres,order,
+										   splineknotspacingmethod,datadict,adaptive_waveknots_tuning)
 	if m1file is not None:
 			m1phase,m1wave,m1flux = np.loadtxt(m1file,unpack=True) #[2][iGood]
 			iGood = np.where((m1phase >= phaserange[0]-phasesplineres*0) & (m1phase <= phaserange[1]+phasesplineres*0) &
@@ -199,7 +305,8 @@ def init_hsiao(hsiaofile='initfiles/hsiao07.dat',
 			   flatnu='initfiles/flatnu.dat',
 			   phaserange=[-20,50],waverange=[2000,9200],phaseinterpres=1.0,
 			   waveinterpres=2.0,phasesplineres=3.2,wavesplineres=72,
-			   days_interp=5,debug=False,normalize=True,order=3,use_snpca_knots=False):
+			   days_interp=5,debug=False,normalize=True,order=3,splineknotspacingmethod='uniform',
+			   datadict=None,adaptive_waveknots_tuning=1.):
 	"""
 	Initialize SALT3 model components from the Hsiao07 SN Ia template.
 
@@ -232,8 +339,12 @@ def init_hsiao(hsiaofile='initfiles/hsiao07.dat',
 		If True, normalize to standard SN Ia absolute magnitude.
 	order : int
 		B-spline order (default 3 = cubic).
-	use_snpca_knots : bool
-		If True, use SALT2/SNPCA knot locations instead of uniform grid.
+	splineknotspacingmethod : {'uniform', 'snpca', 'adaptive'}
+		How knots are placed, see getsplineknots.
+	datadict : dict, optional
+		Training data, required for adaptive knots.
+	adaptive_waveknots_tuning : float
+		See getsplineknots.
 
 	Returns
 	-------
@@ -273,24 +384,8 @@ def init_hsiao(hsiaofile='initfiles/hsiao07.dat',
 
 	#m1phase = phase*1.1
 	# was *3 (phase), *5 (wave)
-	splinephase = np.linspace(phaserange[0],phaserange[1],int((phaserange[1]-phaserange[0])/phasesplineres)+1,True)
-	splinewave	= np.linspace(waverange[0],waverange[1],int((waverange[1]-waverange[0])/wavesplineres)+1,True)
-	#splinephase = [-8.2, -3.85, -0.05, 3.65, 7.9, 12.55, 16.9, 20.9, 25.25, 30.95, 38.55, 50, 50.05, 50.05]
-	#splinewave = [2198,2262.08,2325.44,2387.36,2449.28,2510.48,2570.24,2630,2689.04,2748.08,2805.68,2863.28,2920.88,2977.76,3033.92,3089.36,3145.52,3200.24,3255.68,3310.4,3364.4,3418.4,3472.4,3526.4,3580.4,3633.68,3686.96,3740.24,3793.52,3846.08,3899.36,3952.64,4005.2,4058.48,4111.04,4164.32,4217.6,4270.16,4323.44,4376.72,4430.72,4484,4538,4592,4646,4700.72,4755.44,4810.16,4865.6,4921.76,4977.2,5034.08,5090.24,5147.84,5205.44,5263.76,5322.08,5381.84,5441.6,5502.08,5562.56,5624.48,5687.12,5750.48,5814.56,5880.08,5945.6,6012.56,6080.96,6150.08,6220.64,6291.92,6365.36,6439.52,6515.84,6593.6,6672.8,6754.16,6836.96,6922.64,7010.48,7101.2,7194.08,7289.84,7389.2,7492.16,7598.72,7709.6,7825.52,7945.76,8072.48,8205.68,8345.36,8494.4,8652.08,8821.28,9003.44,9200,9200.72,9200.72]
-	if use_snpca_knots:
-		splinephase = np.array([-20.0,-20.0,-20.0,-20.0,-16.72,-12.90,-8.20,-3.85,-0.08,3.65,7.91,12.54,16.89,20.87,25.22,30.94,38.59,50.0,50.0,50.0,50.0])
-		splinewave = np.array([2000., 2000., 2000., 2000., 2067., 2133., 2198., 2262., 2325., 2387., 2449., 2510.,
-							   2570., 2630., 2689., 2748., 2806., 2863., 2920., 2977., 3033.,
-							   3089., 3145., 3200., 3255., 3310., 3364., 3418., 3472., 3526.,
-							   3580., 3633., 3687., 3740., 3793., 3846., 3899., 3952., 4005.,
-							   4058., 4111., 4164., 4217., 4270., 4323., 4377., 4430., 4484.,
-							   4538., 4592., 4646., 4700., 4755., 4810., 4865., 4921., 4977.,
-							   5033., 5090., 5147., 5205., 5263., 5322., 5381., 5441., 5501.,
-							   5563., 5624., 5687., 5750., 5814., 5879., 5946.,
-							   6012., 6081., 6150., 6220., 6292., 6365., 6439., 6515.,
-							   6593., 6672., 6754., 6837., 6922., 7010., 7101., 7194., 7290.,
-							   7389., 7492., 7598., 7709., 7825., 7946., 8072., 8205., 8345.,
-							   8494., 8652., 8821., 9003.,9200.,9200.,9200.,9200.])
+	splinephase,splinewave = getsplineknots(phaserange,waverange,phasesplineres,wavesplineres,order,
+										   splineknotspacingmethod,datadict,adaptive_waveknots_tuning)
 
 	bspl = bisplrep(phase,wave,m0flux,kx=order,ky=order, tx=splinephase,ty=splinewave,task=-1,nxest=len(splinephase),nyest=len(splinewave))
 	

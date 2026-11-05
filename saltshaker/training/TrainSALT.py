@@ -281,6 +281,17 @@ class TrainSALT(TrainSALTBase):
                 % init_rootdir
             )
 
+        splineknotspacingmethod = self.options.splineknotspacingmethod
+        if not splineknotspacingmethod:
+            # legacy flag, only used if the spacing method is unset
+            splineknotspacingmethod = (
+                "snpca" if self.options.use_snpca_knots else "uniform"
+            )
+        elif self.options.use_snpca_knots and splineknotspacingmethod != "snpca":
+            log.warning(
+                f"splineknotspacingmethod={splineknotspacingmethod} overrides use_snpca_knots"
+            )
+
         # initial guesses
         init_options = {
             "phaserange": self.options.phaserange,
@@ -291,7 +302,9 @@ class TrainSALT(TrainSALTBase):
             "waveinterpres": self.options.waveinterpres,
             "normalize": True,
             "order": self.options.bsorder,
-            "use_snpca_knots": self.options.use_snpca_knots,
+            "splineknotspacingmethod": splineknotspacingmethod,
+            "datadict": datadict,
+            "adaptive_waveknots_tuning": self.options.adaptive_waveknots_tuning,
         }
 
         phase, wave, m0, m1, phaseknotloc, waveknotloc, m0knots, m1knots = init_hsiao(
@@ -336,7 +349,18 @@ class TrainSALT(TrainSALTBase):
         init_options["order"] = self.options.errbsorder
         init_options["n_colorscatpars"] = self.options.n_colorscatpars
 
-        del init_options["use_snpca_knots"]
+        if splineknotspacingmethod == "adaptive":
+            uniqueknots = np.unique(waveknotloc)
+            knotspacing = np.diff(uniqueknots)
+            log.info(
+                f"Adaptive wave knots: {uniqueknots.size} knots from {uniqueknots[0]:.1f} to {uniqueknots[-1]:.1f} angstroms, "
+                f"spacing min {knotspacing.min():.1f}, median {np.median(knotspacing):.1f}, max {knotspacing.max():.1f} angstroms"
+            )
+            log.debug(f"Adaptive wave knot locations in angstroms: {uniqueknots}")
+            log.debug(f"Adaptive wave knot spacing in angstroms: {knotspacing}")
+        del init_options["splineknotspacingmethod"]
+        del init_options["datadict"]
+        del init_options["adaptive_waveknots_tuning"]
         if self.options.initsalt2var:
             (
                 errphaseknotloc,
