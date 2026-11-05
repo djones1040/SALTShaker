@@ -9,6 +9,8 @@ Functions
 ---------
 optimizepaddingsizes
     Determine optimal padding sizes to minimize memory usage.
+stackbcoo
+    Stack sparse arrays along a new batch axis.
 batchdatabysize
     Divide data into batches grouped by size for vmap.
 walkargumenttree
@@ -84,6 +86,40 @@ def optimizepaddingsizes(numbatches, datasizes):
     return padsizes, sum(datasizes) / finalspacecost
 
 
+def stackbcoo(mats):
+    """Stack BCOO arrays along a new batch axis for use with vmap.
+
+    Equivalent to reshaping each array and calling bcoo_concatenate, but padded
+    in numpy, since JAX would compile its operations for each distinct nse.
+
+    Parameters
+    ----------
+    mats : list of jax.experimental.sparse.BCOO
+        Arrays of identical shape, each with n_batch=0 and n_dense=0.
+
+    Returns
+    -------
+    jax.experimental.sparse.BCOO
+        Array with n_batch=1, and shape (len(mats), *mats[0].shape).
+    """
+    shape = mats[0].shape
+    if any(x.shape != shape for x in mats):
+        raise ValueError(
+            f"Sparse arrays in a batch must have matching shapes: {[x.shape for x in mats]}"
+        )
+    nse = max(x.nse for x in mats)
+    data = np.zeros((len(mats), nse), dtype=mats[0].data.dtype)
+    # Unused entries take out-of-bounds indices, matching JAX's convention for padding
+    indices = np.full(
+        (len(mats), nse, len(shape)),
+        np.array(shape, dtype=mats[0].indices.dtype),
+    )
+    for i, x in enumerate(mats):
+        data[i, : x.nse] = np.asarray(x.data)
+        indices[i, : x.nse] = np.asarray(x.indices)
+    return sparse.BCOO((data, indices), shape=(len(mats), *shape))
+
+
 def batchdatabysize(data, outdir=None, prefix="", cache_to_disk=False):
     """Given a set of data, divide them into batches each of a fixed size,
     for easy use with jax's batching methods. Quantities that are marked as
@@ -125,10 +161,7 @@ def batchdatabysize(data, outdir=None, prefix="", cache_to_disk=False):
             vals = [(unpacked[i][j]) for i in range(len(unpacked))]
             # If it's a sparse array, concatenate along new "batched" axis for use with vmap
             if isinstance(vals[0], sparse.BCOO):
-                yield sparse.bcoo_concatenate(
-                    [x.reshape((1, *x.shape)).update_layout(n_batch=1) for x in vals],
-                    dimension=0,
-                )
+                yield stackbcoo(vals)
             else:
                 if not (varname in __ismapped__):
                     # If an attribute is not to be mapped over, the single value is set
