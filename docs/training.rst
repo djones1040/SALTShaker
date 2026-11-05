@@ -145,6 +145,7 @@ colorstretchcorr               1e-4              color and stretch should not be
 colormean                      1e-3              mean sample color is zero
 m0positiveprior                1e-2              M0 is not allowed to be negative
 recalprior                     50                don't allow spectral recalibration to go crazy
+recalcolorprior                not set           spectral recalibration should follow the color law, which it replaces in the spectral model
 
 [bounds]
 x1                             -5,5,0.01         min,max,prior width on x1

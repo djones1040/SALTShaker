@@ -1365,6 +1365,49 @@ class modeledtrainingspectrum(modeledtrainingdata):
         """Return the number of spectral wavelength bins (including padding)."""
         return self.flux.size
 
+    def recalcolordeviation(self, pars):
+        """
+        Compute the deviation of the recalibration term from the color law.
+
+        Recalibrated spectra use the recalibration term in place of the color
+        law in modelflux, so the term is compared to the log of the color law.
+        The polynomial has no constant term and is zero at the mean wavelength,
+        with the overall scale set by the spectrum's own x0, so the color law is
+        taken relative to its value at that wavelength. Spectra without
+        recalibration apply the color law directly, so their term is compared
+        to zero.
+
+        Parameters
+        ----------
+        pars : ndarray or SALTparameters
+            Model parameters.
+
+        Returns
+        -------
+        jnp.ndarray
+            Difference of the terms in log flux at each wavelength bin, zero
+            for padded bins.
+        """
+        if not isinstance(pars, SALTparameters):
+            pars = SALTparameters(self, pars)
+
+        def logcolorexp(wave):
+            colorlaw = sum(
+                [
+                    fun(c, cl, wave)
+                    for fun, c, cl in zip(self.colorlawfunction, pars.c, pars.CL)
+                ]
+            )
+            return -0.4 * jnp.log(10.0) * colorlaw
+
+        recalterm = jnp.dot(self.recaltermderivs, pars.spcrcl)
+        meanwave = jnp.mean(self.restwavelength, where=~self.ipad, keepdims=True)
+        # Padded bins have no wavelength, using the mean gives them a target of 0
+        wave = jnp.where(self.ipad, meanwave, self.restwavelength)
+        # Gradients are stopped so that spectra do not constrain the color or color law
+        target = jax.lax.stop_gradient(logcolorexp(wave) - logcolorexp(meanwave))
+        return recalterm - jnp.where(self.n_specrecal == 0, 0.0, target)
+
     def modelflux(self, pars):
         """
         Compute predicted model flux for this spectrum.

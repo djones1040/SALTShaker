@@ -724,6 +724,9 @@ the value sets the prior width.
    * - ``recalprior``
      - 50
      - Prior constraining spectral recalibration magnitudes.
+   * - ``recalcolorprior``
+     - Not set
+     - Prior constraining the deviation of spectral recalibration from the color law.
 
 
 [bounds] - Parameter Bounds

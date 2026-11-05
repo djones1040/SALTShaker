@@ -22,7 +22,7 @@ Notes
 Available priors include:
 - Population priors: x1mean, x1std, colormean, colorstretchcorr
 - Model priors: m0prior, m1prior, peakprior
-- Recalibration priors: recalprior
+- Recalibration priors: recalprior, recalcolorprior
 - Boundary priors: bounded parameter constraints
 """
 import numpy as np
@@ -33,6 +33,8 @@ from jax.experimental import sparse
 
 from functools import partial
 from saltshaker.util.jaxoptions import jaxoptions
+from saltshaker.util import batching
+from saltshaker.training import datamodels
 
 from inspect import signature
 
@@ -139,6 +141,15 @@ class SALTPriors:
         
         self.priors={ key: partial(__priors__[key],self) for key in __priors__}
         self.nongaussianpriors={ key: partial(__nongaussianpriors__[key],self) for key in __nongaussianpriors__}
+        thinning=4
+        self.batchedrecalterms=batching.batchedmodelfunctions(
+            lambda spectrum,pars: spectrum.recaltermderivs[::thinning,:] @ pars.spcrcl,
+            self.batchedspecdata, datamodels.modeledtrainingspectrum, flatten=True
+        )
+        self.batchedrecaldeviations=batching.batchedmodelfunctions(
+            lambda spectrum,pars: spectrum.recalcolordeviation(pars)[::thinning],
+            self.batchedspecdata, datamodels.modeledtrainingspectrum, flatten=True
+        )
         if len(self.usePriors) != len(self.priorWidths):
             raise RuntimeError('length of priors does not equal length of prior widths!')
 
@@ -355,16 +366,16 @@ class SALTPriors:
     @prior
     def recalprior(self,width,x):
         """Prior on all spectral recalibration"""
-        residuals=[]
-        thinning=4
-        for snid,sn in self.datadict.items():
-            for k,spectrum in sn.specdata.items():
+        if len(self.batchedspecdata)==0:
+            return np.array([])
+        return self.batchedrecalterms(x)/width
 
-                coeffs=x[spectrum.ispcrcl]
-                recalterm=spectrum.recaltermderivs[::thinning,:] @ coeffs
-
-                residuals+=[(recalterm/width)]
-        return jnp.concatenate(residuals) if len(residuals)>0 else np.array([])
+    @prior
+    def recalcolorprior(self,width,x):
+        """Prior on the deviation of all spectral recalibration from the color law"""
+        if len(self.batchedspecdata)==0:
+            return np.array([])
+        return self.batchedrecaldeviations(x)/width
     
     @prior
     def m0positiveprior(self,width,x):
