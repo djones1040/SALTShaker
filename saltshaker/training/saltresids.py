@@ -2053,7 +2053,7 @@ class SALTResids:
                         name
                         if not ((name == "c0") and (len(self.n_colorpars) == 1))
                         else "c"
-                    ): X[self.parlist == "_".join([name, sn])][0]
+                    ): Xfinal[self.parlist == "_".join([name, sn])][0]
                     for name in (
                         [f"x{i}" for i in range(self.n_components)]
                         + ([f"c{i}" for i in range(len(self.n_colorpars))])

@@ -1679,9 +1679,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
         plt.subplots_adjust(
             left=None, bottom=None, right=None, top=0.85, wspace=0.025, hspace=0
         )
-        x0, x1, c, t0 = np.loadtxt(
-            f"{outputdir}/salt3train_snparams.txt", unpack=True, usecols=[1, 2, 3, 4]
-        )
+        t0 = np.loadtxt(f"{outputdir}/salt3train_snparams.txt", usecols=[4])
         snid = np.genfromtxt(
             f"{outputdir}/salt3train_snparams.txt",
             unpack=True,
@@ -1731,6 +1729,9 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
             CheckSALTParams.checkSALT(
                 parameters, parlist, snfiles, snlist, outputdir, idx=j
             )
+        # SN parameters from models trained before snparams used the final
+        # definitions don't match the templates, so read them from the model
+        snpars = dict(zip(parlist, parameters))
 
         # kcor files
         kcordict = {}
@@ -1777,6 +1778,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
         pdf_pages = PdfPages(f"{outputdir}/lcfits.pdf")
         import matplotlib.gridspec as gridspec
 
+        comparisonsource = "salt3"
         gs1 = gridspec.GridSpec(3, 5)
         gs1.update(wspace=0.0)
         i = 0
@@ -1790,36 +1792,21 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
         salt3m1phase, salt3m1wave, salt3m1flux = np.genfromtxt(
             f"{outputdir}/{m1file}", unpack=True
         )
-        salt2phase, salt2wave, salt2flux = np.genfromtxt(
-            f"{salt2dir}/salt2_template_0.dat", unpack=True
-        )
-        salt2m1phase, salt2m1wave, salt2m1flux = np.genfromtxt(
-            f"{salt2dir}/salt2_template_1.dat", unpack=True
-        )
         salt3phase = np.unique(salt3phase)
         salt3wave = np.unique(salt3wave)
         salt3flux = salt3flux.reshape([len(salt3phase), len(salt3wave)])
         salt3m1flux = salt3m1flux.reshape([len(salt3phase), len(salt3wave)])
-        salt2phase = np.unique(salt2phase)
-        salt2wave = np.unique(salt2wave)
-        salt2m0flux = salt2flux.reshape([len(salt2phase), len(salt2wave)])
-        salt2flux = salt2flux.reshape([len(salt2phase), len(salt2wave)])
-        salt2m1flux = salt2m1flux.reshape([len(salt2phase), len(salt2wave)])
 
         saltdict = {
             "salt3phase": salt3phase,
             "salt3wave": salt3wave,
             "salt3flux": salt3flux,
-            "salt3m1phase": salt3m1phase,
-            "salt3m1wave": salt3m1wave,
             "salt3m1flux": salt3m1flux,
-            "salt2phase": salt2phase,
-            "salt2wave": salt2wave,
-            "salt2m0flux": salt2m0flux,
-            "salt2m1phase": salt2m1phase,
-            "salt2m1wave": salt2m1wave,
-            "salt2m1flux": salt2m1flux,
         }
+        if self.options.n_components == 3:
+            saltdict["salt3m2flux"] = np.genfromtxt(
+                f"{outputdir}/salt3_template_2.dat", usecols=[2]
+            ).reshape(salt3flux.shape)
 
         for j, snlist in enumerate(self.options.snlists.split(",")):
             snlist = os.path.expandvars(snlist)
@@ -1856,7 +1843,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
             snfiles = np.genfromtxt(snlist, dtype="str")
             snfiles = np.atleast_1d(snfiles)
             fitx1, fitc = False, False
-            if self.options.n_components == 2:
+            if self.options.n_components >= 2:
                 fitx1 = True
             if self.options.n_colorpars[0] > 0:
                 fitc = True
@@ -1879,7 +1866,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
 
             tlc = time.time()
             count = 0
-            salt2_chi2tot, salt3_chi2tot = 0, 0
+            comparison_chi2tot, salt3_chi2tot = 0, 0
             plotsnlist = []
             snfilelist = []
             for l in snfiles:
@@ -1923,44 +1910,36 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
 
             for sn, l in zip(plotsnlist, snfilelist):
 
-                if not i % 15:
-                    fig = plt.figure()
-                try:
-                    ax1 = plt.subplot(gs1[i % 15])
-                    ax2 = plt.subplot(gs1[(i + 1) % 15])
-                    ax3 = plt.subplot(gs1[(i + 2) % 15])
-                    ax4 = plt.subplot(gs1[(i + 3) % 15])
-                    ax5 = plt.subplot(gs1[(i + 4) % 15])
-                except:
-                    import pdb
-
-                    pdb.set_trace()
-
                 if sn.SNID not in snid:
                     log.warning(f"sn {sn.SNID} not in output files")
                     continue
-                x0sn, x1sn, csn, t0sn = (
-                    x0[snid == sn.SNID][0],
-                    x1[snid == sn.SNID][0],
-                    c[snid == sn.SNID][0],
-                    t0[snid == sn.SNID][0],
-                )
-                if not fitc:
-                    csn = 0
-                if not fitx1:
-                    x1sn = 0
+
+                if not i % 15:
+                    fig = plt.figure()
+                ax1 = plt.subplot(gs1[i % 15])
+                ax2 = plt.subplot(gs1[(i + 1) % 15])
+                ax3 = plt.subplot(gs1[(i + 2) % 15])
+                ax4 = plt.subplot(gs1[(i + 3) % 15])
+                ax5 = plt.subplot(gs1[(i + 4) % 15])
+
+                x0sn = snpars[f"x0_{sn.SNID}"]
+                x1sn = snpars.get(f"x1_{sn.SNID}", 0)
+                x2sn = snpars.get(f"x2_{sn.SNID}", 0)
+                csn = snpars.get(f"c0_{sn.SNID}", 0)
+                t0sn = t0[snid == sn.SNID][0]
 
                 if ".fits" in l.lower():
                     snidval = int(sn.SNID)
                 else:
                     snidval = None
-                salt2chi2, salt3chi2 = ValidateLightcurves.customfilt(
+                comparisonchi2, salt3chi2 = ValidateLightcurves.customfilt(
                     f"{outputdir}/lccomp_{sn.SNID}.png",
                     l,
                     outputdir,
                     t0=t0sn,
                     x0=x0sn,
                     x1=x1sn,
+                    x2=x2sn,
                     c=csn,
                     fitx1=fitx1,
                     fitc=fitc,
@@ -1974,8 +1953,9 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
                     saltdict=saltdict,
                     n_colorpars=self.options.n_colorpars,
                     snid=snidval,
+                    modelsource=comparisonsource,
                 )
-                salt2_chi2tot += salt2chi2
+                comparison_chi2tot += comparisonchi2
                 salt3_chi2tot += salt3chi2
                 if i % 15 == 10:
                     pdf_pages.savefig()
@@ -1988,7 +1968,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
                 count += 1
             log.info(f"plotted light curves for {count} SNe")
             log.info(
-                f"total chi^2 is {salt2_chi2tot:.1f} for SALT2 and {salt3_chi2tot:.1f} for SALT3"
+                f"total chi^2 is {comparison_chi2tot:.1f} for {comparisonsource} and {salt3_chi2tot:.1f} for the trained model"
             )
         if not i % 15 == 0:
             pdf_pages.savefig()
