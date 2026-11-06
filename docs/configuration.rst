@@ -500,6 +500,9 @@ Spectral Recalibration
    * - ``specrange_wavescale_specrecal``
      - float
      - Wavelength scale for recalibration normalization. Default: 2500.
+   * - ``specrecalmethod``
+     - str
+     - Basis of the spectral recalibration: ``polynomial``, or ``quadraticspline`` with uniform knots across each spectrum. Default: polynomial.
    * - ``n_specrecal_per_lightcurve``
      - float
      - Add one recalibration parameter per this many photometric bands. Default: 0.5.

@@ -942,14 +942,22 @@ class SALTResids:
             "trainingparams",
             "n_min_specrecal",
             type=int,
-            help="Minimum order of spectral recalibration polynomials (default=%(default)s)",
+            help="Minimum order of spectral recalibration (default=%(default)s)",
         )
         successful = successful & wrapaddingargument(
             config,
             "trainingparams",
             "n_max_specrecal",
             type=int,
-            help="Maximum order of spectral recalibration polynomials (default=%(default)s)",
+            help="Maximum order of spectral recalibration (default=%(default)s)",
+        )
+        successful = successful & wrapaddingargument(
+            config,
+            "trainingparams",
+            "specrecalmethod",
+            type=str,
+            default="polynomial",
+            help="basis of the spectral recalibration: polynomial or quadraticspline (default=%(default)s)",
         )
         successful = successful & wrapaddingargument(
             config,

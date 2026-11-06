@@ -45,6 +45,7 @@ from jax.tree_util import register_pytree_node_class
 
 from functools import partial
 from saltshaker.util.jaxoptions import jaxoptions, sparsejaxoptions
+from saltshaker.util.specrecal import specrecalbasis
 
 import extinction
 import warnings
@@ -1169,7 +1170,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
 
         # Spectrum-specific amplitude parameter (allows independent flux scaling)
         self.ix0 = np.where(residsobj.parlist == f"specx0_{sn.snid}_{k}")[0][0]
-        # Spectral recalibration polynomial coefficients for this spectrum
+        # Spectral recalibration coefficients for this spectrum
         self.ispcrcl = np.where(residsobj.parlist == f"specrecal_{sn.snid}_{k}")[0]
 
         # Shape of the 2D B-spline coefficient grid
@@ -1248,24 +1249,19 @@ class modeledtrainingspectrum(modeledtrainingdata):
         )
 
         #######################################################################
-        # SECTION 3: Spectral recalibration polynomial setup
+        # SECTION 3: Spectral recalibration setup
         # Recalibration absorbs flux calibration errors in observed spectra
-        # using a polynomial in wavelength: exp(sum_i c_i * ((λ-λ_mean)/scale)^i / i!)
+        # using exp(sum_i c_i * f_i(λ)), see specrecalbasis for the functions f_i
         #######################################################################
-        # Powers for polynomial expansion (highest power first for stability)
-        pow = self.ispcrcl.size - np.arange(self.ispcrcl.size)
-        # Normalized wavelength coordinate centered on spectrum mean
-        recalCoord = (
-            self.wavelength - np.mean(self.wavelength)
-        ) / residsobj.specrange_wavescale_specrecal
-
-        # Build polynomial basis matrix: row i is basis evaluated at wavelength i
-        # Division by factorial gives Taylor series coefficients
-        self.recaltermderivs = (
-            (recalCoord)[:, np.newaxis] ** (pow)[np.newaxis, :]
-        ) / factorial(pow)[np.newaxis, :]
+        # Row i of the basis matrix is the basis evaluated at wavelength i
+        self.recaltermderivs = specrecalbasis(
+            self.wavelength,
+            self.ispcrcl.size,
+            residsobj.specrecalmethod,
+            residsobj.specrange_wavescale_specrecal,
+        )
         # Add zero rows for padding
-        self.recaltermderivs = np.concatenate((self.recaltermderivs, np.zeros((padding, pow.size))))
+        self.recaltermderivs = np.concatenate((self.recaltermderivs, np.zeros((padding, self.ispcrcl.size))))
 
         #######################################################################
         # SECTION 4: Error model setup

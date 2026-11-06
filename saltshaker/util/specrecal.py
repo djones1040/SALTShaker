@@ -15,9 +15,11 @@ chifunc
     Chi-squared objective function for recalibration fit.
 recalfunc
     Apply recalibration coefficients to get correction factors.
+specrecalbasis
+    Evaluate the basis of the recalibration term in the training model.
 """
 from scipy.optimize import minimize
-from scipy.interpolate import interp1d
+from scipy.interpolate import BSpline, interp1d
 from scipy.integrate import trapezoid as trapz
 import numpy as np
 from saltshaker.util.synphot import synphot
@@ -170,3 +172,48 @@ def recalfunc(coeffs,photwave,specrange_wavescale_specrecal):
 	recalexp=np.exp((drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1))
 	
 	return recalexp
+
+def specrecalbasis(wavelength,nparams,method='polynomial',wavescale=2500.):
+	"""
+	Evaluate the basis of the spectral recalibration term.
+
+	The recalibration of a spectrum is the exponential of this basis dotted
+	with the recalibration coefficients. In either basis the term vanishes at
+	the mean wavelength of the spectrum, as its overall scale belongs to the
+	spectrum's amplitude parameter.
+
+	Parameters
+	----------
+	wavelength : ndarray
+		Observer-frame wavelengths of the spectrum.
+	nparams : int
+		Number of recalibration coefficients.
+	method : {'polynomial', 'quadraticspline'}
+		'polynomial' is a Taylor series in wavelength. 'quadraticspline' is a
+		quadratic B-spline with uniform knots across the spectrum, so that a
+		spectrum's knot spacing scales with its wavelength range.
+	wavescale : float
+		Wavelength scale of the polynomial (Angstroms).
+
+	Returns
+	-------
+	ndarray
+		Basis functions evaluated at wavelength, of shape (wavelength.size, nparams).
+	"""
+	if method=='polynomial':
+		pow=nparams-np.arange(nparams)
+		recalCoord=(wavelength-np.mean(wavelength))/wavescale
+		return ((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
+	if method!='quadraticspline':
+		raise ValueError(f'Unknown spectral recalibration method {method}, valid options are polynomial, quadraticspline')
+	if nparams==0:
+		return np.zeros((wavelength.size,0))
+	if nparams<2:
+		raise ValueError(f'Quadratic spline spectral recalibration requires at least 2 coefficients, got {nparams}')
+	order=2
+	# Requiring the term to vanish at the mean removes one degree of freedom
+	nbasis=nparams+1
+	breakpoints=np.linspace(wavelength.min(),wavelength.max(),nbasis-order+1,True)
+	knots=np.concatenate([[breakpoints[0]]*order,breakpoints,[breakpoints[-1]]*order])
+	spline=BSpline(knots,np.eye(nbasis),order)
+	return np.delete(spline(wavelength)-spline(np.mean(wavelength)),nbasis//2,axis=1)

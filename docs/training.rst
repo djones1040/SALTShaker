@@ -99,13 +99,14 @@ specrecal                      1                 if 1 (or True), do the spectral
 n_processes                    1                 **deprecated**
 estimate_tpk                   False             **not recommended** estimate time of maximum light for each SN before beginning the training.  Not robust.
 fix_t0                         False             **deprecated**
-n_min_specrecal                3                 minimum number of parameters for the spectral recalibration polynomial
-n_max_specrecal                10                maximum number of parameters for the spectral recalibration polynomial
+n_min_specrecal                3                 minimum number of parameters for the spectral recalibration
+n_max_specrecal                10                maximum number of parameters for the spectral recalibration
 regulargradientphase           1e4               amplitude of gradient regularization chi^2 penalty for phase (**semi-arbitrary**)
 regulargradientwave            1e5               amplitude of gradient regularization chi^2 penalty for wavelength (**semi-arbitrary**)
 regulardyad                    1e4               amplitude of dyadic regularization chi^2 penalty (**semi-arbitrary**)
 m1regularization               100               multiply regularization amplitude for the M1 component by this amount (**semi-arbitrary**)
 specrange_wavescale_specrecal  2500              normalizes the spectra for recalibration
+specrecalmethod                polynomial        basis of the spectral recalibration: :code:`polynomial`, or :code:`quadraticspline` with uniform knots across each spectrum
 n_specrecal_per_lightcurve     0.5               add one spectral recal parameter for every two photometric bands in a given SN
 regularizationScaleMethod      fixed             options for adjusting regularization scale in :code:`training/saltresids.py`
 wavesmoothingneff              1                 Gaussian smoothing scale for the amount of training data at each wavelength for smoothly varying Neff

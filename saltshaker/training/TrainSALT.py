@@ -57,7 +57,6 @@ from os import path
 import subprocess
 
 from scipy.interpolate import interp1d
-from scipy.special import factorial
 from scipy.linalg import lstsq
 from scipy.optimize import minimize, least_squares, differential_evolution
 
@@ -70,7 +69,7 @@ from saltshaker.util import snana, readutils
 from saltshaker.util.estimate_tpk_bazin import estimate_tpk_bazin
 from saltshaker.util.txtobj import txtobj
 from saltshaker.util.specSynPhot import getScaleForSN
-from saltshaker.util.specrecal import SpecRecal
+from saltshaker.util.specrecal import SpecRecal, specrecalbasis
 from saltshaker.util.synphot import synphot
 from saltshaker.util.example_data_utils import download_dir
 
@@ -743,13 +742,9 @@ class TrainSALT(TrainSALTBase):
                 for k in specdata.keys():
                     order = (parlist == "specrecal_{}_{}".format(sn, k)).sum()
 
-                    pow = (order) - np.arange(order)
-                    recalCoord = (
-                        specdata[k].wavelength - np.mean(specdata[k].wavelength)
-                    ) / 2500
-                    drecaltermdrecal = (
-                        (recalCoord)[:, np.newaxis] ** (pow)[np.newaxis, :]
-                    ) / factorial(pow)[np.newaxis, :]
+                    drecaltermdrecal = specrecalbasis(
+                        specdata[k].wavelength, order, self.options.specrecalmethod
+                    )
 
                     zHel, x0, x1, c = (
                         datadict[sn].zHelio,

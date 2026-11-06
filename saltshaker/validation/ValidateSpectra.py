@@ -3,8 +3,8 @@
 import sys,os,sncosmo
 import numpy as np
 from saltshaker.util import readutils
+from saltshaker.util.specrecal import specrecalbasis
 from matplotlib import pyplot as plt
-from scipy.special import factorial
 from matplotlib.backends.backend_pdf import PdfPages
 from sncosmo.salt2utils import SALT2ColorLaw
 from scipy.interpolate import interp1d
@@ -148,9 +148,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
             wave=specdata[k].wavelength
             restwave=wave/(1+snPars['z'])
             coeffs=pars[parlist=='specrecal_{}_{}'.format(sn,k)]
-            pow=coeffs.size-np.arange(coeffs.size)
-            recalCoord=(wave-np.mean(wave))/2500
-            drecaltermdrecal=((recalCoord)[:,np.newaxis] ** (pow)[np.newaxis,:]) / factorial(pow)[np.newaxis,:]
+            drecaltermdrecal=specrecalbasis(wave,coeffs.size,base.options.specrecalmethod if base else 'polynomial')
             recalexp=np.exp((drecaltermdrecal*coeffs[np.newaxis,:]).sum(axis=1))
 
             uncalledModel = flux(salt3dir,specdata[k].tobs,specdata[k].wavelength,
