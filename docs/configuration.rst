@@ -97,6 +97,10 @@ Output Files
    * - ``yamloutputfile``
      - path
      - File for YAML summary of the training process for use by SNANA. Default: ``/dev/null``.
+   * - ``write_large_outputs``
+     - bool
+     - Write the optimizer histories (``gradienthistory.pickle``, ``gaussnewtonhistory.pickle``)
+       and ``parametercovariance.npy`` to the output directory. These can be hundreds of MB. Default: False.
    * - ``trainingcachefile``
      - path
      - Cache file for pre-processed training data. If exists, loads cached data;
@@ -168,7 +172,7 @@ Model Initialization
    * - ``resume_from_gnhistory``
      - path
      - Resume from a ``gaussnewtonhistory.pickle`` file. Useful for recovering
-       from crashes.
+       from crashes. The file is only written by runs with ``write_large_outputs`` set.
    * - ``error_dir``
      - path
      - Directory with previous error files, for use with ``use_previous_errors``.
@@ -190,6 +194,11 @@ Validation Options
      - bool
      - If True, only generate model validation plots (skip SN-by-SN plots).
        Faster and avoids occasional crashes. Default: False.
+   * - ``validation_plots``
+     - str
+     - Comma-separated validation plots to write: any of ``modelsummary`` (model surfaces, synthetic
+       photometry, parameter and data density plots), ``lcresiduals`` (``lcfits.pdf``) and
+       ``specresiduals`` (``speccomp_*.pdf``), or ``all`` or ``none``. Default: all.
    * - ``use_previous_errors``
      - bool
      - Use error model from previous run instead of recomputing. Default: False.

@@ -48,6 +48,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         for x in self.configoptionnames:
      	    self.__dict__[x]=getattr(options,x)
         self.outputdir=options.outputdir
+        self.write_large_outputs=options.write_large_outputs
         assert(0<self.searchsize<1)
         assert(0<self.searchtolerance<1)
         assert(0<self.etaminus<1)
@@ -357,8 +358,9 @@ class rpropwithbacktracking(salttrainingoptimizer):
             log.info('Optimizer encountered iteration limit')
         final= startlen+np.argmin( self.losshistory[startlen:])
         X,loss=self.Xhistory[final],self.losshistory[final]
-        with open(path.join(self.outputdir,'gradienthistory.pickle'),'wb') as file:
-            pickle.dump((self.Xhistory,self.losshistory),file)
+        if self.write_large_outputs:
+            with open(path.join(self.outputdir,'gradienthistory.pickle'),'wb') as file:
+                pickle.dump((self.Xhistory,self.losshistory),file)
         return X,loss,rates.at[rates==0].set(initrates[rates==0])
         
 

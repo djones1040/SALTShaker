@@ -703,21 +703,9 @@ class SALTResids:
                 [],
             )
 
-            cache_to_disk = getattr(self, 'cache_batches_to_disk', False)
+            self.batchedphotdata = list(batching.batchdatabysize(self.allphotdata))
 
-            self.batchedphotdata = list(
-                batching.batchdatabysize(
-                    self.allphotdata, self.outputdir, prefix="phot",
-                    cache_to_disk=cache_to_disk,
-                )
-            )
-
-            self.batchedspecdata = list(
-                batching.batchdatabysize(
-                    self.allspecdata, self.outputdir, prefix="spec",
-                    cache_to_disk=cache_to_disk,
-                )
-            )
+            self.batchedspecdata = list(batching.batchdatabysize(self.allspecdata))
 
             if self.trainingcachefile:
                 log.info(

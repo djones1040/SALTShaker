@@ -292,6 +292,14 @@ class TrainSALTBase:
             action=FullPaths,
             help="File to which to output a summary of the fitting process",
         )
+        successful = successful & wrapaddingargument(
+            config,
+            "iodata",
+            "write_large_outputs",
+            type=boolean_string,
+            default="False",
+            help="if set, write the optimizer histories (gradienthistory.pickle, gaussnewtonhistory.pickle) and parametercovariance.npy to the output directory, which can be hundreds of MB (default=%(default)s)",
+        )
 
         # options to configure cuts
         successful = successful & wrapaddingargument(
@@ -421,6 +429,14 @@ class TrainSALTBase:
             "validate_modelonly",
             type=boolean_string,
             help="""if set, only make model plots in the validation stage""",
+        )
+        successful = successful & wrapaddingargument(
+            config,
+            "iodata",
+            "validation_plots",
+            type=str,
+            default="all",
+            help="comma-separated validation plots to write: any of modelsummary, lcresiduals, specresiduals, or all or none (default=%(default)s)",
         )
         # if resume_from_outputdir, use the errors from the previous run
         successful = successful & wrapaddingargument(
@@ -569,14 +585,6 @@ class TrainSALTBase:
             "spectroscopic_zeropadding_batches",
             type=int,
             help="Number of batches to divide the spectroscopic data into when zero-padding. Increasing this value may improve memory performance at the cost of speed (default=%(default)s)",
-        )
-        successful = successful & wrapaddingargument(
-            config,
-            "trainparams",
-            "cache_batches_to_disk",
-            type=boolean_string,
-            default="False",
-            help="If True, write batched data to pickle files on disk to reduce memory usage. Useful for older JAX versions with memory issues (default=%(default)s)",
         )
 
         # survey definitions

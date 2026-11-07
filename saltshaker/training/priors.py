@@ -420,7 +420,7 @@ class SALTPriors:
         return self.__initialphasepcderiv__ @ x[self.im1]/width
     @nongaussianprior
     def surverrfloorprior(self,width,x):
-        """Prior such that at early times there is no flux"""
+        """Prior on survey-specific error floors, with a gamma distribution to enforce positivity"""
         return   jax.scipy.stats.gamma.logpdf(x[self.isurverrfloor],2,scale=width)
                    
         

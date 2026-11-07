@@ -115,6 +115,34 @@ import logging
 
 log = logging.getLogger(__name__)
 
+VALIDATIONPLOTS = ("modelsummary", "lcresiduals", "specresiduals")
+
+
+def parsevalidationplots(value):
+    """
+    Parse the validation_plots option into a set of plot groups.
+
+    Parameters
+    ----------
+    value : str
+        Comma-separated plot groups from VALIDATIONPLOTS, or 'all' or 'none'.
+
+    Returns
+    -------
+    set of str
+        Plot groups to write.
+    """
+    plots = {p.strip() for p in value.split(",") if p.strip()}
+    if "all" in plots:
+        return set(VALIDATIONPLOTS)
+    plots.discard("none")
+    unknown = plots - set(VALIDATIONPLOTS)
+    if unknown:
+        raise ValueError(
+            f"unknown validation_plots {sorted(unknown)}, valid options are all, none, {', '.join(VALIDATIONPLOTS)}"
+        )
+    return plots
+
 
 def _RatioToSatisfyDefinitions(phase, wave, kcordict, components):
     """Ensures that the definitions of M1,M0,x0,x1 are satisfied."""
@@ -1248,7 +1276,8 @@ class TrainSALT(TrainSALTBase):
         Xfinal= saltresids.constraints.enforcefinaldefinitions(x_modelpars,saltresids.SALTModel(x_modelpars))
         if self.options.errors_from_hessianapprox: 
             sigma=saltresids.estimateparametererrorsfromhessian(Xfinal)
-            np.save(path.join(self.options.outputdir,'parametercovariance.npy'), sigma)
+            if self.options.write_large_outputs:
+                np.save(path.join(self.options.outputdir,'parametercovariance.npy'), sigma)
         else: sigma=None
         trainingresult=saltresids.processoptimizedparametersforoutput(Xfinal,x_modelpars,sigma)
         for k in datadict.keys():
@@ -1681,31 +1710,36 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
             usecols=[0],
         )
 
-        if self.options.fitsalt2:
-            ValidateParams.main(
-                f"{outputdir}/salt3train_snparams.txt", f"{outputdir}/saltparcomp.png"
+        plots = parsevalidationplots(self.options.validation_plots)
+        if modelonly:
+            plots -= {"lcresiduals", "specresiduals"}
+
+        if "modelsummary" in plots:
+            if self.options.fitsalt2:
+                ValidateParams.main(
+                    f"{outputdir}/salt3train_snparams.txt", f"{outputdir}/saltparcomp.png"
+                )
+
+            plotSALTModel.mkModelErrPlot(
+                outputdir,
+                outfile=f"{outputdir}/SALTmodelerrcomp.pdf",
+                xlimits=[self.options.waverange[0], self.options.waverange[1]],
             )
 
-        plotSALTModel.mkModelErrPlot(
-            outputdir,
-            outfile=f"{outputdir}/SALTmodelerrcomp.pdf",
-            xlimits=[self.options.waverange[0], self.options.waverange[1]],
-        )
-
-        plotSALTModel.mkModelPlot(
-            outputdir,
-            outfile=f"{outputdir}/SALTmodelcomp.png",
-            xlimits=[self.options.waverange[0], self.options.waverange[1]],
-            n_colorpars=self.options.n_colorpars,
-            host_component=self.options.host_component,
-            colorlaw_function=self.options.colorlaw_function,
-        )
-        SynPhotPlot.plotSynthPhotOverStretchRange(
-            "{}/synthphotrange.pdf".format(outputdir), outputdir, "SDSS"
-        )
-        SynPhotPlot.overPlotSynthPhotByComponent(
-            "{}/synthphotoverplot.pdf".format(outputdir), outputdir, "SDSS"
-        )
+            plotSALTModel.mkModelPlot(
+                outputdir,
+                outfile=f"{outputdir}/SALTmodelcomp.png",
+                xlimits=[self.options.waverange[0], self.options.waverange[1]],
+                n_colorpars=self.options.n_colorpars,
+                host_component=self.options.host_component,
+                colorlaw_function=self.options.colorlaw_function,
+            )
+            SynPhotPlot.plotSynthPhotOverStretchRange(
+                "{}/synthphotrange.pdf".format(outputdir), outputdir, "SDSS"
+            )
+            SynPhotPlot.overPlotSynthPhotByComponent(
+                "{}/synthphotoverplot.pdf".format(outputdir), outputdir, "SDSS"
+            )
 
         snfiles_tot = np.array([])
         for j, snlist in enumerate(self.options.snlists.split(",")):
@@ -1720,9 +1754,10 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
                 skip_header=1,
             )
             parameters = parameters.astype(float)
-            CheckSALTParams.checkSALT(
-                parameters, parlist, snfiles, snlist, outputdir, idx=j
-            )
+            if "modelsummary" in plots:
+                CheckSALTParams.checkSALT(
+                    parameters, parlist, snfiles, snlist, outputdir, idx=j
+                )
         # SN parameters from models trained before snparams used the final
         # definitions don't match the templates, so read them from the model
         snpars = dict(zip(parlist, parameters))
@@ -1766,10 +1801,11 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
 
         plt.close("all")
 
-        if modelonly:
+        if not plots & {"lcresiduals", "specresiduals"}:
             return
 
-        pdf_pages = PdfPages(f"{outputdir}/lcfits.pdf")
+        if "lcresiduals" in plots:
+            pdf_pages = PdfPages(f"{outputdir}/lcfits.pdf")
         import matplotlib.gridspec as gridspec
 
         comparisonsource = "salt3"
@@ -1816,7 +1852,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
                     raise RuntimeError(f"SN list file {snlist} does not exist")
 
             tspec = time.time()
-            if self.options.dospec:
+            if self.options.dospec and "specresiduals" in plots:
                 if self.options.binspec:
                     binspecres = self.options.binspecres
                 else:
@@ -1833,6 +1869,8 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
                     binspecres=binspecres,
                 )
             log.info(f"plotting spectra took {time.time()-tspec:.1f}")
+            if "lcresiduals" not in plots:
+                continue
 
             snfiles = np.genfromtxt(snlist, dtype="str")
             snfiles = np.atleast_1d(snfiles)
@@ -1963,10 +2001,11 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
             log.info(
                 f"total chi^2 is {comparison_chi2tot:.1f} for {comparisonsource} and {salt3_chi2tot:.1f} for the trained model"
             )
-        if not i % 15 == 0:
-            pdf_pages.savefig()
-        pdf_pages.close()
-        log.info(f"plotting light curves took {time.time()-tlc:.1f}")
+        if "lcresiduals" in plots:
+            if not i % 15 == 0:
+                pdf_pages.savefig()
+            pdf_pages.close()
+            log.info(f"plotting light curves took {time.time()-tlc:.1f}")
 
     def main(self, return_optimizer=False):
         """
@@ -2052,15 +2091,16 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
                 + 1,
                 True,
             )
-            datadensity.datadensityplot(
-                path.join(self.options.outputdir, "datadensity.pdf"),
-                phasebins,
-                wavebins,
-                datadict,
-                self.kcordict,
-                1500,
-                200,
-            )
+            if "modelsummary" in parsevalidationplots(self.options.validation_plots):
+                datadensity.datadensityplot(
+                    path.join(self.options.outputdir, "datadensity.pdf"),
+                    phasebins,
+                    wavebins,
+                    datadict,
+                    self.kcordict,
+                    1500,
+                    200,
+                )
             # fit the model - initial pass
             if self.options.stage == "all" or self.options.stage == "train":
                 # read the data
@@ -2236,6 +2276,7 @@ config file options can be overwridden at the command line"""
 
         if salt.options.stage not in ["all", "validate", "train"]:
             raise RuntimeError("stage must be one of all, validate, train")
+        parsevalidationplots(salt.options.validation_plots)
         with open(path.join(salt.options.outputdir, "options.json"), "w") as optfile:
             import json
 

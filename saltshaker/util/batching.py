@@ -24,9 +24,6 @@ import jax
 from jax import numpy as jnp
 from jax.experimental import sparse
 import numpy as np
-import pickle
-import glob
-import os
 
 from scipy import optimize, stats
 
@@ -120,7 +117,7 @@ def stackbcoo(mats):
     return sparse.BCOO((data, indices), shape=(len(mats), *shape))
 
 
-def batchdatabysize(data, outdir=None, prefix="", cache_to_disk=False):
+def batchdatabysize(data):
     """Given a set of data, divide them into batches each of a fixed size,
     for easy use with jax's batching methods. Quantities that are marked as
     'mapped' by their objects will be turned into arrays, otherwise the values
@@ -130,13 +127,6 @@ def batchdatabysize(data, outdir=None, prefix="", cache_to_disk=False):
     ----------
     data : list
         List of modeledtrainingdata objects to batch.
-    outdir : str, optional
-        Output directory for disk caching. Required if cache_to_disk is True.
-    prefix : str
-        Prefix for cache file names (e.g. 'phot', 'spec').
-    cache_to_disk : bool
-        If True, serialize batches to disk to reduce memory usage.
-        Useful for older JAX versions with memory issues.
     """
     batcheddata = {}
 
@@ -196,24 +186,8 @@ def batchdatabysize(data, outdir=None, prefix="", cache_to_disk=False):
                     # Ensures dimensionality is correct
                     yield np.atleast_1d(np.stack(vals, axis=0))
 
-    if cache_to_disk:
-        # Serialize batches to disk and read back to reduce memory footprint
-        # Clean up stale cache files from previous runs
-        for stale in glob.glob(f"{outdir}/caching_{prefix}_*.pkl"):
-            os.remove(stale)
-        for i, x in enumerate(batcheddata.values()):
-            try:
-                jax.clear_caches()
-            except:
-                pass
-            with open(f"{outdir}/caching_{prefix}_{i}.pkl", "wb") as fout:
-                pickle.dump({"data": list(repackforvmap(x))}, fout)
-        for cachefile in sorted(glob.glob(f"{outdir}/caching_{prefix}_*.pkl")):
-            with open(cachefile, "rb") as fin:
-                yield pickle.load(fin)["data"]
-    else:
-        for x in batcheddata.values():
-            yield list(repackforvmap(x))
+    for x in batcheddata.values():
+        yield list(repackforvmap(x))
 
 
 def walkargumenttree(x, targetsize, ncalls=0):

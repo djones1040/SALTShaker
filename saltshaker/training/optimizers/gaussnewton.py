@@ -73,6 +73,7 @@ class gaussnewton(salttrainingoptimizer):
             self.__dict__[key]=options.__dict__[key]
         self.modelobj=saltresids
         self.outputdir=outputdir
+        self.write_large_outputs=options.write_large_outputs
 
         self.debug=False
         self.lsqfit = False
@@ -799,7 +800,8 @@ class gaussnewton(salttrainingoptimizer):
             X-=linearStep       
 
 
-        with open(path.join(self.outputdir,'gaussnewtonhistory.pickle'),'wb') as file: pickle.dump(self.Xhistory,file)
+        if self.write_large_outputs:
+            with open(path.join(self.outputdir,'gaussnewtonhistory.pickle'),'wb') as file: pickle.dump(self.Xhistory,file)
         log.info('Chi2 diff, % diff')
         log.info(' '.join(['{:.2f}'.format(x) for x in [oldChi-chi2,(100*(oldChi-chi2)/oldChi)] ]))
         log.info('')
