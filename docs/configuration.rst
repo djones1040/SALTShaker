@@ -685,7 +685,7 @@ Model Components
      - Number of color scatter polynomial parameters. Default: 5.
    * - ``colorlaw_function``
      - str
-     - Color law functional form. Default: colorlaw_default.
+     - Color law functional form: ``colorlaw_default`` for the SALT2 polynomial, or ``colorlaw_spline`` for a natural cubic spline with ``n_colorpars`` free knots. Default: colorlaw_default.
    * - ``error_snake_phase_binsize``
      - float
      - Phase spacing (days) for error model B-spline. Default: 6.

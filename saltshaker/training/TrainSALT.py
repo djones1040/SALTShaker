@@ -588,43 +588,35 @@ class TrainSALT(TrainSALTBase):
             if self.options.host_component:
                 guess[parlist == "mhost"] = mhostknots
             if self.options.n_colorpars:
+                initcolorlaw = colorlaw.getcolorlaw(
+                    self.options.colorlaw_function[0]
+                )(self.options.n_colorpars[0], self.options.colorwaverange)
                 if self.options.initsalt2model:
                     # if len(self.options.n_colorpars)>1: raise ValueError('Multiple color laws specified with initsalt2model option')
-                    if self.options.n_colorpars == [4]:
-                        guess[parlist == "cl"] = [
-                            -0.504294,
-                            0.787691,
-                            -0.461715,
-                            0.0815619,
-                        ]
-                    else:
-                        clwave = np.linspace(
-                            self.options.waverange[0], self.options.waverange[1], 1000
-                        )
-                        salt2cl = SALT2ColorLaw(
-                            [2800.0, 7000.0],
-                            [-0.504294, 0.787691, -0.461715, 0.0815619],
-                        )(clwave)
-                        initcolorlaw = colorlaw.getcolorlaw(
-                            self.options.colorlaw_function[0]
-                        )(self.options.n_colorpars[0], self.options.colorwaverange)
+                    clwave = np.linspace(
+                        self.options.waverange[0], self.options.waverange[1], 1000
+                    )
+                    salt2cl = SALT2ColorLaw(
+                        [2800.0, 7000.0],
+                        [-0.504294, 0.787691, -0.461715, 0.0815619],
+                    )(clwave)
 
-                        def bestfit(p):
-                            cl_init = initcolorlaw(1, p, clwave)
-                            return cl_init - salt2cl
+                    def bestfit(p):
+                        cl_init = initcolorlaw(1, p, clwave)
+                        return cl_init - salt2cl
 
-                        md = least_squares(
-                            bestfit, np.zeros(self.options.n_colorpars[0])
-                        )
-                        if (
-                            "termination conditions are satisfied" not in md.message
-                            and "termination condition is satisfied" not in md.message
-                        ):
+                    md = least_squares(
+                        bestfit, np.zeros(self.options.n_colorpars[0])
+                    )
+                    if (
+                        "termination conditions are satisfied" not in md.message
+                        and "termination condition is satisfied" not in md.message
+                    ):
 
-                            raise RuntimeError("problem initializing color law!")
-                        guess[parlist == "cl0"] = md.x
+                        raise RuntimeError("problem initializing color law!")
+                    guess[parlist == "cl0"] = md.x
                 else:
-                    guess[parlist == "cl0"] = [0.0] * self.options.n_colorpars
+                    guess[parlist == "cl0"] = [0.0] * self.options.n_colorpars[0]
             if self.options.n_colorscatpars:
 
                 guess[parlist == "clscat"] = clscatcoeffs
@@ -1459,30 +1451,32 @@ SIGMA_INT: 0.106  # used in simulation"""
         with open(f"{outdir}/SALT3.INFO", "w") as foutinfo:
             print(foutinfotext, file=foutinfo)
         if len(trainingresult.clpars) == 1:
-            colorlaw = trainingresult.clpars[0]
+            clpars = trainingresult.clpars[0]
+            fileversion = colorlaw.fileversion(self.options.colorlaw_function[0])
             with open(f"{outdir}/salt3_color_correction.dat", "w") as foutcl:
-                print(f"{len(colorlaw):.0f}", file=foutcl)
+                print(f"{len(clpars):.0f}", file=foutcl)
 
-                for c in colorlaw:
+                for c in clpars:
                     print(f"{c:8.10e}", file=foutcl)
                 print(
-                    f"""Salt2ExtinctionLaw.version 1
+                    f"""Salt2ExtinctionLaw.version {fileversion}
 Salt2ExtinctionLaw.min_lambda {self.options.colorwaverange[0]:.0f}
 Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
                     file=foutcl,
                 )
         else:
-            for i, name, colorlaw in zip(
+            for i, name, clpars in zip(
                 range(trainingresult.clpars.shape[0]),
                 self.options.colorlaw_function,
                 trainingresult.clpars,
             ):
+                fileversion = colorlaw.fileversion(name)
                 with open(f"{outdir}/salt3_color_correction_{i}.dat", "w") as foutcl:
-                    print(f"{len(colorlaw):.0f}", file=foutcl)
-                    for c in colorlaw:
+                    print(f"{len(clpars):.0f}", file=foutcl)
+                    for c in clpars:
                         print(f"{c:8.10e}", file=foutcl)
                     print(
-                        f"""Salt2ExtinctionLaw.version 1
+                        f"""Salt2ExtinctionLaw.version {fileversion}
 Salt2ExtinctionLaw.min_lambda {self.options.colorwaverange[0]:.0f}
 Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
                         file=foutcl,
@@ -1951,7 +1945,6 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
                     ax4=ax4,
                     ax5=ax5,
                     saltdict=saltdict,
-                    n_colorpars=self.options.n_colorpars,
                     snid=snidval,
                     modelsource=comparisonsource,
                 )

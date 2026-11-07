@@ -21,7 +21,8 @@ from sncosmo.io import (
     read_multivector_griddata_ascii
 )
 from sncosmo.magsystems import get_magsystem
-from sncosmo.salt2utils import BicubicInterpolator, SALT2ColorLaw
+from sncosmo.salt2utils import BicubicInterpolator
+from saltshaker.util.salt3_sncosmo import colorlawfromfile
 from sncosmo.utils import integration_grid
 from sncosmo.models import Source
 
@@ -233,40 +234,7 @@ class SALT3PlusSource(Source):
     def _set_colorlaw_from_file(self, name_or_obj):
         """Read color law file and set the internal colorlaw function."""
 
-        # Read file
-        if isinstance(name_or_obj, str):
-            f = open(name_or_obj, 'r')
-        else:
-            f = name_or_obj
-        words = f.read().split()
-        f.close()
-
-        # Get colorlaw coeffecients.
-        ncoeffs = int(words[0])
-        colorlaw_coeffs = [float(word) for word in words[1: 1 + ncoeffs]]
-
-        # If there are more than 1+ncoeffs words in the file, we expect them to
-        # be of the form `keyword value`.
-        version = None
-        colorlaw_range = [3000., 7000.]
-        for i in range(1+ncoeffs, len(words), 2):
-            if words[i] == 'Salt2ExtinctionLaw.version':
-                version = int(words[i+1])
-            elif words[i] == 'Salt2ExtinctionLaw.min_lambda':
-                colorlaw_range[0] = float(words[i+1])
-            elif words[i] == 'Salt2ExtinctionLaw.max_lambda':
-                colorlaw_range[1] = float(words[i+1])
-            else:
-                raise RuntimeError("Unexpected keyword: {}".format(words[i]))
-
-        # Set extinction function to use.
-        if version == 0:
-            raise RuntimeError("Salt2ExtinctionLaw.version 0 not supported.")
-        elif version == 1:
-            self._colorlaw = SALT2ColorLaw(colorlaw_range, colorlaw_coeffs)
-        else:
-            raise RuntimeError('unrecognized Salt2ExtinctionLaw.version: ' +
-                               version)
+        self._colorlaw = colorlawfromfile(name_or_obj)
 
     def colorlaw(self, wave=None):
         """Return the value of the CL function for the given wavelengths.

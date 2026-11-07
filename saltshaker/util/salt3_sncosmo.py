@@ -9,12 +9,20 @@ Classes
 -------
 SALT3Source
     SALT3 spectral timeseries model for sncosmo.
+SplineColorLaw
+    Natural cubic spline color law.
+
+Functions
+---------
+colorlawfromfile
+    Read a color law from a color correction file.
 """
 import abc
 import os
 from collections import OrderedDict as odict
 from copy import copy as cp
 from textwrap import dedent
+from functools import partial
 from math import ceil
 import itertools
 
@@ -34,6 +42,150 @@ from sncosmo.salt2utils import BicubicInterpolator, SALT2ColorLaw
 from sncosmo.utils import integration_grid
 from sncosmo.constants import HC_ERG_AA, MODEL_BANDFLUX_SPACING
 from sncosmo.models import Source
+
+SALT2CL_B = 4302.57
+SALT2CL_V = 5428.55
+
+
+class SplineColorLaw:
+    """
+    Natural cubic spline color law.
+
+    The coefficients are the values of the color law at the knots. Two
+    further knots are fixed so that CL(B) = 0 and CL(V) = -1, as for the
+    polynomial color law, and the color law is linearly extrapolated outside
+    of the knots.
+
+    Parameters
+    ----------
+    wave_range : tuple
+        (min_wave, max_wave) in Angstroms, the first and last knots. Must
+        contain the B and V wavelengths.
+    n_coeffs : int
+        Number of coefficients, at least 2. The knots start out uniform, with
+        the two nearest to B and V moved onto those wavelengths.
+    """
+
+    def __init__(self, wave_range, n_coeffs):
+        wave_lo, wave_hi = wave_range
+        if n_coeffs < 2:
+            raise ValueError(f"spline color law needs at least 2 coefficients, got {n_coeffs}")
+        if not wave_lo < SALT2CL_B < SALT2CL_V < wave_hi:
+            raise ValueError(f"spline color law range {wave_range} must contain the B and V wavelengths")
+
+        knots = np.linspace(wave_lo, wave_hi, n_coeffs + 2)
+        for anchor in (SALT2CL_B, SALT2CL_V):
+            interior = np.arange(1, knots.size - 1)
+            interior = interior[~np.isin(knots[interior], (SALT2CL_B, SALT2CL_V))]
+            knots[interior[np.argmin(np.abs(knots[interior] - anchor))]] = anchor
+        knots.sort()
+
+        self.knots = knots
+        self.spacing = np.diff(knots)
+        free = ~np.isin(knots, (SALT2CL_B, SALT2CL_V))
+        self.fixedvalues = np.where(knots == SALT2CL_V, -1., 0.)
+        self.valuebasis = np.eye(knots.size)[:, free]
+
+        # Second derivatives at the knots are linear in the knot values, and
+        # vanish at the end knots for a natural spline
+        h = self.spacing
+        lhs, rhs = np.eye(knots.size), np.zeros((knots.size, knots.size))
+        for i in range(1, knots.size - 1):
+            lhs[i, i-1:i+2] = h[i-1] / 6, (h[i-1] + h[i]) / 3, h[i] / 6
+            rhs[i, i-1:i+2] = 1 / h[i-1], -1 / h[i-1] - 1 / h[i], 1 / h[i]
+        self.curvature = np.linalg.solve(lhs, rhs)
+
+    def __call__(self, coeffs, wave, xp=np):
+        """
+        Evaluate the color law.
+
+        Parameters
+        ----------
+        coeffs : array_like
+            Color law values at the free knots.
+        wave : array_like
+            Wavelengths in Angstroms.
+        xp : module, optional
+            Array module to evaluate with, numpy or jax.numpy.
+
+        Returns
+        -------
+        ndarray
+            Color law values at wave.
+        """
+        wave = xp.atleast_1d(wave)
+        knots, spacing = xp.asarray(self.knots), xp.asarray(self.spacing)
+        values = self.fixedvalues + xp.dot(self.valuebasis, xp.asarray(coeffs))
+        secondderivs = xp.dot(self.curvature, values)
+
+        i = xp.clip(xp.searchsorted(knots, wave, side='right') - 1, 0, knots.size - 2)
+        h = spacing[i]
+        a = (knots[i+1] - wave) / h
+        b = 1 - a
+        interior = (a * values[i] + b * values[i+1]
+                    + ((a**3 - a) * secondderivs[i]
+                       + (b**3 - b) * secondderivs[i+1]) * h**2 / 6)
+
+        slope_lo = ((values[1] - values[0]) / spacing[0]
+                    - spacing[0] * secondderivs[1] / 6)
+        slope_hi = ((values[-1] - values[-2]) / spacing[-1]
+                    + spacing[-1] * secondderivs[-2] / 6)
+        return xp.where(wave < knots[0], values[0] + slope_lo * (wave - knots[0]),
+                        xp.where(wave > knots[-1], values[-1] + slope_hi * (wave - knots[-1]),
+                                 interior))
+
+
+def colorlawfromfile(name_or_obj):
+    """
+    Read a color law from a color correction file.
+
+    Parameters
+    ----------
+    name_or_obj : str or fileobj
+        Color correction file. Salt2ExtinctionLaw.version in the file names
+        the form of the color law, 1 for the SALT2 polynomial and
+        colorlaw_spline for SplineColorLaw.
+
+    Returns
+    -------
+    callable
+        Function of wavelength in Angstroms returning the color law.
+    """
+    # Read file
+    if isinstance(name_or_obj, str):
+        f = open(name_or_obj, 'r')
+    else:
+        f = name_or_obj
+    words = f.read().split()
+    f.close()
+
+    # Get colorlaw coeffecients.
+    ncoeffs = int(words[0])
+    colorlaw_coeffs = [float(word) for word in words[1: 1 + ncoeffs]]
+
+    # If there are more than 1+ncoeffs words in the file, we expect them to
+    # be of the form `keyword value`.
+    version = '0'
+    colorlaw_range = [3000., 7000.]
+    for i in range(1+ncoeffs, len(words), 2):
+        if words[i] == 'Salt2ExtinctionLaw.version':
+            version = words[i+1]
+        elif words[i] == 'Salt2ExtinctionLaw.min_lambda':
+            colorlaw_range[0] = float(words[i+1])
+        elif words[i] == 'Salt2ExtinctionLaw.max_lambda':
+            colorlaw_range[1] = float(words[i+1])
+        else:
+            raise RuntimeError("Unexpected keyword: {}".format(words[i]))
+
+    # Set extinction function to use.
+    if version == '0':
+        raise RuntimeError("Salt2ExtinctionLaw.version 0 not supported.")
+    elif version == '1':
+        return SALT2ColorLaw(colorlaw_range, colorlaw_coeffs)
+    elif version == 'colorlaw_spline':
+        return partial(SplineColorLaw(colorlaw_range, ncoeffs), np.array(colorlaw_coeffs))
+    raise RuntimeError('unrecognized Salt2ExtinctionLaw.version: ' + version)
+
 
 class SALT3Source(Source):
     """The SALT3 Type Ia supernova spectral timeseries model.
@@ -290,40 +442,7 @@ class SALT3Source(Source):
     def _set_colorlaw_from_file(self, name_or_obj):
         """Read color law file and set the internal colorlaw function."""
 
-        # Read file
-        if isinstance(name_or_obj, str):
-            f = open(name_or_obj, 'r')
-        else:
-            f = name_or_obj
-        words = f.read().split()
-        f.close()
-
-        # Get colorlaw coeffecients.
-        ncoeffs = int(words[0])
-        colorlaw_coeffs = [float(word) for word in words[1: 1 + ncoeffs]]
-
-        # If there are more than 1+ncoeffs words in the file, we expect them to
-        # be of the form `keyword value`.
-        version = 0
-        colorlaw_range = [3000., 7000.]
-        for i in range(1+ncoeffs, len(words), 2):
-            if words[i] == 'Salt2ExtinctionLaw.version':
-                version = int(words[i+1])
-            elif words[i] == 'Salt2ExtinctionLaw.min_lambda':
-                colorlaw_range[0] = float(words[i+1])
-            elif words[i] == 'Salt2ExtinctionLaw.max_lambda':
-                colorlaw_range[1] = float(words[i+1])
-            else:
-                raise RuntimeError("Unexpected keyword: {}".format(words[i]))
-
-        # Set extinction function to use.
-        if version == 0:
-            raise Exception("Salt2ExtinctionLaw.version 0 not supported.")
-        elif version == 1:
-            self._colorlaw = SALT2ColorLaw(colorlaw_range, colorlaw_coeffs)
-        else:
-            raise Exception('unrecognized Salt2ExtinctionLaw.version: ' +
-                            version)
+        self._colorlaw = colorlawfromfile(name_or_obj)
 
     def colorlaw(self, wave=None):
         """Return the value of the CL function for the given wavelengths.

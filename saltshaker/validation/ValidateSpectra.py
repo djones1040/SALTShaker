@@ -4,6 +4,7 @@ import sys,os,sncosmo
 import numpy as np
 from saltshaker.util import readutils
 from saltshaker.util.specrecal import specrecalbasis
+from saltshaker.util.salt3_sncosmo import SALT3Source
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from sncosmo.salt2utils import SALT2ColorLaw
@@ -105,7 +106,7 @@ def compareSpectra(speclist,salt3dir,outdir=None,specfile=None,parfile='salt3_pa
     if base: datadict = base.mkcuts(datadict)[0]
     print('making cuts took %.1f seconds'%(time()-tc))
 
-    salt3 = sncosmo.SALT2Source(modeldir=salt3dir,m0file=m0file,
+    salt3 = SALT3Source(modeldir=salt3dir,m0file=m0file,
                                 m1file=m1file,
                                 clfile=clfile,cdfile=cdfile,
                                 errscalefile=errscalefile,

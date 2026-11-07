@@ -9,7 +9,7 @@ from saltshaker.util import readutils
 from saltshaker.training import saltfit
 import configparser
 import numpy as np
-from sncosmo.salt2utils import SALT2ColorLaw
+from saltshaker.util.salt3_sncosmo import colorlawfromfile
 import extinction
 from scipy.interpolate import interp1d
 from saltshaker.util.synphot import synphot
@@ -183,15 +183,7 @@ class SALT3ModelFiles:
         
         t0,x0,x1,c = snparams
 
-        with open(f'{self.salt3dir}/salt3_color_correction.dat') as fin:
-            lines = fin.readlines()
-        for i in range(len(lines)):
-            lines[i] = lines[i].replace('\n','')
-        colorlaw_salt3_coeffs = np.array(lines[1:self.n_colorpars+1]).astype('float')
-        salt3_colormin = float(lines[self.n_colorpars+2].split()[1])
-        salt3_colormax = float(lines[self.n_colorpars+3].split()[1])
-
-        salt3colorlaw = SALT2ColorLaw([salt3_colormin,salt3_colormax],colorlaw_salt3_coeffs)
+        salt3colorlaw = colorlawfromfile(f'{self.salt3dir}/salt3_color_correction.dat')
 
         # flux
         salt3flux = x0*(self.salt3flux + x1*self.salt3m1flux)

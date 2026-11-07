@@ -15,6 +15,8 @@ colorlaw_default
     Standard SALT2-style polynomial color law.
 colorlaw_intrinsic_plus_dust
     Two-component model separating intrinsic and dust color.
+colorlaw_spline
+    Natural cubic spline color law.
 
 Functions
 ---------
@@ -22,11 +24,15 @@ colorlaw
     Decorator to register a color law class.
 getcolorlaw
     Retrieve a registered color law by name.
+fileversion
+    Value of Salt2ExtinctionLaw.version in the color correction file.
 """
 from scipy.interpolate import interp1d
 from jax import numpy as jnp
 
 import jax
+
+from saltshaker.util.salt3_sncosmo import SALT2CL_B, SALT2CL_V, SplineColorLaw
 
 __colorlaws__ = dict()
 
@@ -53,8 +59,23 @@ def getcolorlaw(color_name):
     """
     return __colorlaws__[color_name]
 
-SALT2CL_B = 4302.57
-SALT2CL_V = 5428.55
+
+def fileversion(color_name):
+    """
+    Value of Salt2ExtinctionLaw.version in the color correction file.
+
+    Parameters
+    ----------
+    color_name : str
+        Name of the color law class.
+
+    Returns
+    -------
+    str
+        1 for colorlaw_default, as in SALT2 files, otherwise the name.
+    """
+    return '1' if color_name == 'colorlaw_default' else color_name
+
 SALT2CL_V_MINUS_B = SALT2CL_V - SALT2CL_B
 
 class SALT2ColorLaw:
@@ -295,6 +316,28 @@ class colorlaw_galactic:
         gCL = GalacticDustLaw()(wave)
         # need a minus sign here to match default colorlaw
         return -color*gCL
+
+
+@colorlaw
+class colorlaw_spline:
+    """
+    Natural cubic spline color law, see SplineColorLaw.
+
+    Parameters
+    ----------
+    n_colorpars : int
+        Number of free knots.
+    colorwaverange : tuple
+        (min_wave, max_wave) in Angstroms.
+    """
+
+    def __init__(self, n_colorpars, colorwaverange):
+        self.n_colorpars=n_colorpars
+        self.colorwaverange=colorwaverange
+        self.spline=SplineColorLaw(colorwaverange, n_colorpars)
+
+    def __call__(self, color,colorlawparams,wave):
+        return color*self.spline(colorlawparams,wave,xp=jnp)
 
 
 @colorlaw    

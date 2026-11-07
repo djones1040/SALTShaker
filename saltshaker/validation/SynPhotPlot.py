@@ -13,6 +13,7 @@ from sncosmo.constants import HC_ERG_AA
 from saltshaker.initfiles import init_rootdir
 from saltshaker.training.init_templates import synphotB
 from sncosmo.salt2utils import SALT2ColorLaw
+from saltshaker.util.salt3_sncosmo import SALT3Source
 import os
 
 
@@ -42,7 +43,7 @@ def overPlotSynthPhotByComponent(outfile,salt3dir,filterset='SDSS',comparison='s
 	zpsys='AB'
 	
 	salt2model = sncosmo.Model(source=comparison)
-	salt3 = sncosmo.SALT3Source(modeldir=salt3dir,m0file=m0file,
+	salt3 = SALT3Source(modeldir=salt3dir,m0file=m0file,
 								m1file=m1file,
 								clfile=clfile,cdfile=cdfile,
 								lcrv00file=lcrv00file,
@@ -188,7 +189,7 @@ def overPlotSynthPhotByComponentCustom(
 	zpsys='AB'
 	
 	salt2model = sncosmo.Model(source=comparison)
-	salt3 = sncosmo.SALT3Source(modeldir=salt3dir,m0file=m0file,
+	salt3 = SALT3Source(modeldir=salt3dir,m0file=m0file,
 								m1file=m1file,
 								clfile=clfile,cdfile=cdfile,
 								lcrv00file=lcrv00file,
@@ -289,7 +290,7 @@ def plotSynthPhotOverStretchRange(outfile,salt3dir,filterset='SDSS',comparison='
 	zpsys='AB'
 	
 	salt2model = sncosmo.Model(source=comparison)
-	salt3 = sncosmo.SALT3Source(modeldir=salt3dir,m0file=m0file,
+	salt3 = SALT3Source(modeldir=salt3dir,m0file=m0file,
 								m1file=m1file,
 								clfile=clfile,cdfile=cdfile,
 								lcrv00file=lcrv00file,
@@ -375,7 +376,7 @@ def plotSynthPhotOverStretchRangeNIR(
 	
 	zpsys='AB'
 	
-	salt3 = sncosmo.SALT3Source(modeldir=salt3dir,m0file=m0file,
+	salt3 = SALT3Source(modeldir=salt3dir,m0file=m0file,
 								m1file=m1file,
 								clfile=clfile,cdfile=cdfile,
 								lcrv00file=lcrv00file,

@@ -5,6 +5,7 @@ import pylab as plt
 import sncosmo
 import argparse
 from saltshaker.util import snana
+from saltshaker.util.salt3_sncosmo import colorlawfromfile
 from astropy.table import Table
 import astropy.units as u
 from saltshaker.util.synphot import synphot
@@ -13,7 +14,6 @@ from scipy.optimize import least_squares
 from sncosmo.constants import HC_ERG_AA
 from saltshaker.initfiles import init_rootdir
 from saltshaker.training.init_templates import synphotB
-from sncosmo.salt2utils import SALT2ColorLaw
 import extinction
 import copy
 from astropy.io import fits
@@ -167,7 +167,7 @@ def customfilt(outfile,lcfile,salt3dir,
                x0 = None, x1 = None, x2 = None, c = None, t0 = None,
                fitx1=False,fitc=False,bandpassdict=None,
                n_components=1, ax1=None, ax2=None, ax3=None, ax4=None, ax5=None,
-               saltdict={},n_colorpars=4,snid=None,modelsource='salt3'):
+               saltdict={},snid=None,modelsource='salt3'):
 
     comparison_chi2tot,salt3_chi2tot = 0,0
     
@@ -253,16 +253,8 @@ def customfilt(outfile,lcfile,salt3dir,
         salt3phase *= 1+sn.REDSHIFT_HELIO; salt3wave *= 1+sn.REDSHIFT_HELIO
 
     # color laws
-    with open('%s/%s'%(salt3dir,clfile)) as fin:
-        lines = fin.readlines()
-    if len(lines):
-        for i in range(len(lines)):
-            lines[i] = lines[i].replace('\n','')
-        colorlaw_salt3_coeffs = np.array(lines[1:n_colorpars[0]+1]).astype('float')
-        salt3_colormin = float(lines[n_colorpars[0]+2].split()[1])
-        salt3_colormax = float(lines[n_colorpars[0]+3].split()[1])
+    salt3colorlaw = colorlawfromfile('%s/%s'%(salt3dir,clfile))
 
-        salt3colorlaw = SALT2ColorLaw([salt3_colormin,salt3_colormax],colorlaw_salt3_coeffs)
     comparisonmodel.set(z=sn.REDSHIFT_HELIO,mwebv=sn.MWEBV)
     fitparams = ['t0']+list(comparisonmodel.source.param_names)
     # both models are refit to each SN within the same bounds
