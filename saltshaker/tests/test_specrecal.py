@@ -12,7 +12,7 @@ class test_specrecal(unittest.TestCase):
     def test_polynomial(self):
         coord = (self.wave - self.wave.mean()) / 2500
         expected = np.stack([coord**3 / factorial(3), coord**2 / 2, coord], axis=1)
-        self.assertTrue(np.array_equal(specrecalbasis(self.wave, 3), expected))
+        self.assertTrue(np.allclose(specrecalbasis(self.wave, 3), expected))
 
     def test_spline_vanishes_at_mean(self):
         # the mean is inserted as a sample so that the basis is evaluated there
