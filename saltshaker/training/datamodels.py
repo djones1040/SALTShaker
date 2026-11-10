@@ -35,6 +35,7 @@ from scipy.special import factorial
 from scipy.interpolate import bisplev, interp1d
 from scipy import sparse as scisparse
 from saltshaker.util.bsplinebasis import tensorbsplinebasis
+from saltshaker.util.sparseutils import bcoofromdense
 import numpy as np
 
 from jax import numpy as jnp
@@ -710,7 +711,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
 
         # Store as sparse matrix for efficient JAX operations
         # Add zero rows for padding elements
-        self.pcderivsparse = sparse.BCOO.fromdense(
+        self.pcderivsparse = bcoofromdense(
             np.stack(
                 splinebasisconvolutions
                 + [np.zeros(splinebasisconvolutions[-1].shape)] * padding
@@ -779,7 +780,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
                     (residsobj.errphaseknotloc, residsobj.errwaveknotloc,
                      np.arange(residsobj.imodelerr0.size) == i,
                      residsobj.errbsorder, residsobj.errbsorder))
-            self.errordesignmat = sparse.BCOO.fromdense(
+            self.errordesignmat = bcoofromdense(
                 np.concatenate((derivInterp, np.zeros((padding, residsobj.imodelerr0.size)))))
 
         #######################################################################
@@ -1234,7 +1235,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
         )
 
         # Store as sparse matrix, add zero rows for padding
-        self.pcderivsparse = sparse.BCOO.fromdense(
+        self.pcderivsparse = bcoofromdense(
             np.concatenate((derivInterp, np.zeros((padding, residsobj.im0.size))))
         )
 
@@ -1316,7 +1317,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
                     (residsobj.errphaseknotloc, residsobj.errwaveknotloc,
                      np.arange(residsobj.imodelerr0.size) == i,
                      residsobj.errbsorder, residsobj.errbsorder))
-            self.errordesignmat = sparse.BCOO.fromdense(
+            self.errordesignmat = bcoofromdense(
                 np.concatenate((derivInterp, np.zeros((padding, residsobj.imodelerr0.size)))))
 
         #######################################################################

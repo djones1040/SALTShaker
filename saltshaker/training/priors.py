@@ -36,6 +36,7 @@ from saltshaker.util.jaxoptions import jaxoptions
 from saltshaker.util import batching
 from saltshaker.training import datamodels
 from saltshaker.util.bsplinebasis import tensorbsplinebasis
+from saltshaker.util.sparseutils import bcoofromdense
 
 from inspect import signature
 
@@ -185,16 +186,16 @@ class SALTPriors:
 
         peakbasis = tensorbsplinebasis([0], self.wave, self.phaseknotloc, self.waveknotloc, self.bsorder, dx=1)[0]
         m0Bderivjac = (bandweights * peakbasis).sum(axis=0) * intmult
-        self.__peakpriorderiv__=sparse.BCOO.fromdense(m0Bderivjac)
+        self.__peakpriorderiv__=bcoofromdense(m0Bderivjac)
 
         peakbasis = tensorbsplinebasis([0], self.wave, self.phaseknotloc, self.waveknotloc, self.bsorder)[0]
         fluxDeriv = (bandweights * peakbasis).sum(axis=0) * intmult
-        self.__maximumlightpcderiv__=sparse.BCOO.fromdense(fluxDeriv)
+        self.__maximumlightpcderiv__=bcoofromdense(fluxDeriv)
 
         thinning=4
         jacobian = tensorbsplinebasis(self.phase[:2], self.wave[::thinning], self.phaseknotloc,
                                       self.waveknotloc, self.bsorder).reshape(-1, self.im0.size)
-        self.__initialphasepcderiv__=sparse.BCOO.fromdense(jacobian)
+        self.__initialphasepcderiv__=bcoofromdense(jacobian)
         
         
         self.__componentderivs__=SALTResidsObj.componentderiv

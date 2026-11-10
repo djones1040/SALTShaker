@@ -30,6 +30,7 @@ from jax import lax
 from jax.experimental import sparse
 from saltshaker.util.jaxoptions import jaxoptions
 from saltshaker.util.bsplinebasis import tensorbsplinebasis
+from saltshaker.util.sparseutils import bcoofromdense
 
 from scipy.interpolate import splprep, splev, bisplev, bisplrep, interp1d, interp2d, RegularGridInterpolator, RectBivariateSpline
 from scipy import stats
@@ -86,7 +87,7 @@ class SALTconstraints:
         peakbasis = tensorbsplinebasis([0], self.wave, self.phaseknotloc, self.waveknotloc, self.bsorder)[0]
         fluxDeriv = (self.kcordict['default']['Bpbspl'] @ peakbasis) * intmult
 
-        self.__maximumlightpcderiv__=sparse.BCOO.fromdense(fluxDeriv)
+        self.__maximumlightpcderiv__=bcoofromdense(fluxDeriv)
 
     @partial(jaxoptions, static_argnums=[0, 2], static_argnames=['usesecondary'], jitdefault=True)
     def transformtoconstrainedparams(self, guess, usesecondary=True):

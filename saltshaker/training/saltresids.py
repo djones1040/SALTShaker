@@ -57,6 +57,7 @@ from scipy.interpolate import (
     RectBivariateSpline,
 )
 from saltshaker.util.bsplinebasis import bsplinebasis, tensorbsplinebasis
+from saltshaker.util.sparseutils import bcoofromdense
 from scipy.integrate import trapezoid as trapz
 from scipy import linalg
 from scipy import sparse as scisparse
@@ -546,7 +547,7 @@ class SALTResids:
                                dx, dy).reshape(-1, self.im0.size)
             for dx, dy in [(0, 0), (1, 0), (0, 1), (1, 1)]
         ]
-        regularizationDerivs = map(sparse.BCOO.fromdense, regularizationDerivs)
+        regularizationDerivs = map(bcoofromdense, regularizationDerivs)
         (
             self.componentderiv,
             self.dcompdphasederiv,
