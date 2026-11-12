@@ -4,6 +4,7 @@ from saltshaker.util import readutils
 #from saltshaker.training.saltfit import fitting
 from saltshaker.training import optimizers
 from saltshaker.training import saltresids
+from saltshaker.training.datamodels import SALTparameters
 import numpy as np
 import time
 
@@ -74,3 +75,45 @@ code."""
         # this is slower than it used to be
         # but still shouldn't take more than 5 minutes
         self.assertTrue(tfinish - tstart < 300)
+
+    def test_likelihood_passband_not_preintegrated(self):
+        """Light curves with different wavelength coverage batch together, and each
+applies the color law at its own wavelengths."""
+
+        salt = TrainSALT()
+        rt = RunTraining()
+        rt.get_config_options(salt,'testdata/test.conf',None)
+        salt.options.preintegrate_photometric_passband = False
+
+        datadict = readutils.rdAllData(
+            'testdata/data/SALT3TRAIN_K21_CSPDR3/SALT3TRAIN_K21_CSPDR3.LIST',False,
+            dospec=True,
+            peakmjdlist='testdata/test_pkmjd.LIST',
+            binspecres=None,snparlist='testdata/test_pars.LIST',
+            maxsn=None,specrecallist='testdata/test_spcrl.LIST')
+        kcordict=readutils.rdkcor(['CSP'],salt.options)
+        salt.kcordict = kcordict
+
+        x_modelpars,modelconfiguration = salt.initialParameters(datadict)
+        saltres = saltresids.SALTResids(datadict,kcordict,modelconfiguration,salt.options)
+
+        # Nonzero colors, so the flux depends on where the color law is evaluated
+        x_modelpars = x_modelpars.copy()
+        x_modelpars[saltres.ic] = np.linspace(-0.3,0.5,np.size(saltres.ic))
+        self.assertTrue(np.isfinite(saltres.maxlikefit(x_modelpars,dospec=True)))
+
+        lcs = [(sn,flt,lc) for sn in saltres.datadict.values() for flt,lc in sn.photdata.items()]
+        self.assertGreater(len({lc.pcderivsparse.shape[1] for _,_,lc in lcs}),1)
+
+        batched = saltres.batchedphotlikelihood(x_modelpars,None,False,False)
+        unbatched = sum(lc.modelloglikelihood(x_modelpars) for _,_,lc in lcs)
+        np.testing.assert_allclose(batched,unbatched,rtol=1e-12)
+
+        for sn,flt,lc in lcs:
+            pars = SALTparameters(lc,x_modelpars)
+            kcor = kcordict[sn.survey][flt]
+            wave = saltres.wave[(sn.obswave >= kcor['minlam']) & (sn.obswave <= kcor['maxlam'])]
+            colorlaw = sum(fun(c,cl,wave) for fun,c,cl in zip(lc.colorlawfunction,pars.c,pars.CL))
+            fluxcoeffs = np.concatenate(([1.],pars.coordinates)) @ pars.components * pars.x0
+            expected = np.clip((lc.pcderivsparse @ fluxcoeffs) @ 10**(-0.4*colorlaw),0,None)
+            np.testing.assert_allclose(lc.modelflux(x_modelpars),expected,rtol=1e-12,err_msg=lc.uniqueid)
