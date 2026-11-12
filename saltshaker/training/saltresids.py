@@ -33,6 +33,7 @@ from saltshaker.training import colorlaw
 
 from saltshaker.training.priors import SALTPriors, __priors__, __nongaussianpriors__
 from saltshaker.training.constraints import SALTconstraints
+from saltshaker.training.masscorrection import sampleknotweights
 
 from saltshaker.config.configparsing import *
 
@@ -116,7 +117,9 @@ interactive = sys.stdout.isatty()
 
 saltconfiguration = namedtuple(
     "saltconfiguration",
-    ["parlist", "phaseknotloc", "waveknotloc", "errphaseknotloc", "errwaveknotloc"],
+    ["parlist", "phaseknotloc", "waveknotloc", "errphaseknotloc", "errwaveknotloc",
+     "masscorrphasebasis", "masscorrwavebasis"],
+    defaults=(None, None),
 )
 
 salttrainingresult = namedtuple(
@@ -345,6 +348,23 @@ class SALTResids:
             )
         # Pre-compute parameter index arrays for efficient slicing
         self.set_param_indices()
+
+        # Each SN's interpolation weights on the host-mass knots of the mass correction
+        if self.masscorrection_rank:
+            if self.host_component:
+                raise NotImplementedError("the host-mass correction cannot be combined with host_component")
+            snids = list(self.datadict)
+            weights = sampleknotweights([self.datadict[sn].hostlogmass for sn in snids],
+                                        [self.datadict[sn].hostlogmasserr for sn in snids],
+                                        self.masscorrection_knots)
+            self.massknotweights = dict(zip(snids, weights))
+            self.meanmassknotweights = weights.mean(axis=0)
+            log.info(f"host-mass correction of rank {self.masscorrection_rank}: "
+                     f"{sum(np.isfinite(self.datadict[sn].hostlogmass) for sn in snids)} of {len(snids)} SNe have masses")
+            if "masscorrmean" not in self.usePriors:
+                log.warning("without the masscorrmean prior, the host-mass correction is degenerate with the model components")
+        else:
+            self.massknotweights = None
 
         # ===== Phase/wavelength grid setup =====
         # Internal grids for model evaluation (higher resolution)
@@ -1177,6 +1197,23 @@ class SALTResids:
             default=1.0,
             help="for adaptive knots, high values give ~ uniform spacing, low values reduce resolution where spectra are not present (default=%(default)s)",
         )
+        successful = successful & wrapaddingargument(
+            config,
+            "modelparams",
+            "masscorrection_rank",
+            type=int,
+            default=0,
+            help="rank of the host-mass-dependent correction to each model component; 0 turns it off (default=%(default)s)",
+        )
+        successful = successful & wrapaddingargument(
+            config,
+            "modelparams",
+            "masscorrection_knots",
+            type=float,
+            nargs="+",
+            default="8.5,9.5,10.5,11.5",
+            help="log10 host stellar masses at which the mass correction is defined (default=%(default)s)",
+        )
 
         successful = successful & wrapaddingargument(
             config,
@@ -1404,6 +1441,11 @@ class SALTResids:
         if self.host_component:
             self.icomponents += [self.imhost]
         self.icomponents = np.array(self.icomponents)
+        # Shape (n_components, n_knots * rank**2), with zero width when the correction is off
+        self.imasscorr = np.array(
+            [np.where(self.parlist == f"masscorr{i}")[0] for i in range(self.n_components)],
+            dtype=int,
+        )
         self.iclscat_0, self.iclscat_poly = np.array([], dtype="int"), np.array(
             [], dtype="int"
         )

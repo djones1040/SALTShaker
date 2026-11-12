@@ -48,6 +48,7 @@ from jax.tree_util import register_pytree_node_class
 from functools import partial
 from saltshaker.util.jaxoptions import jaxoptions, sparsejaxoptions
 from saltshaker.util.specrecal import specrecalbasis
+from saltshaker.training.masscorrection import masscorrection
 
 import extinction
 import warnings
@@ -63,6 +64,23 @@ from sncosmo.constants import HC_ERG_AA, MODEL_BANDFLUX_SPACING
 recalmax = 20
 
 _SCALE_FACTOR = 1e-12
+
+
+def setmasscorrection(dataobj, sn, residsobj):
+    """Attach the host-mass correction's parameter indices, bases and the SN's mass-knot weights."""
+    dataobj.imasscorr = residsobj.imasscorr
+    # A tuple, so batching does not mistake the bases' leading axes for the batch axis
+    dataobj.masscorrbases = (residsobj.masscorrphasebasis, residsobj.masscorrwavebasis)
+    dataobj.massweights = (np.zeros(0) if residsobj.massknotweights is None
+                           else residsobj.massknotweights[sn.snid])
+
+
+def correctedcomponents(dataobj, pars):
+    """Model component coefficients, including the host-mass correction when it is on."""
+    if pars.masscorr.size == 0:
+        return pars.components
+    return jnp.asarray(pars.components).at[: pars.masscorr.shape[0]].add(
+        masscorrection(dataobj.massweights, pars.masscorr, *dataobj.masscorrbases))
 
 
 def __anyinnonzeroareaforsplinebasis__(
@@ -216,12 +234,15 @@ class SALTparameters:
         Model error surface coefficients.
     modelcorrs : ndarray
         Model correlation surface coefficients.
+    masscorr : ndarray
+        Host-mass correction coefficients for each component (see masscorrection.py).
     """
 
     __slots__ = [
         "x0",
         "coordinates",
         "components",
+        "masscorr",
         "c",
         "CL",
         "modelcorrs",
@@ -486,6 +507,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         "ic",
         "icoordinates",
         "icomponents",
+        "imasscorr",
         "imodelcorrs",
         "imodelerrs",
         "iclscat",
@@ -506,6 +528,8 @@ class modeledtraininglightcurve(modeledtrainingdata):
         "wavebasis",
         "wavebasisoffset",
         "padding",
+        "massweights",
+        "masscorrbases",
     ] + __indexattributes__
     __staticattributes__ = [
         "preintegratebasis",
@@ -536,6 +560,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         "wavebasisoffset",
         "padding",
         "uniqueid",
+        "massweights",
     }
 
     def __init__(self, sn, lc, residsobj, kcordict, padding=0):
@@ -613,6 +638,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         #######################################################################
         self.icoordinates = sn.icoordinates  # x1, xhost indices for this SN
         self.icomponents = residsobj.icomponents  # M0, M1 component indices
+        setmasscorrection(self, sn, residsobj)
 
         self.iCL = residsobj.iCL  # Color law coefficient indices
         self.ix0 = sn.ix0  # Amplitude parameter index
@@ -823,7 +849,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         # coordinates = [1, x1, x2, ..., xhost] for combining model components
         coordinates = jnp.concatenate((jnp.ones(1), pars.coordinates))
 
-        fluxcoeffs = jnp.dot(coordinates, pars.components) * pars.x0
+        fluxcoeffs = jnp.dot(coordinates, correctedcomponents(self, pars)) * pars.x0
         # Evaluate color law at the wavelength basis centers
         colorlaw = sum(
             [
@@ -1071,6 +1097,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
         "ix0",
         "ispcrcl",
         "icomponents",
+        "imasscorr",
         "icoordinates",
         "ipad",
         "iCL",
@@ -1090,6 +1117,8 @@ class modeledtrainingspectrum(modeledtrainingdata):
         "errordesignmat",
         "pcderivsparse",
         "spectralsuppression",
+        "massweights",
+        "masscorrbases",
     ]
     __staticattributes__ = [
         "padding",
@@ -1115,6 +1144,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
         "recaltermderivs",
         "pcderivsparse",
         "errordesignmat",
+        "massweights",
         # Per-spectrum (redshift, MW extinction, padding zeros); if unmapped,
         # every spectrum in a batch would use the first spectrum's prefactor
         "varianceprefactor",
@@ -1186,6 +1216,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
         self.ic = sn.ic
         self.colorlawfunction = residsobj.colorlawfunction
         self.icomponents = residsobj.icomponents
+        setmasscorrection(self, sn, residsobj)
         self.icoordinates = sn.icoordinates
 
         # Evaluate MW extinction at observed wavelengths
@@ -1407,7 +1438,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
         # Define recalibration factor
         coeffs = pars.spcrcl
         coordinates = jnp.concatenate((jnp.ones(1), pars.coordinates))
-        components = pars.components
+        components = correctedcomponents(self, pars)
 
         recalterm = jnp.dot(self.recaltermderivs, coeffs)
         recalterm = jnp.clip(recalterm, -recalmax, recalmax)

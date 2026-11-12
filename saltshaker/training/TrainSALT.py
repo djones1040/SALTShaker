@@ -88,6 +88,7 @@ from saltshaker.training.base import TrainSALTBase
 from saltshaker.training import saltresids
 from saltshaker.training import optimizers
 from saltshaker.training import colorlaw
+from saltshaker.training.masscorrection import masscorrectionbases
 
 from saltshaker.validation import ValidateParams, datadensity
 from saltshaker.validation import ValidateLightcurves
@@ -456,6 +457,10 @@ class TrainSALT(TrainSALTBase):
             parlist = np.append(parlist, ["m" + str(i)] * (n_phaseknots * n_waveknots))
         if self.options.host_component:
             parlist = np.append(parlist, ["mhost"] * (n_phaseknots * n_waveknots))
+        if self.options.masscorrection_rank:
+            nmasscorr = len(self.options.masscorrection_knots) * self.options.masscorrection_rank**2
+            for i in range(self.options.n_components):
+                parlist = np.append(parlist, [f"masscorr{i}"] * nmasscorr)
         if self.options.n_colorpars:
             parlist = np.append(
                 parlist,
@@ -549,12 +554,22 @@ class TrainSALT(TrainSALTBase):
             )
             parlist = np.append(parlist, [f"surverrfloor_{x}" for x in filtlist])
 
+        # Bases for the host-mass correction come from the template initialization, so a
+        # resumed training reproduces them
+        masscorrphasebasis, masscorrwavebasis = None, None
+        if self.options.masscorrection_rank:
+            masscorrphasebasis, masscorrwavebasis = masscorrectionbases(
+                [m0knots.reshape(n_phaseknots, n_waveknots), m1knots.reshape(n_phaseknots, n_waveknots)],
+                self.options.masscorrection_rank)
+
         modelconfiguration = saltresids.saltconfiguration(
             parlist=parlist,
             phaseknotloc=phaseknotloc,
             waveknotloc=waveknotloc,
             errphaseknotloc=errphaseknotloc,
             errwaveknotloc=errwaveknotloc,
+            masscorrphasebasis=masscorrphasebasis,
+            masscorrwavebasis=masscorrwavebasis,
         )
         # initial guesses
         n_params = parlist.size
