@@ -265,6 +265,46 @@ class SALTtrainingspectrum(SALTtrainingdata):
         return len(self.wavelength)
 
 
+def readhostlogmass(sn, snpar=None):
+    """
+    Read the host-galaxy log10 stellar mass and its uncertainty for one supernova.
+
+    A ``HOST_LOGMASS`` column (with optional ``HOST_LOGMASS_ERR``) in the SN parameter
+    list takes precedence over the ``HOSTGAL_LOGMASS`` header key, which ASCII files
+    write as ``value +- error`` and FITS files pair with ``HOSTGAL_LOGMASS_ERR``.
+
+    Returns
+    -------
+    hostlogmass, hostlogmasserr : float
+        NaN where unknown, including SNANA's negative sentinels such as -9 and -999.
+    """
+
+    def parse(value):
+        try:
+            return [float(x) for x in str(value).split("#")[0].split("+-")]
+        except ValueError:
+            return [np.nan]
+
+    mass, err = np.nan, np.nan
+    snid = str(sn.SNID)
+    if snpar is not None and "HOST_LOGMASS" in snpar.colnames and snid in snpar["SNID"]:
+        row = snpar["SNID"] == snid
+        mass = np.ma.filled(np.ma.asarray(snpar["HOST_LOGMASS"][row], dtype=float), np.nan)[0]
+        if "HOST_LOGMASS_ERR" in snpar.colnames:
+            err = np.ma.filled(np.ma.asarray(snpar["HOST_LOGMASS_ERR"][row], dtype=float), np.nan)[0]
+    elif "HOSTGAL_LOGMASS" in sn.__dict__:
+        values = parse(sn.HOSTGAL_LOGMASS)
+        mass = values[0]
+        if "HOSTGAL_LOGMASS_ERR" in sn.__dict__:
+            err = parse(sn.HOSTGAL_LOGMASS_ERR)[0]
+        elif len(values) > 1:
+            err = values[1]
+
+    if not mass >= 0:
+        return np.nan, np.nan
+    return float(mass), float(err) if err >= 0 else np.nan
+
+
 class SALTtrainingSN:
     """
     Container for all training data associated with one supernova.
@@ -298,6 +338,9 @@ class SALTtrainingSN:
         Estimated time of B-band maximum (MJD).
     salt2fitprob : float
         SALT2 fit probability (for quality cuts).
+    hostlogmass, hostlogmasserr : float
+        Host-galaxy log10 stellar mass and uncertainty, NaN where unknown
+        (see ``readhostlogmass``).
     photdata : dict
         Dictionary of SALTtraininglightcurve objects keyed by filter.
     specdata : dict
@@ -316,6 +359,8 @@ class SALTtrainingSN:
         "SIM_SALT2x0",
         "SIM_SALT2x1",
         "SIM_SALT2c",
+        "hostlogmass",
+        "hostlogmasserr",
     ]
 
     def __init__(
@@ -412,6 +457,7 @@ class SALTtrainingSN:
             self.SIM_SALT2c = sn.SIM_SALT2c
         else:
             self.SIM_SALT2c = None
+        self.hostlogmass, self.hostlogmasserr = readhostlogmass(sn, snpar)
 
         # Find E(B-V) from Milky Way
         if "MWEBV" in sn.__dict__.keys():
@@ -868,6 +914,8 @@ def rdAllData(
 
         datadict.update(snreadinfromlist)
     log.info(f"read in {len(datadict)} SNe, {skipcount} SNe were not read")
+    nhostmass = sum(np.isfinite(sn.hostlogmass) for sn in datadict.values())
+    log.info(f"host masses read for {nhostmass} of {len(datadict)} SNe")
     log.info("reading data files took %.1f" % (time() - rdstart))
     if not len(datadict.keys()):
         raise RuntimeError("no light curve data to train on!!")
