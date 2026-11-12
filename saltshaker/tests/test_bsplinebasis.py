@@ -4,7 +4,7 @@ import numpy as np
 from scipy.interpolate import bisplev
 
 from saltshaker.training.init_templates import getsplineknots
-from saltshaker.util.bsplinebasis import bsplinebasis, tensorbsplinebasis
+from saltshaker.util.bsplinebasis import bsplinebasis, tensorbsplinebasis, tensorproductnonzeros
 
 
 def bisplevbasis(x, y, xknots, yknots, order, dx=0, dy=0):
@@ -45,6 +45,20 @@ class test_bsplinebasis(unittest.TestCase):
         phaseknots, _ = getsplineknots(*self.knotargs, "uniform")
         basis = bsplinebasis([-20, 50], phaseknots, 3)
         np.testing.assert_allclose(basis.sum(axis=1), 1, rtol=0, atol=1e-14)
+
+    def test_tensorproductnonzeros_matches_dense(self):
+        """Values and row-major indices equal the nonzeros of the dense product with masked columns zeroed."""
+        phaseknots, waveknots = getsplineknots(*self.knotargs, "uniform")
+        a = bsplinebasis([-20, -3.2, 0, 17.5, 50], phaseknots, 3) * np.arange(1, 6)[:, np.newaxis]
+        # The first wavelength has zero weight, as at the edge of a passband
+        b = bsplinebasis(np.linspace(3000, 7000, 101), waveknots, 3) * np.linspace(0, 1, 101)[:, np.newaxis]
+        mask = np.random.default_rng(0).uniform(size=a.shape[1] * b.shape[1]) < 0.7
+        dense = np.einsum('ip,jq->ijpq', a, b).reshape(a.shape[0], b.shape[0], -1)
+        dense[:, :, ~mask] = 0
+        values, indices = tensorproductnonzeros(a, b, mask)
+        nonzero = np.nonzero(dense)
+        np.testing.assert_array_equal(indices, np.stack(nonzero, axis=-1))
+        np.testing.assert_array_equal(values, dense[nonzero])
 
 
 if __name__ == "__main__":

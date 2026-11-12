@@ -15,6 +15,14 @@ def bcoofromdense(mat):
     """
     mat = np.asarray(mat)
     nonzero = np.nonzero(mat)
-    indices = np.stack(nonzero, axis=-1).astype(np.int32)
-    return sparse.BCOO((mat[nonzero], indices), shape=mat.shape,
-                       indices_sorted=True, unique_indices=True)
+    return bcoofromnonzeros(mat[nonzero], np.stack(nonzero, axis=-1), mat.shape)
+
+
+def bcoofromnonzeros(values, indices, shape):
+    """
+    Build a BCOO array from its nonzero values and their indices, given in row-major order.
+
+    The result matches ``bcoofromdense`` of the corresponding dense array.
+    """
+    return sparse.BCOO((np.asarray(values), np.asarray(indices, dtype=np.int32).reshape(-1, len(shape))),
+                       shape=shape, indices_sorted=True, unique_indices=True)
