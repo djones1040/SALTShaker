@@ -504,6 +504,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         "varianceprefactor",
         "clscatderivs",
         "wavebasis",
+        "wavebasisoffset",
         "padding",
     ] + __indexattributes__
     __staticattributes__ = [
@@ -532,6 +533,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
         "pcderivsparse",
         "varianceprefactor",
         "clscatderivs",
+        "wavebasisoffset",
         "padding",
         "uniqueid",
     }
@@ -648,6 +650,8 @@ class modeledtraininglightcurve(modeledtrainingdata):
         fluxfactor = residsobj.fluxfactor[sn.survey][lc.filt]  # Zeropoint correction
 
         wave = residsobj.wave[waveidxs]
+        # Index of wave[0] in residsobj.wave, which is the wavebasis when the passband is not preintegrated
+        self.wavebasisoffset = np.flatnonzero(waveidxs)[0]
 
         # Determine which basis functions have non-zero support at our phases/wavelengths
         inds = np.array(range(residsobj.im0.size))
@@ -853,6 +857,11 @@ class modeledtraininglightcurve(modeledtrainingdata):
             # Multiply spline bases by flux coefficients
             return jnp.clip(self.pcderivsparse @ fluxcoeffsreddened, 0, None)
         else:
+            # Color law on this light curve's wavelengths; batching may pad the wavelength
+            # axis past them, where the basis is zero
+            nwave = self.pcderivsparse.shape[1]
+            colorexp = jnp.take(colorexp, self.wavebasisoffset + jnp.arange(nwave),
+                                mode="fill", fill_value=0)
             # Integrate basis functions over wavelength and sum over flux coefficients
             return jnp.clip((self.pcderivsparse @ fluxcoeffs) @ colorexp, 0, None)
 

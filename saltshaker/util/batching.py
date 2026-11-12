@@ -92,18 +92,20 @@ def stackbcoo(mats):
     Parameters
     ----------
     mats : list of jax.experimental.sparse.BCOO
-        Arrays of identical shape, each with n_batch=0 and n_dense=0.
+        Arrays of the same number of dimensions, each with n_batch=0 and
+        n_dense=0. Each is zero-padded to the largest size along every axis.
 
     Returns
     -------
     jax.experimental.sparse.BCOO
-        Array with n_batch=1, and shape (len(mats), *mats[0].shape).
+        Array with n_batch=1, and shape (len(mats), *shape), where shape is the
+        largest size along each axis.
     """
-    shape = mats[0].shape
-    if any(x.shape != shape for x in mats):
+    if len({x.ndim for x in mats}) > 1:
         raise ValueError(
-            f"Sparse arrays in a batch must have matching shapes: {[x.shape for x in mats]}"
+            f"Sparse arrays in a batch must have the same number of dimensions: {[x.shape for x in mats]}"
         )
+    shape = tuple(int(n) for n in np.max([x.shape for x in mats], axis=0))
     nse = max(x.nse for x in mats)
     data = np.zeros((len(mats), nse), dtype=mats[0].data.dtype)
     # Unused entries take out-of-bounds indices, matching JAX's convention for padding
