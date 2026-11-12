@@ -34,6 +34,8 @@ from saltshaker.util.readutils import (
 from scipy.special import factorial
 from scipy.interpolate import bisplev, interp1d
 from scipy import sparse as scisparse
+from saltshaker.util.bsplinebasis import tensorbsplinebasis
+from saltshaker.util.sparseutils import bcoofromdense
 import numpy as np
 
 from jax import numpy as jnp
@@ -648,7 +650,6 @@ class modeledtraininglightcurve(modeledtrainingdata):
         wave = residsobj.wave[waveidxs]
 
         # Determine which basis functions have non-zero support at our phases/wavelengths
-        # This optimization avoids evaluating basis functions that contribute nothing
         inds = np.array(range(residsobj.im0.size))
         # Convert linear index to 2D (phase, wave) indices
         phaseind, waveind = inds // (
@@ -664,18 +665,13 @@ class modeledtraininglightcurve(modeledtrainingdata):
             wave.min() <= residsobj.waveknotloc[waveind + residsobj.bsorder + 1]
         )
 
-        # Only evaluate basis functions that overlap in both phase AND wavelength
+        # Only keep basis functions that overlap in both phase AND wavelength
         isrelevant = inphase & inwave
 
-        # Evaluate each relevant B-spline basis function on the (phase, wavelength) grid
         # derivInterp[phase_idx, wave_idx, basis_idx] = basis function value
-        derivInterp = np.zeros((clippedphase.size, waveidxs.sum(), residsobj.im0.size))
-        for i in np.where(isrelevant)[0]:
-            derivInterp[:, :, i] = bisplev(
-                clippedphase, wave,
-                (residsobj.phaseknotloc, residsobj.waveknotloc,
-                 np.arange(residsobj.im0.size) == i,  # Unit vector for basis i
-                 residsobj.bsorder, residsobj.bsorder))
+        derivInterp = tensorbsplinebasis(clippedphase, wave, residsobj.phaseknotloc,
+                                         residsobj.waveknotloc, residsobj.bsorder)
+        derivInterp[:, :, ~isrelevant] = 0
 
         # Combine passband with MW extinction and flux scaling factors
         # This is the "effective passband" that converts flux to counts
@@ -715,7 +711,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
 
         # Store as sparse matrix for efficient JAX operations
         # Add zero rows for padding elements
-        self.pcderivsparse = sparse.BCOO.fromdense(
+        self.pcderivsparse = bcoofromdense(
             np.stack(
                 splinebasisconvolutions
                 + [np.zeros(splinebasisconvolutions[-1].shape)] * padding
@@ -784,7 +780,7 @@ class modeledtraininglightcurve(modeledtrainingdata):
                     (residsobj.errphaseknotloc, residsobj.errwaveknotloc,
                      np.arange(residsobj.imodelerr0.size) == i,
                      residsobj.errbsorder, residsobj.errbsorder))
-            self.errordesignmat = sparse.BCOO.fromdense(
+            self.errordesignmat = bcoofromdense(
                 np.concatenate((derivInterp, np.zeros((padding, residsobj.imodelerr0.size)))))
 
         #######################################################################
@@ -1227,15 +1223,10 @@ class modeledtrainingspectrum(modeledtrainingdata):
 
         isrelevant = inphase & inwave
 
-        # Evaluate each relevant basis function at all wavelengths
         # derivInterp[wave_idx, basis_idx] = basis function value
-        derivInterp = np.zeros((spectrum.wavelength.size, residsobj.im0.size))
-        for i in np.where(isrelevant)[0]:
-            derivInterp[:, i] = bisplev(
-                spectrum.phase, self.restwavelength,
-                (residsobj.phaseknotloc, residsobj.waveknotloc,
-                 np.arange(residsobj.im0.size) == i,  # Unit vector for basis i
-                 residsobj.bsorder, residsobj.bsorder))
+        derivInterp = tensorbsplinebasis(spectrum.phase, self.restwavelength, residsobj.phaseknotloc,
+                                         residsobj.waveknotloc, residsobj.bsorder)[0]
+        derivInterp[:, ~isrelevant] = 0
 
         # Apply MW extinction and flux scaling
         # Scale factor and (1+z) handle unit conversions
@@ -1244,7 +1235,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
         )
 
         # Store as sparse matrix, add zero rows for padding
-        self.pcderivsparse = sparse.BCOO.fromdense(
+        self.pcderivsparse = bcoofromdense(
             np.concatenate((derivInterp, np.zeros((padding, residsobj.im0.size))))
         )
 
@@ -1326,7 +1317,7 @@ class modeledtrainingspectrum(modeledtrainingdata):
                     (residsobj.errphaseknotloc, residsobj.errwaveknotloc,
                      np.arange(residsobj.imodelerr0.size) == i,
                      residsobj.errbsorder, residsobj.errbsorder))
-            self.errordesignmat = sparse.BCOO.fromdense(
+            self.errordesignmat = bcoofromdense(
                 np.concatenate((derivInterp, np.zeros((padding, residsobj.imodelerr0.size)))))
 
         #######################################################################

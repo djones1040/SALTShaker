@@ -35,6 +35,8 @@ from functools import partial
 from saltshaker.util.jaxoptions import jaxoptions
 from saltshaker.util import batching
 from saltshaker.training import datamodels
+from saltshaker.util.bsplinebasis import tensorbsplinebasis
+from saltshaker.util.sparseutils import bcoofromdense
 
 from inspect import signature
 
@@ -172,49 +174,28 @@ class SALTPriors:
         self.isbounded=np.where(~np.isinf(widths))[0]
         self.parameterbounds= lower[self.isbounded],upper[self.isbounded],widths[self.isbounded]
      
-        m0Bderivjac= np.zeros(self.im0.size)
         passbandColorExp = self.kcordict['default']['Bpbspl']
         intmult = (self.wave[1]-self.wave[0])*self.fluxfactor['default']['B']
-        for i in range(self.im0.size):
-            waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
-            phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
-            #Check if this filter is inside values affected by changes in knot i
-            minlam=np.min(self.kcordict['default']['Bwave'][self.kcordict['default']['Btp'] > 0.01])
-            maxlam=np.max(self.kcordict['default']['Bwave'][self.kcordict['default']['Btp'] > 0.01])
+        # B-band weights per basis function: zero unless phase 0 is in its support,
+        # and integrated only over wavelengths strictly inside its support
+        phaseind, waveind = np.divmod(np.arange(self.im0.size), self.waveknotloc.size-self.bsorder-1)
+        atpeak = (self.phaseknotloc[phaseind] <= 0) & (0 <= self.phaseknotloc[phaseind+self.bsorder+1])
+        inbounds = ((self.wave[:, np.newaxis] > self.waveknotloc[waveind])
+                    & (self.wave[:, np.newaxis] < self.waveknotloc[waveind+self.bsorder+1]))
+        bandweights = passbandColorExp[:, np.newaxis] * inbounds * atpeak
 
-            if waverange[0] > maxlam or waverange[1] < minlam:
-                pass
-            if (0>=phaserange[0] ) & (0<=phaserange[1]):
-                #Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
-                #Integrate only over wavelengths within the relevant range
-                inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
-                derivInterp = bisplev(np.array([0]),self.wave[inbounds],(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder),dx=1) 
-                m0Bderivjac[i] = np.sum( passbandColorExp[inbounds] * derivInterp)*intmult 
-        self.__peakpriorderiv__=sparse.BCOO.fromdense(m0Bderivjac)
-   
-        fluxDeriv= np.zeros(self.im0.size)
-        for i in range(self.im0.size):
-            waverange=self.waveknotloc[[i%(self.waveknotloc.size-self.bsorder-1),i%(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
-            phaserange=self.phaseknotloc[[i//(self.waveknotloc.size-self.bsorder-1),i//(self.waveknotloc.size-self.bsorder-1)+self.bsorder+1]]
-            #Check if this filter is inside values affected by changes in knot i
-            minlam=np.min(self.kcordict['default']['Bwave'][self.kcordict['default']['Btp'] > 0.01])
-            maxlam=np.max(self.kcordict['default']['Bwave'][self.kcordict['default']['Btp'] > 0.01])
-            if waverange[0] > maxlam or waverange[1] < minlam:
-                pass
-            if (0>=phaserange[0] ) & (0<=phaserange[1]):
-                #Bisplev with only this knot set to one, all others zero, modulated by passband and color law, multiplied by flux factor, scale factor, dwave, redshift, and x0
-                #Integrate only over wavelengths within the relevant range
-                inbounds=(self.wave>waverange[0]) & (self.wave<waverange[1])
-                derivInterp = bisplev(np.array([0]),self.wave[inbounds],(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder))
-                fluxDeriv[i] = np.sum( passbandColorExp[inbounds] * derivInterp)*intmult 
-        self.__maximumlightpcderiv__=sparse.BCOO.fromdense(fluxDeriv)
+        peakbasis = tensorbsplinebasis([0], self.wave, self.phaseknotloc, self.waveknotloc, self.bsorder, dx=1)[0]
+        m0Bderivjac = (bandweights * peakbasis).sum(axis=0) * intmult
+        self.__peakpriorderiv__=bcoofromdense(m0Bderivjac)
 
+        peakbasis = tensorbsplinebasis([0], self.wave, self.phaseknotloc, self.waveknotloc, self.bsorder)[0]
+        fluxDeriv = (bandweights * peakbasis).sum(axis=0) * intmult
+        self.__maximumlightpcderiv__=bcoofromdense(fluxDeriv)
 
         thinning=4
-        jacobian=np.zeros((2*self.wave[::thinning].size,self.im0.size))
-        for i in range(self.im0.size):
-            jacobian[:,i] = bisplev(self.phase[:2],self.wave[::thinning],(self.phaseknotloc,self.waveknotloc,np.arange(self.im0.size)==i,self.bsorder,self.bsorder)).flatten()
-        self.__initialphasepcderiv__=sparse.BCOO.fromdense(jacobian)
+        jacobian = tensorbsplinebasis(self.phase[:2], self.wave[::thinning], self.phaseknotloc,
+                                      self.waveknotloc, self.bsorder).reshape(-1, self.im0.size)
+        self.__initialphasepcderiv__=bcoofromdense(jacobian)
         
         
         self.__componentderivs__=SALTResidsObj.componentderiv

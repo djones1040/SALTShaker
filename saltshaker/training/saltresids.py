@@ -56,6 +56,8 @@ from scipy.interpolate import (
     RegularGridInterpolator,
     RectBivariateSpline,
 )
+from saltshaker.util.bsplinebasis import bsplinebasis, tensorbsplinebasis
+from saltshaker.util.sparseutils import bcoofromdense
 from scipy.integrate import trapezoid as trapz
 from scipy import linalg
 from scipy import sparse as scisparse
@@ -529,40 +531,23 @@ class SALTResids:
         ) / 2
 
         self.regularizationscalemin = 40
-        basisfunctions = [
-            bisplev(self.phase, self.wave,
-                    (self.phaseknotloc, self.waveknotloc,
-                     np.arange(self.im0.size) == i * (self.waveBins[0].size),
-                     self.bsorder, self.bsorder))
-            for i in range(self.phaseBins[0].size)]
-        self.phaseBinCenters = np.array(
-            [(self.phase[:, np.newaxis] * x).sum() / x.sum() for x in basisfunctions])
-        basisfunctions = [
-            bisplev(self.phase, self.wave,
-                    (self.phaseknotloc, self.waveknotloc,
-                     np.arange(self.im0.size) == i, self.bsorder, self.bsorder))
-            for i in range(self.waveBins[0].size)]
-
-        self.waveBinCenters = np.array(
-            [(self.wave[np.newaxis, :] * x).sum() / x.sum() for x in basisfunctions]
-        )
+        # Bin centers are the basis-weighted mean phase / wavelength of each 1D basis function
+        phasesplines = bsplinebasis(self.phase, self.phaseknotloc, self.bsorder)
+        self.phaseBinCenters = (self.phase @ phasesplines) / phasesplines.sum(axis=0)
+        wavesplines = bsplinebasis(self.wave, self.waveknotloc, self.bsorder)
+        self.waveBinCenters = (self.wave @ wavesplines) / wavesplines.sum(axis=0)
 
         # Find the basis functions evaluated at the centers of the basis functions for use in the regularization derivatives
         regularizationDerivs = [
             np.zeros((self.phaseRegularizationPoints.size * self.waveRegularizationPoints.size,
                       self.im0.size))
-            for i in range(4)
+            if self.bsorder == 0 else
+            tensorbsplinebasis(self.phaseRegularizationPoints, self.waveRegularizationPoints,
+                               self.phaseknotloc, self.waveknotloc, self.bsorder,
+                               dx, dy).reshape(-1, self.im0.size)
+            for dx, dy in [(0, 0), (1, 0), (0, 1), (1, 1)]
         ]
-        for i in range(len(self.im0)):
-            for j, derivs in enumerate([(0, 0), (1, 0), (0, 1), (1, 1)]):
-                if self.bsorder == 0:
-                    continue
-                regularizationDerivs[j][:, i] = bisplev(
-                    self.phaseRegularizationPoints, self.waveRegularizationPoints,
-                    (self.phaseknotloc, self.waveknotloc, np.arange(self.im0.size) == i,
-                     self.bsorder, self.bsorder),
-                    dx=derivs[0], dy=derivs[1]).flatten()
-        regularizationDerivs = map(sparse.BCOO.fromdense, regularizationDerivs)
+        regularizationDerivs = map(bcoofromdense, regularizationDerivs)
         (
             self.componentderiv,
             self.dcompdphasederiv,
@@ -1903,20 +1888,18 @@ class SALTResids:
 
         for chunkindex in iterable:
 
-            spline_derivs = np.empty(
-                [
-                    self.phaseout.size,
-                    min(self.waveout.size - chunkindex, chunksize),
-                    self.im0.size,
-                ]
-            )
-            for i in range(self.im0.size):
-                if self.bsorder == 0:
-                    continue
-                spline_derivs[:, :, i] = bisplev(
+            if self.bsorder == 0:
+                spline_derivs = np.zeros(
+                    [
+                        self.phaseout.size,
+                        min(self.waveout.size - chunkindex, chunksize),
+                        self.im0.size,
+                    ]
+                )
+            else:
+                spline_derivs = tensorbsplinebasis(
                     self.phaseout, self.waveout[chunkindex : chunkindex + chunksize],
-                    (self.phaseknotloc, self.waveknotloc, np.arange(self.im0.size) == i,
-                     self.bsorder, self.bsorder))
+                    self.phaseknotloc, self.waveknotloc, self.bsorder)
             spline2d = scisparse.csr_matrix(spline_derivs.reshape(-1, self.im0.size))
 
             # Smooth things a bit, since this is supposed to be for broadband photometry
