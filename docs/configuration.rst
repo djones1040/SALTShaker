@@ -704,6 +704,28 @@ Model Components
    * - ``error_snake_wave_binsize``
      - float
      - Wavelength spacing (Angstroms) for error model B-spline. Default: 1200.
+   * - ``masscorrection_rank``
+     - int
+     - Rank of the host-mass-dependent correction to each SED component; 0 turns it
+       off. Each component's spline coefficients become C + U W(m) V, where U and V
+       are the leading phase and wavelength singular vectors of the initial M0 and M1,
+       shared by all components, and W(m) interpolates rank x rank matrices between
+       the mass knots. Each SN's knot weights average the interpolation over its host
+       mass measurement combined with the sample's mass distribution, so SNe with
+       imprecise or missing masses follow the population. At each knot the correction
+       to every component has zero B-band flux at peak and no component along the
+       initial M1 or along the SALT2 color law times the initial M0, since changes of
+       x0, x1 and c reproduce those directions; this leaves rank x rank - 3
+       parameters per component and knot, so ranks of 3 or more are useful. Each
+       SN's knot weights are taken relative to the sample average, so the correction
+       averages to zero over the training sample and C describes the average SN. The
+       phase and wavelength gradient regularizations apply to the correction at each
+       knot as to the components. Cannot be combined with ``host_component``.
+       Default: 0.
+   * - ``masscorrection_knots``
+     - float list
+     - log10(M*/Msun) values at which the host-mass correction is defined; it is
+       constant beyond the end knots. Default: 8.5,9.5,10.5,11.5.
 
 
 [priors] - Prior Constraints
@@ -748,6 +770,10 @@ the value sets the prior width.
    * - ``recalcolorprior``
      - Not set
      - Prior constraining the deviation of spectral recalibration from the color law.
+   * - ``masscorrsmooth``
+     - Not set
+     - Prior penalizing curvature of the host-mass correction with log mass. Width is
+       a fraction of M0 per dex squared.
 
 
 [bounds] - Parameter Bounds

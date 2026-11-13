@@ -343,6 +343,18 @@ class SALTPriors:
         """host component should have zero flux at t=0 in the B band.  Not sure if needed"""
         return self.__maximumlightpcderiv__ @ x[self.imhost] / (self.bstdflux* width)
 
+    def masscorrperknot(self,x):
+        """Host-mass correction coordinates, shape (n_components, n_knots, n_subspace), in units of M0"""
+        later=x[self.imasscorr].reshape(self.imasscorr.shape[0],len(self.masscorrection_knots)-1,-1)
+        return jnp.concatenate([jnp.zeros_like(later[:,:1]),later],axis=1)
+
+    @prior
+    def masscorrsmooth(self,width,x):
+        """The host-mass correction changes linearly with log mass; width is in units of M0 per dex squared"""
+        if not self.imasscorr.size: return jnp.zeros(0)
+        slopes=jnp.diff(self.masscorrperknot(x),axis=1)/np.diff(self.masscorrection_knots)[np.newaxis,:,np.newaxis]
+        return jnp.diff(slopes,axis=1).flatten()/width
+
     
     @prior
     def recalprior(self,width,x):
