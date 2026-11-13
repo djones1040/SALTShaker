@@ -33,7 +33,8 @@ from saltshaker.training import colorlaw
 
 from saltshaker.training.priors import SALTPriors, __priors__, __nongaussianpriors__
 from saltshaker.training.constraints import SALTconstraints
-from saltshaker.training.masscorrection import masscorrection, sampleknotweights
+from saltshaker.training.masscorrection import (
+    masscorrection, masscorrectionresult, populationmassdistribution, sampleknotweights)
 
 from saltshaker.config.configparsing import *
 
@@ -142,7 +143,9 @@ salttrainingresult = namedtuple(
         "clpars",
         "clscat",
         "snparams",
+        "masscorrection",
     ],
+    defaults=(None,),
 )
 
 
@@ -356,9 +359,12 @@ class SALTResids:
             if len(self.masscorrection_knots) < 2:
                 raise ValueError("the host-mass correction needs at least two masscorrection_knots")
             snids = list(self.datadict)
-            weights = sampleknotweights([self.datadict[sn].hostlogmass for sn in snids],
-                                        [self.datadict[sn].hostlogmasserr for sn in snids],
-                                        self.masscorrection_knots)
+            logmasses = [self.datadict[sn].hostlogmass for sn in snids]
+            logmasserrs = [self.datadict[sn].hostlogmasserr for sn in snids]
+            # (mean, spread) of the sample's log masses
+            self.masspopulation = populationmassdistribution(logmasses, logmasserrs)
+            weights = sampleknotweights(logmasses, logmasserrs, self.masscorrection_knots,
+                                        self.masspopulation)
             # Relative to the sample average, so the correction averages to zero over the training
             # sample and the components describe the average SN
             self.meanmassknotweights = weights.mean(axis=0)
@@ -2080,7 +2086,28 @@ class SALTResids:
                 }
                 for sn in self.datadict
             },
+            masscorrection=None if self.massknotweights is None else masscorrectionresult(
+                knots=np.array(self.masscorrection_knots),
+                population=np.array(self.masspopulation),
+                phasebasis=self.masscorrphasebasis,
+                wavebasis=self.masscorrwavebasis,
+                subspace=self.masscorrsubspace,
+                surfaces=self.massknotsurfaces(
+                    Xfinal, evaluatePhase=self.phaseout, evaluateWave=self.waveout),
+            ),
         )
+
+    def massknotsurfaces(self, x, evaluatePhase=None, evaluateWave=None):
+        """Flux surfaces of the model components at each host-mass knot, shape (n_knots, n_components, n_phase, n_wave)"""
+        surfaces = []
+        for weights in np.eye(len(self.masscorrection_knots)) - self.meanmassknotweights:
+            xknot = np.array(x, dtype=float)
+            delta = np.asarray(masscorrection(weights, xknot[self.imasscorr], self.masscorrphasebasis,
+                                              self.masscorrwavebasis, self.masscorrsubspace))
+            for i in range(self.n_components):
+                xknot[self.icomponents[i]] += delta[i]
+            surfaces.append(self.SALTModel(xknot, evaluatePhase, evaluateWave))
+        return np.array(surfaces)
 
     def SALTModel(self, x, evaluatePhase=None, evaluateWave=None):
         """Returns flux surfaces of SALT model"""
