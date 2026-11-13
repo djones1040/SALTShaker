@@ -712,7 +712,7 @@ Model Components
        shared by all components, and W(m) interpolates rank x rank matrices between
        the mass knots. Each SN's knot weights average the interpolation over its host
        mass measurement combined with the sample's mass distribution, so SNe with
-       imprecise or missing masses follow the population. Use with the
+       imprecise or missing masses follow the population. Requires the
        ``masscorrmean`` prior. Cannot be combined with ``host_component``. Default: 0.
    * - ``masscorrection_knots``
      - float list
@@ -765,7 +765,8 @@ the value sets the prior width.
    * - ``masscorrmean``
      - Not set
      - Prior holding the sample-average host-mass correction at zero, so the SED
-       components describe the average SN. Width is a fraction of M0.
+       components describe the average SN. Width is a fraction of M0. Required when
+       ``masscorrection_rank`` > 0.
    * - ``masscorrsmooth``
      - Not set
      - Prior penalizing curvature of the host-mass correction with log mass. Width is

@@ -353,6 +353,9 @@ class SALTResids:
         if self.masscorrection_rank:
             if self.host_component:
                 raise NotImplementedError("the host-mass correction cannot be combined with host_component")
+            if "masscorrmean" not in self.usePriors:
+                raise ValueError("the host-mass correction requires the masscorrmean prior, "
+                                 "without which it is degenerate with the model components")
             snids = list(self.datadict)
             weights = sampleknotweights([self.datadict[sn].hostlogmass for sn in snids],
                                         [self.datadict[sn].hostlogmasserr for sn in snids],
@@ -361,8 +364,6 @@ class SALTResids:
             self.meanmassknotweights = weights.mean(axis=0)
             log.info(f"host-mass correction of rank {self.masscorrection_rank}: "
                      f"{sum(np.isfinite(self.datadict[sn].hostlogmass) for sn in snids)} of {len(snids)} SNe have masses")
-            if "masscorrmean" not in self.usePriors:
-                log.warning("without the masscorrmean prior, the host-mass correction is degenerate with the model components")
         else:
             self.massknotweights = None
 

@@ -1,3 +1,4 @@
+import copy
 import unittest
 
 import jax
@@ -71,12 +72,14 @@ class test_masscorrection_training(unittest.TestCase):
         RunTraining().get_config_options(salt, 'testdata/test.conf', [])
         salt.options.masscorrection_rank = 2
         salt.options.masscorrection_knots = [9.5, 10.5, 11.5]
+        salt.options.prior_masscorrmean = 1e-4
         datadict = readutils.rdAllData(
             'testdata/data/SALT3TRAIN_K21_CSPDR3/SALT3TRAIN_K21_CSPDR3.LIST', False, dospec=True,
             peakmjdlist='testdata/test_pkmjd.LIST', binspecres=None, snparlist='testdata/test_pars.LIST',
             maxsn=None, specrecallist='testdata/test_spcrl.LIST')
         salt.kcordict = readutils.rdkcor(['CSP'], salt.options)
         x, config = salt.initialParameters(datadict)
+        cls.salt, cls.datadict, cls.config = salt, datadict, config
         cls.res = saltresids.SALTResids(datadict, salt.kcordict, config, salt.options)
         rng = np.random.default_rng(3)
         cls.x = np.asarray(x).copy()
@@ -136,6 +139,12 @@ class test_masscorrection_training(unittest.TestCase):
         constrained = np.asarray(res.constraints.constraints['fixbbandfluxes'](jnp.array(self.x)))
         for lc in res.datadict['2004ef'].photdata.values():
             np.testing.assert_allclose(lc.modelflux(constrained), lc.modelflux(self.x), rtol=1e-10, atol=0)
+
+    def test_requires_mean_prior(self):
+        options = copy.copy(self.salt.options)
+        del options.prior_masscorrmean
+        with self.assertRaisesRegex(ValueError, 'masscorrmean'):
+            saltresids.SALTResids(self.datadict, self.salt.kcordict, self.config, options)
 
     def test_priors(self):
         """masscorrmean vanishes when the sample-average correction is zero; masscorrsmooth vanishes for corrections linear in mass."""
