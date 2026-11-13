@@ -34,8 +34,8 @@ from saltshaker.util.readutils import (
 from scipy.special import factorial
 from scipy.interpolate import bisplev, interp1d
 from scipy import sparse as scisparse
-from saltshaker.util.bsplinebasis import tensorbsplinebasis
-from saltshaker.util.sparseutils import bcoofromdense
+from saltshaker.util.bsplinebasis import bsplinebasis, tensorproductnonzeros
+from saltshaker.util.sparseutils import bcoofromdense, bcoofromnonzeros
 import numpy as np
 
 from jax import numpy as jnp
@@ -672,11 +672,6 @@ class modeledtraininglightcurve(modeledtrainingdata):
         # Only keep basis functions that overlap in both phase AND wavelength
         isrelevant = inphase & inwave
 
-        # derivInterp[phase_idx, wave_idx, basis_idx] = basis function value
-        derivInterp = tensorbsplinebasis(clippedphase, wave, residsobj.phaseknotloc,
-                                         residsobj.waveknotloc, residsobj.bsorder)
-        derivInterp[:, :, ~isrelevant] = 0
-
         # Combine passband with MW extinction and flux scaling factors
         # This is the "effective passband" that converts flux to counts
         reddenedpassband = (
@@ -688,39 +683,28 @@ class modeledtraininglightcurve(modeledtrainingdata):
             / (1 + z)  # K-correction: (1+z) for flux density transformation
         )
 
-        # Convolve each basis function with the passband for each observation
-        splinebasisconvolutions = []
-        for pdx in range(len(lc)):
-            # Handle late-time photometry beyond model phase range
-            # Extrapolate assuming linear magnitude decline
-            if self.phase[pdx] > sn.obsphase.max():
-                decayFactor = 10 ** (-0.4 * residsobj.extrapolateDecline
-                                     * (self.phase[pdx] - sn.obsphase.max()))
-            else:
-                decayFactor = 1
+        # Late-time photometry beyond the model phase range follows a linear magnitude decline
+        decayfactor = 10 ** (-0.4 * residsobj.extrapolateDecline
+                             * np.maximum(self.phase - sn.obsphase.max(), 0))
 
-            if self.preintegratebasis:
-                # Preintegrate: dot product integrates over wavelength
-                # Result is vector of length n_basis
-                splinebasisconvolutions += [
-                    decayFactor * (np.dot(derivInterp[pdx, :, :].T, reddenedpassband))
-                ]
-            else:
-                # Keep wavelength dimension for later color law application
-                # Result is matrix of shape (n_wavelength, n_basis)
-                splinebasisconvolutions += [
-                    decayFactor
-                    * (derivInterp[pdx, :, :] * reddenedpassband[:, np.newaxis])
-                ]
-
-        # Store as sparse matrix for efficient JAX operations
-        # Add zero rows for padding elements
-        self.pcderivsparse = bcoofromdense(
-            np.stack(
-                splinebasisconvolutions
-                + [np.zeros(splinebasisconvolutions[-1].shape)] * padding
-            )
-        )
+        # The 2D basis is a product of phase and wavelength bases, so the decay and the
+        # passband weight them separately; padding rows stay empty
+        phasesplines = (bsplinebasis(clippedphase, residsobj.phaseknotloc, residsobj.bsorder)
+                        * decayfactor[:, np.newaxis])
+        wavesplines = (bsplinebasis(wave, residsobj.waveknotloc, residsobj.bsorder)
+                       * reddenedpassband[:, np.newaxis])
+        if self.preintegratebasis:
+            # Integrate over the passband: shape (n_obs, n_basis)
+            splinebasisconvolutions = (phasesplines[:, :, np.newaxis]
+                                       * wavesplines.sum(axis=0)).reshape(clippedphase.size, -1)
+            splinebasisconvolutions[:, ~isrelevant] = 0
+            self.pcderivsparse = bcoofromdense(np.concatenate(
+                (splinebasisconvolutions, np.zeros((padding, splinebasisconvolutions.shape[1])))))
+        else:
+            # Keep the wavelength axis for the color law: shape (n_obs, n_wavelength, n_basis)
+            self.pcderivsparse = bcoofromnonzeros(
+                *tensorproductnonzeros(phasesplines, wavesplines, isrelevant),
+                (clippedphase.size + padding, wave.size, residsobj.im0.size))
 
         #######################################################################
         # SECTION 5: Error model setup
@@ -1232,21 +1216,16 @@ class modeledtrainingspectrum(modeledtrainingdata):
 
         isrelevant = inphase & inwave
 
-        # derivInterp[wave_idx, basis_idx] = basis function value
-        derivInterp = tensorbsplinebasis(spectrum.phase, self.restwavelength, residsobj.phaseknotloc,
-                                         residsobj.waveknotloc, residsobj.bsorder)[0]
-        derivInterp[:, ~isrelevant] = 0
+        # Basis functions at this phase, and at each wavelength scaled by MW extinction,
+        # the scale factor and (1+z)
+        phasesplines = bsplinebasis(spectrum.phase, residsobj.phaseknotloc, residsobj.bsorder)
+        wavesplines = (bsplinebasis(self.restwavelength, residsobj.waveknotloc, residsobj.bsorder)
+                       * (_SCALE_FACTOR / (1 + z) * mwextcurve)[:, np.newaxis])
 
-        # Apply MW extinction and flux scaling
-        # Scale factor and (1+z) handle unit conversions
-        derivInterp = (
-            derivInterp * (_SCALE_FACTOR / (1 + z) * mwextcurve)[:, np.newaxis]
-        )
-
-        # Store as sparse matrix, add zero rows for padding
-        self.pcderivsparse = bcoofromdense(
-            np.concatenate((derivInterp, np.zeros((padding, residsobj.im0.size))))
-        )
+        # Shape (n_wavelength, n_basis) after dropping the single phase axis; padding rows stay empty
+        values, indices = tensorproductnonzeros(phasesplines, wavesplines, isrelevant)
+        self.pcderivsparse = bcoofromnonzeros(
+            values, indices[:, 1:], (spectrum.wavelength.size + padding, residsobj.im0.size))
 
         #######################################################################
         # SECTION 3: Spectral recalibration setup

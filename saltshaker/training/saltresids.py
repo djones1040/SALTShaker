@@ -56,8 +56,8 @@ from scipy.interpolate import (
     RegularGridInterpolator,
     RectBivariateSpline,
 )
-from saltshaker.util.bsplinebasis import bsplinebasis, tensorbsplinebasis
-from saltshaker.util.sparseutils import bcoofromdense
+from saltshaker.util.bsplinebasis import bsplinebasis, tensorbsplinebasis, tensorproductnonzeros
+from saltshaker.util.sparseutils import bcoofromnonzeros
 from scipy.integrate import trapezoid as trapz
 from scipy import linalg
 from scipy import sparse as scisparse
@@ -537,17 +537,21 @@ class SALTResids:
         wavesplines = bsplinebasis(self.wave, self.waveknotloc, self.bsorder)
         self.waveBinCenters = (self.wave @ wavesplines) / wavesplines.sum(axis=0)
 
-        # Find the basis functions evaluated at the centers of the basis functions for use in the regularization derivatives
-        regularizationDerivs = [
-            np.zeros((self.phaseRegularizationPoints.size * self.waveRegularizationPoints.size,
-                      self.im0.size))
-            if self.bsorder == 0 else
-            tensorbsplinebasis(self.phaseRegularizationPoints, self.waveRegularizationPoints,
-                               self.phaseknotloc, self.waveknotloc, self.bsorder,
-                               dx, dy).reshape(-1, self.im0.size)
-            for dx, dy in [(0, 0), (1, 0), (0, 1), (1, 1)]
-        ]
-        regularizationDerivs = map(bcoofromdense, regularizationDerivs)
+        # Find the basis functions evaluated at the centers of the basis functions for use in the regularization derivatives;
+        # rows run over phase points, then wavelength points
+        nregwave = self.waveRegularizationPoints.size
+        regularizationDerivs = []
+        for dx, dy in [(0, 0), (1, 0), (0, 1), (1, 1)]:
+            if self.bsorder == 0:
+                values, indices = np.zeros(0), np.zeros((0, 3), dtype=int)
+            else:
+                values, indices = tensorproductnonzeros(
+                    bsplinebasis(self.phaseRegularizationPoints, self.phaseknotloc, self.bsorder, dx),
+                    bsplinebasis(self.waveRegularizationPoints, self.waveknotloc, self.bsorder, dy))
+            rows = indices[:, 0] * nregwave + indices[:, 1]
+            regularizationDerivs.append(bcoofromnonzeros(
+                values, np.stack([rows, indices[:, 2]], axis=-1),
+                (self.phaseRegularizationPoints.size * nregwave, self.im0.size)))
         (
             self.componentderiv,
             self.dcompdphasederiv,
