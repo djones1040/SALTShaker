@@ -33,7 +33,7 @@ from saltshaker.training import colorlaw
 
 from saltshaker.training.priors import SALTPriors, __priors__, __nongaussianpriors__
 from saltshaker.training.constraints import SALTconstraints
-from saltshaker.training.masscorrection import sampleknotweights
+from saltshaker.training.masscorrection import masscorrection, sampleknotweights
 
 from saltshaker.config.configparsing import *
 
@@ -118,8 +118,8 @@ interactive = sys.stdout.isatty()
 saltconfiguration = namedtuple(
     "saltconfiguration",
     ["parlist", "phaseknotloc", "waveknotloc", "errphaseknotloc", "errwaveknotloc",
-     "masscorrphasebasis", "masscorrwavebasis"],
-    defaults=(None, None),
+     "masscorrphasebasis", "masscorrwavebasis", "masscorrsubspace"],
+    defaults=(None, None, None),
 )
 
 salttrainingresult = namedtuple(
@@ -353,15 +353,16 @@ class SALTResids:
         if self.masscorrection_rank:
             if self.host_component:
                 raise NotImplementedError("the host-mass correction cannot be combined with host_component")
-            if "masscorrmean" not in self.usePriors:
-                raise ValueError("the host-mass correction requires the masscorrmean prior, "
-                                 "without which it is degenerate with the model components")
+            if len(self.masscorrection_knots) < 2:
+                raise ValueError("the host-mass correction needs at least two masscorrection_knots")
             snids = list(self.datadict)
             weights = sampleknotweights([self.datadict[sn].hostlogmass for sn in snids],
                                         [self.datadict[sn].hostlogmasserr for sn in snids],
                                         self.masscorrection_knots)
-            self.massknotweights = dict(zip(snids, weights))
+            # Relative to the sample average, so the correction averages to zero over the training
+            # sample and the components describe the average SN
             self.meanmassknotweights = weights.mean(axis=0)
+            self.massknotweights = dict(zip(snids, weights - self.meanmassknotweights))
             log.info(f"host-mass correction of rank {self.masscorrection_rank}: "
                      f"{sum(np.isfinite(self.datadict[sn].hostlogmass) for sn in snids)} of {len(snids)} SNe have masses")
         else:
@@ -1442,7 +1443,7 @@ class SALTResids:
         if self.host_component:
             self.icomponents += [self.imhost]
         self.icomponents = np.array(self.icomponents)
-        # Shape (n_components, n_knots * rank**2), with zero width when the correction is off
+        # Shape (n_components, n_knots * n_subspace), with zero width when the correction is off
         self.imasscorr = np.array(
             [np.where(self.parlist == f"masscorr{i}")[0] for i in range(self.n_components)],
             dtype=int,
@@ -2382,6 +2383,20 @@ class SALTResids:
             plt.savefig(output, dpi=288)
         plt.clf()
 
+    def regularizedsurfaces(self, x):
+        """
+        Coefficients of the components, then of the host-mass correction at each knot.
+
+        The gradient regularizations apply to all of them, relative to the components'
+        fluxes, so the correction is smooth where data are sparse.
+        """
+        surfaces = [x[self.icomponents]]
+        if self.imasscorr.size:
+            for weights in np.eye(len(self.masscorrection_knots)) - self.meanmassknotweights:
+                surfaces.append(masscorrection(weights, x[self.imasscorr], self.masscorrphasebasis,
+                                               self.masscorrwavebasis, self.masscorrsubspace))
+        return surfaces
+
     def dyadicRegularization(self, x, neff):
         """
         Compute dyadic (cross-derivative) regularization penalty.
@@ -2463,16 +2478,18 @@ class SALTResids:
                 % self.regularizationScaleMethod
             )
 
-        dfluxdphase = self.dcompdphasederiv @ coeffs.T
         normalization = jnp.sqrt(
             self.regulargradientphase
             * self.relativeregularizationweights
             / ((self.waveBins[0].size - 1) * (self.phaseBins[0].size - 1))
         )
-        return (
-            normalization[np.newaxis, :]
-            * (dfluxdphase / denominator / neff[:, np.newaxis])
-        ).flatten()
+        return jnp.concatenate([
+            (
+                normalization[np.newaxis, :]
+                * ((self.dcompdphasederiv @ surface.T) / denominator / neff[:, np.newaxis])
+            ).flatten()
+            for surface in self.regularizedsurfaces(x)
+        ])
 
     def waveGradientRegularization(self, x, neff):
         """
@@ -2504,29 +2521,32 @@ class SALTResids:
                 "Unknown regularization scale method %s"
                 % self.regularizationScaleMethod
             )
-        dfluxdwave = self.dcompdwavederiv @ coeffs.T
         normalization = jnp.sqrt(
             self.regulargradientwave
             * self.relativeregularizationweights
             / ((self.waveBins[0].size - 1) * (self.phaseBins[0].size - 1))
         )
-        dfluxdwave = (
-            dfluxdwave.reshape(
-                self.phaseRegularizationPoints.size,
-                self.waveRegularizationPoints.size,
-                2,
+
+        def residuals(surface):
+            dfluxdwave = (
+                (self.dcompdwavederiv @ surface.T).reshape(
+                    self.phaseRegularizationPoints.size,
+                    self.waveRegularizationPoints.size,
+                    2,
+                )
+                * (
+                    (self.waveRegularizationPoints / self.waveRegularizationPoints.max())
+                    ** self.waveregularizationreweighting
+                )[np.newaxis, :, np.newaxis]
+            ).reshape(
+                self.phaseRegularizationPoints.size * self.waveRegularizationPoints.size, 2
             )
-            * (
-                (self.waveRegularizationPoints / self.waveRegularizationPoints.max())
-                ** self.waveregularizationreweighting
-            )[np.newaxis, :, np.newaxis]
-        ).reshape(
-            self.phaseRegularizationPoints.size * self.waveRegularizationPoints.size, 2
-        )
-        return (
-            normalization[np.newaxis, :]
-            * (dfluxdwave / denominator / neff[:, np.newaxis])
-        ).flatten()
+            return (
+                normalization[np.newaxis, :]
+                * (dfluxdwave / denominator / neff[:, np.newaxis])
+            ).flatten()
+
+        return jnp.concatenate([residuals(surface) for surface in self.regularizedsurfaces(x)])
 
 
 def fourierRegularization(self, x, neff):

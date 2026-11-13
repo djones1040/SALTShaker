@@ -344,14 +344,9 @@ class SALTPriors:
         return self.__maximumlightpcderiv__ @ x[self.imhost] / (self.bstdflux* width)
 
     def masscorrperknot(self,x):
-        """Host-mass correction matrices, shape (n_components, n_knots, rank**2), in units of M0"""
-        return x[self.imasscorr].reshape(self.imasscorr.shape[0],len(self.masscorrection_knots),-1)
-
-    @prior
-    def masscorrmean(self,width,x):
-        """The host-mass correction averages to zero over the training sample, so the components describe the average SN"""
-        if not self.imasscorr.size: return jnp.zeros(0)
-        return jnp.tensordot(self.meanmassknotweights,self.masscorrperknot(x),axes=([0],[1])).flatten()/width
+        """Host-mass correction coordinates, shape (n_components, n_knots, n_subspace), in units of M0"""
+        later=x[self.imasscorr].reshape(self.imasscorr.shape[0],len(self.masscorrection_knots)-1,-1)
+        return jnp.concatenate([jnp.zeros_like(later[:,:1]),later],axis=1)
 
     @prior
     def masscorrsmooth(self,width,x):

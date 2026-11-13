@@ -5,12 +5,20 @@ Each component's B-spline coefficient matrix C becomes C + U @ W(m) @ V for a su
 whose host has log stellar mass m. U (phase) and V (wavelength) are bases shared by all
 components, so linear transformations of the components carry over exactly to the
 corrections, and W(m) interpolates r x r matrices defined at a set of host-mass knots.
+
+A change of M0 or M1 along M0, M1 or the color law can be undone by changing x0, x1 or c,
+so the correction at each knot is restricted to the subspace with zero B-band flux at peak
+and no component along M1 or along the color law times M0. These conditions use fixed
+reference surfaces and apply to every component, so linear transformations of the
+components keep them.
 """
 
 import numpy as np
 from jax import numpy as jnp
 from scipy.optimize import minimize
 from scipy.stats import norm
+
+from saltshaker.util.bsplinebasis import tensorbsplinebasis
 
 
 def massknotweights(logmass, logmasserr, knots):
@@ -114,7 +122,45 @@ def masscorrectionbases(coefficients, rank):
     return phasebasis * np.linalg.norm(coefficients[0]), wavebasis
 
 
-def masscorrection(weights, masscorr, phasebasis, wavebasis):
+def bbandpeakfunctional(kcordict, phaseknotloc, waveknotloc, order, wave):
+    """Weights of the B-band flux at peak on a coefficient matrix, up to normalization, shape (n_phase, n_wave)."""
+    passband = wave * np.interp(wave, kcordict["default"]["Bwave"], kcordict["default"]["Btp"], left=0, right=0)
+    peakbasis = tensorbsplinebasis(np.zeros(1), wave, phaseknotloc, waveknotloc, order)[0]
+    return (passband @ peakbasis).reshape(len(phaseknotloc) - order - 1, len(waveknotloc) - order - 1)
+
+
+def masscorrectionreferences(m0, m1, bbandpeak, colorlaw, waveknotloc, order):
+    """
+    Surfaces that the correction at each knot is orthogonal to, as coefficient matrices.
+
+    The correction has zero B-band flux at peak, and no component along M1 or along the
+    color law times M0, with the color law evaluated at each wavelength coefficient's knot
+    average.
+    """
+    centers = np.array([waveknotloc[j + 1:j + order + 1].mean() for j in range(m0.shape[1])])
+    return [bbandpeak, m1, colorlaw(centers)[np.newaxis, :] * m0]
+
+
+def masscorrectionsubspace(phasebasis, wavebasis, references):
+    """
+    Orthonormal basis of the r x r matrices W for which U @ W @ V is orthogonal to every reference.
+
+    Returns
+    -------
+    ndarray, shape (rank**2, rank**2 - len(references))
+    """
+    rank = phasebasis.shape[1]
+    if rank**2 <= len(references):
+        raise ValueError(f"masscorrection_rank squared must exceed the {len(references)} conditions on the correction")
+    conditions = np.array([(phasebasis.T @ ref @ wavebasis.T).flatten() for ref in references])
+    conditions /= np.linalg.norm(conditions, axis=1)[:, np.newaxis]
+    singular, rows = np.linalg.svd(conditions)[1:]
+    if singular[-1] < 1e-6 * singular[0]:
+        raise ValueError("the host-mass correction's reference surfaces are degenerate in its bases")
+    return rows[len(references):].T
+
+
+def masscorrection(weights, masscorr, phasebasis, wavebasis, subspace):
     """
     Coefficient corrections for one supernova, shape (n_components, n_phase * n_wave).
 
@@ -122,11 +168,16 @@ def masscorrection(weights, masscorr, phasebasis, wavebasis):
     ----------
     weights : array, shape (n_knots,)
         The supernova's mass-knot weights.
-    masscorr : array, shape (n_components, n_knots * rank * rank)
-        Correction matrices at each knot, flattened in (knot, row, column) order.
+    masscorr : array, shape (n_components, (n_knots - 1) * n_subspace)
+        Coordinates in ``subspace`` of the correction matrices at each knot after the
+        first, flattened in (knot, coordinate) order. The first knot's coordinates are zero:
+        training takes weights relative to the sample average, so only differences between
+        knots affect the model.
     phasebasis, wavebasis : arrays from ``masscorrectionbases``
+    subspace : array from ``masscorrectionsubspace``
     """
     rank = phasebasis.shape[1]
-    perknot = masscorr.reshape(masscorr.shape[0], weights.size, rank, rank)
-    atmass = jnp.tensordot(weights, perknot, axes=([0], [1]))
-    return jnp.einsum("pr,crs,sw->cpw", phasebasis, atmass, wavebasis).reshape(masscorr.shape[0], -1)
+    perknot = masscorr.reshape(masscorr.shape[0], weights.size - 1, subspace.shape[1])
+    atmass = jnp.tensordot(weights[1:], perknot, axes=([0], [1])) @ subspace.T
+    return jnp.einsum("pr,crs,sw->cpw", phasebasis, atmass.reshape(-1, rank, rank),
+                      wavebasis).reshape(masscorr.shape[0], -1)

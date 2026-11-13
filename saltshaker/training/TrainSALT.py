@@ -88,7 +88,12 @@ from saltshaker.training.base import TrainSALTBase
 from saltshaker.training import saltresids
 from saltshaker.training import optimizers
 from saltshaker.training import colorlaw
-from saltshaker.training.masscorrection import masscorrectionbases
+from saltshaker.training.masscorrection import (
+    bbandpeakfunctional,
+    masscorrectionbases,
+    masscorrectionreferences,
+    masscorrectionsubspace,
+)
 
 from saltshaker.validation import ValidateParams, datadensity
 from saltshaker.validation import ValidateLightcurves
@@ -109,6 +114,8 @@ from sncosmo.constants import HC_ERG_AA
 
 _example_data_url = "https://github.com/djones1040/SALTShaker/raw/main/examples/saltshaker-latest-training.tgz"
 _flatnu = f"{init_rootdir}/flatnu.dat"
+# The SALT2 color law, which initializes the color law and defines the host-mass correction
+_SALT2COLORLAW = SALT2ColorLaw([2800.0, 7000.0], [-0.504294, 0.787691, -0.461715, 0.0815619])
 
 # validation utils
 
@@ -451,6 +458,27 @@ class TrainSALT(TrainSALTBase):
             len(errwaveknotloc) - self.options.errbsorder - 1,
         )
         n_sn = len(datadict.keys())
+
+        # Bases for the host-mass correction come from the template initialization, so a
+        # resumed training reproduces them
+        masscorrphasebasis, masscorrwavebasis, masscorrsubspace = None, None, None
+        if self.options.masscorrection_rank:
+            components = [m0knots.reshape(n_phaseknots, n_waveknots), m1knots.reshape(n_phaseknots, n_waveknots)]
+            masscorrphasebasis, masscorrwavebasis = masscorrectionbases(
+                components, self.options.masscorrection_rank)
+            wave = np.linspace(
+                self.options.waverange[0],
+                self.options.waverange[1],
+                int((self.options.waverange[1] - self.options.waverange[0]) / self.options.waveinterpres) + 1,
+            )
+            bbandpeak = bbandpeakfunctional(self.kcordict, phaseknotloc, waveknotloc, self.options.bsorder, wave)
+            # M0 as the initial guess sets it, with no zero or negative coefficients
+            m0start = np.where(components[0] > 0, components[0], 1e-4)
+            masscorrsubspace = masscorrectionsubspace(
+                masscorrphasebasis, masscorrwavebasis,
+                masscorrectionreferences(m0start, components[1], bbandpeak, _SALT2COLORLAW,
+                                         waveknotloc, self.options.bsorder))
+
         parlist = []
         # set up the list of parameters
         for i in range(self.options.n_components):
@@ -458,7 +486,7 @@ class TrainSALT(TrainSALTBase):
         if self.options.host_component:
             parlist = np.append(parlist, ["mhost"] * (n_phaseknots * n_waveknots))
         if self.options.masscorrection_rank:
-            nmasscorr = len(self.options.masscorrection_knots) * self.options.masscorrection_rank**2
+            nmasscorr = (len(self.options.masscorrection_knots) - 1) * masscorrsubspace.shape[1]
             for i in range(self.options.n_components):
                 parlist = np.append(parlist, [f"masscorr{i}"] * nmasscorr)
         if self.options.n_colorpars:
@@ -554,14 +582,6 @@ class TrainSALT(TrainSALTBase):
             )
             parlist = np.append(parlist, [f"surverrfloor_{x}" for x in filtlist])
 
-        # Bases for the host-mass correction come from the template initialization, so a
-        # resumed training reproduces them
-        masscorrphasebasis, masscorrwavebasis = None, None
-        if self.options.masscorrection_rank:
-            masscorrphasebasis, masscorrwavebasis = masscorrectionbases(
-                [m0knots.reshape(n_phaseknots, n_waveknots), m1knots.reshape(n_phaseknots, n_waveknots)],
-                self.options.masscorrection_rank)
-
         modelconfiguration = saltresids.saltconfiguration(
             parlist=parlist,
             phaseknotloc=phaseknotloc,
@@ -570,6 +590,7 @@ class TrainSALT(TrainSALTBase):
             errwaveknotloc=errwaveknotloc,
             masscorrphasebasis=masscorrphasebasis,
             masscorrwavebasis=masscorrwavebasis,
+            masscorrsubspace=masscorrsubspace,
         )
         # initial guesses
         n_params = parlist.size
@@ -639,10 +660,7 @@ class TrainSALT(TrainSALTBase):
                     clwave = np.linspace(
                         self.options.waverange[0], self.options.waverange[1], 1000
                     )
-                    salt2cl = SALT2ColorLaw(
-                        [2800.0, 7000.0],
-                        [-0.504294, 0.787691, -0.461715, 0.0815619],
-                    )(clwave)
+                    salt2cl = _SALT2COLORLAW(clwave)
 
                     def bestfit(p):
                         cl_init = initcolorlaw(1, p, clwave)

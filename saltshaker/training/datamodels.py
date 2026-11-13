@@ -70,7 +70,7 @@ def setmasscorrection(dataobj, sn, residsobj):
     """Attach the host-mass correction's parameter indices, bases and the SN's mass-knot weights."""
     dataobj.imasscorr = residsobj.imasscorr
     # A tuple, so batching does not mistake the bases' leading axes for the batch axis
-    dataobj.masscorrbases = (residsobj.masscorrphasebasis, residsobj.masscorrwavebasis)
+    dataobj.masscorrbases = (residsobj.masscorrphasebasis, residsobj.masscorrwavebasis, residsobj.masscorrsubspace)
     dataobj.massweights = (np.zeros(0) if residsobj.massknotweights is None
                            else residsobj.massknotweights[sn.snid])
 
