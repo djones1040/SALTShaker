@@ -59,6 +59,9 @@ Input Files
      - path
      - Initial SN parameters from a SALT fit. Columns: SNID,
        zHelio, x0, x1, c, FITPROB. The FITPROB column is used for quality cuts.
+       Optional HOST_LOGMASS and HOST_LOGMASS_ERR columns give host-galaxy
+       log10 stellar masses, which take precedence over the HOSTGAL_LOGMASS
+       key in the data file headers.
    * - ``specrecallist``
      - path
      - *Deprecated.* Initial spectral recalibration parameters. No longer recommended.
