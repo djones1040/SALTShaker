@@ -4,6 +4,7 @@ import unittest
 
 import jax
 import numpy as np
+import sncosmo
 from jax import numpy as jnp
 from scipy import integrate
 
@@ -11,8 +12,10 @@ from saltshaker.training import saltresids
 from saltshaker.training.TrainSALT import _SALT2COLORLAW, RunTraining, TrainSALT
 from saltshaker.training.masscorrection import (
     MASSCORRECTIONFILE, massknotweights, masscorrection, masscorrectionbases, masscorrectionsubspace,
-    sampleknotweights, writemodelatmass)
+    readmasscorrection, sampleknotweights, surfacesatmass, writemodelatmass)
 from saltshaker.util import readutils
+from saltshaker.util.salt3_sncosmo import SALT3Source
+from saltshaker.validation.masscorrectionplots import BANDS, deltamagnitudes, plotmasscorrection, readtemplates
 
 
 class test_masscorrection_functions(unittest.TestCase):
@@ -240,6 +243,26 @@ class test_masscorrection_training(unittest.TestCase):
                 sorted(os.listdir(modeldir)),
                 sorted(name for name in os.listdir(outdir)
                        if name == 'SALT3.INFO' or name.startswith(('salt3_template', 'salt3_lc', 'salt3_color'))))
+
+    def test_plotted_magnitudes_match_model_at_mass(self):
+        """Magnitude changes in the validation plot equal sncosmo photometry of the model written at that mass."""
+        with tempfile.TemporaryDirectory() as outdir:
+            self.writeoutput(outdir)
+            result, phase, wave = readmasscorrection(outdir)
+            average = readtemplates(outdir, self.res.n_components, phase, wave)
+            peak = np.argmin(np.abs(phase))
+            for logmass in [9.0, 10.2, 11.5]:
+                modeldir = os.path.join(outdir, str(logmass))
+                writemodelatmass(outdir, modeldir, logmass)
+                models = [sncosmo.Model(SALT3Source(modeldir=d)) for d in (modeldir, outdir)]
+                for model in models:
+                    model.set(z=0, t0=0, x0=1, x1=0, c=0)
+                expected = [-2.5 * np.log10(models[0].bandflux(band, 0) / models[1].bandflux(band, 0)) for band in BANDS]
+                plotted = deltamagnitudes(surfacesatmass(result, logmass)[0], average[0], wave)[:, peak]
+                np.testing.assert_allclose(plotted, expected, rtol=0, atol=1e-5)
+            plotfile = os.path.join(outdir, 'SALTmasscomp.pdf')
+            plotmasscorrection(plotfile, outdir, logmasses=[sn.hostlogmass for sn in self.datadict.values()])
+            self.assertGreater(os.path.getsize(plotfile), 0)
 
     def test_resume_reads_saved_correction(self):
         """Resuming reads the bases and corrections from the output, and starts at zero when they are not there."""

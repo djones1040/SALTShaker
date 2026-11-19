@@ -100,6 +100,7 @@ from saltshaker.training.masscorrection import (
 )
 
 from saltshaker.validation import ValidateParams, datadensity
+from saltshaker.validation.masscorrectionplots import plotmasscorrection
 from saltshaker.validation import ValidateLightcurves
 from saltshaker.validation import ValidateSpectra
 from saltshaker.validation import ValidateModel
@@ -1720,6 +1721,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
         Generated outputs include:
         - SALTmodelcomp.png : M0, M1 surface comparison with SALT2
         - SALTmodelerrcomp.pdf : Error surface comparison
+        - SALTmasscomp.pdf : Host-mass correction, with masscorrection_rank > 0
         - lcfits.pdf : Light curve fit residuals for all SNe
         - speccomp_*.pdf : Spectral comparison plots
         - saltparcomp.png : Parameter comparison (if fitsalt2=True)
@@ -1766,6 +1768,13 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
             SynPhotPlot.overPlotSynthPhotByComponent(
                 "{}/synthphotoverplot.pdf".format(outputdir), outputdir, "SDSS"
             )
+            if path.exists(path.join(outputdir, MASSCORRECTIONFILE)):
+                plotmasscorrection(
+                    f"{outputdir}/SALTmasscomp.pdf",
+                    outputdir,
+                    logmasses=[sn.hostlogmass for sn in datadict.values()],
+                    xlimits=[self.options.waverange[0], self.options.waverange[1]],
+                )
 
         snfiles_tot = np.array([])
         for j, snlist in enumerate(self.options.snlists.split(",")):
