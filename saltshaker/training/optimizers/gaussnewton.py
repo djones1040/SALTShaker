@@ -120,6 +120,7 @@ class gaussnewton(salttrainingoptimizer):
                     includePars[self.modelobj.im0]=True
                     includePars[self.modelobj.im1]=True
                     includePars[self.modelobj.imhost]=True
+                    includePars[self.modelobj.imasscorr.flatten()]=True
                     includePars[self.modelobj.ispcrcl]=True
                 elif 'pcaparams' == fit:
                     self.GN_iter[fit]=2
@@ -131,6 +132,7 @@ class gaussnewton(salttrainingoptimizer):
                     includePars[self.modelobj.im0]=True
                     includePars[self.modelobj.im1]=True
                     includePars[self.modelobj.imhost]=True
+                    includePars[self.modelobj.imasscorr.flatten()]=True
                 elif 'component0' in fit :
                     self.damping[fit]=1e-3
                     includePars[self.modelobj.im0]=True

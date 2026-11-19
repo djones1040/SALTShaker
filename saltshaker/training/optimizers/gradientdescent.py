@@ -202,6 +202,8 @@ class rpropwithbacktracking(salttrainingoptimizer):
         #The rest of the parameters are mostly dimensionless coeffs of O(1)
         for idx in [self.saltobj.iCL,self.saltobj.ispcrcl_coeffs,self.saltobj.iclscat,self.saltobj.imodelcorr]:
             learningrates[idx]=1e-2
+        # Host-mass corrections start at zero and are fractions of M0
+        learningrates[self.saltobj.imasscorr.flatten()]=1e-3
         learningrates[self.saltobj.isurverrfloor]=1e-2
         #Check that all parameters get an initial guess
         try:

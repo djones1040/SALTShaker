@@ -152,9 +152,10 @@ class SALTconstraints:
         bstdflux=(10**((self.m0guess-27.5)/-2.5) )
         bflux= self.__maximumlightpcderiv__ @ guess[self.im0]
         guess=guess.at[self.icomponents].set( guess[self.icomponents] *bstdflux/bflux) #*  -self.bstdflux
+        guess=guess.at[self.imasscorr].set(guess[self.imasscorr]*bstdflux/bflux)
         guess=guess.at[self.ix0].set(guess[self.ix0]*bflux/bstdflux)
-     
-        
+
+
         for i,comp in enumerate(self.icomponents[1:]):
             bflux=self.__maximumlightpcderiv__ @ guess[comp]
             ratio=bflux/bstdflux
@@ -162,6 +163,8 @@ class SALTconstraints:
             guess=guess.at[self.ix0].set(guess[self.ix0]*(1+ratio*guess[indices]))
             guess=guess.at[self.icoordinates].set( guess[self.icoordinates]/(1+ratio*guess[self.icoordinates[i][np.newaxis,:]]))
             guess=guess.at[comp].set(guess[comp]-  ratio * guess[self.im0])
+            if self.imasscorr.size:
+                guess=guess.at[self.imasscorr[i+1]].set(guess[self.imasscorr[i+1]]- ratio * guess[self.imasscorr[0]])
         return guess
 
     @constraint
@@ -259,6 +262,7 @@ class SALTconstraints:
                 X[ix0]*=(1+ratio*X[f'x1_{sn}'==self.parlist])
             X[self.ix1]/=1+ratio*X[self.ix1]
             X[self.im1]-=ratio*X[self.im0]
+            X[self.imasscorr[1]]-=ratio*X[self.imasscorr[0]]
         else:
             # we need to modify x1 and M_host to remove correlations
             # this causes problems for the errors, but can be used in conjunction with bootstrapping
@@ -287,6 +291,7 @@ class SALTconstraints:
         #Thus does not need to be recalculated for the last definition
         meanx1=np.mean(X[self.ix1])
         X[self.im0]+= meanx1*X[self.im1]
+        X[self.imasscorr[0]]+= meanx1*X[self.imasscorr[1]]
         X[self.ix1]-=meanx1
         if  (self.n_errorsurfaces>1):
             m0variance+=2*meanx1*m0m1covariance+meanx1**2*m1variance
@@ -299,6 +304,7 @@ class SALTconstraints:
         x1std = np.std(X[self.ix1])
         if x1std == x1std and x1std != 0.0:
             X[self.im1]*= x1std
+            X[self.imasscorr[1]]*= x1std
             X[self.ix1]/= x1std
         if (self.n_errorsurfaces>1):
             m1variance*=x1std**2
@@ -311,6 +317,7 @@ class SALTconstraints:
         fluxratio=self.bstdflux/m0Bflux
         X[self.im0]*=fluxratio
         X[self.im1]*= fluxratio
+        X[self.imasscorr]*= fluxratio
         if self.host_component: X[self.imhost]*= fluxratio
         X[self.ix0]/=fluxratio
         if (self.n_errorsurfaces>1):
@@ -374,6 +381,7 @@ class SALTconstraints:
 
         #apply the rotation to the parameters
         guess[self.icomponents[1:]]= rot @ guess[self.icomponents[1:]]
+        guess[self.imasscorr[1:]]= rot @ guess[self.imasscorr[1:]]
         guess[self.icoordinates]=rot @ guess[self.icoordinates]
         if self.n_errorsurfaces==3:
             m1var=guess[self.parlist == 'modelerr_1']**2
