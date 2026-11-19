@@ -11,7 +11,15 @@ so the correction at each knot is restricted to the subspace with zero B-band fl
 and no component along M1 or along the color law times M0. These conditions use fixed
 reference surfaces and apply to every component, so linear transformations of the
 components keep them.
+
+The model is linear in the knot weights, so the component surfaces at the knots, written
+to MASSCORRECTIONFILE with the training output, give the model at any host mass.
 """
+
+import os
+import re
+import shutil
+from collections import namedtuple
 
 import numpy as np
 from jax import numpy as jnp
@@ -19,6 +27,16 @@ from scipy.optimize import minimize
 from scipy.stats import norm
 
 from saltshaker.util.bsplinebasis import tensorbsplinebasis
+
+MASSCORRECTIONFILE = "salt3_masscorrection.npz"
+
+# Training output for the correction; population is the (mean, spread) of the sample's log
+# masses, and surfaces has shape (n_knots, n_components, n_phase, n_wave)
+masscorrectionresult = namedtuple(
+    "masscorrectionresult", ["knots", "population", "phasebasis", "wavebasis", "subspace", "surfaces"])
+
+# Files a SALT3 fitter reads from a model directory
+_MODELFILE = re.compile(r"^(SALT3\.INFO|salt3_(template_\d+|lc_\w+|color_\w+)\.dat)$")
 
 
 def massknotweights(logmass, logmasserr, knots):
@@ -74,27 +92,29 @@ def populationmassdistribution(logmasses, logmasserrs):
     return mean, np.exp(logspread)
 
 
-def sampleknotweights(logmasses, logmasserrs, knots):
+def posteriormass(logmass, logmasserr, popmean, popspread):
+    """Mean and spread of a host's log mass given its measurement and the population distribution."""
+    if not np.isfinite(logmass):
+        return popmean, popspread
+    if not logmasserr > 0:
+        return logmass, 0.0
+    postvar = 1 / (1 / logmasserr**2 + 1 / popspread**2)
+    return postvar * (logmass / logmasserr**2 + popmean / popspread**2), np.sqrt(postvar)
+
+
+def sampleknotweights(logmasses, logmasserrs, knots, population=None):
     """
     Mass-knot weights for each supernova, shape (n_sn, len(knots)).
 
     Each supernova's weights are averaged over its mass measurement combined with the
     population distribution, which leaves precise masses nearly unchanged and takes
-    imprecise or missing masses toward the population.
+    imprecise or missing masses toward the population. population is (mean, spread),
+    fit to the sample when not given.
     """
-    popmean, popspread = populationmassdistribution(logmasses, logmasserrs)
-    weights = []
-    for logmass, logmasserr in zip(logmasses, logmasserrs):
-        if not np.isfinite(logmass):
-            postmean, postspread = popmean, popspread
-        elif not logmasserr > 0:
-            postmean, postspread = logmass, 0.0
-        else:
-            postvar = 1 / (1 / logmasserr**2 + 1 / popspread**2)
-            postmean = postvar * (logmass / logmasserr**2 + popmean / popspread**2)
-            postspread = np.sqrt(postvar)
-        weights.append(massknotweights(postmean, postspread, knots))
-    return np.array(weights)
+    if population is None:
+        population = populationmassdistribution(logmasses, logmasserrs)
+    return np.array([massknotweights(*posteriormass(logmass, logmasserr, *population), knots)
+                     for logmass, logmasserr in zip(logmasses, logmasserrs)])
 
 
 def masscorrectionbases(coefficients, rank):
@@ -181,3 +201,45 @@ def masscorrection(weights, masscorr, phasebasis, wavebasis, subspace):
     atmass = jnp.tensordot(weights[1:], perknot, axes=([0], [1])) @ subspace.T
     return jnp.einsum("pr,crs,sw->cpw", phasebasis, atmass.reshape(-1, rank, rank),
                       wavebasis).reshape(masscorr.shape[0], -1)
+
+
+def writemasscorrection(outdir, result, phase, wave):
+    """Save a masscorrectionresult and the output grid to MASSCORRECTIONFILE in outdir."""
+    np.savez(os.path.join(outdir, MASSCORRECTIONFILE), phase=phase, wave=wave,
+             **{field: np.asarray(value) for field, value in result._asdict().items()})
+
+
+def readmasscorrection(modeldir):
+    """The masscorrectionresult saved in modeldir, with the output grid as (result, phase, wave)."""
+    with np.load(os.path.join(modeldir, MASSCORRECTIONFILE)) as saved:
+        result = masscorrectionresult(**{field: saved[field] for field in masscorrectionresult._fields})
+        return result, saved["phase"], saved["wave"]
+
+
+def surfacesatmass(result, logmass, logmasserr=0.0):
+    """
+    Component surfaces for a host of the given log mass, shape (n_components, n_phase, n_wave).
+
+    The knot weights combine the mass measurement with the training sample's mass
+    distribution, as in training; a NaN mass gives the population model.
+    """
+    weights = massknotweights(*posteriormass(logmass, logmasserr, *result.population), result.knots)
+    return np.tensordot(weights, result.surfaces, axes=1)
+
+
+def writemodelatmass(modeldir, outdir, logmass, logmasserr=0.0):
+    """
+    Write a standard SALT3 model directory for a host of the given log mass.
+
+    The templates are the trained model at that mass (see surfacesatmass); the other
+    model files are copied from modeldir unchanged.
+    """
+    result, phase, wave = readmasscorrection(modeldir)
+    os.makedirs(outdir, exist_ok=True)
+    for name in os.listdir(modeldir):
+        if _MODELFILE.match(name):
+            shutil.copy(os.path.join(modeldir, name), outdir)
+    grid = np.reshape(np.meshgrid(phase, wave, indexing="ij"), (2, -1)).T
+    for i, surface in enumerate(surfacesatmass(result, logmass, logmasserr)):
+        np.savetxt(os.path.join(outdir, f"salt3_template_{i}.dat"),
+                   np.column_stack([grid, surface.ravel()]), fmt=["%.1f", "%.2f", "%8.15e"])

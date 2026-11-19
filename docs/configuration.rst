@@ -171,7 +171,9 @@ Model Initialization
    * - ``resume_from_outputdir``
      - path
      - Resume training from a previous output directory. Uses saved parameters
-       as initial values.
+       as initial values. With ``masscorrection_rank`` > 0, the correction's bases
+       and subspace are read from the previous output, and the correction starts at zero if the
+       previous training did not have one.
    * - ``resume_from_gnhistory``
      - path
      - Resume from a ``gaussnewtonhistory.pickle`` file. Useful for recovering
@@ -722,6 +724,15 @@ Model Components
        phase and wavelength gradient regularizations apply to the correction at each
        knot as to the components. Cannot be combined with ``host_component``.
        Default: 0.
+
+       The output's ``salt3_template_*.dat`` files hold the uncorrected components,
+       which are the sample-average model.
+       ``salt3_masscorrection.npz`` holds the bases and subspace, the mass knots, the sample's
+       mass distribution and the component surfaces at each knot.
+       ``saltshaker.training.masscorrection.writemodelatmass(outputdir, newdir,
+       logmass, logmasserr)`` writes a standard SALT3 model directory for a given
+       host mass, which any SALT3 fitter can read, and the light-curve validation
+       plots compare each SN with the model at its host mass.
    * - ``masscorrection_knots``
      - float list
      - log10(M*/Msun) values at which the host-mass correction is defined; it is
