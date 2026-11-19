@@ -37,15 +37,15 @@ jobs:
         pip install -r requirements.txt
     - name: Check out the base branch
       run: git worktree add "$RUNNER_TEMP/base" ${{ github.event.pull_request.base.sha }}
-    # Both trainings read the base branch's example data and configs, so only the code differs
+    # Both trainings read the pull request's example data and configs, so only the code differs
     - name: Train with the base branch
-      working-directory: ${{ runner.temp }}/base/examples/saltshaker-latest-training
+      working-directory: ${{ github.workspace }}/examples/saltshaker-latest-training
       run: >
         PYTHONPATH="$RUNNER_TEMP/base" python "$RUNNER_TEMP/base/saltshaker/scripts/trainsalt"
         -c traingradient.conf --maxsn $MAXSN --gradientmaxiter $MAXITER --skip_validation
         --outputdir "$RUNNER_TEMP/output_base"
     - name: Train with the pull request
-      working-directory: ${{ runner.temp }}/base/examples/saltshaker-latest-training
+      working-directory: ${{ github.workspace }}/examples/saltshaker-latest-training
       run: >
         PYTHONPATH="$GITHUB_WORKSPACE" python "$GITHUB_WORKSPACE/saltshaker/scripts/trainsalt"
         -c traingradient.conf --maxsn $MAXSN --gradientmaxiter $MAXITER --skip_validation
