@@ -1,0 +1,65 @@
+# Trains a subset of the Pantheon+ example with the base branch and with the pull request,
+# on the same runner, and fails if any SN's parameters differ. Trainings on different
+# machines differ beyond the tolerances, so the reference is rebuilt on each run.
+
+name: Training regression
+
+on:
+  pull_request:
+    branches: [ "main" ]
+    paths-ignore: [ "docs/**", "**.md", "**.rst" ]
+
+concurrency:
+  group: regression-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  MAXSN: 100
+  MAXITER: 300
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v7
+      with:
+        python-version: "3.10"
+        cache: pip
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    - name: Check out the base branch
+      run: git worktree add "$RUNNER_TEMP/base" ${{ github.event.pull_request.base.sha }}
+    # Both trainings read the pull request's example data and configs, so only the code differs
+    - name: Train with the base branch
+      working-directory: ${{ github.workspace }}/examples/saltshaker-latest-training
+      run: >
+        PYTHONPATH="$RUNNER_TEMP/base" python "$RUNNER_TEMP/base/saltshaker/scripts/trainsalt"
+        -c traingradient.conf --maxsn $MAXSN --gradientmaxiter $MAXITER --skip_validation
+        --outputdir "$RUNNER_TEMP/output_base"
+    - name: Train with the pull request
+      working-directory: ${{ github.workspace }}/examples/saltshaker-latest-training
+      run: >
+        PYTHONPATH="$GITHUB_WORKSPACE" python "$GITHUB_WORKSPACE/saltshaker/scripts/trainsalt"
+        -c traingradient.conf --maxsn $MAXSN --gradientmaxiter $MAXITER --skip_validation
+        --outputdir "$RUNNER_TEMP/output_pr"
+    - name: Compare SN parameters
+      run: >
+        PYTHONPATH=. python -m saltshaker.validation.comparesnparams
+        "$RUNNER_TEMP/output_pr/salt3train_snparams.txt" "$RUNNER_TEMP/output_base/salt3train_snparams.txt"
+    - name: Upload the training outputs
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: regression-outputs
+        path: |
+          ${{ runner.temp }}/output_base
+          ${{ runner.temp }}/output_pr
+        if-no-files-found: ignore

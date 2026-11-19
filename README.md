@@ -125,6 +125,15 @@ We welcome contributions! Please:
 2. Submit pull requests for bug fixes and enhancements
 3. See the documentation for development setup
 
+Pull requests run the test suite and a training regression check, which trains about 100 SNe
+from the Pantheon+ example with the base branch and with the pull request on the same
+runner and fails if any SN's x0, x1, c or t0 differs beyond its tolerance. To compare two
+trainings yourself:
+
+```bash
+python -m saltshaker.validation.comparesnparams new/salt3train_snparams.txt old/salt3train_snparams.txt
+```
+
 ## License
 
 This project is licensed under the BSD License - see the LICENSE file for details.
