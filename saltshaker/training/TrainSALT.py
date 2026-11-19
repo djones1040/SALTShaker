@@ -1568,91 +1568,61 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
                     )
 
         # best-fit and simulated SN params
+        # (entry as listed, path) for every ASCII light-curve file, in list order
+        snfiles = []
+        for snlist in self.options.snlists.split(","):
+            snlist = os.path.expandvars(snlist)
+            if not os.path.exists(snlist):
+                log.warning(
+                    f"SN list file {snlist} does not exist. Checking {data_rootdir}/trainingdata/{snlist}"
+                )
+                snlist = f"{data_rootdir}/trainingdata/{snlist}"
+                if not os.path.exists(snlist):
+                    raise RuntimeError(f"SN list file {snlist} does not exist")
+            for l in np.atleast_1d(np.genfromtxt(snlist, dtype="str")):
+                if ".fits" not in l.lower():
+                    snfiles += [(l, l if "/" in l else f"{os.path.dirname(snlist)}/{l}")]
+
         with open(f"{outdir}/salt3train_snparams.txt", "w") as foutsn:
             print(
                 "# SN x0 x1 c t0 SIM_x0 SIM_x1 SIM_c SIM_t0 SALT2_x0 SALT2_x1 SALT2_c SALT2_t0",
                 file=foutsn,
             )
             # print('# SN x0 x1 c_i c_g t0 SIM_x0 SIM_x1 SIM_c SIM_t0 SALT2_x0 SALT2_x1 SALT2_c SALT2_t0',file=foutsn)
-            for snlist in self.options.snlists.split(","):
-                snlist = os.path.expandvars(snlist)
-                if not os.path.exists(snlist):
-                    log.warning(
-                        f"SN list file {snlist} does not exist. Checking {data_rootdir}/trainingdata/{snlist}"
-                    )
-                    snlist = f"{data_rootdir}/trainingdata/{snlist}"
-                    if not os.path.exists(snlist):
-                        raise RuntimeError(f"SN list file {snlist} does not exist")
-
-                snfiles = np.genfromtxt(snlist, dtype="str")
-                snfiles = np.atleast_1d(snfiles)
-
-                for k in trainingresult.snparams.keys():
-                    foundfile = False
-                    (
-                        SIM_x0,
-                        SIM_x1,
-                        SIM_c,
-                        SIM_PEAKMJD,
-                        salt2x0,
-                        salt2x1,
-                        salt2c,
-                        salt2t0,
-                    ) = (-99, -99, -99, -99, -99, -99, -99, -99)
-                    for l in snfiles:
-                        if ".fits" in l.lower():
-                            continue
-                        if str(k) not in l:
-                            continue
-                        foundfile = True
-                        if "/" not in l:
-                            l = f"{os.path.dirname(snlist)}/{l}"
-                        sn = snana.SuperNova(l)
-                        if str(k) != str(sn.SNID):
-                            continue
-
-                        sn.SNID = str(sn.SNID)
-                        if "SIM_SALT2x0" in sn.__dict__.keys():
-                            SIM_x0 = sn.SIM_SALT2x0
-                        else:
-                            SIM_x0 = -99
-                        if "SIM_SALT2x1" in sn.__dict__.keys():
-                            SIM_x1 = sn.SIM_SALT2x1
-                        else:
-                            SIM_x1 = -99
-                        if "SIM_SALT2c" in sn.__dict__.keys():
-                            SIM_c = sn.SIM_SALT2c
-                        else:
-                            SIM_c = -99
-                        if "SIM_PEAKMJD" in sn.__dict__.keys():
-                            SIM_PEAKMJD = float(sn.SIM_PEAKMJD.split()[0])
-                        else:
-                            SIM_PEAKMJD = -99
+            for k in trainingresult.snparams.keys():
+                # The first file with this SNID is the one the training read
+                sn = None
+                for entry, l in snfiles:
+                    if str(k) not in entry:
+                        continue
+                    candidate = snana.SuperNova(l)
+                    if str(k) == str(candidate.SNID):
+                        sn = candidate
                         break
-                    if not foundfile:
-                        (
-                            SIM_x0,
-                            SIM_x1,
-                            SIM_c,
-                            SIM_PEAKMJD,
-                            salt2x0,
-                            salt2x1,
-                            salt2c,
-                            salt2t0,
-                        ) = (-99, -99, -99, -99, -99, -99, -99, -99)
-                    elif self.options.fitsalt2:
-                        salt2x0, salt2x1, salt2c, salt2t0 = self.salt2fit(sn, datadict)
+
+                if sn is None:
+                    SIM_x0, SIM_x1, SIM_c, SIM_PEAKMJD = -99, -99, -99, -99
+                else:
+                    SIM_x0 = sn.__dict__.get("SIM_SALT2x0", -99)
+                    SIM_x1 = sn.__dict__.get("SIM_SALT2x1", -99)
+                    SIM_c = sn.__dict__.get("SIM_SALT2c", -99)
+                    if "SIM_PEAKMJD" in sn.__dict__.keys():
+                        SIM_PEAKMJD = float(sn.SIM_PEAKMJD.split()[0])
                     else:
-                        salt2x0, salt2x1, salt2c, salt2t0 = -99, -99, -99, -99
+                        SIM_PEAKMJD = -99
+                if sn is not None and self.options.fitsalt2:
+                    salt2x0, salt2x1, salt2c, salt2t0 = self.salt2fit(sn, datadict)
+                else:
+                    salt2x0, salt2x1, salt2c, salt2t0 = -99, -99, -99, -99
 
-                    if "t0" not in trainingresult.snparams[k].keys():
-                        trainingresult.snparams[k]["t0"] = 0.0
+                if "t0" not in trainingresult.snparams[k].keys():
+                    trainingresult.snparams[k]["t0"] = 0.0
 
-                    print(
-                        f"{k} {trainingresult.snparams[k]['x0']:8.10e} {trainingresult.snparams[k]['x1']:.10f} {trainingresult.snparams[k]['c'] if 'c' in trainingresult.snparams[k] else trainingresult.snparams[k]['c0']:.10f} {trainingresult.snparams[k]['t0']:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",
-                        file=foutsn,
-                    )
-                    # print(f"{k} {trainingresult.snparams[k]['x0']:8.10e} {trainingresult.snparams[k]['x1']:.10f} {trainingresult.snparams[k]['c'] if 'c' in trainingresult.snparams[k] else trainingresult.snparams[k]['c0']:.10f} {trainingresult.snparams[k]['c1']:.10f} {trainingresult.snparams[k]['t0']:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",file=foutsn)
+                print(
+                    f"{k} {trainingresult.snparams[k]['x0']:8.10e} {trainingresult.snparams[k]['x1']:.10f} {trainingresult.snparams[k]['c'] if 'c' in trainingresult.snparams[k] else trainingresult.snparams[k]['c0']:.10f} {trainingresult.snparams[k]['t0']:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",
+                    file=foutsn,
+                )
+                # print(f"{k} {trainingresult.snparams[k]['x0']:8.10e} {trainingresult.snparams[k]['x1']:.10f} {trainingresult.snparams[k]['c'] if 'c' in trainingresult.snparams[k] else trainingresult.snparams[k]['c0']:.10f} {trainingresult.snparams[k]['c1']:.10f} {trainingresult.snparams[k]['t0']:.10f} {SIM_x0:8.10e} {SIM_x1:.10f} {SIM_c:.10f} {SIM_PEAKMJD:.2f} {salt2x0:8.10e} {salt2x1:.10f} {salt2c:.10f} {salt2t0:.10f}",file=foutsn)
 
         keys = ["num_lightcurves", "num_spectra", "num_sne"]
         yamloutputdict = {key.upper(): getattr(trainingresult, key) for key in keys}

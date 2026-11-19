@@ -23,7 +23,7 @@ def readsnparams(filename):
     with open(filename) as fin:
         columns = fin.readline().lstrip("#").split()
     table = pd.read_csv(filename, sep=r"\s+", comment="#", names=columns, dtype={"SN": str})
-    # The training output can repeat rows
+    # Reference outputs can repeat each row once per SN list
     table = table.drop_duplicates()
     conflicting = table["SN"][table["SN"].duplicated()].unique()
     if conflicting.size:
