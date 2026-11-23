@@ -1,3 +1,5 @@
+import os
+import tempfile
 import unittest
 
 import jax
@@ -8,7 +10,8 @@ from scipy import integrate
 from saltshaker.training import saltresids
 from saltshaker.training.TrainSALT import _SALT2COLORLAW, RunTraining, TrainSALT
 from saltshaker.training.masscorrection import (
-    massknotweights, masscorrection, masscorrectionbases, masscorrectionsubspace, sampleknotweights)
+    MASSCORRECTIONFILE, massknotweights, masscorrection, masscorrectionbases, masscorrectionsubspace,
+    sampleknotweights, writemodelatmass)
 from saltshaker.util import readutils
 
 
@@ -82,35 +85,60 @@ class test_masscorrection_functions(unittest.TestCase):
 
 class test_masscorrection_training(unittest.TestCase):
 
-    @classmethod
-    def setUpClass(cls):
+    @staticmethod
+    def configuredtrainer(**options):
         salt = TrainSALT()
         RunTraining().get_config_options(salt, 'testdata/test.conf', [])
         salt.options.masscorrection_rank = 3
         salt.options.masscorrection_knots = [9.5, 10.5, 11.5]
-        datadict = readutils.rdAllData(
+        for name, value in options.items():
+            setattr(salt.options, name, value)
+        return salt
+
+    @classmethod
+    def setUpClass(cls):
+        salt = cls.configuredtrainer()
+        cls.datadict = readutils.rdAllData(
             'testdata/data/SALT3TRAIN_K21_CSPDR3/SALT3TRAIN_K21_CSPDR3.LIST', False, dospec=True,
             peakmjdlist='testdata/test_pkmjd.LIST', binspecres=None, snparlist='testdata/test_pars.LIST',
             maxsn=None, specrecallist='testdata/test_spcrl.LIST')
         salt.kcordict = readutils.rdkcor(['CSP'], salt.options)
-        x, config = salt.initialParameters(datadict)
-        cls.res = saltresids.SALTResids(datadict, salt.kcordict, config, salt.options)
+        x, config = salt.initialParameters(cls.datadict)
+        cls.salt, cls.config = salt, config
+        cls.res = saltresids.SALTResids(cls.datadict, salt.kcordict, config, salt.options)
         rng = np.random.default_rng(3)
         cls.xinit = np.asarray(x)
         cls.x = np.asarray(x).copy()
         cls.x[cls.res.imasscorr.flatten()] = rng.normal(scale=0.1, size=cls.res.imasscorr.size)
         cls.x[cls.res.ix1] = rng.normal(0.3, 1.5, size=cls.res.ix1.size)
 
+    def explicitlycorrected(self, sn):
+        """Parameters with sn's correction added to the components and the correction parameters zeroed"""
+        res = self.res
+        delta = np.asarray(masscorrection(res.massknotweights[sn], self.x[res.imasscorr],
+                                          res.masscorrphasebasis, res.masscorrwavebasis, res.masscorrsubspace))
+        explicit = self.x.copy()
+        explicit[res.imasscorr.flatten()] = 0
+        for i in range(res.n_components):
+            explicit[res.icomponents[i]] += delta[i]
+        return explicit
+
+    def writeoutput(self, outdir, result=None):
+        self.salt.options.yamloutputfile = os.path.join(outdir, 'output.yaml')
+        if result is None:
+            result = self.res.processoptimizedparametersforoutput(self.x, self.x)
+        self.salt.wrtoutput(outdir, result, None, None, self.datadict)
+
+    def resumedparameters(self, outdir, **options):
+        salt = self.configuredtrainer(resume_from_outputdir=outdir, **options)
+        salt.kcordict = self.salt.kcordict
+        return salt.initialParameters(self.datadict)
+
     def test_flux_matches_explicitly_corrected_components(self):
         """Light-curve and spectrum fluxes equal those of the uncorrected model with each SN's corrected components."""
         res = self.res
         for sn in ['2004ef', '2006et']:
-            delta = np.asarray(masscorrection(res.massknotweights[sn], self.x[res.imasscorr],
-                                              res.masscorrphasebasis, res.masscorrwavebasis, res.masscorrsubspace))
-            explicit = self.x.copy()
-            explicit[res.imasscorr.flatten()] = 0
-            for i in range(res.n_components):
-                explicit[res.icomponents[i]] += delta[i]
+            explicit = self.explicitlycorrected(sn)
             for data in list(res.datadict[sn].photdata.values()) + list(res.datadict[sn].specdata.values()):
                 np.testing.assert_allclose(data.modelflux(self.x), data.modelflux(explicit), rtol=1e-12, atol=0)
 
@@ -191,6 +219,53 @@ class test_masscorrection_training(unittest.TestCase):
             np.testing.assert_allclose(full[:ncomponents], base[:ncomponents], rtol=1e-12)
             np.testing.assert_array_equal(base[ncomponents:], 0)
             self.assertGreater(np.abs(full[ncomponents:]).max(), 0)
+
+    def test_output_gives_model_at_each_host_mass(self):
+        """The written correction rebuilds each SN's model as a standard SALT3 model directory."""
+        res = self.res
+        with tempfile.TemporaryDirectory() as outdir:
+            self.writeoutput(outdir)
+            for sn in ['2004ef', '2006et']:
+                modeldir = os.path.join(outdir, sn)
+                writemodelatmass(outdir, modeldir, self.datadict[sn].hostlogmass,
+                                 self.datadict[sn].hostlogmasserr)
+                expected = res.SALTModel(self.explicitlycorrected(sn), res.phaseout, res.waveout)
+                for i in range(res.n_components):
+                    phase, wave, flux = np.loadtxt(os.path.join(modeldir, f'salt3_template_{i}.dat'), unpack=True)
+                    np.testing.assert_allclose(flux, expected[i].ravel(), rtol=1e-10, atol=1e-12 * np.abs(expected[i]).max())
+                    np.testing.assert_array_equal(
+                        np.loadtxt(os.path.join(outdir, f'salt3_template_{i}.dat'), usecols=(0, 1)),
+                        np.column_stack([phase, wave]))
+            self.assertEqual(
+                sorted(os.listdir(modeldir)),
+                sorted(name for name in os.listdir(outdir)
+                       if name == 'SALT3.INFO' or name.startswith(('salt3_template', 'salt3_lc', 'salt3_color'))))
+
+    def test_resume_reads_saved_correction(self):
+        """Resuming reads the bases and corrections from the output, and starts at zero when they are not there."""
+        res = self.res
+        with tempfile.TemporaryDirectory() as outdir:
+            result = res.processoptimizedparametersforoutput(self.x, self.x)
+            # Bases unlike the initialization's, as from different initial templates
+            saved = result.masscorrection._replace(phasebasis=2 * result.masscorrection.phasebasis)
+            self.writeoutput(outdir, result._replace(masscorrection=saved))
+            guess, config = self.resumedparameters(outdir)
+            np.testing.assert_array_equal(config.masscorrphasebasis, saved.phasebasis)
+            # Parameters are written to 16 significant digits
+            np.testing.assert_allclose(guess[res.imasscorr], self.x[res.imasscorr], rtol=1e-14)
+            with self.assertRaises(ValueError):
+                self.resumedparameters(outdir, masscorrection_knots=[9.5, 10.5, 11.0])
+
+            os.remove(os.path.join(outdir, MASSCORRECTIONFILE))
+            for name in ['salt3_parameters.dat', 'salt3_parameters_unscaled.dat']:
+                with open(os.path.join(outdir, name)) as fin:
+                    lines = [line for line in fin if not line.startswith('masscorr')]
+                with open(os.path.join(outdir, name), 'w') as fout:
+                    fout.writelines(lines)
+            guess, config = self.resumedparameters(outdir)
+            np.testing.assert_array_equal(config.masscorrphasebasis, res.masscorrphasebasis)
+            np.testing.assert_array_equal(guess[res.imasscorr], 0)
+            np.testing.assert_allclose(guess[res.icomponents], self.x[res.icomponents], rtol=1e-14)
 
     def test_smoothness_prior(self):
         """masscorrsmooth vanishes for corrections linear in mass."""

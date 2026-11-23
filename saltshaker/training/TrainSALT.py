@@ -89,10 +89,14 @@ from saltshaker.training import saltresids
 from saltshaker.training import optimizers
 from saltshaker.training import colorlaw
 from saltshaker.training.masscorrection import (
+    MASSCORRECTIONFILE,
     bbandpeakfunctional,
     masscorrectionbases,
     masscorrectionreferences,
     masscorrectionsubspace,
+    readmasscorrection,
+    surfacesatmass,
+    writemasscorrection,
 )
 
 from saltshaker.validation import ValidateParams, datadensity
@@ -459,8 +463,8 @@ class TrainSALT(TrainSALTBase):
         )
         n_sn = len(datadict.keys())
 
-        # Bases for the host-mass correction come from the template initialization, so a
-        # resumed training reproduces them
+        # Bases for the host-mass correction come from the template initialization, or from
+        # the output being resumed, where the correction parameters were fit with them
         masscorrphasebasis, masscorrwavebasis, masscorrsubspace = None, None, None
         if self.options.masscorrection_rank:
             components = [m0knots.reshape(n_phaseknots, n_waveknots), m1knots.reshape(n_phaseknots, n_waveknots)]
@@ -478,6 +482,18 @@ class TrainSALT(TrainSALTBase):
                 masscorrphasebasis, masscorrwavebasis,
                 masscorrectionreferences(m0start, components[1], bbandpeak, _SALT2COLORLAW,
                                          waveknotloc, self.options.bsorder))
+            if self.options.resume_from_outputdir and path.exists(
+                    path.join(self.options.resume_from_outputdir, MASSCORRECTIONFILE)):
+                saved = readmasscorrection(self.options.resume_from_outputdir)[0]
+                if (not np.array_equal(saved.knots, np.asarray(self.options.masscorrection_knots, dtype=float))
+                        or saved.phasebasis.shape != masscorrphasebasis.shape
+                        or saved.wavebasis.shape != masscorrwavebasis.shape
+                        or saved.subspace.shape != masscorrsubspace.shape):
+                    raise ValueError(
+                        f"the host-mass correction in {self.options.resume_from_outputdir} has different "
+                        "masscorrection_knots, masscorrection_rank or spline knots")
+                masscorrphasebasis, masscorrwavebasis, masscorrsubspace = (
+                    saved.phasebasis, saved.wavebasis, saved.subspace)
 
         parlist = []
         # set up the list of parameters
@@ -628,6 +644,9 @@ class TrainSALT(TrainSALTBase):
                     data = pickle.load(fin)
                     pars = data[-1][0]
             for key in np.unique(parlist):
+                if key.startswith("masscorr") and key not in names:
+                    log.info(f"{key} is not in the previous training, so it starts at zero")
+                    continue
                 try:
                     guess[parlist == key] = pars[names == key]
                 except:
@@ -1360,6 +1379,7 @@ class TrainSALT(TrainSALTBase):
         - salt3_color_dispersion.dat : Color scatter model
         - salt3train_snparams.txt : Best-fit SN parameters
         - SALT3.INFO : Model metadata
+        - salt3_masscorrection.npz : Host-mass correction, with masscorrection_rank > 0
         """
         if not os.path.exists(outdir):
             raise RuntimeError("desired output directory %s doesn't exist" % outdir)
@@ -1380,6 +1400,9 @@ class TrainSALT(TrainSALTBase):
 
         np.save("{}/salt3_mcmcchain.npy".format(outdir), chain)
         np.save("{}/salt3_loglikes.npy".format(outdir), loglikes)
+        if trainingresult.masscorrection is not None:
+            writemasscorrection(outdir, trainingresult.masscorrection,
+                                trainingresult.phase, trainingresult.wave)
 
         # Handle nones when dataerrsurfaces is None by writing it with 0's
         if trainingresult.dataerrsurfaces is None:
@@ -1840,6 +1863,10 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
             saltdict["salt3m2flux"] = np.genfromtxt(
                 f"{outputdir}/salt3_template_2.dat", usecols=[2]
             ).reshape(salt3flux.shape)
+        # With the host-mass correction, each SN is compared with the model at its host mass
+        masscorr = None
+        if path.exists(path.join(outputdir, MASSCORRECTIONFILE)):
+            masscorr = readmasscorrection(outputdir)[0]
 
         for j, snlist in enumerate(self.options.snlists.split(",")):
             snlist = os.path.expandvars(snlist)
@@ -1967,6 +1994,14 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
                     snidval = int(sn.SNID)
                 else:
                     snidval = None
+                sndict = saltdict
+                if masscorr is not None:
+                    sndata = datadict.get(sn.SNID)
+                    surfaces = surfacesatmass(
+                        masscorr, *((np.nan, np.nan) if sndata is None
+                                    else (sndata.hostlogmass, sndata.hostlogmasserr)))
+                    sndict = {**saltdict, **dict(zip(
+                        ["salt3flux", "salt3m1flux", "salt3m2flux"], surfaces))}
                 comparisonchi2, salt3chi2 = ValidateLightcurves.customfilt(
                     f"{outputdir}/lccomp_{sn.SNID}.png",
                     l,
@@ -1985,7 +2020,7 @@ Salt2ExtinctionLaw.max_lambda {self.options.colorwaverange[1]:.0f}""",
                     ax3=ax3,
                     ax4=ax4,
                     ax5=ax5,
-                    saltdict=saltdict,
+                    saltdict=sndict,
                     snid=snidval,
                     modelsource=comparisonsource,
                 )
