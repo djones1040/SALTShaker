@@ -278,6 +278,7 @@ class rpropwithbacktracking(salttrainingoptimizer):
         
         X, Xprev,loss,sign= initvals,initvals, np.inf,np.zeros(initvals.size)
         rates=jnp.array(rates)
+        lasttrial,trialrequested=-np.inf,False
 
         def iteration(X, Xprev,loss,sign,rates):
             #Proposes a new value based on sign of gradient
@@ -303,11 +304,12 @@ class rpropwithbacktracking(salttrainingoptimizer):
             return Xnew, X, newloss,newsign, newgrad,newrates
             
         for i in range(niter):
-            if i%20 == 19:
+            if i%20 == 19 or trialrequested:
                 trials=[( reinitialized,*iteration(X, Xprev,loss,sign, rateguess)) for reinitialized,rateguess in [(False,rates), (True,iFit*self.initializelearningrates(X)*1e-2)]]
                 log.debug('Experimenting with reinitialization')                
                 reinitialized,X,Xprev,loss,sign,grad,rates = min(trials,key=lambda x: self.lossfunction(x[1],**kwargs) )
                 if reinitialized: log.debug('Reinitialized learning rates')
+                lasttrial,trialrequested=i,False
             else:
                 X,Xprev,loss,sign,grad,rates = iteration(X, Xprev,loss,sign,rates)
                 
@@ -320,10 +322,11 @@ class rpropwithbacktracking(salttrainingoptimizer):
             if i==0:
                 log.debug(f'First iteration took {time.time()-starttime:1f} seconds')
             else:
+                noprogress=False
                 if len(self.losshistory)> numconvergence+10:
                     convergencecriterion= np.abs(self.losshistory[-numconvergence] - loss)
-                    if np.isnan(loss) or np.all( np.array(self.losshistory[-numconvergence*2+1:]) > self.losshistory[-numconvergence*2] ):
-                    
+                    noprogress= np.isnan(loss) or np.all( np.array(self.losshistory[-numconvergence*2+1:]) > self.losshistory[-numconvergence*2] )
+                    if noprogress:
                         convergencecriterion=0
                 else:
                     convergencecriterion=np.inf
@@ -337,10 +340,17 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 log.debug(outtext)
                 
                 if i> numconvergence+100:
-                    if np.all(convergencecriterion< self.convergencetolerance):
+                    # Collapsed learning rates also stop the loss changing, so a small change only
+                    # counts once its window includes the step taken after a reinitialization trial
+                    stalled= convergencecriterion< self.convergencetolerance
+                    sincetrial= i-lasttrial
+                    if noprogress or (stalled and 0<sincetrial<numconvergence):
                         sys.stdout.write('\n')
                         log.info('Convergence achieved')
                         break
+                    trialrequested= stalled and sincetrial>=numconvergence
+                    if trialrequested:
+                        log.debug('Loss change below tolerance; trying reinitialized learning rates before accepting convergence')
 
             if in_ipynb:
                 if i==0: continue
