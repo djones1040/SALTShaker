@@ -16,7 +16,7 @@ class SALTShakerTest(TestCommand):
 
 AUTHOR = "David Jones, D'Arcy Kenworthy, Rick Kessler"
 AUTHOR_EMAIL = 'dojones@hawaii.edu'
-VERSION = '1.5'
+VERSION = '1.6'
 LICENSE = 'BSD'
 URL = 'saltshaker.readthedocs.org'
 
