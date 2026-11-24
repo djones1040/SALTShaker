@@ -325,8 +325,8 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 noprogress=False
                 if len(self.losshistory)> numconvergence+10:
                     convergencecriterion= np.abs(self.losshistory[-numconvergence] - loss)
-                    noprogress= np.isnan(loss) or np.all( np.array(self.losshistory[-numconvergence*2+1:]) > self.losshistory[-numconvergence*2] )
-                    if noprogress:
+                    noprogress= np.all( np.array(self.losshistory[-numconvergence*2+1:]) > self.losshistory[-numconvergence*2] )
+                    if np.isnan(loss) or noprogress:
                         convergencecriterion=0
                 else:
                     convergencecriterion=np.inf
@@ -340,17 +340,18 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 log.debug(outtext)
                 
                 if i> numconvergence+100:
-                    # Collapsed learning rates also stop the loss changing, so a small change only
-                    # counts once its window includes the step taken after a reinitialization trial
+                    # Collapsed learning rates also stall the loss, so a stall only counts once the
+                    # losses it compares include the step taken after a reinitialization trial
                     stalled= convergencecriterion< self.convergencetolerance
+                    window= 2*numconvergence if noprogress else numconvergence
                     sincetrial= i-lasttrial
-                    if noprogress or (stalled and 0<sincetrial<numconvergence):
+                    if np.isnan(loss) or (stalled and 0<sincetrial<window):
                         sys.stdout.write('\n')
                         log.info('Convergence achieved')
                         break
-                    trialrequested= stalled and sincetrial>=numconvergence
+                    trialrequested= stalled and sincetrial>=window
                     if trialrequested:
-                        log.debug('Loss change below tolerance; trying reinitialized learning rates before accepting convergence')
+                        log.debug('Loss stalled; trying reinitialized learning rates before accepting convergence')
 
             if in_ipynb:
                 if i==0: continue

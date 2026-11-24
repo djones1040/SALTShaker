@@ -21,8 +21,26 @@ class shrinkinglinesearch(rpropwithbacktracking):
         return (loss, 2 * X) if diff == 'valueandgrad' else loss
 
 
-def makeoptimizer(npar):
-    optimizer = shrinkinglinesearch.__new__(shrinkinglinesearch)
+class risingloss(rpropwithbacktracking):
+    """rprop whose rates collapse within an iteration of each reinitialization, on a loss that rises with each gradient evaluation."""
+    gradientevals = 0
+
+    def twowaybacktracking(self, *args, **kwargs):
+        return 0.01
+
+    def initializelearningrates(self, X):
+        self.trialiterations.append(len(self.losshistory))
+        return np.full(X.size, 300.)
+
+    def lossfunction(self, X, diff=None, **kwargs):
+        if diff == 'valueandgrad':
+            self.gradientevals += 1
+        loss = jnp.sum(X**2) + 3e-3 * self.gradientevals
+        return (loss, 2 * X) if diff == 'valueandgrad' else loss
+
+
+def makeoptimizer(cls, npar):
+    optimizer = cls.__new__(cls)
     optimizer.saltobj = SimpleNamespace(ic=np.array([], dtype=int), icoordinates=np.array([], dtype=int))
     optimizer.ifixedparams = np.zeros(npar, dtype=bool)
     optimizer.Xbounds = np.tile(-np.inf, npar), np.tile(np.inf, npar)
@@ -37,15 +55,25 @@ def makeoptimizer(npar):
 
 class test_rprop_convergence(unittest.TestCase):
 
-    def test_collapsed_rates_not_converged(self):
-        """A loss stalled by collapsed learning rates is not reported converged while reinitialized rates still reduce it."""
-        npar = 3
-        optimizer = makeoptimizer(npar)
+    def optimize(self, optimizer, start):
         with self.assertLogs('saltshaker.training.optimizers.gradientdescent', 'INFO') as logs:
             X, loss, rates = optimizer.optimizeparams(
-                np.ones(npar), np.ones(npar, dtype=bool), np.ones(npar), niter=2000)
+                start, np.ones(start.size, dtype=bool), np.ones(start.size), niter=2000)
         self.assertIn('Convergence achieved', logs.output[-1])
+        return X, loss
+
+    def test_collapsed_rates_not_converged(self):
+        """A loss stalled by collapsed learning rates is not reported converged while reinitialized rates still reduce it."""
+        X, loss = self.optimize(makeoptimizer(shrinkinglinesearch, 3), np.ones(3))
         self.assertLess(loss, 1e-2)
+
+    def test_no_improvement_waits_for_trial_step(self):
+        """A loss rising under collapsed rates is not reported converged on a trial iteration, before that trial's step is in the loss history."""
+        optimizer = makeoptimizer(risingloss, 3)
+        optimizer.trialiterations = []
+        X, loss = self.optimize(optimizer, np.full(3, 0.7))
+        self.assertNotIn(len(optimizer.losshistory) - 1, optimizer.trialiterations)
+        np.testing.assert_array_less(X, 0.4)
 
 
 if __name__ == '__main__':
