@@ -202,7 +202,7 @@ Validation Options
    * - ``validation_plots``
      - str
      - Comma-separated validation plots to write: any of ``modelsummary`` (model surfaces, synthetic
-       photometry, parameter and data density plots), ``lcresiduals`` (``lcfits.pdf``) and
+       photometry, parameter and data density plots, and the host-mass correction), ``lcresiduals`` (``lcfits.pdf``) and
        ``specresiduals`` (``speccomp_*.pdf``), or ``all`` or ``none``. Default: all.
    * - ``use_previous_errors``
      - bool
@@ -732,7 +732,10 @@ Model Components
        ``saltshaker.training.masscorrection.writemodelatmass(outputdir, newdir,
        logmass, logmasserr)`` writes a standard SALT3 model directory for a given
        host mass, which any SALT3 fitter can read, and the light-curve validation
-       plots compare each SN with the model at its host mass.
+       plots compare each SN with the model at its host mass. The model-summary
+       validation plots include ``SALTmasscomp.pdf``, which shows the sample's host
+       masses with the knots, the change in rest-frame UBVRI magnitudes with host mass
+       and phase, and the change in M0 and M1 at each knot.
    * - ``masscorrection_knots``
      - float list
      - log10(M*/Msun) values at which the host-mass correction is defined; it is
