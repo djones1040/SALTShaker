@@ -463,7 +463,8 @@ gradient-based method. Set ``optimizer = rpropwithbacktracking`` in
    * - ``convergencetolerance``
      - float
      - Convergence threshold. Optimization terminates when the change in loss
-       is consistently below this value. Must be greater than 0.
+       is consistently below this value, including over a step taken with
+       reinitialized learning rates. Must be greater than 0.
    * - ``memorydebug``
      - bool
      - Enable JAX memory profiling. Writes memory profiles to the output
