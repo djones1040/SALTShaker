@@ -39,6 +39,23 @@ class risingloss(rpropwithbacktracking):
         return (loss, 2 * X) if diff == 'valueandgrad' else loss
 
 
+class stalledbeforetrial(rpropwithbacktracking):
+    """rprop on a slowly rising loss whose line search fails in the 19 iterations before the trial at iteration 139."""
+    gradientevals = 0
+
+    def twowaybacktracking(self, *args, **kwargs):
+        return 0.01 if 120 <= len(self.losshistory) < 139 else 1.
+
+    def initializelearningrates(self, X):
+        return np.ones(X.size)
+
+    def lossfunction(self, X, diff=None, **kwargs):
+        if diff == 'valueandgrad':
+            self.gradientevals += 1
+        loss = jnp.sum(jnp.abs(X)) + 1e-2 * self.gradientevals
+        return (loss, jnp.sign(X)) if diff == 'valueandgrad' else loss
+
+
 def makeoptimizer(cls, npar):
     optimizer = cls.__new__(cls)
     optimizer.saltobj = SimpleNamespace(ic=np.array([], dtype=int), icoordinates=np.array([], dtype=int))
@@ -74,6 +91,17 @@ class test_rprop_convergence(unittest.TestCase):
         X, loss = self.optimize(optimizer, np.full(3, 0.7))
         self.assertNotIn(len(optimizer.losshistory) - 1, optimizer.trialiterations)
         np.testing.assert_array_less(X, 0.4)
+
+    def test_no_improvement_waits_for_trial_progress(self):
+        """A trial whose first step lowers the loss, but not below the start of the no-improvement window, gets further steps before the fit is reported converged."""
+        optimizer = makeoptimizer(stalledbeforetrial, 3)
+        optimizer.maxlearning = 0.05
+        X, loss = self.optimize(optimizer, np.full(3, 10.))
+        np.testing.assert_array_less(np.abs(X), 1)
+        losses = optimizer.losshistory
+        # Iteration 140 holds the trial's first step; its window starts at iteration 121
+        self.assertLess(losses[140], losses[139])
+        self.assertGreater(losses[140], losses[121])
 
 
 if __name__ == '__main__':

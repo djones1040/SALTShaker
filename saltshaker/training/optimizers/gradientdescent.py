@@ -340,16 +340,18 @@ class rpropwithbacktracking(salttrainingoptimizer):
                 log.debug(outtext)
                 
                 if i> numconvergence+100:
-                    # Collapsed learning rates also stall the loss, so a stall only counts once the
-                    # losses it compares include the step taken after a reinitialization trial
-                    stalled= convergencecriterion< self.convergencetolerance
-                    window= 2*numconvergence if noprogress else numconvergence
+                    # Collapsed learning rates also stall the loss. A loss within tolerance counts only once
+                    # the losses it compares include the step after a reinitialization trial, and a lack of
+                    # improvement only once that trial has had numconvergence iterations to make progress
                     sincetrial= i-lasttrial
-                    if np.isnan(loss) or (stalled and 0<sincetrial<window):
+                    stalled= np.abs(self.losshistory[-numconvergence] - loss)< self.convergencetolerance
+                    withintolerance= stalled and 0<sincetrial<numconvergence
+                    noimprovement= noprogress and numconvergence<=sincetrial<2*numconvergence
+                    if np.isnan(loss) or withintolerance or noimprovement:
                         sys.stdout.write('\n')
                         log.info('Convergence achieved')
                         break
-                    trialrequested= stalled and sincetrial>=window
+                    trialrequested= (stalled and sincetrial>=numconvergence) or (noprogress and sincetrial>=2*numconvergence)
                     if trialrequested:
                         log.debug('Loss stalled; trying reinitialized learning rates before accepting convergence')
 
