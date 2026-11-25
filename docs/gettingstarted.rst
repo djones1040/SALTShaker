@@ -21,8 +21,12 @@ in :ref:`configuration`), run::
 
   trainsalt -c traingradient_masscorrection.conf
 
-This reads host masses from `SALT3_PARS_INIT_PP_MASS.LIST`, which copies the masses in the
-light-curve headers except the placeholders 2.0 +- 2.0 (18 DES SNe), 6.0 +- 0.1 (9 Foundation
-SNe) and 6.0 +- 1.0 (4 PS1 SNe), which it lists as -9, or missing. SNe without a mass follow the
-sample's mass distribution. The training writes to `output_masscorrection/` and makes only the
-model-summary validation plots, including `SALTmasscomp.pdf`.
+This reads host masses from `SALT3_PARS_INIT_PP_MASS.LIST`, which takes them from the
+Pantheon+ distance table (`Pantheon+SH0ES.dat` in the Pantheon+ data release) and, for SNe not
+in that table, from the light-curve headers; 1001 of its 1145 SNe have a mass. Values that mark
+a host without a measurement are listed as -9, or missing: masses of 7.0 or less (the Pantheon+
+floor of 7.0 and the header placeholders 2.0 and 6.0), uncertainties of 5 dex or more, and 10.0
+without an uncertainty. Pantheon+ caps masses at 11.5, the highest default knot, and gives no
+uncertainty for 65 of the masses, which the training then treats as exact. SNe without a mass
+follow the sample's mass distribution. The training writes to `output_masscorrection/` and
+makes only the model-summary validation plots, including `SALTmasscomp.pdf`.
